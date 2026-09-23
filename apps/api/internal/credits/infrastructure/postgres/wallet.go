@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
@@ -53,27 +52,6 @@ FROM create_credit_wallet_restriction($1, $2, $3, $4, $5, $6, $7, $8)`,
 func ReleaseWallet(ctx context.Context, tx pgx.Tx, command ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error) {
 	var result ports.WalletRestrictionChange
 	err := tx.QueryRow(ctx, `
-SELECT restriction_id, replayed
-FROM release_credit_wallet_restriction($1, $2, $3, $4)`,
-		command.RestrictionID, command.Actor.Type, command.Actor.ID, command.Reason,
-	).Scan(&result.RestrictionID, &result.Replayed)
-	return result, err
-}
-
-func SQLRestrictWallet(ctx context.Context, tx *sql.Tx, command ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error) {
-	var result ports.WalletRestrictionChange
-	err := tx.QueryRowContext(ctx, `
-SELECT restriction_id, replayed
-FROM create_credit_wallet_restriction($1, $2, $3, $4, $5, $6, $7, $8)`,
-		command.UserID, command.Type, command.Source, command.RelatedObject.Type,
-		command.RelatedObject.ID, command.Reason, command.Actor.Type, command.Actor.ID,
-	).Scan(&result.RestrictionID, &result.Replayed)
-	return result, err
-}
-
-func SQLReleaseWallet(ctx context.Context, tx *sql.Tx, command ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error) {
-	var result ports.WalletRestrictionChange
-	err := tx.QueryRowContext(ctx, `
 SELECT restriction_id, replayed
 FROM release_credit_wallet_restriction($1, $2, $3, $4)`,
 		command.RestrictionID, command.Actor.Type, command.Actor.ID, command.Reason,

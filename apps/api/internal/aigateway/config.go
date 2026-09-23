@@ -163,11 +163,20 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 	baseURL = strings.TrimRight(strings.TrimSpace(input.BaseURL), "/")
 	accountID = strings.ToLower(strings.TrimSpace(input.AccountID))
 	gatewayID = strings.ToLower(strings.TrimSpace(input.GatewayID))
+	if accountID != "" && !gatewayAccountIDPattern.MatchString(accountID) {
+		return "", "", "", "", false, errors.New("网关 account id 必须是 32 位小写十六进制")
+	}
+	if gatewayID != "" && !gatewayIDPattern.MatchString(gatewayID) {
+		return "", "", "", "", false, errors.New("网关 id 仅允许小写字母、数字与连字符")
+	}
 
 	if baseURL != "" {
 		parsed, err := url.Parse(baseURL)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
 			return "", "", "", "", false, errors.New("网关 Base URL 必须是合法的 http 或 https 地址")
+		}
+		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return "", "", "", "", false, errors.New("网关 Base URL 不得包含凭据、query 或 fragment")
 		}
 		parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
 		if len(parts) >= 3 && parts[0] == "v1" {
@@ -217,7 +226,10 @@ func (r *ConfigRepository) Update(ctx context.Context, input UpdateInput, actorI
 	}
 	if strings.TrimSpace(input.BaseURL) == "" {
 		stored, err := r.GetSummary(ctx)
-		if err == nil && strings.TrimSpace(stored.BaseURL) != "" {
+		if err != nil {
+			return fmt.Errorf("load existing AI gateway config: %w", err)
+		}
+		if strings.TrimSpace(stored.BaseURL) != "" {
 			input.BaseURL = stored.BaseURL
 		}
 	}

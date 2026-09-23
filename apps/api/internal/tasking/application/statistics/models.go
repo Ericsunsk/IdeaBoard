@@ -55,10 +55,11 @@ type AdminStatisticsSummary struct {
 }
 
 type AdminStatisticsTrendItem struct {
-	Date     string                          `json:"date"`
-	Label    string                          `json:"label"`
-	Total    int64                           `json:"total"`
-	Segments []AdminStatisticsTrendItemModel `json:"segments"`
+	Date            string                          `json:"date"`
+	Label           string                          `json:"label"`
+	Total           int64                           `json:"total"`
+	CapturedCredits int64                           `json:"captured_credits"`
+	Segments        []AdminStatisticsTrendItemModel `json:"segments"`
 }
 
 type AdminStatisticsTrendItemModel struct {

@@ -2,11 +2,11 @@ package checkout
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/platform/database"
 	"strconv"
 	"strings"
 	"time"
@@ -212,7 +212,7 @@ func (s *Service) EnsureCustomer(ctx context.Context, configuration paymentconfi
 	if err == nil && stored.StripeCustomerID != "" {
 		return stored, nil
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !database.IsNotFound(err) {
 		return PaymentCustomer{}, fmt.Errorf("get payment customer: %w", err)
 	}
 	created, err := s.gateway.CreateCustomer(ctx, paymentports.CreateCheckoutCustomerInput{APIKey: apiKey, UserID: order.UserID, IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + string(configuration.Mode) + "-" + strconv.FormatInt(order.UserID, 10)})
@@ -291,7 +291,7 @@ func validateCreatedCheckoutSession(order paymentsdomain.PaymentOrder, customer 
 
 func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID string) error {
 	shutdown, err := s.configuration.GetPaymentCheckoutShutdown(ctx, shutdownID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return nil
 	}
 	if err != nil || shutdown.CompletedAt != nil {
@@ -338,7 +338,7 @@ func (s *Service) shutdownAPIKey(ctx context.Context, shutdown paymentconfigurat
 func (s *Service) processCheckoutShutdownOrder(ctx context.Context, shutdown paymentconfiguration.PaymentCheckoutShutdown, apiKey string, order paymentsdomain.PaymentOrder) error {
 	return s.store.WithUserCheckoutLock(ctx, order.UserID, func(c context.Context) error {
 		current, err := s.store.GetPaymentOrderByID(c, order.ID)
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return nil
 		}
 		if err != nil {

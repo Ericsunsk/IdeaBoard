@@ -2,16 +2,14 @@ package queue
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"strings"
 	"sync"
 
 	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
@@ -69,19 +67,18 @@ func (e *TransactionalEnqueuer) EnqueueTx(ctx context.Context, tx pgx.Tx, task *
 }
 
 type RiverQueue struct {
-	mu               sync.RWMutex
-	client           riverClient
-	db               *sql.DB
-	accountLoadStore taskqueueports.AccountLoadStore
-	queueName        string
-	maxRetry         int
+	mu        sync.RWMutex
+	client    riverClient
+	db        *pgxpool.Pool
+	queueName string
+	maxRetry  int
 }
 
-func NewRiverQueue(client *river.Client[pgx.Tx], db *sql.DB, accountLoadStore taskqueueports.AccountLoadStore, maxRetry int) *RiverQueue {
-	return NewRiverQueueWithClient(client, db, accountLoadStore, RiverQueueDefault, maxRetry)
+func NewRiverQueue(client *river.Client[pgx.Tx], db *pgxpool.Pool, maxRetry int) *RiverQueue {
+	return NewRiverQueueWithClient(client, db, RiverQueueDefault, maxRetry)
 }
 
-func NewRiverQueueWithClient(client riverClient, db *sql.DB, accountLoadStore taskqueueports.AccountLoadStore, queueName string, maxRetry int) *RiverQueue {
+func NewRiverQueueWithClient(client riverClient, db *pgxpool.Pool, queueName string, maxRetry int) *RiverQueue {
 	if strings.TrimSpace(queueName) == "" {
 		queueName = RiverQueueDefault
 	}
@@ -89,11 +86,10 @@ func NewRiverQueueWithClient(client riverClient, db *sql.DB, accountLoadStore ta
 		maxRetry = RiverMaxAttemptsDefault
 	}
 	return &RiverQueue{
-		client:           client,
-		db:               db,
-		accountLoadStore: accountLoadStore,
-		queueName:        queueName,
-		maxRetry:         maxRetry,
+		client:    client,
+		db:        db,
+		queueName: queueName,
+		maxRetry:  maxRetry,
 	}
 }
 
@@ -198,49 +194,83 @@ func (q *RiverQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 	return global, 0, nil
 }
 
-func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*tasks.MonitorInfo, error) {
+func (q *RiverQueue) GetMonitorInfo(ctx context.Context) (*tasks.MonitorInfo, error) {
 	global, wait, err := q.QueueLengths(ctx)
 	if err != nil {
 		return nil, err
 	}
-	running, err := q.countActiveTaskLeases(ctx)
+	running, err := q.countRunningExecutionAttempts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("river monitor info active leases: %w", err)
-	}
-	loads := map[int64]*tasks.AccountLoad{}
-	if q != nil && q.accountLoadStore != nil {
-		loads, err = q.accountLoadStore.GetAccountLoadInfo(ctx, accountIDs)
-		if err != nil {
-			return nil, fmt.Errorf("river monitor info account loads: %w", err)
-		}
+		return nil, fmt.Errorf("river monitor info running attempts: %w", err)
 	}
 	return &tasks.MonitorInfo{
 		GlobalQueueLen:  global,
 		WaitQueueLen:    wait,
 		RunningAttempts: running,
-		AccountLoads:    loads,
 	}, nil
 }
 
 func (q *RiverQueue) countQueuedRiverJobs(ctx context.Context) (int64, error) {
 	var count int64
-	err := q.db.QueryRowContext(ctx, `
+	err := q.db.QueryRow(ctx, `
 SELECT COUNT(*)
 FROM river_job
 WHERE queue = $1
-  AND state = ANY($2::river_job_state[])`, q.queueName, pq.Array(queuedRiverJobStateValues())).Scan(&count)
+  AND state = ANY($2::river_job_state[])`, q.queueName, queuedRiverJobStateValues()).Scan(&count)
 	return count, err
 }
 
-func (q *RiverQueue) countActiveTaskLeases(ctx context.Context) (int64, error) {
+// QueueStats returns the River queue depth (waiting jobs) and head lag
+// (age of the oldest waiting job in seconds) for the RED metrics set and
+// the admin monitor. ctx comes first per repository rules; callers polling
+// for metrics must bound it with a short timeout.
+func (q *RiverQueue) QueueStats(ctx context.Context) (depth int64, lagSeconds float64, err error) {
+	if q == nil {
+		return 0, 0, nil
+	}
+	return q.QueueStatsFor(ctx, q.queueName)
+}
+
+// QueueStatsFor reports depth/lag for an explicit queue through this
+// monitor's database handle. The multi-queue RED refresher fans one
+// RiverQueue out to every known queue so each queue gets its own
+// ideaboard_river_queue_depth/_lag_seconds series (see RiverRetryMatrix for
+// the queue inventory). An empty queue name is a caller bug and fails fast
+// so the refresher logs it instead of publishing under a wrong label.
+func (q *RiverQueue) QueueStatsFor(ctx context.Context, queue string) (depth int64, lagSeconds float64, err error) {
+	if q == nil || q.db == nil {
+		return 0, 0, nil
+	}
+	if strings.TrimSpace(queue) == "" {
+		return 0, 0, fmt.Errorf("river queue stats: queue name is empty")
+	}
+	err = q.db.QueryRow(ctx, `
+SELECT COUNT(*),
+       COALESCE(EXTRACT(EPOCH FROM (now() - MIN(created_at)))::float8, 0)
+FROM river_job
+WHERE queue = $1
+  AND state = ANY($2::river_job_state[])`, queue, queuedRiverJobStateValues()).Scan(&depth, &lagSeconds)
+	if err != nil {
+		return 0, 0, fmt.Errorf("river queue stats: %w", err)
+	}
+	if depth < 0 {
+		depth = 0
+	}
+	if lagSeconds < 0 {
+		lagSeconds = 0
+	}
+	return depth, lagSeconds, nil
+}
+
+func (q *RiverQueue) countRunningExecutionAttempts(ctx context.Context) (int64, error) {
 	if q == nil || q.db == nil {
 		return 0, nil
 	}
 	var count int64
-	err := q.db.QueryRowContext(ctx, `
+	err := q.db.QueryRow(ctx, `
 SELECT COUNT(*)
-FROM task_leases
-WHERE released_at IS NULL`).Scan(&count)
+FROM task_execution_attempts
+WHERE status = 'running'`).Scan(&count)
 	return count, err
 }
 

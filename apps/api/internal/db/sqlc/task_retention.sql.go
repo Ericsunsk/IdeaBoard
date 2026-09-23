@@ -7,8 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const deleteExpiredTaskCancellations = `-- name: DeleteExpiredTaskCancellations :execrows
@@ -18,15 +18,22 @@ WHERE task_id IN (
   FROM tasks
   WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
     AND COALESCE(completed_at, cancelled_at, updated_at) < $1
+  ORDER BY COALESCE(completed_at, cancelled_at, updated_at)
+  LIMIT $2
 )
 `
 
-func (q *Queries) DeleteExpiredTaskCancellations(ctx context.Context, cutoff sql.NullTime) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteExpiredTaskCancellations, cutoff)
+type DeleteExpiredTaskCancellationsParams struct {
+	Cutoff    pgtype.Timestamptz `json:"cutoff"`
+	BatchSize int32              `json:"batch_size"`
+}
+
+func (q *Queries) DeleteExpiredTaskCancellations(ctx context.Context, arg DeleteExpiredTaskCancellationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredTaskCancellations, arg.Cutoff, arg.BatchSize)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const deleteExpiredTasks = `-- name: DeleteExpiredTasks :execrows
@@ -42,16 +49,16 @@ WHERE task_id IN (
 `
 
 type DeleteExpiredTasksParams struct {
-	Cutoff    sql.NullTime `json:"cutoff"`
-	BatchSize int32        `json:"batch_size"`
+	Cutoff    pgtype.Timestamptz `json:"cutoff"`
+	BatchSize int32              `json:"batch_size"`
 }
 
 func (q *Queries) DeleteExpiredTasks(ctx context.Context, arg DeleteExpiredTasksParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteExpiredTasks, arg.Cutoff, arg.BatchSize)
+	result, err := q.db.Exec(ctx, deleteExpiredTasks, arg.Cutoff, arg.BatchSize)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const listExpiredTerminalTaskDates = `-- name: ListExpiredTerminalTaskDates :many
@@ -61,7 +68,13 @@ FROM tasks
 WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
   AND COALESCE(completed_at, cancelled_at, updated_at) < $1
 ORDER BY stat_date
+LIMIT $2
 `
+
+type ListExpiredTerminalTaskDatesParams struct {
+	Cutoff   pgtype.Timestamptz `json:"cutoff"`
+	RowLimit int32              `json:"row_limit"`
+}
 
 // Task retention: terminal tasks older than the retention window are purged
 // after their statistics have been frozen into task_daily_stats. Financial
@@ -69,22 +82,19 @@ ORDER BY stat_date
 // statistics aggregates are never touched here; task_execution_metrics,
 // task_execution_attempts and task_outputs follow tasks via ON DELETE CASCADE,
 // task_cancellations has no FK and is deleted explicitly first.
-func (q *Queries) ListExpiredTerminalTaskDates(ctx context.Context, cutoff sql.NullTime) ([]time.Time, error) {
-	rows, err := q.db.QueryContext(ctx, listExpiredTerminalTaskDates, cutoff)
+func (q *Queries) ListExpiredTerminalTaskDates(ctx context.Context, arg ListExpiredTerminalTaskDatesParams) ([]pgtype.Date, error) {
+	rows, err := q.db.Query(ctx, listExpiredTerminalTaskDates, arg.Cutoff, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []time.Time
+	var items []pgtype.Date
 	for rows.Next() {
-		var stat_date time.Time
+		var stat_date pgtype.Date
 		if err := rows.Scan(&stat_date); err != nil {
 			return nil, err
 		}
 		items = append(items, stat_date)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

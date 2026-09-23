@@ -378,7 +378,7 @@ func (r CanonicalRequest) materialize(taskID string, createdAt time.Time) (*task
 	payload := &tasks.TaskPayload{
 		TaskID: taskID, CorrelationID: correlationID, UserID: r.userID,
 		Prompt: r.prompt, Params: r.params, Priority: r.priority,
-		RetryCount: 0, CreatedAt: createdAt.Unix(),
+		CreatedAt: createdAt.Unix(),
 	}
 	return task, payload
 }

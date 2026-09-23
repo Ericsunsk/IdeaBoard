@@ -1,4 +1,4 @@
-package billing
+package postgres
 
 import (
 	"context"
@@ -20,16 +20,16 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 	ctx := t.Context()
 	runtimeRole := fmt.Sprintf("billing_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if _, err := db.ExecContext(cleanupCtx, `DROP OWNED BY `+roleSQL); err != nil {
+		if _, err := db.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL); err != nil {
 			t.Errorf("drop runtime role ownership: %v", err)
 		}
-		if _, err := db.ExecContext(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL); err != nil {
+		if _, err := db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL); err != nil {
 			t.Errorf("drop runtime role: %v", err)
 		}
 	})
@@ -41,31 +41,32 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 		t.Fatal("schema owner was accepted as Billing runtime role")
 	}
 
-	conn, err := db.Conn(ctx)
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime connection: %v", err)
 	}
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if _, err := conn.ExecContext(cleanupCtx, `RESET ROLE`); err != nil {
+		if _, err := conn.Exec(cleanupCtx, `RESET ROLE`); err != nil {
 			t.Errorf("RESET ROLE: %v", err)
 		}
-		if err := conn.Close(); err != nil {
+		conn.Release()
+		if false {
 			t.Errorf("close runtime connection: %v", err)
 		}
 	}()
-	if _, err := conn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
+	if _, err := conn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE: %v", err)
 	}
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT * FROM publish_billing_price($1, $2, $3, $4, $5)`, "test:runtime", "Runtime", "", 0, 1); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT * FROM publish_billing_price($1, $2, $3, $4, $5)`, "test:runtime", "Runtime", "", 0, 1); err != nil {
 		t.Fatalf("typed free price command: %v", err)
 	}
 	var count int
-	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM billing_skus WHERE sku = 'test:runtime'`).Scan(&count); err != nil || count != 1 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM billing_skus WHERE sku = 'test:runtime'`).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("runtime SELECT count=%d error=%v", count, err)
 	}
 
@@ -77,7 +78,7 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 		`INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, reason) SELECT 'set_availability', sku, current_price_version_id, 1, 'bypass' FROM billing_skus WHERE sku = 'test:runtime'`,
 		`SELECT prevent_billing_price_version_mutation()`,
 	} {
-		if _, err := conn.ExecContext(ctx, statement); err == nil {
+		if _, err := conn.Exec(ctx, statement); err == nil {
 			t.Fatalf("runtime bypass unexpectedly succeeded: %s", statement)
 		}
 	}
@@ -86,7 +87,7 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 		var securityDefiner bool
 		var config string
 		var trustedSchema string
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), ''), current_schema()
 FROM pg_proc WHERE oid = $1::regprocedure`, signature).Scan(&securityDefiner, &config, &trustedSchema); err != nil {
 			t.Fatalf("read function config for %s: %v", signature, err)
@@ -95,7 +96,7 @@ FROM pg_proc WHERE oid = $1::regprocedure`, signature).Scan(&securityDefiner, &c
 			t.Fatalf("function %s security_definer=%v config=%q", signature, securityDefiner, config)
 		}
 		var publicCanExecute bool
-		if err := db.QueryRowContext(ctx, `SELECT has_function_privilege('public', $1, 'EXECUTE')`, signature).Scan(&publicCanExecute); err != nil {
+		if err := db.QueryRow(ctx, `SELECT has_function_privilege('public', $1, 'EXECUTE')`, signature).Scan(&publicCanExecute); err != nil {
 			t.Fatalf("read PUBLIC privilege for %s: %v", signature, err)
 		}
 		if publicCanExecute {

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/platform/pagination"
 )
 
 const (
@@ -12,8 +14,10 @@ const (
 	ProviderPexels   = "pexels"
 	AllAssetsFolder  = "all"
 	QuickSavesFolder = "quick-saves"
-	DefaultPageSize  = 24
-	MaxPageSize      = 48
+	// DefaultPageSize tracks the shared pagination standard.
+	DefaultPageSize = pagination.DefaultLimit
+	// MaxPageSize tracks the shared pagination standard.
+	MaxPageSize = pagination.MaxLimit
 )
 
 type FolderSelectionKind string

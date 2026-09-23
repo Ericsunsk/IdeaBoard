@@ -39,7 +39,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 		t.Fatalf("Stripe CreateCheckoutSession calls = %d, want 1", calls)
 	}
 	var returnBaseURL string
-	if err := db.QueryRowContext(t.Context(), `SELECT return_base_url FROM payment_orders WHERE id = $1`, order.ID).Scan(&returnBaseURL); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT return_base_url FROM payment_orders WHERE id = $1`, order.ID).Scan(&returnBaseURL); err != nil {
 		t.Fatal(err)
 	}
 	if returnBaseURL != "https://app.example.com/user/boards" {
@@ -106,7 +106,7 @@ func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t 
 	}
 	assertLifecycleOrderStatus(t, db, created.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
 	var retryAt time.Time
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT next_attempt_at
 FROM payment_order_reconciliations reconciliation
 JOIN payment_orders orders ON orders.id = reconciliation.payment_order_id
@@ -172,7 +172,7 @@ func TestPaymentReconciliationClaimsAtMostOneHundredAndFencesStaleWorkers(t *tes
 	if len(second) != 1 {
 		t.Fatalf("second claim batch = %d, want 1", len(second))
 	}
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 UPDATE payment_order_reconciliations
 SET claimed_at = $2, claimed_until = $3
 WHERE payment_order_id = $1`, first[0].Order.ID, now.Add(-2*time.Minute), now.Add(-time.Second)); err != nil {

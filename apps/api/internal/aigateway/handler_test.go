@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -87,6 +88,13 @@ func (f *fakeGatewayStore) DetectModels(_ context.Context, provider string) (Mod
 		return ModelDetection{}, f.saveErr
 	}
 	return ModelDetection{Models: f.detected, ConfiguredProviders: len(f.detected)}, nil
+}
+
+func (f *fakeGatewayStore) GetModelReference(_ context.Context, modelID, provider, model string, refresh bool) (ModelReference, error) {
+	if f.saveErr != nil {
+		return ModelReference{}, f.saveErr
+	}
+	return ModelReference{ModelID: modelID, Source: ModelsReferenceSource, Note: modelsReferenceNote, Found: true}, nil
 }
 
 func TestGatewayHandlerGetMasksSecrets(t *testing.T) {
@@ -289,7 +297,7 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 			NewHandler(store).SaveCatalog(c)
 		})
 		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1","name":"Model 1","provider":"Test","enabled":true}]}`))
+		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1","name":"Model 1","provider":"Test"}]}`))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -297,6 +305,25 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 		}
 		if len(store.catalog) != 1 || store.catalog[0].ID != "m1" {
 			t.Fatalf("store catalog = %+v", store.catalog)
+		}
+	})
+
+	t.Run("save catalog rejects legacy price fields", func(t *testing.T) {
+		store := &fakeGatewayStore{}
+		router := gin.New()
+		router.PUT("/settings/ai-gateway/catalog", func(c *gin.Context) {
+			testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+			NewHandler(store).SaveCatalog(c)
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1","name":"Model 1","provider":"Test","input_cost_per_token":0.0000025}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+		if len(store.catalog) != 0 {
+			t.Fatalf("store catalog = %+v, want untouched", store.catalog)
 		}
 	})
 }
@@ -433,6 +460,8 @@ func TestGatewayHandlerDetectModels(t *testing.T) {
 
 func TestGatewayHandlerTestConnection(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	restorePolicy := outbound.ConfigurePolicyProvider(stubOutboundPolicy{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restorePolicy)
 
 	serveTest := func(t *testing.T, role principal.Role, body string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -448,6 +477,21 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		return rec
 	}
 
+	t.Run("missing store returns service unavailable", func(t *testing.T) {
+		router := gin.New()
+		router.POST("/settings/ai-gateway/test-connection", func(c *gin.Context) {
+			testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
+			NewHandler(nil).TestConnection(c)
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/settings/ai-gateway/test-connection", strings.NewReader(`{"base_url":"http://127.0.0.1:9"}`))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
+		}
+	})
+
 	t.Run("test rejects non-admin", func(t *testing.T) {
 		rec := serveTest(t, principal.RoleUser, `{"base_url":"http://127.0.0.1:9"}`)
 		if rec.Code != http.StatusForbidden {
@@ -456,11 +500,13 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 	})
 
 	t.Run("reachable server reports status even on 4xx", func(t *testing.T) {
+		var captured *http.Request
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			captured = r.Clone(r.Context())
 			w.WriteHeader(http.StatusNotFound)
 		}))
 		defer upstream.Close()
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"`+upstream.URL+`"}`)
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"`+upstream.URL+`","provider":"openai","model":"gpt-4o","path":"v1/models"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
@@ -468,6 +514,12 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 			if !strings.Contains(rec.Body.String(), want) {
 				t.Fatalf("body missing %s: %s", want, rec.Body.String())
 			}
+		}
+		if captured == nil || captured.Method != http.MethodGet || captured.URL.Path != "/openai/v1/models" {
+			t.Fatalf("probe request = %#v, want GET /openai/v1/models", captured)
+		}
+		if captured.Header.Get("cf-aig-max-attempts") != "1" || captured.Header.Get("cf-aig-skip-cache") != "true" {
+			t.Fatalf("probe headers = %v", captured.Header)
 		}
 	})
 
@@ -488,6 +540,40 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		}
 		if !strings.Contains(rec.Body.String(), `"reachable":false`) {
 			t.Fatalf("body missing unreachable: %s", rec.Body.String())
+		}
+	})
+}
+
+func TestGatewayHandlerModelReference(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	serve := func(t *testing.T, role principal.Role, target string) *httptest.ResponseRecorder {
+		t.Helper()
+		router := gin.New()
+		router.GET("/settings/ai-gateway/models-reference", func(c *gin.Context) {
+			testsupport.SetPrincipal(t, c, 9, role)
+			NewHandler(&fakeGatewayStore{}).GetModelReference(c)
+		})
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/settings/ai-gateway/models-reference"+target, nil)
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	t.Run("rejects non-admin", func(t *testing.T) {
+		if rec := serve(t, principal.RoleUser, "?model_id=openai/gpt-5"); rec.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("returns reference for admin", func(t *testing.T) {
+		rec := serve(t, principal.RoleAdmin, "?model_id=openai/gpt-5")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+		}
+		for _, want := range []string{`"model_id":"openai/gpt-5"`, `"source":"models.dev"`, `"found":true`} {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Fatalf("body missing %s: %s", want, rec.Body.String())
+			}
 		}
 	})
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -151,7 +150,6 @@ func (r providerResultFinalization) completedOutputs() ([]string, []tasks.TaskOu
 type providerResultFinalizer struct {
 	executor      *ProviderExecutor
 	correlationID string
-	account       *accounts.ApiAccount
 }
 
 func (f providerResultFinalizer) finalize(
@@ -186,7 +184,6 @@ func (f providerResultFinalizer) materializeRemoteRefs(ctx context.Context, user
 		userID,
 		taskID,
 		f.correlationID,
-		f.account,
 		result.remoteRefs,
 	)
 	if err != nil {

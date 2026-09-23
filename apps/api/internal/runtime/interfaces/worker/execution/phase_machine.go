@@ -25,6 +25,9 @@ var phaseTransitions = map[phase]map[phase]struct{}{
 		phaseCancelled: {},
 		phaseRequeued:  {},
 		phaseDropped:   {},
+		// Deterministic preflight failures (unparseable params, unconfigured
+		// model) terminate here without ever reaching assignment.
+		phaseFailed: {},
 	},
 	phaseAssigned: {
 		phaseProvider:  {},

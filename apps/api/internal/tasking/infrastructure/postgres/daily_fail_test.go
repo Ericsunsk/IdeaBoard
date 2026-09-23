@@ -2,17 +2,19 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	statisticscontracts "ideaboard/api/internal/tasking/ports/statistics"
 	"strings"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testdb"
 )
 
-func newRepositoryTestDB(t *testing.T) (*Repository, *sql.DB) {
+func newRepositoryTestDB(t *testing.T) (*Repository, *pgxpool.Pool) {
 	t.Helper()
 	db := testdb.Open(t)
 	return NewRepository(db), db
@@ -20,101 +22,6 @@ func newRepositoryTestDB(t *testing.T) (*Repository, *sql.DB) {
 
 func terminalStatsTestTime() time.Time {
 	return time.Date(2026, time.July, 15, 12, 0, 0, 0, time.Local)
-}
-
-func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
-	ctx := context.Background()
-	taskRepo, db := newRepositoryTestDB(t)
-	accountID := seedRepositoryTestAccount(t, db, 66)
-	failedAt := terminalStatsTestTime()
-	createdAt := failedAt.Add(-10 * time.Minute)
-
-	if err := createRepositoryTestTask(t, taskRepo, ctx, &tasks.Task{
-		TaskID:                     "acc-fail-1",
-		UserID:                     10,
-		AssignedProviderEndpointID: testPtr(accountID + 10000),
-		AccountID:                  testPtr(accountID),
-		FeatureSlug:                "image-generate",
-		APIType:                    "openai-compatible",
-		Status:                     tasks.StatusRunning,
-		Result:                     `{"model":"model-stop","username":"user-stop"}`,
-		CreatedAt:                  createdAt,
-	}); err != nil {
-		t.Fatalf("seed task1 failed: %v", err)
-	}
-	if err := createRepositoryTestTask(t, taskRepo, ctx, &tasks.Task{
-		TaskID:                     "acc-fail-2",
-		UserID:                     10,
-		AssignedProviderEndpointID: testPtr(accountID + 10000),
-		AccountID:                  testPtr(accountID),
-		FeatureSlug:                "image-generate",
-		APIType:                    "openai-compatible",
-		Status:                     tasks.StatusRunning,
-		Result:                     `{"model":"model-stop","username":"user-stop"}`,
-		CreatedAt:                  createdAt,
-	}); err != nil {
-		t.Fatalf("seed task2 failed: %v", err)
-	}
-	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
-	insertRepositoryActiveTaskLease(t, db, "acc-fail-1", accountID, accountID+10000, credentialID, "lease-acc-fail-1")
-	insertRepositoryActiveTaskLease(t, db, "acc-fail-2", accountID, accountID+10000, credentialID, "lease-acc-fail-2")
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback()
-	failedTaskIDs, err := taskRepo.FailRunningByAccountIDWithTx(ctx, tx, accountID, "stopped", failedAt)
-	if err != nil {
-		t.Fatalf("FailRunningByAccountIDWithTx failed: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	if len(failedTaskIDs) != 2 {
-		t.Fatalf("failedTaskIDs=%v, want 2 tasks", failedTaskIDs)
-	}
-	failedSet := map[string]bool{}
-	for _, taskID := range failedTaskIDs {
-		failedSet[taskID] = true
-	}
-	if !failedSet["acc-fail-1"] || !failedSet["acc-fail-2"] {
-		t.Fatalf("failedTaskIDs=%v, want acc-fail-1 and acc-fail-2", failedTaskIDs)
-	}
-
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, failedAt, failedAt)
-	if err != nil {
-		t.Fatalf("list daily stats failed: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("daily rows=%d, want 1", len(rows))
-	}
-	if rows[0].Failed != 2 || rows[0].Total != 2 || rows[0].Completed != 0 {
-		t.Fatalf("unexpected daily row: %+v", rows[0])
-	}
-
-	events := int64(0)
-	if err := taskRepo.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM task_stat_events`).Scan(&events); err != nil {
-		t.Fatalf("count stat events failed: %v", err)
-	}
-	if events != 2 {
-		t.Fatalf("event count=%d, want 2", events)
-	}
-
-	var userID, eventAccountID, channelID int64
-	var featureSlug, apiType string
-	if err := taskRepo.db.QueryRowContext(ctx, `
-SELECT user_id, account_id, provider_endpoint_id, feature_slug, api_type
-FROM task_stat_events
-WHERE task_id = 'acc-fail-1'`,
-	).Scan(&userID, &eventAccountID, &channelID, &featureSlug, &apiType); err != nil {
-		t.Fatalf("read stat event dimensions failed: %v", err)
-	}
-	if userID != 10 || eventAccountID != accountID || channelID != accountID+10000 ||
-		featureSlug != "image-generate" || apiType != "openai-compatible" {
-		t.Fatalf("unexpected stat event dimensions: user=%d account=%d channel=%d feature=%q api=%q",
-			userID, eventAccountID, channelID, featureSlug, apiType)
-	}
 }
 
 func TestConvergePendingFailureUpsertsDailyStats(t *testing.T) {
@@ -156,7 +63,7 @@ func TestConvergePendingFailureUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("unexpected failed daily row: %+v", rows)
 	}
 	var eventCount int64
-	if err := taskRepo.db.QueryRowContext(ctx, `SELECT count(*) FROM task_stat_events WHERE task_id = $1`, task.TaskID).Scan(&eventCount); err != nil {
+	if err := taskRepo.db.QueryRow(ctx, `SELECT count(*) FROM task_stat_events WHERE task_id = $1`, task.TaskID).Scan(&eventCount); err != nil {
 		t.Fatalf("count task stat events failed: %v", err)
 	}
 	if eventCount != 1 {
@@ -222,14 +129,8 @@ func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *tes
 	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 
-	rowsAffected, err := taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(
-		task.TaskID,
-		accountID,
-		channelID,
-		credentialID,
-		task.LeaseToken,
+	rowsAffected, err := taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(task.TaskID, task.LeaseToken,
 		`{"model":"model-complete","username":"user-complete"}`,
 		completedAt,
 		nil,
@@ -426,7 +327,7 @@ func TestRebuildDailyStatsFromEventsByDateRangeReconstructsProjection(t *testing
 	occurredAt := time.Now().Add(-2 * time.Hour)
 	statDate := taskStatDateFromTime(occurredAt, time.Now().Location())
 
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, cancelled)
 VALUES ($1, 'stale-model', 'stale-user', 9, 9, 0, 0)`, statDate); err != nil {
 		t.Fatalf("seed stale daily stat failed: %v", err)

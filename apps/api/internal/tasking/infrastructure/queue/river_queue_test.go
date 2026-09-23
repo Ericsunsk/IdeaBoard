@@ -6,11 +6,25 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	tasks "ideaboard/api/internal/tasking/domain"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
+
+// openLazyPostgresForStats returns a *pgxpool.Pool without pinging, so stats
+// validation paths stay unit-testable without a live database.
+func openLazyPostgresForStats() (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig("postgres://ideaboard:secret@127.0.0.1:5432/ideaboard?sslmode=disable")
+	if err != nil {
+		return nil, err
+	}
+	cfg.MinConns = 0
+	cfg.MaxConns = 1
+	return pgxpool.NewWithConfig(context.Background(), cfg)
+}
 
 type fakeRiverClient struct {
 	args river.JobArgs
@@ -34,7 +48,7 @@ func (c *concurrentRiverClient) Insert(_ context.Context, _ river.JobArgs, _ *ri
 
 func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 	client := &fakeRiverClient{}
-	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
+	queue := NewRiverQueueWithClient(client, nil, RiverQueueDefault, 7)
 	task := &tasks.TaskPayload{TaskID: "task_123", UserID: 42, Priority: tasks.TaskPriorityInteractive}
 
 	if err := queue.Enqueue(context.Background(), task); err != nil {
@@ -74,7 +88,7 @@ func TestDrawingTaskInsertOptsUsesRiverDefaults(t *testing.T) {
 
 func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 	client := &fakeRiverClient{}
-	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
+	queue := NewRiverQueueWithClient(client, nil, RiverQueueDefault, 7)
 	if err := queue.Enqueue(context.Background(), &tasks.TaskPayload{}); err == nil {
 		t.Fatal("expected error for missing task id")
 	}
@@ -83,7 +97,7 @@ func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 func TestRiverQueueSetClientConcurrentWithEnqueue(t *testing.T) {
 	clientA := &concurrentRiverClient{}
 	clientB := &concurrentRiverClient{}
-	queue := NewRiverQueueWithClient(clientA, nil, nil, RiverQueueDefault, 7)
+	queue := NewRiverQueueWithClient(clientA, nil, RiverQueueDefault, 7)
 	ctx := context.Background()
 
 	const (
@@ -148,5 +162,28 @@ func TestQueuedRiverJobStatesExcludeRunning(t *testing.T) {
 	}
 	if seen[rivertype.JobStateRunning] {
 		t.Fatalf("queued states should not include running: %v", states)
+	}
+}
+
+func TestQueueStatsForRejectsEmptyQueueName(t *testing.T) {
+	db, err := openLazyPostgresForStats()
+	if err != nil {
+		t.Skipf("lazy pool unavailable: %v", err)
+	}
+	defer db.Close()
+	queue := NewRiverQueueWithClient(&fakeRiverClient{}, db, RiverQueueDefault, RiverMaxAttemptsDefault)
+	if _, _, err := queue.QueueStatsFor(context.Background(), "   "); err == nil {
+		t.Fatal("QueueStatsFor with empty queue succeeded, want error")
+	}
+}
+
+func TestQueueStatsForNilMonitorStaysSilent(t *testing.T) {
+	var queue *RiverQueue
+	depth, lag, err := queue.QueueStatsFor(context.Background(), RiverQueueDefault)
+	if err != nil || depth != 0 || lag != 0 {
+		t.Fatalf("nil QueueStatsFor = (%d, %v, %v), want zeros", depth, lag, err)
+	}
+	if _, _, err := queue.QueueStats(context.Background()); err != nil {
+		t.Fatalf("nil QueueStats() error = %v", err)
 	}
 }

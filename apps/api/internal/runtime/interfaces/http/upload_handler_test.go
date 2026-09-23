@@ -162,6 +162,48 @@ func TestValidateUploadFileHeaderCanonicalizesMismatchedKnownImage(t *testing.T)
 	}
 }
 
+func TestValidateUploadFileHeaderRendersFixedSafeMessage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "truncated.png")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	// Valid PNG magic with a truncated body: format detection succeeds but
+	// dimension decoding fails with a wrapped detail error. The wire must
+	// carry only the fixed safe copy, never the wrapped detail.
+	if _, err := part.Write([]byte("\x89PNG\r\n\x1a\ntruncated-body")); err != nil {
+		t.Fatalf("write png header: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("POST", "/", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = request
+	file, err := context.FormFile("file")
+	if err != nil {
+		t.Fatalf("read form file: %v", err)
+	}
+
+	if _, ok := validateUploadFileHeader(context, file, 1024*1024, map[string]bool{".png": true}); ok {
+		t.Fatal("truncated image was accepted")
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "文件内容不合法") {
+		t.Fatalf("body = %s, want fixed safe message", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "读取图片尺寸失败") {
+		t.Fatalf("body leaked wrapped decode detail: %s", recorder.Body.String())
+	}
+}
+
 func TestUploadImageResponseUsesStoredCanonicalMetadata(t *testing.T) {
 	stored := &ports.StoredUploadRef{
 		URL: "https://cdn.example.com/uploads/site/assets/logo.png", MIMEType: "image/png",

@@ -9,9 +9,8 @@ import (
 
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 
-	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
-	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
-	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/aigateway"
+	billinghttp "ideaboard/api/internal/billing/interfaces/http"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
@@ -29,8 +28,9 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
+	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	"ideaboard/api/internal/runtime/ports"
-	"ideaboard/api/internal/searchcatalog"
+	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
 	"ideaboard/api/internal/usage"
@@ -41,7 +41,7 @@ import (
 type Dependencies struct {
 	Auth                AuthDeps
 	UserRoutes          UserRouteDeps
-	PublicSearchHandler *searchcatalog.SearchHandler
+	PublicSearchHandler *searchhttp.SearchHandler
 	AdminRoutes         AdminRouteDeps
 	StaticUploads       StaticUploadDeps
 	CORSMiddleware      gin.HandlerFunc
@@ -49,6 +49,9 @@ type Dependencies struct {
 	Branding            settings.BrandingSettingProvider
 	PaymentWebhook      *paymenthttp.WebhookHandler
 	Internal            InternalRouteDeps
+	// REDMetrics feeds the per-route latency/error middleware. Nil keeps the
+	// middleware a pass-through; production wires the Prometheus set.
+	REDMetrics *redmetrics.Set
 	// ReadyChecker backs /api/readyz. Nil keeps the shallow contract used
 	// by unit tests; production wires the database (PG+River) checker.
 	ReadyChecker ports.HealthChecker
@@ -93,7 +96,7 @@ type UserRouteDeps struct {
 	AuthHandler            *auth.AuthHandler
 	TaskHandler            *taskhttp.Handler
 	BoardHandler           *boards.Handler
-	BillingHandler         *billing.Handler
+	BillingHandler         *billinghttp.Handler
 	BillingRecords         *billingrecords.Handler
 	CreditUserHandler      *credithttp.UserHandler
 	UsageHandler           *usage.Handler
@@ -105,8 +108,7 @@ type UserRouteDeps struct {
 	Imgproxy               imgproxy.Config
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
-	VisionHandler          *searchcatalog.VisionHandler
-	SearchMetricsHandler   *searchcatalog.MetricsHandler
+	VisionHandler          *searchhttp.VisionHandler
 	LibraryHandler         *library.Handler
 }
 
@@ -114,14 +116,13 @@ type AdminRouteDeps struct {
 	AdminHandler                *identityhttp.AdminHandler
 	MailConfigHandler           *auth.MailConfigAdminHandler
 	SocialProviderHandler       *auth.SocialProviderAdminHandler
-	BillingHandler              *billing.Handler
+	AIGatewayHandler            *aigateway.Handler
+	BillingHandler              *billinghttp.Handler
 	CreditAdminCommandHandler   *credithttp.AdminCommandHandler
 	CreditAdminReadHandler      *credithttp.AdminReadHandler
 	CreditReconciliationHandler *credithttp.ReconciliationHandler
-	AccountHandler              *accounthttp.Handler
 	TaskHandler                 *taskhttp.Handler
 	TaskStatsHandler            *statisticshttp.Handler
-	ProviderEndpointHandler     *providerendpointshttp.Handler
 	StorageHandler              *storagehttp.Handler
 	FeaturePromptHandler        *prompts.FeaturePromptHandler
 	StorageService              *storage.Service
@@ -129,7 +130,7 @@ type AdminRouteDeps struct {
 	RewardAdminCommandHandler   *rewards.AdminCommandHandler
 	RewardAdminReadHandler      *rewards.AdminReadHandler
 	PaymentAdminHandler         *paymenthttp.AdminHandler
-	SearchCatalogHandler        *searchcatalog.Handler
+	SearchCatalogHandler        *searchhttp.Handler
 	AdminBrandLogoHandler       *adminbranding.Handler
 }
 
@@ -148,24 +149,34 @@ const (
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                   = "/api/health"
-	RoutePublicSettingsBranding   = "/api/settings/branding"
-	RoutePublicSearch             = "/api/search"
-	RouteUserProfileAvatar        = "/profile/avatar"
-	RouteUserBoardUploads         = "/boards/:board_id/uploads"
-	RouteUserDownload             = "/download"
-	RouteUserEvents               = "/events"
-	RouteUserVisionExtract        = "/search/vision-extract"
-	RouteAdminUpload              = "/upload"
-	RouteAdminSettingsBranding    = "/settings/branding"
-	RouteAdminSettingsMediaUpload = "/settings/media-upload"
-	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
-	RouteAdminSettingsOutbound    = "/settings/outbound-policy"
-	RouteAdminSettingsMail        = "/settings/mail"
-	RouteAdminUsersOAuthProvider  = "/users/oauth-providers/:provider"
-	RouteAdminStripeConfiguration = "/payments/stripe-config"
-	RouteAdminBrandLogoOverrides  = "/brand-logo-overrides"
-	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
+	RouteHealth                                = "/api/health"
+	RoutePublicSettingsBranding                = "/api/settings/branding"
+	RoutePublicSearch                          = "/api/search"
+	RouteUserProfileAvatar                     = "/profile/avatar"
+	RouteUserBoardUploads                      = "/boards/:board_id/uploads"
+	RouteUserDownload                          = "/download"
+	RouteUserEvents                            = "/events"
+	RouteUserVisionExtract                     = "/search/vision-extract"
+	RouteAdminUpload                           = "/upload"
+	RouteAdminSettingsBranding                 = "/settings/branding"
+	RouteAdminSettingsAIGateway                = "/settings/ai-gateway"
+	RouteAdminSettingsAIGatewayModels          = "/settings/ai-gateway/models"
+	RouteAdminSettingsAIGatewayCatalog         = "/settings/ai-gateway/catalog"
+	RouteAdminSettingsAIGatewayProviders       = "/settings/ai-gateway/providers"
+	RouteAdminSettingsAIGatewayDetectModels    = "/settings/ai-gateway/detect-models"
+	RouteAdminSettingsAIGatewayModelsReference = "/settings/ai-gateway/models-reference"
+	RouteAdminSettingsAIGatewayBrandLogo       = "/settings/ai-gateway/brand-logo"
+	RouteAdminSettingsAIGatewayModelsObserved  = "/settings/ai-gateway/models-observed"
+	RouteAdminSettingsAIGatewayRoutePreview    = "/settings/ai-gateway/route-preview"
+	RouteAdminSettingsAIGatewayTestConnection  = "/settings/ai-gateway/test-connection"
+	RouteAdminSettingsMediaUpload              = "/settings/media-upload"
+	RouteAdminSettingsRateLimit                = "/settings/rate-limit"
+	RouteAdminSettingsOutbound                 = "/settings/outbound-policy"
+	RouteAdminSettingsMail                     = "/settings/mail"
+	RouteAdminUsersOAuthProvider               = "/users/oauth-providers/:provider"
+	RouteAdminStripeConfiguration              = "/payments/stripe-config"
+	RouteAdminBrandLogoOverrides               = "/brand-logo-overrides"
+	RoutePaymentStripeWebhook                  = "/api/webhooks/stripe"
 )
 
 // UploadsStaticRoutePrefix is the public prefix for locally served upload
@@ -195,7 +206,7 @@ type readyResponse struct {
 	Component string `json:"component,omitempty"`
 }
 
-func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchcatalog.SearchHandler, readyChecker ports.HealthChecker) {
+func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchhttp.SearchHandler, readyChecker ports.HealthChecker) {
 	// RouteHealth stays shallow: process liveness for Docker/Compose and the
 	// existing healthcheck binary. Orchestrators must use /api/readyz.
 	r.GET(RouteHealth, func(c *gin.Context) {

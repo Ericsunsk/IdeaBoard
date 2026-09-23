@@ -7,7 +7,8 @@ SELECT
 FROM boards AS b
 LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = sqlc.arg(user_id)
 WHERE b.owner_user_id = sqlc.arg(user_id) OR m.user_id = sqlc.arg(user_id)
-ORDER BY b.updated_at DESC;
+ORDER BY b.updated_at DESC
+LIMIT sqlc.arg(row_limit);
 
 -- name: GetBoardByOwnerAndBoardID :one
 SELECT id, board_id, owner_user_id, created_by, name, state, revision, state_schema_version, last_saved_by, created_at, updated_at
@@ -94,7 +95,8 @@ SELECT m.user_id, u.public_id, u.display_name, m.role
 FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
 WHERE m.board_id = sqlc.arg(board_id)
-ORDER BY m.created_at ASC;
+ORDER BY m.created_at ASC
+LIMIT sqlc.arg(row_limit);
 
 -- name: UpsertBoardMember :exec
 INSERT INTO board_members (board_id, user_id, role)
@@ -114,13 +116,24 @@ WHERE board_id = sqlc.arg(board_id) AND user_id = sqlc.arg(user_id);
 -- name: CreateBoardShareToken :one
 INSERT INTO board_share_tokens (
   board_id, token_hash, token_prefix, role, created_by,
-  revoked, expires_at, max_uses
+  revoked, expires_at, max_uses, idempotency_key, request_hash, token_secret
 )
 VALUES (
   sqlc.arg(board_id), sqlc.arg(token_hash), sqlc.arg(token_prefix), sqlc.arg(role), sqlc.arg(created_by),
-  sqlc.arg(revoked), sqlc.arg(expires_at), sqlc.narg(max_uses)
+  sqlc.arg(revoked), sqlc.arg(expires_at), sqlc.narg(max_uses), sqlc.arg(idempotency_key), sqlc.arg(request_hash), sqlc.arg(token_secret)
 )
 RETURNING id;
+
+-- name: GetBoardShareTokenByIdempotency :one
+SELECT id, board_id, token_hash, token_prefix, role, created_by, revoked,
+  usage_count, max_uses, last_used_at, revoked_at, revoked_by,
+  expires_at, created_at, updated_at, idempotency_key, request_hash, token_secret
+FROM board_share_tokens
+WHERE created_by = sqlc.arg(created_by) AND idempotency_key = sqlc.arg(idempotency_key)
+FOR UPDATE;
+
+-- name: LockBoardShareTokenIdempotency :exec
+SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(lock_key), 73128419));
 
 -- name: ListBoardShareTokens :many
 SELECT
@@ -129,7 +142,8 @@ SELECT
   expires_at, created_at, updated_at
 FROM board_share_tokens
 WHERE board_id = sqlc.arg(board_id)
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT sqlc.arg(row_limit);
 
 -- name: GetBoardShareTokenByHash :one
 SELECT

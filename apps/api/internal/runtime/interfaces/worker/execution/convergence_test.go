@@ -17,8 +17,7 @@ func TestConvergencePolicyDecidesOutcomes(t *testing.T) {
 			input: convergenceInput{
 				IsExecutionInterrupted: true,
 				IsTaskCancelled:        true,
-				ProviderFailure:        providerFailureInput(true),
-				Failover:               failoverInput(1, true),
+				ProviderFailure:        providerFailureInput(),
 			},
 			want: convergenceCancel,
 		},
@@ -26,56 +25,54 @@ func TestConvergencePolicyDecidesOutcomes(t *testing.T) {
 			name: "interrupted non-cancelled work requeues through interrupt path",
 			input: convergenceInput{
 				IsExecutionInterrupted: true,
-				ProviderFailure:        providerFailureInput(true),
-				Failover:               failoverInput(1, true),
+				ProviderFailure:        providerFailureInput(),
 			},
 			want: convergenceInterruptRequeue,
 		},
 		{
-			name: "non-failover provider failure final fails",
+			name: "non-retryable provider failure final fails",
 			input: convergenceInput{
-				ProviderFailure: providerFailureInput(false),
+				ProviderFailure: providerFailureInput(),
 			},
 			want: convergenceFinalFail,
 		},
 		{
-			name: "failover provider failure with retry capacity requeues",
+			name: "retryable provider failure below bound requeues",
 			input: convergenceInput{
-				ProviderFailure: providerFailureInput(true),
-				Failover:        failoverInput(2, true),
+				ProviderFailure: retryableFailureInput(),
+				Task:            convergenceTaskContext{RetryCount: 0},
 			},
 			want: convergenceRequeue,
 		},
 		{
-			name: "failover provider failure without remaining account candidates stops requeue",
+			name: "retryable provider failure at bound final fails",
 			input: convergenceInput{
-				ProviderFailure: providerFailureInput(true),
-				Failover:        failoverInput(0, true),
+				ProviderFailure: retryableFailureInput(),
+				Task:            convergenceTaskContext{RetryCount: maxProviderFailureRequeues},
 			},
-			want: convergenceFailoverExhaustedOrNoCapacity,
+			want: convergenceFinalFail,
+		},
+		{
+			name: "retryable provider failure above bound final fails",
+			input: convergenceInput{
+				ProviderFailure: retryableFailureInput(),
+				Task:            convergenceTaskContext{RetryCount: maxProviderFailureRequeues + 1},
+			},
+			want: convergenceFinalFail,
 		},
 		{
 			name: "dirty converged task drops queued work",
 			input: convergenceInput{
-				ProviderFailure: providerFailureInput(true),
-				Failover:        failoverInput(1, true),
+				ProviderFailure: providerFailureInput(),
 				Task: convergenceTaskContext{
 					IsDirtyConverged: true,
 				},
 			},
 			want: convergenceDropConvergedDirtyWork,
 		},
-		{
-			name: "failover exhausted or no capacity stops requeue",
-			input: convergenceInput{
-				ProviderFailure: providerFailureInput(true),
-				Failover:        failoverInput(1, false),
-			},
-			want: convergenceFailoverExhaustedOrNoCapacity,
-		},
 	}
 
-	var decider convergenceDecider = convergencePolicy{}
+	decider := convergencePolicy{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := decider.DecideConvergence(tt.input)
@@ -95,18 +92,16 @@ func TestConvergencePolicyDecidesOutcomes(t *testing.T) {
 	}
 }
 
-func providerFailureInput(isFailoverable bool) convergenceProviderFailure {
+func providerFailureInput() convergenceProviderFailure {
 	return convergenceProviderFailure{
-		IsFailoverable: isFailoverable,
-		Reason:         "上游图像服务调用失败",
-		Stage:          tasks.ExecutionStageProvider,
-		Category:       tasks.FailureCategoryProviderError,
+		Reason:   "上游图像服务调用失败",
+		Stage:    tasks.ExecutionStageProvider,
+		Category: tasks.FailureCategoryProviderError,
 	}
 }
 
-func failoverInput(remainingAccountCandidates int, hasFailoverCapacity bool) convergenceFailover {
-	return convergenceFailover{
-		RemainingAccountCandidates: remainingAccountCandidates,
-		HasFailoverCapacity:        hasFailoverCapacity,
-	}
+func retryableFailureInput() convergenceProviderFailure {
+	failure := providerFailureInput()
+	failure.Retryable = true
+	return failure
 }

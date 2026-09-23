@@ -1,8 +1,7 @@
-package billing
+package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,12 +9,44 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billing/application"
 	"ideaboard/api/internal/testdb"
+)
+
+// Domain vocabulary aliases keep the moved tests byte-identical.
+type (
+	SKU                    = billing.SKU
+	OutputResolution       = billing.OutputResolution
+	Quote                  = billing.Quote
+	PriceInfo              = billing.PriceInfo
+	PublishPriceInput      = billing.PublishPriceInput
+	PublishPricesInput     = billing.PublishPricesInput
+	BillableItemDefinition = billing.BillableItemDefinition
+	AvailabilityInfo       = billing.AvailabilityInfo
+)
+
+const (
+	OutputResolutionDefault    = billing.OutputResolutionDefault
+	OutputResolution1K         = billing.OutputResolution1K
+	BillableItemStatusActive   = billing.BillableItemStatusActive
+	BillableItemStatusDisabled = billing.BillableItemStatusDisabled
+)
+
+var (
+	MaxQuoteCredits         = billing.MaxQuoteCredits
+	ErrPricingUnavailable   = billing.ErrPricingUnavailable
+	ErrSKUNotFound          = billing.ErrSKUNotFound
+	ErrArchivedItemInUse    = billing.ErrArchivedItemInUse
+	NewBillableItemRegistry = billing.NewBillableItemRegistry
+	NewBillableItemCatalog  = application.NewBillableItemCatalog
 )
 
 func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	ctx := t.Context()
 
 	if _, err := service.QuoteAtResolution(ctx, "ideaboard:not-found", OutputResolution1K, 1); !errors.Is(err, ErrSKUNotFound) {
@@ -83,7 +114,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 
 func TestCatalogCommandsPersistAppendOnlyAudit(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	ctx := t.Context()
 
 	price, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("test:audit", "Audit"), UnitCredits: 9, ActorID: 13})
@@ -93,7 +124,7 @@ func TestCatalogCommandsPersistAppendOnlyAudit(t *testing.T) {
 	if _, err := service.SetAvailability(ctx, "test:audit", false, 14); err != nil {
 		t.Fatalf("SetAvailability() error = %v", err)
 	}
-	rows, err := db.QueryContext(ctx, `
+	rows, err := db.Query(ctx, `
 SELECT action_type, actor_id, reason, COALESCE(price_version_id, 0), metadata
 FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	if err != nil {
@@ -137,7 +168,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 		`UPDATE billing_admin_actions SET reason = 'tampered' WHERE sku = 'test:audit'`,
 		`DELETE FROM billing_admin_actions WHERE sku = 'test:audit'`,
 	} {
-		if _, err := db.ExecContext(ctx, statement); err == nil {
+		if _, err := db.Exec(ctx, statement); err == nil {
 			t.Fatalf("statement unexpectedly succeeded: %s", statement)
 		}
 	}
@@ -145,7 +176,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 
 func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	definition := testBillableDefinition("ai-image:inpaint", "局部重绘")
 	if _, err := service.PublishPrice(t.Context(), PublishPriceInput{Definition: definition, UnitCredits: 10, ActorID: 1}); err != nil {
 		t.Fatal(err)
@@ -175,7 +206,7 @@ func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 
 func TestCatalogAvailabilityTransitionsRequirePriceAndPersistAudit(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	definition := testBillableDefinition("ai-image:inpaint", "局部重绘")
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{definition})
 	if err != nil {
@@ -205,7 +236,7 @@ func TestCatalogAvailabilityTransitionsRequirePriceAndPersistAudit(t *testing.T)
 		t.Fatalf("active=%+v disabled=%+v error=%v", active, disabled, err)
 	}
 
-	rows, err := db.QueryContext(t.Context(), `
+	rows, err := db.Query(t.Context(), `
 SELECT actor_id, metadata->>'old', metadata->>'new', metadata->>'outcome'
 FROM billing_admin_actions
 WHERE sku = $1 AND action_type = 'set_availability'
@@ -239,7 +270,7 @@ ORDER BY id`, definition.SKU)
 
 func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	ctx := t.Context()
 
 	price, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("test:immutable", "Immutable"), UnitCredits: 5, ActorID: 1})
@@ -254,7 +285,7 @@ func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 		`DELETE FROM billing_price_versions WHERE price_version_id = $1`,
 	}
 	for _, statement := range statements {
-		if _, err := db.ExecContext(ctx, statement, price.PriceVersionID); err == nil {
+		if _, err := db.Exec(ctx, statement, price.PriceVersionID); err == nil {
 			t.Fatalf("statement unexpectedly succeeded: %s", statement)
 		}
 	}
@@ -262,7 +293,7 @@ func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 
 func TestDeleteArchivedRemovesCatalogAggregateAndPreservesAudit(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	price := publishDeleteCandidate(t, service, "test:delete-success")
 
 	result, err := service.DeleteArchived(t.Context(), "test:delete-success", 17)
@@ -274,10 +305,10 @@ func TestDeleteArchivedRemovesCatalogAggregateAndPreservesAudit(t *testing.T) {
 	}
 
 	var skuCount, priceCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM billing_skus WHERE sku = $1`, result.SKU).Scan(&skuCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT count(*) FROM billing_skus WHERE sku = $1`, result.SKU).Scan(&skuCount); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM billing_price_versions WHERE sku = $1`, result.SKU).Scan(&priceCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT count(*) FROM billing_price_versions WHERE sku = $1`, result.SKU).Scan(&priceCount); err != nil {
 		t.Fatal(err)
 	}
 	if skuCount != 0 || priceCount != 0 {
@@ -287,7 +318,7 @@ func TestDeleteArchivedRemovesCatalogAggregateAndPreservesAudit(t *testing.T) {
 	var publishAuditCount, deleteAuditCount int
 	var deleteActorID int64
 	var deletedPriceCount string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT
   count(*) FILTER (WHERE action_type = 'create_price' AND price_version_id = $2),
   count(*) FILTER (WHERE action_type = 'delete_archived'),
@@ -306,7 +337,7 @@ WHERE sku = $1`, result.SKU, price.PriceVersionID).Scan(
 
 func TestDeleteArchivedSnapshotConflictRollsBackCompletely(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	price := publishDeleteCandidate(t, service, "test:delete-conflict")
 	insertFreeBillingSnapshot(t, db, "snapshot-delete-conflict", "test:delete-conflict", "Delete conflict", price)
 
@@ -316,7 +347,7 @@ func TestDeleteArchivedSnapshotConflictRollsBackCompletely(t *testing.T) {
 
 	var skuCount, priceCount, snapshotCount, deleteAuditCount int
 	var currentPriceID int64
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT
   (SELECT count(*) FROM billing_skus WHERE sku = 'test:delete-conflict'),
   (SELECT count(*) FROM billing_price_versions WHERE sku = 'test:delete-conflict'),
@@ -334,7 +365,7 @@ SELECT
 func TestDeleteArchivedSerializesConcurrentSnapshotInsertInBothLockOrders(t *testing.T) {
 	t.Run("delete lock first", func(t *testing.T) {
 		db, pool := testdb.OpenWithPool(t)
-		service := NewService(pool)
+		service := NewStore(pool)
 		price := publishDeleteCandidate(t, service, "test:delete-lock-first")
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
@@ -364,14 +395,14 @@ func TestDeleteArchivedSerializesConcurrentSnapshotInsertInBothLockOrders(t *tes
 			t.Fatal("concurrent Snapshot insert unexpectedly succeeded after Catalog delete committed")
 		}
 		var count int
-		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM billing_skus WHERE sku = 'test:delete-lock-first'`).Scan(&count); err != nil || count != 0 {
+		if err := db.QueryRow(ctx, `SELECT count(*) FROM billing_skus WHERE sku = 'test:delete-lock-first'`).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("deleted SKU count=%d error=%v", count, err)
 		}
 	})
 
 	t.Run("snapshot lock first", func(t *testing.T) {
 		db, pool := testdb.OpenWithPool(t)
-		service := NewService(pool)
+		service := NewStore(pool)
 		price := publishDeleteCandidate(t, service, "test:snapshot-lock-first")
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
@@ -400,7 +431,7 @@ func TestDeleteArchivedSerializesConcurrentSnapshotInsertInBothLockOrders(t *tes
 			t.Fatalf("DeleteArchived() error = %v, want ErrArchivedItemInUse", err)
 		}
 		var skuCount, snapshotCount, deleteAuditCount int
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT
   (SELECT count(*) FROM billing_skus WHERE sku = 'test:snapshot-lock-first'),
   (SELECT count(*) FROM task_billing_snapshots WHERE task_id = 'snapshot-lock-first'),
@@ -416,7 +447,7 @@ SELECT
 
 func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
+	service := NewStore(pool)
 	ctx := context.Background()
 
 	definition := testBillableDefinition("test:concurrent", "Concurrent")
@@ -507,7 +538,7 @@ INSERT INTO task_billing_snapshots (
   price_version, unit_credits, quantity, total_credits, quoted_at
 ) VALUES ($1, 1, 'test-feature', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
 
-func publishDeleteCandidate(t *testing.T, service *Service, sku SKU) PriceInfo {
+func publishDeleteCandidate(t *testing.T, service *Store, sku SKU) PriceInfo {
 	t.Helper()
 	price, err := service.PublishPrice(t.Context(), PublishPriceInput{
 		Definition:  testBillableDefinition(sku, strings.TrimPrefix(string(sku), "test:")),
@@ -521,12 +552,12 @@ func publishDeleteCandidate(t *testing.T, service *Service, sku SKU) PriceInfo {
 }
 
 type billingSnapshotExecer interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }
 
 func insertFreeBillingSnapshot(t *testing.T, db billingSnapshotExecer, taskID string, sku SKU, displayName string, price PriceInfo) {
 	t.Helper()
-	if _, err := db.ExecContext(t.Context(), freeBillingSnapshotInsertSQL,
+	if _, err := db.Exec(t.Context(), freeBillingSnapshotInsertSQL,
 		taskID, sku, displayName, price.PriceVersionID, price.Version, price.UnitCredits); err != nil {
 		t.Fatalf("insert free Billing Snapshot: %v", err)
 	}

@@ -212,7 +212,7 @@ CREATE TABLE system_settings_admin_actions (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT ck_system_settings_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
-    CONSTRAINT ck_system_settings_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('update_operational_settings'::character varying)::text, ('update_outbound_policy'::character varying)::text, ('update_search_providers'::character varying)::text]))),
+    CONSTRAINT ck_system_settings_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('update_operational_settings'::character varying)::text, ('update_outbound_policy'::character varying)::text, ('update_search_providers'::character varying)::text, ('update_ai_gateway'::character varying)::text, ('update_ai_gateway_model'::character varying)::text]))),
     CONSTRAINT system_settings_admin_actions_actor_id_check CHECK ((actor_id > 0))
 );
 

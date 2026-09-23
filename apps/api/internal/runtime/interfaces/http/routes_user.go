@@ -41,9 +41,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	if h.VisionHandler != nil {
 		userAPI.POST(RouteUserVisionExtract, requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
 	}
-	if h.SearchMetricsHandler != nil {
-		userAPI.POST("/search/metrics", h.SearchMetricsHandler.RecordImageFailure)
-	}
 	if h.LibraryHandler != nil {
 		userAPI.GET("/library/folders", h.LibraryHandler.ListFolders)
 		userAPI.POST("/library/folders", h.LibraryHandler.CreateFolder)

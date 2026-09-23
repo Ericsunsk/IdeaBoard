@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
-	runtimeports "ideaboard/api/internal/runtime/ports"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
@@ -29,16 +31,16 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	task := input.Task
 	if task == nil || strings.TrimSpace(task.TaskID) == "" {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("drawing task is missing"))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("drawing task is missing"))
 	}
 	correlationID := task.EnsureCorrelationID()
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("任务未分配模型，请先在后台配置功能模型"))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("任务未分配模型，请先在后台配置功能模型"))
 	}
 	provider, modelName, pathOverride, err := runtimeports.SplitGatewayModel(model)
 	if err != nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 	// Catalog route overrides fill gaps only: mapping @path always wins.
 	// A nil reader preserves mapping-only behavior (tests, minimal wiring).
@@ -46,7 +48,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	if pathOverride == "" && c != nil && c.modelRoutes != nil {
 		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, model)
 		if routeErr != nil {
-			return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf("读取模型路由配置失败: %w", routeErr))
+			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf("读取模型路由配置失败: %w", routeErr))
 		}
 		if found {
 			pathOverride = catalogPath
@@ -55,42 +57,52 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	params, err := c.parseAndNormalizeTaskParams(ctx, task)
 	if err != nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 	if params.ExecutionPlan == nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("drawing task requires a durable execution plan"))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("drawing task requires a durable execution plan"))
 	}
 	plan := *params.ExecutionPlan
 	operation := plan.RuntimeOperation()
-	adapter, err := domain.AdapterForOperation(operation)
+	// Single routing seam: operation dispatch, gateway path, and shaping
+	// dialect resolve together; execution and preview share dialects.Resolve.
+	route, err := dialects.Resolve(operation, provider, modelName, pathOverride, customParams)
 	if err != nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 	modelRequired := plan.RoutingRequirement().ModelRequirement() == workflow.RoutingModelRequired
 	if modelRequired && modelName == "" {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("operation requires a model"))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("operation requires a model"))
 	}
 	params, err = c.resolveRuntimeProviderTaskParams(ctx, params)
 	if err != nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 	providerReq, err := params.providerRequest(task.Prompt, model)
 	if err != nil {
-		return runtimeports.ProviderCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
 	}
 
 	slogInfoGatewayCall(task.TaskID, correlationID, provider, model, operation)
 	output := runtimeports.ProviderCallOutput{}
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
-	callResult, err := c.callGatewayAdapter(ctx, adapter, provider, modelName, pathOverride, customParams, providerReq, operation)
+	// Gateway log metadata stays searchable: task id + feature travel as
+	// cf-aig-metadata headers. Feature comes from canonical params (already
+	// validated above); empty stays empty rather than failing the call.
+	gatewayFeature := ""
+	if params.Canonical != nil {
+		gatewayFeature = strings.TrimSpace(params.Canonical.Feature)
+	}
+	callResult, err := c.callGatewayAdapter(ctx, task.TaskID, gatewayFeature, route, provider, modelName, customParams, providerReq, operation)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
+	applyGatewayReceipt(&output, callResult.Receipt, model)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return output, err
 		}
-		return output, newExecutionFailureError(
+		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
 			fmt.Errorf("调用 API 失败 (模型: %s): %w", model, err),
@@ -98,7 +110,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
 	if len(imageURLs) == 0 {
-		return output, newExecutionFailureError(
+		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
 			fmt.Errorf("API 未返回图片"),
@@ -124,14 +136,14 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		if errors.Is(err, context.Canceled) {
 			return output, err
 		}
-		if _, _, ok := executionFailureDetails(err); ok {
+		if _, _, ok := runtimeports.ExecutionFailureDetails(err); ok {
 			return output, err
 		}
-		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
 	}
 	if len(imageURLs) == 0 {
 		markFinalizeFinished()
-		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf("finalizer 未返回图片"))
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf("finalizer 未返回图片"))
 	}
 	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()
@@ -149,8 +161,21 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	output.Result = resultJSON
 	output.Outputs = taskOutputs
-	output.ResolvedModel = model
 	return output, nil
+}
+
+func applyGatewayReceipt(output *runtimeports.ProviderCallOutput, receipt runtimeports.GatewayReceipt, requestedModel string) {
+	if output == nil {
+		return
+	}
+	output.ResolvedModel = strings.TrimSpace(receipt.Model)
+	if output.ResolvedModel == "" {
+		output.ResolvedModel = strings.TrimSpace(requestedModel)
+	}
+	output.GatewayStep = strings.TrimSpace(receipt.Step)
+	output.CacheHit = receipt.CacheHit
+	output.ReceiptLogID = strings.TrimSpace(receipt.LogID)
+	output.ReceiptEventID = strings.TrimSpace(receipt.EventID)
 }
 
 func baseGatewayTaskResult(task *tasks.TaskPayload, model string, callResult providerCallResult, imageURLs []string) map[string]interface{} {
@@ -175,6 +200,30 @@ func gatewayCallTimeout(_ domain.ProviderRuntimeAdapter) time.Duration {
 	return defaultGatewayCallTimeout
 }
 
+// providerFailureCategory maps one provider call error to its failure
+// category. It inlines the former errors.go helper verbatim: timeout first,
+// then HTTP status mapping, provider error fallback.
+func providerFailureCategory(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return tasks.FailureCategoryTimeout
+	}
+	if status, ok := runtimeports.ProviderHTTPStatus(err); ok {
+		switch status {
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return tasks.FailureCategoryInputInvalid
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return tasks.FailureCategoryAuth
+		case http.StatusPaymentRequired:
+			return tasks.FailureCategoryQuota
+		case http.StatusRequestTimeout, http.StatusTooManyRequests:
+			return tasks.FailureCategoryTimeout
+		default:
+			return tasks.FailureCategoryProviderError
+		}
+	}
+	return tasks.FailureCategoryProviderError
+}
+
 func (c *Executor) gatewayClientForCall(ctx context.Context) (runtimeports.GatewayClient, error) {
 	if c == nil || c.gatewayFactory == nil {
 		return nil, fmt.Errorf("gateway client factory is not configured")
@@ -191,36 +240,29 @@ func (c *Executor) gatewayClientForCall(ctx context.Context) (runtimeports.Gatew
 
 func (c *Executor) callGatewayAdapter(
 	ctx context.Context,
-	adapter domain.ProviderRuntimeAdapter,
-	provider, model, pathOverride, customParams string,
+	taskID, feature string,
+	route dialects.Route,
+	provider, model, customParams string,
 	providerReq providerRequest,
 	operation workflow.RuntimeOperation,
 ) (providerCallResult, error) {
-	timeout := gatewayCallTimeout(adapter)
-	switch adapter {
+	timeout := gatewayCallTimeout(route.Adapter)
+	switch route.Adapter {
 	case domain.ProviderRuntimeAdapterModelImage:
-		return c.callGatewayModelImage(ctx, provider, model, pathOverride, customParams, providerReq, timeout)
+		return c.callGatewayModelImage(ctx, taskID, feature, provider, model, customParams, route, providerReq, operation, timeout)
 	case domain.ProviderRuntimeAdapterCutout:
-		path, err := cutoutGatewayPath(pathOverride)
-		if err != nil {
-			return providerCallResult{}, err
-		}
 		payload, err := buildCutoutGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, provider, model, path, payload, "抠图", timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, "抠图", timeout)
 	case domain.ProviderRuntimeAdapterUpscale:
-		path, err := upscaleGatewayPath(pathOverride)
-		if err != nil {
-			return providerCallResult{}, err
-		}
 		payload, err := buildUpscaleGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, provider, model, path, payload, "高清放大", timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, "高清放大", timeout)
 	default:
-		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", adapter)
+		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", route.Adapter)
 	}
 }

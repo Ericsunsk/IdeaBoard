@@ -2,14 +2,15 @@ package taskhttp
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
 	"testing"
+
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"ideaboard/api/internal/prompts"
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -20,7 +21,6 @@ import (
 type Service = taskapp.Service
 type ServiceDeps = taskapp.ServiceDeps
 type ServiceOptions = taskapp.ServiceOptions
-type AccountStore = taskapp.AccountStore
 type TaskSubmissionStore = taskapp.TaskSubmissionStore
 type FeaturePromptStore = taskapp.FeaturePromptStore
 type BillingReadiness = taskapp.BillingReadiness
@@ -32,6 +32,28 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 }
 func NewTaskIntake(deps taskapp.TaskIntakeDeps) taskapp.TaskIntake {
 	return taskapp.NewTaskIntake(deps)
+}
+
+type fakeIntakeModelStore struct {
+	model string
+	err   error
+}
+
+func (s *fakeIntakeModelStore) ResolveModel(ctx context.Context, _ string) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	if s.model != "" {
+		return s.model, nil
+	}
+	return "openai/gpt-image-1", nil
+}
+
+func modelStoreOrDefault(store taskapp.ModelStore) taskapp.ModelStore {
+	if store != nil {
+		return store
+	}
+	return &fakeIntakeModelStore{}
 }
 
 type testSubmitMediaValidator struct{}
@@ -130,63 +152,29 @@ func (s adminTaskDetailStoreStub) ListOutputsByTaskIDs(context.Context, []string
 	return map[string][]tasks.TaskOutput{}, nil
 }
 
-type fakeSubmitAccountStore struct {
-	accounts []*accounts.ApiAccount
-	err      error
-}
-
-func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.ApiAccount, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	result := make([]*accounts.ApiAccount, 0, len(s.accounts))
-	for _, account := range s.accounts {
-		if account == nil {
-			continue
-		}
-		copyAccount := *account
-		copyAccount.Capabilities = append([]string(nil), account.Capabilities...)
-		hasEnabledModel := false
-		for _, model := range account.Models {
-			hasEnabledModel = hasEnabledModel || model.Enabled
-		}
-		if hasEnabledModel {
-			hasGeneration := false
-			for _, capability := range copyAccount.Capabilities {
-				hasGeneration = hasGeneration || capability == "generation"
-			}
-			if !hasGeneration {
-				copyAccount.Capabilities = append(copyAccount.Capabilities, "generation")
-			}
-		}
-		result = append(result, &copyAccount)
-	}
-	return result, nil
-}
-
 type fakeCancelStore struct{}
 
 func (fakeCancelStore) MarkCancelled(context.Context, string, time.Duration) error { return nil }
 func (fakeCancelStore) IsCancelled(context.Context, string) (bool, error)          { return false, nil }
 func (fakeCancelStore) ClearCancelled(context.Context, string) error               { return nil }
 
-func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
+func createTaskServiceTestTask(t testing.TB, db *pgxpool.Pool, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
 	if task.Params == "" || task.Params == "{}" {
 		task.Params = `{"schema_version":5}`
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO users(id,display_name,storage_uid,role,status) VALUES($1,$2,$3,'user',1) ON CONFLICT(id) DO NOTHING`, task.UserID, fmt.Sprintf("taskhttp-fixture-user-%d", task.UserID), fmt.Sprintf("TH%04d", task.UserID%10000)); err != nil {
+	if _, err := db.Exec(ctx, `INSERT INTO users(id,display_name,storage_uid,role,status) VALUES($1,$2,$3,'user',1) ON CONFLICT(id) DO NOTHING`, task.UserID, fmt.Sprintf("taskhttp-fixture-user-%d", task.UserID), fmt.Sprintf("TH%04d", task.UserID%10000)); err != nil {
 		return fmt.Errorf("seed task fixture user: %w", err)
 	}
 	if task.Status == tasks.StatusRunning && task.AccountID == nil {
 		var endpointID, accountID, credentialID int64
-		if err := db.QueryRowContext(ctx, `INSERT INTO provider_endpoints(api_type,name,base_url,status) VALUES('openai-compatible',$1,'https://example.com/taskhttp-fixture',1) RETURNING id`, "taskhttp-fixture-"+task.TaskID).Scan(&endpointID); err != nil {
+		if err := db.QueryRow(ctx, `INSERT INTO provider_endpoints(api_type,name,base_url,status) VALUES('openai-compatible',$1,'https://example.com/taskhttp-fixture',1) RETURNING id`, "taskhttp-fixture-"+task.TaskID).Scan(&endpointID); err != nil {
 			return err
 		}
-		if err := db.QueryRowContext(ctx, `INSERT INTO api_accounts(name,provider_endpoint_id,max_concurrent,timeout,extra_config,status,weight) VALUES($1,$2,1,120,'',1,1) RETURNING id`, "taskhttp-fixture-"+task.TaskID, endpointID).Scan(&accountID); err != nil {
+		if err := db.QueryRow(ctx, `INSERT INTO api_accounts(name,provider_endpoint_id,max_concurrent,timeout,extra_config,status,weight) VALUES($1,$2,1,120,'',1,1) RETURNING id`, "taskhttp-fixture-"+task.TaskID, endpointID).Scan(&accountID); err != nil {
 			return err
 		}
-		if err := db.QueryRowContext(ctx, `INSERT INTO api_account_secrets(account_id,secret_material_kind,secret_payload,key_version,fingerprint,status) VALUES($1,'encrypted','fixture-secret','test-key',$2,'active') RETURNING id`, accountID, fmt.Sprintf("taskhttp-fixture-%d", accountID)).Scan(&credentialID); err != nil {
+		if err := db.QueryRow(ctx, `INSERT INTO api_account_secrets(account_id,secret_material_kind,secret_payload,key_version,fingerprint,status) VALUES($1,'encrypted','fixture-secret','test-key',$2,'active') RETURNING id`, accountID, fmt.Sprintf("taskhttp-fixture-%d", accountID)).Scan(&credentialID); err != nil {
 			return err
 		}
 		task.AccountID = &accountID
@@ -200,7 +188,6 @@ func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Reposit
 	return nil
 }
 
-var _ AccountStore = (*fakeSubmitAccountStore)(nil)
 var _ TaskSubmissionStore = (*recordingSubmissionStore)(nil)
 var _ FeaturePromptStore = (*fakeFeaturePromptStore)(nil)
 var _ taskmedia.Validator = testSubmitMediaValidator{}

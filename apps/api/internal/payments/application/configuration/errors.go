@@ -1,12 +1,11 @@
 package configuration
 
 import (
-	"database/sql"
-	"errors"
+	"ideaboard/api/internal/platform/database"
 )
 
 // IsNotFound identifies an absent published Stripe configuration without
 // exposing database details to application workflows.
 func IsNotFound(err error) bool {
-	return errors.Is(err, sql.ErrNoRows)
+	return database.IsNotFound(err)
 }

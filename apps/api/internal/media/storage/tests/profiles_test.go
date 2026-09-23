@@ -483,7 +483,7 @@ func TestListProfilesDoesNotExposeSecretByDefault(t *testing.T) {
 		t.Fatalf("SaveProfile returned error: %v", err)
 	}
 	var storedMaterialKind, storedPayload string
-	if err := repo.DB.QueryRowContext(ctx, `
+	if err := repo.DB.QueryRow(ctx, `
 SELECT secret_material_kind, secret_payload
 FROM storage_profile_secret_versions
 WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
@@ -545,7 +545,7 @@ func TestStorageSecretRotationAppendsVersionsAndRetiresPreviousActive(t *testing
 		t.Fatalf("SaveProfile v2 returned error: %v", err)
 	}
 
-	rows, err := repo.DB.QueryContext(ctx, `
+	rows, err := repo.DB.Query(ctx, `
 SELECT version_number, status
 FROM storage_profile_secret_versions
 WHERE profile_id = $1 AND secret_name = $2
@@ -868,7 +868,7 @@ func TestStorageSecretVersionsAllowOnlyOneActivePerProfile(t *testing.T) {
 		t.Fatalf("SaveProfile returned error: %v", err)
 	}
 
-	_, err := repo.DB.ExecContext(ctx, `
+	_, err := repo.DB.Exec(ctx, `
 INSERT INTO storage_profile_secret_versions (
   profile_id, secret_name, version_number, secret_material_kind, secret_payload, fingerprint, status
 ) VALUES ($1, $2, 99, 'encrypted', 'duplicate-active', 'duplicate-fingerprint', 'active')`,
@@ -934,7 +934,7 @@ func TestListProfilesWithSecretsFailsOnUnsupportedExternalSecretMaterial(t *test
 		t.Fatalf("SaveProfile returned error: %v", err)
 	}
 
-	if _, err := repo.DB.ExecContext(ctx, `
+	if _, err := repo.DB.Exec(ctx, `
 UPDATE storage_profile_secret_versions
 SET secret_material_kind = 'external_ref',
     secret_payload = '',
@@ -981,18 +981,8 @@ func TestListProfilesWithSecretsFailsOnWrongEncryptionKey(t *testing.T) {
 }
 
 func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
+	withTempWorkingDir(t)
 	service, _ := newStorageServiceTest(t)
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
-	}
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("chdir temp: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(oldWd)
-	})
 
 	uploadPath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "image.png")
 	if err := os.MkdirAll(filepath.Dir(uploadPath), 0o755); err != nil {
@@ -1014,6 +1004,7 @@ func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
 func TestReadUploadResourceByURLUsesAssetStorageAfterCurrentProfileChanges(t *testing.T) {
 	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
 	t.Cleanup(restore)
+	withTempWorkingDir(t)
 
 	s3Server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
@@ -1055,16 +1046,6 @@ func TestReadUploadResourceByURLUsesAssetStorageAfterCurrentProfileChanges(t *te
 		t.Fatalf("active provider = %q, want %q", activeProfile.Provider, StorageProviderS3Compatible)
 	}
 
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
-	}
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("chdir temp: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(oldWd) })
-
 	const oldLocalURL = "https://old-media.example.com/" + oldLocalObjectKey
 	oldLocalPath := filepath.FromSlash(oldLocalObjectKey)
 	if err := os.MkdirAll(filepath.Dir(oldLocalPath), 0o755); err != nil {
@@ -1093,49 +1074,26 @@ func (l staticStoredUploadLocator) LocateStoredUpload(context.Context, StoredUpl
 	return l.location, l.location.StorageProfileID != "", l.err
 }
 
-func TestStoreMediaRefCopiesInternalUpload(t *testing.T) {
+func TestStoreMediaRefRejectsLocalUploadRef(t *testing.T) {
+	withTempWorkingDir(t)
 	service, _ := newStorageServiceTest(t)
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
-	}
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("chdir temp: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(oldWd)
-	})
 
+	// Local uploads are copied through UploadRef/StoreBytesRef, never
+	// downloaded: StoreMediaRef only accepts data: payloads and remote URLs.
 	sourceRef := "/uploads/canvas/OWNR1A/board-1/content/image.png"
 	sourcePath := filepath.FromSlash(strings.TrimPrefix(sourceRef, "/"))
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatalf("mkdir upload dir: %v", err)
 	}
-	pngData := tinyPNGBytes(t)
-	if err := os.WriteFile(sourcePath, pngData, 0o600); err != nil {
+	if err := os.WriteFile(sourcePath, tinyPNGBytes(t), 0o600); err != nil {
 		t.Fatalf("write upload: %v", err)
 	}
 
-	stored, err := service.StoreMediaRef(context.Background(), sourceRef, StorageStoreOptions{
+	_, err := service.StoreMediaRef(context.Background(), sourceRef, StorageStoreOptions{
 		DirPrefix: "tasks/1/prepare-action",
 	})
-	if err != nil {
-		t.Fatalf("StoreMediaRef returned error: %v", err)
-	}
-	if stored.URL == sourceRef || !strings.HasPrefix(stored.URL, "/uploads/tasks/1/prepare-action/") {
-		t.Fatalf("stored URL = %q, want prepared task upload", stored.URL)
-	}
-	if stored.MIMEType != "image/png" || stored.Width != 1 || stored.Height != 1 {
-		t.Fatalf("stored metadata = %#v, want 1x1 image/png", stored)
-	}
-
-	copied, err := service.ReadUploadResourceByURL(context.Background(), stored.URL, int64(len(pngData)))
-	if err != nil {
-		t.Fatalf("read copied upload: %v", err)
-	}
-	if !bytes.Equal(copied.Data, pngData) {
-		t.Fatal("copied upload data differs from source")
+	if err == nil || !strings.Contains(err.Error(), "http/https") {
+		t.Fatalf("StoreMediaRef(local ref) error = %v, want http/https rejection", err)
 	}
 }
 
@@ -1173,7 +1131,7 @@ func storageSecretRotationProfileForTest(profileID, secret string) StorageProfil
 
 func loadStorageSecretVersionStatesForTest(t *testing.T, repo *StorageProfileRepository, profileID string) []storageSecretVersionStateForTest {
 	t.Helper()
-	rows, err := repo.DB.QueryContext(context.Background(), `
+	rows, err := repo.DB.Query(context.Background(), `
 SELECT version_number, status
 FROM storage_profile_secret_versions
 WHERE profile_id = $1 AND secret_name = $2

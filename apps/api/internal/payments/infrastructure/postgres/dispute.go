@@ -2,20 +2,20 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/credits/domain"
-	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/credits/ports"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 const disputeReconciliationInterval = time.Hour
@@ -25,17 +25,17 @@ func (r *Repository) ConvergePaymentDispute(ctx context.Context, provider paymen
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
-	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, nil)
+	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, fmt.Errorf("begin Dispute transaction: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	dispute, changed, err := r.convergePaymentDisputeTx(ctx, tx, provider, desiredStatus, now)
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
 	return dispute, changed, nil
@@ -53,7 +53,7 @@ func normalizePaymentDisputeProvider(r *Repository, provider paymentports.Stripe
 	return provider, paymentsdomain.CanonicalPaymentDisputeStatus(provider.Status), nil
 }
 
-func (r *Repository) convergePaymentDisputeTx(ctx context.Context, tx *sql.Tx, provider paymentports.StripeDispute, desiredStatus paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
+func (r *Repository) convergePaymentDisputeTx(ctx context.Context, tx pgx.Tx, provider paymentports.StripeDispute, desiredStatus paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
 	order, err := r.loadEligibleDisputeOrder(ctx, tx, provider)
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
@@ -67,16 +67,16 @@ func (r *Repository) convergePaymentDisputeTx(ctx context.Context, tx *sql.Tx, p
 		updated.PublicOrderNumber = order.PublicNumber
 		return updated, changed, nil
 	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
 	return createPaymentDisputeInTx(ctx, tx, order, provider, desiredStatus, now)
 }
 
-func (r *Repository) loadEligibleDisputeOrder(ctx context.Context, tx *sql.Tx, provider paymentports.StripeDispute) (paymentRefundOrderFacts, error) {
+func (r *Repository) loadEligibleDisputeOrder(ctx context.Context, tx pgx.Tx, provider paymentports.StripeDispute) (paymentRefundOrderFacts, error) {
 	order, err := r.paymentRefundOrderForCharge(ctx, tx, provider.ChargeID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return paymentRefundOrderFacts{}, paymentcontracts.ErrDisputeOrderNotEligible
 		}
 		return paymentRefundOrderFacts{}, err
@@ -87,7 +87,7 @@ func (r *Repository) loadEligibleDisputeOrder(ctx context.Context, tx *sql.Tx, p
 	return order, nil
 }
 
-func createPaymentDisputeInTx(ctx context.Context, tx *sql.Tx, order paymentRefundOrderFacts, provider paymentports.StripeDispute, desiredStatus paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
+func createPaymentDisputeInTx(ctx context.Context, tx pgx.Tx, order paymentRefundOrderFacts, provider paymentports.StripeDispute, desiredStatus paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
 	target, err := availablePaymentDisputeIdeas(ctx, tx, order, provider.AmountMinor)
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
@@ -104,13 +104,13 @@ func createPaymentDisputeInTx(ctx context.Context, tx *sql.Tx, order paymentRefu
 	return dispute, true, nil
 }
 
-func availablePaymentDisputeIdeas(ctx context.Context, tx *sql.Tx, order paymentRefundOrderFacts, amountMinor int64) (int64, error) {
+func availablePaymentDisputeIdeas(ctx context.Context, tx pgx.Tx, order paymentRefundOrderFacts, amountMinor int64) (int64, error) {
 	target := paymentsdomain.ProportionalDisputeIdeas(amountMinor, order.PaidTotal, order.IdeaQuantity)
 	if target > order.IdeaQuantity {
 		target = order.IdeaQuantity
 	}
 	var occupied int64
-	if err := tx.QueryRowContext(ctx, `
+	if err := tx.QueryRow(ctx, `
 SELECT
   COALESCE((SELECT SUM(idea_quantity) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')), 0)
   + COALESCE((SELECT SUM(target_idea_quantity) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')), 0)`, order.ID).Scan(&occupied); err != nil {
@@ -144,8 +144,8 @@ func newPaymentDispute(order paymentRefundOrderFacts, provider paymentports.Stri
 	return dispute
 }
 
-func insertPaymentDispute(ctx context.Context, tx *sql.Tx, dispute paymentsdomain.PaymentDispute, now time.Time) error {
-	if _, err := tx.ExecContext(ctx, `
+func insertPaymentDispute(ctx context.Context, tx pgx.Tx, dispute paymentsdomain.PaymentDispute, now time.Time) error {
+	if _, err := tx.Exec(ctx, `
 INSERT INTO payment_disputes (
   id, payment_order_id, user_id, stripe_dispute_id, stripe_charge_id, stripe_payment_intent_id,
   provider_status, status, amount_minor, currency, target_idea_quantity, debited_idea_quantity,
@@ -164,8 +164,8 @@ INSERT INTO payment_disputes (
 	return nil
 }
 
-func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *paymentsdomain.PaymentDispute) error {
-	restrictions := credits.RestrictionsInSQLTx(tx)
+func applyNewPaymentDisputeRecovery(ctx context.Context, tx pgx.Tx, dispute *paymentsdomain.PaymentDispute) error {
+	restrictions := credits.RestrictionsInTx(tx)
 	change, err := restrictions.RestrictWallet(ctx, ports.RestrictWalletCommand{
 		UserID: dispute.UserID, Type: "payment_dispute", Source: "stripe_dispute",
 		RelatedObject: domain.BusinessReference{Type: "payment_dispute", ID: dispute.ID},
@@ -183,7 +183,7 @@ func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *pa
 	if err != nil {
 		return err
 	}
-	commands, err := credits.CommandsInSQLTx(tx)
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func applyNewPaymentDisputeRecovery(ctx context.Context, tx *sql.Tx, dispute *pa
 	return nil
 }
 
-func convergeExistingPaymentDispute(ctx context.Context, tx *sql.Tx, dispute paymentsdomain.PaymentDispute, provider paymentports.StripeDispute, desired paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
+func convergeExistingPaymentDispute(ctx context.Context, tx pgx.Tx, dispute paymentsdomain.PaymentDispute, provider paymentports.StripeDispute, desired paymentsdomain.PaymentDisputeStatus, now time.Time) (paymentsdomain.PaymentDispute, bool, error) {
 	if err := validateExistingPaymentDispute(dispute, provider, desired); err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
@@ -225,7 +225,7 @@ func convergeExistingPaymentDispute(ctx context.Context, tx *sql.Tx, dispute pay
 	dispute.ProviderStatus = provider.Status
 	dispute.UpdatedAt = now
 	dispute.NextReconciliationAt = now.Add(disputeReconciliationInterval)
-	_, err := tx.ExecContext(ctx, `
+	_, err := tx.Exec(ctx, `
 UPDATE payment_disputes
 SET provider_status = $2, status = $3, restore_transaction_id = NULLIF($4, ''), closed_at = $5,
     unrecovered_credits = $6, next_reconciliation_at = $7, updated_at = $8
@@ -249,13 +249,13 @@ func validateExistingPaymentDispute(dispute paymentsdomain.PaymentDispute, provi
 	return nil
 }
 
-func recoverWonPaymentDispute(ctx context.Context, tx *sql.Tx, dispute *paymentsdomain.PaymentDispute) error {
+func recoverWonPaymentDispute(ctx context.Context, tx pgx.Tx, dispute *paymentsdomain.PaymentDispute) error {
 	if dispute.DebitedIdeaQuantity > 0 && dispute.RestoreTransactionID == "" {
 		amount, err := domain.NewCreditAmount(dispute.DebitedIdeaQuantity)
 		if err != nil {
 			return err
 		}
-		commands, err := credits.CommandsInSQLTx(tx)
+		commands, err := credits.CommandsInTx(tx)
 		if err != nil {
 			return err
 		}
@@ -275,15 +275,15 @@ func recoverWonPaymentDispute(ctx context.Context, tx *sql.Tx, dispute *payments
 	if dispute.RestrictionID == "" {
 		return nil
 	}
-	_, err := credits.RestrictionsInSQLTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
+	_, err := credits.RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ports.ReleaseWalletRestrictionCommand{
 		RestrictionID: dispute.RestrictionID, Reason: "Stripe Dispute won",
 		Actor: domain.Actor{Type: domain.ActorService, ID: "payments"},
 	})
 	return err
 }
 
-func getPaymentDisputeInTx(ctx context.Context, tx *sql.Tx, stripeDisputeID string) (paymentsdomain.PaymentDispute, error) {
-	dispute, err := scanPaymentDispute(tx.QueryRowContext(ctx, `
+func getPaymentDisputeInTx(ctx context.Context, tx pgx.Tx, stripeDisputeID string) (paymentsdomain.PaymentDispute, error) {
+	dispute, err := scanPaymentDispute(tx.QueryRow(ctx, `
 SELECT id::text, payment_order_id::text, user_id, stripe_dispute_id, stripe_charge_id,
        stripe_payment_intent_id, provider_status, status, amount_minor, currency,
        target_idea_quantity, debited_idea_quantity, unrecovered_credits,
@@ -300,14 +300,17 @@ func (r *Repository) GetPaymentDisputeByStripeID(ctx context.Context, stripeDisp
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentDispute{}, paymentcontracts.ErrDisputeUnavailable
 	}
-	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, nil)
+	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	dispute, err := getPaymentDisputeInTx(ctx, tx, strings.TrimSpace(stripeDisputeID))
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, err
 	}
-	return dispute, tx.Commit()
+	if err := tx.Commit(ctx); err != nil {
+		return paymentsdomain.PaymentDispute{}, err
+	}
+	return dispute, nil
 }

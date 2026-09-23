@@ -52,6 +52,10 @@ func (s fakeStatsStore) ListDailyStatsByDateRange(context.Context, time.Time, ti
 	return nil, errors.New("not implemented")
 }
 
+func (s fakeStatsStore) ListDailyCaptureCreditsByRange(context.Context, time.Time, time.Time, *time.Location) (map[string]int64, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s fakeStatsStore) ListExecutionBottleneckStatsByCreatedRange(context.Context, time.Time, time.Time) ([]statisticscontracts.ExecutionBottleneckAggregate, error) {
 	return nil, errors.New("not implemented")
 }
@@ -196,17 +200,11 @@ func TestAdminMonitorDataFromRuntimeNormalizesNilCollections(t *testing.T) {
 	if data.GoldenSignals.SampleCount != 3 {
 		t.Fatalf("golden signal sample count=%d, want 3", data.GoldenSignals.SampleCount)
 	}
-	if data.AccountLoads == nil {
-		t.Fatal("account loads should be an empty object map, got nil")
-	}
 	if data.ExecutionPressure == nil {
 		t.Fatal("execution pressure should be an empty array, got nil")
 	}
 
 	empty := adminMonitorDataFromRuntime(nil, nil, MonitorGoldenSignals{})
-	if empty.AccountLoads == nil {
-		t.Fatal("nil runtime info should still return an empty account loads map")
-	}
 	if empty.ExecutionPressure == nil {
 		t.Fatal("nil runtime info should still return an empty execution pressure array")
 	}
@@ -264,9 +262,6 @@ func TestStreamMonitorSendsInitialSnapshot(t *testing.T) {
 			GlobalQueueLen:  3,
 			WaitQueueLen:    2,
 			RunningAttempts: 1,
-			AccountLoads: map[int64]*tasks.AccountLoad{
-				9: {CurrentConcurrent: 1, MaxConcurrent: 4},
-			},
 		}},
 	)
 

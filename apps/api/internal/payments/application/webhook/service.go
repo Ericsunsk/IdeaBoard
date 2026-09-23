@@ -2,10 +2,10 @@ package webhook
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/platform/database"
 	"strings"
 	"time"
 
@@ -224,7 +224,7 @@ func (s *Service) processRefund(ctx context.Context, event paymentports.StripeWe
 		return paymentports.ErrMalformedWebhookPayload
 	}
 	refund, err := s.convergence.GetPaymentRefundByStripeID(ctx, event.ObjectID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return s.processExternalRefund(ctx, event.ObjectID, credentialID)
 	}
 	if err != nil {
@@ -262,7 +262,7 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 			}
 			return anomalyErr
 		}
-		if errors.Is(createErr, sql.ErrNoRows) || errors.Is(createErr, paymentcontracts.ErrRefundOrderNotEligible) {
+		if database.IsNotFound(createErr) || errors.Is(createErr, paymentcontracts.ErrRefundOrderNotEligible) {
 			return nil
 		}
 		return createErr

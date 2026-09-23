@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/pagination"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -315,18 +316,15 @@ func parsePositiveID(raw string) (int64, bool) {
 }
 
 func parseLimit(raw string) (int, error) {
-	if strings.TrimSpace(raw) == "" {
-		return DefaultPageSize, nil
-	}
-	limit, err := strconv.Atoi(raw)
-	if err != nil || limit < 1 || limit > MaxPageSize {
+	limit, err := pagination.ParseLimit(raw)
+	if err != nil {
 		return 0, ErrInvalidPageSize
 	}
 	return limit, nil
 }
 
 func writeLibraryError(c *gin.Context, err error) {
-	status, code := http.StatusBadRequest, "library_request_invalid"
+	status, code := http.StatusInternalServerError, "library_operation_failed"
 	switch {
 	case errors.Is(err, ErrFolderNameConflict):
 		status, code = http.StatusConflict, "library_folder_name_conflict"
@@ -337,19 +335,19 @@ func writeLibraryError(c *gin.Context, err error) {
 	case errors.Is(err, ErrAssetNotFound):
 		status, code = http.StatusNotFound, "library_asset_not_found"
 	case errors.Is(err, ErrInvalidProvider):
-		code = "library_asset_provider_invalid"
+		status, code = http.StatusBadRequest, "library_asset_provider_invalid"
 	case errors.Is(err, ErrInvalidSource):
-		code = "library_asset_source_invalid"
+		status, code = http.StatusBadRequest, "library_asset_source_invalid"
 	case errors.Is(err, ErrInvalidTargetFolder):
-		code = "library_asset_target_folder_invalid"
+		status, code = http.StatusBadRequest, "library_asset_target_folder_invalid"
 	case errors.Is(err, ErrInvalidFolderName):
-		code = "library_folder_name_invalid"
+		status, code = http.StatusBadRequest, "library_folder_name_invalid"
 	case errors.Is(err, ErrInvalidCursor):
-		code = "library_cursor_invalid"
+		status, code = http.StatusBadRequest, "library_cursor_invalid"
 	case errors.Is(err, ErrInvalidPageSize):
-		code = "library_page_size_invalid"
+		status, code = http.StatusBadRequest, "library_page_size_invalid"
 	case errors.Is(err, ErrInvalidOwner):
-		status = http.StatusUnauthorized
+		status, code = http.StatusUnauthorized, "library_owner_invalid"
 	case errors.Is(err, ErrMaterializerUnavailable):
 		status, code = http.StatusServiceUnavailable, "library_materialization_unavailable"
 	}

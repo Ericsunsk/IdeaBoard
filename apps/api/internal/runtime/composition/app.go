@@ -96,7 +96,7 @@ func runInitCreditWallets(args []string) {
 		fatal("failed to parse verified identities", "err", err)
 	}
 	ctx := context.Background()
-	pool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
+	pool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(cfg.Database), cfg.Database.Pool)
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}
@@ -137,7 +137,7 @@ func runInitAdmin() {
 		fatal("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
 	}
 	ctx := context.Background()
-	pool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
+	pool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(cfg.Database), cfg.Database.Pool)
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}

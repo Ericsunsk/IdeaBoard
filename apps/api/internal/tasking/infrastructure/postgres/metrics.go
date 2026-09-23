@@ -2,12 +2,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	tasks "ideaboard/api/internal/tasking/domain"
-	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
 	statisticscontracts "ideaboard/api/internal/tasking/ports/statistics"
 	"strings"
 	"time"
@@ -120,180 +118,6 @@ func (r *Repository) PatchExecutionSnapshot(ctx context.Context, snapshot tasks.
 	})
 }
 
-func (r *Repository) CreateTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
-	taskID := strings.TrimSpace(start.TaskID)
-	if taskID == "" {
-		return tasks.TaskAttemptRef{}, fmt.Errorf("task_id is required")
-	}
-	if start.CredentialID <= 0 {
-		return tasks.TaskAttemptRef{}, fmt.Errorf("credential_id is required")
-	}
-	providerStartedAt := start.ProviderStartedAt
-	if providerStartedAt.IsZero() {
-		providerStartedAt = time.Now()
-	}
-	row, err := r.q.CreateTaskAttempt(ctx, dbsqlc.CreateTaskAttemptParams{
-		TaskID:             taskID,
-		RiverJobID:         start.RiverJobID,
-		LeaseToken:         strings.TrimSpace(start.LeaseToken),
-		AccountID:          start.AccountID,
-		ProviderEndpointID: start.ProviderEndpointID,
-		CredentialID:       start.CredentialID,
-		ProviderStartedAt:  sql.NullTime{Time: providerStartedAt, Valid: true},
-	})
-	if err != nil {
-		return tasks.TaskAttemptRef{}, err
-	}
-	return tasks.TaskAttemptRef{
-		ID: row.ID, LeaseID: row.LeaseID, AttemptNo: int(row.AttemptNo),
-		TaskID: taskID, LeaseToken: strings.TrimSpace(start.LeaseToken),
-		AccountID: start.AccountID, ProviderEndpointID: start.ProviderEndpointID,
-		CredentialID: start.CredentialID,
-	}, nil
-}
-
-func (r *Repository) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error) {
-	if finish.ID == 0 {
-		return 0, fmt.Errorf("task_attempt id is required")
-	}
-	if err := validateTaskAttemptFinishIdentity(finish); err != nil {
-		return 0, err
-	}
-	return r.q.FinishTaskAttempt(ctx, finishTaskAttemptParams(finish))
-}
-
-func finishTaskAttemptTx(ctx context.Context, q *dbsqlc.Queries, finish *tasks.TaskAttemptFinish) error {
-	if finish == nil || finish.ID == 0 {
-		return nil
-	}
-	updated, err := q.FinishTaskAttempt(ctx, finishTaskAttemptParams(*finish))
-	if err != nil {
-		return err
-	}
-	if updated == 0 {
-		return fmt.Errorf("%w: finish task attempt affected 0 rows, want 1", runtimecontracts.ErrTaskLeaseStateConflict)
-	}
-	if updated > 1 {
-		return fmt.Errorf("finish task attempt affected %d rows, want 1", updated)
-	}
-	return nil
-}
-
-func finishTaskAttemptParams(finish tasks.TaskAttemptFinish) dbsqlc.FinishTaskAttemptParams {
-	status := strings.TrimSpace(finish.Status)
-	if status == "" {
-		status = tasks.TaskAttemptStatusFailed
-	}
-	failureStage := strings.TrimSpace(finish.FailureStage)
-	failureCategory := strings.TrimSpace(finish.FailureCategory)
-	errorMsg := strings.TrimSpace(finish.ErrorMsg)
-	switch status {
-	case tasks.TaskAttemptStatusCompleted:
-		failureStage = ""
-		failureCategory = ""
-		errorMsg = ""
-	case tasks.TaskAttemptStatusCancelled:
-		if failureStage == "" {
-			failureStage = tasks.ExecutionStageQueued
-		}
-		failureCategory = tasks.FailureCategoryCancelled
-		if errorMsg == "" {
-			errorMsg = "task cancelled"
-		}
-	case tasks.TaskAttemptStatusFailed, tasks.TaskAttemptStatusRequeued:
-		if failureStage == "" {
-			failureStage = tasks.ExecutionStageAssigned
-		}
-		if failureCategory == "" {
-			failureCategory = tasks.FailureCategoryUnknown
-		}
-		if errorMsg == "" {
-			errorMsg = "task attempt finished"
-		}
-	}
-	completedAt := finish.CompletedAt
-	if completedAt.IsZero() {
-		completedAt = time.Now()
-	}
-	return dbsqlc.FinishTaskAttemptParams{
-		Status:             status,
-		FailureStage:       failureStage,
-		FailureCategory:    failureCategory,
-		ErrorMsg:           errorMsg,
-		ProviderFinishedAt: dbutil.NullTime(finish.ProviderFinishedAt),
-		FinalizeStartedAt:  dbutil.NullTime(finish.FinalizeStartedAt),
-		FinalizeFinishedAt: dbutil.NullTime(finish.FinalizeFinishedAt),
-		ProviderLatencyMs:  finish.ProviderLatencyMS,
-		FinalizeLatencyMs:  finish.FinalizeLatencyMS,
-		TotalLatencyMs:     finish.TotalLatencyMS,
-		CompletedAt:        sql.NullTime{Time: completedAt, Valid: true},
-		ID:                 finish.ID,
-		TaskID:             strings.TrimSpace(finish.TaskID),
-		AccountID:          finish.AccountID,
-		ProviderEndpointID: finish.ProviderEndpointID,
-		CredentialID:       finish.CredentialID,
-		LeaseToken:         strings.TrimSpace(finish.LeaseToken),
-	}
-}
-
-func validateTaskAttemptFinishIdentity(finish tasks.TaskAttemptFinish) error {
-	if strings.TrimSpace(finish.TaskID) == "" {
-		return fmt.Errorf("task_attempt task_id is required")
-	}
-	if finish.AccountID <= 0 || finish.ProviderEndpointID <= 0 || finish.CredentialID <= 0 {
-		return fmt.Errorf("task_attempt active lease identity is required")
-	}
-	if strings.TrimSpace(finish.LeaseToken) == "" {
-		return fmt.Errorf("task_attempt lease_token is required")
-	}
-	return nil
-}
-
-func taskAttemptFinishWithLeaseIdentity(
-	finish *tasks.TaskAttemptFinish,
-	taskID string,
-	accountID int64,
-	providerEndpointID int64,
-	credentialID int64,
-	leaseToken string,
-) (*tasks.TaskAttemptFinish, error) {
-	if finish == nil || finish.ID == 0 {
-		return finish, nil
-	}
-	taskID = strings.TrimSpace(taskID)
-	leaseToken = strings.TrimSpace(leaseToken)
-	if value := strings.TrimSpace(finish.TaskID); value != "" && value != taskID {
-		return nil, fmt.Errorf("task_attempt task_id=%q conflicts with active lease task_id=%q", value, taskID)
-	}
-	if finish.AccountID > 0 && finish.AccountID != accountID {
-		return nil, fmt.Errorf("task_attempt account_id=%d conflicts with active lease account_id=%d", finish.AccountID, accountID)
-	}
-	if finish.ProviderEndpointID > 0 && finish.ProviderEndpointID != providerEndpointID {
-		return nil, fmt.Errorf(
-			"task_attempt provider_endpoint_id=%d conflicts with active lease provider_endpoint_id=%d",
-			finish.ProviderEndpointID,
-			providerEndpointID,
-		)
-	}
-	if finish.CredentialID > 0 && finish.CredentialID != credentialID {
-		return nil, fmt.Errorf("task_attempt credential_id=%d conflicts with active lease credential_id=%d", finish.CredentialID, credentialID)
-	}
-	if value := strings.TrimSpace(finish.LeaseToken); value != "" && value != leaseToken {
-		return nil, fmt.Errorf("task_attempt lease_token conflicts with active lease")
-	}
-
-	result := *finish
-	result.TaskID = taskID
-	result.AccountID = accountID
-	result.ProviderEndpointID = providerEndpointID
-	result.CredentialID = credentialID
-	result.LeaseToken = leaseToken
-	if err := validateTaskAttemptFinishIdentity(result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func (r *Repository) ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]statisticscontracts.MonitorExecutionPressureAggregate, error) {
 	if start.IsZero() || now.IsZero() {
 		return nil, fmt.Errorf("monitor execution pressure date range is required")
@@ -302,8 +126,8 @@ func (r *Repository) ListMonitorExecutionPressureByRange(ctx context.Context, st
 		return nil, fmt.Errorf("monitor execution pressure now_at must be after started_at")
 	}
 	rows, err := r.q.ListMonitorExecutionPressureByRange(ctx, dbsqlc.ListMonitorExecutionPressureByRangeParams{
-		NowAt:     now,
-		StartedAt: start,
+		NowAt:     dbutil.TimestamptzFromTime(now),
+		StartedAt: dbutil.TimestamptzFromTime(start),
 	})
 	if err != nil {
 		return nil, err
@@ -367,8 +191,6 @@ attempt_samples AS (
     COUNT(*) FILTER (
       WHERE ta.provider_started_at IS NOT NULL
         OR ta.provider_finished_at IS NOT NULL
-        OR ta.provider_latency_ms > 0
-        OR ta.status IN ('completed', 'failed', 'requeued')
     ) AS provider_attempts,
     COUNT(*) FILTER (
       WHERE ta.status IN ('failed', 'requeued')
@@ -377,7 +199,7 @@ attempt_samples AS (
           OR ta.failure_category IN ('auth', 'quota', 'timeout', 'provider_error')
         )
     ) AS provider_errors
-  FROM task_attempts ta
+  FROM task_execution_attempts ta
   JOIN task_samples s ON s.task_id = ta.task_id
   GROUP BY ta.task_id
 )
@@ -444,8 +266,8 @@ func (r *Repository) ListExecutionMetricsByTaskIDs(ctx context.Context, taskIDs 
 
 func (r *Repository) ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.ExecutionBottleneckAggregate, error) {
 	rows, err := r.q.ListTaskExecutionBottleneckStatsByCreatedRange(ctx, dbsqlc.ListTaskExecutionBottleneckStatsByCreatedRangeParams{
-		StartedAt: start,
-		EndedAt:   end,
+		StartedAt: dbutil.TimestamptzFromTime(start),
+		EndedAt:   dbutil.TimestamptzFromTime(end),
 	})
 	if err != nil {
 		return nil, err
@@ -464,8 +286,8 @@ func (r *Repository) ListExecutionBottleneckStatsByCreatedRange(ctx context.Cont
 
 func (r *Repository) ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.ExecutionFailureCategoryAggregate, error) {
 	rows, err := r.q.ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx, dbsqlc.ListTaskExecutionFailureCategoryStatsByCreatedRangeParams{
-		StartedAt: start,
-		EndedAt:   end,
+		StartedAt: dbutil.TimestamptzFromTime(start),
+		EndedAt:   dbutil.TimestamptzFromTime(end),
 	})
 	if err != nil {
 		return nil, err

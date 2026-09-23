@@ -17,7 +17,7 @@ func insertRetentionTestTask(t testing.TB, ctx context.Context, repo *Repository
 			cancelledAt = *terminalAt
 		}
 	}
-	_, err := repo.db.ExecContext(ctx, `
+	_, err := repo.db.Exec(ctx, `
 INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result, cancel_reason, completed_at, cancelled_at)
 VALUES ($1, $2, 'retention probe', 'retention probe', '{}', $3, $4, '', $5, $6, $7)`,
 		taskID, userID, status, errorMsg, cancelReason, completedAt, cancelledAt,
@@ -33,7 +33,7 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 	repo := NewRepository(db)
 
 	var userID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO users (display_name, storage_uid) VALUES ('retention-test', 'RTT001') RETURNING id`).Scan(&userID); err != nil {
+	if err := db.QueryRow(ctx, `INSERT INTO users (display_name, storage_uid) VALUES ('retention-test', 'RTT001') RETURNING id`).Scan(&userID); err != nil {
 		t.Fatalf("insert retention user: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 		{`INSERT INTO task_execution_attempts (task_id, attempt_no, execution_token) VALUES ('ret-old-completed', 1, 'retention-token-1')`, nil},
 		{`INSERT INTO task_execution_metrics (task_id) VALUES ('ret-old-completed')`, nil},
 	} {
-		if _, err := repo.db.ExecContext(ctx, seed.query, seed.args...); err != nil {
+		if _, err := repo.db.Exec(ctx, seed.query, seed.args...); err != nil {
 			t.Fatalf("seed retention dependent: %v", err)
 		}
 	}
@@ -77,7 +77,7 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 
 	for _, taskID := range []string{"ret-old-completed", "ret-old-failed", "ret-old-cancelled", "ret-old-cancelled-results"} {
 		var remaining int
-		if err := repo.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&remaining); err != nil {
+		if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&remaining); err != nil {
 			t.Fatalf("count remaining %s: %v", taskID, err)
 		}
 		if remaining != 0 {
@@ -86,7 +86,7 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 	}
 	for _, taskID := range []string{"ret-young-completed", "ret-old-running"} {
 		var remaining int
-		if err := repo.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&remaining); err != nil {
+		if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&remaining); err != nil {
 			t.Fatalf("count kept %s: %v", taskID, err)
 		}
 		if remaining != 1 {
@@ -104,7 +104,7 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 		{"cancellations", `SELECT COUNT(*) FROM task_cancellations WHERE task_id = 'ret-old-cancelled'`},
 	} {
 		var remaining int
-		if err := repo.db.QueryRowContext(ctx, check.query).Scan(&remaining); err != nil {
+		if err := repo.db.QueryRow(ctx, check.query).Scan(&remaining); err != nil {
 			t.Fatalf("count %s: %v", check.name, err)
 		}
 		if remaining != 0 {
@@ -114,10 +114,42 @@ func TestPurgeExpiredTerminalTasks(t *testing.T) {
 
 	var backfilled int
 	statDate := old.Format("2006-01-02")
-	if err := repo.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM task_daily_stat_backfills WHERE stat_date = $1::date`, statDate).Scan(&backfilled); err != nil {
+	if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM task_daily_stat_backfills WHERE stat_date = $1::date`, statDate).Scan(&backfilled); err != nil {
 		t.Fatalf("count backfill marks: %v", err)
 	}
 	if backfilled != 1 {
 		t.Fatalf("backfill mark for %s missing", statDate)
+	}
+}
+
+func TestPurgeExpiredTerminalTasksDrainsAcrossPasses(t *testing.T) {
+	ctx := context.Background()
+	db, _ := testdb.OpenWithPool(t)
+	repo := NewRepository(db)
+
+	var userID int64
+	if err := db.QueryRow(ctx, `INSERT INTO users (display_name, storage_uid) VALUES ('retention-multipass', 'RTM001') RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("insert retention user: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	old := now.AddDate(0, 0, -10)
+	for _, taskID := range []string{"ret-multi-a", "ret-multi-b", "ret-multi-c", "ret-multi-d", "ret-multi-e"} {
+		insertRetentionTestTask(t, ctx, repo, taskID, userID, "completed", &old, "", "")
+	}
+
+	stats, err := repo.PurgeExpiredTerminalTasks(ctx, now.AddDate(0, 0, -7), 2)
+	if err != nil {
+		t.Fatalf("PurgeExpiredTerminalTasks: %v", err)
+	}
+	if stats.TasksDeleted != 5 {
+		t.Fatalf("TasksDeleted = %d, want 5 drained across passes", stats.TasksDeleted)
+	}
+	var remaining int
+	if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id LIKE 'ret-multi-%'`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("%d multipass tasks not purged", remaining)
 	}
 }

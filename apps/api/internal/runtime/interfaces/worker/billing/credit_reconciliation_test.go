@@ -2,12 +2,13 @@ package billing
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"ideaboard/api/internal/credits/ports"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"ideaboard/api/internal/testdb"
 
@@ -204,11 +205,11 @@ func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
 }
 
 func countCreditReconciliationJobs(t testing.TB, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRow(context.Context, string, ...any) pgx.Row
 }) int64 {
 	t.Helper()
 	var count int64
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM river_job WHERE kind = 'credit_reconciliation'`).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM river_job WHERE kind = 'credit_reconciliation'`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	return count

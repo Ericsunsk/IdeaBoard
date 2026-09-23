@@ -9,9 +9,7 @@ import (
 
 func TestPoolsNilClose(t *testing.T) {
 	var p *database.Pools
-	if err := p.Close(); err != nil {
-		t.Fatalf("nil Pools.Close returned error: %v", err)
-	}
+	p.Close()
 }
 
 func TestHealthCheckerNil(t *testing.T) {

@@ -2,23 +2,25 @@ package billing
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // UsageStore reads immutable Task Billing submission snapshots. Snapshot rows
 // survive user-visible Task deletion and remain the logical AI invocation fact.
 type UsageStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 type contextQueryer struct {
 	ctx context.Context
-	db  *sql.DB
+	db  *pgxpool.Pool
 }
 
-func NewUsageStore(db *sql.DB) *UsageStore {
+func NewUsageStore(db *pgxpool.Pool) *UsageStore {
 	return &UsageStore{db: db}
 }
 
@@ -26,8 +28,8 @@ func (s *UsageStore) dbWithContext(ctx context.Context) contextQueryer {
 	return contextQueryer{ctx: ctx, db: s.db}
 }
 
-func (q contextQueryer) QueryRow(query string, args ...any) *sql.Row {
-	return q.db.QueryRowContext(q.ctx, query, args...)
+func (q contextQueryer) QueryRow(query string, args ...any) pgx.Row {
+	return q.db.QueryRow(q.ctx, query, args...)
 }
 
 func (s *UsageStore) GetTaskUsage(

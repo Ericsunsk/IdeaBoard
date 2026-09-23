@@ -18,6 +18,7 @@ type Store interface {
 	CountAllTaskCalls(ctx context.Context) (int64, error)
 	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate time.Time) ([]time.Time, error)
 	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]statisticscontracts.DailyStatAggregate, error)
+	ListDailyCaptureCreditsByRange(ctx context.Context, start, end time.Time, location *time.Location) (map[string]int64, error)
 	ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.ExecutionBottleneckAggregate, error)
 	ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.ExecutionFailureCategoryAggregate, error)
 	ListStatEventsByOccurredRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.StatEventTrendRow, error)
@@ -32,12 +33,13 @@ type Service struct {
 }
 
 type statisticsTrendBucket struct {
-	date    string
-	label   string
-	total   int64
-	success int64
-	fail    int64
-	models  map[string]int64
+	date            string
+	label           string
+	total           int64
+	success         int64
+	fail            int64
+	capturedCredits int64
+	models          map[string]int64
 }
 
 // MonitorExecutionPressurePoint is an admin-facing chart DTO. Runtime queue
@@ -297,7 +299,14 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	if err != nil {
 		return nil, err
 	}
+	// 意图保留：failure/latency 明细查询服务 shell anomaly radar，
+	// 即使仪表盘不再画这两张图也不得随前端删除（API 兼容 + radar 消费）。
 	failureCategoryRows, err := s.store.ListExecutionFailureCategoryStatsByCreatedRange(ctx, rangeStart, todayStart.AddDate(0, 0, 1))
+	if err != nil {
+		return nil, err
+	}
+	todayEnd := todayStart.AddDate(0, 0, 1)
+	dailyCaptures, err := s.store.ListDailyCaptureCreditsByRange(ctx, rangeStart, todayEnd, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +320,7 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	)
 
 	buckets, orderedDays := buildDateBuckets(rangeStart, days)
+	fillTrendBucketCapturedCredits(buckets, dailyCaptures)
 
 	todayCalls, todaySuccess, todayFailed, todayCancelled,
 		yesterdayCalls, yesterdaySuccess, yesterdayFailed, yesterdayCancelled,
@@ -319,7 +329,7 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	trend := buildTrendItems(orderedDays, buckets)
 	qualityTrend := buildQualityTrendItems(orderedDays, buckets)
 	if normalizedRange == StatisticsRange1D {
-		trend, qualityTrend, err = s.buildIntradayTrendItems(ctx, todayStart, loc)
+		trend, qualityTrend, err = s.buildIntradayTrendItems(ctx, todayStart, loc, dailyCaptures)
 		if err != nil {
 			return nil, fmt.Errorf("build intraday trend: %w", err)
 		}
@@ -518,7 +528,7 @@ type modelMetricAcc struct {
 	latencyCount int64
 }
 
-func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Time, loc *time.Location) ([]AdminStatisticsTrendItem, []AdminStatisticsQualityTrendItem, error) {
+func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Time, loc *time.Location, dailyCaptures map[string]int64) ([]AdminStatisticsTrendItem, []AdminStatisticsQualityTrendItem, error) {
 	const bucketHours = 4
 
 	dayEnd := dayStart.AddDate(0, 0, 1)
@@ -569,6 +579,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		bucket.models[model] += row.OutputCount
 	}
 
+	fillTrendBucketCapturedCredits(buckets, dailyCaptures)
 	return buildTrendItems(orderedKeys, buckets), buildQualityTrendItems(orderedKeys, buckets), nil
 }
 
@@ -590,13 +601,33 @@ func buildTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBu
 			segments = segments[:3]
 		}
 		trend = append(trend, AdminStatisticsTrendItem{
-			Date:     b.date,
-			Label:    b.label,
-			Total:    b.total,
-			Segments: segments,
+			Date:            b.date,
+			Label:           b.label,
+			Total:           b.total,
+			CapturedCredits: b.capturedCredits,
+			Segments:        segments,
 		})
 	}
 	return trend
+}
+
+// fillTrendBucketCapturedCredits assigns per-day platform-wide capture totals
+// to trend buckets. Intraday 1d buckets are keyed as "dateTHH", so matching
+// uses the date prefix and daily buckets match exactly.
+func fillTrendBucketCapturedCredits(buckets map[string]*statisticsTrendBucket, dailyCaptures map[string]int64) {
+	if len(dailyCaptures) == 0 {
+		return
+	}
+	for key, bucket := range buckets {
+		if bucket == nil {
+			continue
+		}
+		dateKey := key
+		if idx := strings.IndexByte(key, 'T'); idx >= 0 {
+			dateKey = key[:idx]
+		}
+		bucket.capturedCredits = dailyCaptures[dateKey]
+	}
 }
 
 func buildQualityTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsQualityTrendItem {

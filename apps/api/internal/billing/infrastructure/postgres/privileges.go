@@ -1,4 +1,4 @@
-package billing
+package postgres
 
 import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 

@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
@@ -23,11 +24,16 @@ type configStore interface {
 	ListCatalog(ctx context.Context) ([]CatalogItem, error)
 	SaveCatalog(ctx context.Context, items []CatalogItem, actorID int64) error
 	DetectModels(ctx context.Context, provider string) (ModelDetection, error)
+	GetModelReference(ctx context.Context, modelID, provider, model string, refresh bool) (ModelReference, error)
 }
 
 // Handler serves the Admin AI gateway settings endpoints.
 type Handler struct {
 	store configStore
+	// observed is the read-only 7-day model observation service, attached
+	// once at composition time via SetObservedService. Nil keeps
+	// ListModelsObserved fail-closed.
+	observed *ObservedService
 }
 
 // NewHandler builds the admin handler over the config store.
@@ -167,14 +173,21 @@ func (h *Handler) PreviewGatewayRoute(c *gin.Context) {
 }
 
 type testGatewayConnectionRequest struct {
-	BaseURL string `json:"base_url"`
-	Token   string `json:"token"`
+	BaseURL  string `json:"base_url"`
+	Token    string `json:"token"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Path     string `json:"path"`
 }
 
 // TestConnection probes gateway reachability server-side (browsers cannot
 // read cross-origin status). The token is used for this probe only and never
 // persisted. Pure diagnosis: no configuration is read or written.
 func (h *Handler) TestConnection(c *gin.Context) {
+	if h == nil || h.store == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		return
+	}
 	var req testGatewayConnectionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
@@ -184,7 +197,33 @@ func (h *Handler) TestConnection(c *gin.Context) {
 		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
-	result := ProbeGatewayConnection(c.Request.Context(), req.BaseURL, req.Token)
+	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.TrimSpace(req.Path)
+	if provider == "" || path == "" {
+		mappings, err := h.store.ListModelMappings(c.Request.Context())
+		if err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取网关模型映射失败", err)
+			return
+		}
+		features := make([]string, 0, len(mappings))
+		for feature := range mappings {
+			features = append(features, feature)
+		}
+		sort.Strings(features)
+		for _, feature := range features {
+			candidate := strings.TrimSpace(mappings[feature])
+			if candidate == "" {
+				continue
+			}
+			candidateProvider, candidateModel, override, splitErr := splitGatewayModel(candidate)
+			if splitErr != nil {
+				continue
+			}
+			route := workflow.ResolveRoute(candidateProvider, candidateModel, override, "")
+			provider, model, path = candidateProvider, candidateModel, route.Path
+			break
+		}
+	}
+	result := ProbeGatewayConnection(c.Request.Context(), req.BaseURL, req.Token, provider, model, path)
 	response.SuccessDTO(c, result)
 }
 
@@ -207,13 +246,22 @@ type saveCatalogRequest struct {
 }
 
 // SaveCatalog updates the full model catalog in system settings.
+// Decoding is strict: unknown fields (including the removed per-token
+// price fields) are rejected instead of silently ignored, so legacy
+// writers fail loudly and migrate to the models.dev reference seam.
 func (h *Handler) SaveCatalog(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
 		return
 	}
 	var req saveCatalogRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		if strings.Contains(err.Error(), "unknown field") {
+			response.Error(c, http.StatusBadRequest, "参数错误：含未知字段，目录单价字段已下线，请改用 models.dev 参照接口")
+			return
+		}
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
@@ -273,4 +321,42 @@ func (h *Handler) DetectModels(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, detection)
+}
+
+// GetModelReference serves the read-only models.dev reference lookup for
+// one model. Degraded outcomes (allowlist gap, upstream failure, miss)
+// return HTTP 200 with Found=false and an explicit error_code inside the
+// payload, never an HTTP error: reference display must not block catalog
+// flows. Only invalid input (missing model identity) is a 400.
+func (h *Handler) GetModelReference(c *gin.Context) {
+	if h == nil || h.store == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		return
+	}
+	if _, ok := principal.RequireAdmin(c); !ok {
+		response.Error(c, http.StatusForbidden, "需要管理员权限")
+		return
+	}
+	reference, err := h.store.GetModelReference(
+		c.Request.Context(),
+		strings.TrimSpace(c.Query("model_id")),
+		strings.TrimSpace(c.Query("provider")),
+		strings.TrimSpace(c.Query("model")),
+		parseRefreshParam(c.Query("refresh")),
+	)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.SuccessDTO(c, reference)
+}
+
+// parseRefreshParam accepts truthy refresh values for cache bypass.
+func parseRefreshParam(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }

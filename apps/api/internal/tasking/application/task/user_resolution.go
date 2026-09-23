@@ -50,7 +50,7 @@ func (s *Service) resolveAdminTaskUser(ctx context.Context, userID int64) (uuid.
 	return publicID, displayName, nil
 }
 
-func (s *Service) enrichAdminTaskListItem(ctx context.Context, item *AdminTaskMonitorListItem) error {
+func (s *Service) enrichAdminTaskListItem(ctx context.Context, item *AdminMonitorListItem) error {
 	if item == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (s *Service) enrichAdminTaskListItem(ctx context.Context, item *AdminTaskMo
 	return nil
 }
 
-func (s *Service) enrichAdminTaskDetail(ctx context.Context, detail *AdminTaskMonitorDetail) error {
+func (s *Service) enrichAdminTaskDetail(ctx context.Context, detail *AdminMonitorDetail) error {
 	if detail == nil {
 		return nil
 	}

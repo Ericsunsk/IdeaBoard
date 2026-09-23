@@ -1,20 +1,28 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
-	"strconv"
-	"strings"
+	"image"
+	"image/color"
+	"image/png"
 	"testing"
-	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	providerendpoints "ideaboard/api/internal/accountpool/providerendpoints/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/workflow"
 )
+
+func buildTinyPNGBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode tiny png: %v", err)
+	}
+	return buf.Bytes()
+}
 
 func marshalWorkflowTaskParamsForTest(t testing.TB, params *tasks.WorkflowTaskParams) string {
 	t.Helper()
@@ -130,157 +138,4 @@ func (r testRuntimeMediaResolver) ResolveRuntimeMedia(_ context.Context, params 
 		result.Mask = &ref
 	}
 	return result, nil
-}
-
-func roundTripDrawingTaskForTest(t *testing.T, task *tasks.TaskPayload) *tasks.TaskPayload {
-	t.Helper()
-	payload, err := json.Marshal(taskqueue.DrawingTaskArgs{Task: *task})
-	if err != nil {
-		t.Fatalf("marshal drawing task args: %v", err)
-	}
-	var decoded taskqueue.DrawingTaskArgs
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("unmarshal drawing task args: %v", err)
-	}
-	return &decoded.Task
-}
-
-func (c *ProviderExecutor) callOpenAIForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := providerPromptParamsForTest(params)
-	return c.callOpenAIWithRequest(ctx, account, newProviderRequest(prompt, width, height, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
-}
-
-func (c *ProviderExecutor) callGoogleAIForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := providerPromptParamsForTest(params)
-	return c.callGoogleAIWithRequest(ctx, account, newProviderRequest(prompt, 0, 0, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
-}
-
-func (c *ProviderExecutor) callGoogleCloudForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	operation, invocation, controls := providerRuntimeIntentForTest(params)
-	compiledParams := providerPromptParamsForTest(params)
-	return c.callGoogleProviderWithRequest(ctx, account, "google-cloud", newProviderRequest(prompt, 0, 0, compiledParams, resolvedModel, providerRequestFactsForTest(compiledParams, operation), operation, invocation, controls), timeout)
-}
-
-func providerPromptParamsForTest(params map[string]interface{}) map[string]interface{} {
-	if params == nil {
-		return nil
-	}
-	out := make(map[string]interface{}, len(params)+2)
-	for key, value := range params {
-		out[key] = value
-	}
-	if contract, ok := params[workflow.ParamKeyVariation].(map[string]interface{}); ok {
-		if strength, exists := contract["strength"]; exists {
-			out["variation_strength"] = strength
-		}
-	}
-	if contract, ok := params[workflow.ParamKeyFusion].(map[string]interface{}); ok {
-		if weights, exists := contract["input_weights"]; exists {
-			out["fusion_input_weights"] = weights
-		}
-	}
-	return out
-}
-
-func providerRequestFactsForTest(params map[string]interface{}, operation workflow.RuntimeOperation) resolvedProviderRequestFacts {
-	count := 1
-	switch raw := params["output_count"].(type) {
-	case int:
-		count = raw
-	case int64:
-		count = int(raw)
-	case float64:
-		count = int(raw)
-	case json.Number:
-		count, _ = strconv.Atoi(string(raw))
-	case string:
-		count, _ = strconv.Atoi(strings.TrimSpace(raw))
-	}
-	resolution := workflow.OutputResolution1K
-	if raw, ok := params["output_resolution"].(string); ok {
-		if normalized, valid := workflow.NormalizeOutputResolution(raw); valid && normalized != workflow.OutputResolutionDefault {
-			resolution = normalized
-		}
-	}
-	primitive := workflow.GenerationPrimitiveTextToImage
-	if operation != workflow.RuntimeOperationGeneration {
-		primitive = workflow.GenerationPrimitiveImageToImage
-	}
-	return resolvedProviderRequestFacts{primitive: primitive, outputCount: count, outputResolution: resolution}
-}
-
-func providerRuntimeIntentForTest(params map[string]interface{}) (workflow.RuntimeOperation, workflow.RuntimeInvocation, workflow.RuntimeControlContract) {
-	feature, _ := workflow.ResolveWorkflowFeatureSlug(params)
-	switch feature {
-	case workflow.FeatureSlugInpaint:
-		return workflow.RuntimeOperationInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugRender:
-		return workflow.RuntimeOperationRender, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugVariations:
-		return workflow.RuntimeOperationVariations, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation
-	case workflow.FeatureSlugFusion:
-		return workflow.RuntimeOperationFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion
-	case workflow.FeatureSlugOutpaint:
-		return workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsOutpaint
-	case workflow.FeatureSlugCutout:
-		return workflow.RuntimeOperationCutout, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsNone
-	case workflow.FeatureSlugUpscale:
-		return workflow.RuntimeOperationUpscale, workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale
-	default:
-		return workflow.RuntimeOperationGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone
-	}
-}
-
-func (c *ProviderExecutor) callDrawingAPIForTest(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignedModel string) (ProviderCallOutput, error) {
-	return c.callDrawingAPIWithAssignment(ctx, runtimeAccountAccessForTest(account), task, assignmentSnapshotForTest(account, assignedModel))
-}
-
-func runtimeAccountAccessForTest(account *accounts.ApiAccount) *accounts.RuntimeAccountAccess {
-	if account == nil {
-		return nil
-	}
-	accountID := account.ID
-	if accountID <= 0 {
-		accountID = 1
-	}
-	return &accounts.RuntimeAccountAccess{
-		ID: accountID, Name: account.Name, APIKey: account.ApiKey, Timeout: account.Timeout,
-	}
-}
-
-func assignmentSnapshotForTest(account *accounts.ApiAccount, resolvedModel string) taskqueueports.TaskAssignment {
-	if account == nil {
-		return taskqueueports.TaskAssignment{}
-	}
-	accountID := account.ID
-	if accountID <= 0 {
-		accountID = 1
-	}
-	endpointID := account.ProviderEndpointID
-	if endpointID <= 0 {
-		endpointID = 1
-	}
-	apiType := strings.TrimSpace(account.ApiType)
-	if apiType == "" {
-		apiType = workflow.ProviderOpenAICompatible
-	}
-	protocol := strings.TrimSpace(account.Protocol)
-	if protocol == "" {
-		protocol = providerendpoints.ProtocolModelAPI
-	}
-	name := strings.TrimSpace(account.Name)
-	if name == "" {
-		name = "test-provider"
-	}
-	return taskqueueports.TaskAssignment{
-		AccountID:                accountID,
-		ProviderEndpointID:       endpointID,
-		ResolvedModel:            strings.TrimSpace(resolvedModel),
-		APIType:                  apiType,
-		ProviderEndpointProtocol: protocol,
-		ProviderEndpointName:     name,
-		ProviderEndpointBaseURL:  strings.TrimSpace(account.ProxyURL),
-	}
 }

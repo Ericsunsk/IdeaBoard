@@ -10,6 +10,8 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
+
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
 type retentionServiceStub struct {
@@ -81,5 +83,11 @@ func TestTaskRetentionDailyScheduleRunsAt0330Shanghai(t *testing.T) {
 	after := time.Date(2026, 9, 17, 4, 0, 0, 0, retentionLocation)
 	if got := schedule.Next(after); got.Hour() != 3 || got.Minute() != 30 || got.Day() != 18 {
 		t.Fatalf("Next() after slot = %v, want next day 03:30", got)
+	}
+}
+
+func TestTaskRetentionWorkerPinsTimeoutMatrix(t *testing.T) {
+	if got := (&TaskRetentionWorker{}).Timeout(nil); got != taskqueue.RiverJobTimeoutTaskRetention {
+		t.Fatalf("retention timeout = %s, want matrix %s", got, taskqueue.RiverJobTimeoutTaskRetention)
 	}
 }

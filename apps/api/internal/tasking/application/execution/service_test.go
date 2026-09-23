@@ -2,20 +2,19 @@ package execution
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/events"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
-	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
-
-	"github.com/lib/pq"
 )
 
 type recordingTaskStatusPublisher struct {
@@ -42,7 +41,7 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 77)
 
 	task := &tasks.Task{
@@ -57,7 +56,7 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: taskExecutionAssignment(task), Reason: "worker context interrupted"}); err != nil {
+	if err := service.ResetRunningTask(ctx, ResetRunningTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken, Reason: "worker context interrupted"}); err != nil {
 		t.Fatalf("ResetRunningTask returned error: %v", err)
 	}
 
@@ -68,8 +67,10 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 	if updated.Status != tasks.StatusPending {
 		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
 	}
-	if updated.AccountID != nil {
-		t.Fatalf("account_id = %d, want nil", tasks.IDValue(updated.AccountID))
+	// Token-fenced reset clears the fence, not the assignment history:
+	// account columns stay for audit while lease_token gates the next claim.
+	if tasks.IDValue(updated.AccountID) != accountID {
+		t.Fatalf("account_id = %d, want retained %d", tasks.IDValue(updated.AccountID), accountID)
 	}
 	if updated.ErrorMsg != "worker context interrupted" {
 		t.Fatalf("error_msg = %q, want %q", updated.ErrorMsg, "worker context interrupted")
@@ -79,11 +80,55 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 	}
 }
 
+func TestRequeueRunningTaskIncrementsRetryCountAndClosesAttempt(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(taskRepo, nil)
+	task := &tasks.Task{TaskID: "task-requeue-count", UserID: 1, Status: tasks.StatusPending}
+	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+	token := "exec-token-requeue-count"
+	if _, err := service.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID: task.TaskID, ExecutionToken: token, FeatureSlug: "render",
+		RequestedModel: "openai/gpt-image-1", Provider: "openai", StartedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("ClaimAndStartExecutionAttempt failed: %v", err)
+	}
+
+	finish := &tasks.TaskAttemptFinish{
+		TaskID: task.TaskID, Status: tasks.TaskAttemptStatusRequeued,
+		FailureStage: "provider", FailureCategory: "timeout", ErrorMsg: "temporary provider failure",
+		CompletedAt: time.Now(),
+	}
+	if err := service.RequeueRunningTask(ctx, ResetRunningTaskInput{
+		TaskID: task.TaskID, ExecutionToken: token, Reason: finish.ErrorMsg, AttemptFinish: finish,
+	}); err != nil {
+		t.Fatalf("RequeueRunningTask failed: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending || updated.RetryCount != 1 || updated.LeaseToken != "" {
+		t.Fatalf("task status/retry_count/lease = %s/%d/%q, want pending/1/empty", updated.Status, updated.RetryCount, updated.LeaseToken)
+	}
+	closed, err := taskRepo.GetExecutionAttemptByToken(ctx, token)
+	if err != nil {
+		t.Fatalf("reload execution attempt failed: %v", err)
+	}
+	if closed.Status != tasks.TaskAttemptStatusRequeued {
+		t.Fatalf("attempt status = %q, want %q", closed.Status, tasks.TaskAttemptStatusRequeued)
+	}
+}
+
 func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 77)
 
 	task := &tasks.Task{
@@ -98,9 +143,43 @@ func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: taskExecutionAssignmentWithLease(task, "lease-terminal"), Reason: "worker context interrupted"})
+	err := service.ResetRunningTask(ctx, ResetRunningTaskInput{TaskID: task.TaskID, ExecutionToken: "lease-terminal", Reason: "worker context interrupted"})
 	if !errors.Is(err, ErrTaskTerminal) {
 		t.Fatalf("expected ErrTaskTerminal, got %v", err)
+	}
+}
+
+func TestResetRunningTaskEmptyTokenLeavesStateUntouched(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(taskRepo, nil)
+	accountID := seedTaskExecutionAccount(t, db, 77)
+
+	task := &tasks.Task{
+		TaskID:                     "task-reset-empty-token",
+		UserID:                     1,
+		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
+		AccountID:                  testPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-empty-token",
+	}
+	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	// Empty token means nothing was claimed by this worker (pre-claim
+	// failure path): the reset must not touch another worker's claim.
+	if err := service.ResetRunningTask(ctx, ResetRunningTaskInput{TaskID: task.TaskID, Reason: "pre-claim failure"}); err != nil {
+		t.Fatalf("ResetRunningTask returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusRunning || updated.LeaseToken != "lease-empty-token" {
+		t.Fatalf("status/lease = %s/%q, want running/lease-empty-token", updated.Status, updated.LeaseToken)
 	}
 }
 
@@ -108,7 +187,7 @@ func TestFailTaskPersistsProvidedResultEnvelope(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 
 	task := &tasks.Task{
 		TaskID: "task-fail-custom-result",
@@ -140,64 +219,19 @@ func TestFailTaskPersistsProvidedResultEnvelope(t *testing.T) {
 	}
 }
 
-func TestRequeueTaskForFailoverPersistsProvidedResultEnvelope(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
-	accountID := seedTaskExecutionAccount(t, db, 101)
-
-	task := &tasks.Task{
-		TaskID:                     "task-requeue-custom-result",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
-		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-requeue-custom-result",
-		RetryCount:                 0,
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	result := `{"task_id":"task-requeue-custom-result","status":"failed","parsed_output_status":"invalid","error":"contract failed"}`
-	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{
-		Assignment: taskExecutionAssignment(task),
-		Reason:     "contract failed",
-		Result:     result,
-	})
-	if err != nil {
-		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
-	}
-	if !requeued {
-		t.Fatalf("expected task to be requeued")
-	}
-
-	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
-	if err != nil {
-		t.Fatalf("reload task failed: %v", err)
-	}
-	if updated.Status != tasks.StatusPending {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
-	}
-	if updated.Result != result {
-		t.Fatalf("result = %q, want provided envelope", updated.Result)
-	}
-}
-
 func ptrTime(t time.Time) *time.Time {
 	return &t
 }
 
-func newTaskExecutionServiceTestDB(t *testing.T) *sql.DB {
+func newTaskExecutionServiceTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	return testdb.Open(t)
 }
 
-func seedTaskExecutionAccount(t testing.TB, db *sql.DB, id int64) int64 {
+func seedTaskExecutionAccount(t testing.TB, db *pgxpool.Pool, id int64) int64 {
 	t.Helper()
 	channelID := taskExecutionProviderEndpointID(id)
-	if _, err := db.Exec(`
+	if _, err := db.Exec(t.Context(), `
 INSERT INTO provider_endpoints (id, api_type, name, base_url, status)
 VALUES ($1, 'openai-compatible', $2, $3, 1)
 ON CONFLICT (id) DO NOTHING`,
@@ -207,7 +241,7 @@ ON CONFLICT (id) DO NOTHING`,
 	); err != nil {
 		t.Fatalf("seed channel %d failed: %v", channelID, err)
 	}
-	if _, err := db.Exec(`
+	if _, err := db.Exec(t.Context(), `
 INSERT INTO api_accounts (id, name, provider_endpoint_id, max_concurrent, timeout, extra_config, status, weight)
 VALUES ($1, $2, $3, 3, 120, '', 1, 1)
 ON CONFLICT (id) DO NOTHING`,
@@ -220,15 +254,15 @@ ON CONFLICT (id) DO NOTHING`,
 	return id
 }
 
-func seedTaskExecutionCredential(t testing.TB, db *sql.DB, accountID int64) int64 {
+func seedTaskExecutionCredential(t testing.TB, db *pgxpool.Pool, accountID int64) int64 {
 	t.Helper()
 	var id int64
-	if err := db.QueryRow(`SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err == nil {
+	if err := db.QueryRow(t.Context(), `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err == nil {
 		return id
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("load credential for account %d failed: %v", accountID, err)
 	}
-	if err := db.QueryRow(`
+	if err := db.QueryRow(t.Context(), `
 INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, key_version, fingerprint, status)
 VALUES ($1, 'encrypted', 'encrypted-secret', 'test-key', $2, 'active')
 RETURNING id`,
@@ -240,7 +274,7 @@ RETURNING id`,
 	return id
 }
 
-func seedTaskExecutionTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
+func seedTaskExecutionTask(t testing.TB, db *pgxpool.Pool, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
 	if task.Params == "" {
 		task.Params = taskExecutionTestParams
@@ -285,42 +319,40 @@ func seedTaskExecutionTask(t testing.TB, db *sql.DB, repo *taskstore.Repository,
 		return err
 	}
 	if task.Status == tasks.StatusRunning && task.LeaseToken != "" {
-		seedTaskExecutionActiveLease(t, db, task, tasks.IDValue(task.AssignedCredentialID))
+		seedTaskExecutionActiveLease(t, db, task)
 	}
 	return nil
 }
 
-func seedTaskExecutionActiveLease(t testing.TB, db *sql.DB, task *tasks.Task, credentialID int64) {
+func seedTaskExecutionActiveLease(t testing.TB, db *pgxpool.Pool, task *tasks.Task) {
 	t.Helper()
 	var exists bool
-	if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM task_leases WHERE task_id=$1 AND released_at IS NULL)`, task.TaskID).Scan(&exists); err != nil {
-		t.Fatalf("check active task lease for %s failed: %v", task.TaskID, err)
+	if err := db.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM task_execution_attempts WHERE task_id=$1 AND status='running')`, task.TaskID).Scan(&exists); err != nil {
+		t.Fatalf("check active execution attempt for %s failed: %v", task.TaskID, err)
 	}
 	if exists {
 		return
 	}
-	if _, err := db.Exec(`
-INSERT INTO task_leases (
-  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, resolved_model, api_type, provider_endpoint_protocol,
-  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
-  acquired_at
-) VALUES ($1, $2, 1, $3, $4, $5, 'image-generate', COALESCE(NULLIF($6, ''), 'gpt-image-1'), 'openai-compatible', 'model-api',
-  'runtime-test-endpoint', 'https://example.com/runtime-test', 'runtime-test-fingerprint', 'test-key', now())`,
+	model := strings.TrimSpace(task.ResolvedModel)
+	if model == "" {
+		model = "gpt-image-1"
+	}
+	if _, err := db.Exec(t.Context(), `
+INSERT INTO task_execution_attempts (
+  task_id, river_job_id, attempt_no, execution_token,
+  feature_slug, requested_model
+) VALUES ($1, 1, 1, $2, 'image-generate', $3)`,
 		task.TaskID,
 		task.LeaseToken,
-		tasks.IDValue(task.AccountID),
-		tasks.IDValue(task.AssignedProviderEndpointID),
-		credentialID,
-		task.ResolvedModel,
+		model,
 	); err != nil {
-		t.Fatalf("seed active task lease for %s failed: %v", task.TaskID, err)
+		t.Fatalf("seed active execution attempt for %s failed: %v", task.TaskID, err)
 	}
 }
 
-func seedTaskExecutionUser(t testing.TB, db *sql.DB, id int64) {
+func seedTaskExecutionUser(t testing.TB, db *pgxpool.Pool, id int64) {
 	t.Helper()
-	if _, err := db.Exec(`
+	if _, err := db.Exec(t.Context(), `
 INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)
 ON CONFLICT (id) DO NOTHING`,
@@ -336,111 +368,11 @@ func taskExecutionProviderEndpointID(accountID int64) int64 {
 	return accountID + 20000
 }
 
-func taskExecutionAssignment(task *tasks.Task) taskqueueports.TaskAssignment {
-	return taskExecutionAssignmentWithLease(task, task.LeaseToken)
-}
-
-func taskExecutionAssignmentWithLease(task *tasks.Task, leaseToken string) taskqueueports.TaskAssignment {
-	return taskqueueports.TaskAssignment{
-		TaskID:             task.TaskID,
-		AccountID:          tasks.IDValue(task.AccountID),
-		ProviderEndpointID: tasks.IDValue(task.AssignedProviderEndpointID),
-		CredentialID:       tasks.IDValue(task.AssignedCredentialID),
-		Status:             taskqueueports.AssignStatusAssigned,
-		LeaseToken:         leaseToken,
-	}
-}
-
-func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
-	accountID := seedTaskExecutionAccount(t, db, 99)
-
-	task := &tasks.Task{
-		TaskID:                     "task-requeue",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
-		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-requeue",
-		RetryCount:                 defaultTaskRetryLimit - 2,
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskExecutionAssignment(task), Reason: "retryable error"})
-	if err != nil {
-		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
-	}
-	if !requeued {
-		t.Fatalf("expected task to be requeued")
-	}
-
-	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
-	if err != nil {
-		t.Fatalf("reload task failed: %v", err)
-	}
-	if updated.Status != tasks.StatusPending {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
-	}
-	if updated.AccountID != nil {
-		t.Fatalf("account_id = %d, want nil", tasks.IDValue(updated.AccountID))
-	}
-	if updated.RetryCount != defaultTaskRetryLimit-1 {
-		t.Fatalf("retry_count = %d, want %d", updated.RetryCount, defaultTaskRetryLimit-1)
-	}
-	if updated.CompletedAt != nil {
-		t.Fatalf("completed_at should be nil when requeued")
-	}
-}
-
-func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	service := NewService(nil, taskRepo, assigner, nil)
-	publisher := newRecordingTaskStatusPublisher()
-	service.SetTaskStatusPublisher(publisher)
-	accountID := seedTaskExecutionAccount(t, db, 42)
-	credentialID := seedTaskExecutionCredential(t, db, accountID)
-
-	task := &tasks.Task{
-		TaskID:                     "task-publish",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
-		AssignedCredentialID:       testPtr(credentialID),
-		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-publish",
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-	seedTaskExecutionActiveLease(t, db, task, credentialID)
-
-	if err := service.ConfirmTaskLease(ctx, taskExecutionAssignment(task)); err != nil {
-		t.Fatalf("ConfirmTaskLease returned error: %v", err)
-	}
-
-	select {
-	case event := <-publisher.ch:
-		if event.TaskID != task.TaskID || event.Status != tasks.StatusRunning {
-			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusRunning)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for running event")
-	}
-}
-
 func TestRecordTaskCancelledPublishesCancelledStatus(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
 	accountID := seedTaskExecutionAccount(t, db, 53)
@@ -494,7 +426,7 @@ func TestConvergeTaskAfterRiverFinalFailureFailsPendingTask(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
 
@@ -536,7 +468,7 @@ func TestConvergeTaskAfterRiverFinalFailureFailsRunningTaskWithSameRiverLease(t 
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
 	accountID := seedTaskExecutionAccount(t, db, 61)
@@ -581,7 +513,7 @@ func TestConvergeTaskAfterRiverFinalFailureRecoversRunningTaskWithoutLease(t *te
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
 	accountID := seedTaskExecutionAccount(t, db, 61)
@@ -623,7 +555,7 @@ func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverL
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 62)
 
 	task := &tasks.Task{
@@ -655,11 +587,11 @@ func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverL
 	}
 }
 
-func TestFailTaskRejectsPartialAssignment(t *testing.T) {
+func TestFailTaskRejectsEmptyTaskID(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 
 	task := &tasks.Task{
 		TaskID: "task-fail-partial-assignment",
@@ -671,8 +603,8 @@ func TestFailTaskRejectsPartialAssignment(t *testing.T) {
 	}
 
 	err := service.FailTask(ctx, FailTaskInput{
-		Assignment: taskqueueports.TaskAssignment{TaskID: task.TaskID},
-		Reason:     "provider failed",
+		TaskID: "",
+		Reason: "provider failed",
 	})
 	if !errors.Is(err, ErrTaskStateConflict) {
 		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
@@ -687,48 +619,11 @@ func TestFailTaskRejectsPartialAssignment(t *testing.T) {
 	}
 }
 
-func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	assigner := taskqueue.NewPostgresTaskAssigner(db)
-	service := NewService(nil, taskRepo, assigner, nil)
-	publisher := newRecordingTaskStatusPublisher()
-	service.SetTaskStatusPublisher(publisher)
-	accountID := seedTaskExecutionAccount(t, db, 42)
-	credentialID := seedTaskExecutionCredential(t, db, accountID)
-
-	task := &tasks.Task{
-		TaskID:                     "task-stale-lease",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
-		AssignedCredentialID:       testPtr(credentialID),
-		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-current",
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-	seedTaskExecutionActiveLease(t, db, task, credentialID)
-
-	err := service.ConfirmTaskLease(ctx, taskExecutionAssignmentWithLease(task, "lease-stale"))
-	if !errors.Is(err, ErrTaskStateConflict) {
-		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
-	}
-
-	select {
-	case event := <-publisher.ch:
-		t.Fatalf("unexpected published event: %+v", event)
-	default:
-	}
-}
-
 func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 42)
 
 	task := &tasks.Task{
@@ -743,7 +638,7 @@ func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskExecutionAssignmentWithLease(task, "stale-lease-token"), Result: `{"status":"success"}`})
+	err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: "stale-lease-token", Result: `{"status":"success"}`})
 	if !errors.Is(err, ErrTaskStateConflict) {
 		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
 	}
@@ -757,142 +652,11 @@ func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 	}
 }
 
-func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
-	accountID := seedTaskExecutionAccount(t, db, 100)
-
-	task := &tasks.Task{
-		TaskID:                     "task-retry-limit",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(accountID)),
-		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-retry-limit",
-		RetryCount:                 defaultTaskRetryLimit - 1,
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	result := `{"task_id":"task-retry-limit","status":"failed","parsed_output_status":"invalid","error":"retry limit reached"}`
-	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskExecutionAssignment(task), Reason: "retry limit reached", Result: result})
-	if err != nil {
-		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
-	}
-	if requeued {
-		t.Fatalf("expected task to stop requeue at retry limit")
-	}
-
-	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
-	if err != nil {
-		t.Fatalf("reload task failed: %v", err)
-	}
-	if updated.Status != tasks.StatusFailed {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
-	}
-	if tasks.IDValue(updated.AccountID) != accountID {
-		t.Fatalf("account_id = %d, want %d", tasks.IDValue(updated.AccountID), accountID)
-	}
-	if tasks.IDValue(updated.AssignedProviderEndpointID) != taskExecutionProviderEndpointID(accountID) {
-		t.Fatalf("assigned_provider_endpoint_id = %d, want %d", tasks.IDValue(updated.AssignedProviderEndpointID), taskExecutionProviderEndpointID(accountID))
-	}
-	if updated.RetryCount != defaultTaskRetryLimit {
-		t.Fatalf("retry_count = %d, want %d", updated.RetryCount, defaultTaskRetryLimit)
-	}
-	if updated.CompletedAt == nil {
-		t.Fatalf("completed_at should be set when retry limit reached")
-	}
-	if updated.Result != result {
-		t.Fatalf("result = %q, want provided envelope", updated.Result)
-	}
-
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, updated.CreatedAt, updated.CreatedAt)
-	if err != nil {
-		t.Fatalf("list daily stats failed: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("daily stat rows = %d, want 1", len(rows))
-	}
-	if rows[0].Failed != 1 || rows[0].Total != 1 {
-		t.Fatalf("daily stat failed=%d total=%d, want 1/1", rows[0].Failed, rows[0].Total)
-	}
-}
-
-func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskExecutionServiceTestDB(t)
-	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
-	publisher := newRecordingTaskStatusPublisher()
-	service.SetTaskStatusPublisher(publisher)
-	account13 := seedTaskExecutionAccount(t, db, 13)
-	account14 := seedTaskExecutionAccount(t, db, 14)
-
-	requeueTask := &tasks.Task{
-		TaskID:                     "task-requeue-publish-pending",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(account13)),
-		AccountID:                  testPtr(account13),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-publish-pending",
-		RetryCount:                 0,
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, requeueTask); err != nil {
-		t.Fatalf("seed requeue task failed: %v", err)
-	}
-	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskExecutionAssignment(requeueTask), Reason: "retry"})
-	if err != nil {
-		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
-	}
-	if !requeued {
-		t.Fatalf("expected requeued=true")
-	}
-	select {
-	case event := <-publisher.ch:
-		if event.Status != tasks.StatusPending {
-			t.Fatalf("requeue event status=%s, want %s", event.Status, tasks.StatusPending)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting requeue pending event")
-	}
-
-	finalTask := &tasks.Task{
-		TaskID:                     "task-requeue-publish-failed",
-		UserID:                     1,
-		AssignedProviderEndpointID: testPtr(taskExecutionProviderEndpointID(account14)),
-		AccountID:                  testPtr(account14),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-publish-failed",
-		RetryCount:                 defaultTaskRetryLimit - 1,
-	}
-	if err := seedTaskExecutionTask(t, db, taskRepo, ctx, finalTask); err != nil {
-		t.Fatalf("seed final requeue task failed: %v", err)
-	}
-	requeued, err = service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskExecutionAssignment(finalTask), Reason: "stop retry"})
-	if err != nil {
-		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
-	}
-	if requeued {
-		t.Fatalf("expected requeued=false when final fail")
-	}
-	select {
-	case event := <-publisher.ch:
-		if event.Status != tasks.StatusFailed {
-			t.Fatalf("final fail event status=%s, want %s", event.Status, tasks.StatusFailed)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting final failed event")
-	}
-}
-
 func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 201)
 
 	task := &tasks.Task{
@@ -909,7 +673,7 @@ func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 	}
 
 	result := `{"model":"gpt-image-1","username":"alice"}`
-	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskExecutionAssignment(task), Result: result}); err != nil {
+	if err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken, Result: result, ResolvedModel: "gpt-image-1"}); err != nil {
 		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 
@@ -942,7 +706,7 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 202)
 	seedTaskExecutionUser(t, db, 7)
 
@@ -975,10 +739,9 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 			ResultIndex:    2,
 		},
 	}
-	if err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskExecutionAssignment(task),
-		Result:     result,
-		Outputs:    taskOutputs,
+	if err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken,
+		Result:  result,
+		Outputs: taskOutputs,
 	}); err != nil {
 		t.Fatalf("CompleteTask returned error: %v", err)
 	}
@@ -1012,33 +775,33 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 		}
 	}
 	var persistedOutputURL string
-	if err := db.QueryRowContext(ctx, `SELECT url FROM task_outputs WHERE task_id = $1 ORDER BY result_index ASC LIMIT 1`, task.TaskID).Scan(&persistedOutputURL); err != nil {
+	if err := db.QueryRow(ctx, `SELECT url FROM task_outputs WHERE task_id = $1 ORDER BY result_index ASC LIMIT 1`, task.TaskID).Scan(&persistedOutputURL); err != nil {
 		t.Fatalf("read raw task output failed: %v", err)
 	}
 	if persistedOutputURL != "" {
 		t.Fatalf("asset task_outputs.url=%q, want empty relation field", persistedOutputURL)
 	}
 	var duplicatedColumns int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)
 FROM information_schema.columns
 WHERE table_name = 'task_outputs'
   AND column_name = ANY($1::text[])
-`, pq.Array([]string{"storage_key", "mime_type", "width", "height", "size_bytes", "checksum_sha256", "storage_profile"})).Scan(&duplicatedColumns); err != nil {
+`, ([]string{"storage_key", "mime_type", "width", "height", "size_bytes", "checksum_sha256", "storage_profile"})).Scan(&duplicatedColumns); err != nil {
 		t.Fatalf("inspect task_outputs columns failed: %v", err)
 	}
 	if duplicatedColumns != 0 {
 		t.Fatalf("task_outputs still has %d duplicated MediaAsset columns", duplicatedColumns)
 	}
 	var assetCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
 		t.Fatalf("count media assets failed: %v", err)
 	}
 	if assetCount != 2 {
 		t.Fatalf("media asset count=%d, want 2", assetCount)
 	}
 	var refCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE task_id = $1 AND ref_type = 'task_output'`, task.TaskID).Scan(&refCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_refs WHERE task_id = $1 AND ref_type = 'task_output'`, task.TaskID).Scan(&refCount); err != nil {
 		t.Fatalf("count media refs failed: %v", err)
 	}
 	if refCount != 2 {
@@ -1050,7 +813,7 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 205)
 	seedTaskExecutionUser(t, db, 7)
 
@@ -1071,10 +834,9 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local", ResultIndex: 0},
 		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local", ResultIndex: 1},
 	}
-	if err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskExecutionAssignment(task),
-		Result:     `{"status":"success"}`,
-		Outputs:    outputs,
+	if err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken,
+		Result:  `{"status":"success"}`,
+		Outputs: outputs,
 	}); err != nil {
 		t.Fatalf("CompleteTask returned error: %v", err)
 	}
@@ -1091,7 +853,7 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 		t.Fatalf("duplicate outputs did not reuse media asset: %+v", persisted)
 	}
 	var assetCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
 		t.Fatalf("count media assets failed: %v", err)
 	}
 	if assetCount != 1 {
@@ -1103,7 +865,7 @@ func TestCompleteTaskPersistsRemoteOnlyOutput(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 206)
 	seedTaskExecutionUser(t, db, 7)
 
@@ -1119,9 +881,8 @@ func TestCompleteTaskPersistsRemoteOnlyOutput(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskExecutionAssignment(task),
-		Result:     `{"status":"success"}`,
+	if err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken,
+		Result: `{"status":"success"}`,
 		Outputs: []tasks.TaskOutput{{
 			OutputKind: "remote",
 			Role:       "image",
@@ -1147,7 +908,7 @@ func TestCompleteTaskPersistsRemoteOnlyOutput(t *testing.T) {
 		t.Fatalf("remote output has asset metadata: %+v", outputs[0])
 	}
 	var assetCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1`, task.UserID).Scan(&assetCount); err != nil {
 		t.Fatalf("count media assets failed: %v", err)
 	}
 	if assetCount != 0 {
@@ -1159,7 +920,7 @@ func TestCompleteTaskDoesNotInferOutputsFromResultURL(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 204)
 
 	task := &tasks.Task{
@@ -1174,7 +935,7 @@ func TestCompleteTaskDoesNotInferOutputsFromResultURL(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskExecutionAssignment(task), Result: `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`}); err != nil {
+	if err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken, Result: `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`}); err != nil {
 		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
@@ -1190,7 +951,7 @@ func TestCompleteTaskRejectsOutputWithoutStorageKey(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	service := NewService(taskRepo, nil)
 	accountID := seedTaskExecutionAccount(t, db, 203)
 
 	task := &tasks.Task{
@@ -1205,9 +966,8 @@ func TestCompleteTaskRejectsOutputWithoutStorageKey(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.CompleteTask(ctx, CompleteTaskInput{
-		Assignment: taskExecutionAssignment(task),
-		Result:     `{"status":"success","image_url":"/uploads/tasks/7/task-inline-result/out-a.png"}`,
+	err := service.CompleteTask(ctx, CompleteTaskInput{TaskID: task.TaskID, ExecutionToken: task.LeaseToken,
+		Result: `{"status":"success","image_url":"/uploads/tasks/7/task-inline-result/out-a.png"}`,
 		Outputs: []tasks.TaskOutput{
 			{URL: "/uploads/tasks/7/task-inline-result/out-a.png"},
 		},

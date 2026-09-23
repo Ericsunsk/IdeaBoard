@@ -2,9 +2,9 @@ package boards
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,19 +12,51 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/idempotency"
+	"ideaboard/api/internal/platform/secrets"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
-func NewRepository(db *sql.DB) *Repository {
+type repositoryQueryer struct {
+	ctx context.Context
+	db  *pgxpool.Pool
+	q   *dbsqlc.Queries
+}
+
+func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
+func (r *Repository) dbWithContext(ctx context.Context) repositoryQueryer {
+	return repositoryQueryer{ctx: ctx, db: r.db, q: r.q}
+}
+
+func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
+	return dbutil.WithTx(db.ctx, db.db, run)
+}
+
+// Bounded list caps: every list query carries a LIMIT so no caller can
+// trigger an unbounded scan. Values cover the largest realistic shape
+// (board media refs on dense canvases) with headroom.
+const (
+	maxAccessibleBoards = int32(500)
+	maxBoardMembers     = int32(500)
+	maxBoardShareTokens = int32(200)
+	maxBoardMediaRefs   = int32(5000)
+)
+
 func (r *Repository) ListAccessibleByUserID(ctx context.Context, userID int64) ([]WithRole, error) {
-	rows, err := r.q.ListAccessibleBoardsByUserID(ctx, userID)
+	rows, err := r.dbWithContext(ctx).q.ListAccessibleBoardsByUserID(ctx, dbsqlc.ListAccessibleBoardsByUserIDParams{
+		UserID: userID, RowLimit: maxAccessibleBoards,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +65,7 @@ func (r *Repository) ListAccessibleByUserID(ctx context.Context, userID int64) (
 	for _, row := range rows {
 		role := RoleOwner
 		if row.OwnerUserID != userID {
-			role = normalizeAccessRole(row.MemberRole.String)
+			role = normalizeAccessRole(pgTextString(row.MemberRole))
 		}
 		if role == "" {
 			continue
@@ -49,8 +81,8 @@ func (r *Repository) ListAccessibleByUserID(ctx context.Context, userID int64) (
 				Revision:           row.Revision,
 				StateSchemaVersion: row.StateSchemaVersion,
 				LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
-				CreatedAt:          row.CreatedAt,
-				UpdatedAt:          row.UpdatedAt,
+				CreatedAt:          dbutil.TimeValue(row.CreatedAt),
+				UpdatedAt:          dbutil.TimeValue(row.UpdatedAt),
 			},
 			Role: role,
 		})
@@ -59,7 +91,7 @@ func (r *Repository) ListAccessibleByUserID(ctx context.Context, userID int64) (
 }
 
 func (r *Repository) GetAccessibleByBoardID(ctx context.Context, userID int64, boardID string) (*WithRole, error) {
-	row, err := r.q.GetAccessibleBoardByBoardID(ctx, dbsqlc.GetAccessibleBoardByBoardIDParams{UserID: userID, BoardID: boardID})
+	row, err := r.dbWithContext(ctx).q.GetAccessibleBoardByBoardID(ctx, dbsqlc.GetAccessibleBoardByBoardIDParams{UserID: userID, BoardID: boardID})
 	if err != nil {
 		return nil, err
 	}
@@ -74,19 +106,19 @@ func (r *Repository) GetAccessibleByBoardID(ctx context.Context, userID int64, b
 			Revision:           row.Revision,
 			StateSchemaVersion: row.StateSchemaVersion,
 			LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
-			CreatedAt:          row.CreatedAt,
-			UpdatedAt:          row.UpdatedAt,
+			CreatedAt:          dbutil.TimeValue(row.CreatedAt),
+			UpdatedAt:          dbutil.TimeValue(row.UpdatedAt),
 		},
 		Role: RoleOwner,
 	}
 	if row.OwnerUserID != userID {
-		board.Role = normalizeAccessRole(row.MemberRole.String)
+		board.Role = normalizeAccessRole(pgTextString(row.MemberRole))
 	}
 	return &board, nil
 }
 
 func (r *Repository) GetByBoardID(ctx context.Context, boardID string) (*Board, error) {
-	row, err := r.q.GetBoardByBoardID(ctx, boardID)
+	row, err := r.dbWithContext(ctx).q.GetBoardByBoardID(ctx, boardID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +127,7 @@ func (r *Repository) GetByBoardID(ctx context.Context, boardID string) (*Board, 
 }
 
 func (r *Repository) GetByOwnerAndBoardID(ctx context.Context, ownerUserID int64, boardID string) (*Board, error) {
-	row, err := r.q.GetBoardByOwnerAndBoardID(ctx, dbsqlc.GetBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
+	row, err := r.dbWithContext(ctx).q.GetBoardByOwnerAndBoardID(ctx, dbsqlc.GetBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +140,7 @@ func (r *Repository) Upsert(ctx context.Context, board *Board) error {
 		return ErrInvalidInput
 	}
 	mediaRefs, shouldReconcileMediaRefs := parseBoardMediaRefsForReconcile(board.State)
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		rows, err := q.UpsertBoard(ctx, upsertBoardParams(board))
 		if err != nil {
 			return err
@@ -137,17 +169,17 @@ func upsertBoardParams(board *Board) dbsqlc.UpsertBoardParams {
 		CreatedBy:   board.CreatedBy,
 		Name:        board.Name,
 		State:       boardStateJSON(board.State),
-		Revision: sql.NullInt64{
+		Revision: pgtype.Int8{
 			Int64: board.Revision,
 			Valid: board.Revision > 0,
 		},
-		StateSchemaVersion: sql.NullInt32{
+		StateSchemaVersion: pgtype.Int4{
 			Int32: board.StateSchemaVersion,
 			Valid: board.StateSchemaVersion > 0,
 		},
 		LastSavedBy:         dbutil.NullInt64(board.LastSavedBy),
-		CreatedAt:           board.CreatedAt,
-		UpdatedAt:           board.UpdatedAt,
+		CreatedAt:           pgtype.Timestamptz{Time: board.CreatedAt, Valid: true},
+		UpdatedAt:           pgtype.Timestamptz{Time: board.UpdatedAt, Valid: true},
 		HasExpectedRevision: board.ExpectedRevision != nil,
 		ExpectedRevision: func() int64 {
 			if board.ExpectedRevision == nil {
@@ -160,7 +192,7 @@ func upsertBoardParams(board *Board) dbsqlc.UpsertBoardParams {
 
 func (r *Repository) HasNameConflict(ctx context.Context, userID int64, boardID, name string) (bool, error) {
 	hasBoardID := strings.TrimSpace(boardID) != ""
-	count, err := r.q.CountBoardNameConflicts(ctx, dbsqlc.CountBoardNameConflictsParams{
+	count, err := r.dbWithContext(ctx).q.CountBoardNameConflicts(ctx, dbsqlc.CountBoardNameConflictsParams{
 		OwnerUserID: userID,
 		Name:        name,
 		HasBoardID:  hasBoardID,
@@ -173,7 +205,7 @@ func (r *Repository) HasNameConflict(ctx context.Context, userID int64, boardID,
 }
 
 func (r *Repository) BoardIDExists(ctx context.Context, boardID string) (bool, error) {
-	count, err := r.q.CountBoardsByBoardID(ctx, boardID)
+	count, err := r.dbWithContext(ctx).q.CountBoardsByBoardID(ctx, boardID)
 	if err != nil {
 		return false, err
 	}
@@ -181,7 +213,7 @@ func (r *Repository) BoardIDExists(ctx context.Context, boardID string) (bool, e
 }
 
 func (r *Repository) GetMemberRole(ctx context.Context, boardID string, userID int64) (AccessRole, error) {
-	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{BoardID: boardID, UserID: userID})
+	raw, err := r.dbWithContext(ctx).q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{BoardID: boardID, UserID: userID})
 	if err != nil {
 		return "", err
 	}
@@ -193,10 +225,11 @@ func (r *Repository) GetMemberRole(ctx context.Context, boardID string, userID i
 }
 
 func (r *Repository) DeleteBoardCascade(ctx context.Context, ownerUserID int64, boardID string) error {
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		previous, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{
 			OwnerUserID: ownerUserID,
 			BoardID:     boardID,
+			RowLimit:    maxBoardMediaRefs,
 		})
 		if err != nil {
 			return err
@@ -223,7 +256,7 @@ func (r *Repository) DeleteBoardCascade(ctx context.Context, ownerUserID int64, 
 		}
 		if len(assetIDs) > 0 {
 			if err := q.ScheduleUnreferencedMediaAssetsForReclamation(ctx, dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
-				ReclaimAfter:  sql.NullTime{Time: time.Now().Add(reclamation.GracePeriod), Valid: true},
+				ReclaimAfter:  gracePeriodTimestamptz(),
 				MediaAssetIds: uniqueMediaAssetIDs(assetIDs),
 			}); err != nil {
 				return err
@@ -234,7 +267,9 @@ func (r *Repository) DeleteBoardCascade(ctx context.Context, ownerUserID int64, 
 }
 
 func (r *Repository) ListMembers(ctx context.Context, ownerUserID int64, boardID string) ([]MemberWithUser, error) {
-	rows, err := r.q.ListBoardMembers(ctx, boardID)
+	rows, err := r.dbWithContext(ctx).q.ListBoardMembers(ctx, dbsqlc.ListBoardMembersParams{
+		BoardID: boardID, RowLimit: maxBoardMembers,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +281,7 @@ func (r *Repository) ListMembers(ctx context.Context, ownerUserID int64, boardID
 		}
 		result = append(result, MemberWithUser{
 			UserID:      row.UserID,
-			PublicID:    row.PublicID,
+			PublicID:    uuidFromPgType(row.PublicID),
 			DisplayName: row.DisplayName,
 			Role:        role,
 		})
@@ -255,7 +290,7 @@ func (r *Repository) ListMembers(ctx context.Context, ownerUserID int64, boardID
 }
 
 func (r *Repository) UpsertMember(ctx context.Context, ownerUserID int64, boardID string, userID int64, role AccessRole) error {
-	return r.q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
+	return r.dbWithContext(ctx).q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
 		BoardID: boardID,
 		UserID:  userID,
 		Role:    string(role),
@@ -263,7 +298,7 @@ func (r *Repository) UpsertMember(ctx context.Context, ownerUserID int64, boardI
 }
 
 func (r *Repository) DeleteMember(ctx context.Context, ownerUserID int64, boardID string, userID int64) error {
-	rows, err := r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{BoardID: boardID, UserID: userID})
+	rows, err := r.dbWithContext(ctx).q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{BoardID: boardID, UserID: userID})
 	if err != nil {
 		return err
 	}
@@ -274,7 +309,7 @@ func (r *Repository) DeleteMember(ctx context.Context, ownerUserID int64, boardI
 }
 
 func (r *Repository) GetMemberByUserID(ctx context.Context, ownerUserID int64, boardID string, userID int64) (*Member, error) {
-	row, err := r.q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{BoardID: boardID, UserID: userID})
+	row, err := r.dbWithContext(ctx).q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{BoardID: boardID, UserID: userID})
 	if err != nil {
 		return nil, err
 	}
@@ -283,22 +318,23 @@ func (r *Repository) GetMemberByUserID(ctx context.Context, ownerUserID int64, b
 		BoardID:   row.BoardID,
 		UserID:    row.UserID,
 		Role:      row.Role,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		CreatedAt: dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 	}
 	return &member, nil
 }
 
 func (r *Repository) CreateShareToken(ctx context.Context, token *ShareToken) error {
-	id, err := r.q.CreateBoardShareToken(ctx, dbsqlc.CreateBoardShareTokenParams{
-		BoardID:     token.BoardID,
-		TokenHash:   token.TokenHash,
-		TokenPrefix: token.TokenPrefix,
-		Role:        token.Role,
-		CreatedBy:   token.CreatedBy,
-		Revoked:     token.Revoked,
-		ExpiresAt:   dbutil.NullTime(token.ExpiresAt),
-		MaxUses:     dbutil.NullInt32(token.MaxUses),
+	id, err := r.dbWithContext(ctx).q.CreateBoardShareToken(ctx, dbsqlc.CreateBoardShareTokenParams{
+		BoardID:        token.BoardID,
+		TokenHash:      token.TokenHash,
+		TokenPrefix:    token.TokenPrefix,
+		Role:           token.Role,
+		CreatedBy:      token.CreatedBy,
+		Revoked:        token.Revoked,
+		ExpiresAt:      dbutil.NullTime(token.ExpiresAt),
+		MaxUses:        dbutil.NullInt32(token.MaxUses),
+		IdempotencyKey: "", RequestHash: "", TokenSecret: "",
 	})
 	if err != nil {
 		return err
@@ -307,8 +343,68 @@ func (r *Repository) CreateShareToken(ctx context.Context, token *ShareToken) er
 	return nil
 }
 
+// CreateShareTokenIdempotent durably creates and replays a share token. The
+// bearer token is encrypted at rest because it is otherwise unrecoverable
+// after a process restart.
+func (r *Repository) CreateShareTokenIdempotent(ctx context.Context, token *ShareToken, key, requestHash string) (*ShareToken, bool, error) {
+	if r == nil || r.db == nil || r.q == nil {
+		return nil, false, errors.New("board repository is unavailable")
+	}
+	ciphertext, err := secrets.EncryptString(token.Token)
+	if err != nil {
+		return nil, false, fmt.Errorf("encrypt share token for replay: %w", err)
+	}
+	var result *ShareToken
+	var replayed bool
+	err = dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if err := q.LockBoardShareTokenIdempotency(ctx, fmt.Sprintf("%d:%s", token.CreatedBy, key)); err != nil {
+			return fmt.Errorf("lock share token idempotency: %w", err)
+		}
+		existing, getErr := q.GetBoardShareTokenByIdempotency(ctx, dbsqlc.GetBoardShareTokenByIdempotencyParams{CreatedBy: token.CreatedBy, IdempotencyKey: key})
+		if getErr == nil {
+			if existing.RequestHash != requestHash {
+				return idempotency.ConflictError()
+			}
+			plain, decryptErr := secrets.DecryptString(existing.TokenSecret)
+			if decryptErr != nil {
+				return fmt.Errorf("decrypt replayed share token: %w", decryptErr)
+			}
+			mapped := shareTokenFromSQLC(dbsqlc.BoardShareToken{
+				ID: existing.ID, BoardID: existing.BoardID, TokenHash: existing.TokenHash,
+				TokenPrefix: existing.TokenPrefix, Role: existing.Role, CreatedBy: existing.CreatedBy,
+				Revoked: existing.Revoked, UsageCount: existing.UsageCount, MaxUses: existing.MaxUses,
+				LastUsedAt: existing.LastUsedAt, RevokedAt: existing.RevokedAt, RevokedBy: existing.RevokedBy,
+				ExpiresAt: existing.ExpiresAt, CreatedAt: existing.CreatedAt, UpdatedAt: existing.UpdatedAt,
+			})
+			mapped.Token = plain
+			result = &mapped
+			replayed = true
+			return nil
+		}
+		if !database.IsNotFound(getErr) {
+			return getErr
+		}
+		id, insertErr := q.CreateBoardShareToken(ctx, dbsqlc.CreateBoardShareTokenParams{
+			BoardID: token.BoardID, TokenHash: token.TokenHash, TokenPrefix: token.TokenPrefix,
+			Role: token.Role, CreatedBy: token.CreatedBy, Revoked: token.Revoked,
+			ExpiresAt: dbutil.NullTime(token.ExpiresAt), MaxUses: dbutil.NullInt32(token.MaxUses),
+			IdempotencyKey: key, RequestHash: requestHash, TokenSecret: ciphertext,
+		})
+		if insertErr != nil {
+			return insertErr
+		}
+		copy := *token
+		copy.ID = int64(id)
+		result = &copy
+		return nil
+	})
+	return result, replayed, err
+}
+
 func (r *Repository) ListShareTokens(ctx context.Context, ownerUserID int64, boardID string) ([]ShareToken, error) {
-	rows, err := r.q.ListBoardShareTokens(ctx, boardID)
+	rows, err := r.dbWithContext(ctx).q.ListBoardShareTokens(ctx, dbsqlc.ListBoardShareTokensParams{
+		BoardID: boardID, RowLimit: maxBoardShareTokens,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +416,7 @@ func (r *Repository) ListShareTokens(ctx context.Context, ownerUserID int64, boa
 }
 
 func (r *Repository) GetShareTokenByHash(ctx context.Context, tokenHash string) (*ShareToken, error) {
-	row, err := r.q.GetBoardShareTokenByHash(ctx, tokenHash)
+	row, err := r.dbWithContext(ctx).q.GetBoardShareTokenByHash(ctx, tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -329,10 +425,10 @@ func (r *Repository) GetShareTokenByHash(ctx context.Context, tokenHash string) 
 }
 
 func (r *Repository) RevokeShareTokenByID(ctx context.Context, ownerUserID int64, boardID string, tokenID int64) error {
-	rows, err := r.q.RevokeBoardShareTokenByID(ctx, dbsqlc.RevokeBoardShareTokenByIDParams{
+	rows, err := r.dbWithContext(ctx).q.RevokeBoardShareTokenByID(ctx, dbsqlc.RevokeBoardShareTokenByIDParams{
 		BoardID:   boardID,
 		TokenID:   tokenID,
-		RevokedBy: sql.NullInt64{Int64: ownerUserID, Valid: true},
+		RevokedBy: pgtype.Int8{Int64: ownerUserID, Valid: true},
 	})
 	if err != nil {
 		return err
@@ -345,7 +441,7 @@ func (r *Repository) RevokeShareTokenByID(ctx context.Context, ownerUserID int64
 
 func (r *Repository) ConsumeShareTokenAndUpsertMember(ctx context.Context, tokenHash string, userID int64) (*ShareToken, error) {
 	var shareToken ShareToken
-	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		row, err := q.ConsumeBoardShareToken(ctx, tokenHash)
 		if err != nil {
 			return err
@@ -368,7 +464,7 @@ func (r *Repository) ConsumeShareTokenAndUpsertMember(ctx context.Context, token
 }
 
 func (r *Repository) ShareTokenHashExists(ctx context.Context, tokenHash string) (bool, error) {
-	count, err := r.q.CountBoardShareTokenByHash(ctx, tokenHash)
+	count, err := r.dbWithContext(ctx).q.CountBoardShareTokenByHash(ctx, tokenHash)
 	if err != nil {
 		return false, err
 	}
@@ -433,6 +529,7 @@ func reconcileBoardMediaRefsTx(ctx context.Context, q *dbsqlc.Queries, board *Bo
 	previous, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{
 		OwnerUserID: board.OwnerUserID,
 		BoardID:     board.BoardID,
+		RowLimit:    maxBoardMediaRefs,
 	})
 	if err != nil {
 		return err
@@ -460,7 +557,7 @@ func reconcileBoardMediaRefsTx(ctx context.Context, q *dbsqlc.Queries, board *Bo
 		assetIDs := uniqueMediaAssetIDs(currentAssetIDs)
 		cancelledAssetIDs, err := q.CancelMediaAssetReclamation(ctx, dbsqlc.CancelMediaAssetReclamationParams{
 			MediaAssetIds:    assetIDs,
-			StaleClaimBefore: sql.NullTime{Time: time.Now().Add(-reclamation.ClaimLeaseDuration), Valid: true},
+			StaleClaimBefore: claimLeaseTimestamptz(),
 		})
 		if err != nil {
 			return err
@@ -475,7 +572,7 @@ func reconcileBoardMediaRefsTx(ctx context.Context, q *dbsqlc.Queries, board *Bo
 	}
 	if len(previousAssetIDs) > 0 {
 		if err := q.ScheduleUnreferencedMediaAssetsForReclamation(ctx, dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
-			ReclaimAfter:  sql.NullTime{Time: time.Now().Add(reclamation.GracePeriod), Valid: true},
+			ReclaimAfter:  gracePeriodTimestamptz(),
 			MediaAssetIds: uniqueMediaAssetIDs(previousAssetIDs),
 		}); err != nil {
 			return err
@@ -527,8 +624,8 @@ func boardFromSQLC(row dbsqlc.Board) Board {
 		Revision:           row.Revision,
 		StateSchemaVersion: row.StateSchemaVersion,
 		LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
+		CreatedAt:          dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:          dbutil.TimeValue(row.UpdatedAt),
 	}
 }
 
@@ -547,22 +644,39 @@ func boardStateString(state json.RawMessage) string {
 	return string(state)
 }
 
-func shareTokenFromSQLC(row dbsqlc.BoardShareToken) ShareToken {
+func shareTokenFromSQLC(row any) ShareToken {
+	// sqlc emits a distinct row type for each query even when the selected
+	// columns match. JSON tags provide a stable adapter without editing the
+	// generated package whenever the schema gains replay-only columns.
+	encoded, _ := json.Marshal(row)
+	var base dbsqlc.BoardShareToken
+	_ = json.Unmarshal(encoded, &base)
 	return ShareToken{
-		ID:          row.ID,
-		BoardID:     row.BoardID,
-		TokenHash:   row.TokenHash,
-		TokenPrefix: row.TokenPrefix,
-		Role:        row.Role,
-		CreatedBy:   row.CreatedBy,
-		Revoked:     row.Revoked,
-		UsageCount:  row.UsageCount,
-		MaxUses:     dbutil.Int32Ptr(row.MaxUses),
-		LastUsedAt:  dbutil.TimePtr(row.LastUsedAt),
-		RevokedAt:   dbutil.TimePtr(row.RevokedAt),
-		RevokedBy:   dbutil.Int64Ptr(row.RevokedBy),
-		ExpiresAt:   dbutil.TimePtr(row.ExpiresAt),
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID: base.ID, BoardID: base.BoardID, TokenHash: base.TokenHash,
+		TokenPrefix: base.TokenPrefix, Role: base.Role, CreatedBy: base.CreatedBy,
+		Revoked: base.Revoked, UsageCount: base.UsageCount,
+		MaxUses: dbutil.Int32Ptr(base.MaxUses), LastUsedAt: dbutil.TimePtr(base.LastUsedAt),
+		RevokedAt: dbutil.TimePtr(base.RevokedAt), RevokedBy: dbutil.Int64Ptr(base.RevokedBy),
+		ExpiresAt: dbutil.TimePtr(base.ExpiresAt), CreatedAt: dbutil.TimeValue(base.CreatedAt),
+		UpdatedAt: dbutil.TimeValue(base.UpdatedAt),
 	}
+}
+
+func pgTextString(v pgtype.Text) string {
+	if !v.Valid {
+		return ""
+	}
+	return v.String
+}
+
+func gracePeriodTimestamptz() pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: time.Now().Add(reclamation.GracePeriod), Valid: true}
+}
+
+func claimLeaseTimestamptz() pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: time.Now().Add(-reclamation.ClaimLeaseDuration), Valid: true}
+}
+
+func uuidFromPgType(v pgtype.UUID) uuid.UUID {
+	return uuid.UUID(v.Bytes)
 }

@@ -14,6 +14,7 @@ func registerGlobalMiddleware(r *gin.Engine, deps Dependencies) {
 	// share one correlation ID. Recovery stays ahead of CORS/rate-limit
 	// so panics there also render the shared error envelope.
 	r.Use(RequestIDMiddleware())
+	r.Use(REDMetricsMiddleware(deps.REDMetrics))
 	r.Use(AccessLogMiddleware())
 	r.Use(RecoveryMiddleware())
 	r.Use(SecurityHeadersMiddleware())

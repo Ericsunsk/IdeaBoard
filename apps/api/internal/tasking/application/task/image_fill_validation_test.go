@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/workflow"
 )
@@ -106,8 +105,8 @@ func TestValidateImageFillDimensions(t *testing.T) {
 func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) {
 	accountsStore := &countingImageFillAccountStore{}
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: accountsStore,
-		Media:    testSubmitMediaValidator{},
+		Models: accountsStore,
+		Media:  testSubmitMediaValidator{},
 	})
 
 	_, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
@@ -134,7 +133,7 @@ func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) 
 
 func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) {
 	accountsStore := &countingImageFillAccountStore{}
-	intake := NewTaskIntake(TaskIntakeDeps{Accounts: accountsStore})
+	intake := NewTaskIntake(TaskIntakeDeps{Models: accountsStore})
 
 	_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Feature: workflow.FeatureSlugInpaint,
@@ -157,7 +156,7 @@ func TestSubmitTaskRejectsImageFillDimensionsBeforeSubmissionTransaction(t *test
 	accountsStore := &countingImageFillAccountStore{}
 	submissionStore := &recordingSubmissionStore{}
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountsStore,
+		ModelStore:      accountsStore,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -191,10 +190,7 @@ type countingImageFillAccountStore struct {
 	calls int
 }
 
-func (s *countingImageFillAccountStore) GetAllEnabled(context.Context) ([]*accounts.ApiAccount, error) {
+func (s *countingImageFillAccountStore) ResolveModel(context.Context, string) (string, error) {
 	s.calls++
-	return []*accounts.ApiAccount{{
-		ID:           101,
-		Capabilities: []string{string(workflow.RoutingCapabilityFill)},
-	}}, nil
+	return "openai/gpt-image-1", nil
 }

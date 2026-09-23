@@ -11,10 +11,12 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/testdb"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
+	_, pool := testdb.OpenWithPool(t)
 	service := credits.NewService(pool)
 	if _, err := service.Grant(t.Context(), ports.GrantCommand{
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 10),
@@ -23,11 +25,11 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 		t.Fatalf("seed Wallet: %v", err)
 	}
 
-	tx, err := db.BeginTx(t.Context(), nil)
+	tx, err := pool.BeginTx(t.Context(), pgx.TxOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	commands, err := credits.CommandsInSQLTx(tx)
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,47 +37,47 @@ func TestPurchaseCreditsUsesCallerTransactionAndCanonicalIdempotency(t *testing.
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
 	})
 	if err != nil {
-		_ = tx.Rollback()
+		_ = tx.Rollback(t.Context())
 		t.Fatalf("Purchase() error = %v", err)
 	}
 	if first.CommandType != domain.CommandPurchaseCredit || first.Wallet.Available != 510 || first.Replayed {
-		_ = tx.Rollback()
+		_ = tx.Rollback(t.Context())
 		t.Fatalf("first Purchase() = %+v", first)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatalf("commit Purchase: %v", err)
 	}
 
-	replayTx, err := db.BeginTx(t.Context(), nil)
+	replayTx, err := pool.BeginTx(t.Context(), pgx.TxOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	replayCommands, err := credits.CommandsInSQLTx(replayTx)
+	replayCommands, err := credits.CommandsInTx(replayTx)
 	if err != nil {
-		_ = replayTx.Rollback()
+		_ = replayTx.Rollback(t.Context())
 		t.Fatal(err)
 	}
 	replayed, err := replayCommands.Purchase(t.Context(), ports.PurchaseCommand{
 		UserID: 42, Amount: testhelpers.MustCreditAmount(t, 500), Metadata: testhelpers.PurchaseMetadata("payment-purchase:order-1", "order-1"),
 	})
 	if err != nil {
-		_ = replayTx.Rollback()
+		_ = replayTx.Rollback(t.Context())
 		t.Fatalf("replayed Purchase() error = %v", err)
 	}
 	if !replayed.Replayed || replayed.TransactionID != first.TransactionID {
-		_ = replayTx.Rollback()
+		_ = replayTx.Rollback(t.Context())
 		t.Fatalf("replayed Purchase() = %+v, first = %+v", replayed, first)
 	}
-	if err := replayTx.Commit(); err != nil {
+	if err := replayTx.Commit(t.Context()); err != nil {
 		t.Fatalf("commit replay: %v", err)
 	}
 
-	conflictTx, err := db.BeginTx(t.Context(), nil)
+	conflictTx, err := pool.BeginTx(t.Context(), pgx.TxOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conflictTx.Rollback()
-	conflictCommands, err := credits.CommandsInSQLTx(conflictTx)
+	defer conflictTx.Rollback(t.Context())
+	conflictCommands, err := credits.CommandsInTx(conflictTx)
 	if err != nil {
 		t.Fatal(err)
 	}

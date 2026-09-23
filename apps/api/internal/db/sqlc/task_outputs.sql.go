@@ -7,11 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTaskOutput = `-- name: CreateTaskOutput :one
@@ -26,18 +23,18 @@ RETURNING id
 `
 
 type CreateTaskOutputParams struct {
-	TaskID       string          `json:"task_id"`
-	MediaAssetID sql.NullInt64   `json:"media_asset_id"`
-	OutputKind   string          `json:"output_kind"`
-	Role         string          `json:"role"`
-	Url          string          `json:"url"`
-	SourceUrl    string          `json:"source_url"`
-	Metadata     json.RawMessage `json:"metadata"`
-	ResultIndex  int32           `json:"result_index"`
+	TaskID       string      `json:"task_id"`
+	MediaAssetID pgtype.Int8 `json:"media_asset_id"`
+	OutputKind   string      `json:"output_kind"`
+	Role         string      `json:"role"`
+	Url          string      `json:"url"`
+	SourceUrl    string      `json:"source_url"`
+	Metadata     []byte      `json:"metadata"`
+	ResultIndex  int32       `json:"result_index"`
 }
 
 func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createTaskOutput,
+	row := q.db.QueryRow(ctx, createTaskOutput,
 		arg.TaskID,
 		arg.MediaAssetID,
 		arg.OutputKind,
@@ -58,7 +55,7 @@ WHERE task_id = $1
 `
 
 func (q *Queries) DeleteOutputsByTaskID(ctx context.Context, taskID string) error {
-	_, err := q.db.ExecContext(ctx, deleteOutputsByTaskID, taskID)
+	_, err := q.db.Exec(ctx, deleteOutputsByTaskID, taskID)
 	return err
 }
 
@@ -90,29 +87,29 @@ ORDER BY o.task_id ASC, o.result_index ASC, o.id ASC
 `
 
 type ListOutputsByTaskIDsRow struct {
-	ID             int64           `json:"id"`
-	TaskID         string          `json:"task_id"`
-	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
-	AssetID        string          `json:"asset_id"`
-	OutputKind     string          `json:"output_kind"`
-	Role           string          `json:"role"`
-	Url            string          `json:"url"`
-	StorageKey     string          `json:"storage_key"`
-	MimeType       string          `json:"mime_type"`
-	Width          int32           `json:"width"`
-	Height         int32           `json:"height"`
-	SizeBytes      int64           `json:"size_bytes"`
-	SourceUrl      string          `json:"source_url"`
-	ChecksumSha256 string          `json:"checksum_sha256"`
-	StorageProfile string          `json:"storage_profile"`
-	Metadata       json.RawMessage `json:"metadata"`
-	ResultIndex    int32           `json:"result_index"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID             int64              `json:"id"`
+	TaskID         string             `json:"task_id"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
+	AssetID        string             `json:"asset_id"`
+	OutputKind     string             `json:"output_kind"`
+	Role           string             `json:"role"`
+	Url            string             `json:"url"`
+	StorageKey     string             `json:"storage_key"`
+	MimeType       string             `json:"mime_type"`
+	Width          int32              `json:"width"`
+	Height         int32              `json:"height"`
+	SizeBytes      int64              `json:"size_bytes"`
+	SourceUrl      string             `json:"source_url"`
+	ChecksumSha256 string             `json:"checksum_sha256"`
+	StorageProfile string             `json:"storage_profile"`
+	Metadata       []byte             `json:"metadata"`
+	ResultIndex    int32              `json:"result_index"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listOutputsByTaskIDs, pq.Array(taskIds))
+	rows, err := q.db.Query(ctx, listOutputsByTaskIDs, taskIds)
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +141,6 @@ func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

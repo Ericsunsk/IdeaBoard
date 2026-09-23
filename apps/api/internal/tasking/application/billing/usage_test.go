@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
@@ -157,7 +158,7 @@ func seedTaskBillingUsageProduct(
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := billing.NewService(pool)
+	service := billingpostgres.NewStore(pool)
 	if _, err := service.PublishPrice(ctx, featurePriceInput(sku, "Usage Index", 0)); err != nil {
 		t.Fatalf("publish usage index price: %v", err)
 	}

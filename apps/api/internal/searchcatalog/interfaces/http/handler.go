@@ -1,27 +1,35 @@
-package searchcatalog
+package httpapi
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/secrets"
+	"ideaboard/api/internal/searchcatalog/domain"
+	"ideaboard/api/internal/searchcatalog/ports"
 
 	"github.com/gin-gonic/gin"
 )
 
+// providerConfigStore is the narrow settings seam the admin handler needs.
+// The settings-backed repository satisfies it structurally.
+type providerConfigStore interface {
+	List(context.Context) ([]domain.ProviderConfig, error)
+	Save(context.Context, domain.Provider, *string, bool, int64) error
+	RecordTest(context.Context, domain.Provider, domain.TestState, domain.FailureCategory, string, int64) error
+	RawAPIKey(context.Context, domain.Provider) (string, error)
+}
+
 type Handler struct {
-	repository *ConfigRepository
-	adapters   map[Provider]providerAdapter
+	repository providerConfigStore
+	adapters   map[domain.Provider]ports.ProviderTestAdapter
 }
 
 type ProviderListResponse struct {
-	Providers []ProviderConfig `json:"providers"`
+	Providers []domain.ProviderConfig `json:"providers"`
 }
 
 type UpdateProviderRequest struct {
@@ -32,17 +40,14 @@ type UpdateProviderRequest struct {
 }
 
 type TestProviderResponse struct {
-	Provider        Provider        `json:"provider"`
-	TestState       TestState       `json:"test_state"`
-	FailureCategory FailureCategory `json:"failure_category,omitempty"`
-	Message         string          `json:"message"`
+	Provider        domain.Provider        `json:"provider"`
+	TestState       domain.TestState       `json:"test_state"`
+	FailureCategory domain.FailureCategory `json:"failure_category,omitempty"`
+	Message         string                 `json:"message"`
 }
 
-func NewHandler(repository *ConfigRepository, adapters ...providerAdapter) *Handler {
-	if len(adapters) == 0 {
-		adapters = newProviderAdapters()
-	}
-	byProvider := make(map[Provider]providerAdapter, len(adapters))
+func NewHandler(repository providerConfigStore, adapters ...ports.ProviderTestAdapter) *Handler {
+	byProvider := make(map[domain.Provider]ports.ProviderTestAdapter, len(adapters))
 	for _, adapter := range adapters {
 		if adapter != nil {
 			byProvider[adapter.Provider()] = adapter
@@ -53,7 +58,7 @@ func NewHandler(repository *ConfigRepository, adapters ...providerAdapter) *Hand
 
 func (h *Handler) List(c *gin.Context) {
 	if h == nil || h.repository == nil {
-		response.Error(c, http.StatusInternalServerError, "搜索供应商配置不可用")
+		response.MachineError(c, http.StatusInternalServerError, "search_provider_unavailable", "搜索供应商配置不可用")
 		return
 	}
 	configs, err := h.repository.List(c.Request.Context())
@@ -69,37 +74,28 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if h == nil || h.repository == nil {
+		response.MachineError(c, http.StatusServiceUnavailable, "search_provider_unavailable", "搜索供应商配置不可用")
+		return
+	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		response.Error(c, http.StatusNotFound, "搜索供应商不存在")
+		response.MachineError(c, http.StatusNotFound, "search_provider_not_found", "搜索供应商不存在")
 		return
 	}
 	var request UpdateProviderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.MachineError(c, http.StatusBadRequest, "search_request_invalid", "参数错误")
 		return
 	}
-	if provider == ProviderVision {
-		endpoint, err := outbound.ValidateConfiguredEndpoint(request.EndpointURL, outbound.AllowHosts(c.Request.Context())...)
-		if err != nil || endpoint == "" || strings.TrimSpace(request.Model) == "" {
-			response.Error(c, http.StatusBadRequest, "Vision Search Endpoint URL 与 Model 无效")
-			return
-		}
-		request.EndpointURL = endpoint
-	}
-	var saveErr error
-	if provider == ProviderVision {
-		saveErr = h.repository.SaveVision(c.Request.Context(), request.APIKey, request.EndpointURL, request.Model, request.Enabled, admin.UserID())
-	} else {
-		saveErr = h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
-	}
+	saveErr := h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
 	if saveErr != nil {
-		if errors.Is(saveErr, ErrProviderTestRequired) {
-			response.Error(c, http.StatusConflict, "启用前请先通过连接测试")
+		if errors.Is(saveErr, domain.ErrProviderTestRequired) {
+			response.MachineError(c, http.StatusConflict, "search_provider_test_required", "启用前请先通过连接测试")
 			return
 		}
 		if strings.Contains(saveErr.Error(), "api key cannot be empty") {
-			response.Error(c, http.StatusBadRequest, "API Key 不能为空")
+			response.MachineError(c, http.StatusBadRequest, "search_provider_api_key_invalid", "API Key 不能为空")
 			return
 		}
 		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商配置失败", saveErr)
@@ -113,82 +109,42 @@ func (h *Handler) Test(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if h == nil || h.repository == nil {
+		response.MachineError(c, http.StatusServiceUnavailable, "search_provider_unavailable", "搜索供应商配置不可用")
+		return
+	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		response.Error(c, http.StatusNotFound, "搜索供应商不存在")
-		return
-	}
-	key, err := h.repository.rawAPIKey(c.Request.Context(), provider)
-	if err != nil {
-		response.Error(c, http.StatusConflict, "请先保存 API Key")
-		return
-	}
-	if provider == ProviderVision {
-		config, configErr := h.repository.VisionTestConfig(c.Request.Context())
-		if configErr != nil {
-			response.Error(c, http.StatusConflict, "请先保存 Vision Search 配置")
-			return
-		}
-		category, message, testErr := testVisionProvider(c.Request.Context(), config.EndpointURL, config.Model, key)
-		state := TestStatePassed
-		if testErr != nil {
-			state = TestStateFailed
-		}
-		if err := h.repository.RecordTest(c.Request.Context(), provider, state, category, message, admin.UserID()); err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商测试状态失败", err)
-			return
-		}
-		if testErr != nil {
-			response.Error(c, http.StatusBadRequest, message)
-			return
-		}
-		response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})
+		response.MachineError(c, http.StatusNotFound, "search_provider_not_found", "搜索供应商不存在")
 		return
 	}
 	adapter := h.adapters[provider]
 	if adapter == nil {
-		response.Error(c, http.StatusInternalServerError, "搜索供应商测试不可用")
+		response.MachineError(c, http.StatusInternalServerError, "search_provider_unavailable", "搜索供应商测试不可用")
+		return
+	}
+	key, err := h.repository.RawAPIKey(c.Request.Context(), provider)
+	if err != nil {
+		response.MachineError(c, http.StatusConflict, "search_provider_api_key_required", "请先保存 API Key")
 		return
 	}
 	category, message, testErr := adapter.Test(c.Request.Context(), key)
-	state := TestStatePassed
+	state := domain.TestStatePassed
 	if testErr != nil {
-		state = TestStateFailed
+		state = domain.TestStateFailed
 	}
 	if err := h.repository.RecordTest(c.Request.Context(), provider, state, category, message, admin.UserID()); err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商测试状态失败", err)
 		return
 	}
 	if testErr != nil {
-		response.Error(c, http.StatusBadRequest, message)
+		response.MachineError(c, http.StatusBadRequest, "search_provider_test_failed", "搜索供应商连接测试失败")
 		return
 	}
 	response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})
 }
 
-func (r *ConfigRepository) rawAPIKey(ctx context.Context, provider Provider) (string, error) {
-	stored, err := r.load(ctx, provider)
-	if err != nil {
-		return "", err
-	}
-	if strings.TrimSpace(stored.APIKeyCiphertext) == "" {
-		return "", ErrProviderUnavailable
-	}
-	return decryptStoredAPIKey(stored)
-}
-
-func decryptStoredAPIKey(stored storedProviderConfig) (string, error) {
-	if strings.TrimSpace(stored.APIKeyCiphertext) == "" {
-		return "", ErrProviderUnavailable
-	}
-	key, err := secrets.DecryptMaterialString(stored.APIKeyCiphertext, stored.MaterialKind)
-	if err != nil {
-		return "", fmt.Errorf("decrypt search provider API key: %w", err)
-	}
-	return key, nil
-}
-
-func parseProvider(raw string) (Provider, bool) {
-	provider := Provider(strings.ToLower(strings.TrimSpace(raw)))
-	return provider, isProvider(provider)
+func parseProvider(raw string) (domain.Provider, bool) {
+	provider := domain.Provider(strings.ToLower(strings.TrimSpace(raw)))
+	return provider, domain.IsProvider(provider)
 }

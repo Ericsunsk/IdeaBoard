@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
+	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	execution "ideaboard/api/internal/runtime/interfaces/worker/execution"
 	providers "ideaboard/api/internal/runtime/interfaces/worker/providers"
+	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskexecution "ideaboard/api/internal/tasking/application/execution"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -33,7 +33,6 @@ type TaskWorker struct {
 	riverqueue.WorkerDefaults[taskqueue.DrawingTaskArgs]
 	processor              *execution.TaskProcessor
 	finalFailures          *finalFailureOrchestrator
-	noCapacityRetryDelay   time.Duration
 	finalFailureRetryDelay time.Duration
 	recordOutput           func(context.Context, any) error
 	enqueueFinalFailure    func(context.Context, taskqueue.DrawingFinalFailureArgs) error
@@ -56,10 +55,13 @@ const (
 	finalFailureRetryOutputKind     = "task_final_failure_convergence"
 	finalFailureExecutionOutputKind = "task_final_attempt_started"
 	defaultFinalFailureRetryDelay   = 5 * time.Second
-	defaultNoCapacityRetryDelay     = 5 * time.Second
-	defaultRiverJobTimeout          = time.Duration(accountlimits.MaxTimeoutSeconds)*time.Second + 2*time.Minute
-	finalFailureConvergeTimeout     = 15 * time.Second
-	riverSchemaLookupTimeout        = 5 * time.Second
+	// defaultRiverJobTimeout is the client-level fallback for unregistered or
+	// test-only workers. Production workers pin their budget explicitly via
+	// Timeout() against taskqueue.RiverTimeoutMatrix; only the drawing worker
+	// legitimately needs this full budget.
+	defaultRiverJobTimeout      = taskqueue.RiverJobTimeoutDrawing
+	finalFailureConvergeTimeout = 15 * time.Second
+	riverSchemaLookupTimeout    = 5 * time.Second
 )
 
 var (
@@ -73,31 +75,31 @@ type finalFailureRetryOutput struct {
 	Reason string `json:"reason"`
 }
 
-type WorkerAccountStore interface {
-	taskexecution.AccountStore
-	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
-}
-
 type TaskWorkerDeps struct {
-	AccountRepo        WorkerAccountStore
 	TaskRepo           taskexecution.TaskStore
 	Enqueuer           taskqueueports.TaskEnqueuer
-	Assigner           taskqueueports.TaskAssigner
 	CancelStore        taskqueueports.TaskCancellationStore
 	MediaReader        taskmedia.UploadReader
 	ResultMaterializer taskmedia.ResultMaterializer
 	TaskEvents         events.TaskStatusPublisher
 	PublicOrigins      config.PublicOriginsConfig
+	ModelResolver      execution.ModelResolver
+	GatewayFactory     runtimeports.GatewayClientFactory
+	ModelRoutes        runtimeports.ModelRouteOverrideReader
+	// REDMetrics feeds worker-level gateway retry observations; nil keeps
+	// the worker uninstrumented. The composition root owns this wiring.
+	REDMetrics *redmetrics.Set
 }
 
 type RiverTaskWorkerDeps = TaskWorkerDeps
 
 func NewTaskWorker(deps TaskWorkerDeps) *TaskWorker {
-	executor := providers.NewExecutor(deps.MediaReader, deps.ResultMaterializer, deps.PublicOrigins)
-	taskExecution := taskexecution.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
+	executor := providers.NewExecutor(deps.MediaReader, deps.ResultMaterializer, deps.PublicOrigins, deps.GatewayFactory, deps.ModelRoutes)
+	taskExecution := taskexecution.NewService(deps.TaskRepo, deps.CancelStore)
 	taskExecution.SetTaskStatusPublisher(deps.TaskEvents)
-	orchestrator := execution.NewOrchestrator(deps.AccountRepo, deps.Enqueuer, taskExecution, executor.CallDrawingAPIWithAssignment)
-	return newTaskWorkerWithProcessor(execution.NewProcessor(deps.Assigner, taskExecution, orchestrator.Execute))
+	orchestrator := execution.NewOrchestrator(deps.Enqueuer, taskExecution, deps.ModelResolver, executor.CallGatewayAPI)
+	orchestrator.SetREDMetrics(deps.REDMetrics)
+	return newTaskWorkerWithProcessor(execution.NewProcessor(taskExecution, orchestrator.Execute))
 }
 
 func NewTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker {
@@ -107,13 +109,11 @@ func NewTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker 
 var (
 	NewRiverTaskWorker              = NewTaskWorker
 	NewRiverTaskWorkerWithProcessor = NewTaskWorkerWithProcessor
-	newRiverTaskWorkerWithProcessor = newTaskWorkerWithProcessor
 )
 
 func newTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker {
 	worker := &TaskWorker{
 		processor:              processor,
-		noCapacityRetryDelay:   defaultNoCapacityRetryDelay,
 		finalFailureRetryDelay: defaultFinalFailureRetryDelay,
 		recordOutput:           riverqueue.RecordOutput,
 	}
@@ -137,6 +137,10 @@ func newTaskWorkerWithProcessor(processor *execution.TaskProcessor) *TaskWorker 
 		}
 	}
 	return worker
+}
+
+func (w *RiverTaskWorker) Timeout(*riverqueue.Job[taskqueue.DrawingTaskArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutDrawing
 }
 
 func (w *RiverTaskWorker) Work(ctx context.Context, job *riverqueue.Job[taskqueue.DrawingTaskArgs]) (workErr error) {
@@ -204,9 +208,6 @@ func (w *RiverTaskWorker) handleProcessError(ctx context.Context, job *riverqueu
 	}
 	if errors.Is(err, errFinalAttemptMarkerUnavailable) {
 		return riverqueue.JobSnooze(w.finalFailureRetryDelay)
-	}
-	if errors.Is(err, taskqueueports.ErrNoAccountCapacity) {
-		return riverqueue.JobSnooze(w.noCapacityRetryDelay)
 	}
 	if !isFinalAttempt {
 		return err
@@ -284,6 +285,10 @@ func NewRiverProducer(dbPool *pgxpool.Pool) (*riverqueue.Client[pgx.Tx], error) 
 		return nil, err
 	}
 	return riverqueue.NewClient(riverpgxv5.New(dbPool), &riverqueue.Config{Schema: schema})
+}
+
+func (w *FinalFailureWorker) Timeout(*riverqueue.Job[taskqueue.DrawingFinalFailureArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutFinalFailure
 }
 
 func (w *FinalFailureWorker) Work(ctx context.Context, job *riverqueue.Job[taskqueue.DrawingFinalFailureArgs]) error {
@@ -414,7 +419,8 @@ func (h *riverFinalFailureHandler) HandleError(ctx context.Context, job *riverty
 		return nil
 	}
 	if isFinalRiverAttempt(job) {
-		slog.Warn("River job reached final failure", "river_job_id", job.ID, "err", err)
+		taskID, _ := drawingTaskIDFromJob(job)
+		slog.Warn("River job reached final failure", "task_id", taskID, "river_job_id", job.ID, "err", err)
 	}
 	h.handle(ctx, job, finalFailureErrorReason)
 	return nil
@@ -422,7 +428,8 @@ func (h *riverFinalFailureHandler) HandleError(ctx context.Context, job *riverty
 
 func (h *riverFinalFailureHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, stack string) *riverqueue.ErrorHandlerResult {
 	if isFinalRiverAttempt(job) {
-		slog.Warn("River job panicked on final attempt", "river_job_id", job.ID, "panic", panicVal, "stack", stack)
+		taskID, _ := drawingTaskIDFromJob(job)
+		slog.Warn("River job panicked on final attempt", "task_id", taskID, "river_job_id", job.ID, "panic", panicVal, "stack", stack)
 	}
 	h.handle(ctx, job, finalFailurePanicReason)
 	return nil
@@ -456,7 +463,7 @@ func drawingTaskIDFromJob(job *rivertype.JobRow) (string, bool) {
 	}
 	var args taskqueue.DrawingTaskArgs
 	if err := json.Unmarshal(job.EncodedArgs, &args); err != nil {
-		slog.Warn("decode River drawing task args failed", "river_job_id", job.ID, "err", err)
+		slog.Warn("decode River drawing task args failed", "task_id", "", "river_job_id", job.ID, "err", err)
 		return "", false
 	}
 	if args.Task.TaskID == "" {
@@ -495,21 +502,35 @@ func currentRiverSchema(ctx context.Context, dbPool *pgxpool.Pool) (string, erro
 }
 
 func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	return NewRiverPgxPoolWithConfig(ctx, dsn, config.PoolConfig{})
+}
+
+// NewRiverPgxPoolWithConfig opens the River pgxpool with deploy-level sizing
+// from PoolConfig (env-tunable). A zero PoolConfig keeps the historical
+// budget (10 max / 1 min) through the Effective* accessors: combined with the
+// runtime pgxpool, a single API instance holds 35 conns against the
+// PostgreSQL default max_connections 100, with headroom for migrations, CLIs
+// and test fixtures. Idle recycling matches the runtime pool so both
+// age out together.
+func NewRiverPgxPoolWithConfig(ctx context.Context, dsn string, pool config.PoolConfig) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
-	// Budget: 10 conns. Combined with the database/sql pool (25) a single
-	// API instance holds 35 < PostgreSQL default max_connections 100, with
-	// head room for migrations, CLIs and test fixtures. Idle recycling
-	// matches the database/sql pool so both age out together.
-	cfg.MaxConns = 10
-	cfg.MinConns = 1
-	cfg.MaxConnLifetime = 30 * time.Minute
-	cfg.MaxConnIdleTime = 5 * time.Minute
+	applyRiverPoolLimits(cfg, pool)
 	cfg.HealthCheckPeriod = time.Minute
 	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+// applyRiverPoolLimits pins sizing and recycling on a parsed pgxpool config
+// without opening connections, so pool tuning stays unit-testable without a
+// live database.
+func applyRiverPoolLimits(cfg *pgxpool.Config, pool config.PoolConfig) {
+	cfg.MaxConns = int32(pool.EffectiveRiverMaxConns())
+	cfg.MinConns = int32(pool.EffectiveRiverMinConns())
+	cfg.MaxConnLifetime = time.Duration(pool.EffectiveMaxLifetimeMin()) * time.Minute
+	cfg.MaxConnIdleTime = time.Duration(pool.EffectiveMaxIdleTimeMin()) * time.Minute
 }
 
 type RiverTx = pgx.Tx

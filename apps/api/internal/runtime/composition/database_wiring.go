@@ -2,15 +2,11 @@ package composition
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	"strings"
 
-	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
-	providerendpointspg "ideaboard/api/internal/accountpool/providerendpoints/infrastructure/postgres"
-	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/boards"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/library"
@@ -25,44 +21,45 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
-	"ideaboard/api/internal/searchcatalog"
+	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type appDatabases struct {
-	db        *sql.DB
+	db        *pgxpool.Pool
 	riverPool *pgxpool.Pool
 }
 
 type appDatabaseOpeners struct {
-	postgres func(context.Context, config.DatabaseConfig) (*sql.DB, error)
+	postgres func(context.Context, config.DatabaseConfig) (*pgxpool.Pool, error)
 	river    func(context.Context, string) (*pgxpool.Pool, error)
 }
 
 type appRepositories struct {
-	db                   *sql.DB
-	userRepo             *identitypostgres.Repository
-	accountRepo          *accountrepo.Repository
-	taskRepo             *taskstore.Repository
-	taskBillingUsage     *taskbilling.UsageStore
-	providerEndpointRepo *providerendpointspg.Repository
-	systemConfigRepo     *settings.SystemConfigRepository
-	featurePromptRepo    *prompts.FeaturePromptRepository
-	storageProfileRepo   *storagepostgres.Repository
-	mediaAssetRegistry   *assets.MediaAssetRegistry
-	boardRepo            *boards.Repository
-	paymentRepo          *paymentpostgres.Repository
-	libraryRepo          *library.Repository
-	adminBrandLogoRepo   *adminbranding.Repository
+	db                 *pgxpool.Pool
+	userRepo           *identitypostgres.Repository
+	taskRepo           *taskstore.Repository
+	taskBillingUsage   *taskbilling.UsageStore
+	systemConfigRepo   *settings.SystemConfigRepository
+	featurePromptRepo  *prompts.FeaturePromptRepository
+	storageProfileRepo *storagepostgres.Repository
+	mediaAssetRegistry *assets.MediaAssetRegistry
+	boardRepo          *boards.Repository
+	paymentRepo        *paymentpostgres.Repository
+	libraryRepo        *library.Repository
+	adminBrandLogoRepo *adminbranding.Repository
 }
 
 func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
 	return openAppDatabasesWithOpeners(ctx, cfg, appDatabaseOpeners{
 		postgres: database.NewPostgres,
-		river:    workerriver.NewRiverPgxPool,
+		river: func(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+			return workerriver.NewRiverPgxPoolWithConfig(ctx, dsn, cfg.Database.Pool)
+		},
 	})
 }
 
@@ -82,20 +79,21 @@ func openAppDatabasesWithOpeners(
 		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	if err := verifyRuntimePrivileges(ctx, db); err != nil {
-		return appDatabases{}, closeStartupDatabase(db, err)
+		closeStartupDatabase(db)
+		return appDatabases{}, err
 	}
 	riverPool, err := openers.river(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
-		return appDatabases{}, closeStartupDatabase(db, fmt.Errorf("failed to connect River database pool: %w", err))
+		closeStartupDatabase(db)
+		return appDatabases{}, fmt.Errorf("failed to connect River database pool: %w", err)
 	}
 	return appDatabases{db: db, riverPool: riverPool}, nil
 }
 
-func closeStartupDatabase(db *sql.DB, cause error) error {
-	if closeErr := db.Close(); closeErr != nil {
-		return errors.Join(cause, fmt.Errorf("close startup database: %w", closeErr))
+func closeStartupDatabase(db *pgxpool.Pool) {
+	if db != nil {
+		db.Close()
 	}
-	return cause
 }
 
 func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
@@ -111,7 +109,7 @@ func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("failed to connect migration database: %w", err)
 	}
 	defer migrationDB.Close()
-	migrationPool, err := workerriver.NewRiverPgxPool(ctx, database.PostgresDSN(migrationConfig))
+	migrationPool, err := workerriver.NewRiverPgxPoolWithConfig(ctx, database.PostgresDSN(migrationConfig), cfg.Database.Pool)
 	if err != nil {
 		return fmt.Errorf("failed to connect River migration pool: %w", err)
 	}
@@ -119,16 +117,23 @@ func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 	if err := workerriver.MigrateRiver(ctx, migrationPool); err != nil {
 		return fmt.Errorf("failed to migrate River schema: %w", err)
 	}
-	privilegeTx, err := migrationDB.BeginTx(ctx, nil)
+	privilegeTx, err := migrationDB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin runtime privilege transaction: %w", err)
 	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = privilegeTx.Rollback(ctx)
+		}
+	}()
 	if err := dbprivileges.Configure(ctx, privilegeTx, cfg.Database.User, runtimePrivilegePolicies()...); err != nil {
-		return rollbackPrivilegeTransaction(privilegeTx, err)
+		return err
 	}
-	if err := privilegeTx.Commit(); err != nil {
+	if err := privilegeTx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit runtime privileges: %w", err)
 	}
+	committed = true
 	return nil
 }
 
@@ -136,25 +141,17 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 	return []dbprivileges.Policy{
 		database.RuntimePrivilegePolicy(),
 		creditpostgres.RuntimePrivilegePolicy(),
-		billing.RuntimePrivilegePolicy(),
+		billingpostgres.RuntimePrivilegePolicy(),
 		taskstore.RuntimePrivilegePolicy(),
 		workerriver.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
 		paymentpostgres.RuntimePrivilegePolicy(),
-		searchcatalog.RuntimePrivilegePolicy(),
+		searchinfra.RuntimePrivilegePolicy(),
 	}
 }
 
 func verifyRuntimePrivileges(ctx context.Context, db dbprivileges.DBTX) error {
 	return dbprivileges.Verify(ctx, db, runtimePrivilegePolicies()...)
-}
-
-func rollbackPrivilegeTransaction(tx *sql.Tx, cause error) error {
-	rollbackErr := tx.Rollback()
-	if rollbackErr == nil || errors.Is(rollbackErr, sql.ErrTxDone) {
-		return cause
-	}
-	return errors.Join(cause, fmt.Errorf("rollback runtime privileges: %w", rollbackErr))
 }
 
 func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (config.DatabaseConfig, error) {
@@ -171,23 +168,21 @@ func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (conf
 	return migrationConfig, nil
 }
 
-func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
+func newAppRepositories(ctx context.Context, db *pgxpool.Pool) (appRepositories, error) {
 	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
-		db:                   db,
-		userRepo:             identitypostgres.NewRepository(db),
-		accountRepo:          accountrepo.NewRepository(db, taskRepo),
-		taskRepo:             taskRepo,
-		taskBillingUsage:     taskbilling.NewUsageStore(db),
-		providerEndpointRepo: providerendpointspg.NewRepository(db),
-		systemConfigRepo:     settings.NewSystemConfigRepository(db),
-		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
-		storageProfileRepo:   storagepostgres.NewRepository(db),
-		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
-		boardRepo:            boards.NewRepository(db),
-		paymentRepo:          paymentpostgres.NewRepository(db),
-		libraryRepo:          library.NewRepository(db),
-		adminBrandLogoRepo:   adminbranding.NewRepository(db),
+		db:                 db,
+		userRepo:           identitypostgres.NewRepository(db),
+		taskRepo:           taskRepo,
+		taskBillingUsage:   taskbilling.NewUsageStore(db),
+		systemConfigRepo:   settings.NewSystemConfigRepository(db),
+		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
+		storageProfileRepo: storagepostgres.NewRepository(db),
+		mediaAssetRegistry: assets.NewMediaAssetRegistry(db),
+		boardRepo:          boards.NewRepository(db),
+		paymentRepo:        paymentpostgres.NewRepository(db),
+		libraryRepo:        library.NewRepository(db),
+		adminBrandLogoRepo: adminbranding.NewRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
 		return appRepositories{}, err
@@ -195,11 +190,11 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 	return repos, nil
 }
 
-func closeStartupResources(db *sql.DB, riverPool *pgxpool.Pool) {
+func closeStartupResources(db *pgxpool.Pool, riverPool *pgxpool.Pool) {
 	if riverPool != nil {
 		riverPool.Close()
 	}
 	if db != nil {
-		_ = db.Close()
+		db.Close()
 	}
 }

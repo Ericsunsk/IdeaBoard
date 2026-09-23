@@ -2,7 +2,6 @@ package submission
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -82,8 +81,8 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	if args.Task.UserID != task.UserID || args.Task.Prompt != task.Prompt || args.Task.Params != task.Params {
 		t.Fatalf("river args task=%+v, want canonical request", args.Task)
 	}
-	if args.Task.RetryCount != 0 || args.Task.CreatedAt <= 0 {
-		t.Fatalf("river args retry/created=(%d,%d), want module defaults", args.Task.RetryCount, args.Task.CreatedAt)
+	if args.Task.CreatedAt <= 0 {
+		t.Fatalf("river args created=%d, want positive module default", args.Task.CreatedAt)
 	}
 	if args.Task.Priority != tasks.TaskPriorityInteractive {
 		t.Fatalf("river args priority=%d, want %d", args.Task.Priority, tasks.TaskPriorityInteractive)
@@ -133,11 +132,11 @@ func TestTaskSubmissionRiverClientPinsCurrentSchemaWhenFallbackContainsRiverTabl
 	currentSchema := taskSubmissionCurrentSchema(t, pool)
 	fallbackSchema := currentSchema + "_river_fallback"
 	fallbackSQL := pgx.Identifier{fallbackSchema}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE SCHEMA `+fallbackSQL); err != nil {
+	if _, err := db.Exec(ctx, `CREATE SCHEMA `+fallbackSQL); err != nil {
 		t.Fatalf("create fallback River schema failed: %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DROP SCHEMA IF EXISTS `+fallbackSQL+` CASCADE`)
+		_, _ = db.Exec(context.Background(), `DROP SCHEMA IF EXISTS `+fallbackSQL+` CASCADE`)
 	})
 
 	migrator, err := rivermigrate.New(riverpgxv5.New(pool), &rivermigrate.Config{
@@ -174,7 +173,7 @@ func TestTaskSubmissionRiverClientPinsCurrentSchemaWhenFallbackContainsRiverTabl
 	}
 	var count int
 	currentRiverJob := pgx.Identifier{currentSchema, "river_job"}.Sanitize()
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+currentRiverJob+` WHERE args->'task'->>'task_id' = $1`, result.TaskID).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM `+currentRiverJob+` WHERE args->'task'->>'task_id' = $1`, result.TaskID).Scan(&count); err != nil {
 		t.Fatalf("count current-schema River jobs failed: %v", err)
 	}
 	if count != 1 {
@@ -274,7 +273,7 @@ func TestStoreSubmitTaskSerializesConcurrentDuplicateClientActionID(t *testing.T
 	assertTaskRowCount(t, db, first.TaskID, 1)
 	assertRiverJobRowCount(t, db, first.TaskID, 1)
 	var duplicateRows int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)
 FROM tasks
 WHERE user_id = $1 AND client_action_id = $2`, int64(42), "canvas-action-concurrent").Scan(&duplicateRows); err != nil {
@@ -450,11 +449,11 @@ type storedRiverJob struct {
 	args        []byte
 }
 
-func loadRiverJobForTask(t testing.TB, db *sql.DB, taskID string) storedRiverJob {
+func loadRiverJobForTask(t testing.TB, db *pgxpool.Pool, taskID string) storedRiverJob {
 	t.Helper()
 	var job storedRiverJob
 	var tagsJSON string
-	err := db.QueryRowContext(t.Context(), `
+	err := db.QueryRow(t.Context(), `
 SELECT kind, queue, max_attempts, priority, args, COALESCE(array_to_json(tags), '[]'::json)::text
 FROM river_job
 WHERE args->'task'->>'task_id' = $1`, taskID).Scan(
@@ -474,10 +473,10 @@ WHERE args->'task'->>'task_id' = $1`, taskID).Scan(
 	return job
 }
 
-func assertStoredTaskPriority(t testing.TB, db *sql.DB, taskID string, want int) {
+func assertStoredTaskPriority(t testing.TB, db *pgxpool.Pool, taskID string, want int) {
 	t.Helper()
 	var priority int
-	if err := db.QueryRowContext(t.Context(), `SELECT priority FROM tasks WHERE task_id = $1`, taskID).Scan(&priority); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT priority FROM tasks WHERE task_id = $1`, taskID).Scan(&priority); err != nil {
 		t.Fatalf("load task priority for %q failed: %v", taskID, err)
 	}
 	if priority != want {
@@ -485,10 +484,10 @@ func assertStoredTaskPriority(t testing.TB, db *sql.DB, taskID string, want int)
 	}
 }
 
-func assertTaskRowCount(t testing.TB, db *sql.DB, taskID string, want int) {
+func assertTaskRowCount(t testing.TB, db *pgxpool.Pool, taskID string, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, taskID).Scan(&count); err != nil {
 		t.Fatalf("count task rows for %q failed: %v", taskID, err)
 	}
 	if count != want {
@@ -496,10 +495,10 @@ func assertTaskRowCount(t testing.TB, db *sql.DB, taskID string, want int) {
 	}
 }
 
-func assertRiverJobRowCount(t testing.TB, db *sql.DB, taskID string, want int) {
+func assertRiverJobRowCount(t testing.TB, db *pgxpool.Pool, taskID string, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM river_job WHERE args->'task'->>'task_id' = $1`, taskID).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM river_job WHERE args->'task'->>'task_id' = $1`, taskID).Scan(&count); err != nil {
 		t.Fatalf("count River job rows for %q failed: %v", taskID, err)
 	}
 	if count != want {

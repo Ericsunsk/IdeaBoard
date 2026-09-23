@@ -1,4 +1,4 @@
-package billing
+package httpapi
 
 import (
 	"context"
@@ -8,10 +8,39 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billing/application"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
+)
+
+// Domain vocabulary aliases keep the moved tests byte-identical.
+type (
+	SKU                      = billing.SKU
+	OutputResolution         = billing.OutputResolution
+	Quote                    = billing.Quote
+	PriceInfo                = billing.PriceInfo
+	PriceSnapshot            = billing.PriceSnapshot
+	AvailabilityInfo         = billing.AvailabilityInfo
+	ArchivedItemDeleteResult = billing.ArchivedItemDeleteResult
+	BillableItemCatalogCard  = application.BillableItemCatalogCard
+	BillableItemDefinition   = billing.BillableItemDefinition
+)
+
+const (
+	OutputResolution1K         = billing.OutputResolution1K
+	OutputResolution2K         = billing.OutputResolution2K
+	BillableItemStatusActive   = billing.BillableItemStatusActive
+	BillableItemStatusDisabled = billing.BillableItemStatusDisabled
+	BillableItemStatusUnpriced = billing.BillableItemStatusUnpriced
+	BillableItemStatusArchived = billing.BillableItemStatusArchived
+)
+
+var (
+	ErrItemNotArchived   = billing.ErrItemNotArchived
+	ErrArchivedItemInUse = billing.ErrArchivedItemInUse
 )
 
 type handlerServiceStub struct {

@@ -61,7 +61,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 	}
 
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = 42`).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = 42`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {

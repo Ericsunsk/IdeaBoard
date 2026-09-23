@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	storageports "ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -93,7 +93,7 @@ func (h *mediaAssetHandler) Metadata(c *gin.Context) {
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	asset, err := h.lookupAsset(c, identity.UserID(), assetID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}
@@ -199,7 +199,7 @@ func (h *mediaAssetHandler) collectMetadataBatch(c *gin.Context, ownerUserID int
 
 func (h *mediaAssetHandler) loadMetadataBatchItem(c *gin.Context, ownerUserID int64, assetID, ensureTier string) (mediaAssetDTO, bool, *metadataBatchFailure) {
 	asset, err := h.lookupAsset(c, ownerUserID, assetID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return mediaAssetDTO{}, false, nil
 	}
 	if err != nil {
@@ -302,7 +302,7 @@ func (h *mediaAssetHandler) Content(c *gin.Context) {
 func (h *mediaAssetHandler) serveTierRedirect(c *gin.Context, ownerUserID int64, assetID, tier string) {
 	asset, err := h.lookupAsset(c, ownerUserID, assetID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}
@@ -412,7 +412,7 @@ func (h *mediaAssetHandler) Original(c *gin.Context) {
 	assetID := strings.TrimSpace(c.Param("asset_id"))
 	asset, err := h.lookupAsset(c, identity.UserID(), assetID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			response.Error(c, http.StatusNotFound, "媒体不存在")
 			return
 		}

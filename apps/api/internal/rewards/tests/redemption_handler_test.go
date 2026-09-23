@@ -87,6 +87,7 @@ func performProjectionFailureRedeem(t *testing.T, router http.Handler) *httptest
 		strings.NewReader(`{"code":"PROJECTION-FAILURE-2026"}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "projection-failure-key")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 	return recorder

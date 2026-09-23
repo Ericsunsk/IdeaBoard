@@ -1,71 +1,213 @@
 # Credits Context
 
-Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示为 `Idea`，数量恰好为 1 时显示 `1 Idea`，其余数量显示 `N Ideas`；内部 domain unit、代码、API 与 schema 继续使用 `Credit/credits`。本 context 只拥有货币账户、不可变账本、余额 projection 和 Credit Commands；商品身份、versioned pricing 与 Quote 属于 `billing` context。
+Credits is the platform-level closed-ecosystem currency of IdeaBoard.
+User-facing copy shows `Idea` (`1 Idea` for exactly 1, `N Ideas` otherwise);
+internal domain units, code, APIs, and schema keep using `Credit`/`credits`.
+This context owns only currency accounts, the immutable ledger,
+balance projections, and Credit Commands;
+product identity, versioned pricing, and Quotes belong to the `billing` context.
+
+## Package Map
+
+- `domain`: pure value objects and policies
+  (`CreditAmount`, ledger shape, wallet, restriction rules); no I/O.
+- `application`: command handlers plus `wallet`, `readmodel`, `usage`,
+  `health`, and `reconciliation` use cases.
+- `ports`: inbound/outbound contracts
+  (`Commands`, `WalletReader`, restrictions, reconciliation, wallet lifecycle).
+- `infrastructure`: `postgres` adapters (SQL routines, projections, triggers).
+- `interfaces`: `http` controllers
+  (Admin Wallet/Ledger read, Grant, Deduction, linked Refund, Correction).
 
 ## Domain Language
 
 | Term | Meaning |
 | ---- | ------- |
-| Credit | 不可拆分的整数货币单位，禁止 floating point |
-| Credit Wallet | 单个用户在 Credits context 中的账户边界 |
-| Wallet Restriction | 与 Wallet 生命周期状态独立的原因化消费限制；按 type、source 与 related object 追溯，可由各来源独立解除 |
-| Credit Account | Double-entry posting 的落点；每个 Wallet 有 available/reserved，System account 按 Wallet shard |
-| Ledger Transaction | 一次不可变的账务事实，包含同一 asset 下至少两条 Posting |
-| Posting | 对一个 Credit Account 的有符号增减；同一 Transaction 的合计必须为 0 |
-| Balance Projection | `credit_accounts.balance` 的 O(1) 缓存，只能由 Posting trigger 更新，不是独立事实源 |
+| Credit | Indivisible integer currency unit; floating point is forbidden |
+| Credit Wallet | Account boundary of a single user inside the Credits context |
+| Wallet Restriction | Reason-coded spending limit, independent of Wallet lifecycle status; traced by type, source, and related object, releasable independently per source |
+| Credit Account | Double-entry posting landing point; each Wallet has available/reserved, System accounts shard by Wallet |
+| Ledger Transaction | One immutable accounting fact with at least two Postings under the same asset |
+| Posting | Signed delta on one Credit Account; the sum within one Transaction must be 0 |
+| Balance Projection | O(1) cache of `credit_accounts.balance`, updated only by the Posting trigger, never an independent fact source |
 | Grant | System Issuance → User Available |
 | Hold | User Available → User Reserved |
 | Capture | User Reserved → System Revenue |
 | Release | User Reserved → User Available |
-| Refund | System Revenue → User Available，累计不得超过原 Charge |
-| Purchase Credit | 已验证外部支付的 `System Issuance → User Available`；由 Payments 以固定 actor/source/reference 调用，不是 discretionary Grant |
-| Purchase Refund | 已验证 Stripe Refund 对应的 `User Reserved → System Issuance`；必须关联 Payments 创建的 Refund Hold，幂等终态结算 |
-| Reconciliation Run | 由 `manual` 或 `scheduled` Trigger 启动、River 异步执行的全量一致性扫描；manual 持久化真实 Admin/reason，scheduled 持久化 schedule slot 且不伪造 actor |
-| Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
-| Finding Type | Credits 拥有的稳定 typed anomaly contract；Admin 对已知类型提供统一名称与摘要，未知类型必须安全降级 |
+| Refund | System Revenue → User Available; cumulative total must never exceed the original Charge |
+| Purchase Credit | `System Issuance → User Available` for verified external payment; called by Payments with a fixed actor/source/reference, never a discretionary Grant |
+| Purchase Refund | `User Reserved → System Issuance` for a verified Stripe Refund; must link the Refund Hold created by Payments, idempotent terminal settlement |
+| Reconciliation Run | Full consistency scan started by a `manual` or `scheduled` trigger and executed asynchronously by River; manual persists the real Admin/reason, scheduled persists the schedule slot without forging an actor |
+| Finding | Re-runnable anomaly fact with a stable fingerprint from finding type + Wallet + subject |
+| Finding Type | Stable typed anomaly contract owned by Credits; Admin provides a uniform name and summary for known types, unknown types must degrade safely |
 
 ## Public Seams
 
-- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund、Purchase、PurchaseRefundHold、PurchaseRefund、PaymentDisputeDebit 与 PaymentDisputeRestore；外部支付命令使用独立 typed `SECURITY DEFINER` routines，其余命令通过 `execute_credit_command_v2`。
-- `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
-- `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
-- `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。
-- `Service.GetCaptureUsage` 是已结算 Capture 的 typed-location 按用户只读聚合实现，供 caller-owned Usage interface 组合；不返回 Refund，也不授予 Ledger 写入能力。
-- 用户侧 Billing Records 是独立 caller-owned Read Model：可读取 Ledger 最终收支并组合 immutable Task Billing Snapshot，但不复用 Admin Ledger DTO、不返回 Hold/Release/Refund，也不获得 Ledger 写入能力。
-- `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary，以及不依赖 Run ID 的 open/resolved 全局 keyset Finding queue。
-- Admin HTTP 提供单用户 Wallet/Ledger read、Grant、Deduction、linked Refund 与 Correction；不提供 set balance、更新或删除账本历史。Ledger read 显式返回 Hold/Charge reference，避免 Admin 以裸关联 ID 推断结算状态。
-
-其他 context 不得直接更新 `credit_accounts.balance`、插入 Ledger 或自行计算幂等 hash。
+- `Commands`: sole application write entrypoint for Grant, Deduct, Hold,
+  Capture, Release, Refund, Purchase, PurchaseRefundHold, PurchaseRefund,
+  PaymentDisputeDebit, and PaymentDisputeRestore.
+  External-payment commands use independent typed `SECURITY DEFINER` routines;
+  all other commands go through `execute_credit_command_v2`.
+- `Service.InTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)`: caller-owned transaction
+  adapters over the same `Commands` contract.
+  Task/River submission and task terminal `settleTerminal` both use pgx;
+  there is no `database/sql` Credit Command path.
+  Callers own commit/rollback; Task Repository holds no
+  application-lifetime Credits/Billing dependency.
+- `WalletReader`: Wallet balance plus keyset-paginated Ledger queries.
+- `WalletRestrictionCommands`: idempotent create and precise release of
+  Restrictions through a transaction-capable typed seam.
+  Other contexts must not write the Restriction table directly.
+- `Service.GetCaptureUsage`: read-only per-user aggregation of settled Captures
+  at typed locations, composed into caller-owned Usage interfaces.
+  Returns no Refunds; grants no Ledger write.
+- User-side Billing Records: independent caller-owned Read Model over settled
+  Ledger facts plus the immutable Task Billing Snapshot.
+  Reuses no Admin Ledger DTO; exposes no Hold/Release/Refund;
+  grants no Ledger write.
+- `Reconciliation`: runs on an independent River queue.
+  Admin reads run history, summaries, and the Run-ID-independent global
+  keyset Finding queue (open/resolved).
+- Admin HTTP: single-user Wallet/Ledger read, Grant, Deduction,
+  linked Refund, and Correction.
+  No set-balance; no Ledger history update/delete.
+  Ledger reads return the Hold/Charge reference explicitly, so Admins never
+  infer settlement state from bare association IDs.
 
 ## Invariants
 
-- `CreditAmount` 为正整数，单次命令上限为 `9_000_000_000_000_000`；available/reserved 永不为负。
-- Ledger Transaction 支持 N postings。PostgreSQL deferred constraint 在 commit 时校验 posting count、单一 asset 和总和为 0。
-- Ledger Transaction 与 Posting 禁止 UPDATE/DELETE；错误只能追加 reversal/correction transaction。
-- Posting statement 按 `account_id` 稳定顺序更新 projection，Command 在写入前也按相同顺序锁账户。
-- API runtime role 对 Credit tables 只有 SELECT，不能直接 DML Ledger/projection，也不能执行内部 trigger functions；migration owner 才拥有 schema。
-- System Issuance、Revenue 与 Sink 使用 `wallet:<user_id>` shard，并保留 role/metadata，避免单个全局 system row 串行化所有 Wallet。
-- 每个 Command 先取得 idempotency-key advisory transaction lock，再比较服务端 canonical SHA-256 request hash。相同 key/相同 hash 返回原结果；不同 hash 返回 conflict。
-- Purchase 仅接受 `service/payments` actor、`stripe_purchase` source 与 `payment_order` business reference；它从不创建 Wallet，也不能由 Admin 或客户端伪造。已验证外部付款是平台既有义务，因此 Purchase 不受 frozen lifecycle 或 active Restriction gate 阻断，必须与 Payments 的 Payment Order terminal fact 原子收敛。
-- Task Hold 不使用 Credits-owned TTL 自动解冻；只有 Task terminal transition 能在同一 transaction 中 Capture 或 Release。
-- actor、source、reason 和 business reference 必填并写入不可变 Transaction。
-- Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin，并以原 Posting 的反向 Posting 追加记录；允许关联原 Admin Grant/Deduction/Refund，或固定 `source=reward_redemption` 的 user-origin Grant，其他非 Admin-origin Grant 仍拒绝。Capture 更正使用 linked Refund。
-- frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction/Hold 被拒绝；既有 Hold 的 Capture/Release 必须继续收敛，authenticated Admin linked Refund/Correction 仍可用于修复，Wallet 不可开始新的消费。
-- Wallet lifecycle status 与 active Restriction 是正交状态。Grant、Deduction、Hold 仅在 lifecycle active 且不存在 active Restriction 时允许；Payments typed PurchaseRefundHold 不是消费，在 lifecycle active 时可绕过 Restriction 预留待退 Ideas；Capture、Release 必须继续收敛既有 Hold，authenticated Admin linked Refund/Correction 继续承担修复职责。Command 的 idempotency replay 在当前 gate 前返回原结果。
-- Restriction create/release 先锁 Wallet row，与 Credit Command gate 线性化；同一 `(Wallet, type, source, related object)` 仅允许一个 active row，解除保留历史且不会清除其他来源的 Restriction。
-- Auth public registration 使用 canonical Email、username 和 Password；Email verification 成功后由 `canonical_email` verified identity 触发 Wallet provisioning，不再生成 synthetic Email。
-- Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
-- Credit Health 状态固定为 `unchecked | healthy | attention | critical | stale | failed`。判定优先级为：open high-risk Finding 或其精确 active `ledger_integrity/reconciliation` Restriction → critical；最新 failed Run 晚于最近成功 Run → failed；从未成功且无 failed → unchecked；最近成功严格超过 48 小时 → stale；其余 open Finding → attention；否则 healthy。active Run 单独返回，不覆盖状态。
-- Reconciliation 的 Stale Hold 策略固定为 24 小时并由 DB per-Run snapshot/constraint 作为事实源；Admin API/UI 不接受阈值，public Run DTO 也不暴露这一内部固定值。
-- manual Reconciliation 必须提供真实 Admin 与 trim 后 1–1000 字符的 reason；scheduled Run 的 actor/reason 必须为空。每天 03:00 Asia/Shanghai 调度，River leader 启动时若 24 小时无成功 Run 则触发 catch-up。
-- manual、daily 与 catch-up 共用同一 transaction-bound start seam。DB advisory lock、active-run unique、scheduled slot unique 与 `enqueue_required` 返回值保证多实例/重复调度只 enqueue 一次；Run insert/reset 与 River enqueue 必须同 transaction。ScheduleJob 遇到其他 active Run 时必须 snooze，不能吞掉目标 slot；仍 overdue 的 failed target slot 复用原 Run、清理终态字段并重新入队。
-- `warning/low`（长期 Hold，或 Billing Snapshot、Settlement、Hold、terminal Ledger 全部完整但 Task trace 缺失）只报告，不限制 Wallet。Task trace 只有在 Hold/terminal command amount、Posting debit/credit shape 与 Snapshot total 全部一致时才能降为 low；其余缺失或不一致均为 `error|critical/high` 资金事实风险。高风险 Finding 会在 run report 同一 transaction 内幂等创建绑定该 Finding 的 `ledger_integrity/reconciliation` Restriction。Finding resolved、降为 low、失去或改变 Wallet 归属时只精确解除其自身 Restriction；Reconciliation alerts 已删除。
-- Finding fingerprint 不包含 run ID；重复异常复用 open Finding 并增加 occurrence/run link，异常消失后标记 resolved，reopen 会创建新的 Restriction history row。Finding 的 `isolated` 从精确 active Restriction 推导；扫描不修改 Wallet lifecycle status、Ledger、projection，也不自动创建 Correction。
-- Run-Finding link 仅保留内部 historical snapshot 和审计关联；Admin Finding read contract 只有全局 open/resolved queue，不提供 Run-scoped 双轨查询。
-- Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 lifecycle status，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；Ban/Unban/删除不得创建或清除独立 Restriction，claim identity 明文不进入 Credits schema。
-- Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。
-- 删除业务用户先在本地事务冻结 Wallet 并记录 durable deletion phase，再依次幂等删除 Auth、清理 Storage、写 user tombstone；失败请求可从持久 phase 重试收敛。最终保留 user tombstone 主键、Task、Wallet、Ledger 与 Welcome claim；相同领取身份重新注册不会再次获得 Welcome Grant。
+- `CreditAmount` is a positive integer;
+  per-command cap is `9_000_000_000_000_000`;
+  available/reserved are never negative.
+- A Ledger Transaction supports N postings.
+  PostgreSQL deferred constraints validate posting count, single asset,
+  and zero sum at commit.
+- Ledger Transactions and Postings forbid UPDATE/DELETE;
+  errors are fixed only by appending reversal/correction transactions.
+- Posting statements update projections in stable `account_id` order;
+  Commands lock accounts in the same order before writing.
+- The API runtime role holds only SELECT on Credit tables:
+  no direct Ledger/projection DML, no execution of internal trigger functions;
+  only the migration owner holds schema.
+- System Issuance, Revenue, and Sink accounts shard by `wallet:<user_id>`
+  and keep role/metadata, avoiding one global system row
+  serializing all Wallets.
+- Each Command takes an idempotency-key advisory transaction lock first,
+  then compares the server-side canonical SHA-256 request hash.
+  Same key + same hash replays the original result;
+  same key + different hash returns conflict.
+- Other contexts must not update `credit_accounts.balance` directly,
+  insert Ledger rows, or compute idempotency hashes themselves.
+- Purchase accepts only the `service/payments` actor,
+  the `stripe_purchase` source, and the `payment_order` business reference;
+  it never creates Wallets and cannot be forged by Admin or clients.
+  Verified external payment is a pre-existing platform obligation,
+  so Purchase bypasses the frozen-lifecycle and active-Restriction gates,
+  and must converge atomically with the Payments Payment Order terminal fact.
+- Task Holds use no Credits-owned TTL auto-release;
+  only the Task terminal transition Captures or Releases in the same transaction.
+- actor, source, reason, and business reference are required
+  and written into the immutable Transaction.
+- Deduction is an Admin-actor-only immutable `user_available → system_sink`
+  transaction; it never touches reserved.
+  Correction is authenticated-Admin-only and appends reverse Postings
+  of the original; it may link the original Admin Grant/Deduction/Refund,
+  or a user-origin Grant with fixed `source=reward_redemption`;
+  other non-Admin-origin Grants stay rejected.
+  Capture corrections use linked Refund.
+- Frozen or anonymized-tombstone Wallets stay historically readable.
+  Discretionary Grant/Deduction/Hold are rejected;
+  existing Holds must still converge via Capture/Release;
+  authenticated-Admin linked Refund/Correction remains available for repair;
+  the Wallet starts no new spending.
+- Wallet lifecycle status and active Restrictions are orthogonal.
+  Grant, Deduction, and Hold require active lifecycle plus zero active
+  Restrictions; the Payments-typed PurchaseRefundHold is not spending and may
+  bypass Restrictions while lifecycle is active to reserve pending Ideas;
+  Capture and Release must still converge existing Holds;
+  authenticated-Admin linked Refund/Correction keeps its repair duty.
+  Idempotency replay returns the original result before the current gate.
+- Restriction create/release locks the Wallet row first to linearize
+  with the Credit Command gate;
+  only one active row per `(Wallet, type, source, related object)`;
+  release keeps history and never clears other sources' Restrictions.
+- Auth public registration uses canonical Email, username, and Password;
+  after Email verification succeeds, the `canonical_email` verified identity
+  triggers Wallet provisioning; no synthetic Email is generated.
+- Reconciliation scans use MVCC reads and never lock hot Ledger/Account rows;
+  a DB advisory lock plus an active-run unique index guarantee
+  at most one active run.
+- Credit Health is fixed to
+  `unchecked | healthy | attention | critical | stale | failed`,
+  evaluated in priority order: open high-risk Finding or its exact active
+  `ledger_integrity/reconciliation` Restriction → critical;
+  latest failed Run newer than latest success → failed;
+  never succeeded and never failed → unchecked;
+  latest success strictly older than 48h → stale;
+  any other open Finding → attention; otherwise healthy.
+  An active Run is reported separately and never overrides the status.
+- The Reconciliation stale-Hold policy is fixed at 24h with the DB per-Run
+  snapshot/constraint as fact source;
+  Admin API/UI accepts no threshold, and the public Run DTO exposes
+  no such internal fixed value.
+- Manual Reconciliation requires the real Admin plus a trimmed 1–1000
+  character reason; scheduled Runs keep actor/reason empty.
+  Daily schedule runs at 03:00 Asia/Shanghai;
+  on River leader startup a catch-up fires when no successful Run
+  exists in the last 24h.
+- manual, daily, and catch-up share one transaction-bound start seam.
+  DB advisory lock, active-run uniqueness, scheduled-slot uniqueness,
+  and the `enqueue_required` return value guarantee multi-instance/repeated
+  scheduling enqueues once;
+  Run insert/reset and River enqueue stay in one transaction.
+  ScheduleJob snoozes on another active Run without swallowing the target slot;
+  a still-overdue failed target slot reuses the original Run,
+  clears terminal fields, and re-enqueues.
+- `warning/low` (long-held Hold, or complete Billing Snapshot/Settlement/Hold/
+  terminal Ledger with only the Task trace missing) reports only
+  and never restricts the Wallet.
+  A Task trace drops to low only when Hold/terminal command amounts,
+  Posting debit/credit shapes, and Snapshot totals all agree;
+  any other missing data or mismatch stays `error|critical/high`
+  funds-fact risk.
+  High-risk Findings idempotently create a `ledger_integrity/reconciliation`
+  Restriction bound to that Finding inside the same run-report transaction.
+  On Finding resolved, downgraded to low, or Wallet-ownership lost/changed,
+  only its own Restriction is precisely released; Reconciliation alerts
+  are removed.
+- Finding fingerprints exclude the run ID;
+  repeat anomalies reuse the open Finding and add occurrence/run links;
+  vanished anomalies mark resolved;
+  reopen creates a new Restriction history row.
+  A Finding's `isolated` derives from its exact active Restriction;
+  scans never mutate Wallet lifecycle status, Ledger, or projections,
+  and never auto-create Corrections.
+- Run-Finding links keep only internal historical snapshots and audit
+  associations; the Admin Finding read contract exposes only the global
+  open/resolved queue, with no Run-scoped dual-track query.
+- Identity atomically provisions the Wallet and freezes/restores lifecycle
+  status through the typed Wallet lifecycle seam, and idempotently issues
+  the `100 Ideas` Welcome Grant keyed by a trusted
+  canonical-registration-identity HMAC claim;
+  Ban/Unban/delete never creates or clears standalone Restrictions,
+  and claim identity plaintext never enters the Credits schema.
+- The Welcome identity HMAC key binds the database fingerprint permanently
+  via a typed `SECURITY DEFINER` command on first use;
+  on config drift, startup/provisioning fails closed so the same identity
+  cannot mint a new claim.
+- Business-user deletion first freezes the Wallet and records a durable
+  deletion phase in the local transaction, then idempotently deletes Auth,
+  cleans Storage, and writes the user tombstone in order;
+  failed requests retry to convergence from the persisted phase.
+  The user tombstone primary key, Tasks, Wallets, Ledger, and Welcome claims
+  are finally retained; re-registration under the same claim identity
+  never re-issues the Welcome Grant.
 
 ## Verification
 
-默认 suite 使用 `internal/testdb` 的隔离 PostgreSQL schema 验证 Commands、HTTP contract、并发锁、limited runtime role 和数据库 constraints。百万数据集 harness 由 migration owner/test DSN 通过 `CREDITS_LOAD_TEST=1` 显式开启，命令和基准结果见 `docs/benchmarks/credits-million.md`。
+- Default suite uses isolated PostgreSQL schemas via `internal/testdb`
+  for Commands, HTTP contracts, concurrency locks, the limited runtime role,
+  and DB constraints.
+- The million-row harness is opt-in by the migration owner/test DSN
+  via `CREDITS_LOAD_TEST=1`; commands and baselines live
+  in `docs/benchmarks/credits-million.md`.

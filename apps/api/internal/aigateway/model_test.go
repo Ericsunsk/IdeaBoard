@@ -22,6 +22,8 @@ func TestValidateModelMapping(t *testing.T) {
 		{"unknown feature", "nope", "openai/gpt-image-1"},
 		{"missing provider", "render", "gpt-image-1"},
 		{"blank model", "render", "   "},
+		{"blank model after separator", "render", "provider/"},
+		{"leading separator in model", "render", "provider//model"},
 		{"whitespace model", "render", "openai/gpt image"},
 	} {
 		if _, _, err := validateModelMapping(tc.feature, tc.model); err == nil {
@@ -36,6 +38,21 @@ func TestValidateModelMapping(t *testing.T) {
 	// contract: it is not a submittable task, only a model id.
 	if slug, _, err := validateModelMapping("vision", "test-provider/test-model"); err != nil || slug != "vision" {
 		t.Fatalf("validate vision = %q, %v", slug, err)
+	}
+}
+
+func TestProbeGatewayConnectionRejectsURLMetadata(t *testing.T) {
+	for _, baseURL := range []string{
+		"https://user:secret@example.com",
+		"https://example.com/path?token=secret",
+		"https://example.com/path#fragment",
+	} {
+		t.Run(baseURL, func(t *testing.T) {
+			result := ProbeGatewayConnection(t.Context(), baseURL, "", "openai", "gpt-4o", "v1/models")
+			if result.Reachable || result.Message != "网关地址必须是 http(s) URL" {
+				t.Fatalf("ProbeGatewayConnection() = %+v, want URL validation failure", result)
+			}
+		})
 	}
 }
 
@@ -147,10 +164,8 @@ func TestSaveCatalogWithoutRemovalsKeepsMappings(t *testing.T) {
 }
 
 func TestSaveCatalogRacesMappingSaveWithoutPartialState(t *testing.T) {
-	// 目录级联删除与映射保存并发时：advisory lock 串行两者，终态必为
-	// 完整之一（级联胜：render 消失；映射胜：render→A 留存），不出现
-	// 目录半写、映射半删。映射胜的悬挂（A 已不在目录）需运营后续重指，
-	// 与串行语义一致，不在本测试断言。
+	// Concurrent catalog pruning and mapping updates must preserve a mapping
+	// to a model that remains in the catalog regardless of lock acquisition order.
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	repo := NewConfigRepository(settings.NewSystemConfigRepository(db))
@@ -180,7 +195,7 @@ func TestSaveCatalogRacesMappingSaveWithoutPartialState(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			if err := repo.SaveModelMapping(ctx, "render", "openai/a", 42); err != nil {
+			if err := repo.SaveModelMapping(ctx, "render", "openai/b", 42); err != nil {
 				errs <- err
 			}
 		}()
@@ -201,8 +216,8 @@ func TestSaveCatalogRacesMappingSaveWithoutPartialState(t *testing.T) {
 		if mappings["generation"] != "openai/b" {
 			t.Fatalf("iter %d: generation mapping lost: %v", i, mappings)
 		}
-		if render, ok := mappings["render"]; ok && render != "openai/a" {
-			t.Fatalf("iter %d: render mapping half-written: %v", i, mappings)
+		if mappings["render"] != "openai/b" {
+			t.Fatalf("iter %d: render mapping to retained model was lost: %v", i, mappings)
 		}
 	}
 }

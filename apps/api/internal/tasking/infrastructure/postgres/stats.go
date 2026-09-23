@@ -38,8 +38,8 @@ func upsertDailyStatByTaskTx(ctx context.Context, q *dbsqlc.Queries, task *tasks
 
 	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
 		TaskID:             event.TaskID,
-		OccurredAt:         event.OccurredAt,
-		StatDate:           event.StatDate,
+		OccurredAt:         dbutil.TimestamptzFromTime(event.OccurredAt),
+		StatDate:           dbutil.DateFromTime(event.StatDate),
 		UserID:             event.UserID,
 		AccountID:          event.AccountID,
 		ProviderEndpointID: event.ProviderEndpointID,
@@ -104,13 +104,15 @@ func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFin
 		ProviderEndpointID: positiveIDValue(task.AssignedProviderEndpointID),
 		CredentialID:       positiveIDValue(task.AssignedCredentialID),
 		FeatureSlug:        normalizeStatFeature(task.FeatureSlug),
-		APIType:            normalizeStatAPIType(task.APIType),
-		ModelName:          taskStatModel(task),
-		UserKey:            taskStatUserKey(task.UserID),
-		Status:             statStatus,
-		OutputCount:        outputCount,
-		LatencySeconds:     taskStatLatencySeconds(task, attemptFinish, occurredAt),
-		CostMicros:         0,
+		// Gateway cutover: tasks no longer carry provider api_type; stat
+		// history keeps its column, new events record empty.
+		APIType:        "",
+		ModelName:      taskStatModel(task),
+		UserKey:        taskStatUserKey(task.UserID),
+		Status:         statStatus,
+		OutputCount:    outputCount,
+		LatencySeconds: taskStatLatencySeconds(task, attemptFinish, occurredAt),
+		CostMicros:     0,
 	}
 	return event, true, nil
 }
@@ -176,7 +178,7 @@ func upsertTaskDailyStatDeltaTx(ctx context.Context, q *dbsqlc.Queries, event no
 	}
 
 	return q.UpsertTaskDailyStatDelta(ctx, dbsqlc.UpsertTaskDailyStatDeltaParams{
-		StatDate:           event.StatDate,
+		StatDate:           dbutil.DateFromTime(event.StatDate),
 		UserID:             event.UserID,
 		AccountID:          event.AccountID,
 		ProviderEndpointID: event.ProviderEndpointID,
@@ -232,14 +234,14 @@ func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, e
 	}
 	start := normalizeTaskStatDate(startDate)
 	end := normalizeTaskStatDate(endDate)
-	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StartDate: start, EndDate: end})
+	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StartDate: dbutil.DateFromTime(start), EndDate: dbutil.DateFromTime(end)})
 	if err != nil {
 		return nil, err
 	}
 	result := make([]statisticscontracts.DailyStatAggregate, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, statisticscontracts.DailyStatAggregate{
-			StatDate:          row.StatDate,
+			StatDate:          dbutil.DateValue(row.StatDate),
 			ModelName:         row.ModelName,
 			UserKey:           row.UserKey,
 			Total:             row.Total,
@@ -254,19 +256,75 @@ func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, e
 	return result, nil
 }
 
+func (r *Repository) ListDailyCaptureCreditsByRange(ctx context.Context, start, end time.Time, location *time.Location) (map[string]int64, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("taskstore: database not configured")
+	}
+	if start.IsZero() || end.IsZero() || !end.After(start) {
+		return nil, fmt.Errorf("taskstore: valid daily capture range is required")
+	}
+	if location == nil {
+		return nil, fmt.Errorf("taskstore: daily capture location is required")
+	}
+	timezoneName := location.String()
+	if timezoneName == "" || timezoneName == "Local" {
+		// Go reports unnamed local zones as "Local", which PostgreSQL cannot
+		// resolve. Fall back to the numeric UTC offset at the range start so
+		// day buckets stay aligned; named zones keep DST-aware grouping.
+		// PostgreSQL reads numeric AT TIME ZONE offsets with POSIX sign
+		// convention (positive = west), opposite of Go/ISO offsets, so the
+		// sign is flipped: "+08:00" must be passed as "-08:00".
+		_, offset := start.In(location).Zone()
+		sign := "-"
+		if offset < 0 {
+			sign = "+"
+			offset = -offset
+		}
+		timezoneName = fmt.Sprintf("%s%02d:%02d", sign, offset/3600, (offset%3600)/60)
+	}
+	rows, err := r.dbWithContext(ctx).Query(`
+SELECT ((created_at AT TIME ZONE $3)::date)::text AS capture_day,
+       SUM(CASE WHEN command_type = 'capture' THEN command_amount
+                WHEN command_type = 'refund' THEN -command_amount
+                ELSE 0 END)::bigint AS amount
+FROM credit_transactions
+WHERE command_type IN ('capture', 'refund')
+  AND created_at >= $1
+  AND created_at < $2
+GROUP BY (created_at AT TIME ZONE $3)::date
+ORDER BY capture_day`, start, end, timezoneName)
+	if err != nil {
+		return nil, fmt.Errorf("taskstore: query daily capture credits: %w", err)
+	}
+	defer rows.Close()
+	dailyCredits := make(map[string]int64)
+	for rows.Next() {
+		var date string
+		var amount int64
+		if err := rows.Scan(&date, &amount); err != nil {
+			return nil, fmt.Errorf("taskstore: scan daily capture credits: %w", err)
+		}
+		dailyCredits[date] = amount
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("taskstore: read daily capture credits: %w", err)
+	}
+	return dailyCredits, nil
+}
+
 func (r *Repository) ListStatEventsByOccurredRange(ctx context.Context, start, end time.Time) ([]statisticscontracts.StatEventTrendRow, error) {
 	if start.IsZero() || end.IsZero() {
 		return nil, fmt.Errorf("stat event occurred range is required")
 	}
-	rows, err := r.q.ListStatEventsByOccurredRange(ctx, dbsqlc.ListStatEventsByOccurredRangeParams{StartedAt: start, EndedAt: end})
+	rows, err := r.q.ListStatEventsByOccurredRange(ctx, dbsqlc.ListStatEventsByOccurredRangeParams{StartedAt: dbutil.TimestamptzFromTime(start), EndedAt: dbutil.TimestamptzFromTime(end)})
 	if err != nil {
 		return nil, err
 	}
 	result := make([]statisticscontracts.StatEventTrendRow, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, statisticscontracts.StatEventTrendRow{
-			OccurredAt:     row.OccurredAt,
-			StatDate:       row.StatDate,
+			OccurredAt:     dbutil.TimeValue(row.OccurredAt),
+			StatDate:       dbutil.DateValue(row.StatDate),
 			ModelName:      row.ModelName,
 			UserKey:        row.UserKey,
 			Status:         row.Status,
@@ -284,7 +342,7 @@ func (r *Repository) ListStatEventLatencySamplesByDateRange(ctx context.Context,
 	}
 	start := normalizeTaskStatDate(startDate)
 	end := normalizeTaskStatDate(endDate)
-	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StartDate: start, EndDate: end})
+	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StartDate: dbutil.DateFromTime(start), EndDate: dbutil.DateFromTime(end)})
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +359,15 @@ func (r *Repository) ListBackfilledDatesByRange(ctx context.Context, startDate, 
 	}
 	start := normalizeTaskStatDate(startDate)
 	end := normalizeTaskStatDate(endDate)
-	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: start, EndDate: end})
+	dateRows, err := r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: dbutil.DateFromTime(start), EndDate: dbutil.DateFromTime(end)})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]time.Time, 0, len(dateRows))
+	for _, d := range dateRows {
+		result = append(result, dbutil.DateValue(d))
+	}
+	return result, nil
 }
 
 func (r *Repository) RebuildDailyStatsFromEventsByDateRange(ctx context.Context, startDate, endDate time.Time) (statisticscontracts.RebuildDailyStatsResult, error) {
@@ -310,7 +376,7 @@ func (r *Repository) RebuildDailyStatsFromEventsByDateRange(ctx context.Context,
 	}
 	start := normalizeTaskStatDate(startDate)
 	end := normalizeTaskStatDate(endDate)
-	row, err := r.q.RebuildTaskDailyStatsByEventDateRange(ctx, dbsqlc.RebuildTaskDailyStatsByEventDateRangeParams{StartDate: start, EndDate: end})
+	row, err := r.q.RebuildTaskDailyStatsByEventDateRange(ctx, dbsqlc.RebuildTaskDailyStatsByEventDateRangeParams{StartDate: dbutil.DateFromTime(start), EndDate: dbutil.DateFromTime(end)})
 	if err != nil {
 		return statisticscontracts.RebuildDailyStatsResult{}, err
 	}
@@ -324,8 +390,8 @@ func (r *Repository) CorrectTaskStatEvent(ctx context.Context, correction statis
 	}
 	return r.q.UpsertTaskStatEventCorrection(ctx, dbsqlc.UpsertTaskStatEventCorrectionParams{
 		TaskID:             event.TaskID,
-		OccurredAt:         event.OccurredAt,
-		StatDate:           event.StatDate,
+		OccurredAt:         dbutil.TimestamptzFromTime(event.OccurredAt),
+		StatDate:           dbutil.DateFromTime(event.StatDate),
 		UserID:             event.UserID,
 		AccountID:          event.AccountID,
 		ProviderEndpointID: event.ProviderEndpointID,
@@ -408,7 +474,7 @@ func (r *Repository) BackfillDailyStatsByCreatedRange(ctx context.Context, start
 		row, err := q.BackfillDailyStatsByCreatedRange(ctx, dbsqlc.BackfillDailyStatsByCreatedRangeParams{
 			StartedAt: dbutil.NullTime(&startedAt),
 			EndedAt:   dbutil.NullTime(&endedAt),
-			StatDate:  normalizeTaskStatDate(statDate),
+			StatDate:  dbutil.DateFromTime(normalizeTaskStatDate(statDate)),
 			MarkDone:  markDone,
 		})
 		if err != nil {
@@ -437,60 +503,26 @@ func normalizeTaskStatDate(value time.Time) time.Time {
 }
 
 type taskLeaseSnapshot struct {
-	ResolvedModel           string
-	APIType                 string
-	ProviderEndpointName    string
-	ProviderEndpointBaseURL string
-	CredentialFingerprint   string
-	CredentialKeyVersion    string
+	ResolvedModel string
 }
 
 func taskFromSQLC(row any) tasks.Task {
 	switch r := row.(type) {
 	case dbsqlc.GetTaskByTaskIDRow:
 		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
-			ResolvedModel:           r.ResolvedModel,
-			APIType:                 r.ApiType,
-			ProviderEndpointName:    r.ProviderEndpointName,
-			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:   r.CredentialFingerprint,
-			CredentialKeyVersion:    r.CredentialKeyVersion,
+			ResolvedModel: r.ResolvedModel,
 		})
 	case dbsqlc.GetTaskByTaskIDAndUserIDRow:
 		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
-			ResolvedModel:           r.ResolvedModel,
-			APIType:                 r.ApiType,
-			ProviderEndpointName:    r.ProviderEndpointName,
-			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:   r.CredentialFingerprint,
-			CredentialKeyVersion:    r.CredentialKeyVersion,
+			ResolvedModel: r.ResolvedModel,
 		})
 	case dbsqlc.ListTasksRow:
 		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
-			ResolvedModel:           r.ResolvedModel,
-			APIType:                 r.ApiType,
-			ProviderEndpointName:    r.ProviderEndpointName,
-			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:   r.CredentialFingerprint,
-			CredentialKeyVersion:    r.CredentialKeyVersion,
-		})
-	case dbsqlc.ListTasksByTaskIDsRow:
-		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
-			ResolvedModel:           r.ResolvedModel,
-			APIType:                 r.ApiType,
-			ProviderEndpointName:    r.ProviderEndpointName,
-			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:   r.CredentialFingerprint,
-			CredentialKeyVersion:    r.CredentialKeyVersion,
+			ResolvedModel: r.ResolvedModel,
 		})
 	case dbsqlc.ListTasksByUserIDRow:
 		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
-			ResolvedModel:           r.ResolvedModel,
-			APIType:                 r.ApiType,
-			ProviderEndpointName:    r.ProviderEndpointName,
-			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:   r.CredentialFingerprint,
-			CredentialKeyVersion:    r.CredentialKeyVersion,
+			ResolvedModel: r.ResolvedModel,
 		})
 	case dbsqlc.Task:
 		return taskFromSQLCModel(r, taskLeaseSnapshot{})
@@ -515,18 +547,13 @@ func taskFromSQLCModel(row dbsqlc.Task, lease taskLeaseSnapshot) tasks.Task {
 		FeatureSlug:                row.FeatureSlug,
 		Priority:                   int(row.Priority),
 		ResolvedModel:              lease.ResolvedModel,
-		APIType:                    lease.APIType,
-		ProviderEndpointName:       lease.ProviderEndpointName,
-		ProviderEndpointBaseURL:    lease.ProviderEndpointBaseURL,
-		CredentialFingerprint:      lease.CredentialFingerprint,
-		CredentialKeyVersion:       lease.CredentialKeyVersion,
 		Status:                     row.Status,
 		LeaseToken:                 row.LeaseToken,
 		RetryCount:                 int(row.RetryCount),
 		ErrorMsg:                   row.ErrorMsg,
 		Result:                     row.Result,
-		CreatedAt:                  row.CreatedAt,
-		UpdatedAt:                  row.UpdatedAt,
+		CreatedAt:                  dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:                  dbutil.TimeValue(row.UpdatedAt),
 		CompletedAt:                dbutil.TimePtr(row.CompletedAt),
 		CancelledAt:                dbutil.TimePtr(row.CancelledAt),
 		CancelledBy:                dbutil.Int64Ptr(row.CancelledBy),

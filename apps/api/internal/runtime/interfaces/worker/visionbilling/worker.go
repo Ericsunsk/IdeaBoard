@@ -1,10 +1,14 @@
-package searchcatalog
+package visionbilling
 
 import (
 	"context"
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"ideaboard/api/internal/searchcatalog/application"
+	"ideaboard/api/internal/searchcatalog/domain"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 )
 
 const VisionBillingQueue = "vision_billing"
@@ -15,16 +19,20 @@ func (visionBillingReconciliationArgs) Kind() string { return "vision_billing_re
 
 type VisionBillingReconciliationWorker struct {
 	river.WorkerDefaults[visionBillingReconciliationArgs]
-	service *VisionBillingService
+	service *application.VisionBillingService
 }
 
-func NewVisionBillingReconciliationWorker(service *VisionBillingService) *VisionBillingReconciliationWorker {
+func NewVisionBillingReconciliationWorker(service *application.VisionBillingService) *VisionBillingReconciliationWorker {
 	return &VisionBillingReconciliationWorker{service: service}
+}
+
+func (*VisionBillingReconciliationWorker) Timeout(*river.Job[visionBillingReconciliationArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutVisionBilling
 }
 
 func (w *VisionBillingReconciliationWorker) Work(ctx context.Context, job *river.Job[visionBillingReconciliationArgs]) error {
 	if w == nil || w.service == nil || job == nil {
-		return ErrVisionUnavailable
+		return domain.ErrVisionUnavailable
 	}
 	return w.service.ReconcilePending(ctx)
 }
@@ -39,7 +47,7 @@ func VisionBillingPeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		visionBillingReconciliationSchedule{},
 		func() (river.JobArgs, *river.InsertOpts) {
-			return visionBillingReconciliationArgs{}, &river.InsertOpts{Queue: VisionBillingQueue, MaxAttempts: 5, Priority: 4}
+			return visionBillingReconciliationArgs{}, &river.InsertOpts{Queue: VisionBillingQueue, MaxAttempts: taskqueue.RiverMaxAttemptsVisionBilling, Priority: 4}
 		},
 		&river.PeriodicJobOpts{ID: "vision-billing-reconciliation", RunOnStart: true},
 	)}

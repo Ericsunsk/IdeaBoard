@@ -2,12 +2,12 @@ package billingrecords
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -63,7 +63,7 @@ type ledgerRecord struct {
 	businessReferenceType ledgerReferenceType
 	availableAfter        int64
 	occurredAt            time.Time
-	snapshotDisplayName   sql.NullString
+	snapshotDisplayName   pgtype.Text
 	originalCommandType   nullableLedgerCommand
 }
 
@@ -93,7 +93,7 @@ func (r *Repository) List(ctx context.Context, userID, beforeSequence int64, fet
 	for rows.Next() {
 		var record ledgerRecord
 		var commandType, actorType, source, businessReferenceType string
-		var originalCommandType sql.NullString
+		var originalCommandType pgtype.Text
 		if err := rows.Scan(
 			&record.sequence,
 			&record.recordID,

@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,13 +17,25 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/outboundhttp"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/gin-gonic/gin"
 )
 
 const maxDownloadSize = 50 * 1024 * 1024
+
+// downloadOutbound is the shared standard outbound client for the image
+// download proxy: timeout cap, bounded retries and Retry-After respect
+// match the gateway migration (#766).
+var downloadOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// downloadTarget names the download proxy egress in outbound logs/metrics.
+const downloadTarget = "image-download"
+
+// downloadTimeout bounds one proxied image fetch.
+const downloadTimeout = 20 * time.Second
 
 type downloadImageSource struct {
 	body          io.Reader
@@ -46,7 +61,7 @@ func downloadImageHandler(deps UploadDownloadDeps) gin.HandlerFunc {
 			serveDownloadedImage(c, source)
 			return
 		}
-		resp, err := safehttp.Get(c.Request.Context(), imgURL, 20*time.Second)
+		resp, err := downloadImageResponse(c.Request.Context(), imgURL)
 		if err != nil {
 			response.Error(c, 400, "下载失败")
 			return
@@ -59,6 +74,51 @@ func downloadImageHandler(deps UploadDownloadDeps) gin.HandlerFunc {
 			contentLength: resp.ContentLength,
 			statusCode:    resp.StatusCode,
 		})
+	}
+}
+
+// downloadImageResponse fetches one external image through the standard
+// outbound client (runtime policy allowlist + bounded retries, same as the
+// gateway migration). An exhausted retryable status returns its status and
+// body preview with a nil error, exactly like the single-shot response it
+// replaces, so the content-type/size validation below keeps working.
+// Only transport/timeout failures surface as errors.
+func downloadImageResponse(ctx context.Context, imgURL string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imgURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := downloadOutbound.Do(ctx, req, outboundhttp.RequestOptions{
+		Timeout:    downloadTimeout,
+		AllowHosts: outbound.AllowHosts(ctx),
+		Target:     downloadTarget,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return downloadStatusResponse(req, statusErr), nil
+		}
+		return nil, err
+	}
+	return resp, nil
+}
+
+// downloadStatusResponse converts an exhausted retryable download status
+// back to a response shape for the unchanged validation pipeline.
+func downloadStatusResponse(req *http.Request, statusErr *outboundhttp.HTTPStatusError) *http.Response {
+	preview := ""
+	status := 0
+	if statusErr != nil {
+		preview = statusErr.Body
+		status = statusErr.StatusCode
+	}
+	return &http.Response{
+		Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		StatusCode:    status,
+		Header:        make(http.Header),
+		Body:          io.NopCloser(strings.NewReader(preview)),
+		ContentLength: int64(len(preview)),
+		Request:       req,
 	}
 }
 

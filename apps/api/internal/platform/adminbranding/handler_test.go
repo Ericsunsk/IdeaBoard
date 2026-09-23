@@ -2,6 +2,7 @@ package adminbranding
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -96,6 +97,50 @@ func TestHandlerRejectsUnsupportedScopeLogoAndTarget(t *testing.T) {
 	}
 }
 
+func TestHandlerRendersFixedSafeMessageWithoutLeakingDetails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const secret = "pg_secret_must_not_escape"
+
+	t.Run("invalid target uses fixed message", func(t *testing.T) {
+		store := &fakeStore{}
+		response := serveHandlerAt(t, http.MethodPut, "/unsupported/42", "admin", store, `{"logo_key":"flux"}`)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+		if !strings.Contains(response.Body.String(), "品牌 Logo 参数错误") {
+			t.Fatalf("body=%s, want fixed safe message", response.Body.String())
+		}
+	})
+
+	t.Run("validation failure uses fixed message", func(t *testing.T) {
+		store := &fakeStore{}
+		response := serveHandlerAt(t, http.MethodPut, "/provider-endpoint/42", "admin", store, `{"logo_key":"not-real"}`)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+		if !strings.Contains(response.Body.String(), "品牌 Logo 参数错误") {
+			t.Fatalf("body=%s, want fixed safe message", response.Body.String())
+		}
+		if strings.Contains(response.Body.String(), "not-real") {
+			t.Fatalf("body echoes raw input: %s", response.Body.String())
+		}
+	})
+
+	t.Run("store failure keeps safe message and hides detail", func(t *testing.T) {
+		store := &fakeStore{err: errors.New("upsert admin brand logo override: " + secret)}
+		response := serveHandlerAt(t, http.MethodPut, "/provider-endpoint/42", "admin", store, `{"logo_key":"flux"}`)
+		if response.Code != http.StatusInternalServerError {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+		if !strings.Contains(response.Body.String(), "保存品牌 Logo 配置失败") {
+			t.Fatalf("body=%s, want safe message", response.Body.String())
+		}
+		if strings.Contains(response.Body.String(), secret) {
+			t.Fatalf("body leaked store detail: %s", response.Body.String())
+		}
+	})
+}
+
 func serveHandler(t *testing.T, method, role string, store Store, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	return serveHandlerAt(t, method, "/provider-endpoint/42", role, store, body)
@@ -118,7 +163,10 @@ func serveHandlerAt(t *testing.T, method, path, role string, store Store, body s
 			t.Fatal(err)
 		}
 	}
-	handler := NewHandler(store)
+	handler := NewHandler(store, func(context *gin.Context) bool {
+		_, ok := principal.RequireAdmin(context)
+		return ok
+	})
 	switch method {
 	case http.MethodGet:
 		handler.List(context)
@@ -128,6 +176,35 @@ func serveHandlerAt(t *testing.T, method, path, role string, store Store, body s
 		handler.Delete(context)
 	}
 	return recorder
+}
+
+func TestHandlerDeniesWithoutInjectedAdminPort(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			store := &fakeStore{}
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+			context.Params = gin.Params{{Key: "scope", Value: "provider-endpoint"}, {Key: "target_key", Value: "42"}}
+			context.Request = httptest.NewRequest(method, "/provider-endpoint/42", strings.NewReader(`{"logo_key":"flux"}`))
+			context.Request.Header.Set("Content-Type", "application/json")
+			handler := NewHandler(store, nil)
+			switch method {
+			case http.MethodGet:
+				handler.List(context)
+			case http.MethodPut:
+				handler.Upsert(context)
+			case http.MethodDelete:
+				handler.Delete(context)
+			}
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status=%d, want %d", recorder.Code, http.StatusForbidden)
+			}
+			if store.listCalls != 0 || store.upsertCalls != 0 || store.deleteCalls != 0 {
+				t.Fatal("store must not be called without an injected admin port")
+			}
+		})
+	}
 }
 
 func TestValidateRejectsUnknownValues(t *testing.T) {

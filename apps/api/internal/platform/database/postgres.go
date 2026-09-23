@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -11,7 +10,7 @@ import (
 
 	"ideaboard/api/internal/platform/config"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -22,19 +21,18 @@ const (
 	postgresConnectTimeout    = 60 * time.Second
 )
 
-// Connection budget: the database/sql pool below plus the River pgxpool
-// (see NewRiverPgxPool) must stay under PostgreSQL max_connections with head
-// room for migrations, CLIs and test fixtures. Default server limit is 100;
-// a single API instance holds 25 + 10 = 35.
-const (
-	postgresMaxOpenConns = 25
-	postgresMaxIdleConns = 10
-)
+// Connection budget: the runtime pgxpool plus the River pgxpool (see
+// NewRiverPgxPool) must stay under PostgreSQL max_connections with head room
+// for migrations, CLIs and test fixtures. Default server limit is 100; a
+// single API instance holds 25 + 10 = 35 (see DefaultPoolMaxOpenConns and
+// DefaultRiverPoolMaxConns in platform/config).
 
-// NewPostgres opens the runtime database/sql pool. Startup retries use
-// exponential backoff with jitter and honor ctx cancellation so a hung
-// database cannot wedge process boot forever.
-func NewPostgres(ctx context.Context, cfg config.DatabaseConfig) (*sql.DB, error) {
+// NewPostgres opens the runtime pgxpool.Pool. Pool sizing comes from
+// config.Database.Pool (env-tunable, see PoolConfig); a zero value keeps the
+// historical defaults above. Startup retries use exponential backoff with
+// jitter and honor ctx cancellation so a hung database cannot wedge process
+// boot forever.
+func NewPostgres(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 	connectCtx, cancel := postgresConnectContext(ctx)
 	defer cancel()
 
@@ -45,21 +43,34 @@ func NewPostgres(ctx context.Context, cfg config.DatabaseConfig) (*sql.DB, error
 		if err := connectCtx.Err(); err != nil {
 			return nil, fmt.Errorf("PostgreSQL connect cancelled: %w", err)
 		}
-		db, err := sql.Open("pgx", dsn)
+		poolCfg, err := pgxpool.ParseConfig(dsn)
 		if err == nil {
-			// sql.DB pool (25 conns). The River worker maintains its own pgxpool.Pool;
-			// keep the combined total under the PostgreSQL max_connections limit.
-			db.SetMaxOpenConns(postgresMaxOpenConns)
-			db.SetMaxIdleConns(postgresMaxIdleConns)
-			db.SetConnMaxLifetime(30 * time.Minute)
+			// pgxpool sizing is deploy-level tuning (PoolConfig,
+			// env-tunable). Zero values fall back to historical defaults
+			// through the Effective* accessors. The River worker maintains
+			// its own pgxpool.Pool; keep the combined total under the
+			// PostgreSQL max_connections limit.
+			pool := cfg.Pool
+			poolCfg.MaxConns = int32(pool.EffectiveMaxOpenConns())
+			idleLimit := newIdleConnectionLimiter(pool.EffectiveMaxIdleConns())
+			poolCfg.PrepareConn = idleLimit.prepareConn
+			poolCfg.AfterRelease = idleLimit.afterRelease
+			poolCfg.BeforeClose = idleLimit.beforeClose
+			poolCfg.MaxConnLifetime = time.Duration(pool.EffectiveMaxLifetimeMin()) * time.Minute
 			// Idle connections behind NAT/pgbouncer go stale silently;
 			// recycle them instead of handing callers a dead socket.
-			db.SetConnMaxIdleTime(5 * time.Minute)
-			if pingErr := pingPostgres(connectCtx, db); pingErr == nil {
-				return db, nil
+			poolCfg.MaxConnIdleTime = time.Duration(pool.EffectiveMaxIdleTimeMin()) * time.Minute
+			poolCfg.HealthCheckPeriod = time.Minute
+			db, poolErr := pgxpool.NewWithConfig(connectCtx, poolCfg)
+			if poolErr == nil {
+				if pingErr := pingPostgres(connectCtx, db); pingErr == nil {
+					return db, nil
+				} else {
+					err = pingErr
+					db.Close()
+				}
 			} else {
-				err = pingErr
-				_ = db.Close()
+				err = poolErr
 			}
 		}
 
@@ -83,10 +94,10 @@ func postgresConnectContext(parent context.Context) (context.Context, context.Ca
 	return context.WithTimeout(parent, postgresConnectTimeout)
 }
 
-func pingPostgres(ctx context.Context, db *sql.DB) error {
+func pingPostgres(ctx context.Context, db *pgxpool.Pool) error {
 	pingCtx, cancel := context.WithTimeout(ctx, postgresPingTimeout)
 	defer cancel()
-	return db.PingContext(pingCtx)
+	return db.Ping(pingCtx)
 }
 
 func sleepContext(ctx context.Context, delay time.Duration) error {

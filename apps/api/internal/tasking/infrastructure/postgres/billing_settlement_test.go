@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
@@ -11,8 +10,10 @@ import (
 	"testing"
 	"time"
 
-	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
+	"github.com/jackc/pgx/v5"
+
 	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -66,18 +67,6 @@ func TestBilledTaskCancellationWithoutExplicitAttemptFinishConvergesAllTerminalF
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-cancel-active-attempt", accountID, channelID, credentialID, "lease-cancel", "lease-cancel")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
-	attempt, err := repo.CreateTaskAttempt(t.Context(), tasks.TaskAttemptStart{
-		TaskID:             task.TaskID,
-		RiverJobID:         1,
-		LeaseToken:         task.LeaseToken,
-		AccountID:          accountID,
-		ProviderEndpointID: channelID,
-		CredentialID:       credentialID,
-		ProviderStartedAt:  time.Now().Add(-time.Second),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	cancelledAt := time.Now()
 	rows, err := repo.MarkTaskCancelled(t.Context(), tasks.TaskCancellationSnapshot{
 		TaskID:      task.TaskID,
@@ -101,19 +90,8 @@ func TestBilledTaskCancellationWithoutExplicitAttemptFinishConvergesAllTerminalF
 	assertRepositoryActiveLeaseCount(t, db, task.TaskID, 0)
 	assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
 
-	var attemptStatus string
-	var attemptCancelledAt sql.NullTime
-	if err := db.QueryRowContext(t.Context(), `
-SELECT status, cancelled_at
-FROM task_attempts
-WHERE id = $1`, attempt.ID).Scan(&attemptStatus, &attemptCancelledAt); err != nil {
-		t.Fatal(err)
-	}
-	if attemptStatus != tasks.TaskAttemptStatusCancelled || !attemptCancelledAt.Valid {
-		t.Fatalf("attempt status/cancelled_at=%q/%v, want cancelled timestamp", attemptStatus, attemptCancelledAt)
-	}
 	var statStatus string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT status
 FROM task_stat_events
 WHERE task_id = $1`, task.TaskID).Scan(&statStatus); err != nil {
@@ -133,19 +111,19 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-complete", accountID, channelID, credentialID, "lease-correct", "lease-correct")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
-	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-wrong", `{}`, time.Now(), nil, nil))
+	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, "lease-wrong", `{}`, time.Now(), nil, nil))
 	if err != nil || rows != 0 {
 		t.Fatalf("wrong lease rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "held", 75, 25)
 
-	rows, err = repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-correct", `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
+	rows, err = repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, "lease-correct", `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
 	if err != nil || rows != 1 {
 		t.Fatalf("complete rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 75, 0)
 	var status, result string
-	if err := db.QueryRowContext(t.Context(), `SELECT status, result FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status, &result); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status, result FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status, &result); err != nil {
 		t.Fatal(err)
 	}
 	if status != tasks.StatusCompleted || result != `{"status":"success"}` {
@@ -177,13 +155,13 @@ func TestBilledTaskPartialCompletionCapturesOutputsAndReleasesRemainder(t *testi
 		{OutputKind: "remote", Role: "image", URL: "https://example.com/0.png", ResultIndex: 0},
 		{OutputKind: "remote", Role: "image", URL: "https://example.com/2.png", ResultIndex: 2},
 	}
-	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), outputs, nil))
+	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, task.LeaseToken, `{"status":"success"}`, time.Now(), outputs, nil))
 	if err != nil || rows != 1 {
 		t.Fatalf("rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 50, 0)
 	var actual, captured, released int64
-	if err := db.QueryRowContext(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
 		t.Fatal(err)
 	}
 	if actual != 2 || captured != 50 || released != 50 {
@@ -197,15 +175,15 @@ func TestBilledTaskPartialCompletionCapturesOutputsAndReleasesRemainder(t *testi
 		t.Fatalf("outputs=%+v, want stable indexes [0,2]", rowsOut[task.TaskID])
 	}
 	terminalTransactions := countTaskSettlementTransactions(t, db, task.TaskID)
-	tx, err := db.BeginTx(t.Context(), nil)
+	tx, err := db.BeginTx(t.Context(), pgx.TxOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(t.Context())
 	if err := settleTerminal(t.Context(), tx, task.TaskID); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := countTaskSettlementTransactions(t, db, task.TaskID); got != terminalTransactions {
@@ -225,7 +203,7 @@ func TestBilledTaskCancellationWithResultsCapturesOutputsAndReleasesRemainder(t 
 	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-cancelled-with-results", accountID, channelID, credentialID, "lease-cancel-results", "lease-cancel-results")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 INSERT INTO task_outputs (task_id, output_kind, role, url, result_index)
 VALUES ($1, 'remote', 'image', 'https://example.com/0.png', 0),
        ($1, 'remote', 'image', 'https://example.com/2.png', 2)`, task.TaskID); err != nil {
@@ -247,14 +225,14 @@ VALUES ($1, 'remote', 'image', 'https://example.com/0.png', 0),
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 50, 0)
 	var actual, captured, released int64
-	if err := db.QueryRowContext(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
 		t.Fatal(err)
 	}
 	if actual != 2 || captured != 50 || released != 50 {
 		t.Fatalf("settlement actual/captured/released=%d/%d/%d", actual, captured, released)
 	}
 	var statStatus string
-	if err := db.QueryRowContext(t.Context(), `SELECT status FROM task_stat_events WHERE task_id = $1`, task.TaskID).Scan(&statStatus); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM task_stat_events WHERE task_id = $1`, task.TaskID).Scan(&statStatus); err != nil {
 		t.Fatal(err)
 	}
 	if statStatus != tasks.StatusCancelled {
@@ -293,7 +271,7 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			channelID := accountID + 10000
 			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-matrix-"+terminal, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
-			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2 WHERE task_id = $1`, task.TaskID, request.Feature); err != nil {
+			if _, err := db.Exec(t.Context(), `UPDATE tasks SET feature_slug = $2 WHERE task_id = $1`, task.TaskID, request.Feature); err != nil {
 				t.Fatal(err)
 			}
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
@@ -301,9 +279,9 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			var rows int64
 			var err error
 			if terminal == "success" {
-				rows, err = repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
+				rows, err = repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, task.LeaseToken, `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
 			} else {
-				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
 			}
 			if err != nil || rows != 1 {
 				t.Fatalf("rows=%d err=%v", rows, err)
@@ -333,9 +311,9 @@ func TestBilledTimeoutAndFinalFailureReleaseHold(t *testing.T) {
 				err  error
 			)
 			if path == "timeout" {
-				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider timeout", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, task.LeaseToken, "provider timeout", `{}`, time.Now(), nil)
 			} else {
-				rows, err = repo.convergeFinalFailureForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFinalFailureForTest(t.Context(), task.TaskID, task.LeaseToken, "retry limit", `{}`, time.Now(), nil)
 			}
 			if err != nil || rows != 1 {
 				t.Fatalf("rows=%d err=%v", rows, err)
@@ -363,7 +341,7 @@ func TestConcurrentBilledCompletionCapturesExactlyOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			rows, err := repo.ConvergeTask(context.Background(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-concurrent", `{}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
+			rows, err := repo.ConvergeTask(context.Background(), completedTaskConvergenceIntent(task.TaskID, "lease-concurrent", `{}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
 			rowsCh <- rows
 			errCh <- err
 		}()
@@ -386,11 +364,71 @@ func TestConcurrentBilledCompletionCapturesExactlyOnce(t *testing.T) {
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 75, 0)
 	var captures int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = 'capture'`, task.TaskID).Scan(&captures); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = 'capture'`, task.TaskID).Scan(&captures); err != nil {
 		t.Fatal(err)
 	}
 	if captures != 1 {
 		t.Fatalf("capture count=%d", captures)
+	}
+}
+
+func TestCacheHitCompletionCapturesExactlyOnceWithReceiptModel(t *testing.T) {
+	// T09 pin: cache hits settle through the identical token-fenced path as
+	// misses, so double capture is impossible; the receipt-resolved model
+	// (not the requested mapping) lands on the attempt and the task read.
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+	accountID := seedRepositoryTestAccount(t, db, 773)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-cache-hit", accountID, channelID, credentialID, "lease-cache-hit", "lease-cache-hit")
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+	cacheHitIntent := runtimecontracts.TaskConvergenceIntent{
+		Kind:           runtimecontracts.TaskConvergenceCompleted,
+		TaskID:         task.TaskID,
+		ExecutionToken: task.LeaseToken,
+		Result:         `{"status":"success"}`,
+		OccurredAt:     time.Now(),
+		Outputs:        oneRemoteTaskOutput("https://example.com/result.png"),
+		ResolvedModel:  "openai/gpt-image-1",
+		GatewayStep:    "model-image",
+		ReceiptLogID:   "log-cache-hit",
+		ReceiptEventID: "evt-cache-hit",
+		CacheHit:       true,
+	}
+	rows, err := repo.ConvergeTask(t.Context(), cacheHitIntent)
+	if err != nil || rows != 1 {
+		t.Fatalf("cache-hit complete rows=%d err=%v", rows, err)
+	}
+	// A redelivered worker retry with the same token converges to zero rows:
+	// the hold was already captured exactly once.
+	rows, err = repo.ConvergeTask(t.Context(), cacheHitIntent)
+	if err != nil || rows != 0 {
+		t.Fatalf("redelivered cache-hit rows=%d err=%v, want 0", rows, err)
+	}
+	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 75, 0)
+	var captures int
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = 'capture'`, task.TaskID).Scan(&captures); err != nil {
+		t.Fatal(err)
+	}
+	if captures != 1 {
+		t.Fatalf("capture count=%d, want exactly 1 on cache hit", captures)
+	}
+	loaded, err := repo.GetByTaskID(t.Context(), task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if loaded.ResolvedModel != "openai/gpt-image-1" {
+		t.Fatalf("task resolved_model=%q, want receipt model", loaded.ResolvedModel)
+	}
+	attempt, err := repo.GetExecutionAttemptByToken(t.Context(), task.LeaseToken)
+	if err != nil {
+		t.Fatalf("load execution attempt failed: %v", err)
+	}
+	if attempt.ResolvedModel != "openai/gpt-image-1" || attempt.GatewayStep != "model-image" ||
+		attempt.ReceiptLogID != "log-cache-hit" || attempt.ReceiptEventID != "evt-cache-hit" || !attempt.CacheHit {
+		t.Fatalf("attempt receipt facts=%+v, want receipt model/step/ids/cache-hit", attempt)
 	}
 }
 
@@ -402,7 +440,7 @@ func TestCapturePersistenceFailureRollsBackTaskResultAndLedger(t *testing.T) {
 	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-rollback", accountID, channelID, credentialID, "lease-rollback", "lease-rollback")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 CREATE FUNCTION fail_task_billing_settlement_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'forced settlement failure'; END $$;
 CREATE TRIGGER force_task_billing_settlement_failure
@@ -410,13 +448,13 @@ BEFORE UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION fail_tas
 		t.Fatal(err)
 	}
 
-	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-rollback", `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
+	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, "lease-rollback", `{"status":"success"}`, time.Now(), oneRemoteTaskOutput("https://example.com/result.png"), nil))
 	if err == nil || rows != 0 {
 		t.Fatalf("rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "held", 75, 25)
 	var status, result string
-	if err := db.QueryRowContext(t.Context(), `SELECT status, result FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status, &result); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status, result FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status, &result); err != nil {
 		t.Fatal(err)
 	}
 	if status != tasks.StatusRunning || result != "" {
@@ -430,10 +468,10 @@ func TestTerminalTransitionRollsBackWhenBillingSettlementIsMissing(t *testing.T)
 	task := &tasks.Task{TaskID: "billing-integrity-missing-settlement", UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature}
 	seedTasks(t, repo, t.Context(), task)
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-	if _, err := db.ExecContext(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
+	if _, err := db.Exec(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, task.TaskID); err != nil {
+	if _, err := db.Exec(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, task.TaskID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -442,7 +480,7 @@ func TestTerminalTransitionRollsBackWhenBillingSettlementIsMissing(t *testing.T)
 		t.Fatalf("rows=%d err=%v, want billing integrity rollback", rows, err)
 	}
 	var status string
-	if err := db.QueryRowContext(t.Context(), `SELECT status FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != tasks.StatusPending {
@@ -460,13 +498,11 @@ func TestFinalFailureConvergenceReleasesBilledHolds(t *testing.T) {
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
 	rows, err := repo.ConvergeTask(t.Context(), runtimecontracts.TaskConvergenceIntent{
-		Kind:   runtimecontracts.TaskConvergenceFinalFailed,
-		TaskID: task.TaskID,
-		Lease: &runtimecontracts.TaskLeaseIdentity{
-			AccountID: accountID, ProviderEndpointID: channelID, CredentialID: credentialID, LeaseToken: task.LeaseToken,
-		},
-		ErrorMessage: "startup recovery",
-		OccurredAt:   time.Now(),
+		Kind:           runtimecontracts.TaskConvergenceFinalFailed,
+		TaskID:         task.TaskID,
+		ExecutionToken: task.LeaseToken,
+		ErrorMessage:   "startup recovery",
+		OccurredAt:     time.Now(),
 	})
 	if err != nil || rows != 1 {
 		t.Fatalf("rows=%d err=%v", rows, err)
@@ -481,50 +517,14 @@ func TestFinalFailureConvergenceReleasesBilledHolds(t *testing.T) {
 	}
 }
 
-func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
-	for _, operation := range []string{"stop", "archive"} {
-		t.Run(operation, func(t *testing.T) {
-			db, pool := testdb.OpenWithPool(t)
-			repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-			accountID := seedRepositoryTestAccount(t, db, 785)
-			channelID := accountID + 10000
-			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
-			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-account-"+operation, accountID, channelID, credentialID, "lease-account", "lease-account")
-			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-			accountRepo := accountrepo.NewRepository(db, repo)
-
-			var (
-				ids []string
-				err error
-			)
-			if operation == "stop" {
-				ids, err = accountRepo.StopAndFinalizeTasks(t.Context(), accountID, "account stopped")
-			} else {
-				ids, err = accountRepo.ArchiveAndFinalizeTasks(t.Context(), accountID, "account archived")
-			}
-			if err != nil || len(ids) != 1 || ids[0] != task.TaskID {
-				t.Fatalf("ids=%v err=%v", ids, err)
-			}
-			assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
-			var status string
-			if err := db.QueryRowContext(t.Context(), `SELECT status FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status); err != nil {
-				t.Fatal(err)
-			}
-			if status != tasks.StatusFailed {
-				t.Fatalf("task status=%q, want failed", status)
-			}
-		})
-	}
-}
-
-func newBillingSettlementFixture(t *testing.T, db *sql.DB, pool *pgxpool.Pool, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
+func newBillingSettlementFixture(t *testing.T, db *pgxpool.Pool, pool *pgxpool.Pool, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
 	return newBillingSettlementFixtureForFeature(t, db, pool, workflow.FeatureSlugGeneration, userID, grant, unit)
 }
 
-func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpool.Pool, feature string, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
+func newBillingSettlementFixtureForFeature(t *testing.T, db *pgxpool.Pool, pool *pgxpool.Pool, feature string, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
 	t.Helper()
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
 	request, err := taskbilling.AIImageRequest(feature, "1k", 1)
@@ -586,20 +586,20 @@ func holdTaskForSettlementTest(t *testing.T, pool *pgxpool.Pool, service *taskbi
 	}
 }
 
-func assertTaskBillingSettlement(t *testing.T, db *sql.DB, taskID, wantState string, wantAvailable, wantReserved int64) {
+func assertTaskBillingSettlement(t *testing.T, db *pgxpool.Pool, taskID, wantState string, wantAvailable, wantReserved int64) {
 	t.Helper()
 	var state string
-	if err := db.QueryRow(`SELECT state FROM task_billing_settlements WHERE task_id = $1`, taskID).Scan(&state); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT state FROM task_billing_settlements WHERE task_id = $1`, taskID).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
 	if state != wantState {
 		t.Fatalf("state=%q want=%q", state, wantState)
 	}
 	var available, reserved int64
-	if err := db.QueryRow(`SELECT balance FROM credit_accounts WHERE wallet_user_id = 1 AND account_role = 'user_available'`).Scan(&available); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT balance FROM credit_accounts WHERE wallet_user_id = 1 AND account_role = 'user_available'`).Scan(&available); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT balance FROM credit_accounts WHERE wallet_user_id = 1 AND account_role = 'user_reserved'`).Scan(&reserved); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT balance FROM credit_accounts WHERE wallet_user_id = 1 AND account_role = 'user_reserved'`).Scan(&reserved); err != nil {
 		t.Fatal(err)
 	}
 	if available != wantAvailable || reserved != wantReserved {
@@ -607,10 +607,10 @@ func assertTaskBillingSettlement(t *testing.T, db *sql.DB, taskID, wantState str
 	}
 }
 
-func countTaskSettlementTransactions(t *testing.T, db *sql.DB, taskID string) int64 {
+func countTaskSettlementTransactions(t *testing.T, db *pgxpool.Pool, taskID string) int64 {
 	t.Helper()
 	var count int64
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT COUNT(*)
 FROM credit_transactions
 WHERE business_reference_type = 'task'

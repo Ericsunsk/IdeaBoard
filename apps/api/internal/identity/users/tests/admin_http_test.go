@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"ideaboard/api/internal/credits/domain"
@@ -113,7 +112,7 @@ func (f *fakeAdminAuthManager) RevokeUserSessions(_ context.Context, authUserID 
 	return f.revokeErr
 }
 
-func newAdminHandlerForRuntimeSettings(db *sql.DB) *AdminHandler {
+func newAdminHandlerForRuntimeSettings(db *pgxpool.Pool) *AdminHandler {
 	return NewAdminHandler(nil, settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db)), nil)
 }
 

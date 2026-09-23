@@ -2,13 +2,15 @@ package prompts
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/workflow"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var ErrFeaturePromptUnsupported = errors.New("该功能不支持 System Prompt")
@@ -28,7 +30,7 @@ type FeaturePromptRuntimeConfig struct {
 	UserPromptMergePolicy FeaturePromptMergePolicy
 }
 
-func NewFeaturePromptRepository(db *sql.DB) *FeaturePromptRepository {
+func NewFeaturePromptRepository(db *pgxpool.Pool) *FeaturePromptRepository {
 	return &FeaturePromptRepository{q: dbsqlc.New(db)}
 }
 
@@ -93,10 +95,7 @@ func (r *FeaturePromptRepository) SaveConfig(ctx context.Context, slug, prompt s
 	if !isPromptConfigurableFeature(slug) {
 		return nil, ErrFeaturePromptUnsupported
 	}
-	updatedByValue := sql.NullInt64{}
-	if updatedBy != nil {
-		updatedByValue = sql.NullInt64{Int64: *updatedBy, Valid: true}
-	}
+	updatedByValue := dbutil.NullInt64(updatedBy)
 	row, err := r.q.UpsertFeaturePrompt(ctx, dbsqlc.UpsertFeaturePromptParams{
 		FeatureSlug: slug,
 		Prompt:      prompt,
@@ -120,10 +119,9 @@ func defaultFeaturePromptConfig(slug string) FeaturePromptConfig {
 }
 
 func featurePromptConfigFromRow(row dbsqlc.FeaturePrompt) FeaturePromptConfig {
-	updatedAt := row.UpdatedAt
 	return FeaturePromptConfig{
 		FeatureSlug: row.FeatureSlug,
 		Prompt:      row.Prompt,
-		UpdatedAt:   &updatedAt,
+		UpdatedAt:   dbutil.TimePtr(row.UpdatedAt),
 	}
 }

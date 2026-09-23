@@ -7,20 +7,23 @@ import (
 	"testing"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
-	taskqueue "ideaboard/api/internal/tasking/ports/queue"
 )
 
-func TestProviderCallerFunc(t *testing.T) {
+func TestGatewayCallerFunc(t *testing.T) {
 	called := false
-	var fn ports.ProviderCallerFunc = func(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (ports.ProviderCallOutput, error) {
+	var fn ports.GatewayCallerFunc = func(ctx context.Context, input ports.GatewayCallInput) (ports.ProviderCallOutput, error) {
 		called = true
+		if input.Model != "openai/gpt-image-1" || input.ExecutionToken == "" {
+			t.Errorf("input = %+v, want model and token", input)
+		}
 		return ports.ProviderCallOutput{Result: "ok"}, nil
 	}
 
-	out, err := fn.CallDrawingAPIWithAssignment(t.Context(), nil, &tasks.TaskPayload{TaskID: "t-1"}, taskqueue.TaskAssignment{})
+	out, err := fn.CallGatewayAPI(t.Context(), ports.GatewayCallInput{
+		Task: &tasks.TaskPayload{TaskID: "t-1"}, Model: "openai/gpt-image-1", ExecutionToken: "tok",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

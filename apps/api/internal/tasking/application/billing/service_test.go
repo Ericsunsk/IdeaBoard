@@ -93,6 +93,46 @@ func TestAIImageWorkflowRequestRejectsNonWorkflowProducts(t *testing.T) {
 	}
 }
 
+func TestModelMappingChangeNeverMovesPrices(t *testing.T) {
+	// T07 pin: AIImageRequest takes no model input by construction (feature,
+	// resolution, quantity only) — the per-feature model mapping lives in
+	// the AI gateway settings namespace. Quoting the same feature before
+	// and after an operator model switch must resolve identically.
+	// The compile-time half of the pin is
+	// TestTaskbillingNeverReadsModelMappings.
+	before, err := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Operator switches generation: openai/gpt-image-1 -> google/gemini-2.5-flash-image.
+	after, err := AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeSKU, err := ResolveSKU(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterSKU, err := ResolveSKU(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeSKU != afterSKU {
+		t.Fatalf("model mapping changed pricing identity: %q != %q", beforeSKU, afterSKU)
+	}
+	beforeFingerprint, err := RequestFingerprint(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterFingerprint, err := RequestFingerprint(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeFingerprint != afterFingerprint {
+		t.Fatal("model mapping changed the billing idempotency fingerprint")
+	}
+}
+
 func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string

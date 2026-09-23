@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -16,8 +17,8 @@ type paymentDisputeScanner interface {
 
 func scanPaymentDispute(row paymentDisputeScanner) (paymentsdomain.PaymentDispute, error) {
 	var dispute paymentsdomain.PaymentDispute
-	var restrictionID, debitID, restoreID sql.NullString
-	var closedAt sql.NullTime
+	var restrictionID, debitID, restoreID pgtype.Text
+	var closedAt pgtype.Timestamptz
 	if err := row.Scan(
 		&dispute.ID, &dispute.PaymentOrderID, &dispute.UserID, &dispute.StripeDisputeID,
 		&dispute.StripeChargeID, &dispute.StripePaymentIntentID, &dispute.ProviderStatus, &dispute.Status,
@@ -41,7 +42,7 @@ func (r *Repository) ListDuePaymentDisputes(ctx context.Context, now time.Time, 
 	if limit < 1 || limit > 100 {
 		limit = 100
 	}
-	rows, err := r.dbWithContext(ctx).executor.QueryContext(ctx, `
+	rows, err := r.dbWithContext(ctx).executor.Query(ctx, `
 SELECT id::text, payment_order_id::text, user_id, stripe_dispute_id, stripe_charge_id,
        stripe_payment_intent_id, provider_status, status, amount_minor, currency,
        target_idea_quantity, debited_idea_quantity, unrecovered_credits,
@@ -70,7 +71,7 @@ func (r *Repository) ListPaymentDisputesForOrder(ctx context.Context, orderNumbe
 	if r == nil || r.db == nil {
 		return nil, paymentcontracts.ErrDisputeUnavailable
 	}
-	rows, err := r.dbWithContext(ctx).executor.QueryContext(ctx, `
+	rows, err := r.dbWithContext(ctx).executor.Query(ctx, `
 SELECT d.id::text, d.payment_order_id::text, d.user_id, d.stripe_dispute_id, d.stripe_charge_id,
        d.stripe_payment_intent_id, d.provider_status, d.status, d.amount_minor, d.currency,
        d.target_idea_quantity, d.debited_idea_quantity, d.unrecovered_credits,

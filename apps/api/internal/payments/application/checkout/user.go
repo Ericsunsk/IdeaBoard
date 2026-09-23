@@ -2,10 +2,10 @@ package checkout
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/platform/database"
 
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -47,7 +47,7 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 func (s *Service) continuePendingOrderLocked(ctx context.Context, userID int64, publicToken string) (paymentcontracts.PendingPaymentOrder, error) {
 	var result paymentcontracts.PendingPaymentOrder
 	order, err := s.store.GetPaymentOrderByPublicToken(ctx, userID, publicToken)
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return result, paymentcontracts.ErrPaymentOrderNotFound
 	}
 	if err != nil {
@@ -97,7 +97,7 @@ func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicT
 	var result paymentcontracts.PendingPaymentOrder
 	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
 		order, err := s.store.GetPaymentOrderByPublicToken(locked, userID, publicToken)
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return paymentcontracts.ErrPaymentOrderNotFound
 		}
 		if err != nil {
@@ -249,7 +249,7 @@ func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64,
 	var result paymentcontracts.PaymentOrderReturnStatus
 	err := s.store.WithUserCheckoutLock(ctx, userID, func(locked context.Context) error {
 		order, err := s.store.GetPaymentOrderByPublicToken(locked, userID, publicToken)
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return paymentcontracts.ErrPaymentOrderNotFound
 		}
 		if err != nil {

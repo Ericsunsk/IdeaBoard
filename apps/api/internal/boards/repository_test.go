@@ -2,9 +2,9 @@ package boards
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,11 +18,49 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newBoardRepoTestDB(t *testing.T) *sql.DB {
+func newBoardRepoTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	return testdb.Open(t)
+}
+
+type acceptingBoardsIntegrityVerifier struct{}
+
+func (acceptingBoardsIntegrityVerifier) Verify(context.Context, string, string, string, string, int64) error {
+	return nil
+}
+
+func setReadyBoardsProcessingInputForTest(t *testing.T, db *pgxpool.Pool, registry *mediaassets.MediaAssetRegistry) {
+	t.Helper()
+	registry.SetProcessingInputMaterializer(func(ctx context.Context, assetID, ownerUserID int64) error {
+		q := dbsqlc.New(db)
+		asset, err := q.GetMediaAssetByID(ctx, assetID)
+		if err != nil {
+			return fmt.Errorf("load materialization asset: %w", err)
+		}
+		upserted, err := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
+			DerivativeID: fmt.Sprintf("test-processing-input-%d", assetID),
+			MediaAssetID: assetID, OwnerUserID: ownerUserID,
+			Tier: "processing-input", Format: "png",
+		})
+		if err != nil {
+			return fmt.Errorf("upsert processing-input derivative: %w", err)
+		}
+		_, err = q.MarkMediaDerivativeReady(ctx, dbsqlc.MarkMediaDerivativeReadyParams{
+			Format: "png", StorageKey: fmt.Sprintf("test-derivatives/%d/processing-input.png", assetID),
+			MimeType: "image/png", Width: 32, Height: 32, SizeBytes: 128,
+			ChecksumSha256:         "test-checksum",
+			SourceObjectGeneration: asset.ObjectGeneration,
+			ID:                     upserted.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("mark processing-input derivative ready: %w", err)
+		}
+		return nil
+	})
 }
 
 func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
@@ -137,7 +175,7 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 		t.Fatalf("initial Upsert returned error: %v", err)
 	}
 
-	refs, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID})
+	refs, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID, RowLimit: 5000})
 	if err != nil {
 		t.Fatalf("ListMediaRefsByBoardID returned error: %v", err)
 	}
@@ -151,7 +189,7 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 		t.Fatalf("second Upsert returned error: %v", err)
 	}
 
-	refs, err = q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID})
+	refs, err = q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID, RowLimit: 5000})
 	if err != nil {
 		t.Fatalf("ListMediaRefsByBoardID after remove returned error: %v", err)
 	}
@@ -188,7 +226,7 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	if err := repo.DeleteBoardCascade(ctx, owner.ID, board.BoardID); err != nil {
 		t.Fatalf("DeleteBoardCascade returned error: %v", err)
 	}
-	refs, err = q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID})
+	refs, err = q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: board.BoardID, RowLimit: 5000})
 	if err != nil {
 		t.Fatalf("ListMediaRefsByBoardID after delete returned error: %v", err)
 	}
@@ -225,7 +263,7 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 		}
 	}
 	for _, boardID := range []string{boardA.BoardID, boardB.BoardID} {
-		refs, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: boardID})
+		refs, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: boardID, RowLimit: 5000})
 		if err != nil || len(refs) != 1 || refs[0].MediaAssetID != assetID {
 			t.Fatalf("shared board %s refs=%#v err=%v, want independent media ref", boardID, refs, err)
 		}
@@ -255,14 +293,14 @@ func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUn
 	}
 
 	claimNow := time.Now().Add(48 * time.Hour)
-	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	claimToken := pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	if _, err := q.ClaimDueMediaAssetReclamation(ctx, dbsqlc.ClaimDueMediaAssetReclamationParams{
 		ID:                assetID,
 		ReclaimGeneration: asset.ReclaimGeneration,
-		ClaimedAt:         sql.NullTime{Time: claimNow, Valid: true},
+		ClaimedAt:         pgtype.Timestamptz{Time: claimNow, Valid: true},
 		ClaimToken:        claimToken,
-		NowAt:             sql.NullTime{Time: claimNow, Valid: true},
-		StaleClaimBefore:  sql.NullTime{Time: claimNow.Add(-48 * time.Hour), Valid: true},
+		NowAt:             pgtype.Timestamptz{Time: claimNow, Valid: true},
+		StaleClaimBefore:  pgtype.Timestamptz{Time: claimNow.Add(-48 * time.Hour), Valid: true},
 	}); err != nil {
 		t.Fatalf("claim scheduled asset failed: %v", err)
 	}
@@ -296,6 +334,8 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 		t.Fatalf("create owner: %v", err)
 	}
 	registry := mediaassets.NewMediaAssetRegistry(db)
+	registry.SetIntegrityVerifier(acceptingBoardsIntegrityVerifier{})
+	setReadyBoardsProcessingInputForTest(t, db, registry)
 	upload := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/owner/upload-reclamation-board/content/image.png", URL: "/uploads/canvas/owner/upload-reclamation-board/content/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "upload-reclamation-board"}}
 	stored := ports.StoredUploadRef{
 		URL:            "/uploads/canvas/owner/upload-reclamation-board/content/image.png",
@@ -412,7 +452,7 @@ func TestBoardRepositoryStableBoardIdentityConstraints(t *testing.T) {
 		t.Fatalf("UpsertMember editor returned error: %v", err)
 	}
 	var memberRows int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM board_members WHERE board_id = $1 AND user_id = $2`, board.BoardID, member.ID).Scan(&memberRows); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM board_members WHERE board_id = $1 AND user_id = $2`, board.BoardID, member.ID).Scan(&memberRows); err != nil {
 		t.Fatalf("count board_members failed: %v", err)
 	}
 	if memberRows != 1 {

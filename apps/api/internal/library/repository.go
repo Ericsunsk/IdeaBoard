@@ -2,61 +2,52 @@ package library
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/database"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
-func NewRepository(db *sql.DB) *Repository {
+type repositoryQueryer struct {
+	ctx context.Context
+	db  *pgxpool.Pool
+	q   *dbsqlc.Queries
+}
+
+func NewRepository(db *pgxpool.Pool) *Repository {
 	if db == nil {
 		return &Repository{}
 	}
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *Repository) dbWithContext(ctx context.Context) *dbsqlc.Queries {
-	if r == nil || r.q == nil {
-		return nil
-	}
-	return r.q
+func (r *Repository) dbWithContext(ctx context.Context) repositoryQueryer {
+	return repositoryQueryer{ctx: ctx, db: r.db, q: r.q}
 }
 
-func (r *Repository) withTx(ctx context.Context, run func(*dbsqlc.Queries) error) error {
-	if r == nil || r.db == nil || r.q == nil {
-		return errors.New("library repository is not configured")
-	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin library transaction: %w", err)
-	}
-	if err := run(r.q.WithTx(tx)); err != nil {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			return errors.Join(err, fmt.Errorf("rollback library transaction: %w", rollbackErr))
-		}
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit library transaction: %w", err)
-	}
-	return nil
+func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
+	return dbutil.WithTx(db.ctx, db.db, run)
 }
 
 func (r *Repository) EnsureQuickSaves(ctx context.Context, ownerUserID int64) (dbsqlc.LibraryFolder, error) {
 	if err := validateOwner(ownerUserID); err != nil {
 		return dbsqlc.LibraryFolder{}, err
 	}
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryFolder{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	if err := q.EnsureQuickSavesFolder(ctx, ownerUserID); err != nil {
 		return dbsqlc.LibraryFolder{}, fmt.Errorf("ensure Quick Saves folder: %w", err)
 	}
@@ -91,10 +82,11 @@ func (r *Repository) ListFolders(ctx context.Context, ownerUserID int64) ([]dbsq
 	if _, err := r.EnsureQuickSaves(ctx, ownerUserID); err != nil {
 		return nil, err
 	}
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return nil, errors.New("library repository is not configured")
 	}
+	q := db.q
 	rows, err := q.ListLibraryFolders(ctx, ownerUserID)
 	if err != nil {
 		return nil, fmt.Errorf("list library folders: %w", err)
@@ -103,10 +95,11 @@ func (r *Repository) ListFolders(ctx context.Context, ownerUserID int64) ([]dbsq
 }
 
 func (r *Repository) CreateFolder(ctx context.Context, ownerUserID int64, name string) (dbsqlc.LibraryFolder, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryFolder{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	folder, err := q.CreateLibraryFolder(ctx, dbsqlc.CreateLibraryFolderParams{OwnerUserID: ownerUserID, Name: name})
 	if err != nil {
 		return dbsqlc.LibraryFolder{}, fmt.Errorf("create library folder: %w", err)
@@ -129,12 +122,13 @@ func (r *Repository) EnsureFolderByNameInTx(ctx context.Context, q *dbsqlc.Queri
 }
 
 func (r *Repository) GetFolder(ctx context.Context, ownerUserID, folderID int64) (dbsqlc.LibraryFolder, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryFolder{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	folder, err := q.GetLibraryFolderByIDForOwner(ctx, dbsqlc.GetLibraryFolderByIDForOwnerParams{ID: folderID, OwnerUserID: ownerUserID})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.LibraryFolder{}, ErrFolderNotFound
 	}
 	if err != nil {
@@ -144,12 +138,13 @@ func (r *Repository) GetFolder(ctx context.Context, ownerUserID, folderID int64)
 }
 
 func (r *Repository) RenameFolder(ctx context.Context, ownerUserID, folderID int64, name string) (dbsqlc.LibraryFolder, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryFolder{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	folder, err := q.RenameLibraryFolder(ctx, dbsqlc.RenameLibraryFolderParams{ID: folderID, OwnerUserID: ownerUserID, Name: name})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.LibraryFolder{}, ErrFolderNotFound
 	}
 	if err != nil {
@@ -159,9 +154,9 @@ func (r *Repository) RenameFolder(ctx context.Context, ownerUserID, folderID int
 }
 
 func (r *Repository) DeleteFolder(ctx context.Context, ownerUserID, folderID int64) error {
-	return r.withTx(ctx, func(q *dbsqlc.Queries) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		folder, err := q.GetLibraryFolderByIDForOwner(ctx, dbsqlc.GetLibraryFolderByIDForOwnerParams{ID: folderID, OwnerUserID: ownerUserID})
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return ErrFolderNotFound
 		}
 		if err != nil {
@@ -189,17 +184,18 @@ func (r *Repository) DeleteFolder(ctx context.Context, ownerUserID, folderID int
 }
 
 func (r *Repository) ListAssets(ctx context.Context, ownerUserID int64, folderID *int64, cursor *Cursor, limit int32) ([]dbsqlc.LibraryAsset, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return nil, errors.New("library repository is not configured")
 	}
+	q := db.q
 	params := dbsqlc.ListLibraryAssetsParams{OwnerUserID: ownerUserID, RowLimit: limit}
 	if folderID != nil {
-		params.FolderID = sql.NullInt64{Int64: *folderID, Valid: true}
+		params.FolderID = dbutil.NullInt64(folderID)
 	}
 	if cursor != nil {
-		params.CursorCreatedAt = sql.NullTime{Time: cursor.CreatedAt, Valid: true}
-		params.CursorID = sql.NullInt64{Int64: cursor.ID, Valid: true}
+		params.CursorCreatedAt = dbutil.NullTime(&cursor.CreatedAt)
+		params.CursorID = dbutil.NullInt64(&cursor.ID)
 	}
 	items, err := q.ListLibraryAssets(ctx, params)
 	if err != nil {
@@ -210,7 +206,7 @@ func (r *Repository) ListAssets(ctx context.Context, ownerUserID int64, folderID
 
 func (r *Repository) SaveAsset(ctx context.Context, command SaveAssetCommand) (dbsqlc.LibraryAsset, error) {
 	returnValue := dbsqlc.LibraryAsset{}
-	err := r.withTx(ctx, func(q *dbsqlc.Queries) error {
+	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries) error {
 		var folder dbsqlc.LibraryFolder
 		var err error
 		if command.FolderSelection != nil {
@@ -219,7 +215,7 @@ func (r *Repository) SaveAsset(ctx context.Context, command SaveAssetCommand) (d
 				folder, err = r.EnsureQuickSavesInTx(ctx, q, command.OwnerUserID)
 			case FolderSelectionUser:
 				folder, err = q.GetLibraryFolderByIDForOwner(ctx, dbsqlc.GetLibraryFolderByIDForOwnerParams{ID: command.FolderSelection.ID, OwnerUserID: command.OwnerUserID})
-				if errors.Is(err, sql.ErrNoRows) {
+				if database.IsNotFound(err) {
 					return ErrFolderNotFound
 				}
 				if err == nil && folder.IsSystem {
@@ -252,12 +248,13 @@ func (r *Repository) SaveAsset(ctx context.Context, command SaveAssetCommand) (d
 }
 
 func (r *Repository) MoveAsset(ctx context.Context, ownerUserID, assetID, folderID int64) (dbsqlc.LibraryAsset, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryAsset{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	asset, err := q.MoveLibraryAsset(ctx, dbsqlc.MoveLibraryAssetParams{ID: assetID, OwnerUserID: ownerUserID, FolderID: folderID})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.LibraryAsset{}, ErrAssetNotFound
 	}
 	if err != nil {
@@ -267,10 +264,11 @@ func (r *Repository) MoveAsset(ctx context.Context, ownerUserID, assetID, folder
 }
 
 func (r *Repository) DeleteAsset(ctx context.Context, ownerUserID, assetID int64) error {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return errors.New("library repository is not configured")
 	}
+	q := db.q
 	deleted, err := q.DeleteLibraryAsset(ctx, dbsqlc.DeleteLibraryAssetParams{ID: assetID, OwnerUserID: ownerUserID})
 	if err != nil {
 		return fmt.Errorf("delete library asset: %w", err)
@@ -282,12 +280,13 @@ func (r *Repository) DeleteAsset(ctx context.Context, ownerUserID, assetID int64
 }
 
 func (r *Repository) GetAsset(ctx context.Context, ownerUserID, assetID int64) (dbsqlc.LibraryAsset, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return dbsqlc.LibraryAsset{}, errors.New("library repository is not configured")
 	}
+	q := db.q
 	asset, err := q.GetLibraryAssetByIDForOwner(ctx, dbsqlc.GetLibraryAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.LibraryAsset{}, ErrAssetNotFound
 	}
 	if err != nil {
@@ -297,10 +296,11 @@ func (r *Repository) GetAsset(ctx context.Context, ownerUserID, assetID int64) (
 }
 
 func (r *Repository) LookupAssets(ctx context.Context, ownerUserID int64, keys []AssetKey) ([]dbsqlc.LibraryAsset, error) {
-	q := r.dbWithContext(ctx)
-	if q == nil {
+	db := r.dbWithContext(ctx)
+	if db.q == nil {
 		return nil, errors.New("library repository is not configured")
 	}
+	q := db.q
 	raw, err := json.Marshal(keys)
 	if err != nil {
 		return nil, fmt.Errorf("encode library lookup keys: %w", err)

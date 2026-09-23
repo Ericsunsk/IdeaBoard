@@ -7,10 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -24,22 +22,22 @@ RETURNING id, public_id, display_name
 `
 
 type CreateUserParams struct {
-	DisplayName string         `json:"display_name"`
-	AuthUserID  sql.NullString `json:"auth_user_id"`
-	StorageUid  string         `json:"storage_uid"`
-	Avatar      string         `json:"avatar"`
-	Role        string         `json:"role"`
-	Status      int16          `json:"status"`
+	DisplayName string      `json:"display_name"`
+	AuthUserID  pgtype.Text `json:"auth_user_id"`
+	StorageUid  string      `json:"storage_uid"`
+	Avatar      string      `json:"avatar"`
+	Role        string      `json:"role"`
+	Status      int16       `json:"status"`
 }
 
 type CreateUserRow struct {
-	ID          int64     `json:"id"`
-	PublicID    uuid.UUID `json:"public_id"`
-	DisplayName string    `json:"display_name"`
+	ID          int64       `json:"id"`
+	PublicID    pgtype.UUID `json:"public_id"`
+	DisplayName string      `json:"display_name"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.DisplayName,
 		arg.AuthUserID,
 		arg.StorageUid,
@@ -58,7 +56,7 @@ WHERE user_id = $1
 `
 
 func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardMembersByUserID, userID)
+	_, err := q.db.Exec(ctx, deleteBoardMembersByUserID, userID)
 	return err
 }
 
@@ -68,7 +66,7 @@ WHERE owner_user_id = $1
 `
 
 func (q *Queries) DeleteUserBoardsByUserID(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUserBoardsByUserID, userID)
+	_, err := q.db.Exec(ctx, deleteUserBoardsByUserID, userID)
 	return err
 }
 
@@ -78,11 +76,11 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteUserByID(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteUserByID, id)
+	result, err := q.db.Exec(ctx, deleteUserByID, id)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const getUsedUIDForUpdate = `-- name: GetUsedUIDForUpdate :one
@@ -94,7 +92,7 @@ FOR UPDATE
 `
 
 func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getUsedUIDForUpdate, storageUid)
+	row := q.db.QueryRow(ctx, getUsedUIDForUpdate, storageUid)
 	var storage_uid string
 	err := row.Scan(&storage_uid)
 	return storage_uid, err
@@ -106,8 +104,8 @@ FROM users
 WHERE auth_user_id = $1
 `
 
-func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullString) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByAuthUserID, authUserID)
+func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByAuthUserID, authUserID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -133,7 +131,7 @@ WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -158,8 +156,8 @@ FROM users
 WHERE public_id = $1
 `
 
-func (q *Queries) GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByPublicID, publicID)
+func (q *Queries) GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByPublicID, publicID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -185,7 +183,7 @@ WHERE storage_uid = $1
 `
 
 func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByStorageUID, storageUid)
+	row := q.db.QueryRow(ctx, getUserByStorageUID, storageUid)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -218,7 +216,7 @@ type GetUserIDByStorageUIDForUpdateParams struct {
 }
 
 func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getUserIDByStorageUIDForUpdate, arg.StorageUid, arg.ID)
+	row := q.db.QueryRow(ctx, getUserIDByStorageUIDForUpdate, arg.StorageUid, arg.ID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -232,7 +230,7 @@ ORDER BY id
 `
 
 func (q *Queries) GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getUsersByIDs, pq.Array(ids))
+	rows, err := q.db.Query(ctx, getUsersByIDs, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -258,9 +256,6 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -274,11 +269,11 @@ ON CONFLICT (storage_uid) DO NOTHING
 `
 
 func (q *Queries) InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, insertUsedUIDIgnore, storageUid)
+	result, err := q.db.Exec(ctx, insertUsedUIDIgnore, storageUid)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const listUserStorageUIDs = `-- name: ListUserStorageUIDs :many
@@ -293,7 +288,7 @@ type ListUserStorageUIDsRow struct {
 }
 
 func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUserStorageUIDs)
+	rows, err := q.db.Query(ctx, listUserStorageUIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -305,9 +300,6 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -337,7 +329,7 @@ type ListUsersParams struct {
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers,
+	rows, err := q.db.Query(ctx, listUsers,
 		arg.HasKeyword,
 		arg.KeywordLike,
 		arg.HasRole,
@@ -371,9 +363,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -410,7 +399,7 @@ type SummarizeUsersRow struct {
 }
 
 func (q *Queries) SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error) {
-	row := q.db.QueryRowContext(ctx, summarizeUsers,
+	row := q.db.QueryRow(ctx, summarizeUsers,
 		arg.HasKeyword,
 		arg.KeywordLike,
 		arg.HasRole,
@@ -440,17 +429,17 @@ WHERE id = $7
 `
 
 type UpdateUserParams struct {
-	DisplayName string         `json:"display_name"`
-	AuthUserID  sql.NullString `json:"auth_user_id"`
-	StorageUid  string         `json:"storage_uid"`
-	Avatar      string         `json:"avatar"`
-	Role        string         `json:"role"`
-	Status      int16          `json:"status"`
-	ID          int64          `json:"id"`
+	DisplayName string      `json:"display_name"`
+	AuthUserID  pgtype.Text `json:"auth_user_id"`
+	StorageUid  string      `json:"storage_uid"`
+	Avatar      string      `json:"avatar"`
+	Role        string      `json:"role"`
+	Status      int16       `json:"status"`
+	ID          int64       `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUser,
+	result, err := q.db.Exec(ctx, updateUser,
 		arg.DisplayName,
 		arg.AuthUserID,
 		arg.StorageUid,
@@ -462,7 +451,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, 
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserAvatar = `-- name: UpdateUserAvatar :execrows
@@ -477,11 +466,11 @@ type UpdateUserAvatarParams struct {
 }
 
 func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserAvatar, arg.Avatar, arg.ID)
+	result, err := q.db.Exec(ctx, updateUserAvatar, arg.Avatar, arg.ID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserLastLoginMetadata = `-- name: UpdateUserLastLoginMetadata :execrows
@@ -493,17 +482,17 @@ WHERE auth_user_id = $3
 `
 
 type UpdateUserLastLoginMetadataParams struct {
-	LastLoginIp      sql.NullString `json:"last_login_ip"`
-	LastLoginCountry sql.NullString `json:"last_login_country"`
-	AuthUserID       sql.NullString `json:"auth_user_id"`
+	LastLoginIp      pgtype.Text `json:"last_login_ip"`
+	LastLoginCountry pgtype.Text `json:"last_login_country"`
+	AuthUserID       pgtype.Text `json:"auth_user_id"`
 }
 
 func (q *Queries) UpdateUserLastLoginMetadata(ctx context.Context, arg UpdateUserLastLoginMetadataParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserLastLoginMetadata, arg.LastLoginIp, arg.LastLoginCountry, arg.AuthUserID)
+	result, err := q.db.Exec(ctx, updateUserLastLoginMetadata, arg.LastLoginIp, arg.LastLoginCountry, arg.AuthUserID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserRole = `-- name: UpdateUserRole :execrows
@@ -518,11 +507,11 @@ type UpdateUserRoleParams struct {
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserRole, arg.Role, arg.ID)
+	result, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.ID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserStatus = `-- name: UpdateUserStatus :execrows
@@ -537,11 +526,11 @@ type UpdateUserStatusParams struct {
 }
 
 func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserStatus, arg.Status, arg.ID)
+	result, err := q.db.Exec(ctx, updateUserStatus, arg.Status, arg.ID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserStorageUID = `-- name: UpdateUserStorageUID :execrows
@@ -556,9 +545,9 @@ type UpdateUserStorageUIDParams struct {
 }
 
 func (q *Queries) UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserStorageUID, arg.StorageUid, arg.ID)
+	result, err := q.db.Exec(ctx, updateUserStorageUID, arg.StorageUid, arg.ID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

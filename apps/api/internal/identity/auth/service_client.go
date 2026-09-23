@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"ideaboard/api/internal/identity/authidentity"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/outboundhttp"
 )
 
 var (
@@ -51,21 +54,22 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.MaxIdleConns = 100
-	transport.MaxIdleConnsPerHost = 10
-	transport.IdleConnTimeout = 90 * time.Second
+	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
+	authHost := ""
+	if parsed, err := url.Parse(baseURL); err == nil {
+		authHost = parsed.Hostname()
+	}
 
 	internalKey := strings.TrimSpace(cfg.InternalAPIKey)
 	httpClient := &http.Client{
 		Timeout: timeout,
-		Transport: &boundedResponseTransport{
-			base:     transport,
-			maxBytes: maxAuthServiceResponseBytes,
+		Transport: &authOutboundRoundTripper{
+			timeout: timeout,
+			host:    authHost,
 		},
 	}
 	client, err := internalcontract.NewClientWithResponses(
-		strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
+		baseURL,
 		internalcontract.WithHTTPClient(httpClient),
 		internalcontract.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			if internalKey != "" {
@@ -77,7 +81,7 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 	return &ServiceClient{
 		contract:    client,
 		httpClient:  httpClient,
-		baseURL:     strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
+		baseURL:     baseURL,
 		internalKey: internalKey,
 		initErr:     err,
 	}
@@ -918,23 +922,88 @@ func normalizeEnsureRole(role ...string) internalcontract.AuthRole {
 	return internalcontract.User
 }
 
-type boundedResponseTransport struct {
-	base     http.RoundTripper
-	maxBytes int64
+// authServiceOutbound is the shared standard outbound client for Auth
+// service egress: timeout cap and observability match the gateway migration
+// (#766). Auth calls stay single-shot (MaxAttempts 1): most Auth operations
+// are mutating POST/PUT/DELETE, so client-side retries could duplicate side
+// effects; the standard client still pins egress through the SSRF allowlist
+// and records every call in logs/metrics.
+var authServiceOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// authServiceTarget names Auth egress in outbound logs/metrics.
+const authServiceTarget = "auth-service"
+
+// authOutboundRoundTripper routes the generated Auth contract client (and
+// the impersonation bridge, which shares c.httpClient) through the standard
+// outbound client. An exhausted retryable status converts back to a response
+// shape so the generated client's status/body contract keeps working;
+// only transport/timeout failures surface as errors.
+type authOutboundRoundTripper struct {
+	timeout time.Duration
+	host    string
 }
 
-func (t *boundedResponseTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	response, err := t.base.RoundTrip(request)
-	if err != nil {
-		return nil, err
+func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	timeout := 5 * time.Second
+	if t != nil && t.timeout > 0 {
+		timeout = t.timeout
 	}
-	if response.Body != nil {
-		response.Body = &boundedResponseBody{
-			ReadCloser: response.Body,
-			remaining:  t.maxBytes,
+	ctx := context.Background()
+	if req != nil && req.Context() != nil {
+		ctx = req.Context()
+	}
+	allowHosts := outbound.AllowHosts(ctx)
+	if t != nil {
+		if host := strings.TrimSpace(t.host); host != "" {
+			allowHosts = append(allowHosts, host)
 		}
 	}
-	return response, nil
+	resp, err := authServiceOutbound.Do(ctx, req, outboundhttp.RequestOptions{
+		Timeout:     timeout,
+		MaxAttempts: 1,
+		AllowHosts:  allowHosts,
+		Target:      authServiceTarget,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return synthesizeAuthResponse(req, statusErr), nil
+		}
+		return nil, err
+	}
+	if resp != nil && resp.Body != nil {
+		resp.Body = &boundedResponseBody{
+			ReadCloser: resp.Body,
+			remaining:  maxAuthServiceResponseBytes,
+		}
+	}
+	return resp, nil
+}
+
+// synthesizeAuthResponse converts an exhausted retryable Auth status back
+// to the response shape the generated contract client expects. Error
+// envelopes are small JSON, so the bounded preview keeps them intact.
+func synthesizeAuthResponse(req *http.Request, statusErr *outboundhttp.HTTPStatusError) *http.Response {
+	preview := ""
+	status := 0
+	var retryAfter time.Duration
+	if statusErr != nil {
+		preview = statusErr.Body
+		status = statusErr.StatusCode
+		retryAfter = statusErr.RetryAfter
+	}
+	header := make(http.Header)
+	if retryAfter > 0 {
+		header.Set("Retry-After", fmt.Sprintf("%d", int64(retryAfter/time.Second)))
+	}
+	return &http.Response{
+		Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		StatusCode:    status,
+		Header:        header,
+		Body:          io.NopCloser(strings.NewReader(preview)),
+		ContentLength: int64(len(preview)),
+		Request:       req,
+	}
 }
 
 type boundedResponseBody struct {

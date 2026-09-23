@@ -289,7 +289,8 @@ SELECT
   board_id, task_id, role, input_index, metadata, created_at, updated_at
 FROM media_refs
 WHERE owner_user_id = sqlc.arg(owner_user_id) AND board_id = sqlc.arg(board_id)
-ORDER BY created_at ASC, id ASC;
+ORDER BY created_at ASC, id ASC
+LIMIT sqlc.arg(row_limit);
 
 -- name: FindPreparedGenerationMedia :one
 SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
@@ -326,7 +327,8 @@ SELECT media_asset_id, role, input_index
 FROM media_refs
 WHERE task_id = sqlc.arg(task_id)
   AND ref_type = 'task_input'
-ORDER BY input_index ASC, id ASC;
+ORDER BY input_index ASC, id ASC
+LIMIT 128;
 
 -- name: DeleteUnclaimedPreparedMediaAsset :execrows
 DELETE FROM media_assets AS asset

@@ -2,7 +2,6 @@ package testdb
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -16,24 +15,24 @@ import (
 
 var roleCounter uint64
 
-func CreateRestrictedRole(t testing.TB, db *sql.DB, prefix string) string {
+func CreateRestrictedRole(t testing.TB, db *pgxpool.Pool, prefix string) string {
 	t.Helper()
 
 	roleName := nextRoleName(prefix)
 	roleSQL := pgx.Identifier{roleName}.Sanitize()
 	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- roleSQL is pg identifier sanitized above
-	if _, err := db.ExecContext(t.Context(), `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(t.Context(), `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create restricted PostgreSQL test role: %v", err)
 	}
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- roleSQL is pg identifier sanitized above
-		if _, err := db.ExecContext(ctx, `DROP OWNED BY `+roleSQL); err != nil {
+		if _, err := db.Exec(ctx, `DROP OWNED BY `+roleSQL); err != nil {
 			t.Errorf("drop restricted PostgreSQL test role ownership: %v", err)
 		}
 		// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- roleSQL is pg identifier sanitized above
-		if _, err := db.ExecContext(ctx, `DROP ROLE IF EXISTS `+roleSQL); err != nil {
+		if _, err := db.Exec(ctx, `DROP ROLE IF EXISTS `+roleSQL); err != nil {
 			t.Errorf("drop restricted PostgreSQL test role: %v", err)
 		}
 	})

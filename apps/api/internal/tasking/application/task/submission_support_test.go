@@ -15,12 +15,34 @@ import (
 )
 
 type submitTestServiceDeps struct {
-	AccountRepo     AccountStore
+	ModelStore      ModelStore
 	SubmissionStore TaskSubmissionStore
 	MediaValidator  taskmedia.Validator
 	MediaPreparer   taskmedia.GenerationMediaPreparer
 	PromptStore     FeaturePromptStore
 	TaskBilling     BillingReadiness
+}
+
+type fakeIntakeModelStore struct {
+	model string
+	err   error
+}
+
+func (s *fakeIntakeModelStore) ResolveModel(context.Context, string) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	if s.model != "" {
+		return s.model, nil
+	}
+	return "openai/gpt-image-1", nil
+}
+
+func modelStoreOrDefault(store ModelStore) ModelStore {
+	if store != nil {
+		return store
+	}
+	return &fakeIntakeModelStore{}
 }
 
 func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *Service {
@@ -40,7 +62,7 @@ func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *S
 	}
 	return NewService(ServiceDeps{
 		TaskIntake: NewTaskIntake(TaskIntakeDeps{
-			Accounts: deps.AccountRepo, Prompts: promptStore, Media: deps.MediaValidator,
+			Models: modelStoreOrDefault(deps.ModelStore), Prompts: promptStore, Media: deps.MediaValidator,
 			MediaPreparer: mediaPreparer, MediaManifest: recordingTaskInputManifestBuilder{},
 		}),
 		SubmissionStore: deps.SubmissionStore,

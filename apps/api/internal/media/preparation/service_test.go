@@ -3,10 +3,14 @@ package preparation
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/assets"
@@ -15,6 +19,42 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/testdb"
 )
+
+type acceptingPreparationIntegrityVerifier struct{}
+
+func (acceptingPreparationIntegrityVerifier) Verify(context.Context, string, string, string, string, int64) error {
+	return nil
+}
+
+func setReadyPreparationProcessingInputForTest(t *testing.T, db *pgxpool.Pool, registry *assets.MediaAssetRegistry) {
+	t.Helper()
+	registry.SetProcessingInputMaterializer(func(ctx context.Context, assetID, ownerUserID int64) error {
+		q := dbsqlc.New(db)
+		asset, err := q.GetMediaAssetByID(ctx, assetID)
+		if err != nil {
+			return fmt.Errorf("load materialization asset: %w", err)
+		}
+		upserted, err := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
+			DerivativeID: fmt.Sprintf("test-processing-input-%d", assetID),
+			MediaAssetID: assetID, OwnerUserID: ownerUserID,
+			Tier: "processing-input", Format: "png",
+		})
+		if err != nil {
+			return fmt.Errorf("upsert processing-input derivative: %w", err)
+		}
+		_, err = q.MarkMediaDerivativeReady(ctx, dbsqlc.MarkMediaDerivativeReadyParams{
+			Format: "png", StorageKey: fmt.Sprintf("test-derivatives/%d/processing-input.png", assetID),
+			MimeType: "image/png", Width: 32, Height: 32, SizeBytes: 128,
+			ChecksumSha256:         "test-checksum",
+			SourceObjectGeneration: asset.ObjectGeneration,
+			ID:                     upserted.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("mark processing-input derivative ready: %w", err)
+		}
+		return nil
+	})
+}
 
 type recordingMediaStore struct {
 	storeCalls  int
@@ -196,6 +236,8 @@ func TestPrepareGenerationMediaReusesReadyChecksumWithPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := assets.NewMediaAssetRegistry(db)
+	registry.SetIntegrityVerifier(acceptingPreparationIntegrityVerifier{})
+	setReadyPreparationProcessingInputForTest(t, db, registry)
 	existingRequest := ingestion.Request{
 		OwnerUserID: owner.ID, StorageProfile: "builtin-local",
 		StorageKey: "uploads/tasks/1/prepare-variation/input-0.png",
@@ -230,7 +272,7 @@ func TestPrepareGenerationMediaReusesReadyChecksumWithPostgres(t *testing.T) {
 		t.Fatalf("prepared asset ID = %d, want existing asset %d", got, existingHandle.AssetID)
 	}
 	var readyCount, failedCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE status = 'ready'), COUNT(*) FILTER (WHERE status = 'failed') FROM media_assets WHERE owner_user_id = $1`, owner.ID).Scan(&readyCount, &failedCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FILTER (WHERE status = 'ready'), COUNT(*) FILTER (WHERE status = 'failed') FROM media_assets WHERE owner_user_id = $1`, owner.ID).Scan(&readyCount, &failedCount); err != nil {
 		t.Fatal(err)
 	}
 	if readyCount != 1 || failedCount != 1 || store.deleteCalls != 1 {

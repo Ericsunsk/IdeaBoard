@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,16 +24,14 @@ type Service struct {
 }
 
 type Backend struct {
-	MapDatabaseError  func(error) error
-	ProvisionWallet   func(context.Context, pgx.Tx, int64) error
-	BindIdentityKey   func(context.Context, pgx.Tx, string) error
-	SetWalletFrozen   func(context.Context, pgx.Tx, int64, bool) error
-	ClaimWelcome      func(context.Context, pgx.Tx, string, int64) (bool, error)
-	ExecuteGrant      func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	RestrictWallet    func(context.Context, pgx.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
-	ReleaseWallet     func(context.Context, pgx.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
-	SQLRestrictWallet func(context.Context, *sql.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
-	SQLReleaseWallet  func(context.Context, *sql.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
+	MapDatabaseError func(error) error
+	ProvisionWallet  func(context.Context, pgx.Tx, int64) error
+	BindIdentityKey  func(context.Context, pgx.Tx, string) error
+	SetWalletFrozen  func(context.Context, pgx.Tx, int64, bool) error
+	ClaimWelcome     func(context.Context, pgx.Tx, string, int64) (bool, error)
+	ExecuteGrant     func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	RestrictWallet   func(context.Context, pgx.Tx, ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error)
+	ReleaseWallet    func(context.Context, pgx.Tx, ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error)
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
@@ -50,16 +47,11 @@ func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
 func backendComplete(backend Backend) bool {
 	return backend.MapDatabaseError != nil && backend.ProvisionWallet != nil && backend.BindIdentityKey != nil &&
 		backend.SetWalletFrozen != nil && backend.ClaimWelcome != nil && backend.ExecuteGrant != nil &&
-		backend.RestrictWallet != nil && backend.ReleaseWallet != nil && backend.SQLRestrictWallet != nil && backend.SQLReleaseWallet != nil
+		backend.RestrictWallet != nil && backend.ReleaseWallet != nil
 }
 
 type transactionLifecycle struct {
 	tx      pgx.Tx
-	backend Backend
-}
-
-type sqlRestrictionCommands struct {
-	tx      *sql.Tx
 	backend Backend
 }
 
@@ -69,10 +61,6 @@ func NewLifecycleTransaction(tx pgx.Tx, backend Backend) ports.WalletLifecycle {
 
 func NewRestrictionTransaction(tx pgx.Tx, backend Backend) ports.WalletRestrictionCommands {
 	return &transactionLifecycle{tx: tx, backend: backend}
-}
-
-func NewSQLRestrictionCommands(tx *sql.Tx, backend Backend) ports.WalletRestrictionCommands {
-	return &sqlRestrictionCommands{tx: tx, backend: backend}
 }
 
 func (s *Service) RestrictWallet(
@@ -198,22 +186,6 @@ func (c *transactionLifecycle) RestrictWallet(
 	return result, nil
 }
 
-func (c *sqlRestrictionCommands) RestrictWallet(ctx context.Context, command ports.RestrictWalletCommand) (ports.WalletRestrictionChange, error) {
-	command, err := normalizeRestrictWalletCommand(command)
-	if err != nil || c == nil || c.tx == nil {
-		return ports.WalletRestrictionChange{}, errOrRestrictionTransaction(err)
-	}
-	if !backendComplete(c.backend) {
-		return ports.WalletRestrictionChange{}, fmt.Errorf("credits wallet: persistence backend not configured")
-	}
-	var result ports.WalletRestrictionChange
-	result, err = c.backend.SQLRestrictWallet(ctx, c.tx, command)
-	if err != nil {
-		return ports.WalletRestrictionChange{}, c.backend.MapDatabaseError(err)
-	}
-	return result, nil
-}
-
 func (c *transactionLifecycle) ReleaseWalletRestriction(
 	ctx context.Context,
 	command ports.ReleaseWalletRestrictionCommand,
@@ -235,29 +207,6 @@ func (c *transactionLifecycle) ReleaseWalletRestriction(
 		return ports.WalletRestrictionChange{}, c.backend.MapDatabaseError(err)
 	}
 	return result, nil
-}
-
-func (c *sqlRestrictionCommands) ReleaseWalletRestriction(ctx context.Context, command ports.ReleaseWalletRestrictionCommand) (ports.WalletRestrictionChange, error) {
-	command, err := normalizeReleaseWalletRestrictionCommand(command)
-	if err != nil || c == nil || c.tx == nil {
-		return ports.WalletRestrictionChange{}, errOrRestrictionTransaction(err)
-	}
-	if !backendComplete(c.backend) {
-		return ports.WalletRestrictionChange{}, fmt.Errorf("credits wallet: persistence backend not configured")
-	}
-	var result ports.WalletRestrictionChange
-	result, err = c.backend.SQLReleaseWallet(ctx, c.tx, command)
-	if err != nil {
-		return ports.WalletRestrictionChange{}, c.backend.MapDatabaseError(err)
-	}
-	return result, nil
-}
-
-func errOrRestrictionTransaction(err error) error {
-	if err != nil {
-		return err
-	}
-	return fmt.Errorf("credits restrictions: transaction not configured")
 }
 
 func withManagedRestrictionTransaction(

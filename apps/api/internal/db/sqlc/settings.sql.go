@@ -7,10 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const clearCurrentStorageProfiles = `-- name: ClearCurrentStorageProfiles :exec
@@ -20,7 +18,17 @@ WHERE is_current
 `
 
 func (q *Queries) ClearCurrentStorageProfiles(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, clearCurrentStorageProfiles)
+	_, err := q.db.Exec(ctx, clearCurrentStorageProfiles)
+	return err
+}
+
+const deleteSystemConfigsByKeys = `-- name: DeleteSystemConfigsByKeys :exec
+DELETE FROM system_configs
+WHERE config_key = ANY($1::text[])
+`
+
+func (q *Queries) DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error {
+	_, err := q.db.Exec(ctx, deleteSystemConfigsByKeys, configKeys)
 	return err
 }
 
@@ -40,7 +48,7 @@ type GetActiveStorageProfileSecretVersionParams struct {
 }
 
 func (q *Queries) GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error) {
-	row := q.db.QueryRowContext(ctx, getActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
+	row := q.db.QueryRow(ctx, getActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
 	var i StorageProfileSecretVersion
 	err := row.Scan(
 		&i.ID,
@@ -70,7 +78,7 @@ WHERE feature_slug = $1
 `
 
 func (q *Queries) GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error) {
-	row := q.db.QueryRowContext(ctx, getFeaturePrompt, featureSlug)
+	row := q.db.QueryRow(ctx, getFeaturePrompt, featureSlug)
 	var i FeaturePrompt
 	err := row.Scan(
 		&i.FeatureSlug,
@@ -89,7 +97,7 @@ WHERE config_key = $1
 `
 
 func (q *Queries) GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error) {
-	row := q.db.QueryRowContext(ctx, getSystemConfig, configKey)
+	row := q.db.QueryRow(ctx, getSystemConfig, configKey)
 	var i SystemConfig
 	err := row.Scan(
 		&i.ID,
@@ -118,7 +126,7 @@ type HasActiveStorageProfileSecretVersionParams struct {
 }
 
 func (q *Queries) HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, hasActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
+	row := q.db.QueryRow(ctx, hasActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -167,19 +175,19 @@ RETURNING
 `
 
 type InsertStorageProfileSecretVersionParams struct {
-	ProfileID          string       `json:"profile_id"`
-	SecretName         string       `json:"secret_name"`
-	SecretMaterialKind string       `json:"secret_material_kind"`
-	SecretRef          string       `json:"secret_ref"`
-	SecretPayload      string       `json:"secret_payload"`
-	Fingerprint        string       `json:"fingerprint"`
-	KeyVersion         string       `json:"key_version"`
-	RotatedAt          sql.NullTime `json:"rotated_at"`
-	ExpiresAt          sql.NullTime `json:"expires_at"`
+	ProfileID          string             `json:"profile_id"`
+	SecretName         string             `json:"secret_name"`
+	SecretMaterialKind string             `json:"secret_material_kind"`
+	SecretRef          string             `json:"secret_ref"`
+	SecretPayload      string             `json:"secret_payload"`
+	Fingerprint        string             `json:"fingerprint"`
+	KeyVersion         string             `json:"key_version"`
+	RotatedAt          pgtype.Timestamptz `json:"rotated_at"`
+	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error) {
-	row := q.db.QueryRowContext(ctx, insertStorageProfileSecretVersion,
+	row := q.db.QueryRow(ctx, insertStorageProfileSecretVersion,
 		arg.ProfileID,
 		arg.SecretName,
 		arg.SecretMaterialKind,
@@ -219,7 +227,7 @@ ORDER BY feature_slug ASC
 `
 
 func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error) {
-	rows, err := q.db.QueryContext(ctx, listFeaturePrompts)
+	rows, err := q.db.Query(ctx, listFeaturePrompts)
 	if err != nil {
 		return nil, err
 	}
@@ -237,9 +245,6 @@ func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, erro
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -263,7 +268,7 @@ type ListStorageProfileSecretVersionsParams struct {
 }
 
 func (q *Queries) ListStorageProfileSecretVersions(ctx context.Context, arg ListStorageProfileSecretVersionsParams) ([]StorageProfileSecretVersion, error) {
-	rows, err := q.db.QueryContext(ctx, listStorageProfileSecretVersions, arg.ProfileID, arg.SecretName)
+	rows, err := q.db.Query(ctx, listStorageProfileSecretVersions, arg.ProfileID, arg.SecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -293,9 +298,6 @@ func (q *Queries) ListStorageProfileSecretVersions(ctx context.Context, arg List
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -312,7 +314,7 @@ ORDER BY builtin DESC, created_at ASC, profile_id ASC
 `
 
 func (q *Queries) ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error) {
-	rows, err := q.db.QueryContext(ctx, listStorageProfiles, includeDeleted)
+	rows, err := q.db.Query(ctx, listStorageProfiles, includeDeleted)
 	if err != nil {
 		return nil, err
 	}
@@ -339,9 +341,6 @@ func (q *Queries) ListStorageProfiles(ctx context.Context, includeDeleted bool) 
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -356,7 +355,7 @@ ORDER BY config_key ASC
 `
 
 func (q *Queries) ListSystemConfigsByKeys(ctx context.Context, configKeys []string) ([]SystemConfig, error) {
-	rows, err := q.db.QueryContext(ctx, listSystemConfigsByKeys, pq.Array(configKeys))
+	rows, err := q.db.Query(ctx, listSystemConfigsByKeys, configKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -374,9 +373,6 @@ func (q *Queries) ListSystemConfigsByKeys(ctx context.Context, configKeys []stri
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -392,7 +388,7 @@ ORDER BY config_key ASC
 `
 
 func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error) {
-	rows, err := q.db.QueryContext(ctx, listSystemConfigsByPrefix, configKeyLike)
+	rows, err := q.db.Query(ctx, listSystemConfigsByPrefix, configKeyLike)
 	if err != nil {
 		return nil, err
 	}
@@ -411,13 +407,21 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAIGatewayModelMappingWrite = `-- name: LockAIGatewayModelMappingWrite :exec
+SELECT pg_advisory_xact_lock(
+  hashtextextended('ai_gateway_model_mapping_write', 0)
+)
+`
+
+func (q *Queries) LockAIGatewayModelMappingWrite(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockAIGatewayModelMappingWrite)
+	return err
 }
 
 const lockStorageProfileSecretVersionRotation = `-- name: LockStorageProfileSecretVersionRotation :one
@@ -441,7 +445,7 @@ type LockStorageProfileSecretVersionRotationParams struct {
 }
 
 func (q *Queries) LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, lockStorageProfileSecretVersionRotation, arg.ProfileID, arg.SecretName)
+	row := q.db.QueryRow(ctx, lockStorageProfileSecretVersionRotation, arg.ProfileID, arg.SecretName)
 	var locked bool
 	err := row.Scan(&locked)
 	return locked, err
@@ -460,11 +464,11 @@ WHERE profile_id = $1
 `
 
 func (q *Queries) MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, markStorageProfileDeleted, profileID)
+	result, err := q.db.Exec(ctx, markStorageProfileDeleted, profileID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const retireActiveStorageProfileSecretVersion = `-- name: RetireActiveStorageProfileSecretVersion :execrows
@@ -482,11 +486,11 @@ type RetireActiveStorageProfileSecretVersionParams struct {
 }
 
 func (q *Queries) RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, retireActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
+	result, err := q.db.Exec(ctx, retireActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const setCurrentStorageProfile = `-- name: SetCurrentStorageProfile :execrows
@@ -499,16 +503,16 @@ WHERE profile_id = $2
 `
 
 type SetCurrentStorageProfileParams struct {
-	UpdatedBy sql.NullInt64 `json:"updated_by"`
-	ProfileID string        `json:"profile_id"`
+	UpdatedBy pgtype.Int8 `json:"updated_by"`
+	ProfileID string      `json:"profile_id"`
 }
 
 func (q *Queries) SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, setCurrentStorageProfile, arg.UpdatedBy, arg.ProfileID)
+	result, err := q.db.Exec(ctx, setCurrentStorageProfile, arg.UpdatedBy, arg.ProfileID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const upsertFeaturePrompt = `-- name: UpsertFeaturePrompt :one
@@ -521,13 +525,13 @@ RETURNING feature_slug, prompt, updated_by, created_at, updated_at
 `
 
 type UpsertFeaturePromptParams struct {
-	FeatureSlug string        `json:"feature_slug"`
-	Prompt      string        `json:"prompt"`
-	UpdatedBy   sql.NullInt64 `json:"updated_by"`
+	FeatureSlug string      `json:"feature_slug"`
+	Prompt      string      `json:"prompt"`
+	UpdatedBy   pgtype.Int8 `json:"updated_by"`
 }
 
 func (q *Queries) UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error) {
-	row := q.db.QueryRowContext(ctx, upsertFeaturePrompt, arg.FeatureSlug, arg.Prompt, arg.UpdatedBy)
+	row := q.db.QueryRow(ctx, upsertFeaturePrompt, arg.FeatureSlug, arg.Prompt, arg.UpdatedBy)
 	var i FeaturePrompt
 	err := row.Scan(
 		&i.FeatureSlug,
@@ -593,20 +597,20 @@ WHERE NOT EXISTS (
 `
 
 type UpsertStorageProfileParams struct {
-	ProfileID string          `json:"profile_id"`
-	Name      string          `json:"name"`
-	Provider  string          `json:"provider"`
-	Enabled   bool            `json:"enabled"`
-	IsCurrent bool            `json:"is_current"`
-	Builtin   bool            `json:"builtin"`
-	Status    string          `json:"status"`
-	Config    json.RawMessage `json:"config"`
-	CreatedBy sql.NullInt64   `json:"created_by"`
-	UpdatedBy sql.NullInt64   `json:"updated_by"`
+	ProfileID string      `json:"profile_id"`
+	Name      string      `json:"name"`
+	Provider  string      `json:"provider"`
+	Enabled   bool        `json:"enabled"`
+	IsCurrent bool        `json:"is_current"`
+	Builtin   bool        `json:"builtin"`
+	Status    string      `json:"status"`
+	Config    []byte      `json:"config"`
+	CreatedBy pgtype.Int8 `json:"created_by"`
+	UpdatedBy pgtype.Int8 `json:"updated_by"`
 }
 
 func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, upsertStorageProfile,
+	result, err := q.db.Exec(ctx, upsertStorageProfile,
 		arg.ProfileID,
 		arg.Name,
 		arg.Provider,
@@ -621,7 +625,7 @@ func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStoragePro
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const upsertSystemConfig = `-- name: UpsertSystemConfig :exec
@@ -637,6 +641,6 @@ type UpsertSystemConfigParams struct {
 }
 
 func (q *Queries) UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error {
-	_, err := q.db.ExecContext(ctx, upsertSystemConfig, arg.ConfigKey, arg.Value)
+	_, err := q.db.Exec(ctx, upsertSystemConfig, arg.ConfigKey, arg.Value)
 	return err
 }

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -19,13 +18,13 @@ import (
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repository struct {
-	db      *sql.DB
-	q       *dbsqlc.Queries
-	metrics taskstoreMetrics
+	db *pgxpool.Pool
+	q  *dbsqlc.Queries
 }
 
 func (r *Repository) ClaimTaskInputMediaRef(ctx context.Context, tx pgx.Tx, claim tasks.MediaRefClaim) error {
@@ -72,21 +71,15 @@ WHERE owner_user_id = $1 AND media_asset_id = $2
 
 type repositoryContextDB struct {
 	ctx context.Context
-	db  *sql.DB
+	db  *pgxpool.Pool
 }
 
 func (r *Repository) dbWithContext(ctx context.Context) repositoryContextDB {
 	return repositoryContextDB{ctx: ctx, db: r.db}
 }
 
-func (q repositoryContextDB) Query(query string, args ...any) (*sql.Rows, error) {
-	return q.db.QueryContext(q.ctx, query, args...)
-}
-
-type RunningTaskLease struct {
-	TaskID     string
-	AccountID  int64
-	LeaseToken string
+func (q repositoryContextDB) Query(query string, args ...any) (pgx.Rows, error) {
+	return q.db.Query(q.ctx, query, args...)
 }
 
 type StartupRecoveredTask struct {
@@ -98,29 +91,15 @@ const (
 	defaultStorageProfileID = "builtin-local"
 )
 
-const createTaskPGXSQL = `
-INSERT INTO tasks (
-  task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, priority,
-  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
-  cancelled_at, cancelled_by, cancel_reason
-) VALUES (
-  $1, $2, $3, $4, $5, $6,
-  $7, $8, $9,
-  $10, $11,
-  $12, $13, $14, $15, $16, $17, $18, $19,
-  $20, $21, $22
-)
-ON CONFLICT (user_id, client_action_id) WHERE client_action_id <> '' DO NOTHING
-RETURNING id, task_id`
-
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db, q: dbsqlc.New(db), metrics: newTaskstoreMetrics(time.Now, defaultTaskstoreMetricsRecorder)}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
+// Create is a thin non-transactional sqlc wrapper kept for fixtures and
+// read-path tests. Production submission never uses it; SubmitTask inserts
+// through CreateWithPGXTx inside the caller-owned submission transaction so
+// task insert, billing hold, media claim, and River enqueue commit atomically.
 func (r *Repository) Create(ctx context.Context, task *tasks.Task) (err error) {
-	finish := r.metrics.StartTransaction(taskstoreOperationCreate)
-	defer func() { finish(taskstoreOutcomeSuccess, err) }()
 	params := createTaskParams(task)
 	id, err := r.q.CreateTask(ctx, params)
 	if err != nil {
@@ -131,63 +110,24 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) (err error) {
 }
 
 func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (created bool, err error) {
-	finish := r.metrics.StartTransaction(taskstoreOperationCreate)
-	defer func() {
-		outcome := taskstoreOutcomeSuccess
-		if err == nil && !created {
-			outcome = taskstoreOutcomeReplayed
-		}
-		finish(outcome, err)
-	}()
 	if tx == nil {
 		return false, fmt.Errorf("taskstore: pgx tx is nil")
 	}
-	params := createTaskParams(task)
-	var taskID string
-	err = tx.QueryRow(ctx, createTaskPGXSQL,
-		params.TaskID,
-		params.UserID,
-		params.ClientActionID,
-		nullableInt64(params.AssignedProviderEndpointID),
-		nullableInt64(params.AssignedCredentialID),
-		nullableInt64(params.AccountID),
-		params.Prompt,
-		params.UserPrompt,
-		params.Params,
-		params.FeatureSlug,
-		params.Priority,
-		params.Status,
-		params.LeaseToken,
-		params.RetryCount,
-		params.ErrorMsg,
-		params.Result,
-		params.CreatedAt,
-		params.UpdatedAt,
-		nullableTime(params.CompletedAt),
-		nullableTime(params.CancelledAt),
-		nullableInt64(params.CancelledBy),
-		params.CancelReason,
-	).Scan(&task.ID, &taskID)
+	params := dbsqlc.CreateTaskIdempotentParams(createTaskParams(task))
+	row, err := r.q.WithTx(tx).CreateTaskIdempotent(ctx, params)
 	if errors.Is(err, pgx.ErrNoRows) && strings.TrimSpace(task.ClientActionID) != "" {
 		return r.loadIdempotentTaskWithPGXTx(ctx, tx, task)
 	}
 	if err != nil {
 		return false, fmt.Errorf("taskstore: create task with pgx tx: %w", err)
 	}
-	task.TaskID = taskID
+	task.ID = row.ID
+	task.TaskID = row.TaskID
 	return true, nil
 }
 
 func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, lookup submissioncontracts.Lookup) (result tasks.TaskSubmissionResult, found bool, err error) {
 	userID, clientActionID, expectedHash := lookup.UserID, lookup.ClientActionID, lookup.RequestHash
-	finish := r.metrics.StartTransaction(taskstoreOperationSubmissionClaim)
-	defer func() {
-		outcome := taskstoreOutcomeSuccess
-		if err == nil && found {
-			outcome = taskstoreOutcomeReplayed
-		}
-		finish(outcome, err)
-	}()
 	if tx == nil || userID <= 0 || strings.TrimSpace(clientActionID) == "" {
 		return tasks.TaskSubmissionResult{}, false, nil
 	}
@@ -216,9 +156,7 @@ func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Co
 }
 
 func (r *Repository) lockSubmissionClaim(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string) error {
-	startedAt := time.Now()
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("task-submit:%d:%s", userID, clientActionID))
-	r.metrics.RecordLock(taskstoreLockSubmissionClaim, startedAt, err)
 	if err != nil {
 		return fmt.Errorf("taskstore: lock submission claim: %w", err)
 	}
@@ -296,17 +234,15 @@ VALUES ($1, $2, $3, $4)`, claim.UserID, clientActionID, taskID, requestHash); er
 }
 
 func (r *Repository) loadIdempotentTaskWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error) {
-	err := tx.QueryRow(ctx, `
-SELECT id, task_id
-FROM tasks
-WHERE user_id = $1 AND client_action_id = $2
-FOR UPDATE`,
-		task.UserID,
-		strings.TrimSpace(task.ClientActionID),
-	).Scan(&task.ID, &task.TaskID)
+	row, err := r.q.WithTx(tx).GetTaskByUserClientActionForUpdate(ctx, dbsqlc.GetTaskByUserClientActionForUpdateParams{
+		UserID:         task.UserID,
+		ClientActionID: strings.TrimSpace(task.ClientActionID),
+	})
 	if err != nil {
 		return false, fmt.Errorf("taskstore: load idempotent task with pgx tx: %w", err)
 	}
+	task.ID = row.ID
+	task.TaskID = row.TaskID
 	return false, nil
 }
 
@@ -336,27 +272,13 @@ func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
 		RetryCount:                 int32(task.RetryCount),
 		ErrorMsg:                   task.ErrorMsg,
 		Result:                     task.Result,
-		CreatedAt:                  task.CreatedAt,
-		UpdatedAt:                  task.UpdatedAt,
+		CreatedAt:                  pgtype.Timestamptz{Time: task.CreatedAt, Valid: true},
+		UpdatedAt:                  pgtype.Timestamptz{Time: task.UpdatedAt, Valid: true},
 		CompletedAt:                dbutil.NullTime(task.CompletedAt),
 		CancelledAt:                dbutil.NullTime(task.CancelledAt),
 		CancelledBy:                dbutil.NullInt64(task.CancelledBy),
 		CancelReason:               task.CancelReason,
 	}
-}
-
-func nullableInt64(value sql.NullInt64) interface{} {
-	if !value.Valid {
-		return nil
-	}
-	return value.Int64
-}
-
-func nullableTime(value sql.NullTime) interface{} {
-	if !value.Valid {
-		return nil
-	}
-	return value.Time
 }
 
 func (r *Repository) GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error) {
@@ -378,11 +300,11 @@ func (r *Repository) ListAdminBillingSnapshots(ctx context.Context, taskIDs []st
 	}
 	rows, err := r.dbWithContext(ctx).Query(`
 SELECT snapshots.task_id, snapshots.sku, snapshots.display_name, snapshots.price_version_id, snapshots.price_version,
-	   snapshots.output_resolution, unit_credits, quantity, total_credits, quoted_at,
+	   snapshots.output_resolution, unit_credits, quantity, total_credits, settlements.captured_credits, quoted_at,
        settlements.state, settlements.settled_at
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
-WHERE snapshots.task_id = ANY($1::text[])`, pq.Array(taskIDs))
+WHERE snapshots.task_id = ANY($1::text[])`, taskIDs)
 	if err != nil {
 		return nil, fmt.Errorf("taskstore: list Admin Billing snapshots: %w", err)
 	}
@@ -390,11 +312,11 @@ WHERE snapshots.task_id = ANY($1::text[])`, pq.Array(taskIDs))
 	for rows.Next() {
 		var taskID string
 		var snapshot tasks.AdminBillingSnapshot
-		var settledAt sql.NullTime
+		var settledAt pgtype.Timestamptz
 		if err := rows.Scan(
 			&taskID, &snapshot.SKU, &snapshot.DisplayName, &snapshot.PriceVersionID,
 			&snapshot.PriceVersion, &snapshot.OutputResolution, &snapshot.UnitCredits, &snapshot.Quantity,
-			&snapshot.TotalCredits, &snapshot.QuotedAt, &snapshot.SettlementState, &settledAt,
+			&snapshot.TotalCredits, &snapshot.CapturedCredits, &snapshot.QuotedAt, &snapshot.SettlementState, &settledAt,
 		); err != nil {
 			return nil, fmt.Errorf("taskstore: scan Admin Billing snapshot: %w", err)
 		}
@@ -426,11 +348,12 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		HasUserID:    hasUserID,
 		UserID:       userID,
 		HasAccountID: hasAccountID,
-		AccountID:    sql.NullInt64{Int64: accountID, Valid: hasAccountID},
-		HasStatus:    hasStatus,
-		Status:       status,
-		HasKeyword:   hasKeyword,
-		KeywordLike:  keywordLike,
+		AccountID:    pgtype.Int8{Int64: accountID, Valid: hasAccountID},
+		// 计数独立于 status 筛选：pill 展示全局分布，列表行才按 status 过滤。
+		HasStatus:   false,
+		Status:      "",
+		HasKeyword:  hasKeyword,
+		KeywordLike: keywordLike,
 	}
 	summary, err := r.q.SummarizeTasks(ctx, summaryParams)
 	if err != nil {
@@ -441,7 +364,7 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		HasUserID:    hasUserID,
 		UserID:       userID,
 		HasAccountID: hasAccountID,
-		AccountID:    sql.NullInt64{Int64: accountID, Valid: hasAccountID},
+		AccountID:    pgtype.Int8{Int64: accountID, Valid: hasAccountID},
 		HasStatus:    hasStatus,
 		Status:       status,
 		HasKeyword:   hasKeyword,
@@ -541,8 +464,8 @@ func taskExecutionMetricsFromSQLC(row dbsqlc.TaskExecutionMetric) tasks.TaskExec
 		ProviderLatencyMS:  row.ProviderLatencyMs,
 		FinalizeLatencyMS:  row.FinalizeLatencyMs,
 		TotalLatencyMS:     row.TotalLatencyMs,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
+		CreatedAt:          dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:          dbutil.TimeValue(row.UpdatedAt),
 	}
 }
 
@@ -565,8 +488,8 @@ func taskOutputFromSQLC(row dbsqlc.ListOutputsByTaskIDsRow) tasks.TaskOutput {
 		StorageProfile: row.StorageProfile,
 		Metadata:       string(row.Metadata),
 		ResultIndex:    int(row.ResultIndex),
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		CreatedAt:      dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:      dbutil.TimeValue(row.UpdatedAt),
 	}
 }
 
@@ -611,11 +534,11 @@ func newMediaAssetID() (string, error) {
 	return "asset_" + hex.EncodeToString(buf[:]), nil
 }
 
-func optionalString(value *string) sql.NullString {
+func optionalString(value *string) pgtype.Text {
 	if value == nil {
-		return sql.NullString{}
+		return pgtype.Text{}
 	}
-	return sql.NullString{String: strings.TrimSpace(*value), Valid: true}
+	return pgtype.Text{String: strings.TrimSpace(*value), Valid: true}
 }
 
 func escapeLikeWildcards(s string) string {

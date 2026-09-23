@@ -2,30 +2,41 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
 	tasks "ideaboard/api/internal/tasking/domain"
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ClaimTaskForExecution fences one pending task for the given execution
-// token and bumps the attempt sequence. A not-found error means another
-// worker won the race or the task already converged.
-func (r *Repository) ClaimTaskForExecution(ctx context.Context, taskID, executionToken string) (int32, error) {
+// ClaimAndStartExecutionAttempt fences one pending task for the execution
+// token and opens its running attempt row in the same statement. It returns
+// the server-assigned attempt number. A not-found error means another worker
+// won the race or the task already converged.
+func (r *Repository) ClaimAndStartExecutionAttempt(ctx context.Context, start tasks.ExecutionAttemptStart) (attemptNo int32, err error) {
 	if r == nil || r.q == nil {
 		return 0, fmt.Errorf("execution attempt repository is unavailable")
 	}
-	attemptSeq, err := r.q.ClaimTaskForExecution(ctx, dbsqlc.ClaimTaskForExecutionParams{
-		TaskID:         strings.TrimSpace(taskID),
-		ExecutionToken: strings.TrimSpace(executionToken),
+	if strings.TrimSpace(start.TaskID) == "" || strings.TrimSpace(start.ExecutionToken) == "" {
+		return 0, fmt.Errorf("execution attempt requires task id and token")
+	}
+	row, err := r.q.ClaimAndStartExecutionAttempt(ctx, dbsqlc.ClaimAndStartExecutionAttemptParams{
+		TaskID:            strings.TrimSpace(start.TaskID),
+		ExecutionToken:    strings.TrimSpace(start.ExecutionToken),
+		RiverJobID:        start.RiverJobID,
+		FeatureSlug:       strings.TrimSpace(start.FeatureSlug),
+		RequestedModel:    strings.TrimSpace(start.RequestedModel),
+		Provider:          strings.TrimSpace(start.Provider),
+		ProviderStartedAt: pgtype.Timestamptz{Time: start.StartedAt, Valid: !start.StartedAt.IsZero()},
 	})
 	if err != nil {
-		return 0, fmt.Errorf("claim task for execution: %w", err)
+		return 0, fmt.Errorf("claim and start execution attempt: %w", err)
 	}
-	return attemptSeq, nil
+	return row.AttemptNo, nil
 }
 
 // GetActiveExecutionAttemptByTaskID reads the running attempt for final
@@ -45,33 +56,6 @@ func (r *Repository) GetActiveExecutionAttemptByTaskID(ctx context.Context, task
 		FeatureSlug:    row.FeatureSlug,
 		ResolvedModel:  row.ResolvedModel,
 	}, nil
-}
-
-// StartExecutionAttempt inserts a running gateway execution attempt.
-func (r *Repository) StartExecutionAttempt(ctx context.Context, start tasks.ExecutionAttemptStart) (int64, error) {
-	if r == nil || r.q == nil {
-		return 0, fmt.Errorf("execution attempt repository is unavailable")
-	}
-	if strings.TrimSpace(start.TaskID) == "" || strings.TrimSpace(start.ExecutionToken) == "" {
-		return 0, fmt.Errorf("execution attempt requires task id and token")
-	}
-	if start.AttemptNo <= 0 {
-		return 0, fmt.Errorf("execution attempt number must be positive")
-	}
-	row, err := r.q.InsertExecutionAttempt(ctx, dbsqlc.InsertExecutionAttemptParams{
-		TaskID:            strings.TrimSpace(start.TaskID),
-		RiverJobID:        start.RiverJobID,
-		AttemptNo:         start.AttemptNo,
-		ExecutionToken:    strings.TrimSpace(start.ExecutionToken),
-		FeatureSlug:       strings.TrimSpace(start.FeatureSlug),
-		RequestedModel:    strings.TrimSpace(start.RequestedModel),
-		Provider:          strings.TrimSpace(start.Provider),
-		ProviderStartedAt: sql.NullTime{Time: start.StartedAt, Valid: !start.StartedAt.IsZero()},
-	})
-	if err != nil {
-		return 0, fmt.Errorf("insert execution attempt: %w", err)
-	}
-	return row.ID, nil
 }
 
 // FinalizeExecutionAttempt closes the running attempt matching token and
@@ -97,8 +81,8 @@ func (r *Repository) FinalizeExecutionAttempt(ctx context.Context, finish tasks.
 		FailureStage:       strings.TrimSpace(finish.FailureStage),
 		FailureCategory:    strings.TrimSpace(finish.FailureCategory),
 		ErrorMsg:           finish.ErrorMsg,
-		ProviderFinishedAt: sql.NullTime{Time: finish.FinishedAt, Valid: !finish.FinishedAt.IsZero()},
-		CompletedAt:        sql.NullTime{Time: finish.CompletedAt, Valid: !finish.CompletedAt.IsZero()},
+		ProviderFinishedAt: pgtype.Timestamptz{Time: finish.FinishedAt, Valid: !finish.FinishedAt.IsZero()},
+		CompletedAt:        pgtype.Timestamptz{Time: finish.CompletedAt, Valid: !finish.CompletedAt.IsZero()},
 		ExecutionToken:     strings.TrimSpace(finish.ExecutionToken),
 		TaskID:             strings.TrimSpace(finish.TaskID),
 	})

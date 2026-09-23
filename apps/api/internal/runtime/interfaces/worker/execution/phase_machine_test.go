@@ -50,6 +50,13 @@ func TestPhaseMachineRejectsSkippingProvider(t *testing.T) {
 	}
 }
 
+func TestPhaseMachineAllowsTerminalFailureFromPreflight(t *testing.T) {
+	machine := newPhaseMachine("phase-preflight-failure")
+	if err := machine.advance(phaseFailed); err != nil {
+		t.Fatalf("deterministic preflight failure must reach failed: %v", err)
+	}
+}
+
 func (m *phaseMachine) current() phase {
 	if m == nil {
 		return ""

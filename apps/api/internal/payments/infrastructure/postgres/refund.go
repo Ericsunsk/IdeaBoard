@@ -2,13 +2,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"ideaboard/api/internal/credits"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -20,7 +22,7 @@ import (
 )
 
 type refundQueryer interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 type paymentRefundOrderFacts struct {
@@ -41,11 +43,11 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if r == nil || r.db == nil || provider.ID == "" || provider.ChargeID == "" || provider.AmountMinor <= 0 {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	order, err := r.paymentRefundOrderForCharge(ctx, tx, provider.ChargeID)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -54,7 +56,7 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if existing, found, err := r.findExistingExternalRefund(ctx, tx, order.ID, provider.ID, key); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	} else if found {
-		return existing, tx.Commit()
+		return existing, tx.Commit(ctx)
 	}
 	if err := validateExternalRefund(order, provider); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -63,49 +65,49 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 		if err := r.attachExternalProviderRefund(ctx, tx, pending, provider, now); err != nil {
 			return paymentsdomain.PaymentRefund{}, err
 		}
-		if err := tx.Commit(); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			return paymentsdomain.PaymentRefund{}, err
 		}
 		pending.StripeRefundID, pending.StripeStatus, pending.UpdatedAt, pending.PublicOrderNumber = provider.ID, provider.Status, now, order.PublicNumber
 		return pending, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	refund, err := r.createExternalRefundFact(ctx, tx, order, provider, key, now)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil
 }
 
-func (r *Repository) findExistingExternalRefund(ctx context.Context, tx *sql.Tx, orderID, stripeRefundID, idempotencyKey string) (paymentsdomain.PaymentRefund, bool, error) {
+func (r *Repository) findExistingExternalRefund(ctx context.Context, tx pgx.Tx, orderID, stripeRefundID, idempotencyKey string) (paymentsdomain.PaymentRefund, bool, error) {
 	if linked, err := r.findRefundByStripeID(ctx, tx, stripeRefundID); err == nil {
 		return linked, true, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentRefund{}, false, err
 	}
 	if existing, err := r.findRefundByIdempotency(ctx, tx, orderID, idempotencyKey); err == nil {
 		return existing, true, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return paymentsdomain.PaymentRefund{}, false, err
 	}
 	return paymentsdomain.PaymentRefund{}, false, nil
 }
 
-func (r *Repository) attachExternalProviderRefund(ctx context.Context, tx *sql.Tx, pending paymentsdomain.PaymentRefund, provider paymentports.StripeRefund, now time.Time) error {
-	_, err := tx.ExecContext(ctx, `UPDATE payment_refunds SET stripe_refund_id = $2, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid`, pending.ID, provider.ID, provider.Status, now)
+func (r *Repository) attachExternalProviderRefund(ctx context.Context, tx pgx.Tx, pending paymentsdomain.PaymentRefund, provider paymentports.StripeRefund, now time.Time) error {
+	_, err := tx.Exec(ctx, `UPDATE payment_refunds SET stripe_refund_id = $2, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid`, pending.ID, provider.ID, provider.Status, now)
 	return err
 }
 
-func (r *Repository) createExternalRefundFact(ctx context.Context, tx *sql.Tx, order paymentRefundOrderFacts, provider paymentports.StripeRefund, key string, now time.Time) (paymentsdomain.PaymentRefund, error) {
+func (r *Repository) createExternalRefundFact(ctx context.Context, tx pgx.Tx, order paymentRefundOrderFacts, provider paymentports.StripeRefund, key string, now time.Time) (paymentsdomain.PaymentRefund, error) {
 	var already, alreadyAmount, disputedIdeas, disputedAmount int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&already, &alreadyAmount); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&already, &alreadyAmount); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas, &disputedAmount); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas, &disputedAmount); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	already += disputedIdeas
@@ -119,7 +121,7 @@ func (r *Repository) createExternalRefundFact(ctx context.Context, tx *sql.Tx, o
 	if qty > order.IdeaQuantity-already {
 		qty = order.IdeaQuantity - already
 	}
-	hold, err := credits.CommandsInSQLTx(tx)
+	hold, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
@@ -134,18 +136,18 @@ func (r *Repository) createExternalRefundFact(ctx context.Context, tx *sql.Tx, o
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, NULL, $12, $13, $13)`, refundID, order.ID, order.UserID, key, qty, provider.AmountMinor, strings.ToLower(provider.Currency), provider.Status, provider.ID, provider.ChargeID, holdResult.TransactionID, "Stripe Dashboard refund", now); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, NULL, $12, $13, $13)`, refundID, order.ID, order.UserID, key, qty, provider.AmountMinor, strings.ToLower(provider.Currency), provider.Status, provider.ID, provider.ChargeID, holdResult.TransactionID, "Stripe Dashboard refund", now); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return paymentsdomain.PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicNumber, UserID: order.UserID, IdeaQuantity: qty, AmountMinor: provider.AmountMinor, Currency: strings.ToLower(provider.Currency), Status: paymentsdomain.PaymentRefundPending, StripeStatus: provider.Status, StripeRefundID: provider.ID, StripeChargeID: provider.ChargeID, CreditHoldTransactionID: holdResult.TransactionID, CreatedAt: now, UpdatedAt: now}, nil
 }
 
 func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider paymentports.StripeRefund, reason string, now time.Time) (int64, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	order, err := r.paymentRefundOrderForCharge(ctx, tx, provider.ChargeID)
 	if err != nil {
 		return 0, err
@@ -157,11 +159,11 @@ func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider pa
 	if qty > order.IdeaQuantity {
 		qty = order.IdeaQuantity
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, error_summary, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'anomaly', $8, $9, $10, '', NULL, 'Stripe Dashboard refund', $11, $12, $12) ON CONFLICT DO NOTHING`, uuid.NewString(), order.ID, order.UserID, "stripe-dashboard-"+provider.ID, qty, provider.AmountMinor, strings.ToLower(provider.Currency), provider.Status, provider.ID, provider.ChargeID, boundedText(reason, 500), now)
+	_, err = tx.Exec(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, error_summary, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'anomaly', $8, $9, $10, '', NULL, 'Stripe Dashboard refund', $11, $12, $12) ON CONFLICT DO NOTHING`, uuid.NewString(), order.ID, order.UserID, "stripe-dashboard-"+provider.ID, qty, provider.AmountMinor, strings.ToLower(provider.Currency), provider.Status, provider.ID, provider.ChargeID, boundedText(reason, 500), now)
 	if err != nil {
 		return 0, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return order.UserID, nil
@@ -176,11 +178,11 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if strings.TrimSpace(input.Reason) == "" {
 		input.Reason = "Admin refund of unused Ideas"
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("begin refund transaction: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	order, paidSubtotal, paidTotal, paidCurrency, paidAt, err := r.loadPendingRefundOrder(ctx, tx, input.OrderNumber)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
@@ -188,7 +190,7 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if existing, replayed, err := findPendingRefundReplay(ctx, tx, order, input); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	} else if replayed {
-		return commitPendingRefundReplay(tx, existing, order)
+		return commitPendingRefundReplay(ctx, tx, existing, order)
 	}
 	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt, input.Now); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
@@ -209,7 +211,7 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
 	}
 	return refund, false, nil
@@ -219,8 +221,8 @@ func validPendingRefundRequest(r *Repository, input paymentrefund.CreatePendingP
 	return r != nil && r.db != nil && input.ActorID > 0 && input.IdeaQuantity > 0
 }
 
-func commitPendingRefundReplay(tx *sql.Tx, existing paymentsdomain.PaymentRefund, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentRefund, bool, error) {
-	if err := tx.Commit(); err != nil {
+func commitPendingRefundReplay(ctx context.Context, tx pgx.Tx, existing paymentsdomain.PaymentRefund, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentRefund, bool, error) {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit refund replay: %w", err)
 	}
 	existing.PublicOrderNumber = order.PublicOrderNumber
@@ -228,9 +230,9 @@ func commitPendingRefundReplay(tx *sql.Tx, existing paymentsdomain.PaymentRefund
 	return existing, true, nil
 }
 
-func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order paymentsdomain.PaymentOrder, currency string, input paymentrefund.CreatePendingPaymentRefundInput, amountMinor int64) (paymentsdomain.PaymentRefund, error) {
+func (r *Repository) persistPendingRefund(ctx context.Context, tx pgx.Tx, order paymentsdomain.PaymentOrder, currency string, input paymentrefund.CreatePendingPaymentRefundInput, amountMinor int64) (paymentsdomain.PaymentRefund, error) {
 	refundID := uuid.NewString()
-	commands, err := credits.CommandsInSQLTx(tx)
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
@@ -246,10 +248,10 @@ func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	currency = strings.ToLower(currency)
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, currency, order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, currency, order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
 		return paymentsdomain.PaymentRefund{}, fmt.Errorf("insert payment refund: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, currency); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, currency); err != nil {
 		return paymentsdomain.PaymentRefund{}, fmt.Errorf("record payment refund audit: %w", err)
 	}
 	return paymentsdomain.PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicOrderNumber, UserID: order.UserID, IdeaQuantity: input.IdeaQuantity, AmountMinor: amountMinor, Currency: currency, Status: paymentsdomain.PaymentRefundPending, StripeChargeID: order.StripeChargeID, CreditHoldTransactionID: hold.TransactionID, CreatedAt: input.Now, UpdatedAt: input.Now}, nil
@@ -257,9 +259,9 @@ func (r *Repository) persistPendingRefund(ctx context.Context, tx *sql.Tx, order
 
 func (r *Repository) MarkPaymentRefundProviderResult(ctx context.Context, refundID, stripeRefundID, stripeStatus string, now time.Time) (paymentsdomain.PaymentRefund, error) {
 	var refund paymentsdomain.PaymentRefund
-	err := r.dbWithContext(ctx).executor.QueryRowContext(ctx, `UPDATE payment_refunds SET stripe_refund_id = CASE WHEN stripe_refund_id = '' THEN $2 ELSE stripe_refund_id END, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid AND status = 'pending' AND (stripe_refund_id = '' OR stripe_refund_id = $2) RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, stripeRefundID, stripeStatus, now).Scan(&refund.ID, &refund.PaymentOrderID, &refund.UserID, &refund.IdeaQuantity, &refund.AmountMinor, &refund.Currency, &refund.Status, &refund.StripeStatus, &refund.StripeRefundID, &refund.StripeChargeID, &refund.CreditHoldTransactionID, &refund.CreditTransactionID, &refund.ErrorSummary, &refund.CreatedAt, &refund.UpdatedAt)
+	err := r.dbWithContext(ctx).executor.QueryRow(ctx, `UPDATE payment_refunds SET stripe_refund_id = CASE WHEN stripe_refund_id = '' THEN $2 ELSE stripe_refund_id END, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid AND status = 'pending' AND (stripe_refund_id = '' OR stripe_refund_id = $2) RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, stripeRefundID, stripeStatus, now).Scan(&refund.ID, &refund.PaymentOrderID, &refund.UserID, &refund.IdeaQuantity, &refund.AmountMinor, &refund.Currency, &refund.Status, &refund.StripeStatus, &refund.StripeRefundID, &refund.StripeChargeID, &refund.CreditHoldTransactionID, &refund.CreditTransactionID, &refund.ErrorSummary, &refund.CreatedAt, &refund.UpdatedAt)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			return paymentsdomain.PaymentRefund{}, fmt.Errorf("record Stripe refund: %w", err)
 		}
 		return r.GetPaymentRefundByID(ctx, refundID)
@@ -268,22 +270,22 @@ func (r *Repository) MarkPaymentRefundProviderResult(ctx context.Context, refund
 }
 
 func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summary string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	var refund paymentsdomain.PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRow(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundFailed || refund.Status == paymentsdomain.PaymentRefundAnomaly {
-		return refund, tx.Commit()
+		return refund, tx.Commit(ctx)
 	}
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
-	commands, err := credits.CommandsInSQLTx(tx)
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
@@ -294,35 +296,35 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 	if _, err := commands.Release(ctx, ports.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: domain.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, domain.ErrHoldSettled) {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `UPDATE payment_refunds SET status = 'failed', error_summary = $2, failed_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, boundedText(summary, 500), now), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRow(ctx, `UPDATE payment_refunds SET status = 'failed', error_summary = $2, failed_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, boundedText(summary, 500), now), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, error_code, error_summary, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'failed', 'provider_failed', $2, jsonb_build_object('phase', 'released') FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, boundedText(summary, 500)); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, error_code, error_summary, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'failed', 'provider_failed', $2, jsonb_build_object('phase', 'released') FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, boundedText(summary, 500)); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil
 }
 
 func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 	var refund paymentsdomain.PaymentRefund
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRow(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded || refund.Status == paymentsdomain.PaymentRefundAnomaly {
-		return refund, tx.Commit()
+		return refund, tx.Commit(ctx)
 	}
 	if refund.Status == paymentsdomain.PaymentRefundFailed {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
-	commands, err := credits.CommandsInSQLTx(tx)
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
@@ -335,13 +337,13 @@ func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID st
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `UPDATE payment_refunds SET status = 'succeeded', stripe_status = 'succeeded', credit_transaction_id = $2, succeeded_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, creditResult.TransactionID, now), &refund); err != nil {
+	if err := scanPaymentRefund(tx.QueryRow(ctx, `UPDATE payment_refunds SET status = 'succeeded', stripe_status = 'succeeded', credit_transaction_id = $2, succeeded_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, creditResult.TransactionID, now), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'succeeded', jsonb_build_object('phase', 'settled', 'credit_transaction_id', $2::text) FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, creditResult.TransactionID); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'succeeded', jsonb_build_object('phase', 'settled', 'credit_transaction_id', $2::text) FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, creditResult.TransactionID); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil

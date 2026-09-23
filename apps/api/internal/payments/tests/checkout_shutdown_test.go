@@ -74,6 +74,29 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}
+	// Reconciliation only claims orders stale for over 2 minutes against the
+	// service clock (pinned to 2026-08-01 in tests): age the fixture past
+	// both gates so it models a due order instead of a fresh one.
+	if _, err := db.Exec(t.Context(), `ALTER TABLE payment_orders DISABLE TRIGGER set_payment_orders_updated_at`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(t.Context(), `ALTER TABLE payment_orders DISABLE TRIGGER guard_payment_orders`); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := db.Exec(t.Context(), `UPDATE payment_orders SET created_at = '2026-07-01T00:00:00Z', updated_at = '2026-07-01T00:00:00Z' WHERE public_token = $1`, order.PublicToken); err != nil {
+		t.Fatal(err)
+	} else if n := res.RowsAffected(); n != 1 {
+		t.Fatalf("backdate matched %d rows, want 1", n)
+	}
+	if _, err := db.Exec(t.Context(), `UPDATE payment_order_reconciliations SET next_attempt_at = '2026-07-01T00:00:00Z' WHERE payment_order_id = (SELECT id FROM payment_orders WHERE public_token = $1)`, order.PublicToken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(t.Context(), `ALTER TABLE payment_orders ENABLE TRIGGER guard_payment_orders`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(t.Context(), `ALTER TABLE payment_orders ENABLE TRIGGER set_payment_orders_updated_at`); err != nil {
+		t.Fatal(err)
+	}
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("reconcile disabled creating order: %v", err)
 	}

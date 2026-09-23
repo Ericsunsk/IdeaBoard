@@ -7,15 +7,18 @@ import (
 
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
 const (
-	PaymentReconciliationQueue     = "payment_reconciliation"
-	PaymentCheckoutShutdownQueue   = "payment_checkout_shutdown"
-	paymentBackgroundWorkerTimeout = 4 * time.Minute
+	PaymentReconciliationQueue   = "payment_reconciliation"
+	PaymentCheckoutShutdownQueue = "payment_checkout_shutdown"
+	// Sweep Timeouts live in the River timeout matrix
+	// (taskqueue.RiverTimeoutMatrix); both payment workers share the
+	// reconciliation-class 4-minute budget.
 )
 
 type paymentReconciliationScheduleJobArgs struct{}
@@ -47,7 +50,7 @@ func PaymentReconciliationPeriodicJobs() []*river.PeriodicJob {
 		river.PeriodicInterval(paymentreconciliation.Interval),
 		func() (river.JobArgs, *river.InsertOpts) {
 			return paymentReconciliationScheduleJobArgs{}, &river.InsertOpts{
-				Queue: PaymentReconciliationQueue, MaxAttempts: 8, Priority: 4,
+				Queue: PaymentReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsPaymentReconciliation, Priority: 4,
 			}
 		},
 		&river.PeriodicJobOpts{ID: "payment-reconciliation-schedule", RunOnStart: true},
@@ -55,7 +58,7 @@ func PaymentReconciliationPeriodicJobs() []*river.PeriodicJob {
 }
 
 func (*PaymentReconciliationWorker) Timeout(*river.Job[paymentReconciliationScheduleJobArgs]) time.Duration {
-	return paymentBackgroundWorkerTimeout
+	return taskqueue.RiverJobTimeoutPaymentReconciliation
 }
 
 type paymentCheckoutShutdownJobArgs struct {
@@ -112,7 +115,7 @@ func PaymentCheckoutShutdownPeriodicJobs() []*river.PeriodicJob {
 		river.PeriodicInterval(paymentreconciliation.Interval),
 		func() (river.JobArgs, *river.InsertOpts) {
 			return paymentCheckoutShutdownScheduleJobArgs{}, &river.InsertOpts{
-				Queue: PaymentCheckoutShutdownQueue, MaxAttempts: 8, Priority: 1,
+				Queue: PaymentCheckoutShutdownQueue, MaxAttempts: taskqueue.RiverMaxAttemptsPaymentCheckoutShutdown, Priority: 1,
 			}
 		},
 		&river.PeriodicJobOpts{ID: "payment-checkout-shutdown-schedule", RunOnStart: true},
@@ -135,16 +138,16 @@ func (d PaymentCheckoutShutdownDispatcher) EnqueuePaymentCheckoutShutdown(ctx co
 		return fmt.Errorf("payment Checkout shutdown queue unavailable")
 	}
 	_, err := d.client.Insert(ctx, paymentCheckoutShutdownJobArgs{ShutdownID: shutdownID}, &river.InsertOpts{
-		Queue: PaymentCheckoutShutdownQueue, MaxAttempts: 8, Priority: 1,
+		Queue: PaymentCheckoutShutdownQueue, MaxAttempts: taskqueue.RiverMaxAttemptsPaymentCheckoutShutdown, Priority: 1,
 		UniqueOpts: river.UniqueOpts{ByArgs: true},
 	})
 	return err
 }
 
 func (*PaymentCheckoutShutdownWorker) Timeout(*river.Job[paymentCheckoutShutdownJobArgs]) time.Duration {
-	return paymentBackgroundWorkerTimeout
+	return taskqueue.RiverJobTimeoutPaymentCheckoutShutdown
 }
 
 func (*PaymentCheckoutShutdownScheduleWorker) Timeout(*river.Job[paymentCheckoutShutdownScheduleJobArgs]) time.Duration {
-	return paymentBackgroundWorkerTimeout
+	return taskqueue.RiverJobTimeoutPaymentCheckoutShutdown
 }

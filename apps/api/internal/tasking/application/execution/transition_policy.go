@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
+	"strings"
 
 	"ideaboard/api/internal/platform/database"
 	tasks "ideaboard/api/internal/tasking/domain"
@@ -28,7 +28,7 @@ type taskTransitionRule struct {
 	from          []string
 	target        string
 	idempotent    []string
-	requiresLease bool
+	requiresFence bool
 	// Lease-owned finalization that sees a terminal task is treated as stale work, not success.
 	terminalConflict bool
 }
@@ -37,7 +37,7 @@ var taskTransitionRules = map[taskTransition]taskTransitionRule{
 	taskTransitionComplete: {
 		from:             []string{tasks.StatusRunning},
 		target:           tasks.StatusCompleted,
-		requiresLease:    true,
+		requiresFence:    true,
 		terminalConflict: true,
 	},
 	taskTransitionFailPending: {
@@ -48,27 +48,27 @@ var taskTransitionRules = map[taskTransition]taskTransitionRule{
 	taskTransitionFailRunning: {
 		from:             []string{tasks.StatusRunning},
 		target:           tasks.StatusFailed,
-		requiresLease:    true,
+		requiresFence:    true,
 		terminalConflict: true,
 	},
 	taskTransitionReset: {
 		from:          []string{tasks.StatusRunning},
 		target:        tasks.StatusPending,
 		idempotent:    []string{tasks.StatusPending},
-		requiresLease: true,
+		requiresFence: true,
 	},
 	taskTransitionRequeue: {
 		from:             []string{tasks.StatusRunning},
 		target:           tasks.StatusPending,
 		idempotent:       []string{tasks.StatusPending},
-		requiresLease:    true,
+		requiresFence:    true,
 		terminalConflict: true,
 	},
 	taskTransitionFinalFail: {
 		from:             []string{tasks.StatusRunning},
 		target:           tasks.StatusFailed,
 		idempotent:       []string{tasks.StatusPending},
-		requiresLease:    true,
+		requiresFence:    true,
 		terminalConflict: true,
 	},
 	taskTransitionRecoveryFail: {
@@ -88,9 +88,9 @@ type taskTransitionCurrentResult struct {
 	idempotent bool
 }
 
-func requireTaskTransitionLease(transition taskTransition, assignment taskqueueports.TaskAssignment) error {
+func requireTaskTransitionToken(transition taskTransition, token string) error {
 	rule := taskTransitionRules[transition]
-	if rule.requiresLease && !assignment.HasLeaseIdentity() {
+	if rule.requiresFence && strings.TrimSpace(token) == "" {
 		return ErrTaskStateConflict
 	}
 	return nil
@@ -106,7 +106,7 @@ func normalizeTaskTransitionWriteError(err error) error {
 	return err
 }
 
-func (s *Service) resolveTaskTransitionResult(ctx context.Context, transition taskTransition, taskID string, assignment taskqueueports.TaskAssignment, rows int64) (bool, error) {
+func (s *Service) resolveTaskTransitionResult(ctx context.Context, transition taskTransition, taskID string, rows int64) (bool, error) {
 	if rows > 0 {
 		return true, nil
 	}
@@ -117,7 +117,7 @@ func (s *Service) resolveTaskTransitionResult(ctx context.Context, transition ta
 		}
 		return false, err
 	}
-	result, err := evaluateTaskTransitionCurrent(transition, task, assignment)
+	result, err := evaluateTaskTransitionCurrent(transition, task)
 	if err != nil {
 		return false, err
 	}
@@ -127,7 +127,10 @@ func (s *Service) resolveTaskTransitionResult(ctx context.Context, transition ta
 	return !result.idempotent, nil
 }
 
-func evaluateTaskTransitionCurrent(transition taskTransition, task *tasks.Task, assignment taskqueueports.TaskAssignment) (taskTransitionCurrentResult, error) {
+// evaluateTaskTransitionCurrent classifies a zero-row write: the task still
+// carries a fence token (another worker owns it → conflict), sits in an
+// idempotent state, or is gone/terminal.
+func evaluateTaskTransitionCurrent(transition taskTransition, task *tasks.Task) (taskTransitionCurrentResult, error) {
 	rule, ok := taskTransitionRules[transition]
 	if !ok {
 		return taskTransitionCurrentResult{}, ErrTaskStateConflict
@@ -138,10 +141,7 @@ func evaluateTaskTransitionCurrent(transition taskTransition, task *tasks.Task, 
 	if rule.hasStatus(rule.idempotent, task.Status) {
 		return taskTransitionCurrentResult{idempotent: true}, nil
 	}
-	if rule.requiresLease && !assignment.HasLeaseIdentity() {
-		return taskTransitionCurrentResult{}, ErrTaskStateConflict
-	}
-	if task.Status == tasks.StatusRunning && rule.requiresLease && !taskMatchesLeaseAssignment(task, assignment) {
+	if rule.requiresFence && strings.TrimSpace(task.LeaseToken) != "" {
 		return taskTransitionCurrentResult{}, ErrTaskStateConflict
 	}
 	if tasks.IsTerminalStatus(task.Status) {
@@ -163,14 +163,4 @@ func (r taskTransitionRule) hasStatus(statuses []string, status string) bool {
 		}
 	}
 	return false
-}
-
-func taskMatchesLeaseAssignment(task *tasks.Task, assignment taskqueueports.TaskAssignment) bool {
-	if task == nil {
-		return false
-	}
-	return tasks.IDValue(task.AccountID) == assignment.AccountID &&
-		tasks.IDValue(task.AssignedProviderEndpointID) == assignment.ProviderEndpointID &&
-		tasks.IDValue(task.AssignedCredentialID) == assignment.CredentialID &&
-		task.LeaseToken == assignment.LeaseToken
 }

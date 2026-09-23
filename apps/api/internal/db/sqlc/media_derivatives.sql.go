@@ -7,7 +7,6 @@ package dbsqlc
 
 import (
 	"context"
-	"encoding/json"
 )
 
 const deleteMediaDerivativesByAsset = `-- name: DeleteMediaDerivativesByAsset :exec
@@ -22,7 +21,7 @@ type DeleteMediaDerivativesByAssetParams struct {
 }
 
 func (q *Queries) DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error {
-	_, err := q.db.ExecContext(ctx, deleteMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
+	_, err := q.db.Exec(ctx, deleteMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
 	return err
 }
 
@@ -43,7 +42,7 @@ type GetMediaDerivativeByAssetTierParams struct {
 }
 
 func (q *Queries) GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMediaDerivativeByAssetTierParams) (MediaDerivative, error) {
-	row := q.db.QueryRowContext(ctx, getMediaDerivativeByAssetTier, arg.MediaAssetID, arg.OwnerUserID, arg.Tier)
+	row := q.db.QueryRow(ctx, getMediaDerivativeByAssetTier, arg.MediaAssetID, arg.OwnerUserID, arg.Tier)
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
@@ -108,7 +107,7 @@ type GetProcessingInputManifestObjectRow struct {
 }
 
 func (q *Queries) GetProcessingInputManifestObject(ctx context.Context, arg GetProcessingInputManifestObjectParams) (GetProcessingInputManifestObjectRow, error) {
-	row := q.db.QueryRowContext(ctx, getProcessingInputManifestObject, arg.MediaAssetID, arg.OwnerUserID)
+	row := q.db.QueryRow(ctx, getProcessingInputManifestObject, arg.MediaAssetID, arg.OwnerUserID)
 	var i GetProcessingInputManifestObjectRow
 	err := row.Scan(
 		&i.AssetID,
@@ -148,7 +147,7 @@ type GetReadyMediaDerivativeStorageLocationByAssetIDRow struct {
 }
 
 func (q *Queries) GetReadyMediaDerivativeStorageLocationByAssetID(ctx context.Context, arg GetReadyMediaDerivativeStorageLocationByAssetIDParams) (GetReadyMediaDerivativeStorageLocationByAssetIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getReadyMediaDerivativeStorageLocationByAssetID, arg.MediaAssetID, arg.Tier)
+	row := q.db.QueryRow(ctx, getReadyMediaDerivativeStorageLocationByAssetID, arg.MediaAssetID, arg.Tier)
 	var i GetReadyMediaDerivativeStorageLocationByAssetIDRow
 	err := row.Scan(&i.StorageProfileID, &i.StorageKey)
 	return i, err
@@ -168,7 +167,7 @@ type ListMediaAssetSourcesParams struct {
 }
 
 func (q *Queries) ListMediaAssetSources(ctx context.Context, arg ListMediaAssetSourcesParams) ([]MediaAssetSource, error) {
-	rows, err := q.db.QueryContext(ctx, listMediaAssetSources, arg.MediaAssetID, arg.OwnerUserID)
+	rows, err := q.db.Query(ctx, listMediaAssetSources, arg.MediaAssetID, arg.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +188,6 @@ func (q *Queries) ListMediaAssetSources(ctx context.Context, arg ListMediaAssetS
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -222,7 +218,7 @@ type ListMediaDerivativesByAssetParams struct {
 }
 
 func (q *Queries) ListMediaDerivativesByAsset(ctx context.Context, arg ListMediaDerivativesByAssetParams) ([]MediaDerivative, error) {
-	rows, err := q.db.QueryContext(ctx, listMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
+	rows, err := q.db.Query(ctx, listMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,9 +255,6 @@ func (q *Queries) ListMediaDerivativesByAsset(ctx context.Context, arg ListMedia
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -302,7 +295,7 @@ type MarkMediaDerivativeReadyParams struct {
 }
 
 func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDerivativeReadyParams) (MediaDerivative, error) {
-	row := q.db.QueryRowContext(ctx, markMediaDerivativeReady,
+	row := q.db.QueryRow(ctx, markMediaDerivativeReady,
 		arg.Format,
 		arg.StorageKey,
 		arg.MimeType,
@@ -358,16 +351,16 @@ RETURNING id
 `
 
 type UpsertMediaAssetSourceParams struct {
-	MediaAssetID  int64           `json:"media_asset_id"`
-	SourceAssetID int64           `json:"source_asset_id"`
-	OwnerUserID   int64           `json:"owner_user_id"`
-	SourceRole    string          `json:"source_role"`
-	SourceIndex   int32           `json:"source_index"`
-	Metadata      json.RawMessage `json:"metadata"`
+	MediaAssetID  int64  `json:"media_asset_id"`
+	SourceAssetID int64  `json:"source_asset_id"`
+	OwnerUserID   int64  `json:"owner_user_id"`
+	SourceRole    string `json:"source_role"`
+	SourceIndex   int32  `json:"source_index"`
+	Metadata      []byte `json:"metadata"`
 }
 
 func (q *Queries) UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, upsertMediaAssetSource,
+	row := q.db.QueryRow(ctx, upsertMediaAssetSource,
 		arg.MediaAssetID,
 		arg.SourceAssetID,
 		arg.OwnerUserID,
@@ -420,7 +413,7 @@ type UpsertMediaDerivativeParams struct {
 }
 
 func (q *Queries) UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error) {
-	row := q.db.QueryRowContext(ctx, upsertMediaDerivative,
+	row := q.db.QueryRow(ctx, upsertMediaDerivative,
 		arg.DerivativeID,
 		arg.MediaAssetID,
 		arg.OwnerUserID,

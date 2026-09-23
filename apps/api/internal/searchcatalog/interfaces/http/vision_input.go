@@ -1,4 +1,4 @@
-package searchcatalog
+package httpapi
 
 import (
 	"context"
@@ -10,14 +10,17 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/searchcatalog/application"
+	"ideaboard/api/internal/searchcatalog/domain"
 )
 
 type VisionInputReader interface {
-	Read(*http.Request, int64) (VisionInput, error)
+	Read(*http.Request, int64) (domain.VisionInput, error)
 }
 
 type multipartVisionInputReader struct {
@@ -32,12 +35,12 @@ func NewVisionInputReader(libraryReader VisionLibraryAssetReader) VisionInputRea
 	return newMultipartVisionInputReader(libraryReader)
 }
 
-func (r multipartVisionInputReader) Read(request *http.Request, ownerUserID int64) (VisionInput, error) {
+func (r multipartVisionInputReader) Read(request *http.Request, ownerUserID int64) (domain.VisionInput, error) {
 	if request == nil {
-		return VisionInput{}, ErrVisionInput
+		return domain.VisionInput{}, domain.ErrVisionInput
 	}
-	if err := request.ParseMultipartForm(visionMaxBytes); err != nil {
-		return VisionInput{}, ErrVisionInput
+	if err := request.ParseMultipartForm(domain.VisionMaxBytes); err != nil {
+		return domain.VisionInput{}, domain.ErrVisionInput
 	}
 	defer request.MultipartForm.RemoveAll()
 	files := request.MultipartForm.File["images[]"]
@@ -54,49 +57,49 @@ func (r multipartVisionInputReader) Read(request *http.Request, ownerUserID int6
 	}
 	assetIDs, err := parseLibraryAssetIDs(rawAssetIDs)
 	if err != nil {
-		return VisionInput{}, ErrVisionInput
+		return domain.VisionInput{}, domain.ErrVisionInput
 	}
 	externalRefs, err := parseExternalReferences(rawExternalRefs)
 	if err != nil {
-		return VisionInput{}, ErrVisionInput
+		return domain.VisionInput{}, domain.ErrVisionInput
 	}
 	totalRefs := len(files) + len(assetIDs) + len(externalRefs)
-	if totalRefs < 1 || totalRefs > visionMaxImages {
-		return VisionInput{}, ErrVisionInput
+	if totalRefs < 1 || totalRefs > domain.VisionMaxImages {
+		return domain.VisionInput{}, domain.ErrVisionInput
 	}
-	images := make([]VisionImage, 0, totalRefs)
+	images := make([]domain.VisionImage, 0, totalRefs)
 	for _, header := range files {
 		image, err := readMultipartVisionImage(header)
 		if err != nil {
-			return VisionInput{}, ErrVisionInput
+			return domain.VisionInput{}, domain.ErrVisionInput
 		}
 		images = append(images, image)
 	}
 	materialized, err := r.materializer.Materialize(request.Context(), ownerUserID, assetIDs, externalRefs)
 	if err != nil {
-		return VisionInput{}, err
+		return domain.VisionInput{}, err
 	}
 	images = append(images, materialized...)
-	if err := validateVisionImages(images); err != nil {
-		return VisionInput{}, err
+	if err := application.ValidateVisionImages(images); err != nil {
+		return domain.VisionInput{}, err
 	}
-	return VisionInput{Images: images, UserText: request.FormValue("user_text")}, nil
+	return domain.VisionInput{Images: images, UserText: request.FormValue("user_text")}, nil
 }
 
-func readMultipartVisionImage(header *multipart.FileHeader) (VisionImage, error) {
+func readMultipartVisionImage(header *multipart.FileHeader) (domain.VisionImage, error) {
 	if header == nil {
-		return VisionImage{}, ErrVisionInput
+		return domain.VisionImage{}, domain.ErrVisionInput
 	}
 	file, err := header.Open()
 	if err != nil {
-		return VisionImage{}, ErrVisionInput
+		return domain.VisionImage{}, domain.ErrVisionInput
 	}
 	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, visionMaxBytes+1))
-	if err != nil || len(data) > visionMaxBytes {
-		return VisionImage{}, ErrVisionInput
+	data, err := io.ReadAll(io.LimitReader(file, domain.VisionMaxBytes+1))
+	if err != nil || len(data) > domain.VisionMaxBytes {
+		return domain.VisionImage{}, domain.ErrVisionInput
 	}
-	return VisionImage{Filename: header.Filename, ContentType: header.Header.Get("Content-Type"), Data: data}, nil
+	return domain.VisionImage{Filename: header.Filename, ContentType: header.Header.Get("Content-Type"), Data: data}, nil
 }
 
 type VisionLibraryAssetReader interface {
@@ -115,15 +118,15 @@ func (m visionReferenceMaterializer) Materialize(
 	ownerUserID int64,
 	assetIDs []int64,
 	externalRefs []VisionExternalReference,
-) ([]VisionImage, error) {
+) ([]domain.VisionImage, error) {
 	if len(assetIDs) > 0 && m.libraryReader == nil {
-		return nil, ErrVisionInput
+		return nil, domain.ErrVisionInput
 	}
-	images := make([]VisionImage, 0, len(assetIDs)+len(externalRefs))
+	images := make([]domain.VisionImage, 0, len(assetIDs)+len(externalRefs))
 	for _, assetID := range assetIDs {
 		asset, err := m.libraryReader.GetAsset(ctx, ownerUserID, assetID)
 		if err != nil {
-			return nil, ErrVisionImageUnavailable
+			return nil, domain.ErrVisionImageUnavailable
 		}
 		image, err := readLibraryVisionImage(ctx, asset)
 		if err != nil {
@@ -141,32 +144,32 @@ func (m visionReferenceMaterializer) Materialize(
 	return images, nil
 }
 
-func readLibraryVisionImage(ctx context.Context, asset library.Asset) (VisionImage, error) {
+func readLibraryVisionImage(ctx context.Context, asset library.Asset) (domain.VisionImage, error) {
 	rawURL := asset.OriginalURL
 	if strings.TrimSpace(rawURL) == "" {
 		rawURL = asset.PreviewURL
 	}
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || parsed.Scheme != "https" || !isLibraryImageHost(parsed.Hostname()) {
-		return VisionImage{}, ErrVisionImageUnavailable
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
+		return domain.VisionImage{}, fmt.Errorf("%w: %w", domain.ErrVisionImageUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return VisionImage{}, ErrVisionImageUnavailable
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, visionMaxBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response.Body, domain.VisionMaxBytes+1))
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
+		return domain.VisionImage{}, fmt.Errorf("%w: %w", domain.ErrVisionImageUnavailable, err)
 	}
-	if len(data) > visionMaxBytes {
-		return VisionImage{}, ErrVisionImageInvalid
+	if len(data) > domain.VisionMaxBytes {
+		return domain.VisionImage{}, domain.ErrVisionImageInvalid
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
-	return VisionImage{Filename: "library-reference", ContentType: contentType, Data: data}, nil
+	return domain.VisionImage{Filename: "library-reference", ContentType: contentType, Data: data}, nil
 }
 
 func getVisionImage(ctx context.Context, imageURL *url.URL) (*http.Response, error) {
@@ -177,12 +180,30 @@ func getVisionImage(ctx context.Context, imageURL *url.URL) (*http.Response, err
 	return visionImageRequest(ctx, request)
 }
 
+// visionImageOutbound is the shared standard outbound client for reference
+// image fetches: timeout cap, bounded retries and Retry-After respect match
+// the gateway migration (#766). Exhausted retryable statuses surface as
+// errors and map to ErrVisionImageUnavailable at the callers, exactly like
+// the single-shot non-2xx responses they replace.
+var visionImageOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// visionInputTarget names reference image egress in outbound logs/metrics.
+const visionInputTarget = "vision-input"
+
 // visionImageRequest is kept as a narrow seam for deterministic tests. The
-// production implementation still runs every request through safehttp and
-// combines the runtime outbound policy with the exact, curated image CDN
-// hosts used by Search references.
+// production implementation still runs every request through the standard
+// outbound client and combines the runtime outbound policy with the exact,
+// curated image CDN hosts used by Search references.
+// visionInputFetchTimeout bounds one external reference image fetch,
+// separate from the gateway extraction timeout.
+const visionInputFetchTimeout = 30 * time.Second
+
 var visionImageRequest = func(ctx context.Context, request *http.Request) (*http.Response, error) {
-	return safehttp.DoRequestWithAllowHosts(ctx, request, visionSearchTimeout, visionImageAllowHosts(ctx)...)
+	return visionImageOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+		Timeout:    visionInputFetchTimeout,
+		AllowHosts: visionImageAllowHosts(ctx),
+		Target:     visionInputTarget,
+	})
 }
 
 func visionImageAllowHosts(ctx context.Context) []string {
@@ -223,7 +244,7 @@ func parseLibraryAssetIDs(rawIDs []string) ([]int64, error) {
 	for _, rawID := range rawIDs {
 		id, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
 		if err != nil || id <= 0 {
-			return nil, ErrVisionInput
+			return nil, domain.ErrVisionInput
 		}
 		if _, exists := seen[id]; exists {
 			continue
@@ -241,13 +262,6 @@ func isLibraryImageHost(host string) bool {
 	default:
 		return false
 	}
-}
-
-func pathExt(filename string) string {
-	if index := strings.LastIndex(filename, "."); index >= 0 {
-		return filename[index:]
-	}
-	return ""
 }
 
 // VisionExternalReference is the metadata the browser sends for a Search
@@ -271,20 +285,20 @@ func parseExternalReferences(raw []string) ([]VisionExternalReference, error) {
 	for _, rawRef := range raw {
 		trimmed := strings.TrimSpace(rawRef)
 		if trimmed == "" {
-			return nil, ErrVisionInput
+			return nil, domain.ErrVisionInput
 		}
 		ref, err := decodeExternalReference(trimmed)
 		if err != nil {
-			return nil, ErrVisionInput
+			return nil, domain.ErrVisionInput
 		}
 		ref.Provider = strings.ToLower(strings.TrimSpace(ref.Provider))
 		ref.ID = strings.TrimSpace(ref.ID)
 		ref.PreviewURL = strings.TrimSpace(ref.PreviewURL)
 		if ref.Provider == "" || ref.ID == "" || ref.PreviewURL == "" {
-			return nil, ErrVisionInput
+			return nil, domain.ErrVisionInput
 		}
 		if !isAllowedExternalProvider(ref.Provider) {
-			return nil, ErrVisionInput
+			return nil, domain.ErrVisionInput
 		}
 		key := ref.Provider + ":" + ref.ID
 		if _, ok := seen[key]; ok {
@@ -317,34 +331,34 @@ func isAllowedExternalProvider(provider string) bool {
 // browser would otherwise have to download directly. The HTTP transport is
 // the same one the library-asset path uses so the allowlist, timeout, and
 // size cap stay consistent.
-func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (VisionImage, error) {
+func readExternalVisionImage(ctx context.Context, ref VisionExternalReference) (domain.VisionImage, error) {
 	parsed, err := url.Parse(strings.TrimSpace(ref.PreviewURL))
 	if err != nil || parsed.Scheme != "https" || !isLibraryImageHost(parsed.Hostname()) {
-		return VisionImage{}, ErrVisionImageUnavailable
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	// Reject anything that is not on the exact CDN host allowlist. The allowlist
 	// is shared with the library-asset path so the server-side materialization
 	// never depends on third-party CORS headers.
 	if !isExternalReferenceHost(parsed.Hostname(), ref.Provider) {
-		return VisionImage{}, ErrVisionImageUnavailable
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
 	response, err := getVisionImage(ctx, parsed)
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
+		return domain.VisionImage{}, fmt.Errorf("%w: %w", domain.ErrVisionImageUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return VisionImage{}, ErrVisionImageUnavailable
+		return domain.VisionImage{}, domain.ErrVisionImageUnavailable
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, visionMaxBytes+1))
+	data, err := io.ReadAll(io.LimitReader(response.Body, domain.VisionMaxBytes+1))
 	if err != nil {
-		return VisionImage{}, fmt.Errorf("%w: %w", ErrVisionImageUnavailable, err)
+		return domain.VisionImage{}, fmt.Errorf("%w: %w", domain.ErrVisionImageUnavailable, err)
 	}
-	if len(data) == 0 || len(data) > visionMaxBytes {
-		return VisionImage{}, ErrVisionImageInvalid
+	if len(data) == 0 || len(data) > domain.VisionMaxBytes {
+		return domain.VisionImage{}, domain.ErrVisionImageInvalid
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
-	return VisionImage{Filename: ref.Provider + "-" + ref.ID, ContentType: contentType, Data: data}, nil
+	return domain.VisionImage{Filename: ref.Provider + "-" + ref.ID, ContentType: contentType, Data: data}, nil
 }
 
 func isExternalReferenceHost(host, provider string) bool {

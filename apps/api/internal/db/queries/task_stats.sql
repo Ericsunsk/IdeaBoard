@@ -129,18 +129,18 @@ WITH candidate_tasks AS (
   SELECT t.task_id, t.user_id, t.account_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.status,
          t.feature_slug,
          COALESCE((NULLIF(btrim(t.params), '')::jsonb #>> '{generation,requested_output_count}')::smallint, 1::smallint) AS output_count,
-         COALESCE(latest_lease.resolved_model, '') AS resolved_model,
-         COALESCE(latest_lease.api_type, '') AS api_type,
+         COALESCE(latest_attempt.resolved_model, '') AS resolved_model,
+         '' AS api_type,
          t.created_at, t.completed_at, t.cancelled_at,
          COALESCE(t.completed_at, t.cancelled_at, t.updated_at) AS occurred_at
   FROM tasks AS t
   LEFT JOIN LATERAL (
-    SELECT resolved_model, api_type
-    FROM task_leases
+    SELECT resolved_model
+    FROM task_execution_attempts
     WHERE task_id = t.task_id
-    ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    ORDER BY (status = 'running') DESC, attempt_no DESC, id DESC
     LIMIT 1
-  ) AS latest_lease ON TRUE
+  ) AS latest_attempt ON TRUE
   WHERE COALESCE(t.completed_at, t.cancelled_at, t.updated_at) >= sqlc.arg(started_at)
     AND COALESCE(t.completed_at, t.cancelled_at, t.updated_at) < sqlc.arg(ended_at)
     AND t.status IN ('completed', 'failed', 'cancelled')

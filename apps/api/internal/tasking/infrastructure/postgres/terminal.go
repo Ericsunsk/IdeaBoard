@@ -2,15 +2,18 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
+
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	tasks "ideaboard/api/internal/tasking/domain"
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type terminalTransitionKind string
@@ -21,22 +24,6 @@ const (
 	terminalTransitionCancelled terminalTransitionKind = "cancelled"
 )
 
-type terminalLeaseReleaseMode uint8
-
-const (
-	terminalLeaseReleaseNone terminalLeaseReleaseMode = iota
-	terminalLeaseReleaseExact
-	terminalLeaseReleaseActive
-)
-
-type terminalLeaseRelease struct {
-	mode               terminalLeaseReleaseMode
-	accountID          int64
-	providerEndpointID int64
-	credentialID       int64
-	leaseToken         string
-}
-
 type terminalTransitionCommand struct {
 	taskID          string
 	kind            terminalTransitionKind
@@ -45,9 +32,20 @@ type terminalTransitionCommand struct {
 	failureStage    string
 	failureCategory string
 	attemptFinish   *tasks.TaskAttemptFinish
-	lease           terminalLeaseRelease
-	outputs         []tasks.TaskOutput
-	writeTaskFact   func(context.Context, *dbsqlc.Queries) (int64, error)
+	// executionToken fences terminal writes. Empty means a system-initiated
+	// transition that needs no fence; the attempt sweep still converges
+	// straggler rows by task.
+	executionToken string
+	// Gateway receipt facts recorded on the closed attempt. The orchestrator
+	// supplies them; the terminal transaction is the single writer so
+	// concurrent workers cannot split attempt state.
+	resolvedModel  string
+	gatewayStep    string
+	receiptLogID   string
+	receiptEventID string
+	cacheHit       bool
+	outputs        []tasks.TaskOutput
+	writeTaskFact  func(context.Context, *dbsqlc.Queries) (int64, error)
 }
 
 type terminalTransitionPolicy struct {
@@ -56,7 +54,6 @@ type terminalTransitionPolicy struct {
 	executionStage  string
 	failureStage    string
 	failureCategory string
-	leaseReason     string
 	replacesOutputs bool
 }
 
@@ -64,10 +61,6 @@ type terminalTransitionPolicy struct {
 // fact, attempt and exact lease release as one database fact; terminal kinds
 // additionally commit metrics, daily stats and Credit settlement.
 func (r *Repository) ConvergeTask(ctx context.Context, intent runtimecontracts.TaskConvergenceIntent) (rowsAffected int64, err error) {
-	finish := r.metrics.StartTransaction(taskstoreOperationConvergence)
-	defer func() {
-		finish(taskstoreOutcomeSuccess, err)
-	}()
 	switch intent.Kind {
 	case runtimecontracts.TaskConvergenceCompleted:
 		return r.convergeCompletedTask(ctx, intent)
@@ -82,26 +75,38 @@ func (r *Repository) ConvergeTask(ctx context.Context, intent runtimecontracts.T
 
 func (r *Repository) convergeCompletedTask(ctx context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error) {
 	finishedAt := terminalTransitionTime(intent.OccurredAt)
-	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
-	if err != nil {
-		return 0, err
+	token := strings.TrimSpace(intent.ExecutionToken)
+	if token == "" {
+		return 0, fmt.Errorf("%w: completed convergence requires an execution token", runtimecontracts.ErrTaskLeaseStateConflict)
 	}
 	return r.runTerminalTransition(ctx, terminalTransitionCommand{
-		taskID:        intent.TaskID,
-		kind:          terminalTransitionCompleted,
-		finishedAt:    finishedAt,
-		attemptFinish: intent.AttemptFinish,
-		outputs:       intent.Outputs,
-		lease:         lease,
+		taskID:         intent.TaskID,
+		kind:           terminalTransitionCompleted,
+		finishedAt:     finishedAt,
+		attemptFinish:  intent.AttemptFinish,
+		outputs:        intent.Outputs,
+		executionToken: token,
+		resolvedModel:  strings.TrimSpace(intent.ResolvedModel),
+		gatewayStep:    strings.TrimSpace(intent.GatewayStep),
+		receiptLogID:   strings.TrimSpace(intent.ReceiptLogID),
+		receiptEventID: strings.TrimSpace(intent.ReceiptEventID),
+		cacheHit:       intent.CacheHit,
 		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
-			return q.CompleteTaskWithLease(ctx, completeTaskWithLeaseParams(intent, finishedAt))
+			return q.CompleteTaskWithExecutionToken(ctx, dbsqlc.CompleteTaskWithExecutionTokenParams{
+				Result:         intent.Result,
+				CompletedAt:    pgtype.Timestamptz{Time: finishedAt, Valid: true},
+				TaskID:         intent.TaskID,
+				Statuses:       []string{tasks.StatusRunning},
+				ExecutionToken: token,
+			})
 		},
 	})
 }
 
 func (r *Repository) convergeFailedTask(ctx context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error) {
 	finishedAt := terminalTransitionTime(intent.OccurredAt)
-	if intent.Lease == nil {
+	token := strings.TrimSpace(intent.ExecutionToken)
+	if token == "" {
 		return r.runTerminalTransition(ctx, terminalTransitionCommand{
 			taskID:        intent.TaskID,
 			kind:          terminalTransitionFailed,
@@ -113,15 +118,18 @@ func (r *Repository) convergeFailedTask(ctx context.Context, intent runtimecontr
 					return q.MarkUnleasedTaskFailed(ctx, dbsqlc.MarkUnleasedTaskFailedParams{
 						ErrorMsg:    intent.ErrorMessage,
 						Result:      intent.Result,
-						CompletedAt: sql.NullTime{Time: finishedAt, Valid: true},
+						CompletedAt: pgtype.Timestamptz{Time: finishedAt, Valid: true},
 						TaskID:      intent.TaskID,
 						Statuses:    []string{tasks.StatusPending, tasks.StatusRunning},
 					})
 				}
-				return q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
+				// Pending-only fail rides the same guarded query: pending tasks
+				// never hold a running attempt, so NOT EXISTS is vacuous here
+				// and a stray running attempt blocks a wrong terminal write.
+				return q.MarkUnleasedTaskFailed(ctx, dbsqlc.MarkUnleasedTaskFailedParams{
 					ErrorMsg:    intent.ErrorMessage,
 					Result:      intent.Result,
-					CompletedAt: sql.NullTime{Time: finishedAt, Valid: true},
+					CompletedAt: pgtype.Timestamptz{Time: finishedAt, Valid: true},
 					TaskID:      intent.TaskID,
 					Statuses:    []string{tasks.StatusPending},
 				})
@@ -129,103 +137,60 @@ func (r *Repository) convergeFailedTask(ctx context.Context, intent runtimecontr
 		})
 	}
 
-	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
-	if err != nil {
-		return 0, err
-	}
 	return r.runTerminalTransition(ctx, terminalTransitionCommand{
-		taskID:        intent.TaskID,
-		kind:          terminalTransitionFailed,
-		finishedAt:    finishedAt,
-		errorMessage:  intent.ErrorMessage,
-		attemptFinish: intent.AttemptFinish,
-		lease:         lease,
+		taskID:         intent.TaskID,
+		kind:           terminalTransitionFailed,
+		finishedAt:     finishedAt,
+		errorMessage:   intent.ErrorMessage,
+		attemptFinish:  intent.AttemptFinish,
+		executionToken: token,
+		resolvedModel:  strings.TrimSpace(intent.ResolvedModel),
+		gatewayStep:    strings.TrimSpace(intent.GatewayStep),
+		receiptLogID:   strings.TrimSpace(intent.ReceiptLogID),
+		receiptEventID: strings.TrimSpace(intent.ReceiptEventID),
+		cacheHit:       intent.CacheHit,
 		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
 			if intent.Kind == runtimecontracts.TaskConvergenceFinalFailed {
-				return q.FinalFailTaskRunningWithLease(ctx, finalFailTaskWithLeaseParams(intent, finishedAt))
+				return q.FinalFailTaskRunningWithExecutionToken(ctx, dbsqlc.FinalFailTaskRunningWithExecutionTokenParams{
+					ErrorMsg:       intent.ErrorMessage,
+					Result:         intent.Result,
+					CompletedAt:    pgtype.Timestamptz{Time: finishedAt, Valid: true},
+					TaskID:         intent.TaskID,
+					Statuses:       []string{tasks.StatusRunning},
+					ExecutionToken: token,
+				})
 			}
-			return q.MarkTaskFailedWithLease(ctx, failedTaskWithLeaseParams(intent, finishedAt))
+			return q.MarkTaskFailedWithExecutionToken(ctx, dbsqlc.MarkTaskFailedWithExecutionTokenParams{
+				ErrorMsg:       intent.ErrorMessage,
+				Result:         intent.Result,
+				CompletedAt:    pgtype.Timestamptz{Time: finishedAt, Valid: true},
+				TaskID:         intent.TaskID,
+				Statuses:       []string{tasks.StatusRunning},
+				ExecutionToken: token,
+			})
 		},
 	})
 }
 
 func (r *Repository) convergePendingTask(ctx context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error) {
-	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
-	if err != nil {
-		return 0, err
+	token := strings.TrimSpace(intent.ExecutionToken)
+	if token == "" {
+		return 0, fmt.Errorf("%w: pending convergence requires an execution token", runtimecontracts.ErrTaskLeaseStateConflict)
 	}
 	policy, err := resolveNonterminalTransitionPolicy(intent.Kind)
 	if err != nil {
 		return 0, err
 	}
 	return r.runNonterminalTransition(ctx, nonterminalTransitionCommand{
-		taskID:        intent.TaskID,
-		kind:          intent.Kind,
-		occurredAt:    terminalTransitionTime(intent.OccurredAt),
-		errorMessage:  intent.ErrorMessage,
-		result:        intent.Result,
-		attemptFinish: intent.AttemptFinish,
-		lease:         lease,
-		policy:        policy,
+		taskID:         intent.TaskID,
+		kind:           intent.Kind,
+		occurredAt:     terminalTransitionTime(intent.OccurredAt),
+		errorMessage:   intent.ErrorMessage,
+		result:         intent.Result,
+		attemptFinish:  intent.AttemptFinish,
+		executionToken: token,
+		policy:         policy,
 	})
-}
-
-func terminalLeaseReleaseForIdentity(identity *runtimecontracts.TaskLeaseIdentity) (terminalLeaseRelease, error) {
-	if identity == nil {
-		return terminalLeaseRelease{}, fmt.Errorf("%w: task convergence requires lease identity", runtimecontracts.ErrTaskLeaseStateConflict)
-	}
-	lease := terminalLeaseRelease{
-		mode:               terminalLeaseReleaseExact,
-		accountID:          identity.AccountID,
-		providerEndpointID: identity.ProviderEndpointID,
-		credentialID:       identity.CredentialID,
-		leaseToken:         identity.LeaseToken,
-	}
-	if lease.accountID <= 0 || lease.providerEndpointID <= 0 || lease.credentialID <= 0 || strings.TrimSpace(lease.leaseToken) == "" {
-		return terminalLeaseRelease{}, fmt.Errorf("%w: task convergence requires lease identity", runtimecontracts.ErrTaskLeaseStateConflict)
-	}
-	return lease, nil
-}
-
-func completeTaskWithLeaseParams(intent runtimecontracts.TaskConvergenceIntent, completedAt time.Time) dbsqlc.CompleteTaskWithLeaseParams {
-	return dbsqlc.CompleteTaskWithLeaseParams{
-		Result:                     intent.Result,
-		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:                     intent.TaskID,
-		Statuses:                   []string{tasks.StatusRunning},
-		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
-		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
-		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
-		LeaseToken:                 intent.Lease.LeaseToken,
-	}
-}
-
-func failedTaskWithLeaseParams(intent runtimecontracts.TaskConvergenceIntent, completedAt time.Time) dbsqlc.MarkTaskFailedWithLeaseParams {
-	return dbsqlc.MarkTaskFailedWithLeaseParams{
-		ErrorMsg:                   intent.ErrorMessage,
-		Result:                     intent.Result,
-		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:                     intent.TaskID,
-		Statuses:                   []string{tasks.StatusRunning},
-		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
-		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
-		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
-		LeaseToken:                 intent.Lease.LeaseToken,
-	}
-}
-
-func finalFailTaskWithLeaseParams(intent runtimecontracts.TaskConvergenceIntent, completedAt time.Time) dbsqlc.FinalFailTaskRunningWithLeaseParams {
-	return dbsqlc.FinalFailTaskRunningWithLeaseParams{
-		ErrorMsg:                   intent.ErrorMessage,
-		Result:                     intent.Result,
-		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:                     intent.TaskID,
-		Statuses:                   []string{tasks.StatusRunning},
-		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
-		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
-		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
-		LeaseToken:                 intent.Lease.LeaseToken,
-	}
 }
 
 // runTerminalTransition owns the atomic terminal recipe. Repository methods
@@ -261,7 +226,7 @@ func prepareTerminalTransition(r *Repository, command terminalTransitionCommand)
 
 func (r *Repository) runTerminalTransitionTx(ctx context.Context, command terminalTransitionCommand, policy terminalTransitionPolicy) (int64, error) {
 	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
 		updated, err := applyTerminalTransitionTx(ctx, q, tx, command, policy)
 		if err != nil {
 			return err
@@ -275,11 +240,11 @@ func (r *Repository) runTerminalTransitionTx(ctx context.Context, command termin
 func applyTerminalTransitionTx(
 	ctx context.Context,
 	q *dbsqlc.Queries,
-	tx *sql.Tx,
+	tx pgx.Tx,
 	command terminalTransitionCommand,
 	policy terminalTransitionPolicy,
 ) (int64, error) {
-	normalizedAttemptFinish, err := normalizeTerminalAttemptFinishTx(ctx, q, command, policy)
+	normalizedAttemptFinish, err := normalizeTerminalAttemptFinishTx(command, policy)
 	if err != nil {
 		return 0, err
 	}
@@ -315,7 +280,7 @@ func validateTerminalTaskStatus(command terminalTransitionCommand, policy termin
 func finalizeTerminalTaskTx(
 	ctx context.Context,
 	q *dbsqlc.Queries,
-	tx *sql.Tx,
+	tx pgx.Tx,
 	task *tasks.Task,
 	command terminalTransitionCommand,
 	policy terminalTransitionPolicy,
@@ -328,9 +293,9 @@ func finalizeTerminalTaskTx(
 	if err := finishTerminalTaskAttemptTx(ctx, q, command, policy); err != nil {
 		return err
 	}
-	if err := releaseTerminalTaskLeaseTx(ctx, q, command, policy); err != nil {
-		return err
-	}
+	// No lease release step: finalizing the execution attempt IS the release.
+	// A token-fenced attempt closes exactly; the by-task sweep converges
+	// stragglers left by crashed workers.
 	if _, err := q.ReleaseTaskInputMediaRefs(ctx, command.taskID); err != nil {
 		return err
 	}
@@ -344,12 +309,18 @@ func finalizeTerminalTaskTx(
 func applyTerminalOutcomeTx(
 	ctx context.Context,
 	q *dbsqlc.Queries,
-	tx *sql.Tx,
+	tx pgx.Tx,
 	task *tasks.Task,
 	metrics *tasks.TaskExecutionMetrics,
 	command terminalTransitionCommand,
 	policy terminalTransitionPolicy,
 ) error {
+	// The task snapshot above predates attempt finalization, so receipt
+	// facts live only on the command at this point. Overlay them before
+	// the stat write or daily stats permanently record "unknown model".
+	if model := strings.TrimSpace(command.resolvedModel); model != "" {
+		task.ResolvedModel = model
+	}
 	if err := upsertDailyStatByTaskTx(ctx, q, task, command.attemptFinish); err != nil {
 		return err
 	}
@@ -376,7 +347,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			taskStatus:      tasks.StatusCompleted,
 			attemptStatus:   tasks.TaskAttemptStatusCompleted,
 			executionStage:  tasks.ExecutionStageCompleted,
-			leaseReason:     tasks.TaskAttemptStatusCompleted,
 			replacesOutputs: true,
 		}, nil
 	case terminalTransitionFailed:
@@ -386,7 +356,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			executionStage:  tasks.ExecutionStageFailed,
 			failureStage:    tasks.ExecutionStageAssigned,
 			failureCategory: tasks.FailureCategoryUnknown,
-			leaseReason:     tasks.TaskAttemptStatusFailed,
 		}, nil
 	case terminalTransitionCancelled:
 		return terminalTransitionPolicy{
@@ -395,7 +364,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			executionStage:  tasks.ExecutionStageCancelled,
 			failureStage:    tasks.ExecutionStageQueued,
 			failureCategory: tasks.FailureCategoryCancelled,
-			leaseReason:     tasks.TaskAttemptStatusCancelled,
 		}, nil
 	default:
 		return terminalTransitionPolicy{}, fmt.Errorf("unsupported task terminal transition %q", kind)
@@ -418,27 +386,45 @@ func finishTerminalTaskAttemptTx(
 	command terminalTransitionCommand,
 	policy terminalTransitionPolicy,
 ) error {
-	if command.attemptFinish != nil && command.attemptFinish.ID > 0 {
-		return finishTaskAttemptTx(ctx, q, command.attemptFinish)
+	token := strings.TrimSpace(command.executionToken)
+	if token != "" {
+		_, err := q.FinalizeExecutionAttempt(ctx, dbsqlc.FinalizeExecutionAttemptParams{
+			Status:             policy.attemptStatus,
+			ResolvedModel:      strings.TrimSpace(command.resolvedModel),
+			GatewayStep:        strings.TrimSpace(command.gatewayStep),
+			ReceiptLogID:       strings.TrimSpace(command.receiptLogID),
+			ReceiptEventID:     strings.TrimSpace(command.receiptEventID),
+			CacheHit:           command.cacheHit,
+			FailureStage:       terminalCommandFailureStage(command, policy),
+			FailureCategory:    terminalCommandFailureCategory(command, policy),
+			ErrorMsg:           terminalCommandErrorMessage(command, policy),
+			ProviderFinishedAt: pgtype.Timestamptz{},
+			CompletedAt:        pgtype.Timestamptz{Time: command.finishedAt, Valid: true},
+			ExecutionToken:     token,
+			TaskID:             command.taskID,
+		})
+		return err
 	}
-	errorMessage := strings.TrimSpace(command.errorMessage)
-	if errorMessage == "" && policy.attemptStatus != tasks.TaskAttemptStatusCompleted {
-		errorMessage = "task " + string(command.kind)
-	}
-	_, err := q.FinishRunningTaskAttemptsByTaskIDs(ctx, dbsqlc.FinishRunningTaskAttemptsByTaskIDsParams{
+	_, err := q.FinishRunningExecutionAttemptsByTaskIDs(ctx, dbsqlc.FinishRunningExecutionAttemptsByTaskIDsParams{
 		Status:          policy.attemptStatus,
 		FailureStage:    terminalCommandFailureStage(command, policy),
 		FailureCategory: terminalCommandFailureCategory(command, policy),
-		ErrorMsg:        errorMessage,
-		FinishedAt:      sql.NullTime{Time: command.finishedAt, Valid: true},
+		ErrorMsg:        terminalCommandErrorMessage(command, policy),
+		FinishedAt:      pgtype.Timestamptz{Time: command.finishedAt, Valid: true},
 		TaskIds:         []string{command.taskID},
 	})
 	return err
 }
 
+func terminalCommandErrorMessage(command terminalTransitionCommand, policy terminalTransitionPolicy) string {
+	errorMessage := strings.TrimSpace(command.errorMessage)
+	if errorMessage == "" && policy.attemptStatus != tasks.TaskAttemptStatusCompleted {
+		errorMessage = "task " + string(command.kind)
+	}
+	return errorMessage
+}
+
 func normalizeTerminalAttemptFinishTx(
-	ctx context.Context,
-	q *dbsqlc.Queries,
 	command terminalTransitionCommand,
 	policy terminalTransitionPolicy,
 ) (*tasks.TaskAttemptFinish, error) {
@@ -454,69 +440,10 @@ func normalizeTerminalAttemptFinishTx(
 		)
 	}
 	finish.Status = policy.attemptStatus
-
-	switch command.lease.mode {
-	case terminalLeaseReleaseExact:
-		return taskAttemptFinishWithLeaseIdentity(
-			&finish,
-			command.taskID,
-			command.lease.accountID,
-			command.lease.providerEndpointID,
-			command.lease.credentialID,
-			command.lease.leaseToken,
-		)
-	case terminalLeaseReleaseActive:
-		lease, err := q.GetActiveTaskLeaseByTaskID(ctx, command.taskID)
-		if err != nil {
-			return nil, fmt.Errorf("resolve active lease for terminal attempt: %w", err)
-		}
-		return taskAttemptFinishWithLeaseIdentity(
-			&finish,
-			command.taskID,
-			lease.AccountID,
-			lease.ProviderEndpointID,
-			lease.CredentialID,
-			lease.LeaseToken,
-		)
-	case terminalLeaseReleaseNone:
-		if strings.TrimSpace(finish.TaskID) == "" {
-			finish.TaskID = command.taskID
-		}
-		if err := validateTaskAttemptFinishIdentity(finish); err != nil {
-			return nil, err
-		}
-		return &finish, nil
-	default:
-		return nil, fmt.Errorf("unsupported task terminal lease release mode %d", command.lease.mode)
+	if strings.TrimSpace(finish.TaskID) == "" {
+		finish.TaskID = command.taskID
 	}
-}
-
-func releaseTerminalTaskLeaseTx(
-	ctx context.Context,
-	q *dbsqlc.Queries,
-	command terminalTransitionCommand,
-	policy terminalTransitionPolicy,
-) error {
-	switch command.lease.mode {
-	case terminalLeaseReleaseNone:
-		return nil
-	case terminalLeaseReleaseExact:
-		return releaseTaskLeaseTx(
-			ctx,
-			q,
-			command.taskID,
-			command.lease.accountID,
-			command.lease.providerEndpointID,
-			command.lease.credentialID,
-			command.lease.leaseToken,
-			policy.leaseReason,
-			command.finishedAt,
-		)
-	case terminalLeaseReleaseActive:
-		return releaseActiveTaskLeaseByTaskIDTx(ctx, q, command.taskID, policy.leaseReason, command.finishedAt)
-	default:
-		return fmt.Errorf("unsupported task terminal lease release mode %d", command.lease.mode)
-	}
+	return &finish, nil
 }
 
 func terminalCommandFailureStage(command terminalTransitionCommand, policy terminalTransitionPolicy) string {

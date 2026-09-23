@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/pagination"
 )
 
 type Service struct {
@@ -37,7 +39,7 @@ func (s *Service) ListFolders(ctx context.Context, ownerUserID int64) ([]Folder,
 		}
 		folder := Folder{
 			ID: row.ID, QueryKey: queryKey, Name: row.Name, IsSystem: row.IsSystem, IsDefault: row.IsDefault,
-			AssetCount: row.AssetCount, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+			AssetCount: row.AssetCount, CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt),
 		}
 		total += row.AssetCount
 		result = append(result, folder)
@@ -102,40 +104,63 @@ func (s *Service) ListAssets(ctx context.Context, ownerUserID int64, selection F
 	if err := validateOwner(ownerUserID); err != nil {
 		return ListAssetsResult{}, err
 	}
-	if rawLimit <= 0 {
-		rawLimit = DefaultPageSize
-	}
-	if rawLimit > MaxPageSize {
+	limit, err := pagination.NormalizeLimit(rawLimit)
+	if err != nil {
 		return ListAssetsResult{}, ErrInvalidPageSize
 	}
 	folderID, err := s.resolveFolderSelection(ctx, ownerUserID, selection)
 	if err != nil {
 		return ListAssetsResult{}, err
 	}
-	cursor, err := DecodeCursor(rawCursor)
+	cursor, err := decodeLibraryCursor(rawCursor)
 	if err != nil {
 		return ListAssetsResult{}, err
 	}
-	rows, err := s.repo.ListAssets(ctx, ownerUserID, folderID, cursor, int32(rawLimit+1))
+	rows, err := s.repo.ListAssets(ctx, ownerUserID, folderID, cursor, int32(limit+1))
 	if err != nil {
 		return ListAssetsResult{}, err
 	}
 	result := ListAssetsResult{Items: make([]Asset, 0, len(rows))}
-	if len(rows) > rawLimit {
+	if len(rows) > limit {
 		result.HasMore = true
-		rows = rows[:rawLimit]
+		rows = rows[:limit]
 	}
 	for _, row := range rows {
 		result.Items = append(result.Items, assetFromRow(row))
 	}
 	if result.HasMore && len(result.Items) > 0 {
 		last := result.Items[len(result.Items)-1]
-		result.NextCursor, err = EncodeCursor(Cursor{CreatedAt: last.CreatedAt, ID: last.ID})
+		result.NextCursor, err = encodeLibraryCursor(Cursor{CreatedAt: last.CreatedAt, ID: last.ID})
 		if err != nil {
 			return ListAssetsResult{}, fmt.Errorf("encode library cursor: %w", err)
 		}
 	}
 	return result, nil
+}
+
+// decodeLibraryCursor validates the transport through the shared pagination
+// helper, then enforces the library keyset position fields.
+func decodeLibraryCursor(raw string) (*Cursor, error) {
+	cursor, err := pagination.DecodeCursor[Cursor](raw)
+	if err != nil {
+		return nil, ErrInvalidCursor
+	}
+	if cursor == nil {
+		return nil, nil
+	}
+	if cursor.ID <= 0 || cursor.CreatedAt.IsZero() {
+		return nil, ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+// encodeLibraryCursor serializes a keyset position through the shared
+// pagination helper so cursor bytes stay wire-compatible with the standard.
+func encodeLibraryCursor(cursor Cursor) (string, error) {
+	if cursor.ID <= 0 || cursor.CreatedAt.IsZero() {
+		return "", ErrInvalidCursor
+	}
+	return pagination.EncodeCursor(cursor)
 }
 
 func (s *Service) resolveFolderSelection(ctx context.Context, ownerUserID int64, selection FolderSelection) (*int64, error) {
@@ -323,11 +348,11 @@ func folderFromRow(row dbsqlc.LibraryFolder) Folder {
 	if row.IsSystem && row.IsDefault {
 		queryKey = QuickSavesFolder
 	}
-	return Folder{ID: row.ID, QueryKey: queryKey, Name: row.Name, IsSystem: row.IsSystem, IsDefault: row.IsDefault, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return Folder{ID: row.ID, QueryKey: queryKey, Name: row.Name, IsSystem: row.IsSystem, IsDefault: row.IsDefault, CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt)}
 }
 
 func assetFromRow(row dbsqlc.LibraryAsset) Asset {
-	return Asset{ID: row.ID, FolderID: row.FolderID, Provider: row.Provider, SourceID: row.SourceID, SourceURL: row.SourceUrl, PreviewURL: row.PreviewUrl, OriginalURL: row.OriginalUrl, Title: row.Title, Author: row.Author, Width: row.Width, Height: row.Height, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return Asset{ID: row.ID, FolderID: row.FolderID, Provider: row.Provider, SourceID: row.SourceID, SourceURL: row.SourceUrl, PreviewURL: row.PreviewUrl, OriginalURL: row.OriginalUrl, Title: row.Title, Author: row.Author, Width: row.Width, Height: row.Height, CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt)}
 }
 
 func validateAssetKey(input AssetInput) error {
@@ -341,7 +366,7 @@ func validateAssetKey(input AssetInput) error {
 }
 
 func isUniqueViolation(err error) bool {
-	// Never assert pq.Error directly: every database/sql handle in this
+	// Never assert pq.Error directly: every pgx handle in this
 	// process runs on the pgx stdlib driver, which surfaces *pgconn.PgError.
 	// The shared helper covers both shapes.
 	return database.IsDuplicateConstraintError(err)

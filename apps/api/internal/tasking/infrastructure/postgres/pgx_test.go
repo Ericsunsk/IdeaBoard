@@ -69,7 +69,7 @@ func TestCreateWithPGXTxRollsBackWithCallerTransaction(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&count); err != nil {
 		t.Fatalf("count task failed: %v", err)
 	}
 	if count != 0 {

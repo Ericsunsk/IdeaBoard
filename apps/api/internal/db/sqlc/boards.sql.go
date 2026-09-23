@@ -7,11 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const consumeBoardShareToken = `-- name: ConsumeBoardShareToken :one
@@ -28,9 +25,27 @@ RETURNING
   expires_at, created_at, updated_at
 `
 
-func (q *Queries) ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error) {
-	row := q.db.QueryRowContext(ctx, consumeBoardShareToken, tokenHash)
-	var i BoardShareToken
+type ConsumeBoardShareTokenRow struct {
+	ID          int64              `json:"id"`
+	BoardID     string             `json:"board_id"`
+	TokenHash   string             `json:"token_hash"`
+	TokenPrefix string             `json:"token_prefix"`
+	Role        string             `json:"role"`
+	CreatedBy   int64              `json:"created_by"`
+	Revoked     bool               `json:"revoked"`
+	UsageCount  int64              `json:"usage_count"`
+	MaxUses     pgtype.Int4        `json:"max_uses"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy   pgtype.Int8        `json:"revoked_by"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ConsumeBoardShareToken(ctx context.Context, tokenHash string) (ConsumeBoardShareTokenRow, error) {
+	row := q.db.QueryRow(ctx, consumeBoardShareToken, tokenHash)
+	var i ConsumeBoardShareTokenRow
 	err := row.Scan(
 		&i.ID,
 		&i.BoardID,
@@ -67,7 +82,7 @@ type CountBoardNameConflictsParams struct {
 }
 
 func (q *Queries) CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countBoardNameConflicts,
+	row := q.db.QueryRow(ctx, countBoardNameConflicts,
 		arg.OwnerUserID,
 		arg.Name,
 		arg.HasBoardID,
@@ -85,7 +100,7 @@ WHERE token_hash = $1
 `
 
 func (q *Queries) CountBoardShareTokenByHash(ctx context.Context, tokenHash string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countBoardShareTokenByHash, tokenHash)
+	row := q.db.QueryRow(ctx, countBoardShareTokenByHash, tokenHash)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -98,7 +113,7 @@ WHERE board_id = $1
 `
 
 func (q *Queries) CountBoardsByBoardID(ctx context.Context, boardID string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countBoardsByBoardID, boardID)
+	row := q.db.QueryRow(ctx, countBoardsByBoardID, boardID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -107,28 +122,31 @@ func (q *Queries) CountBoardsByBoardID(ctx context.Context, boardID string) (int
 const createBoardShareToken = `-- name: CreateBoardShareToken :one
 INSERT INTO board_share_tokens (
   board_id, token_hash, token_prefix, role, created_by,
-  revoked, expires_at, max_uses
+  revoked, expires_at, max_uses, idempotency_key, request_hash, token_secret
 )
 VALUES (
   $1, $2, $3, $4, $5,
-  $6, $7, $8
+  $6, $7, $8, $9, $10, $11
 )
 RETURNING id
 `
 
 type CreateBoardShareTokenParams struct {
-	BoardID     string        `json:"board_id"`
-	TokenHash   string        `json:"token_hash"`
-	TokenPrefix string        `json:"token_prefix"`
-	Role        string        `json:"role"`
-	CreatedBy   int64         `json:"created_by"`
-	Revoked     bool          `json:"revoked"`
-	ExpiresAt   sql.NullTime  `json:"expires_at"`
-	MaxUses     sql.NullInt32 `json:"max_uses"`
+	BoardID        string             `json:"board_id"`
+	TokenHash      string             `json:"token_hash"`
+	TokenPrefix    string             `json:"token_prefix"`
+	Role           string             `json:"role"`
+	CreatedBy      int64              `json:"created_by"`
+	Revoked        bool               `json:"revoked"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	MaxUses        pgtype.Int4        `json:"max_uses"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	RequestHash    string             `json:"request_hash"`
+	TokenSecret    string             `json:"token_secret"`
 }
 
 func (q *Queries) CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createBoardShareToken,
+	row := q.db.QueryRow(ctx, createBoardShareToken,
 		arg.BoardID,
 		arg.TokenHash,
 		arg.TokenPrefix,
@@ -137,6 +155,9 @@ func (q *Queries) CreateBoardShareToken(ctx context.Context, arg CreateBoardShar
 		arg.Revoked,
 		arg.ExpiresAt,
 		arg.MaxUses,
+		arg.IdempotencyKey,
+		arg.RequestHash,
+		arg.TokenSecret,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -154,11 +175,11 @@ type DeleteBoardByOwnerAndBoardIDParams struct {
 }
 
 func (q *Queries) DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteBoardByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
+	result, err := q.db.Exec(ctx, deleteBoardByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const deleteBoardMember = `-- name: DeleteBoardMember :execrows
@@ -172,11 +193,11 @@ type DeleteBoardMemberParams struct {
 }
 
 func (q *Queries) DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteBoardMember, arg.BoardID, arg.UserID)
+	result, err := q.db.Exec(ctx, deleteBoardMember, arg.BoardID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const deleteBoardMembersByBoardID = `-- name: DeleteBoardMembersByBoardID :exec
@@ -185,7 +206,7 @@ WHERE board_id = $1
 `
 
 func (q *Queries) DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardMembersByBoardID, boardID)
+	_, err := q.db.Exec(ctx, deleteBoardMembersByBoardID, boardID)
 	return err
 }
 
@@ -195,7 +216,7 @@ WHERE board_id = $1
 `
 
 func (q *Queries) DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByBoardID, boardID)
+	_, err := q.db.Exec(ctx, deleteBoardShareTokensByBoardID, boardID)
 	return err
 }
 
@@ -219,22 +240,22 @@ type GetAccessibleBoardByBoardIDParams struct {
 }
 
 type GetAccessibleBoardByBoardIDRow struct {
-	ID                 int64           `json:"id"`
-	BoardID            string          `json:"board_id"`
-	OwnerUserID        int64           `json:"owner_user_id"`
-	CreatedBy          int64           `json:"created_by"`
-	Name               string          `json:"name"`
-	State              json.RawMessage `json:"state"`
-	Revision           int64           `json:"revision"`
-	StateSchemaVersion int32           `json:"state_schema_version"`
-	LastSavedBy        sql.NullInt64   `json:"last_saved_by"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
-	MemberRole         sql.NullString  `json:"member_role"`
+	ID                 int64              `json:"id"`
+	BoardID            string             `json:"board_id"`
+	OwnerUserID        int64              `json:"owner_user_id"`
+	CreatedBy          int64              `json:"created_by"`
+	Name               string             `json:"name"`
+	State              []byte             `json:"state"`
+	Revision           int64              `json:"revision"`
+	StateSchemaVersion int32              `json:"state_schema_version"`
+	LastSavedBy        pgtype.Int8        `json:"last_saved_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	MemberRole         pgtype.Text        `json:"member_role"`
 }
 
 func (q *Queries) GetAccessibleBoardByBoardID(ctx context.Context, arg GetAccessibleBoardByBoardIDParams) (GetAccessibleBoardByBoardIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAccessibleBoardByBoardID, arg.UserID, arg.BoardID)
+	row := q.db.QueryRow(ctx, getAccessibleBoardByBoardID, arg.UserID, arg.BoardID)
 	var i GetAccessibleBoardByBoardIDRow
 	err := row.Scan(
 		&i.ID,
@@ -261,7 +282,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetBoardByBoardID(ctx context.Context, boardID string) (Board, error) {
-	row := q.db.QueryRowContext(ctx, getBoardByBoardID, boardID)
+	row := q.db.QueryRow(ctx, getBoardByBoardID, boardID)
 	var i Board
 	err := row.Scan(
 		&i.ID,
@@ -292,7 +313,7 @@ type GetBoardByOwnerAndBoardIDParams struct {
 }
 
 func (q *Queries) GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByOwnerAndBoardIDParams) (Board, error) {
-	row := q.db.QueryRowContext(ctx, getBoardByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
+	row := q.db.QueryRow(ctx, getBoardByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
 	var i Board
 	err := row.Scan(
 		&i.ID,
@@ -322,7 +343,7 @@ type GetBoardMemberByUserIDParams struct {
 }
 
 func (q *Queries) GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error) {
-	row := q.db.QueryRowContext(ctx, getBoardMemberByUserID, arg.BoardID, arg.UserID)
+	row := q.db.QueryRow(ctx, getBoardMemberByUserID, arg.BoardID, arg.UserID)
 	var i BoardMember
 	err := row.Scan(
 		&i.ID,
@@ -347,7 +368,7 @@ type GetBoardMemberRoleParams struct {
 }
 
 func (q *Queries) GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, getBoardMemberRole, arg.BoardID, arg.UserID)
+	row := q.db.QueryRow(ctx, getBoardMemberRole, arg.BoardID, arg.UserID)
 	var role string
 	err := row.Scan(&role)
 	return role, err
@@ -362,9 +383,27 @@ FROM board_share_tokens
 WHERE token_hash = $1
 `
 
-func (q *Queries) GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error) {
-	row := q.db.QueryRowContext(ctx, getBoardShareTokenByHash, tokenHash)
-	var i BoardShareToken
+type GetBoardShareTokenByHashRow struct {
+	ID          int64              `json:"id"`
+	BoardID     string             `json:"board_id"`
+	TokenHash   string             `json:"token_hash"`
+	TokenPrefix string             `json:"token_prefix"`
+	Role        string             `json:"role"`
+	CreatedBy   int64              `json:"created_by"`
+	Revoked     bool               `json:"revoked"`
+	UsageCount  int64              `json:"usage_count"`
+	MaxUses     pgtype.Int4        `json:"max_uses"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy   pgtype.Int8        `json:"revoked_by"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (GetBoardShareTokenByHashRow, error) {
+	row := q.db.QueryRow(ctx, getBoardShareTokenByHash, tokenHash)
+	var i GetBoardShareTokenByHashRow
 	err := row.Scan(
 		&i.ID,
 		&i.BoardID,
@@ -385,6 +424,67 @@ func (q *Queries) GetBoardShareTokenByHash(ctx context.Context, tokenHash string
 	return i, err
 }
 
+const getBoardShareTokenByIdempotency = `-- name: GetBoardShareTokenByIdempotency :one
+SELECT id, board_id, token_hash, token_prefix, role, created_by, revoked,
+  usage_count, max_uses, last_used_at, revoked_at, revoked_by,
+  expires_at, created_at, updated_at, idempotency_key, request_hash, token_secret
+FROM board_share_tokens
+WHERE created_by = $1 AND idempotency_key = $2
+FOR UPDATE
+`
+
+type GetBoardShareTokenByIdempotencyParams struct {
+	CreatedBy      int64  `json:"created_by"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+type GetBoardShareTokenByIdempotencyRow struct {
+	ID             int64              `json:"id"`
+	BoardID        string             `json:"board_id"`
+	TokenHash      string             `json:"token_hash"`
+	TokenPrefix    string             `json:"token_prefix"`
+	Role           string             `json:"role"`
+	CreatedBy      int64              `json:"created_by"`
+	Revoked        bool               `json:"revoked"`
+	UsageCount     int64              `json:"usage_count"`
+	MaxUses        pgtype.Int4        `json:"max_uses"`
+	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy      pgtype.Int8        `json:"revoked_by"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	RequestHash    string             `json:"request_hash"`
+	TokenSecret    string             `json:"token_secret"`
+}
+
+func (q *Queries) GetBoardShareTokenByIdempotency(ctx context.Context, arg GetBoardShareTokenByIdempotencyParams) (GetBoardShareTokenByIdempotencyRow, error) {
+	row := q.db.QueryRow(ctx, getBoardShareTokenByIdempotency, arg.CreatedBy, arg.IdempotencyKey)
+	var i GetBoardShareTokenByIdempotencyRow
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.TokenHash,
+		&i.TokenPrefix,
+		&i.Role,
+		&i.CreatedBy,
+		&i.Revoked,
+		&i.UsageCount,
+		&i.MaxUses,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.RevokedBy,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IdempotencyKey,
+		&i.RequestHash,
+		&i.TokenSecret,
+	)
+	return i, err
+}
+
 const listAccessibleBoardsByUserID = `-- name: ListAccessibleBoardsByUserID :many
 SELECT
   b.id, b.board_id, b.owner_user_id, b.created_by, b.name, b.state,
@@ -395,25 +495,31 @@ FROM boards AS b
 LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = $1
 WHERE b.owner_user_id = $1 OR m.user_id = $1
 ORDER BY b.updated_at DESC
+LIMIT $2
 `
 
-type ListAccessibleBoardsByUserIDRow struct {
-	ID                 int64           `json:"id"`
-	BoardID            string          `json:"board_id"`
-	OwnerUserID        int64           `json:"owner_user_id"`
-	CreatedBy          int64           `json:"created_by"`
-	Name               string          `json:"name"`
-	State              json.RawMessage `json:"state"`
-	Revision           int64           `json:"revision"`
-	StateSchemaVersion int32           `json:"state_schema_version"`
-	LastSavedBy        sql.NullInt64   `json:"last_saved_by"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
-	MemberRole         sql.NullString  `json:"member_role"`
+type ListAccessibleBoardsByUserIDParams struct {
+	UserID   int64 `json:"user_id"`
+	RowLimit int32 `json:"row_limit"`
 }
 
-func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, userID int64) ([]ListAccessibleBoardsByUserIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAccessibleBoardsByUserID, userID)
+type ListAccessibleBoardsByUserIDRow struct {
+	ID                 int64              `json:"id"`
+	BoardID            string             `json:"board_id"`
+	OwnerUserID        int64              `json:"owner_user_id"`
+	CreatedBy          int64              `json:"created_by"`
+	Name               string             `json:"name"`
+	State              []byte             `json:"state"`
+	Revision           int64              `json:"revision"`
+	StateSchemaVersion int32              `json:"state_schema_version"`
+	LastSavedBy        pgtype.Int8        `json:"last_saved_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	MemberRole         pgtype.Text        `json:"member_role"`
+}
+
+func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, arg ListAccessibleBoardsByUserIDParams) ([]ListAccessibleBoardsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listAccessibleBoardsByUserID, arg.UserID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -439,9 +545,6 @@ func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, userID int64
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -454,17 +557,23 @@ FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
 WHERE m.board_id = $1
 ORDER BY m.created_at ASC
+LIMIT $2
 `
 
-type ListBoardMembersRow struct {
-	UserID      int64     `json:"user_id"`
-	PublicID    uuid.UUID `json:"public_id"`
-	DisplayName string    `json:"display_name"`
-	Role        string    `json:"role"`
+type ListBoardMembersParams struct {
+	BoardID  string `json:"board_id"`
+	RowLimit int32  `json:"row_limit"`
 }
 
-func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error) {
-	rows, err := q.db.QueryContext(ctx, listBoardMembers, boardID)
+type ListBoardMembersRow struct {
+	UserID      int64       `json:"user_id"`
+	PublicID    pgtype.UUID `json:"public_id"`
+	DisplayName string      `json:"display_name"`
+	Role        string      `json:"role"`
+}
+
+func (q *Queries) ListBoardMembers(ctx context.Context, arg ListBoardMembersParams) ([]ListBoardMembersRow, error) {
+	rows, err := q.db.Query(ctx, listBoardMembers, arg.BoardID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -482,9 +591,6 @@ func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListB
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -499,17 +605,41 @@ SELECT
 FROM board_share_tokens
 WHERE board_id = $1
 ORDER BY created_at DESC
+LIMIT $2
 `
 
-func (q *Queries) ListBoardShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error) {
-	rows, err := q.db.QueryContext(ctx, listBoardShareTokens, boardID)
+type ListBoardShareTokensParams struct {
+	BoardID  string `json:"board_id"`
+	RowLimit int32  `json:"row_limit"`
+}
+
+type ListBoardShareTokensRow struct {
+	ID          int64              `json:"id"`
+	BoardID     string             `json:"board_id"`
+	TokenHash   string             `json:"token_hash"`
+	TokenPrefix string             `json:"token_prefix"`
+	Role        string             `json:"role"`
+	CreatedBy   int64              `json:"created_by"`
+	Revoked     bool               `json:"revoked"`
+	UsageCount  int64              `json:"usage_count"`
+	MaxUses     pgtype.Int4        `json:"max_uses"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	RevokedBy   pgtype.Int8        `json:"revoked_by"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error) {
+	rows, err := q.db.Query(ctx, listBoardShareTokens, arg.BoardID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []BoardShareToken
+	var items []ListBoardShareTokensRow
 	for rows.Next() {
-		var i BoardShareToken
+		var i ListBoardShareTokensRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.BoardID,
@@ -531,13 +661,19 @@ func (q *Queries) ListBoardShareTokens(ctx context.Context, boardID string) ([]B
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockBoardShareTokenIdempotency = `-- name: LockBoardShareTokenIdempotency :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1, 73128419))
+`
+
+func (q *Queries) LockBoardShareTokenIdempotency(ctx context.Context, lockKey string) error {
+	_, err := q.db.Exec(ctx, lockBoardShareTokenIdempotency, lockKey)
+	return err
 }
 
 const revokeBoardShareTokenByID = `-- name: RevokeBoardShareTokenByID :execrows
@@ -549,17 +685,17 @@ WHERE board_id = $2 AND id = $3
 `
 
 type RevokeBoardShareTokenByIDParams struct {
-	RevokedBy sql.NullInt64 `json:"revoked_by"`
-	BoardID   string        `json:"board_id"`
-	TokenID   int64         `json:"token_id"`
+	RevokedBy pgtype.Int8 `json:"revoked_by"`
+	BoardID   string      `json:"board_id"`
+	TokenID   int64       `json:"token_id"`
 }
 
 func (q *Queries) RevokeBoardShareTokenByID(ctx context.Context, arg RevokeBoardShareTokenByIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeBoardShareTokenByID, arg.RevokedBy, arg.BoardID, arg.TokenID)
+	result, err := q.db.Exec(ctx, revokeBoardShareTokenByID, arg.RevokedBy, arg.BoardID, arg.TokenID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const upsertBoard = `-- name: UpsertBoard :execrows
@@ -590,22 +726,22 @@ WHERE boards.owner_user_id = EXCLUDED.owner_user_id
 `
 
 type UpsertBoardParams struct {
-	BoardID             string          `json:"board_id"`
-	OwnerUserID         int64           `json:"owner_user_id"`
-	CreatedBy           int64           `json:"created_by"`
-	Name                string          `json:"name"`
-	State               json.RawMessage `json:"state"`
-	Revision            sql.NullInt64   `json:"revision"`
-	StateSchemaVersion  sql.NullInt32   `json:"state_schema_version"`
-	LastSavedBy         sql.NullInt64   `json:"last_saved_by"`
-	CreatedAt           time.Time       `json:"created_at"`
-	UpdatedAt           time.Time       `json:"updated_at"`
-	HasExpectedRevision bool            `json:"has_expected_revision"`
-	ExpectedRevision    int64           `json:"expected_revision"`
+	BoardID             string             `json:"board_id"`
+	OwnerUserID         int64              `json:"owner_user_id"`
+	CreatedBy           int64              `json:"created_by"`
+	Name                string             `json:"name"`
+	State               []byte             `json:"state"`
+	Revision            pgtype.Int8        `json:"revision"`
+	StateSchemaVersion  pgtype.Int4        `json:"state_schema_version"`
+	LastSavedBy         pgtype.Int8        `json:"last_saved_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	HasExpectedRevision bool               `json:"has_expected_revision"`
+	ExpectedRevision    int64              `json:"expected_revision"`
 }
 
 func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, upsertBoard,
+	result, err := q.db.Exec(ctx, upsertBoard,
 		arg.BoardID,
 		arg.OwnerUserID,
 		arg.CreatedBy,
@@ -622,7 +758,7 @@ func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const upsertBoardMember = `-- name: UpsertBoardMember :exec
@@ -639,6 +775,6 @@ type UpsertBoardMemberParams struct {
 }
 
 func (q *Queries) UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error {
-	_, err := q.db.ExecContext(ctx, upsertBoardMember, arg.BoardID, arg.UserID, arg.Role)
+	_, err := q.db.Exec(ctx, upsertBoardMember, arg.BoardID, arg.UserID, arg.Role)
 	return err
 }

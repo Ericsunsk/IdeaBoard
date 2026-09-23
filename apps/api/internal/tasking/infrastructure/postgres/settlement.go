@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,12 +12,15 @@ import (
 	creditports "ideaboard/api/internal/credits/ports"
 	taskbilling "ideaboard/api/internal/tasking/ports/billing"
 	"ideaboard/api/internal/workflow"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // settleTerminal applies the durable Task Billing state transition inside the
 // caller-owned SQL transaction. Keeping this recipe in the PostgreSQL adapter
 // preserves the atomic lock and commit boundary with Task terminal facts.
-func settleTerminal(ctx context.Context, tx *sql.Tx, taskID string) error {
+func settleTerminal(ctx context.Context, tx pgx.Tx, taskID string) error {
 	if tx == nil {
 		return fmt.Errorf("task billing transaction unavailable")
 	}
@@ -52,29 +54,29 @@ type settlementFacts struct {
 	unitCredits        int64
 	quantity           int64
 	totalCredits       int64
-	holdTransactionID  sql.NullString
+	holdTransactionID  pgtype.Text
 	currentState       taskbilling.SettlementState
 	settledOutputCount int64
 	actualOutputCount  int64
 }
 
-func loadSettlementFacts(ctx context.Context, tx *sql.Tx, taskID string) (settlementFacts, bool, error) {
+func loadSettlementFacts(ctx context.Context, tx pgx.Tx, taskID string) (settlementFacts, bool, error) {
 	var facts settlementFacts
-	err := tx.QueryRowContext(ctx, `
+	err := tx.QueryRow(ctx, `
 SELECT snapshots.user_id, snapshots.unit_credits, snapshots.quantity, snapshots.total_credits,
        snapshots.hold_transaction_id, settlements.state, settlements.actual_output_count
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
 WHERE snapshots.task_id = $1
 	FOR UPDATE OF settlements`, taskID).Scan(&facts.userID, &facts.unitCredits, &facts.quantity, &facts.totalCredits, &facts.holdTransactionID, &facts.currentState, &facts.settledOutputCount)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		var snapshotExists bool
-		if existsErr := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&snapshotExists); existsErr != nil {
+		if existsErr := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&snapshotExists); existsErr != nil {
 			return settlementFacts{}, false, fmt.Errorf("check task billing snapshot: %w", existsErr)
 		}
 		var feature string
-		taskErr := tx.QueryRowContext(ctx, `SELECT feature_slug FROM tasks WHERE task_id = $1`, taskID).Scan(&feature)
-		if taskErr != nil && !errors.Is(taskErr, sql.ErrNoRows) {
+		taskErr := tx.QueryRow(ctx, `SELECT feature_slug FROM tasks WHERE task_id = $1`, taskID).Scan(&feature)
+		if taskErr != nil && !errors.Is(taskErr, pgx.ErrNoRows) {
 			return settlementFacts{}, false, fmt.Errorf("check task billing requirement: %w", taskErr)
 		}
 		if snapshotExists || workflow.IsAIImageFeature(feature) {
@@ -85,7 +87,7 @@ WHERE snapshots.task_id = $1
 	if err != nil {
 		return settlementFacts{}, false, fmt.Errorf("load task billing settlement: %w", err)
 	}
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_outputs WHERE task_id = $1`, taskID).Scan(&facts.actualOutputCount); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM task_outputs WHERE task_id = $1`, taskID).Scan(&facts.actualOutputCount); err != nil {
 		return settlementFacts{}, false, fmt.Errorf("count persisted task outputs: %w", err)
 	}
 	return facts, true, nil
@@ -132,8 +134,8 @@ type settlementTransactions struct {
 	settledAt time.Time
 }
 
-func applySettlementCommands(ctx context.Context, tx *sql.Tx, taskID string, facts settlementFacts, decision settlementDecision) (settlementTransactions, error) {
-	commands, err := credits.CommandsInSQLTx(tx)
+func applySettlementCommands(ctx context.Context, tx pgx.Tx, taskID string, facts settlementFacts, decision settlementDecision) (settlementTransactions, error) {
+	commands, err := credits.CommandsInTx(tx)
 	if err != nil {
 		return settlementTransactions{}, err
 	}
@@ -171,8 +173,8 @@ func applySettlementCommands(ctx context.Context, tx *sql.Tx, taskID string, fac
 	return transactions, nil
 }
 
-func persistSettlement(ctx context.Context, tx *sql.Tx, taskID string, decision settlementDecision, transactions settlementTransactions) error {
-	resultUpdate, err := tx.ExecContext(ctx, `
+func persistSettlement(ctx context.Context, tx pgx.Tx, taskID string, decision settlementDecision, transactions settlementTransactions) error {
+	commandTag, err := tx.Exec(ctx, `
 UPDATE task_billing_settlements
 SET state = $2, actual_output_count = $3, captured_credits = $4, released_credits = $5,
     capture_transaction_id = $6, release_transaction_id = $7, settled_at = $8, updated_at = clock_timestamp()
@@ -181,12 +183,8 @@ WHERE task_id = $1 AND state = 'held'`, taskID, decision.target, decision.actual
 	if err != nil {
 		return fmt.Errorf("persist task billing settlement: %w", err)
 	}
-	rows, err := resultUpdate.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read task billing settlement affected rows: %w", err)
-	}
-	if rows != 1 {
-		return fmt.Errorf("persist task billing settlement affected %d rows", rows)
+	if commandTag.RowsAffected() != 1 {
+		return fmt.Errorf("persist task billing settlement affected %d rows", commandTag.RowsAffected())
 	}
 	return nil
 }

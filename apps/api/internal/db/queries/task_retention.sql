@@ -10,7 +10,8 @@ SELECT DISTINCT (COALESCE(completed_at, cancelled_at, updated_at)::date) AS stat
 FROM tasks
 WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
   AND COALESCE(completed_at, cancelled_at, updated_at) < sqlc.arg(cutoff)
-ORDER BY stat_date;
+ORDER BY stat_date
+LIMIT sqlc.arg(row_limit);
 
 -- name: DeleteExpiredTaskCancellations :execrows
 DELETE FROM task_cancellations
@@ -19,6 +20,8 @@ WHERE task_id IN (
   FROM tasks
   WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
     AND COALESCE(completed_at, cancelled_at, updated_at) < sqlc.arg(cutoff)
+  ORDER BY COALESCE(completed_at, cancelled_at, updated_at)
+  LIMIT sqlc.arg(batch_size)
 );
 
 -- name: DeleteExpiredTasks :execrows

@@ -2,17 +2,19 @@ package privileges
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // DBTX is the shared database seam used by privilege configuration and
-// verification. *sql.DB, *sql.Conn, and *sql.Tx all satisfy it.
+// verification. *pgxpool.Pool, *pgx.Conn, and pgx.Tx all satisfy it.
 type DBTX interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 type ObjectKind string
@@ -86,7 +88,7 @@ func Configure(ctx context.Context, db DBTX, runtimeRole string, policies ...Pol
 		return fmt.Errorf("configure PostgreSQL privileges: %w", err)
 	}
 	for _, statement := range compileStatements(schemaName, runtimeRole, schemaPolicies, resolved) {
-		if _, err := db.ExecContext(ctx, statement.sql); err != nil {
+		if _, err := db.Exec(ctx, statement.sql); err != nil {
 			return fmt.Errorf(
 				"configure PostgreSQL privileges for %s: %w",
 				formatPolicyNames(statement.policyNames),
@@ -141,7 +143,7 @@ func loadVerificationIdentity(
 	db DBTX,
 	requireSchemaUsage bool,
 ) (schemaName string, currentUser string, schemaAllowed bool, err error) {
-	err = db.QueryRowContext(ctx, `/* ideaboard:verify-schema-privileges */
+	err = db.QueryRow(ctx, `/* ideaboard:verify-schema-privileges */
 WITH identity AS (
   SELECT current_schema() AS schema_name, current_user::TEXT AS role_name
 )
@@ -162,7 +164,7 @@ FROM identity`, requireSchemaUsage).Scan(&schemaName, &currentUser, &schemaAllow
 }
 
 func loadDatabaseIdentity(ctx context.Context, db DBTX) (schemaName string, currentUser string, err error) {
-	err = db.QueryRowContext(ctx, `SELECT current_schema(), current_user`).Scan(&schemaName, &currentUser)
+	err = db.QueryRow(ctx, `SELECT current_schema(), current_user`).Scan(&schemaName, &currentUser)
 	if err != nil {
 		return "", "", fmt.Errorf("load current schema and user: %w", err)
 	}

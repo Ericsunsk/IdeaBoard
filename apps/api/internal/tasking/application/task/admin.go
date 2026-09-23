@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/platform/validation"
 	tasks "ideaboard/api/internal/tasking/domain"
+	billingfacts "ideaboard/api/internal/tasking/ports/billing"
 
 	"github.com/google/uuid"
 )
@@ -18,56 +19,58 @@ const maxTaskKeywordLength = 200
 // AdminQueryService is the application boundary consumed by admin HTTP
 // handlers. It deliberately excludes user commands and submission flows.
 type AdminQueryService interface {
-	GetTask(context.Context, string) (*AdminTaskMonitorDetail, error)
-	ListTasks(context.Context, *tasks.TaskListRequest) ([]AdminTaskMonitorListItem, tasks.TaskListCounts, error)
+	GetTask(context.Context, string) (*AdminMonitorDetail, error)
+	ListTasks(context.Context, *tasks.TaskListRequest) ([]AdminMonitorListItem, tasks.TaskListCounts, error)
 	ResolveAdminTaskUserID(context.Context, string) (int64, error)
 }
 
-type AdminTaskMonitorListItem struct {
-	TaskID          string                             `json:"task_id"`
-	UserPublicID    uuid.UUID                          `json:"user_public_id"`
-	UserDisplayName string                             `json:"user_display_name"`
-	Prompt          string                             `json:"prompt"`
-	Priority        int                                `json:"priority"`
-	Status          string                             `json:"status"`
-	ErrorMsg        string                             `json:"error_msg"`
-	Result          string                             `json:"result"`
-	CreatedAt       time.Time                          `json:"created_at"`
-	CompletedAt     *time.Time                         `json:"completed_at"`
-	LatestExecution *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+type AdminMonitorListItem struct {
+	TaskID          string                         `json:"task_id"`
+	UserPublicID    uuid.UUID                      `json:"user_public_id"`
+	UserDisplayName string                         `json:"user_display_name"`
+	Prompt          string                         `json:"prompt"`
+	FeatureSlug     string                         `json:"feature_slug"`
+	Credits         int64                          `json:"credits"`
+	Priority        int                            `json:"priority"`
+	Status          string                         `json:"status"`
+	ErrorMsg        string                         `json:"error_msg"`
+	Result          string                         `json:"result"`
+	CreatedAt       time.Time                      `json:"created_at"`
+	CompletedAt     *time.Time                     `json:"completed_at"`
+	LatestExecution *AdminMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
 	internalUserID  int64
 }
 
-type AdminTaskMonitorDetail struct {
-	TaskID            string                             `json:"task_id"`
-	CorrelationID     string                             `json:"correlation_id"`
-	UserPublicID      uuid.UUID                          `json:"user_public_id"`
-	UserDisplayName   string                             `json:"user_display_name"`
-	Prompt            string                             `json:"prompt"`
-	UserPrompt        string                             `json:"user_prompt"`
-	Params            string                             `json:"params"`
-	FeatureSlug       string                             `json:"feature_slug"`
-	Priority          int                                `json:"priority"`
-	Status            string                             `json:"status"`
-	RetryCount        int                                `json:"retry_count"`
-	ErrorMsg          string                             `json:"error_msg"`
-	Result            string                             `json:"result"`
-	Outputs           []tasks.TaskOutput                 `json:"outputs,omitempty"`
-	ExecutionMetrics  *tasks.TaskExecutionMetrics        `json:"execution_metrics,omitempty"`
-	CreatedAt         time.Time                          `json:"created_at"`
-	UpdatedAt         time.Time                          `json:"updated_at"`
-	CompletedAt       *time.Time                         `json:"completed_at"`
-	CancelledAt       *time.Time                         `json:"cancelled_at"`
-	CancelReason      string                             `json:"cancel_reason"`
-	Billing           *tasks.AdminBillingSnapshot        `json:"billing,omitempty"`
-	LatestExecution   *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
-	ExecutionAttempts []tasks.AdminTaskAttempt           `json:"execution_attempts"`
+type AdminMonitorDetail struct {
+	TaskID            string                         `json:"task_id"`
+	CorrelationID     string                         `json:"correlation_id"`
+	UserPublicID      uuid.UUID                      `json:"user_public_id"`
+	UserDisplayName   string                         `json:"user_display_name"`
+	Prompt            string                         `json:"prompt"`
+	UserPrompt        string                         `json:"user_prompt"`
+	Params            string                         `json:"params"`
+	FeatureSlug       string                         `json:"feature_slug"`
+	Priority          int                            `json:"priority"`
+	Status            string                         `json:"status"`
+	RetryCount        int                            `json:"retry_count"`
+	ErrorMsg          string                         `json:"error_msg"`
+	Result            string                         `json:"result"`
+	Outputs           []tasks.TaskOutput             `json:"outputs,omitempty"`
+	ExecutionMetrics  *tasks.TaskExecutionMetrics    `json:"execution_metrics,omitempty"`
+	CreatedAt         time.Time                      `json:"created_at"`
+	UpdatedAt         time.Time                      `json:"updated_at"`
+	CompletedAt       *time.Time                     `json:"completed_at"`
+	CancelledAt       *time.Time                     `json:"cancelled_at"`
+	CancelReason      string                         `json:"cancel_reason"`
+	Billing           *tasks.AdminBillingSnapshot    `json:"billing,omitempty"`
+	LatestExecution   *AdminMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+	ExecutionAttempts []tasks.AdminTaskAttempt       `json:"execution_attempts"`
 	internalUserID    int64
 }
 
-type AdminTaskMonitorExecutionSnapshot = tasks.AdminTaskExecutionSnapshot
+type AdminMonitorExecutionSnapshot = tasks.AdminTaskExecutionSnapshot
 
-func (s *Service) GetTask(ctx context.Context, taskID string) (*AdminTaskMonitorDetail, error) {
+func (s *Service) GetTask(ctx context.Context, taskID string) (*AdminMonitorDetail, error) {
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
@@ -82,14 +85,14 @@ func (s *Service) GetTask(ctx context.Context, taskID string) (*AdminTaskMonitor
 		return nil, err
 	}
 	billingSnapshot, hasBilling := billing[task.TaskID]
-	detail := adminTaskMonitorDetailFromTask(task, billingSnapshot, hasBilling, traces[task.TaskID])
+	detail := adminMonitorDetailFromTask(task, billingSnapshot, hasBilling, traces[task.TaskID])
 	if err := s.enrichAdminTaskDetail(ctx, detail); err != nil {
 		return nil, err
 	}
 	return detail, nil
 }
 
-func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]AdminTaskMonitorListItem, tasks.TaskListCounts, error) {
+func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]AdminMonitorListItem, tasks.TaskListCounts, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -110,10 +113,15 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 	if err != nil {
 		return nil, tasks.TaskListCounts{}, err
 	}
-	result := make([]AdminTaskMonitorListItem, 0, len(items))
+	billings, err := s.loadAdminBillingSnapshots(ctx, taskIDsFromTasks(items))
+	if err != nil {
+		return nil, tasks.TaskListCounts{}, err
+	}
+	result := make([]AdminMonitorListItem, 0, len(items))
 	for _, item := range items {
 		latestExecution, hasLatestExecution := latest[item.TaskID]
-		row := adminTaskMonitorListItemFromTask(item, latestExecution, hasLatestExecution)
+		billing, hasBilling := billings[item.TaskID]
+		row := adminMonitorListItemFromTask(item, latestExecution, hasLatestExecution, billing, hasBilling)
 		if err := s.enrichAdminTaskListItem(ctx, &row); err != nil {
 			return nil, tasks.TaskListCounts{}, err
 		}
@@ -171,24 +179,23 @@ func taskIDsFromTasks(items []*tasks.Task) []string {
 	return taskIDs
 }
 
-func adminTaskMonitorExecutionSnapshotFromAttempt(attempt tasks.AdminTaskAttempt) *AdminTaskMonitorExecutionSnapshot {
-	return &AdminTaskMonitorExecutionSnapshot{
-		AccountID:            attempt.AccountID,
-		ProviderEndpointID:   attempt.ProviderEndpointID,
-		ProviderEndpointName: attempt.ProviderEndpointName,
-		ResolvedModel:        attempt.ResolvedModel,
-		APIType:              attempt.APIType,
+func adminMonitorExecutionSnapshotFromAttempt(attempt tasks.AdminTaskAttempt) *AdminMonitorExecutionSnapshot {
+	return &AdminMonitorExecutionSnapshot{
+		ResolvedModel: attempt.ResolvedModel,
+		Provider:      attempt.Provider,
+		GatewayStep:   attempt.GatewayStep,
 	}
 }
 
-func adminTaskMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.AdminTaskExecutionSnapshot, hasLatestExecution bool) AdminTaskMonitorListItem {
+func adminMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.AdminTaskExecutionSnapshot, hasLatestExecution bool, billing tasks.AdminBillingSnapshot, hasBilling bool) AdminMonitorListItem {
 	if task == nil {
-		return AdminTaskMonitorListItem{}
+		return AdminMonitorListItem{}
 	}
-	item := AdminTaskMonitorListItem{
+	item := AdminMonitorListItem{
 		TaskID:         task.TaskID,
 		internalUserID: task.UserID,
 		Prompt:         task.Prompt,
+		FeatureSlug:    task.FeatureSlug,
 		Priority:       task.Priority,
 		Status:         task.Status,
 		ErrorMsg:       task.ErrorMsg,
@@ -196,20 +203,23 @@ func adminTaskMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.Ad
 		CreatedAt:      task.CreatedAt,
 		CompletedAt:    task.CompletedAt,
 	}
+	if hasBilling && billing.SettlementState == string(billingfacts.SettlementStateCaptured) {
+		item.Credits = billing.CapturedCredits
+	}
 	if hasLatestExecution {
 		item.LatestExecution = &latestExecution
 	}
 	return item
 }
 
-func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBillingSnapshot, hasBilling bool, attempts []tasks.AdminTaskAttempt) *AdminTaskMonitorDetail {
+func adminMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBillingSnapshot, hasBilling bool, attempts []tasks.AdminTaskAttempt) *AdminMonitorDetail {
 	if task == nil {
 		return nil
 	}
 	if attempts == nil {
 		attempts = []tasks.AdminTaskAttempt{}
 	}
-	detail := &AdminTaskMonitorDetail{
+	detail := &AdminMonitorDetail{
 		TaskID:            task.TaskID,
 		internalUserID:    task.UserID,
 		CorrelationID:     task.EffectiveCorrelationID(),
@@ -235,7 +245,7 @@ func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBilling
 		detail.Billing = &billing
 	}
 	if len(attempts) > 0 {
-		detail.LatestExecution = adminTaskMonitorExecutionSnapshotFromAttempt(attempts[len(attempts)-1])
+		detail.LatestExecution = adminMonitorExecutionSnapshotFromAttempt(attempts[len(attempts)-1])
 	}
 	return detail
 }

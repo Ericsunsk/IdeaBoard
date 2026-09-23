@@ -3,15 +3,17 @@ package processing
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
+
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/imageformat"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/media/derivatives/domain"
 	"ideaboard/api/internal/media/derivatives/ports"
@@ -22,7 +24,7 @@ import (
 // so there is no queue, no outbox, and no retry scheduling: a render failure
 // fails the creating request instead of wedging clients on pending rows.
 type Service struct {
-	db       *sql.DB
+	db       *pgxpool.Pool
 	storage  ports.Storage
 	verifier ports.Verifier
 	renderer ports.Renderer
@@ -30,7 +32,7 @@ type Service struct {
 }
 
 func NewService(
-	db *sql.DB,
+	db *pgxpool.Pool,
 	storage ports.Storage,
 	verifier ports.Verifier,
 	renderer ports.Renderer,
@@ -64,7 +66,7 @@ func (s *Service) MaterializeProcessingInput(ctx context.Context, assetID, owner
 		MediaAssetID: assetID, OwnerUserID: ownerUserID, Tier: domain.TierProcessingInput,
 	}); err == nil && existing.Status == "ready" && existing.SourceObjectGeneration == asset.ObjectGeneration {
 		return nil
-	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	} else if err != nil && !database.IsNotFound(err) {
 		return fmt.Errorf("load processing-input derivative: %w", err)
 	}
 

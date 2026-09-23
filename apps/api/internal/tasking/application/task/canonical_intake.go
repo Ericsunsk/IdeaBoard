@@ -1,0 +1,644 @@
+package task
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+
+	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/platform/validation"
+	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	tasksubmission "ideaboard/api/internal/tasking/application/submission"
+	tasks "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
+)
+
+// Canonical intake ordering.
+//
+// Submit and Readiness share one map→typed→plan→persisted-JSON sequence owned
+// by this module. The order is load-bearing:
+//
+//  1. map: stamp feature, strip model, normalize structured prompt contracts,
+//     then validate generation/fusion contracts (normalizeSubmitExecutionMap).
+//  2. plan inputs + plan: derive FeatureExecutionParams from the normalized map
+//     and compile the Workflow plan (compileSubmitExecutionPlan or
+//     compileReadinessExecutionPlan).
+//  3. typed: stamp plan-derived output facts back into the map, convert to the
+//     typed WorkflowTaskParams, and attach the encoded plan
+//     (finalizeSubmitTypedParams). The write-back must precede the conversion
+//     so typed Controls agree with the compiled plan.
+//  4. persisted JSON: marshal the typed params with generation snapshot and
+//     billing into the CanonicalRequest (assembleCanonicalTaskRequest).
+//
+// Readiness diverges only at stage 2: it compiles a readiness plan with
+// synthesized media facts and never stamps plan facts back into the map.
+//
+// Workflow stays a pure plan/contract library: it never owns this sequencing,
+// performs I/O, or persists anything.
+type compiledTaskExecution struct {
+	featureSlug string
+	plan        workflow.FeatureExecutionPlan
+	typedParams *tasks.WorkflowTaskParams
+}
+
+// normalizeSubmitExecutionMap runs stage 1 of the canonical submit ordering.
+// Contract normalization must precede media-fact derivation so fusion weights
+// and structured prompt fields are canonical before anything reads them.
+func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug string) error {
+	params["feature"] = featureSlug
+	delete(params, "model")
+	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
+		return err
+	}
+	if featureSlug == workflow.FeatureSlugGeneration {
+		if err := workflow.ValidateGenerationSubmitContract(params); err != nil {
+			return err
+		}
+	}
+	if featureSlug == workflow.FeatureSlugFusion {
+		if err := normalizeFusionParams(params); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// compileSubmitExecutionPlan runs stage 2 of the canonical submit ordering:
+// derive plan inputs from the normalized map, then compile the execution plan.
+func compileSubmitExecutionPlan(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionPlan, error) {
+	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	if err != nil {
+		return workflow.FeatureExecutionPlan{}, err
+	}
+	executionPlan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: featureSlug,
+		Params:  executionParams,
+	})
+	if err != nil {
+		return workflow.FeatureExecutionPlan{}, mapFeatureContractValidationError(err)
+	}
+	return executionPlan, nil
+}
+
+// compileReadinessExecutionPlan runs stage 2 of the canonical readiness
+// ordering. It reads plan inputs from the raw submit map and compiles a
+// readiness plan with synthesized media facts. It never mutates params: plan
+// facts must not leak back into the readiness caller map.
+func compileReadinessExecutionPlan(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionPlan, error) {
+	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	if err != nil {
+		return workflow.FeatureExecutionPlan{}, err
+	}
+	executionPlan, err := workflow.CompileFeatureReadinessPlan(workflow.CompileFeatureExecutionInput{
+		Feature: featureSlug,
+		Params:  executionParams,
+	})
+	if err != nil {
+		return workflow.FeatureExecutionPlan{}, mapFeatureContractValidationError(err)
+	}
+	return executionPlan, nil
+}
+
+// finalizeSubmitTypedParams runs stage 3 of the canonical submit ordering.
+// Plan-derived output facts overwrite caller values in the map before the
+// typed conversion, so the persisted typed Controls cannot disagree with the
+// compiled plan.
+func finalizeSubmitTypedParams(params map[string]interface{}, featureSlug string, executionPlan workflow.FeatureExecutionPlan) (*tasks.WorkflowTaskParams, error) {
+	params[paramkeys.OutputCount] = executionPlan.RequestedOutputCount().Int()
+	params[paramkeys.OutputResolution] = executionPlan.OutputResolution()
+	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
+	if err != nil {
+		return nil, err
+	}
+	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
+	if err != nil {
+		return nil, err
+	}
+	typedParams.ExecutionPlan = executionPlanJSON
+	return typedParams, nil
+}
+
+func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, normalized normalizedTaskCompile, execution compiledTaskExecution, prompt compiledTaskPrompts) (CanonicalTaskRequest, error) {
+	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
+		Plan:                execution.plan,
+		UserPrompt:          req.Prompt,
+		SystemPrompt:        prompt.systemPrompt,
+		CompiledPrompt:      prompt.fullPrompt,
+		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt.config.Prompt),
+		SeedMaterial:        normalized.clientActionID,
+		Params:              execution.typedParams,
+	})
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	billingRequest, err := resolveTaskBillingRequest(execution.plan)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if billingRequest != nil && normalized.clientActionID == "" {
+		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
+	}
+	execution.typedParams.Generation = &generationSnapshot
+	paramsJSON, err := marshalWorkflowTaskParams(execution.typedParams, normalized.params)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
+		UserID: userID, Feature: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
+		Params: paramsJSON, ClientActionID: normalized.clientActionID, Priority: normalized.priority,
+		Generation:     &generationSnapshot,
+		BillingRequest: billingRequest,
+		ExecutionPlan:  &execution.plan,
+	})
+}
+
+func resolveTaskBillingRequest(plan workflow.FeatureExecutionPlan) (*taskbilling.Request, error) {
+	if !workflow.IsAIImageFeature(plan.Feature()) {
+		return nil, nil
+	}
+	request, err := taskbilling.AIImageRequest(
+		plan.Feature(),
+		plan.OutputResolution(),
+		int64(plan.RequestedOutputCount().Int()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+func compileFeatureExecutionParams(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionParams, error) {
+	result := workflow.FeatureExecutionParams{}
+	if raw, ok := params[paramkeys.OutputCount]; ok {
+		value, ok := readExactIntParam(raw)
+		if !ok {
+			return result, validation.New("output_count 仅支持整数 1-4")
+		}
+		result.RequestedOutputCount = &value
+	}
+	if raw, ok := params[paramkeys.OutputResolution]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			return result, validation.New("output_resolution 必须是字符串")
+		}
+		result.OutputResolution = &value
+	}
+	media := workflowMediaInputsFromMap(params, featureSlug)
+	if media == nil {
+		return result, nil
+	}
+	result.ImageInputCount = len(media.Inputs) + len(media.References)
+	if media.Original != nil {
+		result.ImageInputCount++
+	}
+	result.HasMaskInput = media.Mask != nil
+	return result, nil
+}
+
+func mapFeatureContractValidationError(err error) error {
+	var contractErr *workflow.FeatureContractValidationError
+	if !errors.As(err, &contractErr) {
+		return err
+	}
+	switch contractErr.Code {
+	case workflow.FeatureContractUnknownFeature:
+		return validation.New("feature 不受支持")
+	case workflow.FeatureContractInvalidOutputCount:
+		return validation.New("output_count 不符合功能要求")
+	case workflow.FeatureContractUnsupportedResolution:
+		return validation.New("该功能的 output_resolution 不受支持")
+	case workflow.FeatureContractInvalidRuntimeInput:
+		return validation.New("该功能的图片输入不符合要求")
+	default:
+		return validation.New("功能执行参数无效")
+	}
+}
+
+func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[string]interface{}) (string, error) {
+	if params == nil {
+		return "", nil
+	}
+	if source != nil && jsonlimit.ValueDepth(source) > maxSubmitTaskParamsDepth {
+		return "", fmt.Errorf("任务参数层级过深")
+	}
+	payload, err := json.Marshal(params)
+	if err != nil {
+		return "", fmt.Errorf("任务参数格式错误")
+	}
+	if len(payload) > maxSubmitTaskParamsBytes {
+		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
+	}
+	return string(payload), nil
+}
+
+// workflowTaskParamsFromMap converts submit params into the canonical typed
+// WorkflowTaskParams stored on the task and passed through the queue.
+func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string) (*tasks.WorkflowTaskParams, error) {
+	p := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
+	if params == nil {
+		return p, nil
+	}
+	p.Extra = workflowExtraParamsFromMap(params)
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
+		p.Feature = v
+	}
+	p.Media = workflowMediaInputsFromMap(params, featureSlug)
+	p.Controls = generationControlsFromMap(params)
+	applyFeatureSpecificTaskParams(p, params, featureSlug)
+	return p, nil
+}
+
+func workflowExtraParamsFromMap(params map[string]interface{}) map[string]interface{} {
+	var extra map[string]interface{}
+	for key, value := range params {
+		if key == "model" || paramkeys.IsKnownSubmitTaskParamKey(key) {
+			continue
+		}
+		if extra == nil {
+			extra = map[string]interface{}{}
+		}
+		extra[key] = value
+	}
+	return extra
+}
+
+func generationControlsFromMap(params map[string]interface{}) *tasks.GenerationControls {
+	controls := &tasks.GenerationControls{}
+	hasControls := false
+	dimensions, hasDimensions := generationDimensionControlsFromMap(params)
+	if hasDimensions {
+		controls.CustomWidth = dimensions.CustomWidth
+		controls.CustomHeight = dimensions.CustomHeight
+		controls.OriginalWidth = dimensions.OriginalWidth
+		controls.OriginalHeight = dimensions.OriginalHeight
+		hasControls = true
+	}
+	stringsControls, hasStrings := generationStringControlsFromMap(params)
+	if hasStrings {
+		controls.Ratio = stringsControls.Ratio
+		controls.Quality = stringsControls.Quality
+		hasControls = true
+	}
+	output, hasOutput := generationOutputControlsFromMap(params)
+	if hasOutput {
+		controls.OutputCount = output.OutputCount
+		controls.PromptUpsampling = output.PromptUpsampling
+		hasControls = true
+	}
+	if !hasControls {
+		return nil
+	}
+	return controls
+}
+
+func generationDimensionControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
+	hasControls := false
+	if v, ok := readFloatParam(params, paramkeys.CustomWidth); ok {
+		controls.CustomWidth = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, paramkeys.CustomHeight); ok {
+		controls.CustomHeight = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, paramkeys.OriginalImageWidth); ok {
+		controls.OriginalWidth = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, paramkeys.OriginalImageHeight); ok {
+		controls.OriginalHeight = v
+		hasControls = true
+	}
+	return controls, hasControls
+}
+
+func generationStringControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
+	hasControls := false
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Ratio); ok {
+		controls.Ratio = v
+		hasControls = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Quality); ok {
+		controls.Quality = v
+		hasControls = true
+	}
+	return controls, hasControls
+}
+
+func generationOutputControlsFromMap(params map[string]interface{}) (tasks.GenerationControls, bool) {
+	controls := tasks.GenerationControls{}
+	hasControls := false
+	if v, ok := readIntParam(params, paramkeys.OutputCount); ok {
+		controls.OutputCount = v
+		hasControls = true
+	}
+	if v, ok := readBoolParam(params, paramkeys.PromptUpsampling); ok {
+		controls.PromptUpsampling = &v
+		hasControls = true
+	}
+	return controls, hasControls
+}
+
+func applyFeatureSpecificTaskParams(params *tasks.WorkflowTaskParams, raw map[string]interface{}, featureSlug string) {
+	switch featureSlug {
+	case workflow.FeatureSlugVariations:
+		if c, ok := workflow.ReadVariationsPromptContract(raw); ok {
+			params.Variation = &tasks.VariationsParams{Strength: c.Strength}
+		}
+	case workflow.FeatureSlugOutpaint:
+		if c, ok := workflow.ReadOutpaintContract(raw); ok {
+			params.Outpaint = &tasks.OutpaintParams{
+				TargetWidth: c.TargetWidth, TargetHeight: c.TargetHeight,
+				ImageOffsetX: c.ImageOffsetX, ImageOffsetY: c.ImageOffsetY,
+			}
+		}
+	case workflow.FeatureSlugUpscale:
+		if c, ok := workflow.ReadUpscaleContract(raw); ok {
+			params.Upscale = &tasks.UpscaleParams{Scale: c.Scale}
+		}
+	case workflow.FeatureSlugFusion:
+		if c, ok := workflow.ReadFusionPromptContract(raw); ok {
+			params.Fusion = &tasks.FusionParams{
+				Mode:         c.Mode,
+				InputWeights: c.InputWeights,
+			}
+		}
+	}
+}
+
+func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug string) *tasks.MediaInputs {
+	media := &tasks.MediaInputs{}
+	hasMedia := false
+
+	inputWeights := []float64(nil)
+	if featureSlug == workflow.FeatureSlugFusion {
+		if weights, ok := workflow.ReadFusionInputWeights(params); ok {
+			inputWeights = weights
+		}
+	}
+
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
+	if len(imageURLs) > 0 {
+		media.Inputs = mediaRefsFromURLs(imageURLs, tasks.MediaRoleInput, inputWeights)
+		hasMedia = true
+	}
+	assetIDs := collectInt64List(params[paramkeys.ImageAssetIDs])
+	if len(assetIDs) > 0 {
+		media.Inputs = append(media.Inputs, mediaRefsFromAssetIDs(assetIDs, tasks.MediaRoleInput)...)
+		hasMedia = true
+	}
+	referenceAssetIDs := collectInt64List(params[paramkeys.ReferenceImageAssetIDs])
+	if len(referenceAssetIDs) > 0 {
+		media.References = append(media.References, mediaRefsFromAssetIDs(referenceAssetIDs, tasks.MediaRoleReference)...)
+		hasMedia = true
+	}
+	referenceImageURLs := mediarefs.CollectStringList(params[paramkeys.ReferenceImageURLs])
+	if len(referenceImageURLs) > 0 {
+		media.References = mediaRefsFromURLs(referenceImageURLs, tasks.MediaRoleReference, nil)
+		hasMedia = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.MaskImageURL); ok {
+		media.Mask = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleMask}
+		hasMedia = true
+	}
+	if assetID, ok := readInt64Param(params[paramkeys.OriginalImageAssetID]); ok {
+		media.Original = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleOriginal}
+		hasMedia = true
+	}
+	if assetID, ok := readInt64Param(params[paramkeys.MaskImageAssetID]); ok {
+		media.Mask = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleMask}
+		hasMedia = true
+	}
+	if v, ok := readBoolParam(params, paramkeys.UseMask); ok {
+		media.UseMask = &v
+		hasMedia = true
+	}
+	if !hasMedia {
+		return nil
+	}
+	return media
+}
+
+func mediaRefsFromURLs(urls []string, role string, weights []float64) []tasks.MediaRef {
+	if len(urls) == 0 {
+		return nil
+	}
+	refs := make([]tasks.MediaRef, 0, len(urls))
+	for index, raw := range urls {
+		ref := tasks.MediaRef{
+			Source: strings.TrimSpace(raw),
+			Role:   role,
+		}
+		if index < len(weights) {
+			ref.Weight = weights[index]
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
+func mediaRefsFromAssetIDs(assetIDs []int64, role string) []tasks.MediaRef {
+	refs := make([]tasks.MediaRef, 0, len(assetIDs))
+	for _, id := range assetIDs {
+		refs = append(refs, tasks.MediaRef{AssetID: id, Role: role})
+	}
+	return refs
+}
+
+func normalizeFusionParams(params map[string]interface{}) error {
+	if params == nil {
+		return nil
+	}
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
+	if len(imageURLs) < 2 || len(imageURLs) > 4 {
+		return fmt.Errorf("fusion 节点需要 2 到 4 张输入图")
+	}
+	rawFusion, ok := params[paramkeys.Fusion]
+	if !ok {
+		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
+	}
+	fusion, ok := rawFusion.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("fusion 参数格式错误")
+	}
+	if _, ok := fusion[paramkeys.InputWeights]; !ok {
+		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
+	}
+	weights, ok := workflow.ReadFusionInputWeights(params)
+	if !ok {
+		return fmt.Errorf("fusion 权重必须是数字数组")
+	}
+	if len(weights) != len(imageURLs) {
+		return fmt.Errorf("fusion 权重数量必须与输入图数量一致")
+	}
+	normalizedWeights, err := normalizeFusionInputWeights(weights)
+	if err != nil {
+		return err
+	}
+	normalizedFusion := make(map[string]interface{}, len(fusion)+2)
+	for key, value := range fusion {
+		normalizedFusion[key] = value
+	}
+	normalizedFusion[paramkeys.Mode] = "weighted_reference"
+	normalizedFusion[paramkeys.InputWeights] = normalizedWeights
+	params[paramkeys.Fusion] = normalizedFusion
+	return nil
+}
+
+func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
+	out := make([]float64, 0, len(weights))
+	total := 0.0
+	for _, weight := range weights {
+		if math.IsNaN(weight) || math.IsInf(weight, 0) {
+			return nil, fmt.Errorf("fusion 权重必须是有限数字")
+		}
+		if weight < 0 {
+			return nil, fmt.Errorf("fusion 权重不能为负数")
+		}
+		out = append(out, weight)
+		total += weight
+	}
+	if total <= 0 {
+		return nil, fmt.Errorf("fusion 权重总和必须大于 0")
+	}
+	for index := range out {
+		out[index] /= total
+	}
+	return out, nil
+}
+
+func collectInt64List(raw interface{}) []int64 {
+	var values []int64
+	switch v := raw.(type) {
+	case []int64:
+		values = append(values, v...)
+	case []int:
+		for _, n := range v {
+			values = append(values, int64(n))
+		}
+	case []interface{}:
+		for _, item := range v {
+			switch n := item.(type) {
+			case int64:
+				values = append(values, n)
+			case int:
+				values = append(values, int64(n))
+			case float64:
+				if n == float64(int64(n)) {
+					values = append(values, int64(n))
+				}
+			}
+		}
+	}
+	return values
+}
+
+func readInt64Param(raw interface{}) (int64, bool) {
+	switch value := raw.(type) {
+	case int64:
+		return value, value > 0
+	case int:
+		return int64(value), value > 0
+	case float64:
+		if value <= 0 || value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	case json.Number:
+		n, err := value.Int64()
+		return n, err == nil && n > 0
+	default:
+		return 0, false
+	}
+}
+
+func readBoolParam(params map[string]interface{}, key string) (bool, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return false, false
+	}
+	switch v := raw.(type) {
+	case bool:
+		return v, true
+	case string:
+		normalized := strings.ToLower(strings.TrimSpace(v))
+		switch normalized {
+		case "true", "1", "yes":
+			return true, true
+		case "false", "0", "no":
+			return false, true
+		default:
+			return false, false
+		}
+	default:
+		return false, false
+	}
+}
+
+func readFloatParam(params map[string]interface{}, key string) (float64, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case json.Number:
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
+}
+
+func readIntParam(params map[string]interface{}, key string) (int, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+	return readExactIntParam(raw)
+}
+
+func readExactIntParam(raw interface{}) (int, bool) {
+	switch v := raw.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case int32:
+		return int(v), true
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v {
+			return 0, false
+		}
+		return int(v), true
+	case float32:
+		if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) || float32(math.Trunc(float64(v))) != v {
+			return 0, false
+		}
+		return int(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(n), true
+	default:
+		return 0, false
+	}
+}

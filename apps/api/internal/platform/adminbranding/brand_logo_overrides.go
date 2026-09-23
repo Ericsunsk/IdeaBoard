@@ -2,15 +2,17 @@ package adminbranding
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/validation"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Scope string
@@ -48,16 +50,16 @@ type Store interface {
 	Delete(context.Context, Scope, string) (bool, error)
 }
 
-type Repository struct{ db *sql.DB }
+type Repository struct{ db *pgxpool.Pool }
 
 type repositoryContextDB struct {
 	ctx context.Context
-	db  *sql.DB
+	db  *pgxpool.Pool
 }
 
 func (db repositoryContextDB) queries() *dbsqlc.Queries { return dbsqlc.New(db.db) }
 
-func NewRepository(db *sql.DB) *Repository { return &Repository{db: db} }
+func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }
 
 func (r *Repository) dbWithContext(ctx context.Context) repositoryContextDB {
 	return repositoryContextDB{ctx: ctx, db: r.db}
@@ -73,7 +75,7 @@ func (r *Repository) List(ctx context.Context) ([]Override, error) {
 	}
 	items := make([]Override, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, Override{Scope: Scope(row.Scope), TargetKey: row.TargetKey, LogoKey: row.LogoKey, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt})
+		items = append(items, Override{Scope: Scope(row.Scope), TargetKey: row.TargetKey, LogoKey: row.LogoKey, CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt)})
 	}
 	return items, nil
 }
@@ -89,7 +91,7 @@ func (r *Repository) Upsert(ctx context.Context, scope Scope, targetKey, logoKey
 	if err != nil {
 		return Override{}, fmt.Errorf("upsert admin brand logo override: %w", err)
 	}
-	return Override{Scope: Scope(row.Scope), TargetKey: row.TargetKey, LogoKey: row.LogoKey, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
+	return Override{Scope: Scope(row.Scope), TargetKey: row.TargetKey, LogoKey: row.LogoKey, CreatedAt: dbutil.TimeValue(row.CreatedAt), UpdatedAt: dbutil.TimeValue(row.UpdatedAt)}, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, scope Scope, targetKey string) (bool, error) {

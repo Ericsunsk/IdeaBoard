@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,18 +23,12 @@ type Service struct {
 }
 
 type Backend struct {
-	ExecuteCreditCommand                  func(context.Context, pgx.Tx, domain.CommandType, int64, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteSQLCreditCommand               func(context.Context, *sql.Tx, domain.CommandType, int64, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteCreditPurchase                 func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteSQLCreditPurchase              func(context.Context, *sql.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteCreditPurchaseRefundHold       func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteSQLCreditPurchaseRefundHold    func(context.Context, *sql.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteCreditPurchaseRefund           func(context.Context, pgx.Tx, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteSQLCreditPurchaseRefund        func(context.Context, *sql.Tx, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteCreditPaymentDisputeDebit      func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.PaymentDisputeDebitResult, error)
-	ExecuteSQLCreditPaymentDisputeDebit   func(context.Context, *sql.Tx, int64, int64, domain.CommandMetadata) (ports.PaymentDisputeDebitResult, error)
-	ExecuteCreditPaymentDisputeRestore    func(context.Context, pgx.Tx, int64, string, int64, domain.CommandMetadata) (ports.CommandResult, error)
-	ExecuteSQLCreditPaymentDisputeRestore func(context.Context, *sql.Tx, int64, string, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	ExecuteCreditCommand               func(context.Context, pgx.Tx, domain.CommandType, int64, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
+	ExecuteCreditPurchase              func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	ExecuteCreditPurchaseRefundHold    func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
+	ExecuteCreditPurchaseRefund        func(context.Context, pgx.Tx, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
+	ExecuteCreditPaymentDisputeDebit   func(context.Context, pgx.Tx, int64, int64, domain.CommandMetadata) (ports.PaymentDisputeDebitResult, error)
+	ExecuteCreditPaymentDisputeRestore func(context.Context, pgx.Tx, int64, string, int64, domain.CommandMetadata) (ports.CommandResult, error)
 }
 
 func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
@@ -49,12 +42,12 @@ func NewService(pool *pgxpool.Pool, backend Backend) (*Service, error) {
 }
 
 func backendComplete(backend Backend) bool {
-	return backend.ExecuteCreditCommand != nil && backend.ExecuteSQLCreditCommand != nil &&
-		backend.ExecuteCreditPurchase != nil && backend.ExecuteSQLCreditPurchase != nil &&
-		backend.ExecuteCreditPurchaseRefundHold != nil && backend.ExecuteSQLCreditPurchaseRefundHold != nil &&
-		backend.ExecuteCreditPurchaseRefund != nil && backend.ExecuteSQLCreditPurchaseRefund != nil &&
-		backend.ExecuteCreditPaymentDisputeDebit != nil && backend.ExecuteSQLCreditPaymentDisputeDebit != nil &&
-		backend.ExecuteCreditPaymentDisputeRestore != nil && backend.ExecuteSQLCreditPaymentDisputeRestore != nil
+	return backend.ExecuteCreditCommand != nil &&
+		backend.ExecuteCreditPurchase != nil &&
+		backend.ExecuteCreditPurchaseRefundHold != nil &&
+		backend.ExecuteCreditPurchaseRefund != nil &&
+		backend.ExecuteCreditPaymentDisputeDebit != nil &&
+		backend.ExecuteCreditPaymentDisputeRestore != nil
 }
 
 type transactionCommands struct {
@@ -62,23 +55,8 @@ type transactionCommands struct {
 	backend Backend
 }
 
-type sqlTransactionCommands struct {
-	tx      *sql.Tx
-	backend Backend
-}
-
 func NewTransactionCommands(tx pgx.Tx, backend Backend) ports.Commands {
 	return &transactionCommands{tx: tx, backend: backend}
-}
-
-func NewSQLTransactionCommands(tx *sql.Tx, backend Backend) (ports.Commands, error) {
-	if tx == nil {
-		return nil, fmt.Errorf("credits: SQL transaction is nil")
-	}
-	if !backendComplete(backend) {
-		return nil, fmt.Errorf("credits: persistence backend not configured")
-	}
-	return &sqlTransactionCommands{tx: tx, backend: backend}, nil
 }
 
 func (s *Service) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {
@@ -244,54 +222,6 @@ func (c *transactionCommands) Refund(ctx context.Context, command ports.RefundCo
 	return executeRefund(ctx, command, c.execute)
 }
 
-func (c *sqlTransactionCommands) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {
-	return executeGrant(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) Purchase(ctx context.Context, command ports.PurchaseCommand) (ports.CommandResult, error) {
-	return executePurchase(ctx, command, c.executePurchase)
-}
-
-func (c *sqlTransactionCommands) Deduct(ctx context.Context, command ports.DeductionCommand) (ports.CommandResult, error) {
-	return executeDeduction(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) Correct(ctx context.Context, command ports.CorrectionCommand) (ports.CommandResult, error) {
-	return executeCorrection(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) Hold(ctx context.Context, command ports.HoldCommand) (ports.CommandResult, error) {
-	return executeHold(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) PurchaseRefundHold(ctx context.Context, command ports.PurchaseRefundHoldCommand) (ports.CommandResult, error) {
-	return executePurchaseRefundHold(ctx, command, c.executeSQLPurchaseRefundHold)
-}
-
-func (c *sqlTransactionCommands) PurchaseRefund(ctx context.Context, command ports.PurchaseRefundCommand) (ports.CommandResult, error) {
-	return executePurchaseRefund(ctx, command, c.executeSQLPurchaseRefund)
-}
-
-func (c *sqlTransactionCommands) PaymentDisputeDebit(ctx context.Context, command ports.PaymentDisputeDebitCommand) (ports.PaymentDisputeDebitResult, error) {
-	return executePaymentDisputeDebit(ctx, command, c.executePaymentDisputeDebit)
-}
-
-func (c *sqlTransactionCommands) PaymentDisputeRestore(ctx context.Context, command ports.PaymentDisputeRestoreCommand) (ports.CommandResult, error) {
-	return executePaymentDisputeRestore(ctx, command, c.executePaymentDisputeRestore)
-}
-
-func (c *sqlTransactionCommands) Capture(ctx context.Context, command ports.CaptureCommand) (ports.CommandResult, error) {
-	return executeCapture(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) Release(ctx context.Context, command ports.ReleaseCommand) (ports.CommandResult, error) {
-	return executeRelease(ctx, command, c.execute)
-}
-
-func (c *sqlTransactionCommands) Refund(ctx context.Context, command ports.RefundCommand) (ports.CommandResult, error) {
-	return executeRefund(ctx, command, c.execute)
-}
-
 type commandExecutor func(context.Context, domain.CommandType, int64, int64, string, domain.CommandMetadata) (ports.CommandResult, error)
 type purchaseExecutor func(context.Context, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
 type purchaseRefundHoldExecutor func(context.Context, int64, int64, domain.CommandMetadata) (ports.CommandResult, error)
@@ -304,13 +234,6 @@ func (c *transactionCommands) execute(ctx context.Context, commandType domain.Co
 		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
 	}
 	return c.backend.ExecuteCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
-}
-
-func (c *sqlTransactionCommands) execute(ctx context.Context, commandType domain.CommandType, userID, amount int64, relatedID string, metadata domain.CommandMetadata) (ports.CommandResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
 }
 
 func (c *transactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata domain.CommandMetadata) (ports.CommandResult, error) {
@@ -334,13 +257,6 @@ func (c *transactionCommands) executePaymentDisputeRestore(ctx context.Context, 
 	return c.backend.ExecuteCreditPaymentDisputeRestore(ctx, c.tx, userID, originalTransactionID, amount, metadata)
 }
 
-func (c *sqlTransactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata domain.CommandMetadata) (ports.CommandResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditPurchase(ctx, c.tx, userID, amount, metadata)
-}
-
 func (c *transactionCommands) executePurchaseRefundHold(ctx context.Context, userID, amount int64, metadata domain.CommandMetadata) (ports.CommandResult, error) {
 	if c == nil || !backendComplete(c.backend) {
 		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
@@ -348,39 +264,11 @@ func (c *transactionCommands) executePurchaseRefundHold(ctx context.Context, use
 	return c.backend.ExecuteCreditPurchaseRefundHold(ctx, c.tx, userID, amount, metadata)
 }
 
-func (c *sqlTransactionCommands) executeSQLPurchaseRefundHold(ctx context.Context, userID, amount int64, metadata domain.CommandMetadata) (ports.CommandResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditPurchaseRefundHold(ctx, c.tx, userID, amount, metadata)
-}
-
-func (c *sqlTransactionCommands) executePaymentDisputeDebit(ctx context.Context, userID, requestedAmount int64, metadata domain.CommandMetadata) (ports.PaymentDisputeDebitResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.PaymentDisputeDebitResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditPaymentDisputeDebit(ctx, c.tx, userID, requestedAmount, metadata)
-}
-
-func (c *sqlTransactionCommands) executePaymentDisputeRestore(ctx context.Context, userID int64, originalTransactionID string, amount int64, metadata domain.CommandMetadata) (ports.CommandResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditPaymentDisputeRestore(ctx, c.tx, userID, originalTransactionID, amount, metadata)
-}
-
 func (c *transactionCommands) executePurchaseRefund(ctx context.Context, userID int64, holdID string, metadata domain.CommandMetadata) (ports.CommandResult, error) {
 	if c == nil || !backendComplete(c.backend) {
 		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
 	}
 	return c.backend.ExecuteCreditPurchaseRefund(ctx, c.tx, userID, holdID, metadata)
-}
-
-func (c *sqlTransactionCommands) executeSQLPurchaseRefund(ctx context.Context, userID int64, holdID string, metadata domain.CommandMetadata) (ports.CommandResult, error) {
-	if c == nil || !backendComplete(c.backend) {
-		return ports.CommandResult{}, fmt.Errorf("credits commands: persistence backend not configured")
-	}
-	return c.backend.ExecuteSQLCreditPurchaseRefund(ctx, c.tx, userID, holdID, metadata)
 }
 
 func NormalizeMetadata(metadata domain.CommandMetadata) (domain.CommandMetadata, error) {

@@ -25,7 +25,7 @@ func TestFeaturePromptSaveUpdatesSingleCurrentRow(t *testing.T) {
 		t.Fatalf("prompt = %q, want empty", second.Prompt)
 	}
 	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM feature_prompts WHERE feature_slug = $1`, slug).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM feature_prompts WHERE feature_slug = $1`, slug).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {

@@ -133,18 +133,8 @@ type IdentityProjection = ports.IdentityProjection
 type IdentityProjectionReader = ports.IdentityProjectionReader
 type CodeKeyring = domain.CodeKeyring
 type RedemptionHandlerOptions = rewardhttp.RedemptionHandlerOptions
-type RedemptionMetricsRecorder = rewardhttp.RedemptionMetricsRecorder
-type RedemptionMetricObservation = rewardhttp.RedemptionMetricObservation
-type RedemptionOutcome = rewardhttp.RedemptionOutcome
 
-const (
-	DefaultRedemptionAttemptLimit  = rewardhttp.DefaultRedemptionAttemptLimit
-	RedemptionOutcomeSuccess       = rewardhttp.RedemptionOutcomeSuccess
-	RedemptionOutcomeReplayed      = rewardhttp.RedemptionOutcomeReplayed
-	RedemptionOutcomeInvalid       = rewardhttp.RedemptionOutcomeInvalid
-	RedemptionOutcomeRateLimited   = rewardhttp.RedemptionOutcomeRateLimited
-	RedemptionOutcomeInternalError = rewardhttp.RedemptionOutcomeInternalError
-)
+const DefaultRedemptionAttemptLimit = rewardhttp.DefaultRedemptionAttemptLimit
 
 func NewUserHandlerWithOptions(service ports.UserService, options RedemptionHandlerOptions) *UserHandler {
 	return rewardhttp.NewUserHandlerWithOptions(service, options)

@@ -2,11 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
@@ -26,7 +27,7 @@ type fakeMediaAssetRegistry struct {
 }
 
 func (f *fakeMediaAssetRegistry) GetByID(_ context.Context, _ int64, _ int64) (dbsqlc.MediaAsset, error) {
-	return dbsqlc.MediaAsset{}, sql.ErrNoRows
+	return dbsqlc.MediaAsset{}, pgx.ErrNoRows
 }
 
 func (f *fakeMediaAssetRegistry) GetByAssetID(_ context.Context, _ int64, _ string) (dbsqlc.MediaAsset, error) {
@@ -151,7 +152,7 @@ func TestDerivativeContentRejectsUnknownTier(t *testing.T) {
 }
 
 func TestDerivativeContentReturnsNotFoundForUnknownAsset(t *testing.T) {
-	registry := &fakeMediaAssetRegistry{assetErr: sql.ErrNoRows}
+	registry := &fakeMediaAssetRegistry{assetErr: pgx.ErrNoRows}
 	reader := &fakeMediaObjectReader{objects: map[string]*storageports.StoredUploadObject{}}
 
 	rec := serveDerivativeContent(t, newMediaAssetHandler(registry, reader, testImgproxyConfig()), "asset_missing", "preview")

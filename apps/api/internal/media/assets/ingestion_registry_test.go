@@ -2,12 +2,15 @@ package assets
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
@@ -23,10 +26,43 @@ func (acceptingIntegrityVerifier) Verify(context.Context, string, string, string
 	return nil
 }
 
-func newMediaAssetRegistryForTest(db *sql.DB) *MediaAssetRegistry {
+func newMediaAssetRegistryForTest(db *pgxpool.Pool) *MediaAssetRegistry {
 	registry := NewMediaAssetRegistry(db)
 	registry.SetIntegrityVerifier(acceptingIntegrityVerifier{})
 	return registry
+}
+
+// setReadyProcessingInputMaterializerForTest wires a materializer fake that
+// records a ready processing-input derivative row, mirroring what the
+// production derivatives service persists after a successful render.
+func setReadyProcessingInputMaterializerForTest(t *testing.T, db *pgxpool.Pool, registry *MediaAssetRegistry) {
+	t.Helper()
+	registry.SetProcessingInputMaterializer(func(ctx context.Context, assetID, ownerUserID int64) error {
+		q := dbsqlc.New(db)
+		asset, err := q.GetMediaAssetByID(ctx, assetID)
+		if err != nil {
+			return fmt.Errorf("load materialization asset: %w", err)
+		}
+		upserted, err := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
+			DerivativeID: fmt.Sprintf("test-processing-input-%d", assetID),
+			MediaAssetID: assetID, OwnerUserID: ownerUserID,
+			Tier: "processing-input", Format: "png",
+		})
+		if err != nil {
+			return fmt.Errorf("upsert processing-input derivative: %w", err)
+		}
+		_, err = q.MarkMediaDerivativeReady(ctx, dbsqlc.MarkMediaDerivativeReadyParams{
+			Format: "png", StorageKey: fmt.Sprintf("test-derivatives/%d/processing-input.png", assetID),
+			MimeType: "image/png", Width: 32, Height: 32, SizeBytes: 128,
+			ChecksumSha256:         "test-checksum",
+			SourceObjectGeneration: asset.ObjectGeneration,
+			ID:                     upserted.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("mark processing-input derivative ready: %w", err)
+		}
+		return nil
+	})
 }
 
 func TestBoardUploadIngestionTransitionsToReadyWithProcessingInput(t *testing.T) {
@@ -37,6 +73,7 @@ func TestBoardUploadIngestionTransitionsToReadyWithProcessingInput(t *testing.T)
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
+	setReadyProcessingInputMaterializerForTest(t, db, registry)
 	upload := ingestion.Request{OwnerUserID: owner.ID, Origin: ingestion.BoardUploadFacts{BoardID: "board-ingestion"},
 		StorageProfile: "builtin-local", URL: "/uploads/canvas/owner/board-ingestion/content/image.png", StorageKey: "uploads/canvas/owner/board-ingestion/content/image.png"}
 	stored := ports.StoredUploadRef{
@@ -120,11 +157,13 @@ func TestRegistryContractCompletesBoardIngestion(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	concreteRegistry := newMediaAssetRegistryForTest(db)
+	setReadyProcessingInputMaterializerForTest(t, db, concreteRegistry)
 	var registry interface {
 		IngestionRegistry
 		GetByID(context.Context, int64, int64) (dbsqlc.MediaAsset, error)
 		ListDerivatives(context.Context, int64, int64) ([]dbsqlc.MediaDerivative, error)
-	} = newMediaAssetRegistryForTest(db)
+	} = concreteRegistry
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local",
@@ -172,20 +211,21 @@ func TestLibraryMaterializationReusesManagedAssetAndMaterializesProcessingInput(
 		t.Fatal(err)
 	}
 	var folderID, libraryAssetID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO library_folders (owner_user_id, name) VALUES ($1, 'Saved') RETURNING id`, owner.ID).Scan(&folderID); err != nil {
+	if err := db.QueryRow(ctx, `INSERT INTO library_folders (owner_user_id, name) VALUES ($1, 'Saved') RETURNING id`, owner.ID).Scan(&folderID); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'materialized', 'https://unsplash.com/photos/materialized', 'https://images.unsplash.com/materialized-preview', 'https://images.unsplash.com/materialized-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
+	if err := db.QueryRow(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'materialized', 'https://unsplash.com/photos/materialized', 'https://images.unsplash.com/materialized-preview', 'https://images.unsplash.com/materialized-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
+	setReadyProcessingInputMaterializerForTest(t, db, registry)
 	media := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/library/1/materialized/original", URL: "/uploads/library/1/materialized/original", Origin: ingestion.LibraryMaterializationFacts{LibraryAssetID: libraryAssetID, CanonicalSourceURL: "https://unsplash.com/photos/materialized", Provider: "unsplash", SourceID: "materialized"}}
 	handle, err := registry.Begin(ctx, media)
 	if err != nil {
 		t.Fatalf("begin library materialization: %v", err)
 	}
 	mediaAssetID := handle.AssetID
-	stored := ports.StoredUploadRef{URL: "/uploads/library/1/materialized/original.jpg", StorageKey: "uploads/library/1/materialized/original.jpg", StorageProfile: media.StorageProfile, MIMEType: "image/jpeg", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
+	stored := ports.StoredUploadRef{URL: "/uploads/library/1/materialized/original", StorageKey: "uploads/library/1/materialized/original", StorageProfile: media.StorageProfile, MIMEType: "image/jpeg", Width: 640, Height: 480, SizeBytes: 2048, ChecksumSHA256: "library-checksum"}
 	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("https://images.unsplash.com/materialized-original")); err != nil {
 		t.Fatalf("complete library materialization: %v", err)
 	}
@@ -225,6 +265,7 @@ func TestTaskResultIngestionTransitionsToReadyIdempotently(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
+	setReadyProcessingInputMaterializerForTest(t, db, registry)
 	request := ingestion.Request{
 		OwnerUserID:    owner.ID,
 		StorageProfile: "builtin-local", StorageKey: "uploads/tasks/1/task-result-ingestion/result-0.png", URL: "/uploads/tasks/1/task-result-ingestion/result-0.png", SourceURL: "https://provider.example/result.png",
@@ -313,7 +354,7 @@ func TestGenerationPreparationIngestionCompletesWithTypedMediaRef(t *testing.T) 
 		t.Fatalf("prepared asset=%#v err=%v", asset, err)
 	}
 	var refs int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE media_asset_id = $1 AND ref_type = 'prompt_reference'`, handle.AssetID).Scan(&refs); err != nil || refs != 1 {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_refs WHERE media_asset_id = $1 AND ref_type = 'prompt_reference'`, handle.AssetID).Scan(&refs); err != nil || refs != 1 {
 		t.Fatalf("prepared media refs=%d err=%v, want 1", refs, err)
 	}
 }
@@ -326,10 +367,10 @@ func TestMediaAssetRegistryPersistsFailureForEveryOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	var folderID, libraryAssetID int64
-	if err := db.QueryRowContext(ctx, `INSERT INTO library_folders (owner_user_id, name) VALUES ($1, 'Saved') RETURNING id`, owner.ID).Scan(&folderID); err != nil {
+	if err := db.QueryRow(ctx, `INSERT INTO library_folders (owner_user_id, name) VALUES ($1, 'Saved') RETURNING id`, owner.ID).Scan(&folderID); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'failed-origin', 'https://unsplash.com/photos/failed-origin', 'https://images.unsplash.com/failed-preview', 'https://images.unsplash.com/failed-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
+	if err := db.QueryRow(ctx, `INSERT INTO library_assets (owner_user_id, folder_id, provider, source_id, source_url, preview_url, original_url) VALUES ($1, $2, 'unsplash', 'failed-origin', 'https://unsplash.com/photos/failed-origin', 'https://images.unsplash.com/failed-preview', 'https://images.unsplash.com/failed-original') RETURNING id`, owner.ID, folderID).Scan(&libraryAssetID); err != nil {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
@@ -345,11 +386,11 @@ func TestMediaAssetRegistryPersistsFailureForEveryOrigin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("begin %s: %v", request.Origin.IngestionOrigin(), err)
 			}
-			if err := registry.Fail(ctx, handle, sql.ErrConnDone); err != nil {
+			if err := registry.Fail(ctx, handle, errors.New("conn done")); err != nil {
 				t.Fatalf("fail %s: %v", request.Origin.IngestionOrigin(), err)
 			}
 			asset, err := registry.GetByID(ctx, owner.ID, handle.AssetID)
-			if err != nil || asset.Status != "failed" || !strings.Contains(string(asset.Metadata), sql.ErrConnDone.Error()) {
+			if err != nil || asset.Status != "failed" || !strings.Contains(string(asset.Metadata), errors.New("conn done").Error()) {
 				t.Fatalf("failed %s asset=%#v err=%v", request.Origin.IngestionOrigin(), asset, err)
 			}
 		})
@@ -448,6 +489,7 @@ func TestRetireMissingOwnedMediaAssetReleasesChecksumSlot(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := newMediaAssetRegistryForTest(db)
+	setReadyProcessingInputMaterializerForTest(t, db, registry)
 	upload := ingestion.Request{OwnerUserID: owner.ID, Origin: ingestion.BoardUploadFacts{BoardID: "board-retire"},
 		StorageProfile: "builtin-local", URL: "/uploads/canvas/owner/board-retire/content/image.png", StorageKey: "uploads/canvas/owner/board-retire/content/image.png"}
 	handle, err := registry.Begin(ctx, upload)

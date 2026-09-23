@@ -7,8 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const backfillDailyStatsByCreatedRange = `-- name: BackfillDailyStatsByCreatedRange :one
@@ -16,18 +16,18 @@ WITH candidate_tasks AS (
   SELECT t.task_id, t.user_id, t.account_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.status,
          t.feature_slug,
          COALESCE((NULLIF(btrim(t.params), '')::jsonb #>> '{generation,requested_output_count}')::smallint, 1::smallint) AS output_count,
-         COALESCE(latest_lease.resolved_model, '') AS resolved_model,
-         COALESCE(latest_lease.api_type, '') AS api_type,
+         COALESCE(latest_attempt.resolved_model, '') AS resolved_model,
+         '' AS api_type,
          t.created_at, t.completed_at, t.cancelled_at,
          COALESCE(t.completed_at, t.cancelled_at, t.updated_at) AS occurred_at
   FROM tasks AS t
   LEFT JOIN LATERAL (
-    SELECT resolved_model, api_type
-    FROM task_leases
+    SELECT resolved_model
+    FROM task_execution_attempts
     WHERE task_id = t.task_id
-    ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    ORDER BY (status = 'running') DESC, attempt_no DESC, id DESC
     LIMIT 1
-  ) AS latest_lease ON TRUE
+  ) AS latest_attempt ON TRUE
   WHERE COALESCE(t.completed_at, t.cancelled_at, t.updated_at) >= $1
     AND COALESCE(t.completed_at, t.cancelled_at, t.updated_at) < $2
     AND t.status IN ('completed', 'failed', 'cancelled')
@@ -127,10 +127,10 @@ SELECT
 `
 
 type BackfillDailyStatsByCreatedRangeParams struct {
-	StartedAt sql.NullTime `json:"started_at"`
-	EndedAt   sql.NullTime `json:"ended_at"`
-	StatDate  time.Time    `json:"stat_date"`
-	MarkDone  bool         `json:"mark_done"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+	EndedAt   pgtype.Timestamptz `json:"ended_at"`
+	StatDate  pgtype.Date        `json:"stat_date"`
+	MarkDone  bool               `json:"mark_done"`
 }
 
 type BackfillDailyStatsByCreatedRangeRow struct {
@@ -140,7 +140,7 @@ type BackfillDailyStatsByCreatedRangeRow struct {
 }
 
 func (q *Queries) BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error) {
-	row := q.db.QueryRowContext(ctx, backfillDailyStatsByCreatedRange,
+	row := q.db.QueryRow(ctx, backfillDailyStatsByCreatedRange,
 		arg.StartedAt,
 		arg.EndedAt,
 		arg.StatDate,
@@ -165,25 +165,25 @@ ON CONFLICT (task_id) DO NOTHING
 `
 
 type InsertTaskStatEventIgnoreParams struct {
-	TaskID             string    `json:"task_id"`
-	OccurredAt         time.Time `json:"occurred_at"`
-	StatDate           time.Time `json:"stat_date"`
-	UserID             int64     `json:"user_id"`
-	AccountID          int64     `json:"account_id"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	CredentialID       int64     `json:"credential_id"`
-	FeatureSlug        string    `json:"feature_slug"`
-	ApiType            string    `json:"api_type"`
-	ModelName          string    `json:"model_name"`
-	UserKey            string    `json:"user_key"`
-	Status             string    `json:"status"`
-	OutputCount        int16     `json:"output_count"`
-	LatencySeconds     float64   `json:"latency_seconds"`
-	CostMicros         int64     `json:"cost_micros"`
+	TaskID             string             `json:"task_id"`
+	OccurredAt         pgtype.Timestamptz `json:"occurred_at"`
+	StatDate           pgtype.Date        `json:"stat_date"`
+	UserID             int64              `json:"user_id"`
+	AccountID          int64              `json:"account_id"`
+	ProviderEndpointID int64              `json:"provider_endpoint_id"`
+	CredentialID       int64              `json:"credential_id"`
+	FeatureSlug        string             `json:"feature_slug"`
+	ApiType            string             `json:"api_type"`
+	ModelName          string             `json:"model_name"`
+	UserKey            string             `json:"user_key"`
+	Status             string             `json:"status"`
+	OutputCount        int16              `json:"output_count"`
+	LatencySeconds     float64            `json:"latency_seconds"`
+	CostMicros         int64              `json:"cost_micros"`
 }
 
 func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, insertTaskStatEventIgnore,
+	result, err := q.db.Exec(ctx, insertTaskStatEventIgnore,
 		arg.TaskID,
 		arg.OccurredAt,
 		arg.StatDate,
@@ -203,7 +203,7 @@ func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskS
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const listBackfilledDatesByRange = `-- name: ListBackfilledDatesByRange :many
@@ -214,26 +214,23 @@ ORDER BY stat_date ASC
 `
 
 type ListBackfilledDatesByRangeParams struct {
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
 }
 
-func (q *Queries) ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]time.Time, error) {
-	rows, err := q.db.QueryContext(ctx, listBackfilledDatesByRange, arg.StartDate, arg.EndDate)
+func (q *Queries) ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error) {
+	rows, err := q.db.Query(ctx, listBackfilledDatesByRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []time.Time
+	var items []pgtype.Date
 	for rows.Next() {
-		var stat_date time.Time
+		var stat_date pgtype.Date
 		if err := rows.Scan(&stat_date); err != nil {
 			return nil, err
 		}
 		items = append(items, stat_date)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -249,25 +246,25 @@ ORDER BY stat_date ASC
 `
 
 type ListDailyStatsByDateRangeParams struct {
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
 }
 
 type ListDailyStatsByDateRangeRow struct {
-	StatDate          time.Time `json:"stat_date"`
-	ModelName         string    `json:"model_name"`
-	UserKey           string    `json:"user_key"`
-	Total             int64     `json:"total"`
-	Completed         int64     `json:"completed"`
-	Failed            int64     `json:"failed"`
-	Cancelled         int64     `json:"cancelled"`
-	LatencySecondsSum float64   `json:"latency_seconds_sum"`
-	LatencyCount      int64     `json:"latency_count"`
-	CostMicrosSum     int64     `json:"cost_micros_sum"`
+	StatDate          pgtype.Date `json:"stat_date"`
+	ModelName         string      `json:"model_name"`
+	UserKey           string      `json:"user_key"`
+	Total             int64       `json:"total"`
+	Completed         int64       `json:"completed"`
+	Failed            int64       `json:"failed"`
+	Cancelled         int64       `json:"cancelled"`
+	LatencySecondsSum float64     `json:"latency_seconds_sum"`
+	LatencyCount      int64       `json:"latency_count"`
+	CostMicrosSum     int64       `json:"cost_micros_sum"`
 }
 
 func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDailyStatsByDateRange, arg.StartDate, arg.EndDate)
+	rows, err := q.db.Query(ctx, listDailyStatsByDateRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -291,9 +288,6 @@ func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailySt
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -308,8 +302,8 @@ ORDER BY model_name ASC, latency_seconds ASC
 `
 
 type ListStatEventLatencySamplesByDateRangeParams struct {
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
 }
 
 type ListStatEventLatencySamplesByDateRangeRow struct {
@@ -318,7 +312,7 @@ type ListStatEventLatencySamplesByDateRangeRow struct {
 }
 
 func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listStatEventLatencySamplesByDateRange, arg.StartDate, arg.EndDate)
+	rows, err := q.db.Query(ctx, listStatEventLatencySamplesByDateRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -330,9 +324,6 @@ func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, ar
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -348,23 +339,23 @@ ORDER BY occurred_at ASC
 `
 
 type ListStatEventsByOccurredRangeParams struct {
-	StartedAt time.Time `json:"started_at"`
-	EndedAt   time.Time `json:"ended_at"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+	EndedAt   pgtype.Timestamptz `json:"ended_at"`
 }
 
 type ListStatEventsByOccurredRangeRow struct {
-	OccurredAt     time.Time `json:"occurred_at"`
-	StatDate       time.Time `json:"stat_date"`
-	ModelName      string    `json:"model_name"`
-	UserKey        string    `json:"user_key"`
-	Status         string    `json:"status"`
-	OutputCount    int16     `json:"output_count"`
-	LatencySeconds float64   `json:"latency_seconds"`
-	CostMicros     int64     `json:"cost_micros"`
+	OccurredAt     pgtype.Timestamptz `json:"occurred_at"`
+	StatDate       pgtype.Date        `json:"stat_date"`
+	ModelName      string             `json:"model_name"`
+	UserKey        string             `json:"user_key"`
+	Status         string             `json:"status"`
+	OutputCount    int16              `json:"output_count"`
+	LatencySeconds float64            `json:"latency_seconds"`
+	CostMicros     int64              `json:"cost_micros"`
 }
 
 func (q *Queries) ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listStatEventsByOccurredRange, arg.StartedAt, arg.EndedAt)
+	rows, err := q.db.Query(ctx, listStatEventsByOccurredRange, arg.StartedAt, arg.EndedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -385,9 +376,6 @@ func (q *Queries) ListStatEventsByOccurredRange(ctx context.Context, arg ListSta
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -441,8 +429,8 @@ SELECT
 `
 
 type RebuildTaskDailyStatsByEventDateRangeParams struct {
-	StartDate time.Time `json:"start_date"`
-	EndDate   time.Time `json:"end_date"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
 }
 
 type RebuildTaskDailyStatsByEventDateRangeRow struct {
@@ -451,7 +439,7 @@ type RebuildTaskDailyStatsByEventDateRangeRow struct {
 }
 
 func (q *Queries) RebuildTaskDailyStatsByEventDateRange(ctx context.Context, arg RebuildTaskDailyStatsByEventDateRangeParams) (RebuildTaskDailyStatsByEventDateRangeRow, error) {
-	row := q.db.QueryRowContext(ctx, rebuildTaskDailyStatsByEventDateRange, arg.StartDate, arg.EndDate)
+	row := q.db.QueryRow(ctx, rebuildTaskDailyStatsByEventDateRange, arg.StartDate, arg.EndDate)
 	var i RebuildTaskDailyStatsByEventDateRangeRow
 	err := row.Scan(&i.DeletedGroups, &i.RebuiltGroups)
 	return i, err
@@ -479,26 +467,26 @@ SET total = task_daily_stats.total + EXCLUDED.total,
 `
 
 type UpsertTaskDailyStatDeltaParams struct {
-	StatDate           time.Time `json:"stat_date"`
-	UserID             int64     `json:"user_id"`
-	AccountID          int64     `json:"account_id"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	CredentialID       int64     `json:"credential_id"`
-	FeatureSlug        string    `json:"feature_slug"`
-	ApiType            string    `json:"api_type"`
-	ModelName          string    `json:"model_name"`
-	UserKey            string    `json:"user_key"`
-	Total              int64     `json:"total"`
-	Completed          int64     `json:"completed"`
-	Failed             int64     `json:"failed"`
-	Cancelled          int64     `json:"cancelled"`
-	LatencySecondsSum  float64   `json:"latency_seconds_sum"`
-	LatencyCount       int64     `json:"latency_count"`
-	CostMicrosSum      int64     `json:"cost_micros_sum"`
+	StatDate           pgtype.Date `json:"stat_date"`
+	UserID             int64       `json:"user_id"`
+	AccountID          int64       `json:"account_id"`
+	ProviderEndpointID int64       `json:"provider_endpoint_id"`
+	CredentialID       int64       `json:"credential_id"`
+	FeatureSlug        string      `json:"feature_slug"`
+	ApiType            string      `json:"api_type"`
+	ModelName          string      `json:"model_name"`
+	UserKey            string      `json:"user_key"`
+	Total              int64       `json:"total"`
+	Completed          int64       `json:"completed"`
+	Failed             int64       `json:"failed"`
+	Cancelled          int64       `json:"cancelled"`
+	LatencySecondsSum  float64     `json:"latency_seconds_sum"`
+	LatencyCount       int64       `json:"latency_count"`
+	CostMicrosSum      int64       `json:"cost_micros_sum"`
 }
 
 func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error {
-	_, err := q.db.ExecContext(ctx, upsertTaskDailyStatDelta,
+	_, err := q.db.Exec(ctx, upsertTaskDailyStatDelta,
 		arg.StatDate,
 		arg.UserID,
 		arg.AccountID,
@@ -547,25 +535,25 @@ SET occurred_at = EXCLUDED.occurred_at,
 `
 
 type UpsertTaskStatEventCorrectionParams struct {
-	TaskID             string    `json:"task_id"`
-	OccurredAt         time.Time `json:"occurred_at"`
-	StatDate           time.Time `json:"stat_date"`
-	UserID             int64     `json:"user_id"`
-	AccountID          int64     `json:"account_id"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	CredentialID       int64     `json:"credential_id"`
-	FeatureSlug        string    `json:"feature_slug"`
-	ApiType            string    `json:"api_type"`
-	ModelName          string    `json:"model_name"`
-	UserKey            string    `json:"user_key"`
-	Status             string    `json:"status"`
-	OutputCount        int16     `json:"output_count"`
-	LatencySeconds     float64   `json:"latency_seconds"`
-	CostMicros         int64     `json:"cost_micros"`
+	TaskID             string             `json:"task_id"`
+	OccurredAt         pgtype.Timestamptz `json:"occurred_at"`
+	StatDate           pgtype.Date        `json:"stat_date"`
+	UserID             int64              `json:"user_id"`
+	AccountID          int64              `json:"account_id"`
+	ProviderEndpointID int64              `json:"provider_endpoint_id"`
+	CredentialID       int64              `json:"credential_id"`
+	FeatureSlug        string             `json:"feature_slug"`
+	ApiType            string             `json:"api_type"`
+	ModelName          string             `json:"model_name"`
+	UserKey            string             `json:"user_key"`
+	Status             string             `json:"status"`
+	OutputCount        int16              `json:"output_count"`
+	LatencySeconds     float64            `json:"latency_seconds"`
+	CostMicros         int64              `json:"cost_micros"`
 }
 
 func (q *Queries) UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, upsertTaskStatEventCorrection,
+	result, err := q.db.Exec(ctx, upsertTaskStatEventCorrection,
 		arg.TaskID,
 		arg.OccurredAt,
 		arg.StatDate,
@@ -585,5 +573,5 @@ func (q *Queries) UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertT
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

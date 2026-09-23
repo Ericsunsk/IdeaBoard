@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"testing"
 )
 
 func TestProviderHTTPStatusRecognizesWrappedError(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", newUpstreamHTTPError(422, "invalid_image_request"))
+	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", runtimeports.NewUpstreamHTTPError(422, "invalid_image_request", 0))
 
-	status, ok := providerHTTPStatus(err)
+	status, ok := runtimeports.ProviderHTTPStatus(err)
 	if !ok {
 		t.Fatalf("expected wrapped upstream http status to be recognized")
 	}
@@ -39,9 +40,9 @@ func TestShouldFailoverProviderErrorByHTTPStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := fmt.Errorf("wrapped: %w", newUpstreamHTTPError(tt.status, "upstream message"))
-			if got := shouldFailoverProviderError(err); got != tt.want {
-				t.Fatalf("shouldFailoverProviderError(%d)=%v, want=%v", tt.status, got, tt.want)
+			err := fmt.Errorf("wrapped: %w", runtimeports.NewUpstreamHTTPError(tt.status, "upstream message", 0))
+			if got := runtimeports.ShouldFailoverProviderError(err); got != tt.want {
+				t.Fatalf("runtimeports.ShouldFailoverProviderError(%d)=%v, want=%v", tt.status, got, tt.want)
 			}
 		})
 	}
@@ -49,14 +50,14 @@ func TestShouldFailoverProviderErrorByHTTPStatus(t *testing.T) {
 
 func TestShouldFailoverProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) {
 	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", fmt.Errorf("HTTP 请求失败: %w", context.DeadlineExceeded))
-	if !shouldFailoverProviderError(err) {
+	if !runtimeports.ShouldFailoverProviderError(err) {
 		t.Fatalf("expected deadline exceeded to be retryable")
 	}
 }
 
 func TestShouldFailoverProviderErrorDoesNotRetryContextCanceled(t *testing.T) {
 	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", context.Canceled)
-	if shouldFailoverProviderError(err) {
+	if runtimeports.ShouldFailoverProviderError(err) {
 		t.Fatalf("expected context canceled to be non-retryable")
 	}
 }
@@ -72,8 +73,8 @@ func TestShouldFailoverProviderErrorDoesNotRetryFinalizeOrStorageFailure(t *test
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := newExecutionFailureError(tasks.ExecutionStageFinalizing, tt.category, errors.New("save failed"))
-			if shouldFailoverProviderError(err) {
+			err := runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tt.category, errors.New("save failed"))
+			if runtimeports.ShouldFailoverProviderError(err) {
 				t.Fatalf("expected %s failure to be non-retryable", tt.category)
 			}
 		})
@@ -82,10 +83,10 @@ func TestShouldFailoverProviderErrorDoesNotRetryFinalizeOrStorageFailure(t *test
 
 func TestExecutionFailureDetailsRecognizesWrappedError(t *testing.T) {
 	err := fmt.Errorf("outer: %w",
-		newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New("compose failed")),
+		runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, errors.New("compose failed")),
 	)
 
-	stage, category, ok := executionFailureDetails(err)
+	stage, category, ok := runtimeports.ExecutionFailureDetails(err)
 	if !ok {
 		t.Fatalf("expected execution failure details")
 	}

@@ -2,8 +2,8 @@ package dispute
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"ideaboard/api/internal/platform/database"
 
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentorder "ideaboard/api/internal/payments/application/order"
@@ -71,7 +71,7 @@ func (s *Service) ExpireDisputeCheckoutSessions(ctx context.Context, dispute pay
 				// Provider payment submission already happened; normal checkout
 				// convergence owns this terminal outcome.
 			default:
-				return sql.ErrNoRows
+				return database.ErrNotFound
 			}
 		}
 		return nil

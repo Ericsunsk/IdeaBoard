@@ -1,59 +1,60 @@
 # Payments Context
 
-Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它不拥有平台 Idea 余额或账本；Wallet、Double-entry Ledger、余额 projection 与所有 Credit 写入仍由 Credits 独占。
+Payments owns Stripe configuration, signed Webhook intake, and the payment lifecycle (orders, checkout, refunds, disputes, reconciliation).
+It does not own platform Idea balances or the ledger; Wallet, the double-entry Ledger, balance projections, and all Credit writes stay exclusively with Credits.
 
 ## Domain Language
 
 | Term | Meaning |
 | ---- | ------- |
-| Current Stripe Configuration | 当前生效的 Stripe Credential Generation、Product Tax Code 与购买开关；发布只执行短事务 |
-| Stripe Credential Generation | immutable Stripe account、Secret 密文、Payment Method Configuration 与 provider resource references；Payment Order 永久引用创建时使用的 generation |
-| Stripe Gateway | Payments 调用 Stripe API 的 adapter seam；domain service 不依赖 Stripe SDK 类型 |
-| Webhook Inbox | 以 Stripe Event ID 全局去重的最小接收事实，只保存路由与处理所需 metadata，不保存原始 payload |
-| Ignored Event | 签名有效但当前 Payments 不识别的事件；记录为 `ignored` 并成功确认，不触发业务状态变更 |
-| Payment Admin Action | Stripe 配置操作的 append-only audit，包含 actor、outcome 与脱敏错误摘要 |
-| Payment Order | 用户一次充值的 durable、幂等意图与最终支付事实；public token 仅用于已认证用户查询，绝非支付事实 |
-| Checkout Return | Stripe browser return 的 UI 导航信号；服务端必须重新读取 Stripe Checkout Session，只有已支付的 canonical Stripe fact 才可到账 |
-| Purchase Credit | 由已验证 Stripe Payment Order 触发的 `System Issuance → User Available` Credits 命令；不是 Admin Grant |
-| Payment Reconciliation | River 定期读取 durable Payment Order 后向 Stripe 主动核验、收敛丢失 Webhook 与短暂故障的恢复流程 |
-| Reconciliation Claim | 一对一的 Payment Order recovery state；token + generation fence 保护短租约，Stripe I/O 永远发生在 claim transaction 之外 |
-| Payment Refund | Admin 或 Stripe Dashboard 发起的 durable 退款事实；本地先预留未消费 Ideas，再由 canonical Stripe status 幂等结算或释放 |
-| Purchase Refund Hold | 独立 Credits typed Command，将未消费 Ideas 从 User Available 预留到 User Reserved；它不是消费，可在 active Restriction 下执行 |
-| Purchase Refund | 独立 Credits typed Command，将退款预留从 User Reserved 结算回 System Issuance，不复用 Admin Refund |
+| Current Stripe Configuration | Currently effective Stripe Credential Generation, Product Tax Code, and purchase switch; publishing runs only a short transaction |
+| Stripe Credential Generation | Immutable Stripe account, encrypted Secret, Payment Method Configuration, and provider resource references; each Payment Order permanently references the generation used at creation |
+| Stripe Gateway | Adapter seam through which Payments calls the Stripe API; domain services never depend on Stripe SDK types |
+| Webhook Inbox | Minimal receipt fact deduplicated globally by Stripe Event ID; stores only routing and processing metadata, never the raw payload |
+| Ignored Event | Validly signed event that Payments does not recognize; recorded as `ignored` and acknowledged successfully with no business state change |
+| Payment Admin Action | Append-only audit of Stripe configuration operations, including actor, outcome, and redacted error summary |
+| Payment Order | Durable, idempotent intent and final payment fact for one user top-up; the public token is only for authenticated user queries, never a payment fact |
+| Checkout Return | UI navigation signal from the Stripe browser return; the server must re-read the Stripe Checkout Session, and only a paid canonical Stripe fact may credit |
+| Purchase Credit | `System Issuance → User Available` Credits command triggered by a verified Stripe Payment Order; not an Admin Grant |
+| Payment Reconciliation | River periodic flow that reads durable Payment Orders, verifies against Stripe, and converges lost webhooks and transient faults |
+| Reconciliation Claim | One-to-one Payment Order recovery state; token plus generation fence guards a short lease, and Stripe I/O always happens outside the claim transaction |
+| Payment Refund | Durable refund fact initiated by Admin or the Stripe Dashboard; locally reserves unconsumed Ideas first, then idempotently settles or releases by canonical Stripe status |
+| Purchase Refund Hold | Standalone Credits typed Command reserving unconsumed Ideas from User Available to User Reserved; it is not spending and may run under an active Restriction |
+| Purchase Refund | Standalone Credits typed Command settling the refund hold from User Reserved back to System Issuance; does not reuse Admin Refund |
 
 ## Public Seams
 
-- `Service.GetStripeConfiguration` 只返回可安全展示的配置摘要，不返回 API Key、Webhook Secret 或其密文。
-- `Service.ConfigureStripe` 在启用或变更 Stripe 配置时先通过 `StripeGateway` 准备并验证 Stripe account、Product 与 Webhook endpoint，再以 compare-and-swap 短事务原子发布 active generation、settings 和成功 audit；准备失败或并发发布冲突时保留旧配置。
-- `purchases_enabled` 从 true 切为 false 时只提交本地 fast path，并在同一 transaction 写入 durable Checkout shutdown run；River 按数据库 cutoff 幂等 Expire 存量 Session，periodic recovery 负责 enqueue/进程故障后的续跑。
-- `Service.ReceiveStripeWebhook` 对 raw body 验签、去重并写入最小 Webhook Inbox。后续 payment order、refund 与 dispute lifecycle 继续收口在 Payments context。
-- `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。`ListRecharges` 保留已到账、已退款与用户主动放弃的订单事实；HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
-- `Service.EventHub` 只发布本实例已提交的用户充值状态提示；前端据此重新读取 Wallet、订单或充值历史，SSE 不是支付事实源。
-- `Service.ReconcileDuePaymentOrders` 是 River recovery seam，并收敛 Checkout、Refund 与 durable Dispute；`ListPaymentReconciliationAnomalies`、`ListAdminPaymentOrders` 与 `GetAdminPaymentOrder` 是 Admin read seams，HTTP/Admin presentation 不拥有对账 transition。Admin detail 只返回脱敏 Stripe identity、durable recovery facts 和安全 Dashboard URL。
-- 任何支付结果引起的 Idea 余额变化都必须调用 Credits 的 typed Commands；Payments 不直接写 Ledger 或 balance projection。
+- `Service.GetStripeConfiguration` returns only the safely displayable configuration summary, never API Key, Webhook Secret, or ciphertext.
+- `Service.ConfigureStripe` prepares and validates the Stripe account, Product, and Webhook endpoint via `StripeGateway` on enable or change, then atomically publishes the active generation, settings, and success audit in a compare-and-swap short transaction; keeps the old configuration on prepare failure or concurrent publish conflict.
+- `Service` purchase-switch off (`purchases_enabled` true to false) commits only a local fast path plus a durable Checkout shutdown run in the same transaction; River expires remaining Sessions idempotently by database cutoff, and periodic recovery resumes enqueueing after process faults.
+- `Service.ReceiveStripeWebhook` verifies the raw-body signature, deduplicates, and writes the minimal Webhook Inbox; the later payment-order, refund, and dispute lifecycles stay inside the Payments context.
+- `Service.GetPurchaseOptions`, `CreateCheckout`, `ListPendingOrders`, `ContinuePendingOrder`, `AbandonPendingOrder`, `GetPaymentOrderReturnStatus`, `ListRecharges` form the user top-up boundary; `ListRecharges` keeps credited, refunded, and user-abandoned order facts, and HTTP handlers use only the authenticated principal user ID with user-scoped orders, history, and SSE.
+- `Service.EventHub` publishes only this instance's committed user top-up status hints; the frontend re-reads Wallet, orders, or recharge history from it, and SSE is never a payment fact source.
+- `Service.ReconcileDuePaymentOrders` is the River recovery seam and converges Checkout, Refund, and durable Dispute; `ListPaymentReconciliationAnomalies`, `ListAdminPaymentOrders`, `GetAdminPaymentOrder` are Admin read seams, HTTP/Admin presentation owns no reconciliation transition, and Admin detail returns only redacted Stripe identity, durable recovery facts, and a safe Dashboard URL.
+- `Credits typed Commands` carry every Idea balance change caused by a payment outcome; Payments never writes the Ledger or balance projections directly.
 
 ## Invariants
 
-- Stripe API Key 与 Webhook Secret 使用平台 Secret material 加密存储，禁止进入 HTTP response、日志、Webhook Inbox 或 Admin audit。
-- Payments 只持久化收敛和审计所需的最小 Stripe IDs、金额、币种、状态、时间、收据 URL、条款版本与受限错误摘要；禁止持久化卡信息、完整账单地址、完整 raw payload、Secret 明文或内部 stack trace。Payment 事实的 retention 由受控运维流程决定，不得手工删除关联 Ledger 或未结算状态。
-- Checkout 不启用 Stripe Automatic Tax，也不主动要求或保存 Customer 地址；Stripe 或具体 Payment Method 因合规要求收集的最少 Billing 信息不属于应用可屏蔽范围。
-- Webhook 必须在业务解析和持久化前使用 raw body、retained Credential Generations 的 Webhook Secret 与 5 分钟 tolerance 验证签名；无效或过期签名不写 Inbox。
-- Stripe Event ID 在全局唯一。重复投递保持幂等；已签名但未知的事件只记录最小 metadata 并标记 `ignored`。
-- Webhook Inbox 不保存原始 payload，只保存 Event ID、type、object ID、livemode、Stripe created time、接收/处理状态与时间。
-- 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。Payment Order、Refund、Dispute、Checkout shutdown 与 Reconciliation 必须按订单引用的 immutable Credential Generation 访问 Stripe；切换 active generation 不扫描旧订单，也不在 provider I/O 期间持有全局配置锁。
-- 创建 Checkout 前必须先以 `(user_id, client_idempotency_key)` 和 canonical request hash durable 创建或重放 Payment Order；相同 key 的不同请求 fail closed。Stripe Customer、Checkout Session 和其 provider identity 都必须绑定到该 Order。
-- Stripe Customer 按 `(user_id, stripe_account_id, mode)` namespace 复用；test/live 必须隔离，同一 mode 内的 API key rotation 不得重复创建 Customer。
-- 每个新 Stripe Credential Generation 必须保存经当前 API Key 验证且 active 的 `pmc_...`；创建 Checkout 时显式传入该 ID，禁止回退 Stripe Dashboard Default。
-- Stripe 明确拒绝创建 Customer 或 Checkout Session 时，`creating` Order 必须立即进入 `payment_failed`，允许用户用新 Order 重试；网络中断、限流、provider `5xx`、`idempotency_error` 或响应不完整等结果未知失败必须保留原 Order 与原 Stripe Idempotency Key。
-- Payment Order 生命周期以 `creating → checkout_open → async_payment_pending` 表达未完成 Checkout，以 `cancelled|expired|payment_failed` 表达未支付终态，以 `paid_pending_credit → credited` 表达已确认支付到 Ledger 到账。已确认的 late paid fact 可以从未支付终态升级到 `paid_pending_credit`，其他终态不得回退；所有 transition 由数据库约束。
-- 同一用户、同一 Idea 数量只允许一个未支付的 active Checkout；复用 `checkout_open` 或恢复 `creating` 前必须读取或收敛 Stripe canonical state，禁止返回已完成或已过期的旧 Checkout URL。确定已完成或已过期后，客户端才可轮换 Idempotency Key；结果未知的 provider failure 必须保留原 key。创建、继续和放弃 Checkout 按用户串行化，不在 Stripe 网络调用期间持有数据库 transaction。每个用户最多保留 3 笔不同数量的未支付 active Checkout；`paid_pending_credit` 已是支付事实，不占用待支付名额。
-- 仅签名 Webhook 或服务端主动查询取得的、已验证身份绑定的 Stripe paid Checkout Session 可触发到账；浏览器 URL、public token、未支付或失败 Session 均不得到账。Stripe paid fact 先独立 durable 为 `paid_pending_credit`；随后 `purchase_credit` 与 `paid_pending_credit → credited` 在同一 PostgreSQL transaction 中原子提交，并对 replay/concurrency 幂等。
-- 用户充值历史只返回当前用户最近 12 个自然月的 final `credited` 最小事实，以最大 20 条 opaque cursor 分页；不返回 payer PII、provider secret 或内部 Stripe metadata。cursor 必须在解码前限制长度。
-- Dispute Webhook 只触发 canonical Stripe Retrieve。open/lost Dispute 在 Payment Order → Wallet 固定锁序的同一 transaction 中创建原因化 Restriction、执行 bounded `payment_dispute_debit` 并持久化未追回额度；`won` 与 `lost → won` 只恢复本 Dispute 的实际 debit 并精确解除对应 Restriction。
-- User SSE 按 user ID 隔离，连接生命周期必须 heartbeat 并 cleanup；它只通知 `processing`/`credited`/`failed`/`refund_updated`/`dispute_updated`，不替代 Stripe 或 PostgreSQL 的支付事实。
-- 每 5 分钟的 River 对账只 claim 超过 2 分钟未收敛的订单，每批最多 100 条。claim 的 lease 比 worker timeout 更长，token + generation 可阻止 stale worker 覆盖新结果；多 worker 的正确性不依赖队列并发数。
-- `creating` Order 持久化经过校验的 immutable return base URL，以及首次 Stripe 请求使用的整秒 expiry。重启或创建 timeout 后必须用原 public order number 和完全相同的参数重放 Stripe Idempotency Key，而不是依据本地 timeout 直接宣告失败。
-- `paid_pending_credit` 只重试 Credits 原子到账，不重复查询或重写 Stripe paid fact。Stripe transient failure 交给 River retry；确定性配置、权限、响应或身份绑定错误记录脱敏 operational failure 并延迟重试，避免 hot loop。
-- 超过 24 小时仍未收敛的 Order 只增加 durable anomaly 标记，不改变支付业务状态；后续 canonical terminal Stripe fact 会清除该异常。
-- Admin order read model 严格校验 canonical public order number、bounded user/status filters 和 opaque cursor；不得返回 public token、idempotency/request hash、return base URL、Secret 或原始 provider payload。
-- Payments 不改变任务基础设施 ownership：River + PostgreSQL 仍是 Task queue/state fact source，NATS JetStream 仍只承担 event layer。
+- Stripe API Key and Webhook Secret are stored encrypted with platform secret material; they must never enter HTTP responses, logs, the Webhook Inbox, or Admin audit.
+- Payments persists only the minimal Stripe IDs, amounts, currency, statuses, times, receipt URL, terms version, and restricted error summaries needed for convergence and audit; card data, full billing addresses, full raw payloads, plaintext Secrets, and internal stack traces are forbidden, and payment-fact retention is decided by a controlled ops process, never by manually deleting linked Ledger rows or unsettled states.
+- Checkout enables neither Stripe Automatic Tax nor proactively requests or stores Customer addresses; minimal Billing data Stripe or a Payment Method collects for compliance is outside what the app can suppress.
+- Webhooks must verify the signature with the raw body, the Webhook Secret of the retained Credential Generations, and a 5-minute tolerance before any business parsing or persistence; invalid or expired signatures never reach the Inbox.
+- Stripe Event IDs are globally unique; redelivery stays idempotent, and signed-but-unknown events record only minimal metadata marked `ignored`.
+- The Webhook Inbox stores no raw payload, only Event ID, type, object ID, livemode, Stripe created time, and receive/process status with timestamps.
+- Configuration and Webhook Secrets are read from PostgreSQL at request time and take effect immediately, with no application-lifetime config cache; Payment Orders, Refunds, Disputes, Checkout shutdown, and Reconciliation must reach Stripe through the immutable Credential Generation referenced by the order, and switching the active generation neither scans old orders nor holds a global config lock during provider I/O.
+- Before creating a Checkout, durably create or replay the Payment Order by `(user_id, client_idempotency_key)` plus a canonical request hash; same key with a different request fails closed, and the Stripe Customer, Checkout Session, and provider identity all bind to that Order.
+- Stripe Customers are reused per `(user_id, stripe_account_id, mode)` namespace; test and live stay isolated, and API key rotation within one mode must not duplicate Customers.
+- Every new Stripe Credential Generation must store an active, current-API-Key-verified `pmc_...`; Checkout creation passes that ID explicitly and never falls back to the Stripe Dashboard default.
+- When Stripe deterministically refuses Customer or Checkout Session creation, the `creating` Order must move to `payment_failed` at once so the user can retry with a new Order; unknown-outcome failures (network break, rate limit, provider `5xx`, `idempotency_error`, incomplete response) keep the original Order and Stripe Idempotency Key.
+- The Payment Order lifecycle uses `creating → checkout_open → async_payment_pending` for unfinished checkouts, `cancelled|expired|payment_failed` for unpaid terminal states, and `paid_pending_credit → credited` from confirmed payment to Ledger credit; a confirmed late paid fact may promote an unpaid terminal state to `paid_pending_credit`, no other terminal state regresses, and all transitions are database-constrained.
+- One user with one Idea quantity may hold only one unpaid active Checkout; before reusing `checkout_open` or resuming `creating`, read or converge the Stripe canonical state and never return a completed or expired Checkout URL, and only after confirmed completion or expiry may the client rotate the Idempotency Key, while unknown-outcome provider failures keep the original key; Checkout create, continue, and abandon serialize per user without holding a database transaction across Stripe network calls, each user keeps at most 3 unpaid active Checkouts of different quantities, and `paid_pending_credit` is already a payment fact that consumes no unpaid slot.
+- Only a paid Checkout Session with verified identity binding, learned from a signed Webhook or a server-side query, may credit; browser URLs, public tokens, and unpaid or failed Sessions never credit, the Stripe paid fact is first made durable alone as `paid_pending_credit`, and `purchase_credit` with `paid_pending_credit → credited` then commits atomically in one PostgreSQL transaction, idempotent to replay and concurrency.
+- User recharge history returns only the current user's final `credited` minimal facts from the latest 12 calendar months in opaque-cursor pages (default limit 50, max 200 per the shared pagination standard); no payer PII, provider secrets, or internal Stripe metadata, and cursors are length-bounded before decoding.
+- Dispute Webhooks trigger only a canonical Stripe Retrieve; open or lost Disputes create a reasoned Restriction, run a bounded `payment_dispute_debit`, and persist the unrecovered amount in one transaction under the fixed Payment Order to Wallet lock order, while `won` and `lost → won` restore exactly this Dispute's actual debit and release exactly its Restriction.
+- User SSE is isolated by user ID with heartbeat and cleanup over the connection lifetime; it notifies only `processing`/`credited`/`failed`/`refund_updated`/`dispute_updated` and never replaces Stripe or PostgreSQL as the payment fact source.
+- The 5-minute River reconciliation only claims unconverged orders older than 2 minutes, at most 100 per batch; the claim lease outlives the worker timeout, token plus generation blocks stale workers from overwriting newer results, and multi-worker correctness never depends on queue concurrency.
+- A `creating` Order persists the validated immutable return base URL and the whole-second expiry used for the first Stripe request; after restart or create timeout, replay with the original public order number and identical parameters under the same Stripe Idempotency Key instead of failing on the local timeout.
+- `paid_pending_credit` retries only the atomic Credits credit, never re-queries or rewrites the Stripe paid fact; Stripe transient failures go to River retry, and deterministic config, permission, response, or identity-binding errors record a redacted operational failure and retry with delay to avoid hot loops.
+- Orders still unconverged after 24 hours gain only a durable anomaly flag with no payment-state change; a later canonical terminal Stripe fact clears the anomaly.
+- The Admin order read model strictly validates the canonical public order number, bounded user and status filters, and opaque cursors; it never returns public tokens, idempotency or request hashes, return base URLs, Secrets, or raw provider payloads.
+- Payments changes no task-infrastructure ownership: River plus PostgreSQL stays the task queue and state fact source, NATS JetStream stays only the event layer.

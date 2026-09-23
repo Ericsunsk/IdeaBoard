@@ -3,7 +3,6 @@ package database
 import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 
 var apiOwnedTableNames = []string{
-	"api_account_models",
 	"api_account_secrets",
 	"admin_brand_logo_overrides",
 	"api_accounts",
@@ -18,18 +17,15 @@ var apiOwnedTableNames = []string{
 	"media_asset_sources",
 	"media_derivatives",
 	"media_refs",
-	"provider_endpoint_capabilities",
-	"provider_endpoint_models",
 	"provider_endpoints",
 	"storage_profile_secret_versions",
 	"storage_profiles",
 	"system_configs",
-	"task_attempts",
 	"task_cancellations",
 	"task_daily_stat_backfills",
 	"task_daily_stats",
+	"task_execution_attempts",
 	"task_execution_metrics",
-	"task_leases",
 	"task_outputs",
 	"task_stat_events",
 	"tasks",
@@ -38,7 +34,6 @@ var apiOwnedTableNames = []string{
 }
 
 var apiOwnedSequenceNames = []string{
-	"api_account_models_id_seq",
 	"api_account_secrets_id_seq",
 	"api_accounts_id_seq",
 	"board_members_id_seq",
@@ -50,14 +45,12 @@ var apiOwnedSequenceNames = []string{
 	"media_asset_sources_id_seq",
 	"media_derivatives_id_seq",
 	"media_refs_id_seq",
-	"provider_endpoint_models_id_seq",
 	"provider_endpoints_id_seq",
 	"storage_profile_secret_versions_id_seq",
 	"system_configs_id_seq",
-	"task_attempts_id_seq",
 	"task_daily_stat_backfills_id_seq",
+	"task_execution_attempts_id_seq",
 	"task_daily_stats_id_seq",
-	"task_leases_id_seq",
 	"task_outputs_id_seq",
 	"task_stat_events_id_seq",
 	"tasks_id_seq",

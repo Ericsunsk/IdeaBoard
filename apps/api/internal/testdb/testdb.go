@@ -2,7 +2,6 @@ package testdb
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
 )
 
 var (
@@ -30,23 +28,27 @@ var (
 	})
 )
 
-func Open(t testing.TB) *sql.DB {
+// Open returns an isolated pgxpool.Pool for PostgreSQL integration tests.
+func Open(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 
 	env := createIsolatedEnv(t)
-	db := openIsolatedSQLDB(t, env)
-	migrateAndSeed(t, db, env)
-	return db
+	pool := openIsolatedPool(t, env)
+	migrateAndSeed(t, pool, env)
+	return pool
 }
 
-func OpenWithPool(t testing.TB) (*sql.DB, *pgxpool.Pool) {
+// OpenWithPool returns two handles to the same isolated schema pool. Both
+// values point at the same *pgxpool.Pool; the pair exists so call sites
+// migrated from the legacy (sql.DB, pgxpool.Pool) tuple keep compiling
+// while they move to the single-pool seam.
+func OpenWithPool(t testing.TB) (*pgxpool.Pool, *pgxpool.Pool) {
 	t.Helper()
 
 	env := createIsolatedEnv(t)
-	db := openIsolatedSQLDB(t, env)
-	migrateAndSeed(t, db, env)
 	pool := openIsolatedPool(t, env)
-	return db, pool
+	migrateAndSeed(t, pool, env)
+	return pool, pool
 }
 
 type isolatedEnv struct {
@@ -65,7 +67,7 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	}
 
-	adminDB, err := sql.Open("pgx", raw)
+	adminPool, err := pgxpool.New(t.Context(), raw)
 	if err != nil {
 		t.Fatalf("open PostgreSQL test db failed: %v", err)
 	}
@@ -78,16 +80,16 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 		defer cancel()
 		if schemaCreated {
 			// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
-			_, _ = adminDB.ExecContext(ctx, `DROP SCHEMA IF EXISTS `+quotedSchema+` CASCADE`)
+			_, _ = adminPool.Exec(ctx, `DROP SCHEMA IF EXISTS `+quotedSchema+` CASCADE`)
 		}
-		_ = adminDB.Close()
+		adminPool.Close()
 	})
 
-	if err := adminDB.Ping(); err != nil {
+	if err := adminPool.Ping(t.Context()); err != nil {
 		t.Fatalf("ping PostgreSQL test db failed: %v", err)
 	}
 	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query -- quotedSchema is pg identifier sanitized above
-	if _, err := adminDB.ExecContext(t.Context(), `CREATE SCHEMA `+quotedSchema); err != nil {
+	if _, err := adminPool.Exec(t.Context(), `CREATE SCHEMA `+quotedSchema); err != nil {
 		t.Fatalf("create PostgreSQL test schema failed: %v", err)
 	}
 	schemaCreated = true
@@ -103,25 +105,6 @@ func isRequiredDatabase() bool {
 	return err == nil && required
 }
 
-func openIsolatedSQLDB(t testing.TB, env isolatedEnv) *sql.DB {
-	t.Helper()
-
-	cfg, err := pgx.ParseConfig(env.rawDSN)
-	if err != nil {
-		t.Fatalf("parse PostgreSQL test dsn failed: %v", err)
-	}
-	cfg.RuntimeParams["search_path"] = searchPathForSchema(env.schemaName)
-
-	db := stdlib.OpenDB(*cfg)
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-	if err := db.Ping(); err != nil {
-		t.Fatalf("ping isolated PostgreSQL test db failed: %v", err)
-	}
-	return db
-}
-
 func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 	t.Helper()
 
@@ -130,7 +113,6 @@ func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 		t.Fatalf("parse PostgreSQL test pool dsn failed: %v", err)
 	}
 	cfg.ConnConfig.RuntimeParams["search_path"] = searchPathForSchema(env.schemaName)
-	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
 
 	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
 	if err != nil {
@@ -143,13 +125,13 @@ func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 	return pool
 }
 
-func migrateAndSeed(t testing.TB, db *sql.DB, env isolatedEnv) {
+func migrateAndSeed(t testing.TB, pool *pgxpool.Pool, env isolatedEnv) {
 	t.Helper()
 
 	if err := applySchemaSnapshot(t.Context(), env.rawDSN, env.schemaName); err != nil {
 		t.Fatalf("initialize PostgreSQL test schema from snapshot failed: %v", err)
 	}
-	seedDefaults(t, db)
+	seedDefaults(t, pool)
 }
 
 func applySchemaSnapshot(ctx context.Context, rawDSN, schemaName string) error {
@@ -209,11 +191,11 @@ func searchPathForSchema(schemaName string) string {
 	return pgx.Identifier{schemaName}.Sanitize() + ",public"
 }
 
-func seedDefaults(t testing.TB, db *sql.DB) {
+func seedDefaults(t testing.TB, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := db.ExecContext(ctx, `
+	_, err := pool.Exec(ctx, `
 INSERT INTO storage_profiles (profile_id, name, provider, enabled, is_current, builtin, status, config)
 VALUES ('builtin-local', '本地存储', 'local', TRUE, TRUE, TRUE, 'active', '{}'::jsonb)
 ON CONFLICT (profile_id) DO NOTHING;
@@ -221,14 +203,14 @@ ON CONFLICT (profile_id) DO NOTHING;
 	if err != nil {
 		t.Fatalf("seed PostgreSQL test defaults failed: %v", err)
 	}
-	seedTaskFixtureUsers(t, db)
+	seedTaskFixtureUsers(t, pool)
 }
 
-func seedTaskFixtureUsers(t testing.TB, db *sql.DB) {
+func seedTaskFixtureUsers(t testing.TB, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := db.ExecContext(ctx, `
+	_, err := pool.Exec(ctx, `
 WITH seed_users (id, display_name, storage_uid) AS (
   VALUES
     (1, 'test-fixture-user-1', 'T00001'),

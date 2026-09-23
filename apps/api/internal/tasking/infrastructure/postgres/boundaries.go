@@ -36,11 +36,11 @@ type TaskCancellationRepository interface {
 type RuntimeRepository interface {
 	ConvergeTask(context.Context, runtimecontracts.TaskConvergenceIntent) (int64, error)
 	TaskReader
-	GetActiveTaskLeaseByTaskID(context.Context, string) (*runtimecontracts.ActiveTaskLease, error)
+	GetActiveExecutionAttemptByTaskID(context.Context, string) (*runtimecontracts.ActiveTaskExecution, error)
+	ClaimAndStartExecutionAttempt(context.Context, tasks.ExecutionAttemptStart) (int32, error)
 	PatchExecutionMetrics(context.Context, tasks.TaskExecutionMetricsPatch) error
 	PatchExecutionSnapshot(context.Context, tasks.TaskExecutionSnapshot) (int64, error)
-	CreateTaskAttempt(context.Context, tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error)
-	FinishTaskAttempt(context.Context, tasks.TaskAttemptFinish) (int64, error)
+	FinalizeExecutionAttempt(context.Context, tasks.ExecutionAttemptFinish) (int64, error)
 	TaskCancellationRepository
 }
 
@@ -51,7 +51,6 @@ type QueryRepository interface {
 	GetByUserID(context.Context, int64, int, int) ([]*tasks.Task, int64, error)
 	ListOutputsByTaskIDs(context.Context, []string) (map[string][]tasks.TaskOutput, error)
 	TaskCancellationRepository
-	ListTaskIDsByAccountIDAndStatuses(context.Context, int64, ...string) ([]string, error)
 }
 
 type BillingRepository interface {
@@ -66,6 +65,7 @@ type StatisticsRepository interface {
 	CountAllTaskCalls(context.Context) (int64, error)
 	ListBackfilledDatesByRange(context.Context, time.Time, time.Time) ([]time.Time, error)
 	ListDailyStatsByDateRange(context.Context, time.Time, time.Time) ([]statisticscontracts.DailyStatAggregate, error)
+	ListDailyCaptureCreditsByRange(context.Context, time.Time, time.Time, *time.Location) (map[string]int64, error)
 	ListExecutionBottleneckStatsByCreatedRange(context.Context, time.Time, time.Time) ([]statisticscontracts.ExecutionBottleneckAggregate, error)
 	ListExecutionFailureCategoryStatsByCreatedRange(context.Context, time.Time, time.Time) ([]statisticscontracts.ExecutionFailureCategoryAggregate, error)
 	ListStatEventsByOccurredRange(context.Context, time.Time, time.Time) ([]statisticscontracts.StatEventTrendRow, error)

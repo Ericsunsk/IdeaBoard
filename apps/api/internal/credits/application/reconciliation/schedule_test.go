@@ -47,7 +47,7 @@ func TestReconciliationScheduleCreatesOneCatchUpRunAndRetriesMissedSlot(t *testi
 		t.Fatalf("recent-success run count = %d, want 1", got)
 	}
 
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 UPDATE credit_reconciliation_runs
 SET completed_at = clock_timestamp() - INTERVAL '25 hours'
 WHERE id = $1`, first.ID); err != nil {

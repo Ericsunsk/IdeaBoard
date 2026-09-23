@@ -37,7 +37,7 @@ func newExecutionAttemptTestRepo(t *testing.T) *Repository {
 func TestExecutionAttemptValidation(t *testing.T) {
 	repo := &Repository{}
 	ctx := t.Context()
-	if _, err := repo.StartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{}); err == nil {
+	if _, err := repo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{}); err == nil {
 		t.Fatal("empty start accepted")
 	}
 	if _, err := repo.FinalizeExecutionAttempt(ctx, tasks.ExecutionAttemptFinish{Status: "running"}); err == nil {
@@ -55,21 +55,31 @@ func TestExecutionAttemptLifecycle(t *testing.T) {
 	taskID := testExecutionAttemptTask(t, repo)
 	token := "exec-token-lifecycle"
 
-	id, err := repo.StartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
-		TaskID: taskID, RiverJobID: 7, AttemptNo: 1, ExecutionToken: token,
+	attemptNo, err := repo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID: taskID, RiverJobID: 7, ExecutionToken: token,
 		FeatureSlug: "render", RequestedModel: "openai/gpt-image-1", Provider: "openai",
 		StartedAt: time.Now(),
 	})
-	if err != nil || id <= 0 {
-		t.Fatalf("StartExecutionAttempt() = %d, %v", id, err)
+	if err != nil || attemptNo != 1 {
+		t.Fatalf("ClaimAndStartExecutionAttempt() = %d, %v", attemptNo, err)
 	}
-	if _, err := repo.StartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
-		TaskID: taskID, AttemptNo: 2, ExecutionToken: token,
+	// Second claim on the now-running task: no pending row to fence, so the
+	// statement affects zero rows instead of inserting a duplicate attempt.
+	if _, err := repo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID: taskID, ExecutionToken: "exec-token-second",
+	}); err == nil {
+		t.Fatal("second claim on running task accepted, want no-row error")
+	}
+	// Same token on a different pending task: the claim matches, the insert
+	// hits the token uniqueness fence.
+	otherTaskID := testExecutionAttemptTask(t, repo)
+	if _, err := repo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID: otherTaskID, ExecutionToken: token,
 	}); err == nil {
 		t.Fatal("duplicate token accepted, want unique violation")
 	}
 	got, err := repo.GetExecutionAttemptByToken(ctx, token)
-	if err != nil || got.Status != "running" || got.TaskID != taskID {
+	if err != nil || got.Status != "running" || got.TaskID != taskID || got.AttemptNo != 1 {
 		t.Fatalf("GetExecutionAttemptByToken() = %+v, %v", got, err)
 	}
 	affected, err := repo.FinalizeExecutionAttempt(ctx, tasks.ExecutionAttemptFinish{
@@ -103,10 +113,10 @@ func TestExecutionAttemptFailedTerminal(t *testing.T) {
 
 	taskID := testExecutionAttemptTask(t, repo)
 	token := "exec-token-failed"
-	if _, err := repo.StartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
-		TaskID: taskID, AttemptNo: 1, ExecutionToken: token,
+	if _, err := repo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID: taskID, ExecutionToken: token,
 	}); err != nil {
-		t.Fatalf("StartExecutionAttempt() error = %v", err)
+		t.Fatalf("ClaimAndStartExecutionAttempt() error = %v", err)
 	}
 	affected, err := repo.FinalizeExecutionAttempt(ctx, tasks.ExecutionAttemptFinish{
 		ExecutionToken: token, TaskID: taskID, Status: "failed",

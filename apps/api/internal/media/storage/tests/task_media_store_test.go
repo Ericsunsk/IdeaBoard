@@ -13,7 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lib/pq"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/ingestion"
@@ -21,10 +23,6 @@ import (
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 )
-
-type fixedAssetLocator map[int64]StoredUploadLocation
-
-type uploadOnlyAssetLocator map[int64]StoredUploadLocation
 
 type recordingTaskResultRegistry struct {
 	nextID      int64
@@ -70,19 +68,40 @@ func (r *recordingTaskResultRegistry) FindReadyOwnedMediaAssetByChecksum(_ conte
 	return *r.existing, true, nil
 }
 
-func (l fixedAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
-	location, ok := l[lookup.AssetID]
-	return location, ok, nil
+func s3PresignFakeServer(t *testing.T, imageBytes []byte) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.URL.Query()["location"]; ok {
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><LocationConstraint>us-east-1</LocationConstraint>`))
+			return
+		}
+		if r.Method == http.MethodHead {
+			w.Header().Set("X-Amz-Meta-Object-Generation", "1")
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(imageBytes)))
+			w.Header().Set("Content-Type", "image/png")
+			w.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("X-Amz-Meta-Object-Generation", "1")
+		_, _ = w.Write(imageBytes)
+	}))
 }
 
-func (l fixedAssetLocator) LocateStoredDerivative(_ context.Context, lookup StoredDerivativeLookup) (StoredUploadLocation, bool, error) {
-	location, ok := l[lookup.AssetID]
-	return location, ok, nil
-}
-
-func (l uploadOnlyAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
-	location, ok := l[lookup.AssetID]
-	return location, ok, nil
+func saveS3PresignProfileForTest(t *testing.T, service *StorageService, ctx context.Context, id, endpoint string) {
+	t.Helper()
+	if _, err := service.SaveProfile(ctx, &StorageProfile{
+		ID: id, Name: id, Provider: StorageProviderS3Compatible, Enabled: true,
+		Config: map[string]interface{}{
+			"access_key_id": "ak", storageSecretAccessKeyName: "sk", "bucket_name": "bucket",
+			"endpoint": endpoint, "region_id": "us-east-1", "access_domain": "https://cdn.example.com",
+			"force_path_style": true,
+		},
+	}); err != nil {
+		t.Fatalf("save %s profile: %v", id, err)
+	}
 }
 
 func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitch(t *testing.T) {
@@ -90,75 +109,84 @@ func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitc
 	t.Cleanup(restore)
 	service, _ := newStorageServiceTest(t)
 	ctx := t.Context()
-	profile := func(id, domain string) *StorageProfile {
-		return &StorageProfile{
-			ID: id, Name: id, Provider: StorageProviderS3Compatible, Enabled: true,
-			Config: map[string]interface{}{
-				"access_key_id": "ak", storageSecretAccessKeyName: "sk", "bucket_name": "bucket",
-				"endpoint": "127.0.0.1:18080", "region_id": "us-east-1", "access_domain": domain,
-			},
-		}
-	}
-	if _, err := service.SaveProfile(ctx, profile("asset-profile", "https://asset-cdn.example.com")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.SaveProfile(ctx, profile("current-profile", "https://current-cdn.example.com")); err != nil {
-		t.Fatal(err)
-	}
+	imageBytes := tinyPNGBytes(t)
+	assetServer := s3PresignFakeServer(t, imageBytes)
+	t.Cleanup(assetServer.Close)
+	currentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	t.Cleanup(currentServer.Close)
+	saveS3PresignProfileForTest(t, service, ctx, "asset-profile", assetServer.URL)
+	saveS3PresignProfileForTest(t, service, ctx, "current-profile", currentServer.URL)
 	if _, err := service.ApplyProfile(ctx, "current-profile"); err != nil {
 		t.Fatal(err)
 	}
-	service.SetAssetLocator(fixedAssetLocator{91: {
-		StorageProfileID: "asset-profile",
-		StorageKey:       "uploads/tasks/42/task/input.png",
-	}})
+
+	checksumBytes := sha256.Sum256(imageBytes)
+	checksum := hex.EncodeToString(checksumBytes[:])
+	manifest, err := tasks.NewTaskInputManifest([]tasks.TaskInputManifestRef{{
+		AssetID: "asset_91", DerivativeID: "derivative_91", DerivativeTier: tasks.TierProcessingInput,
+		StorageProfileID: "asset-profile", ObjectKey: "uploads/tasks/42/task/input.png", ObjectGeneration: 1,
+		ChecksumSHA256: checksum, MIMEType: "image/png", SizeBytes: int64(len(imageBytes)),
+	}}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
 	params := &tasks.WorkflowTaskParams{
 		Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
 			AssetID: 91, Role: tasks.MediaRoleInput,
 		}}},
+		InputManifest: manifest,
 	}
 	resolved, err := store.ResolveRuntimeMedia(ctx, params)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "https://asset-cdn.example.com/uploads/tasks/42/task/input.png"
-	if resolved.Inputs[0].URL != want {
-		t.Fatalf("resolved media = %#v, want %q", resolved, want)
+	if !strings.Contains(resolved.Inputs[0].URL, "uploads/tasks/42/task/input.png") {
+		t.Fatalf("resolved media = %#v, want manifest object key", resolved)
 	}
-	if strings.Contains(resolved.Inputs[0].URL, "current-cdn") {
+	if strings.Contains(resolved.Inputs[0].URL, currentServer.URL[strings.Index(currentServer.URL, "127.0.0.1"):]) {
 		t.Fatalf("resolver followed current profile: resolved=%q", resolved.Inputs[0].URL)
 	}
 }
 
 func TestRuntimeTaskMediaStoreRejectsLocalAssetWithoutProviderURL(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
-	service.SetAssetLocator(fixedAssetLocator{92: {
-		StorageProfileID: builtinLocalProfileID(),
-		StorageKey:       "uploads/canvas/owner/board/content/input.png",
-	}})
 	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
+	manifest, err := tasks.NewTaskInputManifest([]tasks.TaskInputManifestRef{{
+		AssetID: "asset_92", DerivativeID: "derivative_92", DerivativeTier: tasks.TierProcessingInput,
+		StorageProfileID: builtinLocalProfileID(), ObjectKey: "uploads/canvas/owner/board/content/input.png",
+		ObjectGeneration: 1, ChecksumSHA256: strings.Repeat("b", 64), MIMEType: "image/png", SizeBytes: 1,
+	}}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
 		AssetID: 92, Role: tasks.MediaRoleInput,
-	}}}}
+	}}}, InputManifest: manifest}
 	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil {
 		t.Fatal("expected local asset without a provider URL to be rejected")
 	}
 }
 
-func TestRuntimeTaskMediaStoreNeverFallsBackToOriginalAsset(t *testing.T) {
+func TestRuntimeTaskMediaStoreSurfacesMissingProfileWithoutFallback(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
-	service.SetAssetLocator(uploadOnlyAssetLocator{93: {
-		StorageProfileID: builtinLocalProfileID(),
-		StorageKey:       "uploads/canvas/owner/board/content/image.png",
-	}})
 	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
+	manifest, err := tasks.NewTaskInputManifest([]tasks.TaskInputManifestRef{{
+		AssetID: "asset_93", DerivativeID: "derivative_93", DerivativeTier: tasks.TierProcessingInput,
+		StorageProfileID: "profile-missing", ObjectKey: "uploads/canvas/owner/board/content/image.png",
+		ObjectGeneration: 1, ChecksumSHA256: strings.Repeat("c", 64), MIMEType: "image/png", SizeBytes: 1,
+	}}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
 		AssetID: 93, Role: tasks.MediaRoleInput,
-	}}}}
-	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil || !strings.Contains(err.Error(), "衍生图解析器未配置") {
-		t.Fatalf("expected processing derivative lookup failure without fallback, got %v", err)
+	}}}, InputManifest: manifest}
+	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil {
+		t.Fatal("expected missing manifest profile to surface without fallback")
 	}
 }
 
@@ -347,7 +375,7 @@ func TestRuntimeTaskMediaStoreMaterializeBytesResultConvergesAfterChecksumConfli
 	imageBytes := tinyPNGBytes(t)
 	digest := sha256.Sum256(imageBytes)
 	canonical := &dbsqlc.MediaAsset{ID: 88, OwnerUserID: 42, StorageProfileID: builtinLocalProfileID(), StorageKey: "uploads/tasks/42/existing/result.png", Url: "https://cdn.example/existing.png", MimeType: "image/png", Width: 1, Height: 1, SizeBytes: int64(len(imageBytes)), ChecksumSha256: hex.EncodeToString(digest[:]), Status: "ready"}
-	registry := &recordingTaskResultRegistry{existing: canonical, completeErr: &pq.Error{Code: "23505", Constraint: "uq_media_assets_owned_checksum"}}
+	registry := &recordingTaskResultRegistry{existing: canonical, completeErr: &pgconn.PgError{Code: "23505", ConstraintName: "uq_media_assets_owned_checksum"}}
 	service, _ := newStorageServiceTest(t)
 	adapter := NewRuntimeTaskMediaStore(service, registry)
 

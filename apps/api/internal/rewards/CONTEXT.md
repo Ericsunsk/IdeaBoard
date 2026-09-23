@@ -1,54 +1,56 @@
 # Rewards Context
 
-Rewards 管理平台 Idea 奖励的 RewardCode 与 Redemption。用户展示使用 `Idea/Ideas`；内部数量、代码、API 与 schema 使用 `Credit/credits`。
+Rewards owns RewardCode rules and Redemption facts for platform Idea rewards.
+User-facing copy uses `Idea`/`Ideas`; internal amounts, codes, APIs, and schema use `Credit`/`credits`.
+It does not own the Credits Ledger or Identity data; all ledger effects go through `credits.Service`, and user fields come from the authenticated `Principal` or the Runtime Identity projection adapter.
 
 ## Domain Language
 
 | Term | Meaning |
 | ---- | ------- |
-| RewardCode | 名称、HMAC-only bearer Code、Credit 奖励、可选总 cap/过期时间与 enabled intent 的单一 aggregate |
-| Redemption | 用户成功领取 RewardCode 的不可变事实 |
-| Admin Action Journal | Rewards context 内 append-only 的 actor/action/time/safe metadata 记录 |
+| RewardCode | Single aggregate of display name, HMAC-only bearer Code, Credit award, optional total cap and expiry, and enabled intent |
+| Redemption | Immutable fact of one user's successful RewardCode claim |
+| Admin Action Journal | Append-only record inside the Rewards context of actor, action, time, and safe metadata |
 
 ## Public Seams
 
-- `AdminCommands` 提供 Create、Update、SetEnabled 与 Delete：Create 以 client idempotency key 创建；Update 在单个 transaction 内保存规则并可选轮换 bearer Code；SetEnabled 是 set-state；Delete 仅接受零 Redemption aggregate。
-- `AdminReads.SearchRewardCodes` 通过 no-store POST body 提供名称模糊搜索、完整 Code HMAC lookup、effective status filter、filtered total 与 keyset page，结果不含 plaintext/full digest。
-- `AdminReads.ListAdminRedemptions` 按 RewardCode scope 提供成功 Redemption 的 keyset summary page；`GetAdminRedemption` 仅在相同 RewardCode scope 内按需返回 Credits Transaction ID 与 masked Code hint。
-- `UserCommands.Redeem` 同步兑换 RewardCode，返回 Redemption、credited amount、available balance 与 replay marker。
-- `UserReads.ListRedemptions` 按 ID cursor 返回当前用户的成功 Redemption history，仅含 RewardCode display name、credited amount、masked Code hint 与兑换时间。
+- `AdminCommands` offers Create, Update, SetEnabled, and Delete: Create uses a client idempotency key; Update saves rules and optionally rotates the bearer Code in one transaction; SetEnabled is set-state; Delete accepts only zero-Redemption aggregates.
+- `AdminReads.SearchRewardCodes` searches via no-store POST body with fuzzy name search, full-Code HMAC lookup, effective-status filter, filtered total, and keyset pages, and results carry no plaintext or full digest.
+- `AdminReads.ListAdminRedemptions` pages successful Redemption summaries by RewardCode scope with a keyset; `GetAdminRedemption` returns the Credits Transaction ID and masked Code hint only within the same RewardCode scope.
+- `UserCommands.Redeem` synchronously redeems a RewardCode and returns the Redemption, credited amount, available balance, and replay marker.
+- `UserReads.ListRedemptions` returns the current user's successful Redemption history by ID cursor with only RewardCode display name, credited amount, masked Code hint, and redeem time.
 
-Hash normalization、HMAC candidates、row locking、persistence 和 Credits transaction orchestration 都留在 module implementation 内。
+Implementation note: hash normalization, HMAC candidates, row locking, persistence, and Credits transaction orchestration stay inside the module implementation.
 
 ## Invariants
 
-- RewardCode 创建以 normalized Code 的 key-independent PostgreSQL advisory transaction lock 串行化；HMAC digest alias 同时覆盖 current/previous key，避免 rolling rotation 期间相同 plaintext 的双写。
-- RewardCode create idempotency 以非敏感业务字段 fingerprint 和 persisted digest alias 双重校验；old-only 与 current+previous 实例在 rotation overlap 期间可对称 replay，同时不同 Code 或不同业务 payload 仍 conflict。
-- RewardCode mutation 与 Redeem 先按 RewardCode ID 获取 PostgreSQL advisory transaction lock，再由受控 database function 获取 row lock；same-user replay、有效性/cap gate、capacity counter、Credits Grant 与 Redemption insert 严格位于同一 transaction。Runtime 不需要也不得获得 RewardCode table 的直接 UPDATE privilege；Credit business reference 使用独立 `reward_code_redemption` namespace。
-- 每个 User 每个 RewardCode 最多成功兑换一次；`max_redemptions = 0` 表示 unlimited。
-- RewardCode plaintext 只允许出现在首次 successful create，或携带新 Code 的 successful update response；create replay、普通 update、Code replay、list、history、Journal、日志与错误均不得包含 plaintext 或 full digest，相关 HTTP response 始终 `Cache-Control: no-store`。
-- Update 只改变后续 Redemption 使用的名称、Credit amount、cap 与 expiry；历史 Redemption 的 amount、Credit Transaction ID 与时间保持不可变。有限 cap 不得低于当前 Redemption count，`0` 恢复 unlimited。
-- `enabled` 是 Admin intent；有效状态按 `expired > exhausted > disabled > enabled` 推导，前端以独立 Toggle 展示配置 intent，避免与实际可兑换原因混淆。
-- Update 将规则变更与 optional Code rotation 收敛为单个 Admin PATCH 和同一 transaction；任一校验、collision 或 persistence 失败会整体 rollback。新 Code 会替换 primary digest 与全部 current/previous aliases，旧 Code commit 后立即失效；提交 Code 已命中目标当前 alias 时视为 replay，不重复 rotation Journal 且不返回 plaintext。
-- Update/SetEnabled 对相同目标状态不重复 Journal。零 Redemption RewardCode 可 hard delete；Journal 的 nullable FK 使用 `ON DELETE SET NULL`，并永久保留 immutable target ID 与 safe target snapshot。
-- Code 明文或可逆密文不得进入 database、Admin list、URL、Journal 或日志；只保存 key version、HMAC-SHA256 digest 与四字符 hint。
-- Admin search 只接受 POST body；可归一化为完整 Code 的 query 仅生成 current/previous HMAC candidates，不得作为名称查询参数发送到 PostgreSQL。名称、effective status、filtered total 与 keyset page 必须来自同一 read snapshot。
-- Rewards 拥有 caller transaction，并只通过 `credits.Service.InTx(tx).Grant` 写入 Credits Ledger；capacity、Grant 与 Redemption 同时 commit 或 rollback。
-- Runtime role 执行 `reserve_reward_code_redemption_v1` 是受限能力，仍可消耗一条当前 eligible RewardCode 的 cap；expiry 只由数据库时间判定，Grant 与 Redemption insert 继续由 application transaction 编排。
-- Credit Grant 固定使用 source `reward_redemption`、reason `兑换奖励` 和 Redemption ID business reference。
-- authenticated Admin 可通过 Credits Correction 逆转 Grant 的账务结果；Correction 是新的 Ledger 事实，不删除 Redemption，也不恢复 RewardCode capacity。
-- User Redemption history 只读取已提交 Redemption，并按 `(user_id, id DESC)` 隔离和分页；不 join 或复制 Identity PII、Code digest 或明文。
-- User Redeem response 的 `user_public_id` 与 `display_name` 只来自 Auth middleware 已验证的 request `Principal` snapshot；commit 后禁止执行 fallible Identity read。
-- Admin Redemption read 只按 `(reward_code_id, id DESC)` 读取已提交事实；summary 不含技术详情，detail 必须同时匹配 RewardCode ID 与 Redemption ID，且两者都不 join Identity、Journal 或 Code digest/plaintext。HTTP presentation 通过 Runtime Identity projection adapter 组合用户字段：每个 list page 只执行一次 bounded batch read，detail 执行一次 single read，缺失或不一致的 Identity mapping 统一 fail closed。Authenticated Redemption history 不读取 Identity。
-- `reward_admin_actions` 自动记录 actor/action/time/safe metadata，不接收手填 reason，并由 database trigger 与 runtime privileges 双重保证 append-only。Guard 只放行 `ON DELETE SET NULL` 引发的 FK referential nullification：parent 必须已不存在且其他 Journal 字段完全不变。Runtime 不拥有 RewardCode/Alias/Journal 的直接 UPDATE/DELETE，只能执行 transaction-bound Rewards command functions，避免绕过 Journal。
-- `REWARDS_CODE_HMAC_KEYS` 只接受 current 与可选 previous；每个 base64 key 解码后至少 32 bytes，配置无效时 startup fail closed。
-- Code normalization 在任何 Unicode normalization 前执行 128-byte raw bound，再做 NFKC、uppercase、trim 与 Unicode whitespace/hyphen removal；最终 payload 只接受 8–32 个 `A-Z0-9`。
-- HMAC rotation overlap 期间 lookup 同时验证 current/previous，新发行只使用 current；任何 persisted RewardCode（包括 disabled、expired 或未兑换）仍依赖其 primary key version，因此依赖旧 version 的记录存在时 previous key 不得退休。
-- 用户 Redeem endpoint 自有 per-user in-process token bucket，默认 10 attempts / 10 minutes，并在流量到来时清理 idle entries；它不是跨实例业务 invariant，不扩展为 Platform interface 或持久化 bucket。
-- Redeem 的不可用 Code 状态使用统一 public error；response 与日志不得包含 raw Code、full digest 或 request body，Redeem response 始终 `no-store`。
-- Redemption observability 只记录固定 outcome、credited Ideas 与 latency；User/RewardCode/Code/digest 不得成为 metrics field 或 label。
-- RewardCode schema 只从单一 canonical migration 创建，不重放已删除的 Campaign/Batch 演进链。数据库若带有 removed migration version、Rewards Ledger reference 或既有 RewardCode facts，migration/rollback 必须 fail closed，并要求显式 Fresh Database reset；不得自动清理或孤立 Credits Ledger。
+- RewardCode creation serializes on a key-independent PostgreSQL advisory transaction lock over the normalized Code; the HMAC digest alias covers current and previous keys together so the same plaintext cannot double-write during rolling rotation.
+- Create idempotency double-checks a non-sensitive business-field fingerprint and the persisted digest alias; old-only and current-plus-previous instances may replay symmetrically during rotation overlap, while a different Code or business payload still conflicts.
+- RewardCode mutation and Redeem first take the PostgreSQL advisory transaction lock by RewardCode ID, then the row lock via a controlled database function; same-user replay, eligibility and cap gates, capacity counter, Credits Grant, and Redemption insert all sit in one transaction, Runtime neither needs nor holds direct UPDATE privilege on the RewardCode table, and the Credit business reference uses the standalone `reward_code_redemption` namespace.
+- Each user redeems each RewardCode successfully at most once; `max_redemptions = 0` means unlimited.
+- RewardCode plaintext appears only in the first successful create response or a successful update response carrying a new Code; create replays, plain updates, Code replays, lists, history, Journal, logs, and errors never carry plaintext or full digest, and related HTTP responses are always `Cache-Control: no-store`.
+- Update changes only the name, Credit amount, cap, and expiry for later Redemptions; historical Redemption amounts, Credit Transaction IDs, and times stay immutable, a finite cap must not drop below the current Redemption count, and `0` restores unlimited.
+- `enabled` is Admin intent; effective status derives as `expired > exhausted > disabled > enabled`, and the frontend shows the configured intent with a standalone toggle so it never confuses the actual redeemable cause.
+- Update converges rule changes and optional Code rotation into one Admin PATCH and one transaction; any validation, collision, or persistence failure rolls everything back, a new Code replaces the primary digest and all current and previous aliases with the old Code dead right after commit, and submitting a Code that already hits the target's current alias counts as replay with no repeated rotation Journal and no plaintext returned.
+- Update and SetEnabled never double-Journal the same target state; a zero-Redemption RewardCode may hard-delete, and the Journal nullable FK uses `ON DELETE SET NULL` while permanently keeping the immutable target ID and safe target snapshot.
+- Code plaintext or reversible ciphertext never enters the database, Admin lists, URLs, Journal, or logs; only key version, HMAC-SHA256 digest, and a four-character hint are stored.
+- Admin search accepts POST bodies only; a query normalizable to a full Code generates only current and previous HMAC candidates and is never sent to PostgreSQL as a name parameter, and name, effective status, filtered total, and keyset page must come from one read snapshot.
+- Rewards owns the caller transaction and writes the Credits Ledger only via `credits.Service.InTx(tx).Grant`; capacity, Grant, and Redemption commit or roll back together.
+- The Runtime role executing `reserve_reward_code_redemption_v1` is a restricted capability that still consumes one eligible RewardCode cap entry; expiry is judged by database time only, and the Grant plus Redemption insert stay orchestrated by the application transaction.
+- Credit Grants always use source `reward_redemption`, a fixed redemption-reward reason literal, and the Redemption ID business reference.
+- An authenticated Admin may reverse a Grant's accounting effect via Credits Correction; the Correction is a new Ledger fact that deletes no Redemption and restores no RewardCode capacity.
+- User Redemption history reads only committed Redemptions and pages them isolated by `(user_id, id DESC)`; it joins or copies no Identity PII, Code digest, or plaintext.
+- The User Redeem response takes `user_public_id` and `display_name` only from the Auth middleware's verified request `Principal` snapshot; no fallible Identity read runs after commit.
+- Admin Redemption reads only committed facts by `(reward_code_id, id DESC)`; the summary carries no technical detail, detail must match both RewardCode ID and Redemption ID, and neither joins Identity, Journal, or Code digest and plaintext; HTTP presentation composes user fields through the Runtime Identity projection adapter with at most one bounded batch read per list page and one single read per detail, and missing or inconsistent Identity mappings fail closed, while authenticated Redemption history reads no Identity.
+- `reward_admin_actions` records actor, action, time, and safe metadata automatically with no hand-filled reason, and stays append-only by both database trigger and runtime privileges; the guard admits only FK referential nullification from `ON DELETE SET NULL`, where the parent must already be gone and every other Journal field unchanged, and Runtime holds no direct UPDATE or DELETE on RewardCode, Alias, or Journal and only runs transaction-bound Rewards command functions so the Journal cannot be bypassed.
+- `REWARDS_CODE_HMAC_KEYS` accepts only current plus optional previous; each base64 key decodes to at least 32 bytes, and startup fails closed on invalid config.
+- Code normalization applies a 128-byte raw bound before any Unicode normalization, then NFKC, uppercase, trim, and Unicode whitespace and hyphen removal; the final payload accepts only 8 to 32 `A-Z0-9` characters.
+- During HMAC rotation overlap, lookup verifies current and previous while new issuance uses current only; every persisted RewardCode (including disabled, expired, or unredeemed) still depends on its primary key version, so the previous key must not retire while records depending on the old version exist.
+- The user Redeem endpoint owns a per-user in-process token bucket, 10 attempts per 10 minutes by default, cleaning idle entries on arrival; it is not a cross-instance business invariant and never grows into a Platform interface or persisted bucket.
+- Unavailable-Code Redeem states share one public error; responses and logs carry no raw Code, full digest, or request body, and Redeem responses are always `no-store`.
+- Redemption observability records only fixed outcome, credited Ideas, and latency; User, RewardCode, Code, and digest must never become metrics fields or labels.
+- RewardCode schema is created from one canonical migration only and never replays the deleted Campaign and Batch evolution chain; if the database carries a removed migration version, Rewards Ledger reference, or existing RewardCode facts, migration and rollback must fail closed and demand an explicit Fresh Database reset, and must never auto-clean or orphan the Credits Ledger.
 
-## Current Boundary
+## Non-goals
 
-当前使用普通 PostgreSQL B-tree、RewardCode row lock 与精确 counter，不包含 partitioning、sharded counter、Redis/quota block、distributed limiter、Platform RateLimiter abstraction 或 PostgreSQL bucket。
+- No partitioning, sharded counters, Redis or quota blocks, distributed limiters, Platform RateLimiter abstraction, or PostgreSQL buckets; the current design uses plain PostgreSQL B-trees, RewardCode row locks, and exact counters.

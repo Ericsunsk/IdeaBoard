@@ -16,11 +16,9 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminBrandLogoRoutes(adminAPI, h)
 	registerAdminSettingsRoutes(adminAPI, h)
 	registerAdminUserRoutes(adminAPI, h)
-	registerAdminAccountRoutes(adminAPI, h)
 	registerAdminTaskRoutes(adminAPI, h)
 	registerAdminUploadRoutes(adminAPI, h)
 	registerAdminStorageRoutes(adminAPI, h)
-	registerAdminProviderEndpointRoutes(adminAPI, h)
 	registerAdminSearchProviderRoutes(adminAPI, h)
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
@@ -97,6 +95,21 @@ func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT(RouteAdminSettingsMediaUpload, h.AdminHandler.UpdateMediaUploadSettings)
 	adminAPI.GET(RouteAdminSettingsOutbound, h.AdminHandler.GetOutboundPolicy)
 	adminAPI.PUT(RouteAdminSettingsOutbound, h.AdminHandler.UpdateOutboundPolicy)
+	if h.AIGatewayHandler != nil {
+		adminAPI.GET(RouteAdminSettingsAIGateway, h.AIGatewayHandler.Get)
+		adminAPI.PUT(RouteAdminSettingsAIGateway, h.AIGatewayHandler.Update)
+		adminAPI.GET(RouteAdminSettingsAIGatewayModels, h.AIGatewayHandler.ListMappings)
+		adminAPI.PUT(RouteAdminSettingsAIGatewayModels+"/:feature", h.AIGatewayHandler.SaveMapping)
+		adminAPI.GET(RouteAdminSettingsAIGatewayCatalog, h.AIGatewayHandler.ListCatalog)
+		adminAPI.PUT(RouteAdminSettingsAIGatewayCatalog, h.AIGatewayHandler.SaveCatalog)
+		adminAPI.GET(RouteAdminSettingsAIGatewayProviders, h.AIGatewayHandler.ListProviders)
+		adminAPI.GET(RouteAdminSettingsAIGatewayDetectModels, h.AIGatewayHandler.DetectModels)
+		adminAPI.GET(RouteAdminSettingsAIGatewayModelsReference, h.AIGatewayHandler.GetModelReference)
+		adminAPI.GET(RouteAdminSettingsAIGatewayBrandLogo, h.AIGatewayHandler.GetBrandLogo)
+		adminAPI.GET(RouteAdminSettingsAIGatewayModelsObserved, h.AIGatewayHandler.ListModelsObserved)
+		adminAPI.POST(RouteAdminSettingsAIGatewayRoutePreview, h.AIGatewayHandler.PreviewGatewayRoute)
+		adminAPI.POST(RouteAdminSettingsAIGatewayTestConnection, h.AIGatewayHandler.TestConnection)
+	}
 	if h.MailConfigHandler != nil {
 		adminAPI.GET(RouteAdminSettingsMail, h.MailConfigHandler.Get)
 		adminAPI.PUT(RouteAdminSettingsMail, h.MailConfigHandler.Update)
@@ -117,20 +130,6 @@ func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT("/users/:public_id/role", h.AdminHandler.UpdateUserRole)
 	adminAPI.DELETE("/users/:public_id", h.AdminHandler.DeleteUser)
 	adminAPI.POST("/users/:public_id/impersonate", h.AdminHandler.ImpersonateUser)
-}
-
-func registerAdminAccountRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/accounts", h.AccountHandler.ListAccounts)
-	adminAPI.GET("/accounts/limits", h.AccountHandler.GetAccountLimits)
-	adminAPI.GET("/accounts/:id", h.AccountHandler.GetAccount)
-	adminAPI.POST("/accounts", h.AccountHandler.CreateAccount)
-	adminAPI.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)
-	adminAPI.PATCH("/accounts/:id/models", h.AccountHandler.PatchAccountModel)
-	adminAPI.DELETE("/accounts/:id/models", h.AccountHandler.DeleteAccountModel)
-	adminAPI.DELETE("/accounts/:id", h.AccountHandler.DeleteAccount)
-	adminAPI.POST("/accounts/:id/start", h.AccountHandler.StartAccount)
-	adminAPI.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
-	adminAPI.GET("/accounts/:id/queue", h.AccountHandler.GetAccountQueue)
 }
 
 func registerAdminTaskRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
@@ -157,16 +156,6 @@ func registerAdminStorageRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/storage/profiles/:id/apply", h.StorageHandler.ApplyProfile)
 	adminAPI.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
 	adminAPI.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
-}
-
-func registerAdminProviderEndpointRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/provider-endpoints", h.ProviderEndpointHandler.List)
-	adminAPI.GET("/provider-endpoints/registry", h.ProviderEndpointHandler.Registry)
-	adminAPI.POST("/provider-endpoints", h.ProviderEndpointHandler.Create)
-	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)
-	adminAPI.PATCH("/provider-endpoints/:id/status", h.ProviderEndpointHandler.UpdateStatus)
-	adminAPI.DELETE("/provider-endpoints/:id", h.ProviderEndpointHandler.Delete)
-	adminAPI.POST("/provider-endpoints/detect-models", h.ProviderEndpointHandler.DetectModels)
 }
 
 func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

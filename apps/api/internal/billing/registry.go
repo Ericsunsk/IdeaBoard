@@ -1,15 +1,10 @@
 package billing
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
-	"time"
 	"unicode/utf8"
-
-	"github.com/jackc/pgx/v5"
 )
 
 var ErrDuplicateBillableItem = errors.New("duplicate billable item SKU")
@@ -53,11 +48,11 @@ func NewBillableItemRegistry(definitions []BillableItemDefinition) (*BillableIte
 		if strings.TrimSpace(definition.Namespace) != namespace || productKind == "" || utf8.RuneCountInString(productKind) > 64 {
 			return nil, ErrInvalidCatalogEntry
 		}
-		displayName, err := normalizeDisplayName(definition.DisplayName)
+		displayName, err := NormalizeDisplayName(definition.DisplayName)
 		if err != nil {
 			return nil, err
 		}
-		description, err := normalizeDescription(definition.Description)
+		description, err := NormalizeDescription(definition.Description)
 		if err != nil {
 			return nil, err
 		}
@@ -120,192 +115,8 @@ func (r *BillableItemRegistry) Contains(rawSKU string) bool {
 	return exists
 }
 
-type BillableItemCatalogCard struct {
-	BillableItemDefinition
-	Status          BillableItemStatus             `json:"status"`
-	CurrentPrices   map[OutputResolution]PriceInfo `json:"current_prices"`
-	PricingVariants []OutputResolution             `json:"pricing_variants"`
-	UpdatedAt       *time.Time                     `json:"updated_at,omitempty"`
-}
-
-type CatalogFactReader interface {
-	ListCatalogFacts(context.Context) ([]CatalogItem, error)
-}
-
-type CatalogPricePublisher interface {
-	PublishPrices(context.Context, PublishPricesInput) (map[OutputResolution]PriceInfo, error)
-}
-
-type CatalogStore interface {
-	CatalogFactReader
-	CatalogPricePublisher
-	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
-	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
-	QuoteAtResolution(context.Context, string, OutputResolution, int64) (Quote, error)
-	QuoteAtResolutionInTx(context.Context, pgx.Tx, string, OutputResolution, int64) (Quote, error)
-}
-
-type BillableItemCatalog struct {
-	registry *BillableItemRegistry
-	store    CatalogStore
-}
-
-func NewBillableItemCatalog(registry *BillableItemRegistry, store CatalogStore) *BillableItemCatalog {
-	return &BillableItemCatalog{registry: registry, store: store}
-}
-
-func (c *BillableItemCatalog) PublishPrices(ctx context.Context, rawSKU string, prices map[OutputResolution]int64, actorID int64) (map[OutputResolution]PriceInfo, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return nil, ErrServiceUnavailable
-	}
-	definition, exists := c.registry.Find(rawSKU)
-	if !exists {
-		return nil, ErrSKUNotFound
-	}
-	if actorID <= 0 {
-		return nil, ErrInvalidCatalogEntry
-	}
-	if err := validatePricingVariants(definition, prices); err != nil {
-		return nil, err
-	}
-	return c.store.PublishPrices(ctx, PublishPricesInput{
-		Definition: definition, Prices: prices, ActorID: actorID,
-	})
-}
-
-func (c *BillableItemCatalog) SetAvailability(ctx context.Context, rawSKU string, enabled bool, actorID int64) (AvailabilityInfo, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return AvailabilityInfo{}, ErrServiceUnavailable
-	}
-	if _, exists := c.registry.Find(rawSKU); !exists {
-		return AvailabilityInfo{}, ErrSKUNotFound
-	}
-	return c.store.SetAvailability(ctx, rawSKU, enabled, actorID)
-}
-
-func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string, actorID int64) (ArchivedItemDeleteResult, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return ArchivedItemDeleteResult{}, ErrServiceUnavailable
-	}
-	if actorID <= 0 {
-		return ArchivedItemDeleteResult{}, ErrInvalidCatalogEntry
-	}
-	if _, err := CanonicalizeSKU(rawSKU); err != nil {
-		return ArchivedItemDeleteResult{}, err
-	}
-	if _, exists := c.registry.Find(rawSKU); exists {
-		return ArchivedItemDeleteResult{}, ErrItemNotArchived
-	}
-	return c.store.DeleteArchived(ctx, rawSKU, actorID)
-}
-
-func (c *BillableItemCatalog) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
-	definition, err := c.registeredDefinition(rawSKU)
-	if err != nil {
-		return Quote{}, err
-	}
-	if err := validatePricingVariant(definition, resolution); err != nil {
-		return Quote{}, err
-	}
-	quote, err := c.store.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
-	return quote, normalizeCatalogQuoteError(err)
-}
-
-func (c *BillableItemCatalog) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
-	definition, err := c.registeredDefinition(rawSKU)
-	if err != nil {
-		return Quote{}, err
-	}
-	if err := validatePricingVariant(definition, resolution); err != nil {
-		return Quote{}, err
-	}
-	quote, err := c.store.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
-	return quote, normalizeCatalogQuoteError(err)
-}
-
-func (c *BillableItemCatalog) registeredDefinition(rawSKU string) (BillableItemDefinition, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return BillableItemDefinition{}, ErrServiceUnavailable
-	}
-	if _, err := CanonicalizeSKU(rawSKU); err != nil {
-		return BillableItemDefinition{}, err
-	}
-	definition, exists := c.registry.Find(rawSKU)
-	if !exists {
-		return BillableItemDefinition{}, ErrPricingUnavailable
-	}
-	return definition, nil
-}
-
-func normalizeCatalogQuoteError(err error) error {
-	if errors.Is(err, ErrSKUNotFound) {
-		return ErrPricingUnavailable
-	}
-	return err
-}
-
-func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCard, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return nil, ErrServiceUnavailable
-	}
-	facts, err := c.store.ListCatalogFacts(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list billable item catalog facts: %w", err)
-	}
-	factsBySKU := make(map[SKU]CatalogItem, len(facts))
-	for _, fact := range facts {
-		factsBySKU[fact.SKU] = fact
-	}
-
-	definitions := c.registry.Items()
-	cards := make([]BillableItemCatalogCard, 0, len(definitions)+len(facts))
-	for _, definition := range definitions {
-		card := BillableItemCatalogCard{
-			BillableItemDefinition: definition,
-			Status:                 BillableItemStatusUnpriced,
-			CurrentPrices:          map[OutputResolution]PriceInfo{},
-			PricingVariants:        append([]OutputResolution(nil), definition.PricingVariants...),
-		}
-		if fact, exists := factsBySKU[definition.SKU]; exists {
-			card.CurrentPrices = clonePriceMap(fact.CurrentPrices)
-			updatedAt := fact.UpdatedAt
-			card.UpdatedAt = &updatedAt
-			if hasConfiguredPricingVariant(definition, fact.CurrentPrices) {
-				if fact.Enabled {
-					card.Status = BillableItemStatusActive
-				} else {
-					card.Status = BillableItemStatusDisabled
-				}
-			}
-			delete(factsBySKU, definition.SKU)
-		}
-		cards = append(cards, card)
-	}
-
-	archived := make([]CatalogItem, 0, len(factsBySKU))
-	for _, fact := range factsBySKU {
-		archived = append(archived, fact)
-	}
-	sort.Slice(archived, func(i, j int) bool { return archived[i].SKU < archived[j].SKU })
-	for _, fact := range archived {
-		namespace, _, _ := strings.Cut(string(fact.SKU), ":")
-		updatedAt := fact.UpdatedAt
-		cards = append(cards, BillableItemCatalogCard{
-			BillableItemDefinition: BillableItemDefinition{
-				SKU: fact.SKU, Namespace: namespace, ProductKind: "legacy",
-				DisplayName: fact.DisplayName, Description: fact.Description,
-			},
-			Status:          BillableItemStatusArchived,
-			CurrentPrices:   clonePriceMap(fact.CurrentPrices),
-			PricingVariants: sortedPriceVariants(fact.CurrentPrices),
-			UpdatedAt:       &updatedAt,
-		})
-	}
-	return cards, nil
-}
-
-func validatePricingVariants(definition BillableItemDefinition, prices map[OutputResolution]int64) error {
-	variants := definition.pricingVariants()
+func ValidatePricingVariants(definition BillableItemDefinition, prices map[OutputResolution]int64) error {
+	variants := definition.ResolvedPricingVariants()
 	if len(variants) == 0 || len(prices) == 0 {
 		return ErrInvalidCatalogEntry
 	}
@@ -324,57 +135,14 @@ func validatePricingVariants(definition BillableItemDefinition, prices map[Outpu
 	return nil
 }
 
-func validatePricingVariant(definition BillableItemDefinition, variant OutputResolution) error {
+func ValidatePricingVariant(definition BillableItemDefinition, variant OutputResolution) error {
 	if _, err := NormalizeOutputResolution(string(variant)); err != nil {
 		return err
 	}
-	for _, allowed := range definition.pricingVariants() {
+	for _, allowed := range definition.ResolvedPricingVariants() {
 		if variant == allowed {
 			return nil
 		}
 	}
 	return ErrInvalidOutputResolution
-}
-
-func hasConfiguredPricingVariant(definition BillableItemDefinition, prices map[OutputResolution]PriceInfo) bool {
-	for _, variant := range definition.pricingVariants() {
-		if _, ok := prices[variant]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-func sortedPriceVariants(prices map[OutputResolution]PriceInfo) []OutputResolution {
-	variants := make([]OutputResolution, 0, len(prices))
-	for variant := range prices {
-		variants = append(variants, variant)
-	}
-	sort.Slice(variants, func(i, j int) bool {
-		return pricingVariantOrder(variants[i]) < pricingVariantOrder(variants[j])
-	})
-	return variants
-}
-
-func pricingVariantOrder(variant OutputResolution) int {
-	switch variant {
-	case OutputResolutionDefault:
-		return 0
-	case OutputResolution1K:
-		return 1
-	case OutputResolution2K:
-		return 2
-	case OutputResolution4K:
-		return 3
-	default:
-		return 4
-	}
-}
-
-func clonePriceMap(prices map[OutputResolution]PriceInfo) map[OutputResolution]PriceInfo {
-	cloned := make(map[OutputResolution]PriceInfo, len(prices))
-	for resolution, price := range prices {
-		cloned[resolution] = price
-	}
-	return cloned
 }

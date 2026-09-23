@@ -15,8 +15,8 @@ const (
 	// DefaultRetentionDays matches the admin observability window: the
 	// task monitor only looks back 7 days, so older raw rows have no readers.
 	DefaultRetentionDays = 7
-	// DefaultBatchSize bounds one purge transaction; the daily job reruns
-	// until no expired rows remain.
+	// DefaultBatchSize bounds one purge pass; the store loops passes until
+	// a pass deletes less than a full batch.
 	DefaultBatchSize = 1000
 )
 
@@ -48,9 +48,5 @@ func (s *Service) PurgeExpiredTasks(ctx context.Context, retentionDays int) (Pur
 	if err != nil {
 		return PurgeResult{}, err
 	}
-	return PurgeResult{
-		BackfilledDates:      stats.BackfilledDates,
-		TasksDeleted:         stats.TasksDeleted,
-		CancellationsDeleted: stats.CancellationsDeleted,
-	}, nil
+	return stats, nil
 }

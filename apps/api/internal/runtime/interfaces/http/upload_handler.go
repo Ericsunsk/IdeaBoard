@@ -75,7 +75,7 @@ func resolveUploadMaxConcurrent(ctx context.Context, provider settings.MediaUplo
 	if provider != nil {
 		nextSetting, err := provider.GetMediaUpload(ctx)
 		if err != nil {
-			slog.WarnContext(ctx, "runtime media upload settings read failed; using defaults", "error", err)
+			slog.WarnContext(ctx, "runtime media upload settings read failed; using defaults", "err", err)
 		} else {
 			setting = nextSetting
 		}
@@ -514,7 +514,8 @@ func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes
 	facts, err := imageformat.InspectFileHeader(fh)
 	if err != nil || !allowedExts[facts.Extension] {
 		if err != nil {
-			response.Error(c, 400, err.Error())
+			slog.Warn("upload file inspect failed", "err", err)
+			response.Error(c, 400, "文件内容不合法")
 		} else {
 			response.Error(c, 400, "仅支持 "+imageformat.SupportedUploadImageLabel()+" 格式")
 		}

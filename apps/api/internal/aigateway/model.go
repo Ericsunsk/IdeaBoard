@@ -2,15 +2,19 @@ package aigateway
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/database"
+	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/outboundhttp"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )
@@ -52,13 +56,14 @@ func validateModelMapping(feature, model string) (string, string, error) {
 		}
 	}
 	model = strings.TrimSpace(model)
-	if !strings.Contains(model, "/") || strings.ContainsAny(model, " \t\n") {
+	separator := strings.IndexByte(model, '/')
+	if separator <= 0 || separator == len(model)-1 || strings.HasPrefix(model[separator+1:], "/") || strings.ContainsAny(model, " \t\n") {
 		return "", "", errors.New("模型必须是 provider/model 格式且不含空白")
 	}
 	if len(model) > 128 {
 		return "", "", errors.New("模型标识过长")
 	}
-	provider := strings.TrimSpace(strings.SplitN(model, "/", 2)[0])
+	provider := strings.TrimSpace(model[:separator])
 	if provider == "" {
 		return "", "", errors.New("模型缺少 provider 前缀")
 	}
@@ -126,7 +131,7 @@ func (r *ConfigRepository) ListModelMappings(ctx context.Context) (map[string]st
 		result[strings.TrimPrefix(key, modelMappingKeyPrefix)] = strings.TrimSpace(value)
 	}
 	visionRaw, visionErr := r.settings.Get(ctx, visionMappingKey)
-	if visionErr != nil && !errors.Is(visionErr, sql.ErrNoRows) {
+	if visionErr != nil && !database.IsNotFound(visionErr) {
 		return nil, fmt.Errorf("load AI gateway vision model mapping: %w", visionErr)
 	}
 	if strings.TrimSpace(visionRaw) != "" {
@@ -182,10 +187,15 @@ type RoutePreview struct {
 }
 
 // PreviewGatewayRoute resolves routing facts without touching configuration.
-// It shares workflow.ResolveRoute with execution: preview output and the
-// executed route cannot diverge.
+// Preview targets the generic image pipeline, whose path is produced entirely
+// by workflow.ResolveRoute (dialects.Resolve delegates to it for Generation
+// and preview only reads namespace/path/source): preview output and the
+// executed route cannot diverge, and this business package stays free of
+// runtime imports per the architecture gate.
 func PreviewGatewayRoute(modelID, customPath, customParams string) RoutePreview {
 	provider, model := workflow.SplitModelIdentifier(modelID, "")
+	// Preview targets the generic image pipeline (ModelImage adapter); pipeline
+	// operations with dedicated routes resolve their own paths at execution time.
 	resolved := workflow.ResolveRoute(provider, model, customPath, customParams)
 	return RoutePreview{
 		ProviderSlug:    resolved.Namespace,
@@ -207,13 +217,23 @@ type ConnectionProbeResult struct {
 	Message    string `json:"message"`
 }
 
-// ProbeGatewayConnection dials baseURL with a bounded timeout. The provided
-// token is used only for this probe and never persisted.
+// gatewayProbeOutbound is the shared standard outbound client for
+// connection diagnosis: timeout cap and observability match the gateway
+// migration (#766). Probes stay single-shot end to end (MaxAttempts 1):
+// any HTTP status counts as reachable, only transport failures are
+// unreachable.
+var gatewayProbeOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// gatewayProbeTarget names connection diagnosis in outbound logs/metrics.
+const gatewayProbeTarget = "ai-gateway-probe"
+
+// ProbeGatewayConnection probes one provider-native route with a bounded
+// timeout. The provided token is used only for this probe and never persisted.
 // Purpose split (deliberate): this is transport diagnosis, not availability.
 // Any HTTP status counts as reachable (even 401/403 — they still prove
 // routing, DNS and TLS); only transport failures are unreachable. Model
 // availability questions go through workflow.ClassifyGatewayResponse.
-func ProbeGatewayConnection(ctx context.Context, baseURL, token string) ConnectionProbeResult {
+func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model, path string) ConnectionProbeResult {
 	const probeTimeout = 8 * time.Second
 
 	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
@@ -221,36 +241,55 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token string) Connecti
 		return ConnectionProbeResult{Message: "网关地址为空"}
 	}
 	parsed, err := url.Parse(trimmed)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return ConnectionProbeResult{Message: "网关地址必须是 http(s) URL"}
 	}
+	provider = strings.TrimSpace(provider)
+	model = strings.TrimSpace(model)
+	path = strings.Trim(strings.TrimSpace(path), "/")
+	if provider == "" || path == "" {
+		return ConnectionProbeResult{Message: "必须提供 provider 和 provider-native path"}
+	}
+	if strings.ContainsAny(provider+path, "?&#\r\n") {
+		return ConnectionProbeResult{Message: "provider-native path 无效"}
+	}
+	probeURL := trimmed + "/" + workflow.GatewayProviderPath(provider) + "/" + path
 
 	start := time.Now()
-	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
-	defer cancel()
 
-	doRequest := func(method string) (*http.Response, error) {
-		req, err := http.NewRequestWithContext(probeCtx, method, trimmed, nil)
+	doRequest := func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, probeURL, nil)
 		if err != nil {
 			return nil, err
 		}
 		if strings.TrimSpace(token) != "" {
-			req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
+			req.Header.Set(gatewayHeaderAuthorization, "Bearer "+strings.TrimSpace(token))
 		}
-		return http.DefaultClient.Do(req)
+		req.Header.Set(gatewayHeaderMaxAttempts, "1")
+		req.Header.Set(gatewayHeaderSkipCache, "true")
+		if model != "" {
+			req.Header.Set(gatewayHeaderModel, model)
+		}
+		resp, err := gatewayProbeOutbound.Do(ctx, req, outboundhttp.RequestOptions{
+			Timeout:     probeTimeout,
+			MaxAttempts: 1,
+			AllowHosts:  outbound.AllowHosts(ctx),
+			Target:      gatewayProbeTarget,
+		})
+		if err != nil {
+			var statusErr *outboundhttp.HTTPStatusError
+			if errors.As(err, &statusErr) {
+				return gatewayProbeStatusResponse(req, statusErr), nil
+			}
+			return nil, err
+		}
+		return resp, nil
 	}
 
-	resp, err := doRequest(http.MethodHead)
+	resp, err := doRequest()
 	if err != nil {
 		return ConnectionProbeResult{Message: "网关连接失败: " + err.Error()}
-	}
-	if resp.StatusCode == http.StatusMethodNotAllowed || resp.StatusCode == http.StatusNotImplemented {
-		// 该端点不支持 HEAD，降级为 GET（不读 body）。
-		resp.Body.Close()
-		resp, err = doRequest(http.MethodGet)
-		if err != nil {
-			return ConnectionProbeResult{Message: "网关连接失败: " + err.Error()}
-		}
 	}
 	defer resp.Body.Close()
 	latency := time.Since(start).Milliseconds()
@@ -262,12 +301,35 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token string) Connecti
 	}
 }
 
+// gatewayProbeStatusResponse converts an exhausted retryable probe status
+// back to a response shape: diagnosis treats any HTTP status as reachable,
+// so a single-shot 429/5xx still proves routing, DNS and TLS.
+func gatewayProbeStatusResponse(req *http.Request, statusErr *outboundhttp.HTTPStatusError) *http.Response {
+	preview := ""
+	status := 0
+	if statusErr != nil {
+		preview = statusErr.Body
+		status = statusErr.StatusCode
+	}
+	resp := &http.Response{
+		Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		StatusCode:    status,
+		Header:        make(http.Header),
+		Body:          io.NopCloser(strings.NewReader(preview)),
+		ContentLength: int64(len(preview)),
+		Request:       req,
+	}
+	return resp
+}
+
 // catalogConfigKey stores the JSON array of available model items.
 const catalogConfigKey = "ai_gateway_model_catalog"
 
 // CatalogItem describes one model available in the AI gateway catalog.
-// Cost fields are reference data mirrored from detection (USD per token),
-// never billing input.
+// The catalog carries routing and display metadata only: it holds no
+// prices. Billing charges solely on the billing SKU UnitCredits; reference
+// prices (if needed) come from the read-only models.dev seam, never from
+// stored catalog data.
 type CatalogItem struct {
 	ID                  string   `json:"id"`
 	Name                string   `json:"name"`
@@ -283,12 +345,8 @@ type CatalogItem struct {
 	CustomParams        string   `json:"custom_params,omitempty"`
 	// DescriptionEnriched marks auto-filled detection descriptions: refresh
 	// enrichment may overwrite them, operator-written text is never touched.
-	DescriptionEnriched     bool    `json:"description_enriched,omitempty"`
-	InputCostPerToken       float64 `json:"input_cost_per_token,omitempty"`
-	OutputCostPerToken      float64 `json:"output_cost_per_token,omitempty"`
-	CacheReadCostPerToken   float64 `json:"cache_read_input_token_cost,omitempty"`
-	CacheCreateCostPerToken float64 `json:"cache_creation_input_token_cost,omitempty"`
-	SupportsPromptCaching   bool    `json:"supports_prompt_caching,omitempty"`
+	DescriptionEnriched   bool `json:"description_enriched,omitempty"`
+	SupportsPromptCaching bool `json:"supports_prompt_caching,omitempty"`
 }
 
 // DefaultCatalog returns no built-in models: the catalog is fully
@@ -308,7 +366,7 @@ func (r *ConfigRepository) ListCatalog(ctx context.Context) ([]CatalogItem, erro
 	}
 	raw, err := r.settings.Get(ctx, catalogConfigKey)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return DefaultCatalog(), nil
 		}
 		return nil, fmt.Errorf("load AI gateway model catalog: %w", err)
@@ -359,7 +417,9 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 		return fmt.Errorf("model catalog exceeds %d items", maxCatalogItems)
 	}
 	seenIDs := make(map[string]struct{}, len(items))
-	for i, item := range items {
+	validated := make([]CatalogItem, 0, len(items))
+	for i := range items {
+		item := items[i]
 		item.ID = strings.TrimSpace(item.ID)
 		item.Name = strings.TrimSpace(item.Name)
 		item.Provider = strings.TrimSpace(item.Provider)
@@ -387,14 +447,6 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 		if err := validateCatalogItemBounds(i, item); err != nil {
 			return err
 		}
-		for field, value := range map[string]float64{
-			"input_cost_per_token": item.InputCostPerToken, "output_cost_per_token": item.OutputCostPerToken,
-			"cache_read_input_token_cost": item.CacheReadCostPerToken, "cache_creation_input_token_cost": item.CacheCreateCostPerToken,
-		} {
-			if value < 0 {
-				return fmt.Errorf("item %d %s must not be negative", i, field)
-			}
-		}
 		if strings.TrimSpace(item.CustomParams) != "" {
 			var decoded any
 			if err := json.Unmarshal([]byte(item.CustomParams), &decoded); err != nil {
@@ -404,65 +456,90 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 				return fmt.Errorf("item %d custom_params must be a JSON object", i)
 			}
 		}
-		items[i] = item
+		validated = append(validated, item)
 	}
+	copy(items, validated)
 	encoded, err := json.Marshal(items)
 	if err != nil {
 		return fmt.Errorf("encode AI gateway model catalog: %w", err)
 	}
-	// 级联：新目录删掉的模型 ID，其映射（功能映射 + vision）一并移除，
-	// 否则定价页残留指向不存在模型的映射。基线/映射读失败时跳过级联
-	// 只存目录（保留 corrupt 数据的覆盖恢复路径），不改变保存语义。
-	removedMappingKeys := staleMappingKeysForRemovedModels(ctx, r, items)
-	metadata, err := json.Marshal(map[string]any{"operation": "save_catalog", "count": len(items), "removed_mappings": removedMappingKeys})
-	if err != nil {
-		return fmt.Errorf("encode AI gateway catalog audit: %w", err)
-	}
-	return r.settings.SetAndDeleteManyWithAdminAudit(ctx, []settings.SystemConfigValue{
-		{Key: catalogConfigKey, Value: string(encoded)},
-	}, removedMappingKeys, settings.SystemConfigAdminAudit{
-		ActionType: "update_ai_gateway_model",
-		ActorID:    actorID,
-		Metadata:   metadata,
+	return r.settings.WithAIGatewayModelMappingWrite(ctx, func(tx settings.SystemConfigWriteTx) (settings.SystemConfigAdminAudit, error) {
+		// Read and prune under the same lock as mapping writes so a valid
+		// mapping update cannot be deleted using a stale pre-lock snapshot.
+		removedMappingKeys, err := staleMappingKeysForRemovedModels(ctx, tx, items)
+		if err != nil {
+			return settings.SystemConfigAdminAudit{}, fmt.Errorf("read AI gateway catalog mappings: %w", err)
+		}
+		metadata, err := json.Marshal(map[string]any{"operation": "save_catalog", "count": len(items), "removed_mappings": removedMappingKeys})
+		if err != nil {
+			return settings.SystemConfigAdminAudit{}, fmt.Errorf("encode AI gateway catalog audit: %w", err)
+		}
+		if err := tx.SetMany(ctx, []settings.SystemConfigValue{{Key: catalogConfigKey, Value: string(encoded)}}); err != nil {
+			return settings.SystemConfigAdminAudit{}, fmt.Errorf("save AI gateway model catalog: %w", err)
+		}
+		if err := tx.DeleteMany(ctx, removedMappingKeys); err != nil {
+			return settings.SystemConfigAdminAudit{}, fmt.Errorf("delete stale AI gateway model mappings: %w", err)
+		}
+		return settings.SystemConfigAdminAudit{
+			ActionType: "update_ai_gateway_model",
+			ActorID:    actorID,
+			Metadata:   metadata,
+		}, nil
 	})
 }
 
-// staleMappingKeysForRemovedModels returns the storage keys of mappings
-// pointing at model IDs absent from the incoming catalog. Read failures
-// yield nil (skip cascade, still save) so a corrupt baseline never blocks
-// catalog recovery.
-func staleMappingKeysForRemovedModels(ctx context.Context, r *ConfigRepository, items []CatalogItem) []string {
-	keep := make(map[string]bool, len(items))
+// staleMappingKeysForRemovedModels returns storage keys that point at models
+// absent from the incoming catalog. Corrupt catalog JSON skips pruning so an
+// admin can replace it; database errors abort the transaction.
+func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemConfigWriteTx, items []CatalogItem) ([]string, error) {
+	keep := make(map[string]struct{}, len(items))
 	for _, item := range items {
-		keep[strings.TrimSpace(item.ID)] = true
+		keep[strings.TrimSpace(item.ID)] = struct{}{}
 	}
-	oldItems, err := r.ListCatalog(ctx)
-	if err != nil {
-		return nil
+	rawCatalog, err := tx.Get(ctx, catalogConfigKey)
+	oldItems := DefaultCatalog()
+	if err != nil && !database.IsNotFound(err) {
+		return nil, fmt.Errorf("load current catalog: %w", err)
 	}
-	removed := make(map[string]bool)
+	if err == nil && strings.TrimSpace(rawCatalog) != "" {
+		if err := json.Unmarshal([]byte(rawCatalog), &oldItems); err != nil {
+			return nil, nil
+		}
+	}
+	removed := make(map[string]struct{})
 	for _, item := range oldItems {
-		if id := strings.TrimSpace(item.ID); id != "" && !keep[id] {
-			removed[id] = true
+		if id := strings.TrimSpace(item.ID); id != "" {
+			if _, ok := keep[id]; !ok {
+				removed[id] = struct{}{}
+			}
 		}
 	}
 	if len(removed) == 0 {
-		return nil
+		return nil, nil
 	}
-	mappings, err := r.ListModelMappings(ctx)
+	mappingValues, err := tx.GetByPrefix(ctx, modelMappingKeyPrefix)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("load current model mappings: %w", err)
 	}
-	var keys []string
-	for feature, model := range mappings {
-		if !removed[strings.TrimSpace(model)] {
+	keys := make([]string, 0, len(mappingValues)+1)
+	for _, mapping := range mappingValues {
+		if mapping.Key == catalogConfigKey || !isRemovedModel(removed, mapping.Value) {
 			continue
 		}
-		if feature == visionMappingFeature {
-			keys = append(keys, visionMappingKey)
-			continue
-		}
-		keys = append(keys, modelMappingKey(feature))
+		keys = append(keys, mapping.Key)
 	}
-	return keys
+	visionModel, err := tx.Get(ctx, visionMappingKey)
+	if err != nil && !database.IsNotFound(err) {
+		return nil, fmt.Errorf("load current vision mapping: %w", err)
+	}
+	if err == nil && isRemovedModel(removed, visionModel) {
+		keys = append(keys, visionMappingKey)
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
+func isRemovedModel(removed map[string]struct{}, model string) bool {
+	_, ok := removed[strings.TrimSpace(model)]
+	return ok
 }

@@ -82,6 +82,7 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	seedRechargeableWallet(t, pool, 42)
+	publishTestStripeConfiguration(t, paymentpostgres.NewRepository(db), "acct_user_http", "prod_user_http")
 	checkoutGateway := &fakeCheckoutGateway{}
 	verifier := &fakeWebhookVerifier{}
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
@@ -276,7 +277,7 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
-	if _, err := db.ExecContext(t.Context(), `UPDATE credit_wallets SET status = 'frozen' WHERE user_id = 88`); err != nil {
+	if _, err := db.Exec(t.Context(), `UPDATE credit_wallets SET status = 'frozen' WHERE user_id = 88`); err != nil {
 		t.Fatalf("freeze test wallet: %v", err)
 	}
 	service := newConfiguredPurchaseService(
@@ -293,7 +294,7 @@ func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 
 	response := performPaymentRequest(router, http.MethodPost, "/user/payments/checkout-sessions", `{
 "idempotency_key":"user-http-no-wallet","idea_quantity":500000,"terms_accepted":true,"terms_version":"2026-08-01","refund_policy_version":"2026-08-01"}`, nil)
-	if response.Code != http.StatusLocked {
+	if response.Code != http.StatusConflict {
 		t.Fatalf("non-rechargeable Wallet response=%d %s", response.Code, response.Body.String())
 	}
 }
@@ -331,10 +332,10 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	}
 
 	var configurationCount, auditCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_stripe_configurations`).Scan(&configurationCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_stripe_configurations`).Scan(&configurationCount); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT COUNT(*) FROM payment_admin_actions
 WHERE outcome = 'failed' AND error_code = 'invalid_key'`).Scan(&auditCount); err != nil {
 		t.Fatal(err)

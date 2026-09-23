@@ -34,7 +34,7 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, int64(42)).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, int64(42)).Scan(&count); err != nil {
 		t.Fatalf("count task failed: %v", err)
 	}
 	if count != 0 {
@@ -62,7 +62,7 @@ func TestStoreRejectsUnpreparedGenerationMediaBeforeTaskInsert(t *testing.T) {
 		t.Fatal("expected unprepared media submission to fail")
 	}
 	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, int64(42)).Scan(&count); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, int64(42)).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 0 {
@@ -94,7 +94,7 @@ func TestStoreRejectsMissingBillingWithoutPartialFacts(t *testing.T) {
 		"holds":     `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold'`,
 	} {
 		var count int
-		if err := db.QueryRowContext(ctx, query).Scan(&count); err != nil {
+		if err := db.QueryRow(ctx, query).Scan(&count); err != nil {
 			t.Fatalf("count %s: %v", name, err)
 		}
 		if count != 0 {

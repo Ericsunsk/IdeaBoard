@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -13,24 +12,26 @@ import (
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
 type repositoryQueryer struct {
 	ctx context.Context
-	db  *sql.DB
+	db  *pgxpool.Pool
 	q   *dbsqlc.Queries
 }
 
-func NewRepository(db *sql.DB) *Repository {
+func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *Repository) DB() *sql.DB {
+func (r *Repository) Pool() *pgxpool.Pool {
 	if r == nil {
 		return nil
 	}
@@ -80,7 +81,7 @@ func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 			return err
 		}
 		user.ID = created.ID
-		user.PublicID = created.PublicID
+		user.PublicID = uuid.UUID(created.PublicID.Bytes)
 		user.DisplayName = created.DisplayName
 		return nil
 	})
@@ -119,7 +120,7 @@ func (r *Repository) GetByPublicID(ctx context.Context, rawPublicID string) (*do
 	if err != nil {
 		return nil, database.ErrNotFound
 	}
-	row, err := r.dbWithContext(ctx).q.GetUserByPublicID(ctx, publicID)
+	row, err := r.dbWithContext(ctx).q.GetUserByPublicID(ctx, pgtype.UUID{Bytes: publicID, Valid: true})
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,8 @@ func (r *Repository) GetByPublicID(ctx context.Context, rawPublicID string) (*do
 
 // GetByAuthUserID 根据 Better Auth user id 获取用户
 func (r *Repository) GetByAuthUserID(ctx context.Context, authUserID string) (*domain.User, error) {
-	row, err := r.dbWithContext(ctx).q.GetUserByAuthUserID(ctx, sql.NullString{String: strings.TrimSpace(authUserID), Valid: strings.TrimSpace(authUserID) != ""})
+	trimmedAuthID := strings.TrimSpace(authUserID)
+	row, err := r.dbWithContext(ctx).q.GetUserByAuthUserID(ctx, pgtype.Text{String: trimmedAuthID, Valid: trimmedAuthID != ""})
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +173,9 @@ func (r *Repository) Update(ctx context.Context, user *domain.User) error {
 // UpdateLastLoginMetadata records the latest successful auth session.
 func (r *Repository) UpdateLastLoginMetadata(ctx context.Context, authUserID, ip, country string) error {
 	updated, err := r.dbWithContext(ctx).q.UpdateUserLastLoginMetadata(ctx, dbsqlc.UpdateUserLastLoginMetadataParams{
-		AuthUserID:       sql.NullString{String: authUserID, Valid: authUserID != ""},
-		LastLoginIp:      sql.NullString{String: ip, Valid: ip != ""},
-		LastLoginCountry: sql.NullString{String: country, Valid: country != ""},
+		AuthUserID:       pgtype.Text{String: authUserID, Valid: authUserID != ""},
+		LastLoginIp:      pgtype.Text{String: ip, Valid: ip != ""},
+		LastLoginCountry: pgtype.Text{String: country, Valid: country != ""},
 	})
 	if err != nil {
 		return err
@@ -401,16 +403,23 @@ func requireOneUserRow(rows int64) error {
 func userFromSQLC(row dbsqlc.User) domain.User {
 	return domain.User{
 		ID:               row.ID,
-		PublicID:         row.PublicID,
+		PublicID:         uuid.UUID(row.PublicID.Bytes),
 		DisplayName:      row.DisplayName,
 		AuthUserID:       dbutil.StringPtr(row.AuthUserID),
 		StorageUID:       row.StorageUid,
 		Avatar:           row.Avatar,
 		Role:             row.Role,
 		Status:           row.Status,
-		LastLoginIP:      row.LastLoginIp.String,
-		LastLoginCountry: row.LastLoginCountry.String,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
+		LastLoginIP:      pgTextToString(row.LastLoginIp),
+		LastLoginCountry: pgTextToString(row.LastLoginCountry),
+		CreatedAt:        dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:        dbutil.TimeValue(row.UpdatedAt),
 	}
+}
+
+func pgTextToString(v pgtype.Text) string {
+	if !v.Valid {
+		return ""
+	}
+	return v.String
 }

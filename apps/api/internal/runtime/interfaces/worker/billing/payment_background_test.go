@@ -2,10 +2,11 @@ package billing
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"ideaboard/api/internal/testdb"
 
@@ -105,11 +106,11 @@ func TestPaymentCheckoutShutdownDispatcherUsesRiverProducer(t *testing.T) {
 }
 
 func countPaymentBackgroundJobs(t testing.TB, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRow(context.Context, string, ...any) pgx.Row
 }, kind string) int64 {
 	t.Helper()
 	var count int64
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM river_job WHERE kind = $1`, kind).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM river_job WHERE kind = $1`, kind).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	return count

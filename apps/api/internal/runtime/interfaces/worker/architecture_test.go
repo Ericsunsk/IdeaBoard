@@ -8,7 +8,7 @@ import (
 )
 
 func TestProviderExecutorImplementsRuntimePort(t *testing.T) {
-	var _ runtimeports.ProviderCaller = (*providers.Executor)(nil)
+	var _ runtimeports.GatewayCaller = (*providers.Executor)(nil)
 }
 
 // The worker implementation collaborates with Tasking exclusively through
@@ -21,6 +21,7 @@ var forbiddenWorkerTaskingImports = []string{
 	"ideaboard/api/internal/tasking/application/submission",
 	"ideaboard/api/internal/tasking/application/billing",
 	"ideaboard/api/internal/tasking/application/statistics",
+	"ideaboard/api/internal/tasking/application/retention",
 }
 
 func TestWorkerCollaboratesThroughTaskingPortsOnly(t *testing.T) {
@@ -42,5 +43,12 @@ func TestWorkerSubpackagesIsolation(t *testing.T) {
 		"ideaboard/api/internal/runtime/interfaces/worker/execution",
 		"ideaboard/api/internal/runtime/interfaces/worker/providers",
 		"ideaboard/api/internal/runtime/interfaces/worker/river",
+		"ideaboard/api/internal/runtime/interfaces/worker/retention",
+	})
+	archtest.AssertNoForbiddenImports(t, "retention", []string{
+		"ideaboard/api/internal/runtime/interfaces/worker/execution",
+		"ideaboard/api/internal/runtime/interfaces/worker/providers",
+		"ideaboard/api/internal/runtime/interfaces/worker/river",
+		"ideaboard/api/internal/runtime/interfaces/worker/billing",
 	})
 }

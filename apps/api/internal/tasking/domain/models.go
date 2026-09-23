@@ -21,11 +21,6 @@ type Task struct {
 	FeatureSlug                string                `json:"feature_slug"`
 	Priority                   int                   `json:"priority"`
 	ResolvedModel              string                `json:"resolved_model"`
-	APIType                    string                `json:"api_type"`
-	ProviderEndpointName       string                `json:"provider_endpoint_name"`
-	ProviderEndpointBaseURL    string                `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string                `json:"credential_fingerprint"`
-	CredentialKeyVersion       string                `json:"credential_key_version"`
 	Status                     string                `json:"status"`
 	LeaseToken                 string                `json:"lease_token"`
 	RetryCount                 int                   `json:"retry_count"`
@@ -59,6 +54,7 @@ type AdminBillingSnapshot struct {
 	UnitCredits      int64      `json:"unit_credits"`
 	Quantity         int64      `json:"quantity"`
 	TotalCredits     int64      `json:"total_credits"`
+	CapturedCredits  int64      `json:"captured_credits"`
 	QuotedAt         time.Time  `json:"quoted_at"`
 	SettlementState  string     `json:"settlement_state"`
 	SettledAt        *time.Time `json:"settled_at"`
@@ -68,34 +64,29 @@ type AdminBillingSnapshot struct {
 // AdminTaskExecutionSnapshot is the immutable lease snapshot used by Admin
 // Task list projections. It intentionally contains no attempt lifecycle data.
 type AdminTaskExecutionSnapshot struct {
-	AccountID            int64  `json:"account_id"`
-	ProviderEndpointID   int64  `json:"provider_endpoint_id"`
-	ProviderEndpointName string `json:"provider_endpoint_name"`
-	ResolvedModel        string `json:"resolved_model"`
-	APIType              string `json:"api_type"`
+	ResolvedModel string `json:"resolved_model"`
+	Provider      string `json:"provider"`
+	GatewayStep   string `json:"gateway_step"`
 }
 
 // AdminTaskAttempt is the safe, immutable execution history projection for
 // Admin Task details. It intentionally excludes credentials and queue metadata.
+// Finalize timing is not recorded per attempt: result materialization is part
+// of the terminal write itself, so there is no separate finalize phase to report.
 type AdminTaskAttempt struct {
-	AttemptNo            int        `json:"attempt_no"`
-	AccountID            int64      `json:"account_id"`
-	Status               string     `json:"status"`
-	Stage                string     `json:"stage"`
-	FailureCategory      string     `json:"failure_category"`
-	ProviderEndpointID   int64      `json:"provider_endpoint_id"`
-	ProviderEndpointName string     `json:"provider_endpoint_name"`
-	ResolvedModel        string     `json:"resolved_model"`
-	APIType              string     `json:"api_type"`
-	ProviderStartedAt    *time.Time `json:"provider_started_at"`
-	ProviderFinishedAt   *time.Time `json:"provider_finished_at"`
-	FinalizeStartedAt    *time.Time `json:"finalize_started_at"`
-	FinalizeFinishedAt   *time.Time `json:"finalize_finished_at"`
-	CompletedAt          *time.Time `json:"completed_at"`
-	CancelledAt          *time.Time `json:"cancelled_at"`
-	ProviderLatencyMS    int64      `json:"provider_latency_ms"`
-	FinalizeLatencyMS    int64      `json:"finalize_latency_ms"`
-	TotalLatencyMS       int64      `json:"total_latency_ms"`
+	AttemptNo          int        `json:"attempt_no"`
+	Status             string     `json:"status"`
+	Stage              string     `json:"stage"`
+	FailureCategory    string     `json:"failure_category"`
+	ResolvedModel      string     `json:"resolved_model"`
+	Provider           string     `json:"provider"`
+	GatewayStep        string     `json:"gateway_step"`
+	ProviderStartedAt  *time.Time `json:"provider_started_at"`
+	ProviderFinishedAt *time.Time `json:"provider_finished_at"`
+	CompletedAt        *time.Time `json:"completed_at"`
+	CancelledAt        *time.Time `json:"cancelled_at"`
+	ProviderLatencyMS  int64      `json:"provider_latency_ms"`
+	TotalLatencyMS     int64      `json:"total_latency_ms"`
 }
 
 type TaskOutput struct {

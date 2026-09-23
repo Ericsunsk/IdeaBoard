@@ -37,7 +37,7 @@ func TestTerminalTransitionReleasesTaskInputMediaRefs(t *testing.T) {
 		t.Fatalf("cancel task rows=%d err=%v", rows, err)
 	}
 	var refCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM media_refs WHERE task_id=$1 AND ref_type='task_input'`, task.TaskID).Scan(&refCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM media_refs WHERE task_id=$1 AND ref_type='task_input'`, task.TaskID).Scan(&refCount); err != nil {
 		t.Fatal(err)
 	}
 	if refCount != 0 {

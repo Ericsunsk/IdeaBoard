@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	accountapp "ideaboard/api/internal/accountpool/accounts/application"
+	"ideaboard/api/internal/aigateway"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users/ports"
@@ -21,12 +21,17 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/application/orchestration"
 	"ideaboard/api/internal/runtime/domain"
+	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	eventinterfaces "ideaboard/api/internal/runtime/interfaces/events"
 	workerbilling "ideaboard/api/internal/runtime/interfaces/worker/billing"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
+	workerretention "ideaboard/api/internal/runtime/interfaces/worker/retention"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
+	visionbilling "ideaboard/api/internal/runtime/interfaces/worker/visionbilling"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	"ideaboard/api/internal/searchcatalog"
+	searchapplication "ideaboard/api/internal/searchcatalog/application"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskretention "ideaboard/api/internal/tasking/application/retention"
 	taskstats "ideaboard/api/internal/tasking/application/statistics"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	taskservice "ideaboard/api/internal/tasking/application/task"
@@ -38,10 +43,10 @@ import (
 )
 
 type appTaskServices struct {
-	accountService   *accountapp.Service
 	taskService      *taskservice.Service
 	taskStatsService *taskstats.Service
 	userEvents       *events.UserEventHub
+	monitor          *taskqueue.RiverQueue
 }
 
 type appWorkerRuntime struct {
@@ -49,6 +54,10 @@ type appWorkerRuntime struct {
 	eventBus    *events.NATSJetStreamEventBus
 	queueName   string
 	concurrency int
+	// queueMetrics polls River depth/lag gauges for every known queue
+	// (see taskqueue.RiverRetryMatrix); nil keeps the runtime
+	// uninstrumented (tests).
+	queueMetrics *redmetrics.MultiRefresher
 }
 
 func (r appWorkerRuntime) Name() string {
@@ -64,14 +73,27 @@ func (r appWorkerRuntime) Start(ctx context.Context) error {
 		return nil
 	}
 	slog.Info("River worker starting", "queue", r.queueName, "concurrency", r.concurrency)
-	return r.riverClient.Start(ctx)
+	if err := r.riverClient.Start(ctx); err != nil {
+		return err
+	}
+	if r.queueMetrics == nil {
+		return nil
+	}
+	return r.queueMetrics.Start(ctx)
 }
 
 func (r appWorkerRuntime) Stop(ctx context.Context) error {
-	if r.riverClient == nil {
-		return nil
+	var stopErr error
+	if r.queueMetrics != nil {
+		stopErr = r.queueMetrics.Stop(ctx)
 	}
-	return r.riverClient.Stop(ctx)
+	if r.riverClient == nil {
+		return stopErr
+	}
+	if err := r.riverClient.Stop(ctx); err != nil && stopErr == nil {
+		stopErr = err
+	}
+	return stopErr
 }
 
 func (r appWorkerRuntime) CheckHealth(context.Context) domain.ComponentStatus {
@@ -105,11 +127,11 @@ func newAppTaskRuntime(
 	dbs appDatabases,
 	repos appRepositories,
 	services appDomainServices,
+	redMetrics *redmetrics.Set,
 ) (appTaskServices, appWorkerRuntime, error) {
 	workerConcurrency := cfg.Worker.EffectiveConcurrency()
 
 	taskBillingService := taskbilling.NewService(services.billingCatalog, services.creditService)
-	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
 	taskMediaAuthorizer := storageauth.NewTaskMediaAuthorizer(
 		uploadBoardAccessResolver{service: services.boardService},
@@ -125,31 +147,37 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
 
-	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, taskqueue.RiverMaxAttemptsDefault)
-	accountService := accountapp.NewService(accountapp.ServiceDeps{
-		AccountRepo:      repos.accountRepo,
-		TaskRepo:         repos.taskRepo.Queries(),
-		QueueStats:       riverQueue,
-		AccountLoadStore: postgresRuntimeStore,
-		ConcurrencyStore: postgresRuntimeStore,
-		CancelStore:      postgresRuntimeStore,
-		MonitorStore:     riverQueue,
-	}, accountapp.ServiceOptions{
-		TaskEvents: taskEvents,
-	})
+	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, taskqueue.RiverMaxAttemptsDefault)
+	aiGatewayRepo := aigateway.NewConfigRepository(repos.systemConfigRepo)
+	modelRoutes := aiGatewayModelRouteReader{repo: aiGatewayRepo}
+	gatewayFactory := func(ctx context.Context) (runtimeports.GatewayClient, error) {
+		resolved, err := aiGatewayRepo.Resolve(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{
+			BaseURL: resolved.BaseURL,
+			Token:   resolved.Token,
+			Metrics: redMetrics,
+		})
+	}
 	riverTaskWorker := workerriver.NewRiverTaskWorker(workerriver.RiverTaskWorkerDeps{
-		AccountRepo:        repos.accountRepo,
 		TaskRepo:           repos.taskRepo.Runtime(),
 		Enqueuer:           riverQueue,
-		Assigner:           postgresAssigner,
 		CancelStore:        postgresRuntimeStore,
 		MediaReader:        runtimeTaskMediaStore,
 		ResultMaterializer: runtimeTaskMediaStore,
 		TaskEvents:         taskEvents,
 		PublicOrigins:      cfg.PublicOrigins,
+		ModelResolver:      aiGatewayRepo,
+		GatewayFactory:     gatewayFactory,
+		ModelRoutes:        modelRoutes,
+		REDMetrics:         redMetrics,
 	})
 	creditPeriodicJobs := workerbilling.CreditReconciliationPeriodicJobs()
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()
+	retentionService := taskretention.NewService(repos.taskRepo)
+	retentionPeriodicJobs := workerretention.PeriodicJobs()
 	paymentPeriodicJobs := workerbilling.PaymentReconciliationPeriodicJobs()
 	checkoutShutdownPeriodicJobs := workerbilling.PaymentCheckoutShutdownPeriodicJobs()
 	mediaDerivativeEvents := derivativeevents.NewUserEventPublisher(userEventHub)
@@ -166,11 +194,12 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
-	visionBillingService := searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
-	visionBillingPeriodicJobs := searchcatalog.VisionBillingPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs))
+	visionBillingService := searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
+	visionBillingPeriodicJobs := visionbilling.VisionBillingPeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(retentionPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
+	periodicJobs = append(periodicJobs, retentionPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
@@ -180,19 +209,21 @@ func newAppTaskRuntime(
 		AdditionalQueues: map[string]river.QueueConfig{
 			workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
 			reclamation.QueueName:                      {MaxWorkers: 1},
+			workerretention.QueueName:                  {MaxWorkers: 1},
 			workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
-			searchcatalog.VisionBillingQueue:           {MaxWorkers: 1},
+			visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationScheduleWorker(services.creditService))
 			river.AddWorker(workers, reclamation.NewReclaimWorker(dbs.db, services.storageService))
+			river.AddWorker(workers, workerretention.NewTaskRetentionWorker(retentionService, cfg.Worker.EffectiveTaskRetentionDays()))
 			river.AddWorker(workers, reclamation.NewScheduleWorker(dbs.db))
 			river.AddWorker(workers, workerbilling.NewPaymentReconciliationWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
-			river.AddWorker(workers, searchcatalog.NewVisionBillingReconciliationWorker(visionBillingService))
+			river.AddWorker(workers, visionbilling.NewVisionBillingReconciliationWorker(visionBillingService))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -222,7 +253,7 @@ func newAppTaskRuntime(
 	)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
-			Accounts:       repos.accountRepo,
+			Models:         aiGatewayRepo,
 			Prompts:        repos.featurePromptRepo,
 			Media:          submitMediaValidator,
 			MediaReadiness: repos.mediaAssetRegistry,
@@ -243,16 +274,39 @@ func newAppTaskRuntime(
 	})
 
 	return appTaskServices{
-			accountService:   accountService,
-			taskService:      taskService,
-			taskStatsService: taskstats.NewService(repos.taskRepo.Statistics()),
-			userEvents:       userEventHub,
-		}, appWorkerRuntime{
-			riverClient: riverClient,
-			eventBus:    eventBus,
-			queueName:   taskqueue.RiverQueueDefault,
-			concurrency: workerConcurrency,
-		}, nil
+		taskService:      taskService,
+		taskStatsService: taskstats.NewService(repos.taskRepo.Statistics()),
+		userEvents:       userEventHub,
+	}, appWorkerRuntime{
+		riverClient:  riverClient,
+		eventBus:     eventBus,
+		queueName:    taskqueue.RiverQueueDefault,
+		concurrency:  workerConcurrency,
+		queueMetrics: redmetrics.NewMultiRefresher(redMetrics, riverQueueStatsByQueue(riverQueue), redmetrics.DefaultRefreshInterval),
+	}, nil
+}
+
+// riverQueueStatsByQueue fans one RiverQueue monitor out to every known
+// queue so each queue gets its own depth/lag gauge series. Queue inventory
+// must track taskqueue.RiverRetryMatrix; a missing queue loses its RED
+// signals (depth/lag alerts in docs/runbooks/backend-metrics.md).
+func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics.RiverQueueStats {
+	queues := []string{
+		taskqueue.RiverQueueDefault,
+		workerbilling.CreditReconciliationQueue,
+		workerbilling.PaymentReconciliationQueue,
+		workerbilling.PaymentCheckoutShutdownQueue,
+		workerretention.QueueName,
+		visionbilling.VisionBillingQueue,
+		reclamation.QueueName,
+	}
+	stats := make(map[string]redmetrics.RiverQueueStats, len(queues))
+	for _, name := range queues {
+		stats[name] = func(ctx context.Context) (int64, float64, error) {
+			return monitor.QueueStatsFor(ctx, name)
+		}
+	}
+	return stats
 }
 
 type uploadBoardAccessResolver struct {
@@ -277,4 +331,24 @@ func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context
 		return "", err
 	}
 	return user.StorageUID, nil
+}
+
+// aiGatewayModelRouteReader adapts the admin model catalog to the worker's
+// route-override seam. It lives in composition (the sole assembly root) so
+// runtime never imports the aigateway business context.
+type aiGatewayModelRouteReader struct {
+	repo *aigateway.ConfigRepository
+}
+
+func (a aiGatewayModelRouteReader) LookupRouteOverride(ctx context.Context, modelID string) (string, string, bool, error) {
+	items, err := a.repo.ListCatalog(ctx)
+	if err != nil {
+		return "", "", false, err
+	}
+	for _, item := range items {
+		if item.ID == modelID {
+			return item.CustomPath, item.CustomParams, true, nil
+		}
+	}
+	return "", "", false, nil
 }

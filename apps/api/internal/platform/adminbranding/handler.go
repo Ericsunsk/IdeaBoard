@@ -2,19 +2,29 @@ package adminbranding
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
-	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct{ store Store }
+// RequireAdminFunc reports whether the request carries admin authority,
+// rendering the denial response otherwise. The composition root injects the
+// identity-backed implementation so platform stays independent of identity.
+type RequireAdminFunc func(c *gin.Context) bool
 
-func NewHandler(store Store) *Handler { return &Handler{store: store} }
+type Handler struct {
+	store        Store
+	requireAdmin RequireAdminFunc
+}
+
+func NewHandler(store Store, requireAdmin RequireAdminFunc) *Handler {
+	return &Handler{store: store, requireAdmin: requireAdmin}
+}
 
 type listResponse struct {
 	Overrides []Override `json:"overrides"`
@@ -25,7 +35,7 @@ type updateRequest struct {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
+	if !h.checkAdmin(c) {
 		return
 	}
 	store, ok := h.requireStore(c)
@@ -41,7 +51,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Upsert(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
+	if !h.checkAdmin(c) {
 		return
 	}
 	store, ok := h.requireStore(c)
@@ -69,7 +79,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
+	if !h.checkAdmin(c) {
 		return
 	}
 	store, ok := h.requireStore(c)
@@ -86,6 +96,16 @@ func (h *Handler) Delete(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// checkAdmin enforces admin authority through the injected port. A missing
+// port denies fail-closed so platform never serves admin writes by default.
+func (h *Handler) checkAdmin(c *gin.Context) bool {
+	if h == nil || h.requireAdmin == nil {
+		response.Error(c, http.StatusForbidden, "需要管理员权限")
+		return false
+	}
+	return h.requireAdmin(c)
+}
+
 func (h *Handler) requireStore(c *gin.Context) (Store, bool) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusInternalServerError, "品牌 Logo 配置服务未初始化", errors.New("admin brand logo override store is unavailable"))
@@ -98,7 +118,8 @@ func parseTarget(c *gin.Context) (Scope, string, bool) {
 	scope := Scope(strings.TrimSpace(c.Param("scope")))
 	targetKey := strings.TrimSpace(c.Param("target_key"))
 	if err := ValidateTarget(scope, targetKey); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		slog.Warn("admin brand logo target invalid", "err", err)
+		response.Error(c, http.StatusBadRequest, "品牌 Logo 参数错误")
 		return "", "", false
 	}
 	return scope, targetKey, true
@@ -109,7 +130,8 @@ func (h *Handler) respondStoreError(c *gin.Context, err error) bool {
 		return false
 	}
 	if validation.Is(err) {
-		response.Error(c, http.StatusBadRequest, err.Error())
+		slog.Warn("admin brand logo validation failed", "err", err)
+		response.Error(c, http.StatusBadRequest, "品牌 Logo 参数错误")
 		return true
 	}
 	response.InternalError(c, http.StatusInternalServerError, "保存品牌 Logo 配置失败", err)

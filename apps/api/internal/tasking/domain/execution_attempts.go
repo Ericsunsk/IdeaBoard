@@ -2,13 +2,14 @@ package domain
 
 import "time"
 
-// ExecutionAttemptStart opens one gateway execution attempt. The execution
-// token must be unique per attempt; finalization requires the same token,
-// which is how stale workers lose the race.
+// ExecutionAttemptStart opens one gateway execution attempt. The claim and
+// the attempt row commit atomically, so a fenced token always has its row:
+// the attempt sequence is server-assigned, never caller-supplied. The
+// execution token must be unique per attempt; finalization requires the same
+// token, which is how stale workers lose the race.
 type ExecutionAttemptStart struct {
 	TaskID         string
 	RiverJobID     int64
-	AttemptNo      int32
 	ExecutionToken string
 	FeatureSlug    string
 	RequestedModel string

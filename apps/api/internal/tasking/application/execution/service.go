@@ -11,14 +11,12 @@ import (
 	"strings"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/database"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
 const (
-	defaultTaskRetryLimit        = 3
 	taskCancellationPollInterval = 2 * time.Second
 )
 
@@ -28,65 +26,49 @@ var (
 	ErrTaskStateConflict = errors.New("task state conflict")
 )
 
-type AccountStore interface {
-	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
-	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
-	IncrementFailCount(ctx context.Context, id int64) error
-	UpdateStatus(ctx context.Context, id int64, status int16) error
-	ResetFailCount(ctx context.Context, id int64) error
-}
-
 type TaskStore interface {
 	ConvergeTask(ctx context.Context, intent runtimecontracts.TaskConvergenceIntent) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
-	GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string) (*runtimecontracts.ActiveTaskLease, error)
+	GetActiveExecutionAttemptByTaskID(ctx context.Context, taskID string) (*runtimecontracts.ActiveTaskExecution, error)
+	ClaimAndStartExecutionAttempt(ctx context.Context, start tasks.ExecutionAttemptStart) (int32, error)
 	PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error
 	PatchExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) (int64, error)
-	CreateTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error)
-	FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error)
+	FinalizeExecutionAttempt(ctx context.Context, finish tasks.ExecutionAttemptFinish) (int64, error)
 	MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 }
 
 type Service struct {
-	accountRepo AccountStore
 	taskRepo    TaskStore
-	queue       taskqueueports.TaskAssigner
 	cancelStore taskqueueports.TaskCancellationStore
 	taskEvents  events.TaskStatusPublisher
 }
 
 type FailTaskInput struct {
-	TaskID        string
-	Assignment    taskqueueports.TaskAssignment
-	Reason        string
-	Result        string
-	AttemptFinish *tasks.TaskAttemptFinish
+	TaskID         string
+	ExecutionToken string
+	Reason         string
+	Result         string
+	ResolvedModel  string
+	GatewayStep    string
+	ReceiptLogID   string
+	ReceiptEventID string
+	CacheHit       bool
+	AttemptFinish  *tasks.TaskAttemptFinish
 }
 
 type ResetRunningTaskInput struct {
-	Assignment    taskqueueports.TaskAssignment
-	Reason        string
-	AttemptFinish *tasks.TaskAttemptFinish
-}
-
-type RequeueForFailoverInput struct {
-	Assignment             taskqueueports.TaskAssignment
-	Reason                 string
-	Result                 string
-	RequeuedAttemptFinish  *tasks.TaskAttemptFinish
-	FinalFailAttemptFinish *tasks.TaskAttemptFinish
+	TaskID         string
+	ExecutionToken string
+	Reason         string
+	AttemptFinish  *tasks.TaskAttemptFinish
 }
 
 func NewService(
-	accountRepo AccountStore,
 	taskRepo TaskStore,
-	assigner taskqueueports.TaskAssigner,
 	cancelStore taskqueueports.TaskCancellationStore,
 ) *Service {
 	service := &Service{
-		accountRepo: accountRepo,
 		taskRepo:    taskRepo,
-		queue:       assigner,
 		cancelStore: cancelStore,
 	}
 	return service
@@ -94,20 +76,6 @@ func NewService(
 
 func (s *Service) SetTaskStatusPublisher(publisher events.TaskStatusPublisher) {
 	s.taskEvents = publisher
-}
-
-func (s *Service) ConfirmTaskLease(ctx context.Context, assignment taskqueueports.TaskAssignment) error {
-	if s.queue == nil {
-		return ErrTaskStateConflict
-	}
-	if err := s.queue.ConfirmTaskLease(ctx, assignment); err != nil {
-		if errors.Is(err, taskqueueports.ErrTaskLeaseConflict) {
-			return fmt.Errorf("%w: %w", ErrTaskStateConflict, err)
-		}
-		return err
-	}
-	s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusRunning)
-	return nil
 }
 
 func (s *Service) IsTaskCancelled(ctx context.Context, taskID string) (bool, error) {
@@ -168,12 +136,12 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 		return err
 	}
 	rows, err := s.taskRepo.ConvergeTask(ctx, runtimecontracts.TaskConvergenceIntent{
-		Kind:         transition.convergenceKind,
-		TaskID:       taskID,
-		Lease:        transition.leaseIdentity,
-		ErrorMessage: reason,
-		Result:       resolveTaskFailureResult(taskID, reason, ""),
-		OccurredAt:   time.Now(),
+		Kind:           transition.convergenceKind,
+		TaskID:         taskID,
+		ExecutionToken: transition.executionToken,
+		ErrorMessage:   reason,
+		Result:         resolveTaskFailureResult(taskID, reason, ""),
+		OccurredAt:     time.Now(),
 	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
@@ -183,7 +151,7 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 			return err
 		}
 	}
-	applied, err := s.resolveTaskTransitionResult(ctx, transition.transition, taskID, transition.assignment, rows)
+	applied, err := s.resolveTaskTransitionResult(ctx, transition.transition, taskID, rows)
 	if err != nil {
 		return err
 	}
@@ -196,8 +164,9 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 type finalFailureTransition struct {
 	transition      taskTransition
 	convergenceKind runtimecontracts.TaskConvergenceKind
-	assignment      taskqueueports.TaskAssignment
-	leaseIdentity   *runtimecontracts.TaskLeaseIdentity
+	// executionToken fences the write when the failed River job still owns
+	// the live attempt; empty for pending or already-reaped tasks.
+	executionToken string
 }
 
 func (s *Service) loadTaskForFinalFailure(ctx context.Context, taskID string) (*tasks.Task, error) {
@@ -229,7 +198,7 @@ func (s *Service) prepareFinalFailureTransition(ctx context.Context, task *tasks
 }
 
 func (s *Service) prepareRunningFinalFailureTransition(ctx context.Context, result finalFailureTransition, taskID string, riverJobID int64) (finalFailureTransition, error) {
-	activeLease, err := s.taskRepo.GetActiveTaskLeaseByTaskID(ctx, taskID)
+	activeAttempt, err := s.taskRepo.GetActiveExecutionAttemptByTaskID(ctx, taskID)
 	if err != nil {
 		if !database.IsNotFound(err) {
 			return finalFailureTransition{}, err
@@ -241,30 +210,13 @@ func (s *Service) prepareRunningFinalFailureTransition(ctx context.Context, resu
 		result.convergenceKind = runtimecontracts.TaskConvergenceRecoveredFailed
 		return result, nil
 	}
-	assignment := finalFailureAssignment(activeLease)
-	if !assignment.HasLeaseIdentity() || (riverJobID > 0 && !taskqueueports.LeaseBelongsToRiverJob(activeLease.LeaseToken, riverJobID)) {
+	if riverJobID > 0 && !taskqueueports.LeaseBelongsToRiverJob(activeAttempt.ExecutionToken, riverJobID) {
 		return finalFailureTransition{}, ErrTaskStateConflict
 	}
 	result.transition = taskTransitionFinalFail
-	result.assignment = assignment
-	result.leaseIdentity = taskConvergenceLease(assignment)
+	result.convergenceKind = runtimecontracts.TaskConvergenceFinalFailed
+	result.executionToken = activeAttempt.ExecutionToken
 	return result, nil
-}
-
-func finalFailureAssignment(activeLease *runtimecontracts.ActiveTaskLease) taskqueueports.TaskAssignment {
-	return taskqueueports.TaskAssignment{
-		TaskID:                  activeLease.TaskID,
-		AccountID:               activeLease.AccountID,
-		ProviderEndpointID:      activeLease.ProviderEndpointID,
-		CredentialID:            activeLease.CredentialID,
-		ResolvedModel:           activeLease.ResolvedModel,
-		APIType:                 activeLease.APIType,
-		ProviderEndpointName:    activeLease.ProviderEndpointName,
-		ProviderEndpointBaseURL: activeLease.ProviderEndpointBaseURL,
-		CredentialFingerprint:   activeLease.CredentialFingerprint,
-		CredentialKeyVersion:    activeLease.CredentialKeyVersion,
-		LeaseToken:              activeLease.LeaseToken,
-	}
 }
 
 func (s *Service) resolveFinalFailureNoop(ctx context.Context, taskID string) error {
@@ -282,17 +234,17 @@ func (s *Service) resolveFinalFailureNoop(ctx context.Context, taskID string) er
 }
 
 func (s *Service) FailTask(ctx context.Context, input FailTaskInput) error {
-	if input.Assignment.HasLeaseIdentity() {
-		return s.failRunningTaskWithLease(ctx, input)
+	if strings.TrimSpace(input.ExecutionToken) != "" {
+		return s.failRunningTaskWithExecutionToken(ctx, input)
 	}
-	if input.Assignment.TaskID != "" {
+	if strings.TrimSpace(input.TaskID) == "" {
 		return ErrTaskStateConflict
 	}
 	return s.failPendingTask(ctx, input)
 }
 
 func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) error {
-	taskID := input.TaskID
+	taskID := strings.TrimSpace(input.TaskID)
 	if taskID == "" {
 		return ErrTaskStateConflict
 	}
@@ -308,7 +260,7 @@ func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) erro
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailPending, taskID, taskqueueports.TaskAssignment{}, rows)
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailPending, taskID, rows)
 	if err != nil {
 		return err
 	}
@@ -318,37 +270,66 @@ func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) erro
 	return nil
 }
 
-func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskInput) error {
-	assignment := input.Assignment
-	if err := requireTaskTransitionLease(taskTransitionFailRunning, assignment); err != nil {
+func (s *Service) failRunningTaskWithExecutionToken(ctx context.Context, input FailTaskInput) error {
+	if err := requireTaskTransitionToken(taskTransitionFailRunning, input.ExecutionToken); err != nil {
 		return err
+	}
+	if strings.TrimSpace(input.TaskID) == "" {
+		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(input.AttemptFinish)
 	rows, err := s.taskRepo.ConvergeTask(ctx, runtimecontracts.TaskConvergenceIntent{
-		Kind:          runtimecontracts.TaskConvergenceFailed,
-		TaskID:        assignment.TaskID,
-		Lease:         taskConvergenceLease(assignment),
-		ErrorMessage:  input.Reason,
-		Result:        resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result),
-		OccurredAt:    now,
-		AttemptFinish: input.AttemptFinish,
+		Kind:           runtimecontracts.TaskConvergenceFailed,
+		TaskID:         input.TaskID,
+		ExecutionToken: strings.TrimSpace(input.ExecutionToken),
+		ErrorMessage:   input.Reason,
+		Result:         resolveTaskFailureResult(input.TaskID, input.Reason, input.Result),
+		OccurredAt:     now,
+		AttemptFinish:  input.AttemptFinish,
+		ResolvedModel:  strings.TrimSpace(input.ResolvedModel),
+		GatewayStep:    strings.TrimSpace(input.GatewayStep),
+		ReceiptLogID:   strings.TrimSpace(input.ReceiptLogID),
+		ReceiptEventID: strings.TrimSpace(input.ReceiptEventID),
+		CacheHit:       input.CacheHit,
 	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailRunning, assignment.TaskID, assignment, rows)
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailRunning, input.TaskID, rows)
 	if err != nil {
 		return err
 	}
 	if applied {
-		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
+		s.publishTaskStatusEvent(ctx, input.TaskID, tasks.StatusFailed)
 	}
 	return nil
 }
 
 func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskInput) error {
-	assignment := input.Assignment
-	if err := requireTaskTransitionLease(taskTransitionReset, assignment); err != nil {
+	token := strings.TrimSpace(input.ExecutionToken)
+	if token == "" {
+		// Nothing was claimed by this worker; resetting is a no-op so the
+		// task keeps whatever state convergence left behind.
+		return nil
+	}
+	return s.convergeRunningTask(ctx, input, runtimecontracts.TaskConvergenceReset, taskTransitionReset)
+}
+
+// RequeueRunningTask records one bounded retry for a running execution. Unlike
+// ResetRunningTask, requeue convergence increments retry_count atomically with
+// releasing the execution token.
+func (s *Service) RequeueRunningTask(ctx context.Context, input ResetRunningTaskInput) error {
+	return s.convergeRunningTask(ctx, input, runtimecontracts.TaskConvergenceRequeued, taskTransitionRequeue)
+}
+
+func (s *Service) convergeRunningTask(
+	ctx context.Context,
+	input ResetRunningTaskInput,
+	kind runtimecontracts.TaskConvergenceKind,
+	transition taskTransition,
+) error {
+	token := strings.TrimSpace(input.ExecutionToken)
+	if err := requireTaskTransitionToken(transition, token); err != nil {
 		return err
 	}
 
@@ -358,91 +339,24 @@ func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskIn
 	}
 
 	rows, err := s.taskRepo.ConvergeTask(ctx, runtimecontracts.TaskConvergenceIntent{
-		Kind:          runtimecontracts.TaskConvergenceReset,
-		TaskID:        assignment.TaskID,
-		Lease:         taskConvergenceLease(assignment),
-		ErrorMessage:  errMsg,
-		OccurredAt:    taskTerminalTime(input.AttemptFinish),
-		AttemptFinish: input.AttemptFinish,
+		Kind:           kind,
+		TaskID:         strings.TrimSpace(input.TaskID),
+		ExecutionToken: token,
+		ErrorMessage:   errMsg,
+		OccurredAt:     taskTerminalTime(input.AttemptFinish),
+		AttemptFinish:  input.AttemptFinish,
 	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionReset, assignment.TaskID, assignment, rows)
+	applied, err := s.resolveTaskTransitionResult(ctx, transition, strings.TrimSpace(input.TaskID), rows)
 	if err != nil {
 		return err
 	}
 	if applied {
-		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
+		s.publishTaskStatusEvent(ctx, strings.TrimSpace(input.TaskID), tasks.StatusPending)
 	}
 	return nil
-}
-
-func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFailoverInput) (bool, error) {
-	assignment := input.Assignment
-	if err := requireTaskTransitionLease(taskTransitionRequeue, assignment); err != nil {
-		return false, err
-	}
-	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return false, ErrTaskNotFound
-		}
-		return false, err
-	}
-	current, err := evaluateTaskTransitionCurrent(taskTransitionRequeue, task, assignment)
-	if err != nil {
-		return false, err
-	}
-	if current.idempotent {
-		return true, nil
-	}
-
-	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.ConvergeTask(ctx, runtimecontracts.TaskConvergenceIntent{
-			Kind:          runtimecontracts.TaskConvergenceRequeued,
-			TaskID:        assignment.TaskID,
-			Lease:         taskConvergenceLease(assignment),
-			ErrorMessage:  input.Reason,
-			Result:        strings.TrimSpace(input.Result),
-			OccurredAt:    taskTerminalTime(input.RequeuedAttemptFinish),
-			AttemptFinish: input.RequeuedAttemptFinish,
-		})
-		if err := normalizeTaskTransitionWriteError(err); err != nil {
-			return false, err
-		}
-		applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionRequeue, assignment.TaskID, assignment, rows)
-		if err != nil {
-			return false, err
-		}
-		if applied {
-			s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
-		}
-		return true, nil
-	}
-
-	now := taskTerminalTime(input.FinalFailAttemptFinish)
-	rows, err := s.taskRepo.ConvergeTask(ctx, runtimecontracts.TaskConvergenceIntent{
-		Kind:          runtimecontracts.TaskConvergenceFinalFailed,
-		TaskID:        assignment.TaskID,
-		Lease:         taskConvergenceLease(assignment),
-		ErrorMessage:  input.Reason,
-		Result:        resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result),
-		OccurredAt:    now,
-		AttemptFinish: input.FinalFailAttemptFinish,
-	})
-	if err := normalizeTaskTransitionWriteError(err); err != nil {
-		return false, err
-	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFinalFail, assignment.TaskID, assignment, rows)
-	if err != nil {
-		return false, err
-	}
-	if applied {
-		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
-		return false, nil
-	}
-	return true, nil
 }
 
 func taskTerminalTime(attemptFinish *tasks.TaskAttemptFinish) time.Time {
@@ -452,44 +366,52 @@ func taskTerminalTime(attemptFinish *tasks.TaskAttemptFinish) time.Time {
 	return time.Now()
 }
 
-func taskConvergenceLease(assignment taskqueueports.TaskAssignment) *runtimecontracts.TaskLeaseIdentity {
-	return &runtimecontracts.TaskLeaseIdentity{
-		AccountID:          assignment.AccountID,
-		ProviderEndpointID: assignment.ProviderEndpointID,
-		CredentialID:       assignment.CredentialID,
-		LeaseToken:         assignment.LeaseToken,
-	}
-}
-
-func (s *Service) RecordAccountFailure(ctx context.Context, accountID int64) (disabled bool, failCount int, err error) {
-	if accountID == 0 {
-		return false, 0, nil
-	}
-
-	if err := s.accountRepo.IncrementFailCount(ctx, accountID); err != nil {
-		return false, 0, err
-	}
-
-	account, err := s.accountRepo.GetByID(ctx, accountID)
-	if err != nil {
-		return false, 0, err
-	}
-
-	if account.FailCount >= accounts.MaxFailCount && account.Status != 0 {
-		if err := s.accountRepo.UpdateStatus(ctx, accountID, 0); err != nil {
-			return false, account.FailCount, err
-		}
-		return true, account.FailCount, nil
-	}
-
-	return false, account.FailCount, nil
-}
-
-func (s *Service) ResetAccountFailure(ctx context.Context, accountID int64) error {
-	if accountID == 0 {
+// TaskAttemptFinishFromExecution adapts the gateway attempt outcome onto the
+// legacy attempt-finish shape consumed by stats and cancellation paths.
+func TaskAttemptFinishFromExecution(finish *tasks.ExecutionAttemptFinish) *tasks.TaskAttemptFinish {
+	if finish == nil {
 		return nil
 	}
-	return s.accountRepo.ResetFailCount(ctx, accountID)
+	return &tasks.TaskAttemptFinish{
+		TaskID:          strings.TrimSpace(finish.TaskID),
+		Status:          strings.TrimSpace(finish.Status),
+		FailureStage:    strings.TrimSpace(finish.FailureStage),
+		FailureCategory: strings.TrimSpace(finish.FailureCategory),
+		ErrorMsg:        finish.ErrorMsg,
+		CompletedAt:     finish.CompletedAt,
+	}
+}
+
+// ClaimAndStartExecutionAttempt fences one pending task for the execution
+// token and opens its attempt row atomically. It returns the server-assigned
+// attempt number. A state-conflict error means another worker won the race
+// or the task already converged; callers drop such tasks instead of retrying.
+func (s *Service) ClaimAndStartExecutionAttempt(ctx context.Context, start tasks.ExecutionAttemptStart) (int32, error) {
+	start.TaskID = strings.TrimSpace(start.TaskID)
+	start.ExecutionToken = strings.TrimSpace(start.ExecutionToken)
+	attemptNo, err := s.taskRepo.ClaimAndStartExecutionAttempt(ctx, start)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return 0, ErrTaskStateConflict
+		}
+		return 0, err
+	}
+	s.publishTaskStatusEvent(ctx, start.TaskID, tasks.StatusRunning)
+	return attemptNo, nil
+}
+
+// GetTaskRetryCount reads the fresh tasks.retry_count for requeue bounding.
+// Payload-carried counts go stale across redeliveries, so the orchestrator
+// loads it at failure time; the token fence (not this read) owns correctness.
+func (s *Service) GetTaskRetryCount(ctx context.Context, taskID string) (int, error) {
+	task, err := s.taskRepo.GetByTaskID(ctx, strings.TrimSpace(taskID))
+	if err != nil {
+		if database.IsNotFound(err) {
+			return 0, ErrTaskNotFound
+		}
+		return 0, err
+	}
+	return task.RetryCount, nil
 }
 
 func validateTaskOutputs(taskID string, outputs []tasks.TaskOutput) error {

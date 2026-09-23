@@ -11,7 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
@@ -306,11 +305,11 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 	}
 }
 
-func TestAdminTaskMonitorDetailDerivesLatestExecutionFromOrderedTrace(t *testing.T) {
+func TestAdminMonitorDetailDerivesLatestExecutionFromOrderedTrace(t *testing.T) {
 	task := &tasks.Task{TaskID: "task-failover"}
-	detail := adminTaskMonitorDetailFromTask(task, tasks.AdminBillingSnapshot{}, false, []tasks.AdminTaskAttempt{
+	detail := adminMonitorDetailFromTask(task, tasks.AdminBillingSnapshot{}, false, []tasks.AdminTaskAttempt{
 		{AttemptNo: 1, Status: tasks.TaskAttemptStatusRequeued, ResolvedModel: "model-a"},
-		{AttemptNo: 2, Status: tasks.TaskAttemptStatusCompleted, ResolvedModel: "model-b", ProviderEndpointName: "Trace Endpoint"},
+		{AttemptNo: 2, Status: tasks.TaskAttemptStatusCompleted, ResolvedModel: "model-b", Provider: "openai"},
 	})
 	if len(detail.ExecutionAttempts) != 2 || detail.LatestExecution == nil || detail.LatestExecution.ResolvedModel != "model-b" {
 		t.Fatalf("detail=%+v, want latest execution from ordered trace", detail)
@@ -328,11 +327,9 @@ func TestListTasksIncludesOnlyLatestImmutableExecutionProjection(t *testing.T) {
 		},
 		AdminTaskListRead: adminTaskListReadStub{latest: map[string]tasks.AdminTaskExecutionSnapshot{
 			"terminal-task": {
-				AccountID:            101,
-				ProviderEndpointID:   202,
-				ProviderEndpointName: "Provider A",
-				ResolvedModel:        "image-model",
-				APIType:              "google-native",
+				Provider:      "openai",
+				ResolvedModel: "image-model",
+				GatewayStep:   "model-image",
 			},
 		}, requests: &requests},
 	}, ServiceOptions{})
@@ -344,11 +341,11 @@ func TestListTasksIncludesOnlyLatestImmutableExecutionProjection(t *testing.T) {
 	if len(items) != 2 || items[0].LatestExecution == nil {
 		t.Fatalf("monitor list latest execution=%+v, want immutable snapshot", items)
 	}
-	if got := items[0].LatestExecution.ProviderEndpointName; got != "Provider A" {
-		t.Fatalf("latest execution endpoint=%q, want Provider A", got)
+	if got := items[0].LatestExecution.Provider; got != "openai" {
+		t.Fatalf("latest execution provider=%q, want openai", got)
 	}
-	if items[0].LatestExecution.AccountID != 101 || items[0].LatestExecution.ProviderEndpointID != 202 {
-		t.Fatalf("latest execution owner=%+v, want immutable account/Endpoint IDs", items[0].LatestExecution)
+	if items[0].LatestExecution.ResolvedModel != "image-model" {
+		t.Fatalf("latest execution model=%+v, want image-model", items[0].LatestExecution)
 	}
 	if items[1].LatestExecution != nil {
 		t.Fatalf("pending Task latest execution=%+v, want empty", items[1].LatestExecution)
@@ -362,7 +359,7 @@ func TestGetTaskIncludesExplicitLatestExecutionAlongsideOrderedTrace(t *testing.
 	service := NewService(ServiceDeps{
 		TaskRepo: adminTaskDetailStoreStub{task: &tasks.Task{TaskID: "detail-task", Status: tasks.StatusCompleted}},
 		AdminTaskTrace: adminTaskTraceStub{attempts: map[string][]tasks.AdminTaskAttempt{
-			"detail-task": {{AttemptNo: 1, ProviderEndpointName: "Trace Endpoint", ResolvedModel: "trace-model"}},
+			"detail-task": {{AttemptNo: 1, Provider: "openai", ResolvedModel: "trace-model"}},
 		}},
 	}, ServiceOptions{})
 
@@ -370,10 +367,10 @@ func TestGetTaskIncludesExplicitLatestExecutionAlongsideOrderedTrace(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.LatestExecution == nil || task.LatestExecution.ProviderEndpointName != "Trace Endpoint" {
+	if task.LatestExecution == nil || task.LatestExecution.Provider != "openai" {
 		t.Fatalf("latest execution=%+v, want latest trace snapshot", task.LatestExecution)
 	}
-	if len(task.ExecutionAttempts) != 1 || task.ExecutionAttempts[0].ProviderEndpointName != "Trace Endpoint" {
+	if len(task.ExecutionAttempts) != 1 || task.ExecutionAttempts[0].Provider != "openai" {
 		t.Fatalf("execution trace=%+v, want ordered detail trace", task.ExecutionAttempts)
 	}
 }
@@ -840,9 +837,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
+		Models: &fakeIntakeModelStore{},
 		Media: taskmedia.NewSubmitMediaValidator(
 			config.PublicOriginsConfig{API: "https://assets.example.com"},
 			mediaAuthorizer,
@@ -901,14 +896,11 @@ func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testi
 
 func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-		{ID: 202, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
@@ -951,9 +943,7 @@ func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 	ctx := context.Background()
 	cause := errors.New("river insert unavailable")
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-		}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{err: cause},
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
@@ -977,9 +967,7 @@ func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 
 func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-		}},
+		ModelStore:  &fakeIntakeModelStore{},
 		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
 
@@ -1002,9 +990,7 @@ func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
 
 func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.T) {
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-		}},
+		ModelStore:  &fakeIntakeModelStore{},
 		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugGeneration, ""),
 	}, ServiceOptions{})
 
@@ -1049,9 +1035,7 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 	preparer := &recordingGenerationMediaPreparer{}
 	submissionStore := &recordingSubmissionStore{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		}}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 		MediaPreparer:   preparer,
@@ -1077,18 +1061,10 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 
 func TestSubmitTaskRejectsConflictingGenerationModeBeforeSubmission(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name:    "gpt-image-1",
-				Enabled: true,
-			}},
-		},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugGeneration, "template {{user_prompt}}"),
 	}, ServiceOptions{})
@@ -1113,12 +1089,10 @@ func TestSubmitTaskRejectsConflictingGenerationModeBeforeSubmission(t *testing.T
 
 func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
@@ -1160,15 +1134,13 @@ func TestSubmitTaskRejectsInvalidPriority(t *testing.T) {
 
 func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{
 		result: tasks.TaskSubmissionResult{TaskID: "task_existing_action", Created: false},
 	}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugRender, "gpt-image-1"),
 		MediaValidator:  testSubmitMediaValidator{},
@@ -1213,18 +1185,10 @@ func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
 
 func TestSubmitTaskNormalizesFusionContract(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name:    "gpt-image-1",
-				Enabled: true,
-			}},
-		},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugFusion, "gpt-image-1"),
@@ -1309,19 +1273,10 @@ func TestSubmitTaskNormalizesFusionContract(t *testing.T) {
 
 func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{
-			ID:           101,
-			Capabilities: []string{"fill"},
-			Models: []accounts.AccountModel{{
-				Name:    "gpt-image-1",
-				Enabled: true,
-			}},
-		},
-	}}
+	modelStore := &fakeIntakeModelStore{}
 	submissionStore := &recordingSubmissionStore{}
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     accountRepo,
+		ModelStore:      modelStore,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugOutpaint, "gpt-image-1"),
@@ -1411,49 +1366,9 @@ func mustCreateTaskUploadUser(t *testing.T, repo *identitypostgres.Repository, d
 	return user
 }
 
-type fakeSubmitAccountStore struct {
-	accounts []*accounts.ApiAccount
-	err      error
-}
-
-func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.ApiAccount, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	result := make([]*accounts.ApiAccount, 0, len(s.accounts))
-	for _, account := range s.accounts {
-		if account == nil {
-			continue
-		}
-		copyAccount := *account
-		copyAccount.Capabilities = append([]string(nil), account.Capabilities...)
-		hasEnabledModel := false
-		for _, model := range account.Models {
-			hasEnabledModel = hasEnabledModel || model.Enabled
-		}
-		if hasEnabledModel {
-			hasImageGeneration := false
-			for _, capability := range copyAccount.Capabilities {
-				hasImageGeneration = hasImageGeneration || capability == "generation"
-			}
-			if !hasImageGeneration {
-				copyAccount.Capabilities = append(copyAccount.Capabilities, "generation")
-			}
-		}
-		result = append(result, &copyAccount)
-	}
-	return result, nil
-}
-
 func newGoogleNativeSubmitTestService(submissionStore *recordingSubmissionStore) *Service {
 	return newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{
-				ID:      101,
-				ApiType: workflow.ProviderGoogleAI,
-				Models:  []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
-			},
-		}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: submissionStore,
 		TaskBilling:     newHandlerTaskBillingService(),
 		MediaValidator:  testSubmitMediaValidator{},

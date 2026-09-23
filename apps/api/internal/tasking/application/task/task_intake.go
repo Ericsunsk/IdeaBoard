@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
@@ -49,12 +48,14 @@ type FeaturePromptStore interface {
 	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
 }
 
-type AccountStore interface {
-	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
+// ModelStore resolves the admin-configured model for one feature.
+// Composition wires the AI gateway settings repository; tests inject fakes.
+type ModelStore interface {
+	ResolveModel(ctx context.Context, feature string) (string, error)
 }
 
 type TaskIntakeDeps struct {
-	Accounts       AccountStore
+	Models         ModelStore
 	Prompts        FeaturePromptStore
 	Media          taskmedia.Validator
 	MediaReadiness taskmedia.ProcessingInputReadiness
@@ -63,7 +64,7 @@ type TaskIntakeDeps struct {
 }
 
 type taskIntake struct {
-	accounts       AccountStore
+	models         ModelStore
 	prompts        FeaturePromptStore
 	media          taskmedia.Validator
 	mediaReadiness taskmedia.ProcessingInputReadiness
@@ -73,7 +74,7 @@ type taskIntake struct {
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 	return &taskIntake{
-		accounts:       deps.Accounts,
+		models:         deps.Models,
 		prompts:        deps.Prompts,
 		media:          deps.Media,
 		mediaReadiness: deps.MediaReadiness,
@@ -100,16 +101,9 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 	if featureSlug == "" {
 		return TaskReadinessCompilation{}, validation.New("feature 不能为空")
 	}
-	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	executionPlan, err := compileReadinessExecutionPlan(params, featureSlug)
 	if err != nil {
 		return TaskReadinessCompilation{}, err
-	}
-	executionPlan, err := workflow.CompileFeatureReadinessPlan(workflow.CompileFeatureExecutionInput{
-		Feature: featureSlug,
-		Params:  executionParams,
-	})
-	if err != nil {
-		return TaskReadinessCompilation{}, mapFeatureContractValidationError(err)
 	}
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
@@ -126,7 +120,7 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 			return TaskReadinessCompilation{}, err
 		}
 	}
-	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
+	if err := i.ensureProviderAvailable(ctx, featureSlug); err != nil {
 		return TaskReadinessCompilation{}, err
 	}
 	billingRequest, err := resolveTaskBillingRequest(executionPlan)
@@ -206,12 +200,6 @@ func (i *taskIntake) normalizeCompileRequest(ctx context.Context, userID int64, 
 	return normalizedTaskCompile{clientActionID: clientActionID, priority: priority, params: params}, nil
 }
 
-type compiledTaskExecution struct {
-	featureSlug string
-	plan        workflow.FeatureExecutionPlan
-	typedParams *tasks.WorkflowTaskParams
-}
-
 func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, params map[string]interface{}) (compiledTaskExecution, error) {
 	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
 	if err != nil {
@@ -220,35 +208,14 @@ func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req
 	if featureSlug == "" {
 		return compiledTaskExecution{}, validation.New("feature 不能为空")
 	}
-	params["feature"] = featureSlug
-	delete(params, "model")
-	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
+	if err := normalizeSubmitExecutionMap(params, featureSlug); err != nil {
 		return compiledTaskExecution{}, err
 	}
-	if featureSlug == workflow.FeatureSlugGeneration {
-		if err := workflow.ValidateGenerationSubmitContract(params); err != nil {
-			return compiledTaskExecution{}, err
-		}
-	}
-	if featureSlug == workflow.FeatureSlugFusion {
-		if err := normalizeFusionParams(params); err != nil {
-			return compiledTaskExecution{}, err
-		}
-	}
-	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	executionPlan, err := compileSubmitExecutionPlan(params, featureSlug)
 	if err != nil {
 		return compiledTaskExecution{}, err
 	}
-	executionPlan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
-		Feature: featureSlug,
-		Params:  executionParams,
-	})
-	if err != nil {
-		return compiledTaskExecution{}, mapFeatureContractValidationError(err)
-	}
-	params[paramkeys.OutputCount] = executionPlan.RequestedOutputCount().Int()
-	params[paramkeys.OutputResolution] = executionPlan.OutputResolution()
-	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
+	typedParams, err := finalizeSubmitTypedParams(params, featureSlug, executionPlan)
 	if err != nil {
 		return compiledTaskExecution{}, err
 	}
@@ -258,12 +225,7 @@ func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req
 	if err := i.validateProcessingInputReadiness(ctx, userID, submitRequestAssetIDs(req)); err != nil {
 		return compiledTaskExecution{}, err
 	}
-	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
-	if err != nil {
-		return compiledTaskExecution{}, err
-	}
-	typedParams.ExecutionPlan = executionPlanJSON
-	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
+	if err := i.ensureProviderAvailable(ctx, featureSlug); err != nil {
 		return compiledTaskExecution{}, err
 	}
 	return compiledTaskExecution{featureSlug: featureSlug, plan: executionPlan, typedParams: typedParams}, nil
@@ -303,40 +265,6 @@ func (i *taskIntake) compileTaskPrompts(ctx context.Context, req *tasks.SubmitTa
 		return compiledTaskPrompts{}, err
 	}
 	return compiledTaskPrompts{fullPrompt: fullPrompt, systemPrompt: systemPrompt, config: promptConfig}, nil
-}
-
-func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, normalized normalizedTaskCompile, execution compiledTaskExecution, prompt compiledTaskPrompts) (CanonicalTaskRequest, error) {
-	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
-		Plan:                execution.plan,
-		UserPrompt:          req.Prompt,
-		SystemPrompt:        prompt.systemPrompt,
-		CompiledPrompt:      prompt.fullPrompt,
-		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt.config.Prompt),
-		SeedMaterial:        normalized.clientActionID,
-		Params:              execution.typedParams,
-	})
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	billingRequest, err := resolveTaskBillingRequest(execution.plan)
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	if billingRequest != nil && normalized.clientActionID == "" {
-		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
-	}
-	execution.typedParams.Generation = &generationSnapshot
-	paramsJSON, err := marshalWorkflowTaskParams(execution.typedParams, normalized.params)
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
-		UserID: userID, Feature: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
-		Params: paramsJSON, ClientActionID: normalized.clientActionID, Priority: normalized.priority,
-		Generation:     &generationSnapshot,
-		BillingRequest: billingRequest,
-		ExecutionPlan:  &execution.plan,
-	})
 }
 
 func mediaAssetIDsFromParams(params map[string]interface{}) []int64 {
@@ -462,84 +390,15 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context, requirement workflow.RoutingRequirement) error {
-	if i == nil || i.accounts == nil {
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug string) error {
+	if i == nil || i.models == nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
-	apiAccounts, err := i.accounts.GetAllEnabled(ctx)
-	if err != nil {
+	model, err := i.models.ResolveModel(ctx, featureSlug)
+	if err != nil || model == "" {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	apiAccounts = accounts.FilterByCapability(apiAccounts, string(requirement.Capability()))
-	if requirement.ModelRequirement() == workflow.RoutingModelRequired {
-		apiAccounts = accounts.FilterByResolution(apiAccounts, requirement.OutputResolution())
-	}
-	if len(apiAccounts) == 0 {
-		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-	}
 	return nil
-}
-
-func resolveTaskBillingRequest(plan workflow.FeatureExecutionPlan) (*taskbilling.Request, error) {
-	if !workflow.IsAIImageFeature(plan.Feature()) {
-		return nil, nil
-	}
-	request, err := taskbilling.AIImageRequest(
-		plan.Feature(),
-		plan.OutputResolution(),
-		int64(plan.RequestedOutputCount().Int()),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &request, nil
-}
-
-func compileFeatureExecutionParams(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionParams, error) {
-	result := workflow.FeatureExecutionParams{}
-	if raw, ok := params[paramkeys.OutputCount]; ok {
-		value, ok := readExactIntParam(raw)
-		if !ok {
-			return result, validation.New("output_count 仅支持整数 1-4")
-		}
-		result.RequestedOutputCount = &value
-	}
-	if raw, ok := params[paramkeys.OutputResolution]; ok {
-		value, ok := raw.(string)
-		if !ok {
-			return result, validation.New("output_resolution 必须是字符串")
-		}
-		result.OutputResolution = &value
-	}
-	media := workflowMediaInputsFromMap(params, featureSlug)
-	if media == nil {
-		return result, nil
-	}
-	result.ImageInputCount = len(media.Inputs) + len(media.References)
-	if media.Original != nil {
-		result.ImageInputCount++
-	}
-	result.HasMaskInput = media.Mask != nil
-	return result, nil
-}
-
-func mapFeatureContractValidationError(err error) error {
-	var contractErr *workflow.FeatureContractValidationError
-	if !errors.As(err, &contractErr) {
-		return err
-	}
-	switch contractErr.Code {
-	case workflow.FeatureContractUnknownFeature:
-		return validation.New("feature 不受支持")
-	case workflow.FeatureContractInvalidOutputCount:
-		return validation.New("output_count 不符合功能要求")
-	case workflow.FeatureContractUnsupportedResolution:
-		return validation.New("该功能的 output_resolution 不受支持")
-	case workflow.FeatureContractInvalidRuntimeInput:
-		return validation.New("该功能的图片输入不符合要求")
-	default:
-		return validation.New("功能执行参数无效")
-	}
 }
 
 func normalizeSubmitTaskClientActionID(raw string) (string, error) {

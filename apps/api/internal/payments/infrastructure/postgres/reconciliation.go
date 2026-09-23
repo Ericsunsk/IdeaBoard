@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	paymentreconciliation "ideaboard/api/internal/payments/application/reconciliation"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -23,8 +25,8 @@ func (r *Repository) ClaimDuePaymentOrderReconciliations(ctx context.Context, no
 	now = now.UTC()
 	token := uuid.New()
 	rows, err := r.dbWithContext(ctx).queries().ClaimDuePaymentOrderReconciliations(ctx, dbsqlc.ClaimDuePaymentOrderReconciliationsParams{
-		StaleBefore: now.Add(-2 * time.Minute), NowAt: now, RowLimit: paymentReconciliationBatchSize,
-		ClaimToken: token, ClaimUntil: now.Add(paymentreconciliation.Lease),
+		StaleBefore: dbutil.TimestamptzFromTime(now.Add(-2 * time.Minute)), NowAt: dbutil.TimestamptzFromTime(now), RowLimit: paymentReconciliationBatchSize,
+		ClaimToken: pgtype.UUID{Bytes: token, Valid: true}, ClaimUntil: dbutil.TimestamptzFromTime(now.Add(paymentreconciliation.Lease)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("claim due payment order reconciliations: %w", err)
@@ -59,10 +61,10 @@ func (r *Repository) CompletePaymentOrderReconciliationClaim(
 		return false, fmt.Errorf("payments repository: reconciliation check time is required")
 	}
 	rows, err := r.dbWithContext(ctx).queries().CompletePaymentOrderReconciliationClaim(ctx, dbsqlc.CompletePaymentOrderReconciliationClaimParams{
-		CheckedAt: checkedAt, NextAttemptAt: outcome.NextAttemptAt.UTC(),
+		CheckedAt: dbutil.TimestamptzFromTime(checkedAt), NextAttemptAt: dbutil.TimestamptzFromTime(outcome.NextAttemptAt.UTC()),
 		ErrorCode: boundedText(outcome.ErrorCode, 64), ErrorSummary: boundedText(outcome.ErrorSummary, 500),
 		ClearAnomaly: outcome.ClearAnomaly, MarkAnomalous: outcome.Anomalous,
-		PaymentOrderID: orderID, ClaimToken: token, ClaimGeneration: claim.Generation,
+		PaymentOrderID: pgUUIDToPgType(orderID), ClaimToken: pgUUIDToPgType(token), ClaimGeneration: claim.Generation,
 	})
 	if err != nil {
 		return false, fmt.Errorf("complete payment order reconciliation claim: %w", err)
@@ -87,9 +89,9 @@ func (r *Repository) ListPaymentReconciliationAnomalies(ctx context.Context, lim
 			continue
 		}
 		items = append(items, paymentreconciliation.Anomaly{
-			PaymentOrderID: row.ID.String(), PublicOrderNumber: row.PublicOrderNumber, UserID: row.UserID,
+			PaymentOrderID: pgUUIDString(row.ID), PublicOrderNumber: row.PublicOrderNumber, UserID: row.UserID,
 			Status: paymentsdomain.PaymentOrderStatus(row.Status), LastErrorCode: row.LastErrorCode, LastErrorSummary: row.LastErrorSummary,
-			LastCheckedAt: NullTimePointer(row.LastCheckedAt), AnomalousAt: row.AnomalousAt.Time, CreatedAt: row.CreatedAt,
+			LastCheckedAt: NullTimePointer(row.LastCheckedAt), AnomalousAt: dbutil.TimeValue(row.AnomalousAt), CreatedAt: dbutil.TimeValue(row.CreatedAt),
 		})
 	}
 	return items, nil

@@ -3,30 +3,22 @@ package providers
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	providerendpoints "ideaboard/api/internal/accountpool/providerendpoints/domain"
 	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"
 	"ideaboard/api/internal/media/storage/infrastructure/postgres"
 	"ideaboard/api/internal/platform/config"
+	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/workflow"
 )
 
 func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
@@ -51,9 +43,7 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 		publicOrigins:      config.PublicOriginsConfig{Web: "https://app.example.test", API: "https://assets.example.test"},
 	}
 
-	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", &accounts.ApiAccount{
-		ProxyURL: "https://provider.example.test/v1",
-	}, []string{dataURL})
+	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", []string{dataURL})
 	if err != nil {
 		t.Fatalf("materializeProviderResultImages returned error: %v", err)
 	}
@@ -69,86 +59,10 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	if !reflect.DeepEqual(materializer.remoteSourceURLs, []string{dataURL}) {
 		t.Fatalf("materializer source urls=%#v", materializer.remoteSourceURLs)
 	}
-	for _, wantHost := range []string{"provider.example.test", "assets.example.test"} {
+	for _, wantHost := range []string{"assets.example.test"} {
 		if !containsString(materializer.remoteOpts.AllowHosts, wantHost) {
 			t.Fatalf("AllowHosts=%#v missing %q", materializer.remoteOpts.AllowHosts, wantHost)
 		}
-	}
-}
-
-func TestCallDrawingAPIStoresParsedOutputEnvelope(t *testing.T) {
-	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + rawImagePayload + `"}]}`))
-	}))
-	defer server.Close()
-
-	materializer := &captureResultMaterializer{
-		remoteResult: taskmedia.MaterializedResults{
-			Items: []taskmedia.MaterializedResult{{
-				ImageURL: "/uploads/tasks/42/task-prompt/result.png",
-				Output: tasks.TaskOutput{
-					TaskID: "task-prompt",
-					Role:   "image",
-					URL:    "/uploads/tasks/42/task-prompt/result.png",
-				},
-			}},
-		},
-	}
-	executor := &ProviderExecutor{resultMaterializer: materializer}
-	account := &accounts.ApiAccount{
-		ID:       7,
-		Name:     "prompt-openai",
-		ApiType:  "openai-compatible",
-		Protocol: providerendpoints.ProtocolModelAPI,
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-prompt",
-		UserID: 42,
-		Prompt: "repeatable textile pattern",
-		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
-		}),
-	}
-
-	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
-	if err != nil {
-		t.Fatalf("callDrawingAPI returned error: %v", err)
-	}
-	if len(output.Outputs) != 1 {
-		t.Fatalf("outputs len = %d, want 1", len(output.Outputs))
-	}
-	if len(materializer.remoteSourceURLs) != 1 || !strings.HasPrefix(materializer.remoteSourceURLs[0], "data:image/png;base64,") {
-		t.Fatalf("unexpected materializer source URLs: %#v", materializer.remoteSourceURLs)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-	if result["status"] != tasks.ResultStatusSuccess {
-		t.Fatalf("status = %#v, want success", result["status"])
-	}
-	if result["parsed_output_status"] != parsedOutputStatusValid {
-		t.Fatalf("parsed_output_status = %#v, want valid", result["parsed_output_status"])
-	}
-	if result["image_url"] != "/uploads/tasks/42/task-prompt/result.png" {
-		t.Fatalf("image_url = %#v", result["image_url"])
-	}
-	rawPreview, _ := result["raw_provider_output_preview"].(string)
-	if rawPreview == "" {
-		t.Fatal("raw_provider_output_preview should be present")
-	}
-	if strings.Contains(rawPreview, rawImagePayload) {
-		t.Fatalf("raw preview should redact image payload, got %s", rawPreview)
-	}
-	if !strings.Contains(rawPreview, "[redacted:") {
-		t.Fatalf("raw preview should describe redaction, got %s", rawPreview)
 	}
 }
 
@@ -180,7 +94,6 @@ func TestMaterializeProviderResultImagesLogsProvidedCorrelationID(t *testing.T) 
 		42,
 		"task-owned",
 		"corr-custom",
-		&accounts.ApiAccount{},
 		[]string{"https://cdn.example/image.png"},
 	)
 	if err != nil {
@@ -218,103 +131,14 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	}
 }
 
-func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
-	executor := newTestProviderExecutorWithLocalStorage(t)
-	executor.publicOrigins = config.PublicOriginsConfig{API: "https://api.example.com"}
-	source := buildTinyPNGBytes(t)
-	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
-	relativeRef := "/" + filepath.ToSlash(sourcePath)
-	executor.mediaResolver = testRuntimeMediaResolver{urls: map[int64]string{1: relativeRef, 2: relativeRef}}
-	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
-		t.Fatalf("mkdir upload dir: %v", err)
-	}
-	if err := os.WriteFile(sourcePath, source, 0o600); err != nil {
-		t.Fatalf("write source upload: %v", err)
-	}
-
-	var gotRequest googleGeminiRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&gotRequest); err != nil {
-			t.Fatalf("decode request: %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t)) + `"}}]}}]}`))
-	}))
-	defer server.Close()
-
-	rawParams := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "variations",
-		Media: &tasks.MediaInputs{
-			Inputs:   []tasks.MediaRef{{AssetID: 1, Role: "input"}},
-			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
-		},
-		Variation: &tasks.VariationsParams{Strength: 40},
-	})
-	task := &tasks.TaskPayload{TaskID: "task-google-storage-input", Prompt: "prompt", Params: rawParams}
-	parsedParams, parseErr := executor.parseAndNormalizeTaskParams(context.Background(), task)
-	if parseErr != nil {
-		t.Fatal(parseErr)
-	}
-	parsedParams, resolveErr := executor.resolveRuntimeProviderTaskParams(context.Background(), parsedParams)
-	if resolveErr != nil {
-		t.Fatal(resolveErr)
-	}
-	providerReq, requestErr := parsedParams.providerRequest(task.Prompt, "gemini-3.1-flash-image")
-	if requestErr != nil {
-		t.Fatal(requestErr)
-	}
-	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, readGoogleProviderParams(providerReq))
-	if err != nil {
-		t.Fatalf("callGoogleGeminiGenerateContent returned error: %v", err)
-	}
-	if len(gotRequest.Contents) != 1 || len(gotRequest.Contents[0].Parts) < 2 {
-		t.Fatalf("expected text plus inline image parts, got %#v", gotRequest.Contents)
-	}
-	inline := gotRequest.Contents[0].Parts[1].InlineData
-	if inline == nil {
-		t.Fatalf("expected inline image part, got %#v", gotRequest.Contents[0].Parts[1])
-		return
-	}
-	if inline.normalizedMIMEType() != "image/png" {
-		t.Fatalf("inline mime=%q, want image/png", inline.normalizedMIMEType())
-	}
-	decoded, err := base64.StdEncoding.DecodeString(inline.Data)
-	if err != nil {
-		t.Fatalf("decode inline image: %v", err)
-	}
-	if string(decoded) != string(source) {
-		t.Fatal("inline image data should come from local uploaded file")
-	}
-}
-
-func TestOpenAIRejectsHugeRelativeCanvasUploadFromStorage(t *testing.T) {
-	executor := newTestProviderExecutorWithLocalStorage(t)
-	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "huge.png")
-	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
-		t.Fatalf("mkdir upload dir: %v", err)
-	}
-	if err := os.WriteFile(sourcePath, buildConfigOnlyPNGBytes(20000, 20000), 0o600); err != nil {
-		t.Fatalf("write source upload: %v", err)
-	}
-
-	_, _, _, err := executor.resolveOpenAIImageBytes(context.Background(), "/uploads/canvas/OWNR1A/board-1/content/huge.png", 0, time.Second)
-	if err == nil {
-		t.Fatal("expected huge local upload to be rejected")
-	}
-	if !strings.Contains(err.Error(), "图片尺寸超过限制") {
-		t.Fatalf("expected dimension-limit error, got %v", err)
-	}
-}
-
 func TestMaterializeProviderResultImagesFailsWhenMaterializerMissing(t *testing.T) {
 	executor := &ProviderExecutor{}
 
-	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", &accounts.ApiAccount{}, []string{"data:image/png;base64,abc"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", []string{"data:image/png;base64,abc"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}
-	stage, category, ok := executionFailureDetails(err)
+	stage, category, ok := runtimeports.ExecutionFailureDetails(err)
 	if !ok {
 		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
 	}
@@ -332,14 +156,14 @@ func TestMaterializeProviderResultImagesWrapsMaterializerFailure(t *testing.T) {
 		resultMaterializer: &captureResultMaterializer{remoteErr: storeErr},
 	}
 
-	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", &accounts.ApiAccount{}, []string{"https://cdn.example/image.png"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", []string{"https://cdn.example/image.png"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}
 	if !errors.Is(err, storeErr) {
 		t.Fatalf("expected wrapped materializer error, got %v", err)
 	}
-	stage, category, ok := executionFailureDetails(err)
+	stage, category, ok := runtimeports.ExecutionFailureDetails(err)
 	if !ok {
 		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
 	}

@@ -2,13 +2,12 @@ package privileges
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type compiledStatement struct {
@@ -180,15 +179,14 @@ func verifyPrivilegeBatch(
 	if err != nil {
 		return fmt.Errorf("verify PostgreSQL privileges for %s: encode %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, err)
 	}
-	rows, err := db.QueryContext(ctx, batch.query, string(encoded), schemaName, currentUser)
+	rows, err := db.Query(ctx, batch.query, string(encoded), schemaName, currentUser)
 	if err != nil {
 		return fmt.Errorf("verify PostgreSQL privileges for %s: query %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, err)
 	}
+	defer rows.Close()
 	if !rows.Next() {
-		readErr := rows.Err()
-		closeErr := rows.Close()
-		if readErr != nil || closeErr != nil {
-			return fmt.Errorf("verify PostgreSQL privileges for %s: read %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, errors.Join(readErr, closeErr))
+		if readErr := rows.Err(); readErr != nil {
+			return fmt.Errorf("verify PostgreSQL privileges for %s: read %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, readErr)
 		}
 		return nil
 	}
@@ -196,15 +194,12 @@ func verifyPrivilegeBatch(
 	var (
 		checkIndex   int
 		objectExists bool
-		allowed      sql.NullBool
+		allowed      pgtype.Bool
 	)
 	if scanErr := rows.Scan(&checkIndex, &objectExists, &allowed); scanErr != nil {
-		return closeVerificationRows(rows, fmt.Errorf("scan %s mismatch: %w", batch.kind, scanErr))
+		return fmt.Errorf("scan %s mismatch: %w", batch.kind, scanErr)
 	}
-	//nolint:sqlclosecheck // early close surfaces verification query errors with batch context
-	if closeErr := rows.Close(); closeErr != nil {
-		return fmt.Errorf("verify PostgreSQL privileges for %s: close %s checks: %w", formatPolicyNames(sortedUnique(policyNames)), batch.kind, closeErr)
-	}
+	rows.Close()
 	if checkIndex < 0 || checkIndex >= len(batch.checks) {
 		return fmt.Errorf("verify PostgreSQL privileges for %s: %s check returned invalid index %d", formatPolicyNames(sortedUnique(policyNames)), batch.kind, checkIndex)
 	}
@@ -243,13 +238,6 @@ func verifyPrivilegeBatch(
 		"verify PostgreSQL privileges for %s: role %q has forbidden %s on %s",
 		formatPolicyNames(check.rule.policyNames), currentUser, check.privilege, check.rule.displayName(schemaName),
 	)
-}
-
-func closeVerificationRows(rows *sql.Rows, cause error) error {
-	if closeErr := rows.Close(); closeErr != nil {
-		return errors.Join(cause, closeErr)
-	}
-	return cause
 }
 
 const verifyTablePrivilegesQuery = `/* ideaboard:verify-table-privileges */

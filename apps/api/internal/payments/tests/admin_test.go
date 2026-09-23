@@ -3,15 +3,19 @@ package tests
 import (
 	payments "ideaboard/api/internal/payments"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"net/http"
 	"strings"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -107,14 +111,35 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 		t.Fatal(err)
 	}
 	nonCanonicalCursor := base64.RawURLEncoding.EncodeToString(nonCanonicalCursorPayload)
-	for _, query := range []string{
-		"limit=0", "limit=101", "limit=x", "cursor=bad", "status=paid", "order_number=not-an-order",
-		"user=unsafe%0Aname", "anomaly_only=1", "unexpected=true", "limit=1&limit=2",
-		"cursor=" + nonCanonicalCursor,
+	for _, testCase := range []struct {
+		name     string
+		query    string
+		wantCode string
+	}{
+		{name: "limit zero", query: "limit=0", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "limit over max", query: "limit=201", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "limit malformed", query: "limit=x", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "cursor malformed", query: "cursor=bad", wantCode: "admin_payment_order_cursor_invalid"},
+		{name: "cursor non-canonical", query: "cursor=" + nonCanonicalCursor, wantCode: "admin_payment_order_cursor_invalid"},
+		{name: "status", query: "status=paid", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "order number", query: "order_number=not-an-order", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "user newline", query: "user=unsafe%0Aname", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "anomaly only", query: "anomaly_only=1", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "unexpected param", query: "unexpected=true", wantCode: "admin_payment_order_filter_invalid"},
+		{name: "repeated limit", query: "limit=1&limit=2", wantCode: "admin_payment_order_filter_invalid"},
 	} {
-		response := performPaymentRequest(router, http.MethodGet, "/admin/payments/orders?"+query, "", nil)
+		response := performPaymentRequest(router, http.MethodGet, "/admin/payments/orders?"+testCase.query, "", nil)
 		if response.Code != http.StatusBadRequest || response.Header().Get("Cache-Control") != "no-store" {
-			t.Fatalf("invalid query %q status=%d headers=%v body=%s", query, response.Code, response.Header(), response.Body.String())
+			t.Fatalf("invalid query %q status=%d headers=%v body=%s", testCase.query, response.Code, response.Header(), response.Body.String())
+		}
+		var machineError struct {
+			Code string `json:"code"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &machineError); err != nil {
+			t.Fatalf("invalid query %q decode error: %v body=%s", testCase.query, err, response.Body.String())
+		}
+		if machineError.Code != testCase.wantCode {
+			t.Fatalf("invalid query %q code=%q want %q body=%s", testCase.query, machineError.Code, testCase.wantCode, response.Body.String())
 		}
 	}
 	for _, path := range []string{
@@ -197,10 +222,10 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 }
 
-func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID {
+func adminPaymentUserPublicID(t *testing.T, db *pgxpool.Pool, userID int64) uuid.UUID {
 	t.Helper()
 	var publicID uuid.UUID
-	if err := db.QueryRowContext(t.Context(), `SELECT public_id FROM users WHERE id = $1`, userID).Scan(&publicID); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT public_id FROM users WHERE id = $1`, userID).Scan(&publicID); err != nil {
 		t.Fatalf("load payment user public identity: %v", err)
 	}
 	return publicID
@@ -272,14 +297,14 @@ func createAdminPaymentOrder(t *testing.T, repo *paymentpostgres.Repository, use
 }
 
 func markAdminPaymentOrderAnomalous(t *testing.T, db interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }, orderID string) {
 	t.Helper()
 	parsed, err := uuid.Parse(orderID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 UPDATE payment_order_reconciliations
 SET anomalous_at = now(),
     last_checked_at = now(),

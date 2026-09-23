@@ -2,26 +2,29 @@ package settings
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SystemConfigRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
 type systemConfigContextDB struct {
 	ctx context.Context
-	db  *sql.DB
+	db  *pgxpool.Pool
 }
 
-func NewSystemConfigRepository(db *sql.DB) *SystemConfigRepository {
+func NewSystemConfigRepository(db *pgxpool.Pool) *SystemConfigRepository {
 	return &SystemConfigRepository{db: db, q: dbsqlc.New(db)}
 }
 
@@ -29,7 +32,7 @@ func (r *SystemConfigRepository) dbWithContext(ctx context.Context) systemConfig
 	return systemConfigContextDB{ctx: ctx, db: r.db}
 }
 
-func (db systemConfigContextDB) withTx(run func(*dbsqlc.Queries, *sql.Tx) error) error {
+func (db systemConfigContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) error {
 	return dbutil.WithTxDBTX(db.ctx, db.db, run)
 }
 
@@ -42,6 +45,55 @@ type SystemConfigAdminAudit struct {
 	ActionType string
 	ActorID    int64
 	Metadata   json.RawMessage
+}
+
+// SystemConfigWriteTx exposes transaction-bound settings operations to a
+// context that must calculate and apply one atomic config mutation.
+type SystemConfigWriteTx interface {
+	Get(context.Context, string) (string, error)
+	GetByPrefix(context.Context, string) ([]SystemConfigValue, error)
+	SetMany(context.Context, []SystemConfigValue) error
+	DeleteMany(context.Context, []string) error
+}
+
+type systemConfigWriteTx struct {
+	q *dbsqlc.Queries
+}
+
+func (tx systemConfigWriteTx) Get(ctx context.Context, key string) (string, error) {
+	value, err := tx.q.GetSystemConfig(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	return value.Value, nil
+}
+
+func (tx systemConfigWriteTx) GetByPrefix(ctx context.Context, prefix string) ([]SystemConfigValue, error) {
+	values, err := tx.q.ListSystemConfigsByPrefix(ctx, prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	result := make([]SystemConfigValue, len(values))
+	for index, value := range values {
+		result[index] = SystemConfigValue{Key: value.ConfigKey, Value: value.Value}
+	}
+	return result, nil
+}
+
+func (tx systemConfigWriteTx) SetMany(ctx context.Context, values []SystemConfigValue) error {
+	for _, value := range values {
+		if err := tx.q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tx systemConfigWriteTx) DeleteMany(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	return tx.q.DeleteSystemConfigsByKeys(ctx, keys)
 }
 
 func (r *SystemConfigRepository) Get(ctx context.Context, key string) (string, error) {
@@ -88,7 +140,7 @@ func (r *SystemConfigRepository) SetMany(ctx context.Context, values []SystemCon
 	if len(values) == 0 {
 		return nil
 	}
-	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ *sql.Tx) error {
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ pgx.Tx) error {
 		for _, value := range values {
 			if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
 				return err
@@ -106,17 +158,79 @@ func (r *SystemConfigRepository) SetManyWithAdminAudit(ctx context.Context, valu
 	if len(values) == 0 {
 		return nil
 	}
-	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		for _, value := range values {
-			if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
-				return err
-			}
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		if err := upsertSystemConfigs(ctx, q, values); err != nil {
+			return err
 		}
-		if _, err := tx.ExecContext(ctx, `
+		return insertSystemConfigAdminAction(ctx, tx, audit)
+	})
+}
+
+// SetAndDeleteManyWithAdminAudit upserts values and deletes keys in one
+// transaction with a single audit record. Used when one admin write must
+// retire dependent rows (e.g. catalog save cascading to stale mappings).
+// It always holds the model-mapping write lock: mapping writers
+// (SaveModelMapping routes through here too) serialize against cascades,
+// so a concurrent mapping save can neither slip between the cascade's read
+// and write nor interleave two catalog saves.
+func (r *SystemConfigRepository) SetAndDeleteManyWithAdminAudit(ctx context.Context, values []SystemConfigValue, deleteKeys []string, audit SystemConfigAdminAudit) error {
+	if r == nil || r.db == nil || r.q == nil {
+		return ErrRuntimeSettingsRepositoryUnavailable
+	}
+	if len(values) == 0 && len(deleteKeys) == 0 {
+		return nil
+	}
+	return r.WithAIGatewayModelMappingWrite(ctx, func(tx SystemConfigWriteTx) (SystemConfigAdminAudit, error) {
+		if err := tx.SetMany(ctx, values); err != nil {
+			return audit, err
+		}
+		if err := tx.DeleteMany(ctx, deleteKeys); err != nil {
+			return audit, err
+		}
+		return audit, nil
+	})
+}
+
+// WithAIGatewayModelMappingWrite serializes one settings read-modify-write
+// with every AI Gateway mapping writer and commits its audit record atomically.
+func (r *SystemConfigRepository) WithAIGatewayModelMappingWrite(
+	ctx context.Context,
+	mutate func(SystemConfigWriteTx) (SystemConfigAdminAudit, error),
+) error {
+	if r == nil || r.db == nil || r.q == nil {
+		return ErrRuntimeSettingsRepositoryUnavailable
+	}
+	if mutate == nil {
+		return errors.New("system config mutation is nil")
+	}
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		if err := q.LockAIGatewayModelMappingWrite(ctx); err != nil {
+			return err
+		}
+		audit, err := mutate(systemConfigWriteTx{q: q})
+		if err != nil {
+			return err
+		}
+		return insertSystemConfigAdminAction(ctx, tx, audit)
+	})
+}
+
+// upsertSystemConfigs writes one batch of typed configuration rows.
+func upsertSystemConfigs(ctx context.Context, q *dbsqlc.Queries, values []SystemConfigValue) error {
+	for _, value := range values {
+		if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// insertSystemConfigAdminAction appends one audit record for an admin settings write.
+func insertSystemConfigAdminAction(ctx context.Context, tx pgx.Tx, audit SystemConfigAdminAudit) error {
+	if _, err := tx.Exec(ctx, `
 INSERT INTO system_settings_admin_actions (action_type, actor_id, metadata)
 VALUES ($1, $2, $3::jsonb)`, audit.ActionType, audit.ActorID, audit.Metadata); err != nil {
-			return fmt.Errorf("insert system settings admin action: %w", err)
-		}
-		return nil
-	})
+		return fmt.Errorf("insert system settings admin action: %w", err)
+	}
+	return nil
 }

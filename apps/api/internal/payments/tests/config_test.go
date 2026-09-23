@@ -19,7 +19,6 @@ import (
 func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	db.SetMaxOpenConns(1)
 	gateway := &fakeStripeGateway{prepared: paymentports.PreparedStripeConfiguration{
 		AccountID: "acct_test", Mode: paymentports.StripeModeTest, ChargesEnabled: true,
 		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_idea", WebhookEndpointID: "we_idea", WebhookSecret: "whsec_test",
@@ -48,7 +47,7 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 	}
 
 	var encryptedKey, encryptedWebhookSecret, materialKind string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind
 	FROM payment_stripe_credentials credentials
 	JOIN payment_stripe_configurations configuration ON configuration.active_credential_id = credentials.id
@@ -61,7 +60,7 @@ SELECT api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind
 
 	var actorID int64
 	var outcome string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT actor_id, outcome FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).Scan(&actorID, &outcome); err != nil {
 		t.Fatalf("read success audit: %v", err)
 	}
@@ -106,7 +105,7 @@ func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedEr
 	}
 
 	var outcome, errorCode, errorSummary string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT outcome, error_code, error_summary
 FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).Scan(&outcome, &errorCode, &errorSummary); err != nil {
 		t.Fatalf("read failure audit: %v", err)
@@ -162,7 +161,7 @@ func TestConfigureStripeReusesOnlyAnUnchangedCredentialGeneration(t *testing.T) 
 		t.Fatal("changed API Key reused the previous credential generation")
 	}
 	var credentialCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_stripe_credentials`).Scan(&credentialCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_stripe_credentials`).Scan(&credentialCount); err != nil {
 		t.Fatal(err)
 	}
 	if credentialCount != 2 {

@@ -2,7 +2,6 @@ package usage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
@@ -85,9 +85,9 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 
 }
 
-func seedUsageUser(t *testing.T, ctx context.Context, db *sql.DB, userID int64, storageUID string) {
+func seedUsageUser(t *testing.T, ctx context.Context, db *pgxpool.Pool, userID int64, storageUID string) {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)`, userID, fmt.Sprintf("usage-user-%d", userID), storageUID); err != nil {
 		t.Fatalf("seed user %d: %v", userID, err)
@@ -148,7 +148,7 @@ func usageCreditMetadata(key string) domain.CommandMetadata {
 func seedDurableUsageSnapshots(
 	t *testing.T,
 	ctx context.Context,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	pool *pgxpool.Pool,
 	billingWriter *taskbilling.Service,
 	request taskbilling.Request,
@@ -179,7 +179,7 @@ func newDurableUsageBilling(
 	creditService *credits.Service,
 ) (*taskbilling.Service, taskbilling.Request) {
 	t.Helper()
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
 		t.Fatalf("build task billing request: %v", err)
@@ -205,16 +205,16 @@ func usagePriceInput(sku billing.SKU, displayName string, unitCredits int64) bil
 	}
 }
 
-func seedUsageTask(t *testing.T, ctx context.Context, db *sql.DB, taskID string, userID int64) {
+func seedUsageTask(t *testing.T, ctx context.Context, db *pgxpool.Pool, taskID string, userID int64) {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result, created_at, updated_at)
 VALUES ($1, $2, 'usage task', 'usage task', '{}', 'pending', '', '', clock_timestamp(), clock_timestamp())`, taskID, userID); err != nil {
 		t.Fatalf("seed task %s: %v", taskID, err)
 	}
 }
 
-func setUsageTaskStatus(t *testing.T, ctx context.Context, db *sql.DB, taskID, status string) {
+func setUsageTaskStatus(t *testing.T, ctx context.Context, db *pgxpool.Pool, taskID, status string) {
 	t.Helper()
 	var query string
 	switch status {
@@ -227,7 +227,7 @@ func setUsageTaskStatus(t *testing.T, ctx context.Context, db *sql.DB, taskID, s
 	default:
 		t.Fatalf("unsupported fixture status %q", status)
 	}
-	if _, err := db.ExecContext(ctx, query, taskID); err != nil {
+	if _, err := db.Exec(ctx, query, taskID); err != nil {
 		t.Fatalf("set task %s status %s: %v", taskID, status, err)
 	}
 }

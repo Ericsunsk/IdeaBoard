@@ -10,9 +10,7 @@ import (
 	"strings"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	tasks "ideaboard/api/internal/tasking/domain"
-	taskqueue "ideaboard/api/internal/tasking/ports/queue"
 )
 
 // ProviderCallTimeline records the externally visible phases of one provider attempt.
@@ -23,23 +21,42 @@ type ProviderCallTimeline struct {
 	FinalizeFinishedAt *time.Time
 }
 
-// ProviderCallOutput is the stable result contract between provider adapters and execution orchestration.
+// ProviderCallOutput is the stable result contract between the gateway
+// caller and execution orchestration.
 type ProviderCallOutput struct {
 	Result   string
 	Outputs  []tasks.TaskOutput
 	Timeline ProviderCallTimeline
+	// Gateway receipt facts recorded on the closed attempt.
+	ResolvedModel  string
+	GatewayStep    string
+	CacheHit       bool
+	ReceiptLogID   string
+	ReceiptEventID string
 }
 
-// ProviderCaller hides provider-specific protocols from task execution orchestration.
-type ProviderCaller interface {
-	CallDrawingAPIWithAssignment(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (ProviderCallOutput, error)
+// GatewayCallInput carries one gateway execution's resolved inputs. The
+// model comes from the admin mapping (read at execution time); the token
+// fences terminal writes so stale workers lose.
+type GatewayCallInput struct {
+	Task           *tasks.TaskPayload
+	Model          string
+	ExecutionToken string
+	AttemptNo      int32
+	Client         GatewayClient
 }
 
-// ProviderCallerFunc adapts a function to ProviderCaller for focused orchestration tests.
-type ProviderCallerFunc func(context.Context, *accounts.RuntimeAccountAccess, *tasks.TaskPayload, taskqueue.TaskAssignment) (ProviderCallOutput, error)
+// GatewayCaller hides the gateway transport from task execution
+// orchestration. Dialects shape the request body; this seam only sends it.
+type GatewayCaller interface {
+	CallGatewayAPI(context.Context, GatewayCallInput) (ProviderCallOutput, error)
+}
 
-func (f ProviderCallerFunc) CallDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (ProviderCallOutput, error) {
-	return f(ctx, account, task, assignment)
+// GatewayCallerFunc adapts a function to GatewayCaller for focused orchestration tests.
+type GatewayCallerFunc func(context.Context, GatewayCallInput) (ProviderCallOutput, error)
+
+func (f GatewayCallerFunc) CallGatewayAPI(ctx context.Context, input GatewayCallInput) (ProviderCallOutput, error) {
+	return f(ctx, input)
 }
 
 // UpstreamHTTPError records status code and body from provider HTTP responses.

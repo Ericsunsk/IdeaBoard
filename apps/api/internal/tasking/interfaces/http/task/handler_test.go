@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/prompts"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
+	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -113,7 +113,9 @@ func TestCancelAdminTaskUsesAuthenticatedAdminActor(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/admin/tasks/"+task.TaskID+"/cancel", nil))
+	cancelReq := httptest.NewRequest(http.MethodPost, "/admin/tasks/"+task.TaskID+"/cancel", nil)
+	cancelReq.Header.Set("Idempotency-Key", "admin-handler-cancel-key")
+	router.ServeHTTP(rec, cancelReq)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
@@ -131,15 +133,7 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 
 	submissionStore := &recordingSubmissionStore{}
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{
-				ID: 101,
-				Models: []accounts.AccountModel{{
-					Name:    "gpt-image-1",
-					Enabled: true,
-				}},
-			},
-		}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -204,15 +198,7 @@ func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T
 	gin.SetMode(gin.TestMode)
 
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{
-				ID: 101,
-				Models: []accounts.AccountModel{{
-					Name:    "gpt-image-1",
-					Enabled: true,
-				}},
-			},
-		}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrInsufficientCredits},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -247,12 +233,7 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 	gin.SetMode(gin.TestMode)
 
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name: "gpt-image-1", Enabled: true,
-			}},
-		}}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrPricingUnavailable},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -273,12 +254,7 @@ func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const internalCause = "river database connection refused"
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name: "gpt-image-1", Enabled: true,
-			}},
-		}}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{err: errors.New(internalCause)},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -300,12 +276,7 @@ func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
 func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name: "gpt-image-1", Enabled: true,
-			}},
-		}}},
+		ModelStore:     &fakeIntakeModelStore{},
 		MediaValidator: testSubmitMediaValidator{},
 	}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(t, service, 42)
@@ -326,12 +297,7 @@ func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t 
 func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name: "gpt-image-1", Enabled: true,
-			}},
-		}}},
+		ModelStore:     &fakeIntakeModelStore{},
 		MediaValidator: testSubmitMediaValidator{},
 	}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(t, service, 42)
@@ -368,16 +334,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-			{
-				ID:           101,
-				Capabilities: []string{"fill"},
-				Models: []accounts.AccountModel{{
-					Name:    "gpt-image-1",
-					Enabled: true,
-				}},
-			},
-		}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{},
 		MediaValidator:  testSubmitMediaValidator{},
 		TaskBilling:     newHandlerTaskBillingService(),
@@ -427,10 +384,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 func TestCheckSubmitTaskReadinessMatrixReturnsAllFeatureEnvelopes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:     101,
-			Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		}}},
+		ModelStore:      &fakeIntakeModelStore{},
 		SubmissionStore: &recordingSubmissionStore{},
 		MediaValidator:  testSubmitMediaValidator{},
 		TaskBilling:     newHandlerTaskBillingService(),
@@ -468,7 +422,7 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	gin.SetMode(gin.TestMode)
 
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:     &fakeSubmitAccountStore{},
+		ModelStore:      &fakeIntakeModelStore{err: errors.New("no model mapping")},
 		SubmissionStore: &recordingSubmissionStore{},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
@@ -506,12 +460,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 	for _, quoteErr := range []error{billing.ErrSKUNotFound, billing.ErrPricingUnavailable} {
 		t.Run(quoteErr.Error(), func(t *testing.T) {
 			service := newSubmitServiceForTest(submitTestServiceDeps{
-				AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-					ID: 101,
-					Models: []accounts.AccountModel{{
-						Name: "gpt-image-1", Enabled: true,
-					}},
-				}}},
+				ModelStore:      &fakeIntakeModelStore{},
 				SubmissionStore: &recordingSubmissionStore{},
 				MediaValidator:  testSubmitMediaValidator{},
 				TaskBilling: taskbilling.NewService(
@@ -587,7 +536,7 @@ func newHandlerTaskBillingService() *taskbilling.Service {
 }
 
 type submitTestServiceDeps struct {
-	AccountRepo     AccountStore
+	ModelStore      taskapp.ModelStore
 	SubmissionStore TaskSubmissionStore
 	MediaValidator  taskmedia.Validator
 	MediaPreparer   taskmedia.GenerationMediaPreparer
@@ -613,7 +562,7 @@ func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *S
 	}
 	return NewService(ServiceDeps{
 		TaskIntake: NewTaskIntake(TaskIntakeDeps{
-			Accounts:      deps.AccountRepo,
+			Models:        modelStoreOrDefault(deps.ModelStore),
 			Prompts:       promptStore,
 			Media:         deps.MediaValidator,
 			MediaPreparer: mediaPreparer,

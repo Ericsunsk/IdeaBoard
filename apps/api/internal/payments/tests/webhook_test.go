@@ -101,7 +101,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 
 	var eventType, objectID, paymentOrderID, result string
 	var createdAt time.Time
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT event_type, stripe_object_id, payment_order_id::TEXT, processing_result, stripe_created_at
 FROM payment_webhook_events WHERE stripe_event_id = 'evt_1'`).Scan(&eventType, &objectID, &paymentOrderID, &result, &createdAt); err != nil {
 		t.Fatalf("read webhook inbox: %v", err)
@@ -146,7 +146,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 		t.Fatalf("invalid signature error = %v", err)
 	}
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_webhook_events`).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_webhook_events`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {

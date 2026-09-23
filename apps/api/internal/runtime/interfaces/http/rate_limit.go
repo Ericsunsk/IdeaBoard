@@ -113,7 +113,7 @@ func resolveRateLimitPolicy(ctx context.Context, provider settings.RateLimitSett
 	defer cancel()
 	setting, err := provider.GetRateLimit(settingsCtx)
 	if err != nil {
-		slog.WarnContext(ctx, "runtime rate limit settings read failed; using defaults", "error", err)
+		slog.WarnContext(ctx, "runtime rate limit settings read failed; using defaults", "err", err)
 		return defaultRateLimitPolicy()
 	}
 	policy, ok := rateLimitPolicyFromSetting(setting)

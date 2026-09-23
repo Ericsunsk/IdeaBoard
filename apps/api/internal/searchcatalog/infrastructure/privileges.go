@@ -1,4 +1,4 @@
-package searchcatalog
+package infrastructure
 
 import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 

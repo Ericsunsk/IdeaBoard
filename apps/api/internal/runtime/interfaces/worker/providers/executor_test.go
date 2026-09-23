@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
+	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -30,7 +31,7 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 	if !errors.As(err, &unsupportedTypeErr) {
 		t.Fatalf("expected wrapped json.UnsupportedTypeError, got %T (%v)", err, err)
 	}
-	stage, category, ok := executionFailureDetails(err)
+	stage, category, ok := runtimeports.ExecutionFailureDetails(err)
 	if !ok {
 		t.Fatal("expected execution failure details")
 	}
@@ -39,56 +40,14 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 	}
 }
 
-func TestResolveRuntimeAccountTimeout(t *testing.T) {
-	tests := []struct {
-		name    string
-		account *accounts.RuntimeAccountAccess
-		want    time.Duration
-	}{
-		{
-			name:    "nil account fallback",
-			account: nil,
-			want:    120 * time.Second,
-		},
-		{
-			name: "negative timeout fallback",
-			account: &accounts.RuntimeAccountAccess{
-				Timeout: -10,
-			},
-			want: 120 * time.Second,
-		},
-		{
-			name: "zero timeout fallback",
-			account: &accounts.RuntimeAccountAccess{
-				Timeout: 0,
-			},
-			want: 120 * time.Second,
-		},
-		{
-			name: "positive timeout keep",
-			account: &accounts.RuntimeAccountAccess{
-				Timeout: 75,
-			},
-			want: 75 * time.Second,
-		},
+func TestGatewayCallTimeoutStandardBudget(t *testing.T) {
+	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterCutout); got != defaultGatewayCallTimeout {
+		t.Fatalf("cutout timeout = %v, want %v", got, defaultGatewayCallTimeout)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveRuntimeAccountTimeout(tt.account); got != tt.want {
-				t.Fatalf("resolveRuntimeAccountTimeout() = %v, want %v", got, tt.want)
-			}
-		})
+	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterModelImage); got != 300*time.Second {
+		t.Fatalf("model image timeout = %v, want %v", got, 300*time.Second)
 	}
-}
-
-func TestResolveProviderTimeoutGrantsFluxFillColdStartBudget(t *testing.T) {
-	account := &accounts.RuntimeAccountAccess{Timeout: 120}
-
-	if got := resolveProviderTimeout(account, providerRuntimeAdapterFluxFill); got != minimumFluxFillTimeout {
-		t.Fatalf("Flux Fill timeout = %v, want %v", got, minimumFluxFillTimeout)
-	}
-	if got := resolveProviderTimeout(account, providerRuntimeAdapterCutout); got != 120*time.Second {
-		t.Fatalf("cutout timeout = %v, want %v", got, 120*time.Second)
+	if got := gatewayCallTimeout(domain.ProviderRuntimeAdapterUpscale); got != 300*time.Second {
+		t.Fatalf("upscale timeout = %v, want %v", got, 300*time.Second)
 	}
 }

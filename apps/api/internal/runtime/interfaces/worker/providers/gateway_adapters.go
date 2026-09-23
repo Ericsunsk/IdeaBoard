@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -21,75 +21,92 @@ func slogInfoGatewayCall(taskID, correlationID, provider, model string, operatio
 		"provider", provider, "model", model, "operation", string(operation))
 }
 
-// gatewayRequestPath resolves pipeline-only routes (cutout/upscale), where
-// the mapping @path is required configuration. Model-image routing moved
-// to workflow.ResolveRoute (shared with preview).
-func gatewayRequestPath(adapter domain.ProviderRuntimeAdapter, pathOverride string) (string, error) {
-	switch adapter {
-	case domain.ProviderRuntimeAdapterCutout:
-		return cutoutGatewayPath(pathOverride)
-	case domain.ProviderRuntimeAdapterUpscale:
-		return upscaleGatewayPath(pathOverride)
-	default:
-		return "", fmt.Errorf("unsupported provider runtime adapter %d", adapter)
-	}
-}
-
 func (c *Executor) callGatewayModelImage(
 	ctx context.Context,
-	provider, model, pathOverride, customParams string,
+	taskID, feature string,
+	provider, model, customParams string,
+	route dialects.Route,
 	providerReq providerRequest,
+	operation workflow.RuntimeOperation,
 	timeout time.Duration,
 ) (providerCallResult, error) {
-	client, err := c.gatewayClientForCall(ctx)
+	// Routing arrives pre-resolved from dialects.Resolve (shared with
+	// preview): mapping @path and catalog custom fields already merged;
+	// customParams already joined the chat judgment. No re-derivation here.
+	dialect := route.Dialect
+	imageURLs, err := resolveDialectImageURLs(c, providerReq)
 	if err != nil {
 		return providerCallResult{}, err
 	}
-	contentType := "application/json"
-	// Single routing seam with preview: mapping @path and catalog custom
-	// fields arrive here already merged; customParams joins the chat judgment.
-	resolved := workflow.ResolveRoute(provider, model, pathOverride, customParams)
-	resolvedPath := resolved.Path
-
-	body, err := BuildGatewayRequestBody(c, providerReq, provider, model, workflow.RuntimeOperationRender, customParams)
-	if err != nil {
-		return providerCallResult{}, err
-	}
-	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
-			Provider: resolved.Namespace,
-			Path:     resolvedPath,
-		},
-		Model:       provider + "/" + model,
-		TaskID:      "",
-		Body:        body,
-		ContentType: contentType,
-		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
-		Timeout:     timeout,
+	body, err := dialect.Encode(dialects.Request{
+		Prompt:    providerReq.Prompt,
+		Model:     model,
+		Operation: operation,
+		Images:    imageURLs,
 	})
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return providerCallResult{}, err
-		}
-		return providerCallResult{}, fmt.Errorf("网关请求失败: %w", err)
+		return providerCallResult{}, err
 	}
-	imageURLs, err := ParseImageResponses(provider, resp.Body)
+	// Operator custom params win over shaped defaults; applied once here,
+	// never inside dialects, so base shapes stay pure and testable.
+	if body, err = dialects.InjectCustomParams(body, customParams, provider, model); err != nil {
+		return providerCallResult{}, err
+	}
+	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, body, "application/json", timeout, "网关")
+	if err != nil {
+		return providerCallResult{Receipt: resp.Receipt}, err
+	}
+	respBody := resp.Body
+	imageURLs, err = decodeGatewayImageResponse(dialect, respBody)
 	if err != nil {
 		return providerCallResult{
 			Model:            model,
-			RawOutputPreview: providerRawOutputPreview(resp.Body),
+			Receipt:          resp.Receipt,
+			RawOutputPreview: providerRawOutputPreview(respBody),
 			ParsedOutputKind: "image-results",
-		}, newProviderOutputParseError(err)
+		}, runtimeports.NewProviderOutputParseError(err)
 	}
 	return providerCallResult{
 		ImageURL:          imageURLs[0],
 		ImageURLs:         imageURLs,
 		Model:             model,
-		RawOutputPreview:  providerRawOutputPreview(resp.Body),
+		Receipt:           resp.Receipt,
+		RawOutputPreview:  providerRawOutputPreview(respBody),
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
+}
+
+// resolveDialectImageURLs resolves media refs to public URLs in legacy
+// order (input images, then mask, then canvas ref). Dialects index this
+// order exactly as documented per shape.
+func resolveDialectImageURLs(c *Executor, providerReq providerRequest) ([]string, error) {
+	refs := append(append([]string{}, providerReq.ImageRefs...), providerReq.MaskRefs...)
+	if strings.TrimSpace(providerReq.CanvasRef) != "" {
+		refs = append(refs, providerReq.CanvasRef)
+	}
+	var resolvedPublicURLs []string
+	for _, ref := range refs {
+		if strings.TrimSpace(ref) == "" {
+			continue
+		}
+		pubURL, err := resolveProviderPublicImageURL(c, ref, "输入图像")
+		if err != nil {
+			return nil, err
+		}
+		resolvedPublicURLs = append(resolvedPublicURLs, pubURL)
+	}
+	return resolvedPublicURLs, nil
+}
+
+// decodeGatewayImageResponse extracts image URLs from one gateway response:
+// binary streams sniff first (vendor-agnostic), otherwise the dialect's
+// JSON decode (shared universal recall across dialects).
+func decodeGatewayImageResponse(dialect dialects.Dialect, respBody []byte) ([]string, error) {
+	if dataURL, ok := dialects.SniffImageStream(respBody); ok {
+		return []string{dataURL}, nil
+	}
+	return dialect.Decode(respBody)
 }
 
 func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
@@ -112,23 +129,6 @@ func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[s
 	}, nil
 }
 
-// cutoutGatewayPath and upscaleGatewayPath require explicit operator
-// configuration: pipeline endpoint paths were per-account data with no
-// static form. The mapping value carries them (provider/model@gateway-path).
-func cutoutGatewayPath(pathOverride string) (string, error) {
-	if path := strings.Trim(strings.TrimSpace(pathOverride), "/"); path != "" {
-		return path, nil
-	}
-	return "v1/images/cutout", nil
-}
-
-func upscaleGatewayPath(pathOverride string) (string, error) {
-	if path := strings.Trim(strings.TrimSpace(pathOverride), "/"); path != "" {
-		return path, nil
-	}
-	return "v1/images/upscale", nil
-}
-
 func buildCutoutGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
 	inputURL, err := c.imageTransformInputURL(providerReq, "抠图")
 	if err != nil {
@@ -138,59 +138,92 @@ func buildCutoutGatewayPayload(c *Executor, providerReq providerRequest) (map[st
 }
 
 // callGatewayImageBytes posts one JSON payload to an image pipeline
-// route (cutout/upscale) and extracts the image response using the universal extractor.
-// It seamlessly supports both binary image streams and JSON responses (URL/Base64).
+// route (cutout/upscale). Pipeline payloads are provider-agnostic by design
+// and stay outside dialect shaping; responses decode through the resolved
+// dialect (universal recall) with the shared binary sniff first. The route
+// arrives pre-resolved from dialects.Resolve: no path or dialect
+// re-derivation here.
 func (c *Executor) callGatewayImageBytes(
 	ctx context.Context,
-	provider, model, path string,
+	taskID, feature string,
+	provider, model string,
+	route dialects.Route,
 	payload map[string]interface{},
 	label string,
 	timeout time.Duration,
 ) (providerCallResult, error) {
-	client, err := c.gatewayClientForCall(ctx)
-	if err != nil {
-		return providerCallResult{}, err
-	}
 	bodyJSON, err := json.Marshal(payload)
 	if err != nil {
 		return providerCallResult{}, fmt.Errorf("序列化%s请求失败: %w", label, err)
 	}
-	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
-		Endpoint: runtimeports.GatewayEndpoint{
-			Kind:     runtimeports.GatewayEndpointProviderNative,
-			Provider: gatewayProviderPath(provider),
-			Path:     path,
-		},
-		Model:   provider + "/" + model,
-		Body:    bodyJSON,
-		Cache:   runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
-		Timeout: timeout,
-	})
+	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, bodyJSON, "application/json", timeout, label)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return providerCallResult{}, err
-		}
-		return providerCallResult{}, fmt.Errorf("%s网关请求失败: %w", label, err)
+		return providerCallResult{Receipt: resp.Receipt}, err
 	}
-	if len(resp.Body) == 0 {
-		return providerCallResult{}, fmt.Errorf("%s响应为空", label)
-	}
-	imageURLs, err := ParseImageResponses(provider, resp.Body)
+	respBody := resp.Body
+	imageURLs, err := decodeGatewayImageResponse(route.Dialect, respBody)
 	if err != nil {
 		return providerCallResult{
 			Model:            model,
-			RawOutputPreview: providerRawOutputPreview(resp.Body),
+			Receipt:          resp.Receipt,
+			RawOutputPreview: providerRawOutputPreview(respBody),
 			ParsedOutputKind: "image-results",
-		}, newProviderOutputParseError(fmt.Errorf("%s响应解析失败: %w", label, err))
+		}, runtimeports.NewProviderOutputParseError(fmt.Errorf("%s响应解析失败: %w", label, err))
 	}
 	return providerCallResult{
 		ImageURL:          imageURLs[0],
 		ImageURLs:         imageURLs,
 		Model:             model,
-		RawOutputPreview:  providerRawOutputPreview(resp.Body),
+		Receipt:           resp.Receipt,
+		RawOutputPreview:  providerRawOutputPreview(respBody),
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
+}
+
+// doGatewayImageCall is the single gateway send + empty-body guard for image
+// routes. Transport errors carry the human label prefix; context.Canceled
+// passes through untouched so interruption converges as requeue, not failure.
+func doGatewayImageCall(
+	ctx context.Context,
+	c *Executor,
+	taskID, feature, provider, model, namespace, path string,
+	body []byte,
+	contentType string,
+	timeout time.Duration,
+	label string,
+) (runtimeports.GatewayResponse, error) {
+	client, err := c.gatewayClientForCall(ctx)
+	if err != nil {
+		return runtimeports.GatewayResponse{}, err
+	}
+	if strings.TrimSpace(contentType) == "" {
+		contentType = "application/json"
+	}
+	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Kind:     runtimeports.GatewayEndpointProviderNative,
+			Provider: namespace,
+			Path:     path,
+		},
+		Model:       provider + "/" + model,
+		TaskID:      taskID,
+		Feature:     feature,
+		Body:        body,
+		ContentType: contentType,
+		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
+		Timeout:     timeout,
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return resp, err
+		}
+		return resp, fmt.Errorf("%s网关请求失败: %w", label, err)
+	}
+	if len(resp.Body) == 0 {
+		return resp, fmt.Errorf("%s响应为空", label)
+	}
+	return resp, nil
 }
 
 func (c *ProviderExecutor) imageTransformInputURL(request providerRequest, label string) (string, error) {
@@ -202,4 +235,3 @@ func (c *ProviderExecutor) imageTransformInputURL(request providerRequest, label
 	}
 	return resolveProviderPublicImageURL(c, ref, label)
 }
-

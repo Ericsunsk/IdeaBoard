@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"ideaboard/api/internal/identity/users/application/administration"
@@ -148,7 +147,7 @@ func identityAdminError(kind IdentityAdminErrorKind, message string, cause error
 	return &IdentityAdminCommandError{Kind: kind, Message: message, Cause: cause}
 }
 
-func newUserRepoTestDB(t *testing.T) *sql.DB {
+func newUserRepoTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	return testdb.Open(t)
 }

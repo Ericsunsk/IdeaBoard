@@ -5,15 +5,19 @@ import (
 	"ideaboard/api/internal/credits/ports"
 	payments "ideaboard/api/internal/payments"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/credits"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -64,7 +68,7 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 		t.Fatalf("Stripe Checkout sessions created = %d, want 1", calls)
 	}
 	var orderCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1 AND idea_quantity = $2`, 42, 500).Scan(&orderCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1 AND idea_quantity = $2`, 42, 500).Scan(&orderCount); err != nil {
 		t.Fatal(err)
 	}
 	if orderCount != 1 {
@@ -149,7 +153,7 @@ func TestCheckoutLifecycleRetrieveFailurePreservesExistingSessionAndIntent(t *te
 		t.Fatalf("retry after Stripe recovery = %+v, %v", retried, err)
 	}
 	var orderCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, 42).Scan(&orderCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, 42).Scan(&orderCount); err != nil {
 		t.Fatal(err)
 	}
 	if orderCount != 1 {
@@ -186,7 +190,7 @@ func TestCheckoutLifecycleLimitsThreeActiveOrdersAndExpiredOrdersReleaseCapacity
 		t.Fatalf("Stripe Checkout sessions after expiry = %d, want 4", calls)
 	}
 	var activeCount int
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT COUNT(*) FROM payment_orders
 WHERE user_id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')`, 42).Scan(&activeCount); err != nil {
 		t.Fatal(err)
@@ -277,9 +281,9 @@ func TestCheckoutLifecycleAsyncPaymentCreditsOnceAndPaidFactWinsOutOfOrderEvents
 	assertLifecyclePurchaseCount(t, db, 1)
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
-	var paidAt, creditedAt sql.NullTime
-	var creditTransactionID sql.NullString
-	if err := db.QueryRowContext(t.Context(), `
+	var paidAt, creditedAt pgtype.Timestamptz
+	var creditTransactionID pgtype.Text
+	if err := db.QueryRow(t.Context(), `
 SELECT paid_at, credited_at, credit_transaction_id FROM payment_orders WHERE public_token = $1`, created.PublicToken).Scan(&paidAt, &creditedAt, &creditTransactionID); err != nil {
 		t.Fatal(err)
 	}
@@ -325,11 +329,11 @@ func TestCheckoutLifecyclePaidPendingCreditRetriesOnceAfterCreditPurchaseFailure
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 }
 
-func injectLifecyclePurchaseCreditFailure(t *testing.T, db *sql.DB) func() {
+func injectLifecyclePurchaseCreditFailure(t *testing.T, db *pgxpool.Pool) func() {
 	t.Helper()
 	const functionName = "fail_checkout_lifecycle_purchase_credit"
 	const triggerName = "fail_checkout_lifecycle_purchase_credit_trigger"
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 CREATE FUNCTION fail_checkout_lifecycle_purchase_credit()
 RETURNS trigger AS $$
 BEGIN
@@ -341,7 +345,7 @@ END;
 $$ LANGUAGE plpgsql`); err != nil {
 		t.Fatalf("install purchase_credit failure function: %v", err)
 	}
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 CREATE TRIGGER fail_checkout_lifecycle_purchase_credit_trigger
 BEFORE INSERT ON credit_transactions
 FOR EACH ROW EXECUTE FUNCTION fail_checkout_lifecycle_purchase_credit()`); err != nil {
@@ -353,10 +357,10 @@ FOR EACH ROW EXECUTE FUNCTION fail_checkout_lifecycle_purchase_credit()`); err !
 			return
 		}
 		removed = true
-		if _, err := db.ExecContext(t.Context(), "DROP TRIGGER "+triggerName+" ON credit_transactions"); err != nil {
+		if _, err := db.Exec(t.Context(), "DROP TRIGGER "+triggerName+" ON credit_transactions"); err != nil {
 			t.Fatalf("remove purchase_credit failure trigger: %v", err)
 		}
-		if _, err := db.ExecContext(t.Context(), "DROP FUNCTION "+functionName+"()"); err != nil {
+		if _, err := db.Exec(t.Context(), "DROP FUNCTION "+functionName+"()"); err != nil {
 			t.Fatalf("remove purchase_credit failure function: %v", err)
 		}
 	}
@@ -446,7 +450,7 @@ func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutat
 	if _, err := service.AbandonPendingOrder(t.Context(), 42, cancelled.PublicToken); err != nil {
 		t.Fatalf("AbandonPendingOrder() error = %v", err)
 	}
-	if _, err := db.ExecContext(t.Context(), `UPDATE payment_orders SET status = 'checkout_open' WHERE public_token = $1`, cancelled.PublicToken); err == nil {
+	if _, err := db.Exec(t.Context(), `UPDATE payment_orders SET status = 'checkout_open' WHERE public_token = $1`, cancelled.PublicToken); err == nil {
 		t.Fatal("cancelled -> checkout_open direct SQL transition unexpectedly succeeded")
 	}
 	assertLifecycleOrderStatus(t, db, cancelled.PublicToken, paymentsdomain.PaymentOrderCancelled)
@@ -462,7 +466,7 @@ func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutat
 	}
 	removeFailure()
 	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
-	if _, err := db.ExecContext(t.Context(), `UPDATE payment_orders SET status = 'payment_failed' WHERE public_token = $1`, paid.PublicToken); err == nil {
+	if _, err := db.Exec(t.Context(), `UPDATE payment_orders SET status = 'payment_failed' WHERE public_token = $1`, paid.PublicToken); err == nil {
 		t.Fatal("paid_pending_credit -> payment_failed direct SQL transition unexpectedly succeeded")
 	}
 	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderPaidPendingCredit)
@@ -471,7 +475,7 @@ func TestCheckoutLifecycleDatabaseGuardRejectsIllegalTransitionsAndPaidFactMutat
 		t.Fatalf("credit paid_pending_credit order error = %v", err)
 	}
 	assertLifecycleOrderStatus(t, db, paid.PublicToken, paymentsdomain.PaymentOrderCredited)
-	if _, err := db.ExecContext(t.Context(), `
+	if _, err := db.Exec(t.Context(), `
 UPDATE payment_orders SET paid_total_minor = paid_total_minor + 1 WHERE public_token = $1`, paid.PublicToken); err == nil {
 		t.Fatal("credited paid fact mutation unexpectedly succeeded")
 	}
@@ -581,7 +585,7 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	}
 }
 
-func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*sql.DB, *payments.Service, *credits.Service, *paymentevents.Hub) {
+func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout paymentports.CheckoutGateway, verifier paymentports.StripeWebhookVerifier) (*pgxpool.Pool, *payments.Service, *credits.Service, *paymentevents.Hub) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
@@ -627,10 +631,10 @@ func seedCheckoutLifecycleWallet(t *testing.T, wallets *credits.Service, userID 
 	}
 }
 
-func assertLifecycleOrderStatus(t *testing.T, db *sql.DB, publicToken string, want paymentsdomain.PaymentOrderStatus) {
+func assertLifecycleOrderStatus(t *testing.T, db *pgxpool.Pool, publicToken string, want paymentsdomain.PaymentOrderStatus) {
 	t.Helper()
 	var status paymentsdomain.PaymentOrderStatus
-	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE public_token = $1`, publicToken).Scan(&status); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE public_token = $1`, publicToken).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != want {
@@ -638,10 +642,10 @@ func assertLifecycleOrderStatus(t *testing.T, db *sql.DB, publicToken string, wa
 	}
 }
 
-func assertLifecyclePurchaseCount(t *testing.T, db *sql.DB, want int) {
+func assertLifecyclePurchaseCount(t *testing.T, db *pgxpool.Pool, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != want {

@@ -1,46 +1,17 @@
-package searchcatalog
+package application
 
 import (
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"ideaboard/api/internal/searchcatalog/domain"
+	"ideaboard/api/internal/searchcatalog/ports"
 )
 
 func TestNormalizeQueryTrimsAndCollapsesWhitespace(t *testing.T) {
 	got, err := normalizeQuery("  warm\t shadows\n  ")
 	if err != nil || got != "warm shadows" {
 		t.Fatalf("normalizeQuery() = %q, %v", got, err)
-	}
-}
-
-func TestPrometheusSearchMetricsRecordSafeFields(t *testing.T) {
-	registry := prometheus.NewRegistry()
-	metrics, err := NewPrometheusMetrics(registry)
-	if err != nil {
-		t.Fatalf("NewPrometheusMetrics() error = %v", err)
-	}
-	metrics.RecordSearch(SearchObservation{
-		Duration:    150 * time.Millisecond,
-		Page:        "first",
-		Outcome:     "partial",
-		ResultCount: 3,
-		ProviderStatus: []ProviderStatus{{
-			Provider:        ProviderUnsplash,
-			Status:          "failed",
-			FailureCategory: FailureNetwork,
-			LatencyMS:       42,
-		}},
-	})
-	families, err := registry.Gather()
-	if err != nil {
-		t.Fatalf("Gather() error = %v", err)
-	}
-	for _, family := range families {
-		if strings.Contains(family.GetName(), "api_key") || strings.Contains(family.GetName(), "payload") {
-			t.Fatalf("metrics expose a secret-bearing field: %s", family.GetName())
-		}
 	}
 }
 
@@ -51,10 +22,10 @@ func TestNormalizeQueryRejectsOverlongInput(t *testing.T) {
 }
 
 func TestDedupeResultsUsesProviderAndStableSourceIdentity(t *testing.T) {
-	results := dedupeResults([]Result{
-		{ID: "1", Provider: ProviderUnsplash, ThumbnailURL: "thumb", PreviewURL: "preview", SourceURL: "source"},
-		{ID: "1", Provider: ProviderUnsplash, ThumbnailURL: "thumb-2", PreviewURL: "preview-2", SourceURL: "source-2"},
-		{ID: "1", Provider: ProviderPexels, ThumbnailURL: "thumb", PreviewURL: "preview", SourceURL: "source"},
+	results := dedupeResults([]domain.Result{
+		{ID: "1", Provider: domain.ProviderUnsplash, ThumbnailURL: "thumb", PreviewURL: "preview", SourceURL: "source"},
+		{ID: "1", Provider: domain.ProviderUnsplash, ThumbnailURL: "thumb-2", PreviewURL: "preview-2", SourceURL: "source-2"},
+		{ID: "1", Provider: domain.ProviderPexels, ThumbnailURL: "thumb", PreviewURL: "preview", SourceURL: "source"},
 	})
 	if len(results) != 2 {
 		t.Fatalf("dedupeResults() length = %d, want 2", len(results))
@@ -72,11 +43,11 @@ func TestCursorRoundTrip(t *testing.T) {
 func TestNextCursorStopsCallingExhaustedProvider(t *testing.T) {
 	got := nextCursor(
 		searchCursor{Unsplash: 1, Pexels: 1},
-		[]Provider{ProviderUnsplash, ProviderPexels},
-		[]ProviderStatus{{Provider: ProviderUnsplash, Status: "ok"}, {Provider: ProviderPexels, Status: "ok"}},
-		map[Provider]adapterPage{
-			ProviderUnsplash: {HasMore: false},
-			ProviderPexels:   {HasMore: true},
+		[]domain.Provider{domain.ProviderUnsplash, domain.ProviderPexels},
+		[]domain.ProviderStatus{{Provider: domain.ProviderUnsplash, Status: "ok"}, {Provider: domain.ProviderPexels, Status: "ok"}},
+		map[domain.Provider]ports.SearchProviderPage{
+			domain.ProviderUnsplash: {HasMore: false},
+			domain.ProviderPexels:   {HasMore: true},
 		},
 	)
 	if !got.UnsplashDone || got.Unsplash != 1 || got.PexelsDone || got.Pexels != 2 {
@@ -85,7 +56,7 @@ func TestNextCursorStopsCallingExhaustedProvider(t *testing.T) {
 }
 
 func TestFilterProviderResultsRejectsUntrustedURLs(t *testing.T) {
-	results := filterProviderResults(ProviderUnsplash, []Result{
+	results := filterProviderResults(domain.ProviderUnsplash, []domain.Result{
 		{ID: "safe", ThumbnailURL: "https://images.unsplash.com/thumb", PreviewURL: "https://images.unsplash.com/preview", SourceURL: "https://unsplash.com/photos/safe", Width: 100, Height: 100},
 		{ID: "unsafe", ThumbnailURL: "https://evil.example/thumb", PreviewURL: "https://images.unsplash.com/preview", SourceURL: "https://unsplash.com/photos/unsafe", Width: 100, Height: 100},
 	})
@@ -95,7 +66,7 @@ func TestFilterProviderResultsRejectsUntrustedURLs(t *testing.T) {
 }
 
 func TestSearchGracefullyDegradesWhenNoProvidersConfigured(t *testing.T) {
-	service := NewSearchService(nil)
+	service := NewSearchService(nil, nil)
 	resp, err := service.Search(t.Context(), "minimal art", "", 24)
 	if err != nil {
 		t.Fatalf("expected nil error on unconfigured providers, got: %v", err)

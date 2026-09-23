@@ -3,7 +3,6 @@ package composition
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const defaultMigrationDirectory = "file://internal/db/migrations"
@@ -60,8 +60,8 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 	}
 	defer db.Close()
 
-	var revisionsTable sql.NullString
-	err = db.QueryRowContext(ctx, `
+	var revisionsTable pgtype.Text
+	err = db.QueryRow(ctx, `
 		SELECT COALESCE(
 			to_regclass('atlas_schema_revisions.atlas_schema_revisions')::text,
 			to_regclass('public.atlas_schema_revisions')::text
@@ -74,7 +74,7 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 		return nil
 	}
 
-	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT version::text FROM %s ORDER BY version ASC", revisionsTable.String))
+	rows, err := db.Query(ctx, fmt.Sprintf("SELECT version::text FROM %s ORDER BY version ASC", revisionsTable.String))
 	if err != nil {
 		return fmt.Errorf("query atlas schema revisions: %w", err)
 	}
@@ -134,7 +134,7 @@ func reconcileCleanBreakDatabase(ctx context.Context, migrationConfig config.Dat
 			GRANT ALL ON SCHEMA public TO %s;
 			GRANT ALL ON SCHEMA public TO public;
 		`, sanitizedOwner, sanitizedOwner)
-		if _, err := db.ExecContext(ctx, stmt); err != nil {
+		if _, err := db.Exec(ctx, stmt); err != nil {
 			return fmt.Errorf("reset clean break schema: %w", err)
 		}
 	}

@@ -12,8 +12,27 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/settings"
 	runtimeports "ideaboard/api/internal/runtime/ports"
+
+	"ideaboard/api/internal/platform/outboundhttp"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+type gatewayTestOutboundPolicy struct{}
+
+func (gatewayTestOutboundPolicy) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
+	return settings.OutboundPolicySetting{AllowHosts: []string{"localhost", "127.0.0.1", "::1"}}, nil
+}
+
+func TestMain(m *testing.M) {
+	restore := outbound.ConfigurePolicyProvider(gatewayTestOutboundPolicy{})
+	code := m.Run()
+	restore()
+	os.Exit(code)
+}
 
 func TestNewGatewayClientRejectsBadConfig(t *testing.T) {
 	for _, cfg := range []GatewayClientConfig{
@@ -72,6 +91,38 @@ func TestGatewayRequestValidation(t *testing.T) {
 	}
 }
 
+func TestGatewayClientUsesRequestTimeAllowlistWithoutAppendingTarget(t *testing.T) {
+	var capture gatewayCapture
+	server := newGatewayCaptureServer(t, &capture, http.StatusOK, nil, `{}`)
+	defer server.Close()
+	client := newGatewayTestClient(t, server)
+	policy := &mutableGatewayTestPolicy{hosts: []string{"127.0.0.1"}}
+	restore := outbound.ConfigurePolicyProvider(policy)
+	defer restore()
+
+	if _, err := client.Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
+		Body:     []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("authorized gateway request failed: %v", err)
+	}
+	policy.hosts = []string{"gateway.example.invalid"}
+	if _, err := client.Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
+		Body:     []byte(`{}`),
+	}); err == nil {
+		t.Fatal("gateway request succeeded after request-time allowlist revoked")
+	}
+}
+
+type mutableGatewayTestPolicy struct {
+	hosts []string
+}
+
+func (p *mutableGatewayTestPolicy) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
+	return settings.OutboundPolicySetting{AllowHosts: append([]string(nil), p.hosts...)}, nil
+}
+
 type gatewayCapture struct {
 	method      string
 	path        string
@@ -104,6 +155,26 @@ func newGatewayCaptureServer(t *testing.T, capture *gatewayCapture, status int, 
 func newGatewayTestClient(t *testing.T, server *httptest.Server) *GatewayClient {
 	t.Helper()
 	client, err := NewGatewayClient(GatewayClientConfig{BaseURL: server.URL, Token: "test-token"})
+	if err != nil {
+		t.Fatalf("NewGatewayClient() error = %v", err)
+	}
+	return client
+}
+
+// newGatewayFastRetryClient keeps retry semantics but skips real waiting so
+// exhaustion tests stay fast.
+func newGatewayFastRetryClient(t *testing.T, server *httptest.Server) *GatewayClient {
+	t.Helper()
+	client, err := NewGatewayClient(GatewayClientConfig{
+		BaseURL: server.URL,
+		Token:   "test-token",
+		Outbound: outboundhttp.NewClient(outboundhttp.Config{
+			MaxAttempts:       3,
+			MaxRetryAfterWait: time.Second,
+			Sleep:             func(context.Context, time.Duration) error { return nil },
+			Metrics:           outboundhttp.NewMetrics(prometheus.NewRegistry()),
+		}),
+	})
 	if err != nil {
 		t.Fatalf("NewGatewayClient() error = %v", err)
 	}
@@ -254,6 +325,94 @@ func TestGatewayClientSurfacesUpstreamErrors(t *testing.T) {
 	}
 	if status, ok := runtimeports.ProviderHTTPStatus(err); !ok || status != http.StatusTooManyRequests {
 		t.Fatalf("ProviderHTTPStatus() = %d, %v, want 429, true", status, ok)
+	}
+}
+
+func TestGatewayClientDoesNotRetryGatewayRequestsAfter503(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":"upstream outcome is ambiguous"}`))
+	}))
+	defer server.Close()
+
+	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Kind:     runtimeports.GatewayEndpointProviderNative,
+			Provider: "openai",
+			Path:     "v1/images/generations",
+		},
+		Model: "openai/gpt-image-1",
+		Body:  []byte(`{"prompt":"a cat"}`),
+		Cache: runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
+	})
+	var upstreamErr *runtimeports.UpstreamHTTPError
+	if !errors.As(err, &upstreamErr) || upstreamErr.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("Do() error = %v, want UpstreamHTTPError 503", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want single gateway send", attempts)
+	}
+}
+
+func TestGatewayClientPreservesRetryAfterForWorkerRetry(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Retry-After", "7")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":"slow down"}`))
+	}))
+	defer server.Close()
+
+	_, err := newGatewayFastRetryClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{Kind: runtimeports.GatewayEndpointCompatChat},
+		Body:     []byte(`{}`),
+	})
+	if err == nil {
+		t.Fatal("Do() succeeded on persistent 429, want UpstreamHTTPError")
+	}
+	var upstreamErr *runtimeports.UpstreamHTTPError
+	if !errors.As(err, &upstreamErr) || upstreamErr.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("err = %v, want UpstreamHTTPError 429", err)
+	}
+	if upstreamErr.RetryAfter != 7*time.Second {
+		t.Fatalf("RetryAfter = %v, want 7s (preserved for classifiers)", upstreamErr.RetryAfter)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want single gateway send", attempts)
+	}
+}
+
+func TestGatewayClientProbeStaysSingleShot(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	_, err := newGatewayTestClient(t, server).Do(context.Background(), runtimeports.GatewayRequest{
+		Endpoint: runtimeports.GatewayEndpoint{
+			Kind:     runtimeports.GatewayEndpointProviderNative,
+			Provider: "openai",
+			Path:     "v1/models",
+		},
+		Body:        []byte(`{}`),
+		Cache:       runtimeports.GatewayCachePolicy{Mode: runtimeports.GatewayCacheSkip},
+		MaxAttempts: 1,
+		Timeout:     5 * time.Second,
+	})
+	if err == nil {
+		t.Fatal("Do() succeeded on 503, want error")
+	}
+	var upstreamErr *runtimeports.UpstreamHTTPError
+	if !errors.As(err, &upstreamErr) || upstreamErr.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("err = %v, want UpstreamHTTPError 503", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want single-shot 1 for probes", attempts)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +16,18 @@ import (
 type Handler struct {
 	service       *Service
 	publicOrigins config.PublicOriginsConfig
+	replay        *idempotency.Store
 }
+
+// Board POST replay scopes. Keys stay per (scope, user, key); only the
+// success DTO and the request digest are cached, never secrets.
+const (
+	boardInviteMemberScope   = "board:invite-member"
+	boardCreateShareScope    = "board:create-share-token"
+	boardRevokeShareScope    = "board:revoke-share-token"
+	boardJoinByShareScope    = "board:join-by-share-token"
+	boardIdempotencyConflict = "幂等请求与原请求不一致"
+)
 
 type boardDTO struct {
 	BoardID            string      `json:"board_id"`
@@ -78,7 +90,49 @@ type boardShareTokenRevokeResponse struct {
 }
 
 func NewHandler(service *Service, publicOrigins config.PublicOriginsConfig) *Handler {
-	return &Handler{service: service, publicOrigins: publicOrigins}
+	return &Handler{service: service, publicOrigins: publicOrigins, replay: idempotency.NewStore(idempotency.DefaultStoreOptions())}
+}
+
+// replayStore is nil-safe: handlers built without NewHandler still enforce
+// keys and skip replay instead of failing.
+func (h *Handler) replayStore() *idempotency.Store {
+	if h == nil {
+		return nil
+	}
+	return h.replay
+}
+
+// requireBoardIdempotencyKey enforces Idempotency-Key on board POST writes.
+// Missing/invalid keys render a stable machine code (no new namespace).
+func requireBoardIdempotencyKey(c *gin.Context) (string, bool) {
+	key, err := idempotency.Parse(c.GetHeader(idempotency.Header))
+	if err != nil {
+		idempotency.DefaultMetrics.ObserveError(err)
+		response.MachineError(c, idempotency.RenderStatusOf(err), idempotency.RenderCodeOf(err), err.Error())
+		return "", false
+	}
+	return key, true
+}
+
+// executeBoardWrite atomically coordinates a process-local write and serves
+// the first result to concurrent/retried callers. Durable board operations
+// still own their database facts; this closes the handler-side race window.
+func executeBoardWrite(c *gin.Context, store *idempotency.Store, scope string, userID int64, key, requestHash string, execute func() (any, error), handleError func(error)) bool {
+	cached, replayed, err := store.Do(c.Request.Context(), scope, userID, key, requestHash, execute)
+	if err != nil {
+		if idempotency.IsConflict(err) {
+			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
+			response.MachineError(c, idempotency.RenderStatusOf(err), idempotency.RenderCodeOf(err), boardIdempotencyConflict)
+		} else {
+			handleError(err)
+		}
+		return true
+	}
+	if replayed {
+		idempotency.DefaultMetrics.Observe(idempotency.OutcomeReplay)
+	}
+	response.SuccessDTO(c, cached)
+	return true
 }
 
 func requireBoardUserID(c *gin.Context) (int64, bool) {
@@ -96,7 +150,7 @@ func (h *Handler) ListBoards(c *gin.Context) {
 	}
 	list, err := h.service.ListBoards(c.Request.Context(), userID)
 	if err != nil {
-		response.InternalError(c, 500, "获取画布失败", err)
+		respondBoardError(c, err, nil, "获取画布失败")
 		return
 	}
 	result := make([]boardDTO, 0, len(list))
@@ -113,12 +167,12 @@ func (h *Handler) UpsertBoard(c *gin.Context) {
 	}
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if boardID == "" {
-		response.Error(c, 400, "缺少画布ID")
+		writeBoardInputError(c, "缺少画布ID")
 		return
 	}
 	var req UpsertRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
 	board, err := h.service.UpsertBoard(c.Request.Context(), userID, boardID, &req)
@@ -139,7 +193,7 @@ func (h *Handler) DeleteBoard(c *gin.Context) {
 	}
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	if boardID == "" {
-		response.Error(c, 400, "缺少画布ID")
+		writeBoardInputError(c, "缺少画布ID")
 		return
 	}
 	if err := h.service.DeleteBoard(c.Request.Context(), userID, boardID); err != nil {
@@ -165,21 +219,27 @@ func (h *Handler) ListMembers(c *gin.Context) {
 
 func (h *Handler) InviteMember(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
-	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
 		return
 	}
+	key, ok := requireBoardIdempotencyKey(c)
+	if !ok {
+		return
+	}
+	boardID := strings.TrimSpace(c.Param("board_id"))
 	var req InviteMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
-	member, err := h.service.InviteMember(c.Request.Context(), userID, boardID, req.MemberPublicID, req.Role)
-	if err != nil {
-		h.respondBoardMemberError(c, err, "邀请成员失败")
-		return
-	}
-	response.SuccessDTO(c, boardMemberResponse{Member: member})
+	requestHash := idempotency.HashRequest(boardID, req.MemberPublicID, req.Role)
+	executeBoardWrite(c, h.replayStore(), boardInviteMemberScope, userID, key, requestHash, func() (any, error) {
+		member, err := h.service.InviteMember(c.Request.Context(), userID, boardID, req.MemberPublicID, req.Role)
+		if err != nil {
+			return nil, err
+		}
+		return boardMemberResponse{Member: member}, nil
+	}, func(err error) { h.respondBoardMemberError(c, err, "邀请成员失败") })
 }
 
 func (h *Handler) UpdateMemberRole(c *gin.Context) {
@@ -190,12 +250,12 @@ func (h *Handler) UpdateMemberRole(c *gin.Context) {
 		return
 	}
 	if memberPublicID == "" {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
 	var req UpdateMemberRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
 	member, err := h.service.UpdateMemberRole(c.Request.Context(), userID, boardID, memberPublicID, req.Role)
@@ -214,7 +274,7 @@ func (h *Handler) RemoveMember(c *gin.Context) {
 		return
 	}
 	if memberPublicID == "" {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
 	if err := h.service.RemoveMember(c.Request.Context(), userID, boardID, memberPublicID); err != nil {
@@ -226,22 +286,31 @@ func (h *Handler) RemoveMember(c *gin.Context) {
 
 func (h *Handler) CreateShareToken(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
-	boardID := strings.TrimSpace(c.Param("board_id"))
 	if !ok {
 		return
 	}
+	key, ok := requireBoardIdempotencyKey(c)
+	if !ok {
+		return
+	}
+	boardID := strings.TrimSpace(c.Param("board_id"))
 	var req CreateShareTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
-	shareToken, err := h.service.CreateShareToken(c.Request.Context(), userID, boardID, req.Role, req.ExpiresAt)
-	if err != nil {
-		h.respondShareTokenError(c, err, "创建分享链接失败")
-		return
+	var expiresAt string
+	if req.ExpiresAt != nil {
+		expiresAt = strconv.FormatInt(*req.ExpiresAt, 10)
 	}
-	baseURL := h.publicOrigins.Web
-	response.SuccessDTO(c, boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, baseURL)})
+	requestHash := idempotency.HashRequest(boardID, req.Role, expiresAt)
+	executeBoardWrite(c, h.replayStore(), boardCreateShareScope, userID, key, requestHash, func() (any, error) {
+		shareToken, _, err := h.service.CreateShareTokenIdempotent(c.Request.Context(), userID, boardID, req.Role, req.ExpiresAt, key, requestHash)
+		if err != nil {
+			return nil, err
+		}
+		return boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, h.publicOrigins.Web)}, nil
+	}, func(err error) { h.respondShareTokenError(c, err, "创建分享链接失败") })
 }
 
 func (h *Handler) ListShareTokens(c *gin.Context) {
@@ -265,20 +334,26 @@ func (h *Handler) ListShareTokens(c *gin.Context) {
 
 func (h *Handler) RevokeShareToken(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
-	boardID := strings.TrimSpace(c.Param("board_id"))
-	tokenID, err := strconv.ParseInt(strings.TrimSpace(c.Param("token_id")), 10, 64)
 	if !ok {
 		return
 	}
+	key, ok := requireBoardIdempotencyKey(c)
+	if !ok {
+		return
+	}
+	boardID := strings.TrimSpace(c.Param("board_id"))
+	tokenID, err := strconv.ParseInt(strings.TrimSpace(c.Param("token_id")), 10, 64)
 	if err != nil || tokenID <= 0 {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
-	if err := h.service.RevokeShareToken(c.Request.Context(), userID, boardID, tokenID); err != nil {
-		h.respondShareTokenError(c, err, "撤销分享链接失败")
-		return
-	}
-	response.SuccessDTO(c, boardShareTokenRevokeResponse{Revoked: true})
+	requestHash := idempotency.HashRequest(boardID, strconv.FormatInt(tokenID, 10))
+	executeBoardWrite(c, h.replayStore(), boardRevokeShareScope, userID, key, requestHash, func() (any, error) {
+		if err := h.service.RevokeShareToken(c.Request.Context(), userID, boardID, tokenID); err != nil {
+			return nil, err
+		}
+		return boardShareTokenRevokeResponse{Revoked: true}, nil
+	}, func(err error) { h.respondShareTokenError(c, err, "撤销分享链接失败") })
 }
 
 func (h *Handler) JoinByShareToken(c *gin.Context) {
@@ -286,17 +361,23 @@ func (h *Handler) JoinByShareToken(c *gin.Context) {
 	if !ok {
 		return
 	}
+	key, ok := requireBoardIdempotencyKey(c)
+	if !ok {
+		return
+	}
 	var req JoinByShareTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+		writeBoardInputError(c, "参数错误")
 		return
 	}
-	board, err := h.service.JoinBoardByShareToken(c.Request.Context(), userID, req.Token)
-	if err != nil {
-		h.respondShareTokenError(c, err, "加入画布失败")
-		return
-	}
-	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
+	requestHash := idempotency.HashRequest(strings.TrimSpace(req.Token))
+	executeBoardWrite(c, h.replayStore(), boardJoinByShareScope, userID, key, requestHash, func() (any, error) {
+		board, err := h.service.JoinBoardByShareToken(c.Request.Context(), userID, req.Token)
+		if err != nil {
+			return nil, err
+		}
+		return boardResponse{Board: toBoardDTO(board.Board, board.Role)}, nil
+	}, func(err error) { h.respondShareTokenError(c, err, "加入画布失败") })
 }
 
 func (h *Handler) respondBoardMemberError(c *gin.Context, err error, internalMessage string) {

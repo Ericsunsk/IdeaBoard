@@ -210,7 +210,7 @@ func (s *Service) enqueue(ctx context.Context, shutdown *PaymentCheckoutShutdown
 		return
 	}
 	if err := s.shutdown.EnqueuePaymentCheckoutShutdown(ctx, shutdown.ID); err != nil {
-		slog.Error("enqueue Checkout shutdown failed; periodic River recovery will retry", "shutdown_id", shutdown.ID, "error", err)
+		slog.Error("enqueue Checkout shutdown failed; periodic River recovery will retry", "shutdown_id", shutdown.ID, "err", err)
 	}
 }
 func (s *Service) loadCurrent(ctx context.Context) (StoredStripeConfiguration, bool, error) {

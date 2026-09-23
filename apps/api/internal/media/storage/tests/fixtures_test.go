@@ -2,13 +2,14 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/media/storage/application/authorization"
@@ -66,7 +67,7 @@ type (
 	LocalStorageProfileConfig     = local.LocalStorageProfileConfig
 	StorageProfileRepository      struct {
 		*postgres.Repository
-		DB *sql.DB
+		DB *pgxpool.Pool
 	}
 )
 
@@ -123,7 +124,7 @@ func publicUploadURL(objectKey string) string {
 	return "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
 }
 
-func newStorageProfileRepository(db *sql.DB) *StorageProfileRepository {
+func newStorageProfileRepository(db *pgxpool.Pool) *StorageProfileRepository {
 	return &StorageProfileRepository{Repository: postgres.NewRepository(db), DB: db}
 }
 

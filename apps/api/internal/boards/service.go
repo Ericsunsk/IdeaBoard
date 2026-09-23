@@ -286,13 +286,23 @@ func (s *Service) RemoveMember(ctx context.Context, ownerUserID int64, boardID s
 }
 
 func (s *Service) CreateShareToken(ctx context.Context, ownerUserID int64, boardID string, role string, expiresAt *int64) (*ShareToken, error) {
+	token, _, err := s.createShareToken(ctx, ownerUserID, boardID, role, expiresAt, "", "")
+	return token, err
+}
+
+func (s *Service) CreateShareTokenIdempotent(ctx context.Context, ownerUserID int64, boardID string, role string, expiresAt *int64, key, requestHash string) (*ShareToken, bool, error) {
+	token, replayed, err := s.createShareToken(ctx, ownerUserID, boardID, role, expiresAt, key, requestHash)
+	return token, replayed, err
+}
+
+func (s *Service) createShareToken(ctx context.Context, ownerUserID int64, boardID string, role string, expiresAt *int64, key, requestHash string) (*ShareToken, bool, error) {
 	board, err := s.requireOwnerBoard(ctx, ownerUserID, boardID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	targetRole := normalizeMemberRole(role)
 	if targetRole == "" {
-		return nil, ErrMemberInvalidRole
+		return nil, false, ErrMemberInvalidRole
 	}
 	var expiresAtTime *time.Time
 	if expiresAt != nil && *expiresAt > 0 {
@@ -301,7 +311,7 @@ func (s *Service) CreateShareToken(ctx context.Context, ownerUserID int64, board
 	}
 	token, err := generateBoardShareToken(ctx, s.repo)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	tokenHash := boardShareTokenHash(token)
 	shareToken := &ShareToken{
@@ -314,10 +324,14 @@ func (s *Service) CreateShareToken(ctx context.Context, ownerUserID int64, board
 		Revoked:     false,
 		ExpiresAt:   expiresAtTime,
 	}
-	if err := s.repo.CreateShareToken(ctx, shareToken); err != nil {
-		return nil, err
+	if key != "" {
+		created, replayed, err := s.repo.CreateShareTokenIdempotent(ctx, shareToken, key, requestHash)
+		return created, replayed, err
 	}
-	return shareToken, nil
+	if err := s.repo.CreateShareToken(ctx, shareToken); err != nil {
+		return nil, false, err
+	}
+	return shareToken, false, nil
 }
 
 func (s *Service) ListShareTokens(ctx context.Context, ownerUserID int64, boardID string) ([]ShareToken, error) {

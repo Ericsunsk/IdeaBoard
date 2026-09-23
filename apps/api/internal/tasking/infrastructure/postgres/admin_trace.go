@@ -2,12 +2,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
 	tasks "ideaboard/api/internal/tasking/domain"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (r *Repository) ListAdminTaskAttempts(
@@ -42,45 +45,54 @@ func (r *Repository) ListAdminTaskLatestExecutions(
 	}
 	for _, row := range rows {
 		result[row.TaskID] = tasks.AdminTaskExecutionSnapshot{
-			AccountID:            row.AccountID,
-			ProviderEndpointID:   row.ProviderEndpointID,
-			ProviderEndpointName: row.ProviderEndpointName,
-			ResolvedModel:        row.ResolvedModel,
-			APIType:              row.ApiType,
+			ResolvedModel: row.ResolvedModel,
+			Provider:      row.Provider,
+			GatewayStep:   row.GatewayStep,
 		}
 	}
 	return result, nil
 }
 
 func adminTaskAttemptFromSQLC(row dbsqlc.ListAdminTaskAttemptsByTaskIDsRow) tasks.AdminTaskAttempt {
+	providerLatencyMS := int64(0)
+	if row.ProviderStartedAt.Valid && row.ProviderFinishedAt.Valid {
+		providerLatencyMS = row.ProviderFinishedAt.Time.Sub(row.ProviderStartedAt.Time).Milliseconds()
+		if providerLatencyMS < 0 {
+			providerLatencyMS = 0
+		}
+	}
+	var totalLatencyMS int64
+	if row.CompletedAt.Valid {
+		totalLatencyMS = row.CompletedAt.Time.Sub(dbutil.TimeValue(row.CreatedAt)).Milliseconds()
+		if totalLatencyMS < 0 {
+			totalLatencyMS = 0
+		}
+	}
+	var cancelledAt *time.Time
+	if row.Status == tasks.TaskAttemptStatusCancelled && row.CompletedAt.Valid {
+		completed := row.CompletedAt.Time
+		cancelledAt = &completed
+	}
 	return tasks.AdminTaskAttempt{
-		AttemptNo:            int(row.AttemptNo),
-		AccountID:            row.AccountID,
-		Status:               row.Status,
-		Stage:                adminTaskAttemptStage(row),
-		FailureCategory:      row.FailureCategory,
-		ProviderEndpointID:   row.ProviderEndpointID,
-		ProviderEndpointName: row.ProviderEndpointName,
-		ResolvedModel:        row.ResolvedModel,
-		APIType:              row.ApiType,
-		ProviderStartedAt:    nullTimePointer(row.ProviderStartedAt),
-		ProviderFinishedAt:   nullTimePointer(row.ProviderFinishedAt),
-		FinalizeStartedAt:    nullTimePointer(row.FinalizeStartedAt),
-		FinalizeFinishedAt:   nullTimePointer(row.FinalizeFinishedAt),
-		CompletedAt:          nullTimePointer(row.CompletedAt),
-		CancelledAt:          nullTimePointer(row.CancelledAt),
-		ProviderLatencyMS:    row.ProviderLatencyMs,
-		FinalizeLatencyMS:    row.FinalizeLatencyMs,
-		TotalLatencyMS:       row.TotalLatencyMs,
+		AttemptNo:          int(row.AttemptNo),
+		Status:             row.Status,
+		Stage:              adminTaskAttemptStage(row),
+		FailureCategory:    row.FailureCategory,
+		ResolvedModel:      row.ResolvedModel,
+		Provider:           row.Provider,
+		GatewayStep:        row.GatewayStep,
+		ProviderStartedAt:  nullTimePointer(row.ProviderStartedAt),
+		ProviderFinishedAt: nullTimePointer(row.ProviderFinishedAt),
+		CompletedAt:        nullTimePointer(row.CompletedAt),
+		CancelledAt:        cancelledAt,
+		ProviderLatencyMS:  providerLatencyMS,
+		TotalLatencyMS:     totalLatencyMS,
 	}
 }
 
 func adminTaskAttemptStage(row dbsqlc.ListAdminTaskAttemptsByTaskIDsRow) string {
 	switch row.Status {
 	case tasks.TaskAttemptStatusRunning:
-		if row.FinalizeStartedAt.Valid {
-			return tasks.ExecutionStageFinalizing
-		}
 		if row.ProviderStartedAt.Valid {
 			return tasks.ExecutionStageProvider
 		}
@@ -96,10 +108,6 @@ func adminTaskAttemptStage(row dbsqlc.ListAdminTaskAttemptsByTaskIDsRow) string 
 	return tasks.ExecutionStageFailed
 }
 
-func nullTimePointer(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	result := value.Time
-	return &result
+func nullTimePointer(value pgtype.Timestamptz) *time.Time {
+	return dbutil.TimePtr(value)
 }

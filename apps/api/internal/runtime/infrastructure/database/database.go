@@ -2,8 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"ideaboard/api/internal/runtime/domain"
 	"ideaboard/api/internal/runtime/ports"
@@ -13,30 +11,26 @@ import (
 
 // Pools holds runtime-owned database pool references.
 type Pools struct {
-	DB        *sql.DB
+	Pool      *pgxpool.Pool
 	RiverPool *pgxpool.Pool
 }
 
 // Close gracefully releases both PostgreSQL and River pools.
-func (p *Pools) Close() error {
+func (p *Pools) Close() {
 	if p == nil {
-		return nil
+		return
 	}
-	var errs []error
 	if p.RiverPool != nil {
 		p.RiverPool.Close()
 	}
-	if p.DB != nil {
-		if err := p.DB.Close(); err != nil {
-			errs = append(errs, err)
-		}
+	if p.Pool != nil {
+		p.Pool.Close()
 	}
-	return errors.Join(errs...)
 }
 
 // HealthChecker verifies readiness of runtime database connections.
 type HealthChecker struct {
-	db        *sql.DB
+	pool      *pgxpool.Pool
 	riverPool *pgxpool.Pool
 }
 
@@ -45,15 +39,15 @@ func NewHealthChecker(pools *Pools) *HealthChecker {
 	if pools == nil {
 		return &HealthChecker{}
 	}
-	return &HealthChecker{db: pools.DB, riverPool: pools.RiverPool}
+	return &HealthChecker{pool: pools.Pool, riverPool: pools.RiverPool}
 }
 
 // CheckHealth queries both Postgres and River pools to report readiness.
 func (h *HealthChecker) CheckHealth(ctx context.Context) domain.ComponentStatus {
-	if h == nil || h.db == nil || h.riverPool == nil {
+	if h == nil || h.pool == nil || h.riverPool == nil {
 		return domain.ComponentStatus{Name: "database", Kind: domain.ComponentKindDatabase, Ready: false, Required: true, Detail: "database pools are not initialized"}
 	}
-	if err := h.db.PingContext(ctx); err != nil {
+	if err := h.pool.Ping(ctx); err != nil {
 		return domain.ComponentStatus{Name: "database", Kind: domain.ComponentKindDatabase, Ready: false, Required: true, Detail: err.Error()}
 	}
 	if err := h.riverPool.Ping(ctx); err != nil {

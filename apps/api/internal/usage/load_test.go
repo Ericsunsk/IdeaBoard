@@ -2,7 +2,6 @@ package usage
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"os"
 	"runtime"
@@ -11,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
@@ -61,10 +60,10 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	verifyUsageLoadFacts(t, ctx, db, transactionCount, targetCount)
 	verifyDuration := time.Since(verifyStarted)
 
-	if _, err := db.ExecContext(ctx, `ANALYZE credit_transactions`); err != nil {
+	if _, err := db.Exec(ctx, `ANALYZE credit_transactions`); err != nil {
 		t.Fatalf("analyze Usage load facts: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `ANALYZE task_billing_snapshots`); err != nil {
+	if _, err := db.Exec(ctx, `ANALYZE task_billing_snapshots`); err != nil {
 		t.Fatalf("analyze Usage load Task Billing facts: %v", err)
 	}
 	location, err := time.LoadLocation(ShanghaiTimezone)
@@ -109,7 +108,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 	}
 
 	var postgresVersion string
-	if err := db.QueryRowContext(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
+	if err := db.QueryRow(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
 		t.Fatalf("read PostgreSQL version: %v", err)
 	}
 	t.Logf(
@@ -164,7 +163,7 @@ func usageLoadAnchor(t *testing.T) time.Time {
 func seedUsageLoadTaskSnapshots(
 	t *testing.T,
 	ctx context.Context,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	pool *pgxpool.Pool,
 	transactionCount int,
 	targetCount int,
@@ -172,15 +171,15 @@ func seedUsageLoadTaskSnapshots(
 ) {
 	t.Helper()
 	const sku = "usage:load-test"
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	price, err := billingService.PublishPrice(ctx, usagePriceInput(sku, "Usage Load Test", 0))
 	if err != nil {
 		t.Fatalf("create Usage load price: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_validate_insert`); err != nil {
+	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_validate_insert`); err != nil {
 		t.Fatalf("disable Task Billing load trigger: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
   task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
@@ -208,16 +207,16 @@ SELECT
 FROM generate_series(1, $1::bigint) AS series`, transactionCount, targetCount, usageLoadTargetUserID, usageLoadUserCount, sku, price.PriceVersionID, price.Version, anchor); err != nil {
 		t.Fatalf("seed Usage load Task Billing snapshots: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots ENABLE TRIGGER task_billing_snapshots_validate_insert`); err != nil {
+	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots ENABLE TRIGGER task_billing_snapshots_validate_insert`); err != nil {
 		t.Fatalf("enable Task Billing load trigger: %v", err)
 	}
 }
 
-func verifyUsageLoadFacts(t *testing.T, ctx context.Context, db *sql.DB, transactionCount, targetCount int) {
+func verifyUsageLoadFacts(t *testing.T, ctx context.Context, db *pgxpool.Pool, transactionCount, targetCount int) {
 	t.Helper()
 	var captures int
 	var targetCaptures int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)::integer,
        COUNT(*) FILTER (WHERE wallet_user_id = $1)::integer
 FROM credit_transactions
@@ -229,7 +228,7 @@ WHERE transaction_id LIKE 'usage_load_tx_%'`, usageLoadTargetUserID).Scan(&captu
 	}
 	var snapshots int
 	var targetSnapshots int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)::integer,
        COUNT(*) FILTER (WHERE user_id = $1)::integer
 FROM task_billing_snapshots
@@ -240,7 +239,7 @@ WHERE task_id LIKE 'usage_load_task_%'`, usageLoadTargetUserID).Scan(&snapshots,
 		t.Fatalf("Usage load Task counts=%d/%d, want %d/%d", snapshots, targetSnapshots, transactionCount, targetCount)
 	}
 	var invalid int
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)::integer
 FROM (
   SELECT transactions.transaction_id
@@ -260,7 +259,7 @@ FROM (
 func explainUsageCaptureTrend(
 	t *testing.T,
 	ctx context.Context,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	userID int64,
 	location *time.Location,
 	start time.Time,
@@ -268,7 +267,7 @@ func explainUsageCaptureTrend(
 ) any {
 	t.Helper()
 	var raw []byte
-	err := db.QueryRowContext(ctx, `
+	err := db.QueryRow(ctx, `
 EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
 SELECT ((created_at AT TIME ZONE $2)::date)::text AS capture_day,
        SUM(command_amount)::bigint AS amount

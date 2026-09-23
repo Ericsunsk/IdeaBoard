@@ -6,7 +6,6 @@ import (
 	payments "ideaboard/api/internal/payments"
 
 	"context"
-	"database/sql"
 	"errors"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"strconv"
@@ -34,7 +33,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	checkoutGateway.afterCreateCustomer = func() { now = now.Add(2 * time.Minute) }
 	checkoutGateway.beforeCreateSession = func(input paymentports.CreateCheckoutSessionInput) {
 		var status string
-		if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, input.PaymentOrderID).Scan(&status); err != nil {
+		if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, input.PaymentOrderID).Scan(&status); err != nil {
 			t.Fatalf("Stripe called before durable Payment Order: %v", err)
 		}
 		if status != string(paymentsdomain.PaymentOrderCreating) {
@@ -65,7 +64,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 		t.Fatalf("Stripe Checkout input = %+v", createdInput)
 	}
 	var storedExpiresAt time.Time
-	if err := db.QueryRowContext(t.Context(), `SELECT expires_at FROM payment_orders WHERE public_token = $1`, first.PublicToken).Scan(&storedExpiresAt); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT expires_at FROM payment_orders WHERE public_token = $1`, first.PublicToken).Scan(&storedExpiresAt); err != nil {
 		t.Fatal(err)
 	}
 	if !storedExpiresAt.Equal(createdInput.ExpiresAt) {
@@ -200,7 +199,7 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 		t.Fatalf("replayed Stripe Checkout input changed: first=%+v second=%+v", first, second)
 	}
 	var orderCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, command.UserID).Scan(&orderCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, command.UserID).Scan(&orderCount); err != nil {
 		t.Fatal(err)
 	}
 	if orderCount != 1 {
@@ -320,7 +319,7 @@ func TestCreateCheckoutReleasesOrderAfterDefinitiveProviderRejection(t *testing.
 		t.Fatalf("rejected Checkout error = %v, want purchases unavailable", err)
 	}
 	var firstToken, firstStatus string
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT public_token, status
 FROM payment_orders
 WHERE user_id = $1 AND client_idempotency_key = $2`, command.UserID, command.ClientIdempotencyKey).Scan(&firstToken, &firstStatus); err != nil {
@@ -455,7 +454,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		t.Fatalf("replayed webhook = %+v, %v", replay, err)
 	}
 	var purchaseCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
 		t.Fatal(err)
 	}
 	if purchaseCount != 1 {
@@ -609,10 +608,10 @@ func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input pay
 	return f.createdSession, nil
 }
 
-func assertPurchaseOrderStatusByKey(t *testing.T, db *sql.DB, userID int64, idempotencyKey string, want paymentsdomain.PaymentOrderStatus) {
+func assertPurchaseOrderStatusByKey(t *testing.T, db *pgxpool.Pool, userID int64, idempotencyKey string, want paymentsdomain.PaymentOrderStatus) {
 	t.Helper()
 	var status paymentsdomain.PaymentOrderStatus
-	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE user_id = $1 AND client_idempotency_key = $2`, userID, idempotencyKey).Scan(&status); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE user_id = $1 AND client_idempotency_key = $2`, userID, idempotencyKey).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != want {
@@ -672,7 +671,7 @@ func configuredFakeStripeGateway(accountID, productID string) *fakeStripeGateway
 
 func newConfiguredPurchaseService(
 	t *testing.T,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets ports.WalletReader,
@@ -684,7 +683,7 @@ func newConfiguredPurchaseService(
 
 func newConfiguredPurchaseServiceWithClock(
 	t *testing.T,
-	db *sql.DB,
+	db *pgxpool.Pool,
 	configurationGateway paymentports.StripeGateway,
 	checkoutGateway paymentports.CheckoutGateway,
 	wallets ports.WalletReader,

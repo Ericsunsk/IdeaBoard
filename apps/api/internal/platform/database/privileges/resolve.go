@@ -2,13 +2,12 @@ package privileges
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type resolvedRule struct {
@@ -125,7 +124,7 @@ WHERE n.nspname = $1
   AND c.relkind::text = ANY($2)
   AND left(c.relname, length($3)) = $3
 ORDER BY c.relname`
-		args = []any{schemaName, pq.Array(relationKinds), rule.namePrefix}
+		args = []any{schemaName, relationKinds, rule.namePrefix}
 	} else {
 		rowsQuery = `
 SELECT c.relname
@@ -135,9 +134,9 @@ WHERE n.nspname = $1
   AND c.relkind::text = ANY($2)
   AND c.relname = ANY($3)
 ORDER BY c.relname`
-		args = []any{schemaName, pq.Array(relationKinds), pq.Array(rule.names)}
+		args = []any{schemaName, relationKinds, rule.names}
 	}
-	rows, err := db.QueryContext(ctx, rowsQuery, args...)
+	rows, err := db.Query(ctx, rowsQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -153,9 +152,7 @@ ORDER BY c.relname`
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
+	rows.Close()
 	return objects, nil
 }
 
@@ -166,7 +163,7 @@ func discoverFunctions(
 	rule validatedRule,
 ) ([]discoveredObject, error) {
 	if rule.namePrefix != "" {
-		rows, err := db.QueryContext(ctx, `
+		rows, err := db.Query(ctx, `
 SELECT p.proname, pg_catalog.oidvectortypes(p.proargtypes)
 FROM pg_catalog.pg_proc AS p
 JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
@@ -189,9 +186,7 @@ ORDER BY p.proname, pg_catalog.oidvectortypes(p.proargtypes)`, schemaName, rule.
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		if err := rows.Close(); err != nil {
-			return nil, err
-		}
+		rows.Close()
 		return objects, nil
 	}
 
@@ -204,7 +199,7 @@ ORDER BY p.proname, pg_catalog.oidvectortypes(p.proargtypes)`, schemaName, rule.
 		functionNames[index] = functionName
 		functionArguments[index] = arguments
 	}
-	rows, err := db.QueryContext(ctx, `/* ideaboard:resolve-explicit-functions */
+	rows, err := db.Query(ctx, `/* ideaboard:resolve-explicit-functions */
 WITH requested AS (
   SELECT selector_name, function_name, function_arguments, ordinal
   FROM unnest($2::TEXT[], $3::TEXT[], $4::TEXT[]) WITH ORDINALITY
@@ -226,7 +221,7 @@ LEFT JOIN LATERAL (
     )
 ) AS resolved ON TRUE
 ORDER BY requested.ordinal`,
-		schemaName, pq.Array(selectors), pq.Array(functionNames), pq.Array(functionArguments),
+		schemaName, selectors, functionNames, functionArguments,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("resolve explicit functions: %w", err)
@@ -236,8 +231,8 @@ ORDER BY requested.ordinal`,
 	for rows.Next() {
 		var (
 			selectorName string
-			name         sql.NullString
-			arguments    sql.NullString
+			name         pgtype.Text
+			arguments    pgtype.Text
 		)
 		if err := rows.Scan(&selectorName, &name, &arguments); err != nil {
 			return nil, fmt.Errorf("scan explicit function: %w", err)
@@ -255,9 +250,7 @@ ORDER BY requested.ordinal`,
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read explicit functions: %w", err)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("close explicit function rows: %w", err)
-	}
+	rows.Close()
 	sort.Slice(objects, func(i, j int) bool {
 		return objects[i].name+"("+objects[i].functionArguments+")" <
 			objects[j].name+"("+objects[j].functionArguments+")"

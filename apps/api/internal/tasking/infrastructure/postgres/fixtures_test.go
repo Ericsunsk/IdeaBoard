@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	tasks "ideaboard/api/internal/tasking/domain"
 	runtimecontracts "ideaboard/api/internal/tasking/ports/runtime"
@@ -12,23 +15,20 @@ import (
 
 func completedTaskConvergenceIntent(
 	taskID string,
-	accountID int64,
-	providerEndpointID int64,
-	credentialID int64,
-	leaseToken string,
+	executionToken string,
 	result string,
 	completedAt time.Time,
 	outputs []tasks.TaskOutput,
 	attemptFinish *tasks.TaskAttemptFinish,
 ) runtimecontracts.TaskConvergenceIntent {
 	return runtimecontracts.TaskConvergenceIntent{
-		Kind:          runtimecontracts.TaskConvergenceCompleted,
-		TaskID:        taskID,
-		Lease:         &runtimecontracts.TaskLeaseIdentity{AccountID: accountID, ProviderEndpointID: providerEndpointID, CredentialID: credentialID, LeaseToken: leaseToken},
-		Result:        result,
-		OccurredAt:    completedAt,
-		Outputs:       outputs,
-		AttemptFinish: attemptFinish,
+		Kind:           runtimecontracts.TaskConvergenceCompleted,
+		TaskID:         taskID,
+		ExecutionToken: executionToken,
+		Result:         result,
+		OccurredAt:     completedAt,
+		Outputs:        outputs,
+		AttemptFinish:  attemptFinish,
 	}
 }
 
@@ -47,14 +47,14 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 		accountID := tasks.IDValue(task.AccountID)
 		if task.AssignedProviderEndpointID == nil {
 			var providerEndpointID int64
-			if err := repo.db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&providerEndpointID); err != nil {
+			if err := repo.db.QueryRow(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&providerEndpointID); err != nil {
 				return fmt.Errorf("load task store fixture provider endpoint: %w", err)
 			}
 			task.AssignedProviderEndpointID = testPtr(providerEndpointID)
 		}
 		if task.AssignedCredentialID == nil {
 			var credentialID int64
-			if err := repo.db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&credentialID); err != nil {
+			if err := repo.db.QueryRow(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&credentialID); err != nil {
 				return fmt.Errorf("load task store fixture credential: %w", err)
 			}
 			task.AssignedCredentialID = testPtr(credentialID)
@@ -92,4 +92,66 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 
 func testPtr(value int64) *int64 {
 	return &value
+}
+
+func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*tasks.Task) {
+	t.Helper()
+	for _, item := range items {
+		if item.Params == "" {
+			item.Params = `{"schema_version":5}`
+		}
+		if err := createRepositoryTestTask(t, repo, ctx, item); err != nil {
+			t.Fatalf("seed task %q failed: %v", item.TaskID, err)
+		}
+	}
+}
+
+func seedRepositoryRunningTaskWithActiveLease(t *testing.T, repo *Repository, db *pgxpool.Pool, ctx context.Context, taskID string, accountID int64, channelID int64, credentialID int64, taskLeaseToken string, _ string) *tasks.Task {
+	t.Helper()
+	task := &tasks.Task{
+		TaskID:                     taskID,
+		UserID:                     1,
+		AssignedProviderEndpointID: testPtr(channelID),
+		AssignedCredentialID:       testPtr(credentialID),
+		AccountID:                  testPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 taskLeaseToken,
+		ResolvedModel:              "gpt-image-1",
+	}
+	seedTasks(t, repo, ctx, task)
+	if _, err := db.Exec(ctx, `
+INSERT INTO task_execution_attempts(task_id,river_job_id,attempt_no,execution_token,feature_slug,requested_model)
+VALUES($1,1,1,$2,'image-generate','gpt-image-1')
+ON CONFLICT (execution_token) DO NOTHING`,
+		taskID, taskLeaseToken); err != nil {
+		t.Fatalf("seed active execution attempt for %s failed: %v", taskID, err)
+	}
+	return task
+}
+
+func assertRepositoryActiveLeaseCount(t *testing.T, db *pgxpool.Pool, taskID string, want int) {
+	t.Helper()
+	var leaseToken string
+	if err := db.QueryRow(t.Context(), `SELECT COALESCE(lease_token, '') FROM tasks WHERE task_id = $1`, taskID).Scan(&leaseToken); err != nil {
+		t.Fatalf("load task lease token for %q failed: %v", taskID, err)
+	}
+	got := 0
+	if leaseToken != "" {
+		got = 1
+	}
+	if got != want {
+		t.Fatalf("active lease count for %q=%d, want %d (lease_token=%q)", taskID, got, want, leaseToken)
+	}
+}
+
+func assertTaskState(t *testing.T, repo *Repository, ctx context.Context, taskID string, status string, accountID int64, leaseToken string) {
+	t.Helper()
+	task, err := repo.GetByTaskID(ctx, taskID)
+	if err != nil {
+		t.Fatalf("load task %q failed: %v", taskID, err)
+	}
+	if task.Status != status || tasks.IDValue(task.AccountID) != accountID || task.LeaseToken != leaseToken {
+		t.Fatalf("task %q state = status=%q account_id=%d lease_token=%q, want status=%q account_id=%d lease_token=%q",
+			taskID, task.Status, tasks.IDValue(task.AccountID), task.LeaseToken, status, accountID, leaseToken)
+	}
 }

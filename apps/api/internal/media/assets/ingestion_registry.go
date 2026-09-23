@@ -3,14 +3,14 @@ package assets
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/platform/database"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	mediaerrors "ideaboard/api/internal/media/errors"
@@ -20,6 +20,10 @@ import (
 	"ideaboard/api/internal/media/storage/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func (r *MediaAssetRegistry) Begin(ctx context.Context, request ingestion.Request) (ingestion.Handle, error) {
@@ -57,14 +61,14 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 	if err != nil {
 		return err
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin media asset completion: %w", err)
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 	q := dbsqlc.New(tx)
@@ -76,7 +80,7 @@ func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Hand
 	}); err != nil {
 		return fmt.Errorf("complete media asset: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit media asset completion: %w", err)
 	}
 	committed = true
@@ -109,7 +113,7 @@ func (r *MediaAssetRegistry) markReadyAssetFailed(ctx context.Context, handle in
 	_, err := r.q.MarkReadyMediaAssetFailed(ctx, dbsqlc.MarkReadyMediaAssetFailedParams{
 		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, ErrorMessage: message,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return nil
 	}
 	return err
@@ -124,14 +128,14 @@ func (r *MediaAssetRegistry) Fail(ctx context.Context, handle ingestion.Handle, 
 		message = cause.Error()
 	}
 	_, err := r.q.MarkMediaAssetFailed(ctx, dbsqlc.MarkMediaAssetFailedParams{ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, ErrorMessage: message})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return nil
 	}
 	return err
 }
 
 type MediaAssetRegistry struct {
-	db                          *sql.DB
+	db                          *pgxpool.Pool
 	q                           *dbsqlc.Queries
 	now                         func() time.Time
 	integrityVerifier           processingInputIntegrityVerifier
@@ -157,7 +161,7 @@ func (r *MediaAssetRegistry) FindReadyLibraryMaterializedMedia(ctx context.Conte
 	asset, err := r.q.GetReadyLibraryMaterializedMediaAsset(ctx, dbsqlc.GetReadyLibraryMaterializedMediaAssetParams{
 		OwnerUserID: ownerUserID, LibraryAssetID: libraryAssetID,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.MediaAsset{}, false, nil
 	}
 	if err != nil {
@@ -178,21 +182,21 @@ func (r *MediaAssetRegistry) beginLibraryMaterialization(ctx context.Context, re
 	if err != nil {
 		return ingestion.Handle{}, err
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin library materialized media transaction: %w", err)
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 	q := dbsqlc.New(tx)
 	assetIDValue, err := q.BeginLibraryMaterializedMediaAsset(ctx, dbsqlc.BeginLibraryMaterializedMediaAssetParams{
 		AssetID: assetID, OwnerUserID: request.OwnerUserID, StorageProfileID: request.StorageProfile, StorageKey: request.StorageKey,
 		Url: request.URL, SourceUrl: request.SourceURL, Metadata: metadata,
-		ReclaimAfter: sql.NullTime{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
+		ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
 	})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin library materialized media: %w", err)
@@ -202,14 +206,14 @@ func (r *MediaAssetRegistry) beginLibraryMaterialization(ctx context.Context, re
 	}); err != nil {
 		return ingestion.Handle{}, fmt.Errorf("link library materialized media: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return ingestion.Handle{}, fmt.Errorf("commit library materialized media transaction: %w", err)
 	}
 	committed = true
 	return ingestionHandle(assetIDValue, assetID, false, request), nil
 }
 
-func NewMediaAssetRegistry(db *sql.DB) *MediaAssetRegistry {
+func NewMediaAssetRegistry(db *pgxpool.Pool) *MediaAssetRegistry {
 	return &MediaAssetRegistry{db: db, q: dbsqlc.New(db), now: time.Now}
 }
 
@@ -281,7 +285,7 @@ func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int6
 		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaNotFound, "media.manifest.resolve", "invalid asset id", nil)
 	}
 	row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		// Assets whose processing-input was never materialized (e.g. task
 		// outputs created before their first chained use) render it on
 		// demand here instead of failing the submission.
@@ -292,7 +296,7 @@ func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int6
 			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", materializeErr)
 		}
 		row, err = r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
 		}
 	}
@@ -352,7 +356,7 @@ func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetByChecksum(ctx context.Cont
 	asset, err := r.q.FindReadyOwnedMediaAssetByChecksum(ctx, dbsqlc.FindReadyOwnedMediaAssetByChecksumParams{
 		OwnerUserID: ownerUserID, StorageProfileID: strings.TrimSpace(storageProfileID), ChecksumSha256: strings.TrimSpace(checksum),
 	})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.MediaAsset{}, false, nil
 	}
 	if err != nil {
@@ -410,14 +414,14 @@ func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request inges
 		return ingestion.Handle{}, fmt.Errorf("encode board upload media metadata: %w", err)
 	}
 	registeredAt := r.now()
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin board upload media registration: %w", err)
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 	q := dbsqlc.New(tx)
@@ -434,12 +438,12 @@ func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request inges
 		ChecksumSha256:   "",
 		Status:           "uploading",
 		Metadata:         metadata,
-		ReclaimAfter:     sql.NullTime{Time: registeredAt.Add(reclamation.GracePeriod), Valid: true},
+		ReclaimAfter:     pgtype.Timestamptz{Time: registeredAt.Add(reclamation.GracePeriod), Valid: true},
 	})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("register board upload media asset: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return ingestion.Handle{}, fmt.Errorf("commit board upload media registration: %w", err)
 	}
 	committed = true
@@ -467,13 +471,13 @@ func (r *MediaAssetRegistry) beginTaskResult(ctx context.Context, request ingest
 	existingReady := false
 	if existing, lookupErr := r.q.GetMediaAssetByStorageLocator(ctx, dbsqlc.GetMediaAssetByStorageLocatorParams{StorageProfileID: profileID, StorageKey: storageKey}); lookupErr == nil {
 		existingReady = existing.Status == "ready"
-	} else if !errors.Is(lookupErr, sql.ErrNoRows) {
+	} else if !database.IsNotFound(lookupErr) {
 		return ingestion.Handle{}, fmt.Errorf("check task result ingestion state: %w", lookupErr)
 	}
 	id, err := r.q.BeginTaskResultMediaAsset(ctx, dbsqlc.BeginTaskResultMediaAssetParams{
 		AssetID: assetID, OwnerUserID: request.OwnerUserID, StorageProfileID: profileID,
 		StorageKey: storageKey, Url: strings.TrimSpace(request.URL), SourceUrl: strings.TrimSpace(request.SourceURL),
-		Metadata: metadata, ReclaimAfter: sql.NullTime{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
+		Metadata: metadata, ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
 	})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin task result ingestion: %w", err)
@@ -496,14 +500,14 @@ func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, req
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("encode prepared media metadata: %w", err)
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("begin prepared media registration: %w", err)
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 	q := dbsqlc.New(tx)
@@ -512,7 +516,7 @@ func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, req
 		StorageKey: request.StorageKey, Url: request.URL, SourceUrl: request.SourceURL, MimeType: "",
 		Width: 0, Height: 0, SizeBytes: 0, Metadata: metadata,
 		ChecksumSha256: "", Status: "uploading",
-		ReclaimAfter: sql.NullTime{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
+		ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
 	})
 	if err != nil {
 		return ingestion.Handle{}, fmt.Errorf("register prepared media asset: %w", err)
@@ -520,7 +524,7 @@ func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, req
 	if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{MediaAssetID: asset, OwnerUserID: request.OwnerUserID, RefType: "prompt_reference", RefID: facts.RefID, TaskID: "", Role: facts.Role, InputIndex: int32(facts.InputIndex), Metadata: metadata}); err != nil {
 		return ingestion.Handle{}, fmt.Errorf("register prepared media ref: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return ingestion.Handle{}, fmt.Errorf("commit prepared media registration: %w", err)
 	}
 	committed = true
@@ -561,7 +565,7 @@ func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ow
 	}
 	row, err := r.q.FindPreparedGenerationMedia(ctx, dbsqlc.FindPreparedGenerationMediaParams{OwnerUserID: ownerUserID, RefID: refID, Role: role, InputIndex: int32(inputIndex)})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			return PreparedGenerationMedia{}, false, nil
 		}
 		return PreparedGenerationMedia{}, false, err
@@ -574,7 +578,7 @@ func (r *MediaAssetRegistry) FindIngestingPreparedGenerationMedia(ctx context.Co
 		return PreparedGenerationMedia{}, false, fmt.Errorf("media asset registry is unavailable")
 	}
 	row, err := r.q.FindIngestingPreparedGenerationMedia(ctx, dbsqlc.FindIngestingPreparedGenerationMediaParams{OwnerUserID: ownerUserID, RefID: refID, Role: role, InputIndex: int32(inputIndex)})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return PreparedGenerationMedia{}, false, nil
 	}
 	if err != nil {
@@ -622,7 +626,7 @@ func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ow
 		OwnerUserID: ownerUserID,
 		Url:         trimmed,
 	})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return 0, false, nil
 	}
 	if err != nil {
@@ -640,7 +644,7 @@ func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup port
 		if err == nil {
 			return ports.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
 		}
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !database.IsNotFound(err) {
 			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by ID: %w", err)
 		}
 		return ports.StoredUploadLocation{}, false, nil
@@ -653,7 +657,7 @@ func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup port
 				StorageKey:       row.StorageKey,
 			}, true, nil
 		}
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !database.IsNotFound(err) {
 			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by URL: %w", err)
 		}
 	}
@@ -686,7 +690,7 @@ func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup 
 		MediaAssetID: lookup.AssetID,
 		Tier:         strings.TrimSpace(lookup.Tier),
 	})
-	if errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return ports.StoredUploadLocation{}, false, nil
 	}
 	if err != nil {
@@ -716,7 +720,7 @@ func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Contex
 		derivative, err := r.q.GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{
 			MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
 		})
-		if errors.Is(err, sql.ErrNoRows) {
+		if database.IsNotFound(err) {
 			// Task outputs never pass through ingestion completion, so they
 			// carry no processing-input row until first use. Materialize on
 			// demand here (same seam as the manifest builder) instead of
@@ -740,7 +744,7 @@ func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Contex
 			derivative, err = r.q.GetMediaDerivativeByAssetTier(ctx, dbsqlc.GetMediaDerivativeByAssetTierParams{
 				MediaAssetID: assetID, OwnerUserID: userID, Tier: "processing-input",
 			})
-			if errors.Is(err, sql.ErrNoRows) {
+			if database.IsNotFound(err) {
 				return mediaerrors.New(
 					mediaerrors.CodeMediaProcessing,
 					"media.derivative.validate_processing_input",

@@ -14,10 +14,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	accounthttp "ideaboard/api/internal/accountpool/accounts/interfaces/http"
-	providerendpointsapp "ideaboard/api/internal/accountpool/providerendpoints/application"
-	providerendpointshttp "ideaboard/api/internal/accountpool/providerendpoints/interfaces/http"
-	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/aigateway"
+	billinghttp "ideaboard/api/internal/billing/interfaces/http"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
@@ -31,7 +29,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
-	"ideaboard/api/internal/searchcatalog"
+	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
 	"ideaboard/api/internal/testdb"
@@ -296,7 +294,7 @@ func TestPublicBrandingSettingsHandlerRequiresProvider(t *testing.T) {
 func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	registerPublicRoutes(router, nil, searchcatalog.NewSearchHandler(nil), nil)
+	registerPublicRoutes(router, nil, searchhttp.NewSearchHandler(nil), nil)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, RoutePublicSearch, nil)
@@ -305,8 +303,8 @@ func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
 	if res.Code == http.StatusUnauthorized {
 		t.Fatalf("public search route unexpectedly required authentication: status=%d body=%s", res.Code, res.Body.String())
 	}
-	if res.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d for an unconfigured public search service; body=%s", res.Code, http.StatusOK, res.Body.String())
+	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), `"code":"search_unavailable"`) {
+		t.Fatalf("status = %d body=%s, want unauthenticated search_unavailable 503", res.Code, res.Body.String())
 	}
 }
 
@@ -322,7 +320,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			AuthHandler:       auth.NewAuthHandler(nil),
 			TaskHandler:       taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			BoardHandler:      boards.NewHandler(nil, config.PublicOriginsConfig{}),
-			BillingHandler:    billing.NewHandler(nil, nil),
+			BillingHandler:    billinghttp.NewHandler(nil, nil),
 			BillingRecords:    billingrecords.NewHandler(nil),
 			CreditUserHandler: credithttp.NewUserHandler(nil, nil),
 			UsageHandler:      usage.NewHandler(nil),
@@ -334,14 +332,13 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		AdminRoutes: AdminRouteDeps{
 			AdminHandler:                identityhttp.NewAdminHandler(nil, nil, nil),
 			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
-			BillingHandler:              billing.NewHandler(nil, nil),
+			AIGatewayHandler:            aigateway.NewHandler(nil),
+			BillingHandler:              billinghttp.NewHandler(nil, nil),
 			CreditAdminCommandHandler:   credithttp.NewAdminCommandHandler(nil, nil),
 			CreditAdminReadHandler:      credithttp.NewAdminReadHandler(nil, nil),
 			CreditReconciliationHandler: credithttp.NewReconciliationHandler(nil, nil),
-			AccountHandler:              accounthttp.NewHandler(nil),
 			TaskHandler:                 taskhttp.NewHandler(taskhttp.HandlerDeps{}),
 			TaskStatsHandler:            statisticshttp.NewHandler(nil, nil),
-			ProviderEndpointHandler:     providerendpointshttp.NewHandler(providerendpointsapp.NewService(nil)),
 			StorageHandler:              storagehttp.NewHandler(nil),
 			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(nil),
 			RewardAdminCommandHandler:   rewards.NewAdminCommandHandler(nil),
@@ -391,19 +388,10 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	const adminCreditReconciliationGlobalFindingQueueRouteUnderContract = "GET /api/admin/credits/reconciliation/findings"
 
 	want := map[string]bool{
-		"DELETE /api/admin/accounts/:id":                              false,
-		"DELETE /api/admin/accounts/:id/models":                       false,
 		"DELETE /api/admin/billing/catalog/:sku":                      false,
-		"DELETE /api/admin/provider-endpoints/:id":                    false,
 		"DELETE /api/admin/rewards/codes/:id":                         false,
 		"DELETE /api/admin/storage/profiles/:id":                      false,
 		"DELETE /api/admin/users/:public_id":                          false,
-		"GET /api/admin/accounts":                                     false,
-		"GET /api/admin/accounts/:id":                                 false,
-		"GET /api/admin/accounts/:id/queue":                           false,
-		"GET /api/admin/accounts/limits":                              false,
-		"GET /api/admin/provider-endpoints":                           false,
-		"GET /api/admin/provider-endpoints/registry":                  false,
 		"GET /api/admin/feature-prompts":                              false,
 		"GET /api/admin/feature-prompts/:slug":                        false,
 		"GET /api/admin/credits/wallets/:public_id":                   false,
@@ -423,6 +411,14 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/settings/branding":                            false,
 		"GET /api/admin/settings/media-upload":                        false,
 		"GET /api/admin/settings/outbound-policy":                     false,
+		"GET /api/admin/settings/ai-gateway":                          false,
+		"GET /api/admin/settings/ai-gateway/models":                   false,
+		"GET /api/admin/settings/ai-gateway/catalog":                  false,
+		"GET /api/admin/settings/ai-gateway/detect-models":            false,
+		"GET /api/admin/settings/ai-gateway/models-reference":         false,
+		"GET /api/admin/settings/ai-gateway/brand-logo":               false,
+		"GET /api/admin/settings/ai-gateway/models-observed":          false,
+		"GET /api/admin/settings/ai-gateway/providers":                false,
 		"GET /api/admin/settings/rate-limit":                          false,
 		"GET /api/admin/settings/registration":                        false,
 		"GET /api/admin/statistics":                                   false,
@@ -433,7 +429,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/tasks/:task_id":                               false,
 		"GET /api/admin/users":                                        false,
 		"GET /api/admin/users/oauth-providers/:provider":              false,
-		"POST /api/admin/accounts":                                    false,
 		"POST /api/admin/credits/grants":                              false,
 		"POST /api/admin/credits/deductions":                          false,
 		"POST /api/admin/credits/corrections":                         false,
@@ -443,10 +438,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/payments/orders/:order_number/refunds":       false,
 		"POST /api/admin/rewards/codes":                               false,
 		"POST /api/admin/rewards/codes/search":                        false,
-		"POST /api/admin/accounts/:id/start":                          false,
-		"POST /api/admin/accounts/:id/stop":                           false,
-		"POST /api/admin/provider-endpoints":                          false,
-		"POST /api/admin/provider-endpoints/detect-models":            false,
+		"POST /api/admin/settings/ai-gateway/route-preview":           false,
+		"POST /api/admin/settings/ai-gateway/test-connection":         false,
 		"POST /api/admin/statistics/backfill":                         false,
 		"POST /api/admin/storage/profiles":                            false,
 		"POST /api/admin/storage/profiles/:id/apply":                  false,
@@ -458,18 +451,17 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/users/:public_id/impersonate":                false,
 		"POST /api/admin/users/:public_id/revoke-sessions":            false,
 		"POST /api/admin/users/:public_id/unban":                      false,
-		"PATCH /api/admin/accounts/:id/models":                        false,
-		"PATCH /api/admin/provider-endpoints/:id/status":              false,
 		"PATCH /api/admin/rewards/codes/:id":                          false,
 		"PATCH /api/admin/rewards/codes/:id/enabled":                  false,
-		"PUT /api/admin/accounts/:id":                                 false,
 		"PUT /api/admin/billing/catalog/:sku/availability":            false,
-		"PUT /api/admin/provider-endpoints/:id":                       false,
 		"PUT /api/admin/feature-prompts/:slug":                        false,
 		"PUT /api/admin/payments/stripe-config":                       false,
 		"PUT /api/admin/settings/branding":                            false,
 		"PUT /api/admin/settings/media-upload":                        false,
 		"PUT /api/admin/settings/outbound-policy":                     false,
+		"PUT /api/admin/settings/ai-gateway":                          false,
+		"PUT /api/admin/settings/ai-gateway/models/:feature":          false,
+		"PUT /api/admin/settings/ai-gateway/catalog":                  false,
 		"PUT /api/admin/settings/rate-limit":                          false,
 		"PUT /api/admin/settings/registration":                        false,
 		"PUT /api/admin/storage/profiles/:id":                         false,

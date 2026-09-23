@@ -22,12 +22,12 @@ func TestRiverRuntimeRoleHasOperationalPrivilegesWithoutMigrationOwnership(t *te
 	}
 	runtimeRole := fmt.Sprintf("river_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role error = %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
 	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
@@ -37,12 +37,12 @@ func TestRiverRuntimeRoleHasOperationalPrivilegesWithoutMigrationOwnership(t *te
 		t.Fatal("schema owner was accepted as the River runtime role")
 	}
 
-	runtimeConn, err := db.Conn(ctx)
+	runtimeConn, err := db.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime connection error = %v", err)
 	}
-	defer runtimeConn.Close()
-	if _, err := runtimeConn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
+	defer runtimeConn.Release()
+	if _, err := runtimeConn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE error = %v", err)
 	}
 	if err := dbprivileges.Verify(ctx, runtimeConn, policies...); err != nil {

@@ -2,7 +2,6 @@ package credits
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -44,18 +43,17 @@ type postgresBackendsSet struct {
 func postgresBackends() postgresBackendsSet {
 	return postgresBackendsSet{
 		commands: commands.Backend{
-			ExecuteCreditCommand: postgres.ExecuteCreditCommand, ExecuteSQLCreditCommand: postgres.ExecuteSQLCreditCommand,
-			ExecuteCreditPurchase: postgres.ExecuteCreditPurchase, ExecuteSQLCreditPurchase: postgres.ExecuteSQLCreditPurchase,
-			ExecuteCreditPurchaseRefundHold: postgres.ExecuteCreditPurchaseRefundHold, ExecuteSQLCreditPurchaseRefundHold: postgres.ExecuteSQLCreditPurchaseRefundHold,
-			ExecuteCreditPurchaseRefund: postgres.ExecuteCreditPurchaseRefund, ExecuteSQLCreditPurchaseRefund: postgres.ExecuteSQLCreditPurchaseRefund,
-			ExecuteCreditPaymentDisputeDebit: postgres.ExecuteCreditPaymentDisputeDebit, ExecuteSQLCreditPaymentDisputeDebit: postgres.ExecuteSQLCreditPaymentDisputeDebit,
-			ExecuteCreditPaymentDisputeRestore: postgres.ExecuteCreditPaymentDisputeRestore, ExecuteSQLCreditPaymentDisputeRestore: postgres.ExecuteSQLCreditPaymentDisputeRestore,
+			ExecuteCreditCommand:               postgres.ExecuteCreditCommand,
+			ExecuteCreditPurchase:              postgres.ExecuteCreditPurchase,
+			ExecuteCreditPurchaseRefundHold:    postgres.ExecuteCreditPurchaseRefundHold,
+			ExecuteCreditPurchaseRefund:        postgres.ExecuteCreditPurchaseRefund,
+			ExecuteCreditPaymentDisputeDebit:   postgres.ExecuteCreditPaymentDisputeDebit,
+			ExecuteCreditPaymentDisputeRestore: postgres.ExecuteCreditPaymentDisputeRestore,
 		},
 		wallet: appwallet.Backend{
 			MapDatabaseError: postgres.MapCreditDatabaseError, ProvisionWallet: postgres.ProvisionWallet, BindIdentityKey: postgres.BindIdentityKey,
 			SetWalletFrozen: postgres.SetWalletFrozen, ClaimWelcome: postgres.ClaimWelcome, ExecuteGrant: postgres.ExecuteGrant,
 			RestrictWallet: postgres.RestrictWallet, ReleaseWallet: postgres.ReleaseWallet,
-			SQLRestrictWallet: postgres.SQLRestrictWallet, SQLReleaseWallet: postgres.SQLReleaseWallet,
 		},
 		readmodel: readmodel.Backend{GetAvailableBalances: postgres.GetAvailableBalances, GetWallet: postgres.GetWallet, ListLedger: postgres.ListLedger},
 		health:    health.Backend{GetSnapshot: postgres.GetCreditHealthSnapshot},
@@ -212,11 +210,14 @@ func (s *Service) InTx(tx pgx.Tx) ports.Commands {
 	return commands.NewTransactionCommands(tx, s.commandBackend)
 }
 
-// CommandsInSQLTx composes Credits commands into an existing database/sql
-// transaction without requiring an application-lifetime Service. The caller
-// owns commit and rollback.
-func CommandsInSQLTx(tx *sql.Tx) (ports.Commands, error) {
-	return commands.NewSQLTransactionCommands(tx, defaultPostgresBackends.commands)
+// CommandsInTx composes Credits commands into an existing pgx transaction
+// without requiring an application-lifetime Service. The caller owns commit
+// and rollback.
+func CommandsInTx(tx pgx.Tx) (ports.Commands, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("credits: transaction is nil")
+	}
+	return commands.NewTransactionCommands(tx, defaultPostgresBackends.commands), nil
 }
 
 // LifecycleInTx lets Identity compose Wallet changes with user writes.
@@ -235,10 +236,10 @@ func (s *Service) RestrictionsInTx(tx pgx.Tx) ports.WalletRestrictionCommands {
 	return appwallet.NewRestrictionTransaction(tx, s.walletBackend)
 }
 
-// RestrictionsInSQLTx lets Payments compose restriction changes with its
-// database/sql transaction and the same Credits-owned SECURITY DEFINER seam.
-func RestrictionsInSQLTx(tx *sql.Tx) ports.WalletRestrictionCommands {
-	return appwallet.NewSQLRestrictionCommands(tx, defaultPostgresBackends.wallet)
+// RestrictionsInTx lets callers compose restriction changes with their pgx
+// transaction and the same Credits-owned SECURITY DEFINER seam.
+func RestrictionsInTx(tx pgx.Tx) ports.WalletRestrictionCommands {
+	return appwallet.NewRestrictionTransaction(tx, defaultPostgresBackends.wallet)
 }
 
 func (s *Service) Grant(ctx context.Context, command ports.GrantCommand) (ports.CommandResult, error) {

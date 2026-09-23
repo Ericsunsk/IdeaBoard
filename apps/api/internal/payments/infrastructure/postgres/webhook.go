@@ -2,13 +2,15 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
 	paymentports "ideaboard/api/internal/payments/ports"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (r *Repository) InsertStripeWebhookEvent(ctx context.Context, event paymentports.StripeWebhookEvent, result string, processedAt *time.Time) (bool, error) {
@@ -18,7 +20,7 @@ func (r *Repository) InsertStripeWebhookEvent(ctx context.Context, event payment
 	rows, err := r.dbWithContext(ctx).queries().InsertPaymentWebhookEvent(ctx, dbsqlc.InsertPaymentWebhookEventParams{
 		StripeEventID: event.ID, EventType: event.Type, StripeObjectID: event.ObjectID,
 		PaymentIntentID: event.PaymentIntentID, ChargeID: event.ChargeID,
-		Livemode: event.Livemode, StripeCreatedAt: event.CreatedAt, ProcessingResult: result,
+		Livemode: event.Livemode, StripeCreatedAt: dbutil.TimestamptzFromTime(event.CreatedAt), ProcessingResult: result,
 		ProcessedAt: dbutil.NullTime(processedAt),
 	})
 	if err != nil {
@@ -33,7 +35,7 @@ func (r *Repository) MarkStripeWebhookEventProcessed(ctx context.Context, eventI
 	}
 	rows, err := r.dbWithContext(ctx).queries().MarkPaymentWebhookEventProcessed(ctx, dbsqlc.MarkPaymentWebhookEventProcessedParams{
 		StripeEventID: eventID, ProcessingResult: result, ErrorSummary: boundedText(errorSummary, 500),
-		ProcessedAt: sql.NullTime{Time: processedAt, Valid: true},
+		ProcessedAt: pgtype.Timestamptz{Time: processedAt, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("mark Stripe webhook event processed: %w", err)

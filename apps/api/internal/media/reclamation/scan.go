@@ -2,14 +2,26 @@ package reclamation
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+
 	"time"
 
-	"ideaboard/api/internal/media/maintenance"
+	"github.com/jackc/pgx/v5"
 )
 
-const StaleUploadingAfter = maintenance.StaleUploadingAfter
+// Reclamation timing policy (previously media/maintenance, folded here:
+// it had one importer and three of its five constants were already dead).
+const (
+	// StaleUploadingAfter is the default age after which uploading assets
+	// are reported as stale.
+	StaleUploadingAfter = 30 * time.Minute
+	// ProcessingLease bounds one derivative-processing lease.
+	ProcessingLease = 15 * time.Minute
+)
+
+type DBTX interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 type ScanReport struct {
 	StaleUploadingAssets       int64
@@ -20,7 +32,7 @@ type ScanReport struct {
 
 // Scan reports media lifecycle states that need operator attention. It is
 // intentionally read-only; the workers remain the only mutation path.
-func Scan(ctx context.Context, db *sql.DB, staleAfter time.Duration) (ScanReport, error) {
+func Scan(ctx context.Context, db DBTX, staleAfter time.Duration) (ScanReport, error) {
 	if db == nil {
 		return ScanReport{}, fmt.Errorf("media reclamation scan database is nil")
 	}
@@ -55,7 +67,7 @@ WHERE asset.deleted_at IS NULL
 			name:  "stale processing derivatives",
 			dest:  &report.StaleProcessingDerivatives,
 			query: `SELECT COUNT(*) FROM media_derivatives WHERE status = 'processing' AND updated_at < $1`,
-			args:  []any{time.Now().Add(-maintenance.ProcessingLease)},
+			args:  []any{time.Now().Add(-ProcessingLease)},
 		},
 		{
 			name:  "pending deletion assets",
@@ -65,7 +77,7 @@ WHERE asset.deleted_at IS NULL
 		},
 	}
 	for _, item := range queries {
-		if err := db.QueryRowContext(ctx, item.query, item.args...).Scan(item.dest); err != nil {
+		if err := db.QueryRow(ctx, item.query, item.args...).Scan(item.dest); err != nil {
 			return ScanReport{}, fmt.Errorf("scan %s: %w", item.name, err)
 		}
 	}

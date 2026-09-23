@@ -2,7 +2,6 @@ package reclamation
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,19 +9,23 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 )
 
 const (
-	QueueName         = "media_reclamation"
-	ReclaimJobKind    = "media_asset_reclaim"
-	ScheduleJobKind   = "media_reclamation_schedule"
-	scheduleInterval  = 15 * time.Minute
-	GracePeriod       = 24 * time.Hour
-	reclaimJobTimeout = 2 * time.Minute
+	QueueName        = "media_reclamation"
+	ReclaimJobKind   = "media_asset_reclaim"
+	ScheduleJobKind  = "media_reclamation_schedule"
+	scheduleInterval = 15 * time.Minute
+	GracePeriod      = 24 * time.Hour
+	// Reclaim and schedule Timeouts live in the River timeout matrix
+	// (taskqueue.RiverTimeoutMatrix); they must stay below ClaimLeaseDuration.
 	// The lease outlives this worker's dedicated timeout while still allowing a
 	// crashed process to recover independently of the configurable task timeout.
 	ClaimLeaseDuration       = 5 * time.Minute
@@ -51,12 +54,12 @@ type ReclaimWorker struct {
 	now     func() time.Time
 }
 
-func NewReclaimWorker(db *sql.DB, storage ObjectDeleter) *ReclaimWorker {
+func NewReclaimWorker(db *pgxpool.Pool, storage ObjectDeleter) *ReclaimWorker {
 	return &ReclaimWorker{q: dbsqlc.New(db), storage: storage, now: time.Now}
 }
 
 func (*ReclaimWorker) Timeout(*river.Job[ReclaimJobArgs]) time.Duration {
-	return reclaimJobTimeout
+	return taskqueue.RiverJobTimeoutMediaReclamation
 }
 
 func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]) error {
@@ -65,7 +68,7 @@ func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]
 	}
 	args := job.Args
 	now := w.now()
-	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	claimToken := pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	asset, claimed, err := w.claimAsset(ctx, args, now, claimToken)
 	if !claimed {
 		return w.resolveSkippedClaim(ctx, args, now)
@@ -84,16 +87,16 @@ func validReclaimJob(w *ReclaimWorker, job *river.Job[ReclaimJobArgs]) bool {
 		job.Args.MediaAssetID > 0 && job.Args.ReclaimGeneration > 0
 }
 
-func (w *ReclaimWorker) claimAsset(ctx context.Context, args ReclaimJobArgs, now time.Time, claimToken uuid.NullUUID) (dbsqlc.MediaAsset, bool, error) {
+func (w *ReclaimWorker) claimAsset(ctx context.Context, args ReclaimJobArgs, now time.Time, claimToken pgtype.UUID) (dbsqlc.MediaAsset, bool, error) {
 	asset, err := w.q.ClaimDueMediaAssetReclamation(ctx, dbsqlc.ClaimDueMediaAssetReclamationParams{
 		ID:                args.MediaAssetID,
 		ReclaimGeneration: args.ReclaimGeneration,
-		ClaimedAt:         sql.NullTime{Time: now, Valid: true},
+		ClaimedAt:         pgtype.Timestamptz{Time: now, Valid: true},
 		ClaimToken:        claimToken,
-		NowAt:             sql.NullTime{Time: now, Valid: true},
-		StaleClaimBefore:  sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+		NowAt:             pgtype.Timestamptz{Time: now, Valid: true},
+		StaleClaimBefore:  pgtype.Timestamptz{Time: now.Add(-ClaimLeaseDuration), Valid: true},
 	})
-	if database.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return dbsqlc.MediaAsset{}, false, nil
 	}
 	if err != nil {
@@ -102,7 +105,7 @@ func (w *ReclaimWorker) claimAsset(ctx context.Context, args ReclaimJobArgs, now
 	return asset, true, nil
 }
 
-func (w *ReclaimWorker) deleteClaimedObjects(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken uuid.NullUUID) error {
+func (w *ReclaimWorker) deleteClaimedObjects(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken pgtype.UUID) error {
 	if err := w.storage.DeleteObjectByStorageProfile(ctx, asset.StorageProfileID, asset.StorageKey); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return w.releaseClaimOnError(ctx, asset.ID, args.ReclaimGeneration, claimToken, fmt.Errorf("delete media asset %d: %w", asset.ID, err))
 	}
@@ -123,7 +126,7 @@ func (w *ReclaimWorker) deleteClaimedObjects(ctx context.Context, asset dbsqlc.M
 	return nil
 }
 
-func (w *ReclaimWorker) releaseClaimOnError(ctx context.Context, assetID, generation int64, claimToken uuid.NullUUID, operationErr error) error {
+func (w *ReclaimWorker) releaseClaimOnError(ctx context.Context, assetID, generation int64, claimToken pgtype.UUID, operationErr error) error {
 	releaseCtx := context.WithoutCancel(ctx)
 	if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: assetID, ReclaimGeneration: generation, ClaimToken: claimToken}); releaseErr != nil {
 		return errors.Join(operationErr, fmt.Errorf("release media reclamation claim: %w", releaseErr))
@@ -131,7 +134,7 @@ func (w *ReclaimWorker) releaseClaimOnError(ctx context.Context, assetID, genera
 	return operationErr
 }
 
-func (w *ReclaimWorker) finalizeReclamation(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken uuid.NullUUID) error {
+func (w *ReclaimWorker) finalizeReclamation(ctx context.Context, asset dbsqlc.MediaAsset, args ReclaimJobArgs, claimToken pgtype.UUID) error {
 	if err := w.q.DeleteMediaDerivativesByAsset(ctx, dbsqlc.DeleteMediaDerivativesByAssetParams{MediaAssetID: asset.ID, OwnerUserID: asset.OwnerUserID}); err != nil {
 		return fmt.Errorf("delete media asset %d derivative records: %w", asset.ID, err)
 	}
@@ -139,7 +142,7 @@ func (w *ReclaimWorker) finalizeReclamation(ctx context.Context, asset dbsqlc.Me
 		ID:                asset.ID,
 		ReclaimGeneration: args.ReclaimGeneration,
 		ClaimToken:        claimToken,
-		DeletedAt:         sql.NullTime{Time: w.now(), Valid: true},
+		DeletedAt:         pgtype.Timestamptz{Time: w.now(), Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("mark media asset %d reclaimed: %w", asset.ID, err)
@@ -152,7 +155,7 @@ func (w *ReclaimWorker) finalizeReclamation(ctx context.Context, asset dbsqlc.Me
 
 func (w *ReclaimWorker) resolveSkippedClaim(ctx context.Context, args ReclaimJobArgs, now time.Time) error {
 	asset, err := w.q.GetMediaAssetByID(ctx, args.MediaAssetID)
-	if database.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
+	if database.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
@@ -176,8 +179,12 @@ type ScheduleWorker struct {
 	now func() time.Time
 }
 
-func NewScheduleWorker(db *sql.DB) *ScheduleWorker {
+func NewScheduleWorker(db *pgxpool.Pool) *ScheduleWorker {
 	return &ScheduleWorker{q: dbsqlc.New(db), now: time.Now}
+}
+
+func (*ScheduleWorker) Timeout(*river.Job[ScheduleJobArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutMediaReclamationSchedule
 }
 
 func (w *ScheduleWorker) Work(ctx context.Context, job *river.Job[ScheduleJobArgs]) error {
@@ -186,8 +193,8 @@ func (w *ScheduleWorker) Work(ctx context.Context, job *river.Job[ScheduleJobArg
 	}
 	now := w.now()
 	assetIDs, err := w.q.ListDueMediaAssetReclamationIDs(ctx, dbsqlc.ListDueMediaAssetReclamationIDsParams{
-		NowAt:            sql.NullTime{Time: now, Valid: true},
-		StaleClaimBefore: sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+		NowAt:            pgtype.Timestamptz{Time: now, Valid: true},
+		StaleClaimBefore: pgtype.Timestamptz{Time: now.Add(-ClaimLeaseDuration), Valid: true},
 		RowLimit:         dueAssetBatchSize,
 	})
 	if err != nil {
@@ -203,7 +210,7 @@ func (w *ScheduleWorker) Work(ctx context.Context, job *river.Job[ScheduleJobArg
 	for _, asset := range assetIDs {
 		if _, err := client.Insert(ctx, ReclaimJobArgs{MediaAssetID: asset.ID, ReclaimGeneration: asset.ReclaimGeneration}, &river.InsertOpts{
 			Queue:       QueueName,
-			MaxAttempts: 10,
+			MaxAttempts: taskqueue.RiverMaxAttemptsMediaReclamation,
 			Priority:    4,
 			UniqueOpts:  river.UniqueOpts{ByArgs: true},
 		}); err != nil {
@@ -217,7 +224,7 @@ func PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(
 		river.PeriodicInterval(scheduleInterval),
 		func() (river.JobArgs, *river.InsertOpts) {
-			return ScheduleJobArgs{}, &river.InsertOpts{Queue: QueueName, MaxAttempts: 10, Priority: 4}
+			return ScheduleJobArgs{}, &river.InsertOpts{Queue: QueueName, MaxAttempts: taskqueue.RiverMaxAttemptsMediaReclamation, Priority: 4}
 		},
 		&river.PeriodicJobOpts{ID: "media-reclamation-schedule", RunOnStart: true},
 	)}

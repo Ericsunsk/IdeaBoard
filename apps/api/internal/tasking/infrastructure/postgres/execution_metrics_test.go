@@ -121,6 +121,46 @@ func TestListCountsCancelledTasksSeparately(t *testing.T) {
 	}
 }
 
+func TestListCountsIgnoreStatusFilter(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	now := time.Now()
+	completedAt := now.Add(-2 * time.Minute)
+
+	tasksToSeed := []*tasks.Task{
+		{
+			TaskID:    "list-count-filter-pending",
+			UserID:    10,
+			Status:    tasks.StatusPending,
+			CreatedAt: now.Add(-5 * time.Minute),
+		},
+		{
+			TaskID:      "list-count-filter-failed",
+			UserID:      10,
+			Status:      tasks.StatusFailed,
+			CreatedAt:   now.Add(-4 * time.Minute),
+			CompletedAt: &completedAt,
+			ErrorMsg:    "boom",
+		},
+	}
+	for _, task := range tasksToSeed {
+		if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
+			t.Fatalf("seed task %s failed: %v", task.TaskID, err)
+		}
+	}
+
+	items, counts, err := taskRepo.List(ctx, 0, 0, string(tasks.StatusFailed), "", 1, 20)
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	if len(items) != 1 || items[0].TaskID != "list-count-filter-failed" {
+		t.Fatalf("filtered rows = %d, want only the failed task", len(items))
+	}
+	if counts.Total != 2 || counts.PendingCount != 1 || counts.FailedCount != 1 {
+		t.Fatalf("counts total/pending/failed=%d/%d/%d, want 2/1/1", counts.Total, counts.PendingCount, counts.FailedCount)
+	}
+}
+
 func TestPatchExecutionMetricsDoesNotOverwriteTerminalStage(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newRepositoryTestDB(t)
@@ -209,9 +249,8 @@ func TestMarkTaskFailedWithLeaseWritesTerminalExecutionMetrics(t *testing.T) {
 	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	insertRepositoryActiveTaskLease(t, db, "metrics-failed-with-lease", accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
 
-	rows, err := taskRepo.convergeFailedWithLeaseForTest(ctx, task.TaskID, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "provider timeout", "{}", completedAt, &tasks.TaskAttemptFinish{
+	rows, err := taskRepo.convergeFailedWithLeaseForTest(ctx, task.TaskID, task.LeaseToken, "provider timeout", "{}", completedAt, &tasks.TaskAttemptFinish{
 		FailureStage:    tasks.ExecutionStageProvider,
 		FailureCategory: tasks.FailureCategoryTimeout,
 		CompletedAt:     completedAt,
@@ -246,42 +285,30 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	taskRepo, db := newRepositoryTestDB(t)
 	accountID := seedRepositoryTestAccount(t, db, 95)
 	channelID := accountID + 10000
-	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 	completedAt := time.Now()
 	task := &tasks.Task{
 		TaskID:                     "metrics-completed-with-outputs",
 		UserID:                     10,
 		AssignedProviderEndpointID: testPtr(channelID),
 		AccountID:                  testPtr(accountID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-metrics-completed",
+		Status:                     tasks.StatusPending,
 		CreatedAt:                  completedAt.Add(-3 * time.Second),
 	}
 	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	insertRepositoryActiveTaskLease(t, db, "metrics-completed-with-outputs", accountID, channelID, credentialID, task.LeaseToken)
-
-	attempt, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:             task.TaskID,
-		LeaseToken:         task.LeaseToken,
-		AccountID:          accountID,
-		ProviderEndpointID: channelID,
-		CredentialID:       credentialID,
-		ProviderStartedAt:  completedAt.Add(-2 * time.Second),
-	})
-	if err != nil {
-		t.Fatalf("create attempt failed: %v", err)
+	const claimToken = "lease-metrics-completed"
+	if _, err := taskRepo.ClaimAndStartExecutionAttempt(ctx, tasks.ExecutionAttemptStart{
+		TaskID:         task.TaskID,
+		RiverJobID:     1,
+		ExecutionToken: claimToken,
+		FeatureSlug:    "generation",
+		RequestedModel: "openai/gpt-image-1",
+		StartedAt:      completedAt.Add(-2 * time.Second),
+	}); err != nil {
+		t.Fatalf("claim and start execution attempt failed: %v", err)
 	}
-	providerFinishedAt := completedAt.Add(-time.Second)
-	rows, err := taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
-		ID:                 attempt.ID,
-		Status:             tasks.TaskAttemptStatusCompleted,
-		ProviderFinishedAt: &providerFinishedAt,
-		ProviderLatencyMS:  1000,
-		TotalLatencyMS:     2000,
-		CompletedAt:        completedAt,
-	}))
+	rows, err := taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(task.TaskID, claimToken, `{"status":"success"}`, completedAt, nil, nil))
 	if err != nil || rows != 1 {
 		t.Fatalf("complete task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
@@ -497,162 +524,5 @@ func TestListMonitorGoldenSignalSamplesByRangeUsesExecutionMetrics(t *testing.T)
 	}
 	if providerObserved != 2 || providerErrors != 1 {
 		t.Fatalf("provider observed/errors=%d/%d, want 2/1 rows=%+v", providerObserved, providerErrors, rows)
-	}
-}
-
-func TestListMonitorGoldenSignalSamplesByRangeCountsFailedAttemptBeforeSuccessfulFailover(t *testing.T) {
-	ctx := context.Background()
-	taskRepo, db := newRepositoryTestDB(t)
-	accountID := seedRepositoryTestAccount(t, db, 97)
-	channelID := accountID + 10000
-	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
-	now := time.Now().Truncate(time.Millisecond)
-	baseURL := "https://example.com/repository-test-channel-10097"
-	task := &tasks.Task{
-		TaskID:                     "golden-failover-success",
-		UserID:                     10,
-		AssignedProviderEndpointID: testPtr(channelID),
-		AssignedCredentialID:       testPtr(credentialID),
-		AccountID:                  testPtr(accountID),
-		ResolvedModel:              "gpt-image-1",
-		APIType:                    "openai-compatible",
-		ProviderEndpointBaseURL:    baseURL,
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-golden-a",
-		CreatedAt:                  now.Add(-2 * time.Minute),
-	}
-	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
-		t.Fatalf("create task failed: %v", err)
-	}
-	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
-
-	firstProviderFinishedAt := now.Add(-80 * time.Second)
-	firstRef, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:             task.TaskID,
-		LeaseToken:         task.LeaseToken,
-		AccountID:          accountID,
-		ProviderEndpointID: channelID,
-		CredentialID:       credentialID,
-		ProviderStartedAt:  now.Add(-90 * time.Second),
-	})
-	if err != nil {
-		t.Fatalf("create first attempt failed: %v", err)
-	}
-	rowsUpdated, err := taskRepo.convergeRequeueForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry provider", "", &tasks.TaskAttemptFinish{
-		ID:                 firstRef.ID,
-		Status:             tasks.TaskAttemptStatusRequeued,
-		FailureStage:       tasks.ExecutionStageProvider,
-		FailureCategory:    tasks.FailureCategoryProviderError,
-		ErrorMsg:           "retry provider",
-		ProviderFinishedAt: &firstProviderFinishedAt,
-		ProviderLatencyMS:  1000,
-		CompletedAt:        firstProviderFinishedAt,
-	})
-	if err != nil || rowsUpdated != 1 {
-		t.Fatalf("requeue first attempt rows=%d err=%v, want rows=1 nil err", rowsUpdated, err)
-	}
-
-	secondLease := "lease-golden-b"
-	if _, err := db.ExecContext(ctx, `
-UPDATE tasks
-SET status = 'running',
-    account_id = $2,
-    assigned_provider_endpoint_id = $3,
-    assigned_credential_id = $4,
-    lease_token = $5
-WHERE task_id = $1`,
-		task.TaskID,
-		accountID,
-		channelID,
-		credentialID,
-		secondLease,
-	); err != nil {
-		t.Fatalf("assign second lease snapshot failed: %v", err)
-	}
-	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, secondLease)
-	if _, err := db.ExecContext(ctx, `
-UPDATE task_leases
-SET provider_endpoint_name = 'Provider B',
-    resolved_model = 'gpt-image-2'
-WHERE lease_token = $1`, secondLease); err != nil {
-		t.Fatalf("update second immutable lease snapshot failed: %v", err)
-	}
-
-	secondProviderFinishedAt := now.Add(-60 * time.Second)
-	finalizeStartedAt := now.Add(-59 * time.Second)
-	finalizeFinishedAt := now.Add(-58 * time.Second)
-	completedAt := now.Add(-57 * time.Second)
-	secondRef, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:             task.TaskID,
-		LeaseToken:         secondLease,
-		AccountID:          accountID,
-		ProviderEndpointID: channelID,
-		CredentialID:       credentialID,
-		ProviderStartedAt:  now.Add(-70 * time.Second),
-	})
-	if err != nil {
-		t.Fatalf("create second attempt failed: %v", err)
-	}
-	rowsUpdated, err = taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, secondLease, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
-		ID:                 secondRef.ID,
-		Status:             tasks.TaskAttemptStatusCompleted,
-		ProviderFinishedAt: &secondProviderFinishedAt,
-		FinalizeStartedAt:  &finalizeStartedAt,
-		FinalizeFinishedAt: &finalizeFinishedAt,
-		ProviderLatencyMS:  1000,
-		FinalizeLatencyMS:  1000,
-		TotalLatencyMS:     2000,
-		CompletedAt:        completedAt,
-	}))
-	if err != nil || rowsUpdated != 1 {
-		t.Fatalf("complete second attempt rows=%d err=%v, want rows=1 nil err", rowsUpdated, err)
-	}
-
-	queueWaitMS := int64(100)
-	providerLatencyMS := int64(2000)
-	finalizeLatencyMS := int64(1000)
-	if err := taskRepo.PatchExecutionMetrics(ctx, tasks.TaskExecutionMetricsPatch{
-		TaskID:            task.TaskID,
-		QueueWaitMS:       &queueWaitMS,
-		ProviderLatencyMS: &providerLatencyMS,
-		FinalizeLatencyMS: &finalizeLatencyMS,
-	}); err != nil {
-		t.Fatalf("patch execution metrics failed: %v", err)
-	}
-
-	rows, err := taskRepo.ListMonitorGoldenSignalSamplesByRange(ctx, now.Add(-10*time.Minute), now.Add(time.Minute))
-	if err != nil {
-		t.Fatalf("ListMonitorGoldenSignalSamplesByRange failed: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("samples=%d, want 1: %+v", len(rows), rows)
-	}
-	if rows[0].ProviderAttempts != 2 || rows[0].ProviderErrors != 1 {
-		t.Fatalf("provider attempts/errors=%d/%d, want 2/1 row=%+v", rows[0].ProviderAttempts, rows[0].ProviderErrors, rows[0])
-	}
-
-	traces, err := taskRepo.ListAdminTaskAttempts(ctx, []string{task.TaskID})
-	if err != nil {
-		t.Fatalf("ListAdminTaskAttempts failed: %v", err)
-	}
-	attempts := traces[task.TaskID]
-	if len(attempts) != 2 {
-		t.Fatalf("execution attempts=%d, want 2: %+v", len(attempts), attempts)
-	}
-	if attempts[0].AttemptNo != 1 || attempts[0].Status != tasks.TaskAttemptStatusRequeued ||
-		attempts[0].ResolvedModel != "gpt-image-1" || attempts[0].FailureCategory != tasks.FailureCategoryProviderError {
-		t.Fatalf("first execution attempt=%+v", attempts[0])
-	}
-	if attempts[1].AttemptNo != 2 || attempts[1].Status != tasks.TaskAttemptStatusCompleted ||
-		attempts[1].ProviderEndpointName != "Provider B" || attempts[1].ResolvedModel != "gpt-image-2" {
-		t.Fatalf("second execution attempt=%+v", attempts[1])
-	}
-	terminalTask, err := taskRepo.GetByTaskID(ctx, task.TaskID)
-	if err != nil {
-		t.Fatalf("GetByTaskID failed: %v", err)
-	}
-	if terminalTask.ResolvedModel != "" ||
-		terminalTask.ProviderEndpointName != "" {
-		t.Fatalf("terminal current assignment leaked historical lease: %+v", terminalTask)
 	}
 }

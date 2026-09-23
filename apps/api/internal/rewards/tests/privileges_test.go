@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	creditpostgres "ideaboard/api/internal/credits/infrastructure/postgres"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T) {
@@ -32,40 +32,40 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 
 	runtimeRole := fmt.Sprintf("rewards_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, _ = db.ExecContext(cleanupCtx, `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = db.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
+		_, _ = db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
 	})
 
 	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
-	conn, err := db.Conn(ctx)
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime connection: %v", err)
 	}
-	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE: %v", err)
 	}
-	defer func() { _, _ = conn.ExecContext(context.Background(), `RESET ROLE`) }()
+	defer func() { _, _ = conn.Exec(context.Background(), `RESET ROLE`) }()
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 UPDATE reward_codes
 SET expires_at = clock_timestamp() - INTERVAL '1 second'
 WHERE id = $1`, created.RewardCode.ID); err != nil {
 		t.Fatalf("expire RewardCode fixture: %v", err)
 	}
 	var reserved bool
-	if err := conn.QueryRowContext(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, created.RewardCode.ID).Scan(&reserved); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, created.RewardCode.ID).Scan(&reserved); err != nil {
 		t.Fatalf("reserve expired RewardCode through runtime capability: %v", err)
 	}
 	if reserved {
@@ -73,7 +73,7 @@ WHERE id = $1`, created.RewardCode.ID); err != nil {
 	}
 
 	var changed bool
-	if err := conn.QueryRowContext(ctx, `SELECT set_reward_code_enabled_v1($1, FALSE, $2)`,
+	if err := conn.QueryRow(ctx, `SELECT set_reward_code_enabled_v1($1, FALSE, $2)`,
 		created.RewardCode.ID, int64(1)).Scan(&changed); err != nil || !changed {
 		t.Fatalf("disable RewardCode through controlled command: changed=%t error=%v", changed, err)
 	}
@@ -97,7 +97,7 @@ WHERE id = $1`, created.RewardCode.ID); err != nil {
 		"guard_reward_code_identity()",
 	} {
 		var runtimeCanExecute, publicCanExecute bool
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT has_function_privilege($1, $2, 'EXECUTE'),
        has_function_privilege('public', $2, 'EXECUTE')`, runtimeRole, signature).Scan(
 			&runtimeCanExecute,
@@ -121,7 +121,7 @@ SELECT has_function_privilege($1, $2, 'EXECUTE'),
 		var owner string
 		var config string
 		var trustedSchema string
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT functions.prosecdef,
        pg_get_userbyid(functions.proowner),
        COALESCE(array_to_string(functions.proconfig, ','), ''),
@@ -138,7 +138,7 @@ WHERE functions.oid = $1::regprocedure`, signature).Scan(
 	}
 	for _, signature := range commandFunctions {
 		var runtimeCanExecute, publicCanExecute bool
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT has_function_privilege($1, $2, 'EXECUTE'),
        has_function_privilege('public', $2, 'EXECUTE')`, runtimeRole, signature).Scan(
 			&runtimeCanExecute,
@@ -214,12 +214,12 @@ func isTrustedRewardFunctionSearchPath(config, schema string) bool {
 func assertRuntimeRewardStatementDenied(
 	t *testing.T,
 	ctx context.Context,
-	conn *sql.Conn,
+	conn *pgxpool.Conn,
 	statement string,
 	args ...any,
 ) {
 	t.Helper()
-	if _, err := conn.ExecContext(ctx, statement, args...); err == nil {
+	if _, err := conn.Exec(ctx, statement, args...); err == nil {
 		t.Fatalf("runtime Rewards bypass unexpectedly succeeded: %s", statement)
 	}
 }

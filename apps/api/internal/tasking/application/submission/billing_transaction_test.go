@@ -2,7 +2,6 @@ package submission
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
@@ -44,7 +44,7 @@ func (noOpRiverTxClient) InsertTx(
 func TestBilledVariationsSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 	db, ownerPool := testdb.OpenWithPool(t)
 	ownerCredits := credits.NewService(ownerPool)
-	ownerBilling := billing.NewService(ownerPool)
+	ownerBilling := billingpostgres.NewStore(ownerPool)
 	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugVariations, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestBilledVariationsSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 	policies := []dbprivileges.Policy{
 		database.RuntimePrivilegePolicy(),
 		creditpostgres.RuntimePrivilegePolicy(),
-		billing.RuntimePrivilegePolicy(),
+		billingpostgres.RuntimePrivilegePolicy(),
 		taskstore.RuntimePrivilegePolicy(),
 	}
 	runtimeRole := testdb.CreateRestrictedRole(t, db, "task_submission_runtime")
@@ -82,7 +82,7 @@ SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
 		noOpRiverTxClient{},
 		submissionRiverTestQueue,
 		submissionRiverTestMaxAttempts,
-		taskbilling.NewService(billing.NewService(runtimePool), credits.NewService(runtimePool)),
+		taskbilling.NewService(billingpostgres.NewStore(runtimePool), credits.NewService(runtimePool)),
 	)
 	task := newBilledAIImageTask("task_style_variation_runtime_role", "variations-runtime-role", request)
 
@@ -97,7 +97,7 @@ SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
 	assertBillingSnapshotCount(t, db, result.TaskID, 1)
 	assertCreditCommandCount(t, db, result.TaskID, "hold", 1)
 	var claimCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, result.TaskID).Scan(&claimCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, result.TaskID).Scan(&claimCount); err != nil {
 		t.Fatalf("count task submission claim: %v", err)
 	}
 	if claimCount != 1 {
@@ -108,7 +108,7 @@ SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
 func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
@@ -136,10 +136,10 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	}
 	var displayName string
 	var total, reserved int64
-	if err := db.QueryRowContext(t.Context(), `SELECT display_name, total_credits FROM task_billing_snapshots WHERE task_id = $1`, firstResult.TaskID).Scan(&displayName, &total); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT display_name, total_credits FROM task_billing_snapshots WHERE task_id = $1`, firstResult.TaskID).Scan(&displayName, &total); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `SELECT balance FROM credit_accounts WHERE wallet_user_id = 42 AND account_role = 'user_reserved'`).Scan(&reserved); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT balance FROM credit_accounts WHERE wallet_user_id = 42 AND account_role = 'user_reserved'`).Scan(&reserved); err != nil {
 		t.Fatal(err)
 	}
 	if displayName != "Pattern Generation" || total != 25 || reserved != 25 {
@@ -150,7 +150,7 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 func TestConcurrentBilledDuplicateCreatesOneTaskHoldAndRiverJob(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
@@ -188,13 +188,13 @@ func TestConcurrentBilledDuplicateCreatesOneTaskHoldAndRiverJob(t *testing.T) {
 		t.Fatalf("results=%+v", got)
 	}
 	var taskCount, snapshotCount, holdCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM tasks WHERE user_id = 42 AND client_action_id = 'pattern-action-concurrent'`).Scan(&taskCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM tasks WHERE user_id = 42 AND client_action_id = 'pattern-action-concurrent'`).Scan(&taskCount); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_billing_snapshots WHERE task_id = $1`, got[0].TaskID).Scan(&snapshotCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM task_billing_snapshots WHERE task_id = $1`, got[0].TaskID).Scan(&snapshotCount); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = 'hold'`, got[0].TaskID).Scan(&holdCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = 'hold'`, got[0].TaskID).Scan(&holdCount); err != nil {
 		t.Fatal(err)
 	}
 	if taskCount != 1 || snapshotCount != 1 || holdCount != 1 || client.InsertCount() != 1 {
@@ -207,7 +207,7 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 		t.Run(missing, func(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			creditService := credits.NewService(pool)
-			billingService := billing.NewService(pool)
+			billingService := billingpostgres.NewStore(pool)
 			request := seedPatternBillingProduct(t, billingService, 25)
 			seedCreditWallet(t, pool, creditService, 42, 100)
 			repo := taskstore.NewRepository(db)
@@ -224,10 +224,10 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := db.ExecContext(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
+				if _, err := db.Exec(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := db.ExecContext(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, result.TaskID); err != nil {
+				if _, err := db.Exec(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, result.TaskID); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -243,7 +243,7 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 func TestBilledDuplicateReturnsDurableClaimAfterTaskCancellation(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	repo := taskstore.NewRepository(db)
@@ -270,10 +270,10 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskCancellation(t *testing.T) {
 		t.Fatalf("River inserts=%d, want 1", client.InsertCount())
 	}
 	var holdCount, claimCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, first.TaskID).Scan(&holdCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, first.TaskID).Scan(&holdCount); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, first.TaskID).Scan(&claimCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, first.TaskID).Scan(&claimCount); err != nil {
 		t.Fatal(err)
 	}
 	if holdCount != 1 || claimCount != 1 {
@@ -284,7 +284,7 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskCancellation(t *testing.T) {
 func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	firstRequest := seedPatternBillingProduct(t, billingService, 25)
 	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugVariations, "1k", 1)
 	if err != nil {
@@ -311,7 +311,7 @@ func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T)
 func TestBilledSubmissionInsufficientCreditsCreatesNothing(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 10)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
@@ -330,7 +330,7 @@ func TestBilledSubmissionInsufficientCreditsCreatesNothing(t *testing.T) {
 func TestConcurrentBilledSubmissionsLeaveNoWritesForInsufficientLoser(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 25)
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
@@ -389,7 +389,7 @@ func TestConcurrentBilledSubmissionsLeaveNoWritesForInsufficientLoser(t *testing
 func TestBilledSubmissionRollsBackHoldSnapshotTaskAndRiver(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
@@ -415,7 +415,7 @@ func TestBilledSubmissionRollsBackHoldSnapshotTaskAndRiver(t *testing.T) {
 func TestFreeBilledSubmissionPersistsSnapshotWithoutLedgerMovement(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	billingService := billing.NewService(pool)
+	billingService := billingpostgres.NewStore(pool)
 	request := seedPatternBillingProduct(t, billingService, 0)
 	seedCreditWallet(t, pool, creditService, 42, 0)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
@@ -430,7 +430,7 @@ func TestFreeBilledSubmissionPersistsSnapshotWithoutLedgerMovement(t *testing.T)
 		t.Fatalf("free hold=%q", result.HoldTransactionID)
 	}
 	var state string
-	if err := db.QueryRowContext(t.Context(), `SELECT state FROM task_billing_settlements WHERE task_id = $1`, result.TaskID).Scan(&state); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT state FROM task_billing_settlements WHERE task_id = $1`, result.TaskID).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
 	if state != "free" {
@@ -459,7 +459,7 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
 				db, pool := testdb.OpenWithPool(t)
 				creditService := credits.NewService(pool)
-				billingService := billing.NewService(pool)
+				billingService := billingpostgres.NewStore(pool)
 				plan, _, err := canonicalExecutionPlanFixture(feature, 1)
 				if err != nil {
 					t.Fatal(err)
@@ -498,7 +498,7 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 					t.Fatal(err)
 				}
 				var snapshotFeature, state string
-				if err := db.QueryRowContext(t.Context(), `
+				if err := db.QueryRow(t.Context(), `
 SELECT snapshots.feature_slug, settlements.state
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
@@ -509,7 +509,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &state); er
 					t.Fatalf("snapshot feature/state=%q/%q", snapshotFeature, state)
 				}
 				var holdCount int
-				if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, result.TaskID).Scan(&holdCount); err != nil {
+				if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, result.TaskID).Scan(&holdCount); err != nil {
 					t.Fatal(err)
 				}
 				if holdCount != scenario.wantHoldCount {
@@ -520,7 +520,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &state); er
 	}
 }
 
-func seedPatternBillingProduct(t *testing.T, service *billing.Service, unitCredits int64) taskbilling.Request {
+func seedPatternBillingProduct(t *testing.T, service *billingpostgres.Store, unitCredits int64) taskbilling.Request {
 	t.Helper()
 	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugGeneration, "1k", 1)
 	if err != nil {
@@ -589,11 +589,11 @@ func newBilledAIImageTask(taskID, clientActionID string, request taskbilling.Req
 }
 
 func assertBillingSnapshotCount(t *testing.T, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRow(context.Context, string, ...any) pgx.Row
 }, taskID string, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_billing_snapshots WHERE task_id = $1`, taskID).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM task_billing_snapshots WHERE task_id = $1`, taskID).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != want {
@@ -602,11 +602,11 @@ func assertBillingSnapshotCount(t *testing.T, db interface {
 }
 
 func assertCreditCommandCount(t *testing.T, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRow(context.Context, string, ...any) pgx.Row
 }, taskID, commandType string, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = $2`, taskID, commandType).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = $2`, taskID, commandType).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != want {

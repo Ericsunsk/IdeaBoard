@@ -43,7 +43,7 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
 
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO users_used_uids (storage_uid) VALUES ($1)`, "ABC123"); err != nil {
+	if _, err := db.Exec(context.Background(), `INSERT INTO users_used_uids (storage_uid) VALUES ($1)`, "ABC123"); err != nil {
 		t.Fatalf("seed used uid failed: %v", err)
 	}
 
@@ -64,7 +64,7 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = $1`, user.StorageUID).Scan(&count); err != nil {
+	if err := db.QueryRow(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = $1`, user.StorageUID).Scan(&count); err != nil {
 		t.Fatalf("count used uid failed: %v", err)
 	}
 	if count != 1 {

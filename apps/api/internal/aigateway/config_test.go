@@ -82,6 +82,9 @@ func TestValidateUpdateInput(t *testing.T) {
 		{"empty token", UpdateInput{Token: strPtr("  "), AccountID: "abcdef0123456789abcdef0123456789", GatewayID: "g"}, 7},
 		{"bad base url scheme", UpdateInput{BaseURL: "ftp://example.com", Token: strPtr("tok")}, 7},
 		{"bad base url empty host", UpdateInput{BaseURL: "http://", Token: strPtr("tok")}, 7},
+		{"base url userinfo", UpdateInput{BaseURL: "https://user:pass@example.com", Token: strPtr("tok")}, 7},
+		{"base url query", UpdateInput{BaseURL: "https://example.com/path?token=secret", Token: strPtr("tok")}, 7},
+		{"explicit invalid account with custom url", UpdateInput{BaseURL: "https://example.com", AccountID: "not-valid", Token: strPtr("tok")}, 7},
 	} {
 		if _, _, _, _, _, err := validateUpdateInput(tc.input, tc.actor); err == nil {
 			t.Fatalf("%s accepted, want error", tc.name)

@@ -5,7 +5,6 @@ import (
 	"ideaboard/api/internal/credits/testhelpers"
 
 	"context"
-	"database/sql"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
@@ -20,6 +19,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const minimumCreditLoadTransactions = 1_000_000
@@ -48,24 +48,24 @@ func TestCreditMillionTransactionDataset(t *testing.T) {
 
 	var availableAccountID int64
 	var issuanceAccountID int64
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT id FROM credit_accounts
 WHERE wallet_user_id = $1 AND account_role = 'user_available'`, userID).Scan(&availableAccountID); err != nil {
 		t.Fatalf("load available account error = %v", err)
 	}
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT id FROM credit_accounts
 WHERE wallet_user_id IS NULL AND shard_key = $1 AND account_role = 'system_issuance'`, testhelpers.WalletSystemShard(userID)).Scan(&issuanceAccountID); err != nil {
 		t.Fatalf("load issuance account error = %v", err)
 	}
 
 	seedStarted := time.Now()
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 ALTER TABLE credit_transactions DISABLE TRIGGER validate_credit_transaction_on_insert;
 ALTER TABLE credit_postings DISABLE TRIGGER guard_credit_posting_transaction_scope;`); err != nil {
 		t.Fatalf("disable seed triggers error = %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO credit_transactions (
   transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
   actor_type, actor_id, source, reason, business_reference_type,
@@ -92,7 +92,7 @@ SELECT
 FROM generate_series(1, $2::BIGINT) AS series`, userID, transactionCount); err != nil {
 		t.Fatalf("seed credit transactions error = %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO credit_postings (transaction_id, account_id, amount)
 SELECT
   'ctx_load_' || series::TEXT,
@@ -104,7 +104,7 @@ CROSS JOIN LATERAL (
 ) AS posting(account_id, amount)`, transactionCount, issuanceAccountID, availableAccountID); err != nil {
 		t.Fatalf("seed credit postings error = %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 ALTER TABLE credit_transactions ENABLE TRIGGER validate_credit_transaction_on_insert;
 ALTER TABLE credit_postings ENABLE TRIGGER guard_credit_posting_transaction_scope;`); err != nil {
 		t.Fatalf("enable seed triggers error = %v", err)
@@ -113,7 +113,7 @@ ALTER TABLE credit_postings ENABLE TRIGGER guard_credit_posting_transaction_scop
 
 	verifyStarted := time.Now()
 	var invalidTransactions int64
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COUNT(*)
 FROM (
   SELECT transaction_id
@@ -130,13 +130,13 @@ FROM (
 	verifyDuration := time.Since(verifyStarted)
 
 	var databaseBytesBefore int64
-	if err := db.QueryRowContext(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesBefore); err != nil {
+	if err := db.QueryRow(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesBefore); err != nil {
 		t.Fatalf("read database size before reconciliation error = %v", err)
 	}
 	var memoryBefore runtime.MemStats
 	runtime.ReadMemStats(&memoryBefore)
 	var reconciliationRunID int64
-	if err := db.QueryRowContext(ctx, `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'million dataset verification', NULL, FALSE)`).Scan(&reconciliationRunID); err != nil {
+	if err := db.QueryRow(ctx, `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'million dataset verification', NULL, FALSE)`).Scan(&reconciliationRunID); err != nil {
 		t.Fatalf("start reconciliation error = %v", err)
 	}
 	reconciliationStarted := time.Now()
@@ -145,14 +145,14 @@ FROM (
 	}
 	reconciliationDuration := time.Since(reconciliationStarted)
 	var reconciliationFindings int64
-	if err := db.QueryRowContext(ctx, `SELECT finding_count FROM credit_reconciliation_runs WHERE id = $1`, reconciliationRunID).Scan(&reconciliationFindings); err != nil {
+	if err := db.QueryRow(ctx, `SELECT finding_count FROM credit_reconciliation_runs WHERE id = $1`, reconciliationRunID).Scan(&reconciliationFindings); err != nil {
 		t.Fatalf("read reconciliation summary error = %v", err)
 	}
 	if reconciliationFindings != 0 {
 		t.Fatalf("clean million dataset reconciliation findings = %d", reconciliationFindings)
 	}
 	var databaseBytesAfter int64
-	if err := db.QueryRowContext(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesAfter); err != nil {
+	if err := db.QueryRow(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesAfter); err != nil {
 		t.Fatalf("read database size after reconciliation error = %v", err)
 	}
 	var memoryAfter runtime.MemStats
@@ -189,7 +189,7 @@ FROM (
 	}
 
 	var postgresVersion string
-	if err := db.QueryRowContext(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
+	if err := db.QueryRow(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
 		t.Fatalf("read PostgreSQL version error = %v", err)
 	}
 	t.Logf(
@@ -296,11 +296,11 @@ func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *cr
 }
 
 func runCreditMultiWalletThroughput(t *testing.T, ctx context.Context, service *credits.Service, db interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }) (time.Duration, float64) {
 	t.Helper()
 	const commandCount = 1000
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO users (id, display_name, storage_uid, role, status)
 SELECT 10000 + series, 'credits-load-' || series, 'L' || lpad(series::TEXT, 5, '0'), 'user', 1
 FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, commandCount); err != nil {

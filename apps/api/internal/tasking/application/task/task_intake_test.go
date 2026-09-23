@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/prompts"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -42,9 +41,7 @@ var _ taskmedia.Validator = assetAwareMediaValidator{}
 func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T) {
 	readiness := &processingReadinessStub{err: errors.New("derivative pending")}
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Capabilities: []string{"generation"}, Models: []accounts.AccountModel{{Name: "model", Enabled: true}},
-		}}},
+		Models:         &fakeIntakeModelStore{},
 		Media:          assetAwareMediaValidator{},
 		MediaReadiness: readiness,
 	})
@@ -64,11 +61,7 @@ func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T
 
 func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t *testing.T) {
 	var intake = NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:           101,
-			Capabilities: []string{"cutout", "upscale", "fill"},
-			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
+		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugInpaint:  {Prompt: "system"},
 			workflow.FeatureSlugOutpaint: {Prompt: "system"},
@@ -185,11 +178,8 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 
 func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:     101,
-			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 
 	for _, outputCount := range []interface{}{0, 5, 8, 1.5, "2"} {
@@ -209,12 +199,8 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 
 func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:           101,
-			Capabilities: []string{"cutout", "upscale"},
-			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 
 	for _, feature := range []string{workflow.FeatureSlugCutout, workflow.FeatureSlugUpscale} {
@@ -238,11 +224,8 @@ func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T
 
 func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:           101,
-			Capabilities: []string{"cutout"},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 
 	if _, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
@@ -256,11 +239,7 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 
 func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:           101,
-			Capabilities: []string{"cutout", "fill"},
-			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		}}},
+		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugInpaint: {Prompt: "system"},
 		}},
@@ -291,10 +270,8 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 
 func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt: "draw a chair", Feature: workflow.FeatureSlugRender,
@@ -326,9 +303,7 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 	preparer := &recordingGenerationMediaPreparer{}
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
-		}}},
+		Models:        &fakeIntakeModelStore{},
 		Media:         testSubmitMediaValidator{},
 		MediaPreparer: preparer,
 		MediaManifest: recordingTaskInputManifestBuilder{},
@@ -370,10 +345,8 @@ func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 
 func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
@@ -389,9 +362,7 @@ func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 
 func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
-		}}},
+		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugGeneration: {
 				Prompt:                "Create an image. {{user_prompt}}",
@@ -438,11 +409,8 @@ func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T)
 
 func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:     101,
-			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
-		Media: testSubmitMediaValidator{},
+		Models: &fakeIntakeModelStore{},
+		Media:  testSubmitMediaValidator{},
 	})
 
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
@@ -460,10 +428,7 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 
 func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:           101,
-			Capabilities: []string{"fill"},
-		}}},
+		Models: &fakeIntakeModelStore{},
 	})
 	tests := []struct {
 		feature string
@@ -503,10 +468,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 	cause := errors.New("database connection refused")
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:     101,
-			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
-		}}},
+		Models:  &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{err: cause},
 		Media:   testSubmitMediaValidator{},
 	})
@@ -525,5 +487,31 @@ func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 	}
 	if submissionErr.Code != "prompt_unavailable" || submissionErr.SafeMessage != "系统提示词暂不可用" {
 		t.Fatalf("SubmissionError = %#v", submissionErr)
+	}
+}
+
+func TestTaskIntakeReadinessFailsFastWithoutModelMapping(t *testing.T) {
+	// T09 pin: an unmapped feature fails closed at readiness with
+	// provider_unavailable, before any billing or submission work.
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Models:  &fakeIntakeModelStore{err: errors.New("AI gateway model mapping is not configured for this feature")},
+		Prompts: fakeFeaturePromptStore{},
+		Media:   testSubmitMediaValidator{},
+	})
+
+	_, err := intake.CompileReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Prompt:         "repeatable textile pattern",
+		Feature:        workflow.FeatureSlugGeneration,
+		ClientActionID: "unmapped-feature",
+	})
+	if err == nil {
+		t.Fatal("CompileReadiness succeeded without a model mapping, want provider_unavailable")
+	}
+	var submissionErr *SubmissionError
+	if !errors.As(err, &submissionErr) {
+		t.Fatalf("readiness error = %T, want SubmissionError", err)
+	}
+	if submissionErr.Code != "provider_unavailable" {
+		t.Fatalf("readiness code = %q, want provider_unavailable", submissionErr.Code)
 	}
 }

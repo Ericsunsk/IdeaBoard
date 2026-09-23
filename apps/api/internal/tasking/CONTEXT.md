@@ -9,11 +9,11 @@ transport details.
 
 - `domain`: task identity, payload, status, manifest, and lifecycle facts.
 - `application`: submission, billing, runtime state transitions, task command/
-  query use cases, and statistics use cases.
+  query use cases, statistics use cases, and retention use cases.
 - `infrastructure`: PostgreSQL persistence, terminal settlement, and River
   queue adapters.
-- `ports`: caller-owned queue, media, runtime, statistics, and submission
-  seams.
+- `ports`: caller-owned queue, media, runtime, statistics, retention, and
+  submission seams.
 - `interfaces/http`: Gin adapters consuming Task Command/Admin/User Query
   interfaces; they do not depend on repository implementations.
 
@@ -24,6 +24,10 @@ transport details.
 - PostgreSQL and River are the task facts and queue source; NATS is event-only.
 - Terminal success captures Credits; failure, cancellation, and timeout release
   the hold atomically with the task transition.
+- Raw task rows live at most the retention window (default 7 days, terminal
+  statuses only): each purge freezes statistics into task_daily_stats first,
+  then deletes tasks in one transaction. Billing snapshots/settlements/claims,
+  the credit ledger, and statistics aggregates are never purged.
 - Lease identity is fenced by task, account, provider endpoint, credential, and
   lease token; stale workers cannot overwrite a newer lease.
 - Application packages depend on interfaces/contracts, never on concrete

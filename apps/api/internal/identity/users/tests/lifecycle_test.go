@@ -616,7 +616,7 @@ func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 		t.Fatalf("encrypt payment webhook secret fixture: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO payment_stripe_credentials (
   id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id,
   api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by
@@ -628,7 +628,7 @@ VALUES (
 		t.Fatalf("seed payment credential generation: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 INSERT INTO payment_orders (
   id, public_order_number, public_token, user_id, client_idempotency_key, request_hash,
   status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,

@@ -16,25 +16,41 @@ import (
 	"sync"
 	"time"
 
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/outboundhttp"
 	"ideaboard/api/internal/workflow"
 )
 
 // DetectedModel represents a model discovered from an AI Gateway.
-// Cost fields mirror LiteLLM community units (USD per token); the admin UI
-// scales them for display. They are reference data only, never billing input.
+// Detection surfaces routing and capability facts only: no prices. Billing
+// charges solely on the billing SKU UnitCredits; reference prices (if
+// needed) come from the read-only models.dev seam.
+// New optional fields stay appended: JSON is name-addressed, but positional
+// order is a compatibility contract.
 type DetectedModel struct {
-	ID                      string  `json:"id"`
-	Name                    string  `json:"name"`
-	Provider                string  `json:"provider"`
-	Mode                    string  `json:"mode,omitempty"`
-	Description             string  `json:"description,omitempty"`
-	ContextOrResolution     string  `json:"context_or_resolution,omitempty"`
-	InputCostPerToken       float64 `json:"input_cost_per_token,omitempty"`
-	OutputCostPerToken      float64 `json:"output_cost_per_token,omitempty"`
-	CacheReadCostPerToken   float64 `json:"cache_read_input_token_cost,omitempty"`
-	CacheCreateCostPerToken float64 `json:"cache_creation_input_token_cost,omitempty"`
-	SupportsPromptCaching   bool    `json:"supports_prompt_caching,omitempty"`
+	ID                    string `json:"id"`
+	Name                  string `json:"name"`
+	Provider              string `json:"provider"`
+	Mode                  string `json:"mode,omitempty"`
+	Description           string `json:"description,omitempty"`
+	ContextOrResolution   string `json:"context_or_resolution,omitempty"`
+	SupportsPromptCaching bool   `json:"supports_prompt_caching,omitempty"`
+	// DescriptionEnriched marks auto-filled detection descriptions: the
+	// admin refresh flow may overwrite them, operator-written catalog text
+	// (enriched=false) is never touched.
+	DescriptionEnriched bool `json:"description_enriched,omitempty"`
+	// ContextLimit is the raw models.dev limit.context in tokens, present
+	// only when models.dev attests the model. It is display metadata only,
+	// never billing input.
+	ContextLimit int `json:"context_limit,omitempty"`
+	// Capabilities names the models.dev capability flags attested true for
+	// the model, upstream names verbatim (reasoning, tool_call,
+	// temperature, attachment, structured_output, open_weights). False and
+	// unknown stay absent: only present capabilities are listed.
+	Capabilities []string `json:"capabilities,omitempty"`
+	// Modalities mirrors the models.dev modalities object verbatim. Nil
+	// means the upstream entry carried no modalities.
+	Modalities *ModelReferenceModalities `json:"modalities,omitempty"`
 }
 
 // ModelDetection is the outcome of community-catalog detection: the
@@ -49,6 +65,10 @@ type ModelDetection struct {
 // configuredProvidersTTL bounds how long a control-plane provider list is
 // reused: management tokens rarely rotate provider wiring within minutes.
 const configuredProvidersTTL = 10 * time.Minute
+
+// maxConfiguredSlugsEntries bounds the token-hash cache: entries are keyed
+// by gateway token, so rotation without a bound leaks one entry per token.
+const maxConfiguredSlugsEntries = 64
 
 type configuredSlugsEntry struct {
 	slugs   []string
@@ -87,8 +107,26 @@ func cachedConfiguredSlugs(ctx context.Context, gateway ResolvedGateway) ([]stri
 		slugs:   append([]string(nil), slugs...),
 		expires: now.Add(configuredProvidersTTL),
 	}
+	evictConfiguredSlugsLocked(now)
 	configuredSlugsCache.Unlock()
 	return slugs, nil
+}
+
+// evictConfiguredSlugsLocked keeps the cache bounded: expired entries go
+// first, then arbitrary entries until back under the cap. Caller holds the
+// lock.
+func evictConfiguredSlugsLocked(now time.Time) {
+	for key, entry := range configuredSlugsCache.byToken {
+		if !now.Before(entry.expires) {
+			delete(configuredSlugsCache.byToken, key)
+		}
+	}
+	for key := range configuredSlugsCache.byToken {
+		if len(configuredSlugsCache.byToken) <= maxConfiguredSlugsEntries {
+			break
+		}
+		delete(configuredSlugsCache.byToken, key)
+	}
 }
 
 // Provider identity lives in workflow.ResolveProvider (single registry):
@@ -130,6 +168,56 @@ func resolveControlPlaneIdentity(gateway ResolvedGateway) (accountID, gatewayID 
 	return accountID, gatewayID, nil
 }
 
+// detectTarget names detection egress in outbound logs/metrics.
+const (
+	detectControlPlaneTarget = "ai-gateway-control-plane"
+	detectWorkersAITarget    = "ai-gateway-workers-ai"
+	detectCatalogTarget      = "community-catalog"
+)
+
+// fetchHTTPBody performs one bounded GET against the URL's own host through
+// the standard outbound client (SSRF allowlist + bounded retries, same as
+// the gateway migration). Status-to-error mapping stays with callers so each
+// domain keeps its fail-closed wording: an exhausted retryable status (408/
+// 429/5xx) returns its status and body preview with a nil error, exactly
+// like the single-shot response it replaces. Only transport/timeout
+// failures surface as errors.
+func fetchHTTPBody(ctx context.Context, rawURL string, headers map[string]string, timeout time.Duration, maxBytes int64, target string, maxAttempts int) (body []byte, statusCode int, err error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, 0, fmt.Errorf("请求地址无效")
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	for key, value := range headers {
+		httpReq.Header.Set(key, value)
+	}
+	resp, err := detectOutbound.Do(ctx, httpReq, outboundhttp.RequestOptions{
+		Timeout:     timeout,
+		MaxAttempts: maxAttempts,
+		// Never authorize the URL's host implicitly. Control-plane,
+		// community-catalog, and custom-gateway egress must all be present
+		// in the operator-managed outbound policy.
+		AllowHosts: outbound.AllowHosts(ctx),
+		Target:     target,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return []byte(statusErr.Body), statusErr.StatusCode, nil
+		}
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	body, err = io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	if err != nil {
+		return nil, 0, err
+	}
+	return body, resp.StatusCode, nil
+}
+
 // tryFetchConfiguredProviderSlugs queries Cloudflare AI Gateway Control Plane API
 // to discover configured providers if the token has management permissions.
 func tryFetchConfiguredProviderSlugs(ctx context.Context, gateway ResolvedGateway) ([]string, error) {
@@ -139,29 +227,16 @@ func tryFetchConfiguredProviderSlugs(ctx context.Context, gateway ResolvedGatewa
 	}
 
 	apiURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/ai-gateway/gateways/%s/provider_configs", accountID, gatewayID)
-	reqCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
-
-	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodGet, apiURL, nil)
+	body, statusCode, err := fetchHTTPBody(ctx, apiURL, map[string]string{
+		"Authorization": "Bearer " + strings.TrimSpace(gateway.Token),
+		"Content-Type":  "application/json",
+	}, 4*time.Second, 1<<20, detectControlPlaneTarget, 0)
 	if err != nil {
 		return nil, err
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(gateway.Token))
-	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := safehttp.DoRequestWithAllowHosts(reqCtx, httpReq, 4*time.Second, "api.cloudflare.com")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("control plane returned %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return nil, err
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("control plane returned %d", statusCode)
 	}
 
 	var cfResp cfProviderConfigsResponse
@@ -179,11 +254,15 @@ func tryFetchConfiguredProviderSlugs(ctx context.Context, gateway ResolvedGatewa
 	return slugs, nil
 }
 
-// DetectModels resolves the admin-visible model offering as the
-// intersection of control-plane configured providers and the LiteLLM
-// community catalog. Community keys are stored verbatim (no ID rewriting);
-// gateway-executable routing is derived in the workflow routing layer.
-// Fail-closed: control-plane and catalog failures surface as errors.
+// DetectModels resolves the admin-visible model offering as the union of
+// the LiteLLM community catalog and the models.dev catalog, both
+// intersected with the control-plane configured providers. Community keys
+// are stored verbatim (no ID rewriting); gateway-executable routing is
+// derived in the workflow routing layer.
+// Fail-closed on the primary source: control-plane and LiteLLM catalog
+// failures surface as errors. models.dev is best-effort enrichment: its
+// failure degrades to pure LiteLLM; only a LiteLLM failure (both sources
+// down included) stays fail-closed.
 func (r *ConfigRepository) DetectModels(ctx context.Context, providerFilter string) (ModelDetection, error) {
 	resolved, err := r.Resolve(ctx)
 	if err != nil {
@@ -191,17 +270,30 @@ func (r *ConfigRepository) DetectModels(ctx context.Context, providerFilter stri
 	}
 
 	filter := strings.ToLower(strings.TrimSpace(providerFilter))
+	configuredSlugs, err := cachedConfiguredSlugs(ctx, resolved)
+	if err != nil {
+		return ModelDetection{}, fmt.Errorf("读取网关已配置 Provider 失败: %w", err)
+	}
 	if filter != "" && filter != "all" && filter != "全部" {
 		spec, known := workflow.ResolveProvider(filter)
 		if !known {
 			return ModelDetection{}, fmt.Errorf("未知 Provider %q", strings.TrimSpace(providerFilter))
 		}
+		configured := false
+		for _, configuredSlug := range configuredSlugs {
+			candidate, _ := workflow.ResolveProvider(configuredSlug)
+			if candidate.Slug == spec.Slug {
+				configured = true
+				break
+			}
+		}
+		if !configured && spec.Slug == "workers-ai" {
+			configured, _ = workersAIAvailable(ctx, resolved)
+		}
+		if !configured {
+			return ModelDetection{ConfiguredProviders: 0}, nil
+		}
 		return detectWithCatalog(ctx, []workflow.ProviderEntry{spec}, 1)
-	}
-
-	configuredSlugs, err := cachedConfiguredSlugs(ctx, resolved)
-	if err != nil {
-		return ModelDetection{}, fmt.Errorf("读取网关已配置 Provider 失败: %w", err)
 	}
 	// Membership is driven by the control plane; the registry only
 	// enriches. Unknown slugs resolve to synthetic defaults (community
@@ -238,9 +330,9 @@ func hasTarget(targets []workflow.ProviderEntry, slug string) bool {
 
 // workersAIAvailable checks Workers AI upstream reachability through the
 // gateway: Workers AI needs no stored key, so control-plane config can
-// never attest it. Classification rides the shared ports signal table;
-// transport failures surface as errors so callers can distinguish
-// "unreachable" from "unavailable".
+// never attest it. The probe never fails: transport problems and truncated
+// bodies read as unavailable, and only an explicit reachable classification
+// adds the target. Classification rides the shared ports signal table.
 func workersAIAvailable(ctx context.Context, gateway ResolvedGateway) (bool, error) {
 	probeURL := strings.TrimRight(strings.TrimSpace(gateway.BaseURL), "/") + "/workers-ai/models/search"
 	parsed, err := url.Parse(probeURL)
@@ -248,72 +340,65 @@ func workersAIAvailable(ctx context.Context, gateway ResolvedGateway) (bool, err
 		return false, fmt.Errorf("网关地址无效")
 	}
 
-	reqCtx, cancel := context.WithTimeout(ctx, workflow.GatewayProbeTimeout)
-	defer cancel()
-
-	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodGet, probeURL, nil)
-	if err != nil {
-		return false, err
-	}
+	headers := map[string]string{}
 	if strings.TrimSpace(gateway.Token) != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(gateway.Token))
-		httpReq.Header.Set("cf-aig-authorization", "Bearer "+strings.TrimSpace(gateway.Token))
+		headers["Authorization"] = "Bearer " + strings.TrimSpace(gateway.Token)
+		headers["cf-aig-authorization"] = "Bearer " + strings.TrimSpace(gateway.Token)
 	}
 
-	resp, err := safehttp.DoRequestWithAllowHosts(reqCtx, httpReq, workflow.GatewayProbeTimeout, parsed.Hostname())
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	return workflow.ClassifyGatewayResponse(resp.StatusCode, string(body)) == workflow.ReachabilityReachable, nil
+	// Legacy semantics: a truncated probe body never fails the probe; only
+	// the status/body classification decides reachability. The probe stays
+	// single-shot end to end (no client-side retry): whatever answers IS
+	// the probed target.
+	body, statusCode, _ := fetchHTTPBody(ctx, probeURL, headers, workflow.GatewayProbeTimeout, 1<<20, detectWorkersAITarget, 1)
+	return workflow.ClassifyGatewayResponse(statusCode, string(body)) == workflow.ReachabilityReachable, nil
 }
 
-// detectWithCatalog intersects one community fetch with the target
-// providers' slices.
+// detectWithCatalog unions the LiteLLM community fetch with the models.dev
+// facts over the same target attribution. Either source matching a target
+// admits the model (models.dev-only entries are included, LiteLLM-only
+// entries are kept); same keys deduplicate with models.dev winning metadata
+// conflicts. models.dev failure degrades to pure LiteLLM (facts=nil);
+// LiteLLM failure stays fail-closed, which also covers both-sources-down.
 func detectWithCatalog(ctx context.Context, targets []workflow.ProviderEntry, configured int) (ModelDetection, error) {
 	entries, err := fetchCommunityCatalog(ctx)
 	if err != nil {
 		return ModelDetection{}, err
 	}
+	facts, err := loadModelsReferenceFacts(ctx, false)
+	if err != nil {
+		facts = nil
+	}
 	return ModelDetection{
-		Models:              filterCommunityModels(entries, targets),
+		Models:              filterCommunityModels(entries, facts, targets),
 		ConfiguredProviders: configured,
 	}, nil
 }
 
 // communityCatalogURL is a var for test override: the LiteLLM community
-// catalog is the single model metadata source (public JSON, no auth).
+// catalog is the primary model metadata source (public JSON, no auth);
+// models.dev joins it as best-effort enrichment in detectWithCatalog.
 var communityCatalogURL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 
 // communityCatalogTTL bounds refetch of the ~3MB community catalog.
 const communityCatalogTTL = 24 * time.Hour
 
 type communityPriceEntry struct {
-	LitellmProvider         string  `json:"litellm_provider"`
-	Mode                    string  `json:"mode"`
-	MaxInputTokens          int     `json:"max_input_tokens"`
-	DeprecationDate         string  `json:"deprecation_date"`
-	InputCostPerToken       float64 `json:"input_cost_per_token"`
-	OutputCostPerToken      float64 `json:"output_cost_per_token"`
-	CacheReadCostPerToken   float64 `json:"cache_read_input_token_cost"`
-	CacheCreateCostPerToken float64 `json:"cache_creation_input_token_cost"`
-	SupportsPromptCaching   bool    `json:"supports_prompt_caching"`
+	LitellmProvider       string `json:"litellm_provider"`
+	Mode                  string `json:"mode"`
+	MaxInputTokens        int    `json:"max_input_tokens"`
+	DeprecationDate       string `json:"deprecation_date"`
+	SupportsPromptCaching bool   `json:"supports_prompt_caching"`
 }
 
 // communityRecord is one trimmed catalog entry: key verbatim, provider
 // lower-cased for matching, deprecation resolved at fetch time.
 type communityRecord struct {
-	Key                     string
-	Provider                string
-	Mode                    string
-	MaxInputTokens          int
-	InputCostPerToken       float64
-	OutputCostPerToken      float64
-	CacheReadCostPerToken   float64
-	CacheCreateCostPerToken float64
-	SupportsPromptCaching   bool
+	Key                   string
+	Provider              string
+	Mode                  string
+	MaxInputTokens        int
+	SupportsPromptCaching bool
 }
 
 var communityCache struct {
@@ -335,31 +420,18 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 	}
 	communityCache.RUnlock()
 
-	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	catalogURL, err := url.Parse(communityCatalogURL)
-	if err != nil || catalogURL.Hostname() == "" {
-		return nil, fmt.Errorf("社区模型目录地址无效")
-	}
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, communityCatalogURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("构造社区目录请求失败: %w", err)
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; IdeaBoard/1.0)")
-
-	resp, err := safehttp.DoRequestWithAllowHosts(reqCtx, req, 15*time.Second, catalogURL.Hostname())
+	bodyBytes, statusCode, err := fetchHTTPBody(ctx, communityCatalogURL, map[string]string{
+		"User-Agent": "Mozilla/5.0 (compatible; IdeaBoard/1.0)",
+	}, 15*time.Second, 8<<20, detectCatalogTarget, 0)
 	if err != nil {
 		return nil, fmt.Errorf("获取社区模型目录失败: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("社区模型目录返回 %d", resp.StatusCode)
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("社区模型目录返回 %d", statusCode)
 	}
 
-	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil || len(bodyBytes) == 0 {
+	if len(bodyBytes) == 0 {
 		return nil, fmt.Errorf("社区模型目录内容为空")
 	}
 
@@ -385,15 +457,11 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 			}
 		}
 		entries = append(entries, communityRecord{
-			Key:                     key,
-			Provider:                strings.ToLower(strings.TrimSpace(entry.LitellmProvider)),
-			Mode:                    strings.ToLower(strings.TrimSpace(entry.Mode)),
-			MaxInputTokens:          entry.MaxInputTokens,
-			InputCostPerToken:       entry.InputCostPerToken,
-			OutputCostPerToken:      entry.OutputCostPerToken,
-			CacheReadCostPerToken:   entry.CacheReadCostPerToken,
-			CacheCreateCostPerToken: entry.CacheCreateCostPerToken,
-			SupportsPromptCaching:   entry.SupportsPromptCaching,
+			Key:                   key,
+			Provider:              strings.ToLower(strings.TrimSpace(entry.LitellmProvider)),
+			Mode:                  strings.ToLower(strings.TrimSpace(entry.Mode)),
+			MaxInputTokens:        entry.MaxInputTokens,
+			SupportsPromptCaching: entry.SupportsPromptCaching,
 		})
 	}
 
@@ -424,19 +492,25 @@ func communityRecordMatches(e communityRecord, target workflow.ProviderEntry) bo
 	return false
 }
 
-// filterCommunityModels intersects the catalog with the target providers.
-// IDs and names stay verbatim community keys (Q4): the last key segment is
-// the display name, bare keys keep the full key. First target match wins;
-// results are deduplicated and sorted by ID.
-func filterCommunityModels(entries []communityRecord, targets []workflow.ProviderEntry) []DetectedModel {
+// filterCommunityModels unions the LiteLLM catalog with the models.dev
+// facts over one shared target attribution: IDs and names stay verbatim
+// community keys (Q4) for community entries; the last key segment is the
+// display name, bare keys keep the full key. First target match wins;
+// results are deduplicated (case-insensitive across sources) and sorted by
+// ID. Same-key entries are enriched in place with models.dev winning
+// metadata conflicts; models.dev-only entries matching a target are
+// appended with the upstream display name when present.
+// Relay partitions (poe/digitalocean/aihubmix, ...) never match: they carry
+// no registry slug, so attribution drops them without a special case.
+func filterCommunityModels(entries []communityRecord, facts map[string]modelsDevFact, targets []workflow.ProviderEntry) []DetectedModel {
 	models := make([]DetectedModel, 0, 64)
-	seen := make(map[string]bool)
+	indexByLowerID := make(map[string]int)
 	for _, target := range targets {
 		for _, e := range entries {
-			if seen[e.Key] || !communityRecordMatches(e, target) {
+			lower := strings.ToLower(e.Key)
+			if _, dup := indexByLowerID[lower]; dup || !communityRecordMatches(e, target) {
 				continue
 			}
-			seen[e.Key] = true
 			name := e.Key
 			if i := strings.LastIndex(e.Key, "/"); i >= 0 {
 				name = e.Key[i+1:]
@@ -445,22 +519,183 @@ func filterCommunityModels(entries []communityRecord, targets []workflow.Provide
 			if name == "" {
 				continue
 			}
+			indexByLowerID[lower] = len(models)
 			models = append(models, DetectedModel{
-				ID:                      e.Key,
-				Name:                    name,
-				Provider:                target.DisplayName,
-				Mode:                    e.Mode,
-				ContextOrResolution:     formatContextLength(e.MaxInputTokens),
-				InputCostPerToken:       e.InputCostPerToken,
-				OutputCostPerToken:      e.OutputCostPerToken,
-				CacheReadCostPerToken:   e.CacheReadCostPerToken,
-				CacheCreateCostPerToken: e.CacheCreateCostPerToken,
-				SupportsPromptCaching:   e.SupportsPromptCaching,
+				ID:                    e.Key,
+				Name:                  name,
+				Provider:              target.DisplayName,
+				Mode:                  e.Mode,
+				ContextOrResolution:   formatContextLength(e.MaxInputTokens),
+				SupportsPromptCaching: e.SupportsPromptCaching,
 			})
+		}
+	}
+	if len(facts) > 0 {
+		ids := make([]string, 0, len(facts))
+		for id := range facts {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			fact := facts[id]
+			lower := strings.ToLower(id)
+			if idx, dup := indexByLowerID[lower]; dup {
+				applyModelsDevEnrichment(&models[idx], fact)
+				continue
+			}
+			for _, target := range targets {
+				if !modelsDevRecordMatches(lower, fact, target) {
+					continue
+				}
+				name := strings.TrimSpace(fact.name)
+				if name == "" {
+					name = lower
+					if i := strings.LastIndex(lower, "/"); i >= 0 {
+						name = lower[i+1:]
+					}
+					name = strings.TrimSpace(name)
+				}
+				if name == "" {
+					break
+				}
+				entry := DetectedModel{ID: lower, Name: name, Provider: target.DisplayName}
+				applyModelsDevEnrichment(&entry, fact)
+				indexByLowerID[lower] = len(models)
+				models = append(models, entry)
+				break
+			}
 		}
 	}
 	sortModelsByID(models)
 	return models
+}
+
+// modelsDevRecordMatches reports whether one models.dev fact belongs to one
+// provider slice, reusing the community attribution verbatim: the fact ID
+// stands in for the community key, the models.dev provider namespace for
+// the litellm_provider field.
+func modelsDevRecordMatches(id string, fact modelsDevFact, target workflow.ProviderEntry) bool {
+	return communityRecordMatches(communityRecord{
+		Key:      id,
+		Provider: strings.ToLower(strings.TrimSpace(fact.provider)),
+	}, target)
+}
+
+// applyModelsDevEnrichment overlays models.dev facts onto one detected
+// model: modalities, capabilities and limit apply whenever attested; a
+// positive limit also reformats the display context (models.dev wins the
+// conflict). Description fills only from structured facts (see
+// describeModelsDevFact) and flips DescriptionEnriched so refresh flows can
+// overwrite auto text while operator-written text stays untouched.
+func applyModelsDevEnrichment(model *DetectedModel, fact modelsDevFact) {
+	if fact.context > 0 {
+		model.ContextLimit = fact.context
+		model.ContextOrResolution = formatContextLength(fact.context)
+	}
+	if fact.modalities != nil {
+		model.Modalities = cloneReferenceModalities(fact.modalities)
+	}
+	if caps := modelsDevCapabilities(fact); len(caps) > 0 {
+		model.Capabilities = caps
+	}
+	if desc := describeModelsDevFact(fact); desc != "" {
+		model.Description = desc
+		model.DescriptionEnriched = true
+	}
+}
+
+// modelsDevCapabilities lists the upstream capability flags attested true,
+// upstream names verbatim, sorted for determinism. False (unsupported) and
+// nil (unknown) stay absent.
+func modelsDevCapabilities(fact modelsDevFact) []string {
+	flags := []struct {
+		name string
+		set  *bool
+	}{
+		{"reasoning", fact.reasoning},
+		{"tool_call", fact.toolCall},
+		{"temperature", fact.temperature},
+		{"attachment", fact.attachment},
+		{"structured_output", fact.structuredOutput},
+		{"open_weights", fact.openWeights},
+	}
+	var caps []string
+	for _, flag := range flags {
+		if flag.set != nil && *flag.set {
+			caps = append(caps, flag.name)
+		}
+	}
+	sort.Strings(caps)
+	return caps
+}
+
+// modelsDevModalityLabels renders common modality tokens for the admin UI;
+// unknown tokens pass through verbatim so feed additions stay visible.
+var modelsDevModalityLabels = map[string]string{
+	"text":  "文本",
+	"image": "图像",
+	"audio": "音频",
+	"video": "视频",
+}
+
+// describeModelsDevFact renders a short auto-generated placeholder from
+// structured models.dev facts (non-trivial modalities + knowledge cutoff).
+// Upstream marketing copy is deliberately never piped (reference-seam
+// posture: gateway运营文案优先); empty means nothing worth auto-filling,
+// so the entry keeps an empty description with enriched=false.
+func describeModelsDevFact(fact modelsDevFact) string {
+	var parts []string
+	if summary := summarizeModelsDevModalities(fact.modalities); summary != "" {
+		parts = append(parts, summary)
+	}
+	if knowledge := strings.TrimSpace(fact.knowledge); knowledge != "" {
+		parts = append(parts, "知识截止 "+knowledge)
+	}
+	return strings.Join(parts, "；")
+}
+
+// summarizeModelsDevModalities names non-text input/output modalities.
+// Pure text-to-text is the default and stays silent to avoid noise.
+func summarizeModelsDevModalities(modalities *ModelReferenceModalities) string {
+	if modalities == nil {
+		return ""
+	}
+	if !hasNonTextModality(modalities.Input) && !hasNonTextModality(modalities.Output) {
+		return ""
+	}
+	var parts []string
+	if labels := labelModalities(modalities.Input); len(labels) > 0 {
+		parts = append(parts, "输入："+strings.Join(labels, "、"))
+	}
+	if labels := labelModalities(modalities.Output); len(labels) > 0 {
+		parts = append(parts, "输出："+strings.Join(labels, "、"))
+	}
+	return strings.Join(parts, "；")
+}
+
+func hasNonTextModality(tokens []string) bool {
+	for _, token := range tokens {
+		if clean := strings.ToLower(strings.TrimSpace(token)); clean != "" && clean != "text" {
+			return true
+		}
+	}
+	return false
+}
+
+func labelModalities(tokens []string) []string {
+	var labels []string
+	for _, token := range tokens {
+		clean := strings.TrimSpace(token)
+		if clean == "" {
+			continue
+		}
+		if label, ok := modelsDevModalityLabels[strings.ToLower(clean)]; ok {
+			labels = append(labels, label)
+		} else {
+			labels = append(labels, clean)
+		}
+	}
+	return labels
 }
 
 func sortModelsByID(models []DetectedModel) {
@@ -476,12 +711,11 @@ func formatContextLength(tokens int) string {
 		}
 		return fmt.Sprintf("%.1fM", float64(tokens)/1_000_000)
 	}
+	// Binary K throughout (admin display only): exact multiples stay exact,
+	// others round to nearest KiB. Previously decimal rounding mixed with a
+	// binary special-case, so 1536 displayed as 2K.
 	if tokens >= 1000 {
-		k := (tokens + 500) / 1000
-		if tokens%1024 == 0 {
-			k = tokens / 1024
-		}
-		return fmt.Sprintf("%dK", k)
+		return fmt.Sprintf("%dK", (tokens+512)/1024)
 	}
 	return fmt.Sprintf("%d", tokens)
 }

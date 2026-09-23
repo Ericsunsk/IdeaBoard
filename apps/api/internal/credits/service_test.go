@@ -9,8 +9,8 @@ import (
 	"ideaboard/api/internal/credits/ports"
 )
 
-func TestCommandsInSQLTxRejectsNilTransaction(t *testing.T) {
-	commands, err := CommandsInSQLTx(nil)
+func TestCommandsInTxRejectsNilTransaction(t *testing.T) {
+	commands, err := CommandsInTx(nil)
 	if err == nil || commands != nil {
 		t.Fatalf("commands=%v error=%v, want explicit nil transaction error", commands, err)
 	}

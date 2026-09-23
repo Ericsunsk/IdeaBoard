@@ -7,9 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createLibraryFolder = `-- name: CreateLibraryFolder :one
@@ -24,7 +23,7 @@ type CreateLibraryFolderParams struct {
 }
 
 func (q *Queries) CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error) {
-	row := q.db.QueryRowContext(ctx, createLibraryFolder, arg.OwnerUserID, arg.Name)
+	row := q.db.QueryRow(ctx, createLibraryFolder, arg.OwnerUserID, arg.Name)
 	var i LibraryFolder
 	err := row.Scan(
 		&i.ID,
@@ -49,11 +48,11 @@ type DeleteLibraryAssetParams struct {
 }
 
 func (q *Queries) DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteLibraryAsset, arg.ID, arg.OwnerUserID)
+	result, err := q.db.Exec(ctx, deleteLibraryAsset, arg.ID, arg.OwnerUserID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const deleteLibraryFolder = `-- name: DeleteLibraryFolder :execrows
@@ -69,11 +68,11 @@ type DeleteLibraryFolderParams struct {
 }
 
 func (q *Queries) DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteLibraryFolder, arg.ID, arg.OwnerUserID)
+	result, err := q.db.Exec(ctx, deleteLibraryFolder, arg.ID, arg.OwnerUserID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const ensureLibraryFolderByName = `-- name: EnsureLibraryFolderByName :exec
@@ -88,7 +87,7 @@ type EnsureLibraryFolderByNameParams struct {
 }
 
 func (q *Queries) EnsureLibraryFolderByName(ctx context.Context, arg EnsureLibraryFolderByNameParams) error {
-	_, err := q.db.ExecContext(ctx, ensureLibraryFolderByName, arg.OwnerUserID, arg.Name)
+	_, err := q.db.Exec(ctx, ensureLibraryFolderByName, arg.OwnerUserID, arg.Name)
 	return err
 }
 
@@ -99,7 +98,7 @@ ON CONFLICT DO NOTHING
 `
 
 func (q *Queries) EnsureQuickSavesFolder(ctx context.Context, ownerUserID int64) error {
-	_, err := q.db.ExecContext(ctx, ensureQuickSavesFolder, ownerUserID)
+	_, err := q.db.Exec(ctx, ensureQuickSavesFolder, ownerUserID)
 	return err
 }
 
@@ -130,7 +129,7 @@ type GetLibraryAssetByIDForOwnerParams struct {
 }
 
 func (q *Queries) GetLibraryAssetByIDForOwner(ctx context.Context, arg GetLibraryAssetByIDForOwnerParams) (LibraryAsset, error) {
-	row := q.db.QueryRowContext(ctx, getLibraryAssetByIDForOwner, arg.ID, arg.OwnerUserID)
+	row := q.db.QueryRow(ctx, getLibraryAssetByIDForOwner, arg.ID, arg.OwnerUserID)
 	var i LibraryAsset
 	err := row.Scan(
 		&i.ID,
@@ -163,7 +162,7 @@ type GetLibraryFolderByIDForOwnerParams struct {
 }
 
 func (q *Queries) GetLibraryFolderByIDForOwner(ctx context.Context, arg GetLibraryFolderByIDForOwnerParams) (LibraryFolder, error) {
-	row := q.db.QueryRowContext(ctx, getLibraryFolderByIDForOwner, arg.ID, arg.OwnerUserID)
+	row := q.db.QueryRow(ctx, getLibraryFolderByIDForOwner, arg.ID, arg.OwnerUserID)
 	var i LibraryFolder
 	err := row.Scan(
 		&i.ID,
@@ -190,7 +189,7 @@ type GetLibraryFolderByOwnerAndNameParams struct {
 }
 
 func (q *Queries) GetLibraryFolderByOwnerAndName(ctx context.Context, arg GetLibraryFolderByOwnerAndNameParams) (LibraryFolder, error) {
-	row := q.db.QueryRowContext(ctx, getLibraryFolderByOwnerAndName, arg.OwnerUserID, arg.Name)
+	row := q.db.QueryRow(ctx, getLibraryFolderByOwnerAndName, arg.OwnerUserID, arg.Name)
 	var i LibraryFolder
 	err := row.Scan(
 		&i.ID,
@@ -214,7 +213,7 @@ WHERE owner_user_id = $1
 `
 
 func (q *Queries) GetQuickSavesFolder(ctx context.Context, ownerUserID int64) (LibraryFolder, error) {
-	row := q.db.QueryRowContext(ctx, getQuickSavesFolder, ownerUserID)
+	row := q.db.QueryRow(ctx, getQuickSavesFolder, ownerUserID)
 	var i LibraryFolder
 	err := row.Scan(
 		&i.ID,
@@ -262,15 +261,15 @@ LIMIT $5
 `
 
 type ListLibraryAssetsParams struct {
-	OwnerUserID     int64         `json:"owner_user_id"`
-	FolderID        sql.NullInt64 `json:"folder_id"`
-	CursorCreatedAt sql.NullTime  `json:"cursor_created_at"`
-	CursorID        sql.NullInt64 `json:"cursor_id"`
-	RowLimit        int32         `json:"row_limit"`
+	OwnerUserID     int64              `json:"owner_user_id"`
+	FolderID        pgtype.Int8        `json:"folder_id"`
+	CursorCreatedAt pgtype.Timestamptz `json:"cursor_created_at"`
+	CursorID        pgtype.Int8        `json:"cursor_id"`
+	RowLimit        int32              `json:"row_limit"`
 }
 
 func (q *Queries) ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]LibraryAsset, error) {
-	rows, err := q.db.QueryContext(ctx, listLibraryAssets,
+	rows, err := q.db.Query(ctx, listLibraryAssets,
 		arg.OwnerUserID,
 		arg.FolderID,
 		arg.CursorCreatedAt,
@@ -304,9 +303,6 @@ func (q *Queries) ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsPa
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -333,18 +329,18 @@ ORDER BY folders.is_system DESC, folders.is_default DESC, folders.created_at ASC
 `
 
 type ListLibraryFoldersRow struct {
-	ID          int64     `json:"id"`
-	OwnerUserID int64     `json:"owner_user_id"`
-	Name        string    `json:"name"`
-	IsSystem    bool      `json:"is_system"`
-	IsDefault   bool      `json:"is_default"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	AssetCount  int64     `json:"asset_count"`
+	ID          int64              `json:"id"`
+	OwnerUserID int64              `json:"owner_user_id"`
+	Name        string             `json:"name"`
+	IsSystem    bool               `json:"is_system"`
+	IsDefault   bool               `json:"is_default"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	AssetCount  int64              `json:"asset_count"`
 }
 
 func (q *Queries) ListLibraryFolders(ctx context.Context, ownerUserID int64) ([]ListLibraryFoldersRow, error) {
-	rows, err := q.db.QueryContext(ctx, listLibraryFolders, ownerUserID)
+	rows, err := q.db.Query(ctx, listLibraryFolders, ownerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -365,9 +361,6 @@ func (q *Queries) ListLibraryFolders(ctx context.Context, ownerUserID int64) ([]
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -401,12 +394,12 @@ WHERE assets.owner_user_id = $1
 `
 
 type LookupLibraryAssetsParams struct {
-	OwnerUserID int64           `json:"owner_user_id"`
-	Keys        json.RawMessage `json:"keys"`
+	OwnerUserID int64  `json:"owner_user_id"`
+	Keys        []byte `json:"keys"`
 }
 
 func (q *Queries) LookupLibraryAssets(ctx context.Context, arg LookupLibraryAssetsParams) ([]LibraryAsset, error) {
-	rows, err := q.db.QueryContext(ctx, lookupLibraryAssets, arg.OwnerUserID, arg.Keys)
+	rows, err := q.db.Query(ctx, lookupLibraryAssets, arg.OwnerUserID, arg.Keys)
 	if err != nil {
 		return nil, err
 	}
@@ -434,9 +427,6 @@ func (q *Queries) LookupLibraryAssets(ctx context.Context, arg LookupLibraryAsse
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -460,7 +450,7 @@ type MoveLibraryAssetParams struct {
 }
 
 func (q *Queries) MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error) {
-	row := q.db.QueryRowContext(ctx, moveLibraryAsset, arg.FolderID, arg.ID, arg.OwnerUserID)
+	row := q.db.QueryRow(ctx, moveLibraryAsset, arg.FolderID, arg.ID, arg.OwnerUserID)
 	var i LibraryAsset
 	err := row.Scan(
 		&i.ID,
@@ -495,11 +485,11 @@ type MoveLibraryAssetsToFolderParams struct {
 }
 
 func (q *Queries) MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, moveLibraryAssetsToFolder, arg.TargetFolderID, arg.OwnerUserID, arg.SourceFolderID)
+	result, err := q.db.Exec(ctx, moveLibraryAssetsToFolder, arg.TargetFolderID, arg.OwnerUserID, arg.SourceFolderID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const renameLibraryFolder = `-- name: RenameLibraryFolder :one
@@ -518,7 +508,7 @@ type RenameLibraryFolderParams struct {
 }
 
 func (q *Queries) RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error) {
-	row := q.db.QueryRowContext(ctx, renameLibraryFolder, arg.Name, arg.ID, arg.OwnerUserID)
+	row := q.db.QueryRow(ctx, renameLibraryFolder, arg.Name, arg.ID, arg.OwnerUserID)
 	var i LibraryFolder
 	err := row.Scan(
 		&i.ID,
@@ -566,7 +556,7 @@ type UpsertLibraryAssetParams struct {
 }
 
 func (q *Queries) UpsertLibraryAsset(ctx context.Context, arg UpsertLibraryAssetParams) (LibraryAsset, error) {
-	row := q.db.QueryRowContext(ctx, upsertLibraryAsset,
+	row := q.db.QueryRow(ctx, upsertLibraryAsset,
 		arg.OwnerUserID,
 		arg.FolderID,
 		arg.Provider,

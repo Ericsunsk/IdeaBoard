@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,7 +15,9 @@ import (
 
 	runtimeports "ideaboard/api/internal/runtime/ports"
 
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/outboundhttp"
+	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 )
 
 const (
@@ -23,6 +26,10 @@ const (
 	// defaultGatewayMaxResponseBytes caps one gateway payload (image
 	// responses can carry base64 bodies; callers needing more set Config).
 	defaultGatewayMaxResponseBytes = 64 << 20
+	// defaultGatewayOutboundTarget names gateway egress in outbound
+	// logs/metrics. Vision search overrides it via Config so its
+	// timeout/retry behavior stays separately observable.
+	defaultGatewayOutboundTarget = "ai-gateway"
 )
 
 // GatewayClientConfig wires the sole AI egress. The token is a Cloudflare
@@ -36,16 +43,31 @@ type GatewayClientConfig struct {
 	Timeout time.Duration
 	// MaxResponseBytes caps one response body; zero keeps the default.
 	MaxResponseBytes int64
+	// Outbound overrides the standard outbound client (timeout cap,
+	// bounded retries, Retry-After). Nil builds the gateway default
+	// policy; tests inject isolated instances here.
+	Outbound *outboundhttp.Client
+	// Target names this egress in outbound logs/metrics; empty keeps the
+	// gateway default ("ai-gateway", vision passes "vision-search").
+	Target string
+	// Metrics receives per-call RED observations by feature; nil disables
+	// observation. The outbound client keeps its own target-dimensioned
+	// counters regardless.
+	Metrics *redmetrics.Set
 }
 
 // GatewayClient sends every AI request through Cloudflare AI Gateway.
-// Egress stays pinned to the configured gateway host via safehttp.
+// Transport rides the standard outbound client (timeout cap, bounded
+// retries, Retry-After respect); egress stays pinned to the configured
+// gateway host via the safehttp SSRF allowlist underneath.
 type GatewayClient struct {
 	baseURL  string
 	token    string
-	host     string
 	timeout  time.Duration
 	maxBytes int64
+	outbound *outboundhttp.Client
+	target   string
+	metrics  *redmetrics.Set
 }
 
 var _ runtimeports.GatewayClient = (*GatewayClient)(nil)
@@ -71,12 +93,26 @@ func NewGatewayClient(cfg GatewayClientConfig) (*GatewayClient, error) {
 	if maxBytes <= 0 {
 		maxBytes = defaultGatewayMaxResponseBytes
 	}
+	outbound := cfg.Outbound
+	if outbound == nil {
+		outbound = outboundhttp.NewClient(outboundhttp.Config{
+			Timeout:     timeout,
+			MaxTimeout:  defaultGatewayTimeout,
+			MaxAttempts: 1,
+		})
+	}
+	target := strings.TrimSpace(cfg.Target)
+	if target == "" {
+		target = defaultGatewayOutboundTarget
+	}
 	return &GatewayClient{
 		baseURL:  baseURL,
 		token:    strings.TrimSpace(cfg.Token),
-		host:     parsed.Hostname(),
 		timeout:  timeout,
 		maxBytes: maxBytes,
+		outbound: outbound,
+		target:   target,
+		metrics:  cfg.Metrics,
 	}, nil
 }
 
@@ -99,25 +135,50 @@ func (c *GatewayClient) Do(ctx context.Context, req runtimeports.GatewayRequest)
 	if timeout <= 0 {
 		timeout = c.timeout
 	}
-	resp, err := safehttp.DoRequestWithAllowHosts(ctx, httpReq, timeout, c.host)
+	// Keep the application-to-gateway request single-shot. Cloudflare owns
+	// provider retries; River owns whole-task retries (ADR-0010). Repeating a
+	// POST after an ambiguous 503/transport failure could duplicate a billable
+	// provider call. req.MaxAttempts only controls Cloudflare's internal tries.
+	// The gateway URL is operator-controlled. Do not add its host here:
+	// request-time policy must explicitly authorize every configured egress.
+	resp, err := c.outbound.Do(ctx, httpReq, outboundhttp.RequestOptions{
+		Timeout:     timeout,
+		MaxAttempts: 1,
+		AllowHosts:  outbound.AllowHosts(ctx),
+		Target:      c.target,
+	})
 	if err != nil {
+		c.metrics.ObserveGatewayRequest(req.Feature, err)
+		// Bounded retries exhausted on a retryable status still surface
+		// as UpstreamHTTPError so failure classifiers (probe verdicts,
+		// provider categories, worker requeue decisions) keep working.
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return runtimeports.GatewayResponse{}, fmt.Errorf("gateway request failed: %w",
+				runtimeports.NewUpstreamHTTPError(statusErr.StatusCode, statusErr.Body, statusErr.RetryAfter))
+		}
 		return runtimeports.GatewayResponse{}, fmt.Errorf("gateway transport failed: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := readCappedResponseBody(resp.Body, c.maxBytes)
 	if err != nil {
+		c.metrics.ObserveGatewayRequest(req.Feature, err)
 		return runtimeports.GatewayResponse{}, err
 	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return runtimeports.GatewayResponse{}, fmt.Errorf("gateway request failed: %w",
-			runtimeports.NewUpstreamHTTPErrorFromResponse(resp, runtimeports.TruncateErrorBody(string(body))))
-	}
-	return runtimeports.GatewayResponse{
+	gatewayResp := runtimeports.GatewayResponse{
 		StatusCode: resp.StatusCode,
 		Header:     resp.Header.Clone(),
 		Body:       body,
 		Receipt:    parseGatewayReceipt(resp),
-	}, nil
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		non2xx := fmt.Errorf("gateway request failed: %w",
+			runtimeports.NewUpstreamHTTPErrorFromResponse(resp, runtimeports.TruncateErrorBody(string(body))))
+		c.metrics.ObserveGatewayRequest(req.Feature, non2xx)
+		return gatewayResp, non2xx
+	}
+	c.metrics.ObserveGatewayRequest(req.Feature, nil)
+	return gatewayResp, nil
 }
 
 func (c *GatewayClient) buildRequest(ctx context.Context, req runtimeports.GatewayRequest) (*http.Request, error) {

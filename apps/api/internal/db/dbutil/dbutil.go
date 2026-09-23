@@ -2,53 +2,67 @@ package dbutil
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"strings"
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) error {
-	return WithTxDBTX(ctx, db, func(q *dbsqlc.Queries, _ *sql.Tx) error {
+func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) error) error {
+	if fn == nil {
+		return errors.New("dbutil: tx function is nil")
+	}
+	return WithTxDBTX(ctx, pool, func(q *dbsqlc.Queries, _ pgx.Tx) error {
 		return fn(q)
 	})
 }
 
-func WithTxDBTX(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries, *sql.Tx) error) error {
-	tx, err := db.BeginTx(ctx, nil)
+func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries, pgx.Tx) error) error {
+	if pool == nil {
+		return errors.New("dbutil: database is nil")
+	}
+	if fn == nil {
+		return errors.New("dbutil: tx function is nil")
+	}
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 				slog.Warn("failed to roll back database transaction", "err", rollbackErr)
 			}
 		}
 	}()
 
-	if err := fn(dbsqlc.New(db).WithTx(tx), tx); err != nil {
+	if err := fn(dbsqlc.New(pool).WithTx(tx), tx); err != nil {
 		return err
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	committed = true
 	return nil
 }
 
-func NullTime(value *time.Time) sql.NullTime {
+func NullTime(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
-		return sql.NullTime{}
+		return pgtype.Timestamptz{}
 	}
-	return sql.NullTime{Time: *value, Valid: true}
+	return pgtype.Timestamptz{Time: *value, Valid: true}
 }
 
-func TimePtr(value sql.NullTime) *time.Time {
+func TimePtr(value pgtype.Timestamptz) *time.Time {
 	if !value.Valid {
 		return nil
 	}
@@ -56,14 +70,21 @@ func TimePtr(value sql.NullTime) *time.Time {
 	return &v
 }
 
-func NullInt64(value *int64) sql.NullInt64 {
-	if value == nil {
-		return sql.NullInt64{}
+func TimeValue(value pgtype.Timestamptz) time.Time {
+	if !value.Valid {
+		return time.Time{}
 	}
-	return sql.NullInt64{Int64: *value, Valid: true}
+	return value.Time
 }
 
-func Int64Ptr(value sql.NullInt64) *int64 {
+func NullInt64(value *int64) pgtype.Int8 {
+	if value == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *value, Valid: true}
+}
+
+func Int64Ptr(value pgtype.Int8) *int64 {
 	if !value.Valid {
 		return nil
 	}
@@ -71,14 +92,14 @@ func Int64Ptr(value sql.NullInt64) *int64 {
 	return &v
 }
 
-func NullInt32(value *int32) sql.NullInt32 {
+func NullInt32(value *int32) pgtype.Int4 {
 	if value == nil {
-		return sql.NullInt32{}
+		return pgtype.Int4{}
 	}
-	return sql.NullInt32{Int32: *value, Valid: true}
+	return pgtype.Int4{Int32: *value, Valid: true}
 }
 
-func Int32Ptr(value sql.NullInt32) *int32 {
+func Int32Ptr(value pgtype.Int4) *int32 {
 	if !value.Valid {
 		return nil
 	}
@@ -86,18 +107,39 @@ func Int32Ptr(value sql.NullInt32) *int32 {
 	return &v
 }
 
-func NullString(value *string) sql.NullString {
+func NullString(value *string) pgtype.Text {
 	if value == nil {
-		return sql.NullString{}
+		return pgtype.Text{}
 	}
 	v := strings.TrimSpace(*value)
-	return sql.NullString{String: v, Valid: v != ""}
+	return pgtype.Text{String: v, Valid: v != ""}
 }
 
-func StringPtr(value sql.NullString) *string {
+func StringPtr(value pgtype.Text) *string {
 	if !value.Valid {
 		return nil
 	}
 	v := value.String
 	return &v
+}
+
+func TimestamptzFromTime(value time.Time) pgtype.Timestamptz {
+	if value.IsZero() {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: value, Valid: true}
+}
+
+func DateFromTime(value time.Time) pgtype.Date {
+	if value.IsZero() {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: value, Valid: true}
+}
+
+func DateValue(value pgtype.Date) time.Time {
+	if !value.Valid {
+		return time.Time{}
+	}
+	return value.Time
 }

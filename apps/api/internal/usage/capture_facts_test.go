@@ -3,9 +3,10 @@ package usage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CaptureFactsConfig struct {
@@ -16,7 +17,7 @@ type CaptureFactsConfig struct {
 	Anchor           time.Time
 }
 
-func SeedCaptureFacts(ctx context.Context, db *sql.DB, config CaptureFactsConfig) error {
+func SeedCaptureFacts(ctx context.Context, db *pgxpool.Pool, config CaptureFactsConfig) error {
 	if db == nil || config.BaseUserID <= 0 || config.UserCount < 2 ||
 		config.TransactionCount <= 0 || config.TargetCount <= 0 ||
 		config.TargetCount > config.TransactionCount || config.Anchor.IsZero() {
@@ -40,7 +41,7 @@ func SeedCaptureFacts(ctx context.Context, db *sql.DB, config CaptureFactsConfig
 	return nil
 }
 
-func seedUsersAndAccounts(ctx context.Context, db *sql.DB, config CaptureFactsConfig) error {
+func seedUsersAndAccounts(ctx context.Context, db *pgxpool.Pool, config CaptureFactsConfig) error {
 	statements := []string{
 		`
 INSERT INTO users (id, display_name, storage_uid, role, status)
@@ -63,15 +64,15 @@ SELECT 'system_revenue', 'usage-load-' || ($1 + series)::text
 FROM generate_series(0, $2 - 1) AS series`,
 	}
 	for _, statement := range statements {
-		if _, err := db.ExecContext(ctx, statement, config.BaseUserID, config.UserCount); err != nil {
+		if _, err := db.Exec(ctx, statement, config.BaseUserID, config.UserCount); err != nil {
 			return fmt.Errorf("credits load test support: seed users and accounts: %w", err)
 		}
 	}
 	return nil
 }
 
-func seedTransactions(ctx context.Context, db *sql.DB, config CaptureFactsConfig) error {
-	_, err := db.ExecContext(ctx, `
+func seedTransactions(ctx context.Context, db *pgxpool.Pool, config CaptureFactsConfig) error {
+	_, err := db.Exec(ctx, `
 INSERT INTO credit_transactions (
   transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
   actor_type, actor_id, source, reason, business_reference_type,
@@ -113,8 +114,8 @@ FROM generate_series(1, $1::bigint) AS series`,
 	return nil
 }
 
-func seedPostings(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
+func seedPostings(ctx context.Context, db *pgxpool.Pool) error {
+	_, err := db.Exec(ctx, `
 INSERT INTO credit_postings (transaction_id, account_id, amount)
 SELECT transactions.transaction_id, posting.account_id, posting.amount
 FROM credit_transactions AS transactions
@@ -137,7 +138,7 @@ WHERE transactions.transaction_id LIKE 'usage_load_tx_%'`)
 	return nil
 }
 
-func setSeedTriggers(ctx context.Context, db *sql.DB, enabled bool) error {
+func setSeedTriggers(ctx context.Context, db *pgxpool.Pool, enabled bool) error {
 	action := "DISABLE"
 	if enabled {
 		action = "ENABLE"
@@ -148,7 +149,7 @@ func setSeedTriggers(ctx context.Context, db *sql.DB, enabled bool) error {
 		`ALTER TABLE credit_postings ` + action + ` TRIGGER apply_credit_posting_balances`,
 	}
 	for _, statement := range statements {
-		if _, err := db.ExecContext(ctx, statement); err != nil {
+		if _, err := db.Exec(ctx, statement); err != nil {
 			return fmt.Errorf("credits load test support: %s seed trigger: %w", action, err)
 		}
 	}

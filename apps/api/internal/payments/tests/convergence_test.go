@@ -74,7 +74,7 @@ func TestPaidPaymentOrderAndPurchaseCreditConvergeAtomicallyOnce(t *testing.T) {
 	}
 
 	var purchaseCount int
-	if err := db.QueryRowContext(t.Context(), `
+	if err := db.QueryRow(t.Context(), `
 SELECT COUNT(*) FROM credit_transactions
 WHERE command_type = 'purchase_credit' AND business_reference_id = $1`, order.ID).Scan(&purchaseCount); err != nil {
 		t.Fatal(err)
@@ -107,14 +107,14 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 		t.Fatalf("ConvergePaidPaymentOrder() error = %v, want idempotency conflict", err)
 	}
 	var purchaseCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
 		t.Fatal(err)
 	}
 	if purchaseCount != 0 {
 		t.Fatalf("purchase ledger transactions = %d, want 0", purchaseCount)
 	}
 	var status string
-	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, order.ID).Scan(&status); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, order.ID).Scan(&status); err != nil {
 		t.Fatal(err)
 	}
 	if status != string(paymentsdomain.PaymentOrderCheckoutOpen) {

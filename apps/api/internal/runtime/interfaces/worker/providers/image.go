@@ -13,7 +13,6 @@ import (
 	"path"
 	"strings"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
@@ -22,23 +21,15 @@ import (
 	_ "golang.org/x/image/webp"
 )
 
-func inferLocalAssetMimeType(filename string, data []byte) string {
-	if len(data) > 0 {
-		if extension := imageformat.DetectImageExtensionFromBytes(data); extension != "" {
-			if mimeType := imageformat.ImageMIMEFromExtension(extension); mimeType != "" {
-				return mimeType
-			}
-		}
+func trustedRuntimeAssetHosts(publicOrigins config.PublicOriginsConfig) []string {
+	base := publicOrigins.APIParsedURL()
+	if base == nil || strings.TrimSpace(base.Host) == "" {
+		return nil
 	}
-	if extension, ok := imageformat.NormalizeImageExtFromFilename(filename); ok {
-		if mimeType := imageformat.ImageMIMEFromExtension(extension); mimeType != "" {
-			return mimeType
-		}
-	}
-	return "image/png"
+	return []string{base.Host}
 }
 
-func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount, publicOrigins config.PublicOriginsConfig) []string {
+func trustedImageDownloadHosts(ctx context.Context, publicOrigins config.PublicOriginsConfig) []string {
 	hosts := map[string]struct{}{}
 	appendHost := func(raw string) {
 		parsed, err := url.Parse(strings.TrimSpace(raw))
@@ -52,9 +43,9 @@ func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount
 		}
 	}
 
-	if account != nil {
-		appendHost(account.ProxyURL)
-	}
+	// Provider image URLs point at public CDNs; the default safehttp policy
+	// already rejects private targets. Explicit entries cover our own
+	// origins plus the deployment egress policy.
 	for _, host := range trustedRuntimeAssetHosts(publicOrigins) {
 		appendHost(host)
 	}

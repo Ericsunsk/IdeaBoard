@@ -2,24 +2,26 @@ package privileges
 
 import (
 	"context"
-	"database/sql"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type panicDB struct{}
 
-func (panicDB) ExecContext(context.Context, string, ...any) (sql.Result, error) {
-	panic("invalid policy reached ExecContext")
+func (panicDB) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	panic("invalid policy reached Exec")
 }
 
-func (panicDB) QueryContext(context.Context, string, ...any) (*sql.Rows, error) {
-	panic("invalid policy reached QueryContext")
+func (panicDB) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	panic("invalid policy reached Query")
 }
 
-func (panicDB) QueryRowContext(context.Context, string, ...any) *sql.Row {
-	panic("invalid policy reached QueryRowContext")
+func (panicDB) QueryRow(context.Context, string, ...any) pgx.Row {
+	panic("invalid policy reached QueryRow")
 }
 
 func TestValidatePoliciesRejectsInvalidPolicyBeforeDatabaseAccess(t *testing.T) {

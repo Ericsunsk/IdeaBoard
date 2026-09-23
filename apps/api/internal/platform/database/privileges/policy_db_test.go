@@ -2,7 +2,6 @@ package privileges
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -24,14 +23,14 @@ func newQueryCountingDB(db DBTX) *queryCountingDB {
 	return &queryCountingDB{DBTX: db, counts: make(map[string]int)}
 }
 
-func (db *queryCountingDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (db *queryCountingDB) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
 	db.record(query)
-	return db.DBTX.QueryContext(ctx, query, args...)
+	return db.DBTX.Query(ctx, query, args...)
 }
 
-func (db *queryCountingDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+func (db *queryCountingDB) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
 	db.record(query)
-	return db.DBTX.QueryRowContext(ctx, query, args...)
+	return db.DBTX.QueryRow(ctx, query, args...)
 }
 
 func (db *queryCountingDB) record(query string) {
@@ -60,21 +59,21 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 		`CREATE FUNCTION policy_allowed_two() RETURNS INTEGER LANGUAGE SQL AS 'SELECT 2'`,
 		`CREATE FUNCTION policy_blocked() RETURNS INTEGER LANGUAGE SQL AS 'SELECT 1'`,
 	} {
-		if _, err := db.ExecContext(ctx, statement); err != nil {
+		if _, err := db.Exec(ctx, statement); err != nil {
 			t.Fatalf("prepare privilege fixture: %v", err)
 		}
 	}
 
 	runtimeRole := fmt.Sprintf("policy_runtime_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, _ = db.ExecContext(cleanupCtx, `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = db.Exec(cleanupCtx, `DROP OWNED BY `+roleSQL)
+		_, _ = db.Exec(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
 	})
 
 	platformPolicy := Policy{
@@ -122,12 +121,12 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 		t.Fatal("Verify() accepted the schema owner despite forbidden privileges")
 	}
 
-	conn, err := db.Conn(ctx)
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime connection: %v", err)
 	}
-	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE: %v", err)
 	}
 	countingDB := newQueryCountingDB(conn)
@@ -146,27 +145,27 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 			t.Fatalf("Verify() query count for %s = %d, want %d", marker, got, want)
 		}
 	}
-	if _, err := conn.ExecContext(ctx, `INSERT INTO "policy.table" (id) VALUES (1)`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO "policy.table" (id) VALUES (1)`); err != nil {
 		t.Fatalf("required table INSERT privilege unavailable: %v", err)
 	}
 	var insertedID int64
-	if err := conn.QueryRowContext(ctx, `SELECT id FROM "policy.table" WHERE id = 1`).Scan(&insertedID); err != nil || insertedID != 1 {
+	if err := conn.QueryRow(ctx, `SELECT id FROM "policy.table" WHERE id = 1`).Scan(&insertedID); err != nil || insertedID != 1 {
 		t.Fatalf("required table SELECT result = %d, error = %v", insertedID, err)
 	}
 
-	if _, err := conn.ExecContext(ctx, `SELECT policy_allowed('ok')`); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT policy_allowed('ok')`); err != nil {
 		t.Fatalf("required function privilege unavailable: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT policy_blocked()`); err == nil {
+	if _, err := conn.Exec(ctx, `SELECT policy_blocked()`); err == nil {
 		t.Fatal("forbidden function privilege remained available")
 	}
-	if _, err := conn.ExecContext(ctx, `UPDATE "policy.table" SET id = id`); err == nil {
+	if _, err := conn.Exec(ctx, `UPDATE "policy.table" SET id = id`); err == nil {
 		t.Fatal("forbidden table privilege remained available")
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT nextval('policy_sequence_a')`); err != nil {
+	if _, err := conn.Exec(ctx, `SELECT nextval('policy_sequence_a')`); err != nil {
 		t.Fatalf("required sequence privilege unavailable: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT setval('policy_sequence_a', 10)`); err == nil {
+	if _, err := conn.Exec(ctx, `SELECT setval('policy_sequence_a', 10)`); err == nil {
 		t.Fatal("forbidden sequence UPDATE privilege remained available")
 	}
 	driftCases := []struct {
@@ -186,7 +185,7 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 	}
 	for _, driftCase := range driftCases {
 		t.Run(driftCase.name, func(t *testing.T) {
-			if _, err := db.ExecContext(ctx, driftCase.statement); err != nil {
+			if _, err := db.Exec(ctx, driftCase.statement); err != nil {
 				t.Fatalf("introduce privilege drift: %v", err)
 			}
 			if err := Verify(ctx, conn, platformPolicy, commandPolicy); err == nil || !strings.Contains(err.Error(), driftCase.want) {
@@ -200,7 +199,7 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 			}
 		})
 	}
-	if _, err := conn.ExecContext(ctx, `RESET ROLE`); err != nil {
+	if _, err := conn.Exec(ctx, `RESET ROLE`); err != nil {
 		t.Fatalf("RESET ROLE: %v", err)
 	}
 }
@@ -208,17 +207,17 @@ func TestPolicyConfiguresAndVerifiesAllPostgresObjectKinds(t *testing.T) {
 func TestConfigureFailsBeforeMutationWhenRequiredObjectIsMissing(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := t.Context()
-	if _, err := db.ExecContext(ctx, `CREATE TABLE policy_existing (id BIGINT)`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE TABLE policy_existing (id BIGINT)`); err != nil {
 		t.Fatalf("create existing table: %v", err)
 	}
 	runtimeRole := fmt.Sprintf("policy_missing_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role: %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
 
 	policy := Policy{Name: "required-objects", Objects: []ObjectRule{
@@ -230,7 +229,7 @@ func TestConfigureFailsBeforeMutationWhenRequiredObjectIsMissing(t *testing.T) {
 		t.Fatalf("Configure() error = %v, want missing required object", err)
 	}
 	var granted bool
-	if err := db.QueryRowContext(ctx,
+	if err := db.QueryRow(ctx,
 		`SELECT has_table_privilege($1, 'policy_existing', 'SELECT')`, runtimeRole,
 	).Scan(&granted); err != nil {
 		t.Fatalf("check pre-mutation privilege: %v", err)

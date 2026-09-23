@@ -2,7 +2,6 @@ package composition
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,6 +14,7 @@ import (
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	databaseinfra "ideaboard/api/internal/runtime/infrastructure/database"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
+	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	natsinfra "ideaboard/api/internal/runtime/infrastructure/nats"
 	"ideaboard/api/internal/runtime/ports"
 
@@ -25,7 +25,7 @@ import (
 type appContainer struct {
 	router *gin.Engine
 
-	db             *sql.DB
+	db             *pgxpool.Pool
 	riverPool      *pgxpool.Pool
 	workerRuntime  appWorkerRuntime
 	healthCheckers []ports.HealthChecker
@@ -63,13 +63,13 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, err
 	}
 
-	taskServices, workerRuntime, err := newAppTaskRuntime(ctx, cfg, dbs, repos, services)
+	taskServices, workerRuntime, err := newAppTaskRuntime(ctx, cfg, dbs, repos, services, redmetrics.DefaultSet())
 	if err != nil {
 		closeStartupResources(dbs.db, dbs.riverPool)
 		return nil, err
 	}
-	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{DB: dbs.db, RiverPool: dbs.riverPool})
-	router, err := newAppRouter(cfg, repos, services, taskServices, dbHealthChecker)
+	dbHealthChecker := databaseinfra.NewHealthChecker(&databaseinfra.Pools{Pool: dbs.db, RiverPool: dbs.riverPool})
+	router, err := newAppRouter(cfg, repos, services, taskServices, dbHealthChecker, redmetrics.DefaultSet())
 	if err != nil {
 		closeStartupResources(dbs.db, dbs.riverPool)
 		return nil, err
@@ -167,9 +167,7 @@ func (c *appContainer) Close() error {
 		c.riverPool.Close()
 	}
 	if c.db != nil {
-		if err := c.db.Close(); err != nil && closeErr == nil {
-			closeErr = err
-		}
+		c.db.Close()
 	}
 	return closeErr
 }

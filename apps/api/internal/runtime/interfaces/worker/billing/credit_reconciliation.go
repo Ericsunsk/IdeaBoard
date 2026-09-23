@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"log/slog"
 	"time"
 
@@ -47,7 +48,7 @@ func (d *CreditReconciliationDispatcher) DispatchReconciliationRun(
 		return domain.ErrInvalidCommand
 	}
 	_, err := d.client.InsertTx(ctx, tx, creditReconciliationJobArgs{RunID: runID}, &river.InsertOpts{
-		Queue: CreditReconciliationQueue, MaxAttempts: 5, Priority: 4,
+		Queue: CreditReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsCreditReconciliation, Priority: 4,
 	})
 	return err
 }
@@ -65,6 +66,10 @@ type CreditReconciliationWorker struct {
 
 func NewCreditReconciliationWorker(service creditReconciliationWorkerService) *CreditReconciliationWorker {
 	return &CreditReconciliationWorker{service: service}
+}
+
+func (*CreditReconciliationWorker) Timeout(*river.Job[creditReconciliationJobArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutCreditReconciliation
 }
 
 func (w *CreditReconciliationWorker) Work(ctx context.Context, job *river.Job[creditReconciliationJobArgs]) error {
@@ -150,7 +155,7 @@ func (creditReconciliationDailySchedule) Next(current time.Time) time.Time {
 
 func CreditReconciliationPeriodicJobs() []*river.PeriodicJob {
 	insertOpts := func() *river.InsertOpts {
-		return &river.InsertOpts{Queue: CreditReconciliationQueue, MaxAttempts: 5, Priority: 4}
+		return &river.InsertOpts{Queue: CreditReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsCreditReconciliation, Priority: 4}
 	}
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(
@@ -182,6 +187,10 @@ type CreditReconciliationScheduleWorker struct {
 
 func NewCreditReconciliationScheduleWorker(service creditReconciliationScheduleService) *CreditReconciliationScheduleWorker {
 	return &CreditReconciliationScheduleWorker{service: service, now: time.Now}
+}
+
+func (*CreditReconciliationScheduleWorker) Timeout(*river.Job[creditReconciliationScheduleJobArgs]) time.Duration {
+	return taskqueue.RiverJobTimeoutCreditSchedule
 }
 
 func (w *CreditReconciliationScheduleWorker) Work(

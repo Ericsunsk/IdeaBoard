@@ -5,80 +5,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
-	"io"
 	"log/slog"
 	"net/url"
 	"strings"
-	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	providerendpoints "ideaboard/api/internal/accountpool/providerendpoints/domain"
-	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 	"ideaboard/api/internal/workflow"
 )
 
-var _ runtimeports.ProviderCaller = (*Executor)(nil)
+var _ runtimeports.GatewayCaller = (*Executor)(nil)
 
 const (
-	// maxAPIResponseBody caps upstream API reads to prevent OOM from malicious or broken streams.
-	maxAPIResponseBody = 50 * 1024 * 1024 // 50 MB
-	// maxRemoteImageRefBytes caps remote image reference downloads to match the
-	// 10 MB limit already enforced for data URLs and local uploads.
-	maxRemoteImageRefBytes = 10 * 1024 * 1024
-	// maxErrorBodyLen caps error messages stored in task records.
-	maxErrorBodyLen = 500
 	// maxProviderRawOutputPreviewLen keeps task result envelopes inspectable without
 	// storing full image payloads or oversized provider responses.
 	maxProviderRawOutputPreviewLen = 2000
 	maxProviderRawOutputStringLen  = 300
 	maxProviderRawOutputDepth      = 4
 	maxProviderRawOutputArrayItems = 5
-	minimumFluxFillTimeout         = 15 * time.Minute
 )
 
 const (
 	parsedOutputStatusValid = "valid"
 )
-
-func readLimitedBody(body io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(body, maxAPIResponseBody+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > maxAPIResponseBody {
-		return nil, fmt.Errorf("响应体超过大小限制 (%d MB)", maxAPIResponseBody/1024/1024)
-	}
-	return data, nil
-}
-
-// readLimitedImageRef reads a remote image reference body with the 10 MB cap
-// that matches data URL and local upload limits.
-func readLimitedImageRef(body io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(body, maxRemoteImageRefBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > maxRemoteImageRefBytes {
-		return nil, fmt.Errorf("参考图像超过大小限制 (%d MB)", maxRemoteImageRefBytes/1024/1024)
-	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("参考图像为空")
-	}
-	return data, nil
-}
-
-func truncateErrorBody(body string) string {
-	if len(body) > maxErrorBodyLen {
-		return body[:maxErrorBodyLen] + "...(truncated)"
-	}
-	return body
-}
 
 func providerRawOutputPreview(raw []byte) string {
 	trimmed := strings.TrimSpace(string(raw))
@@ -176,21 +128,28 @@ type Executor struct {
 	mediaResolver      taskmedia.RuntimeMediaResolver
 	resultMaterializer taskmedia.ResultMaterializer
 	publicOrigins      config.PublicOriginsConfig
+	gatewayFactory     runtimeports.GatewayClientFactory
+	modelRoutes        runtimeports.ModelRouteOverrideReader
 }
 
 // ProviderExecutor is the internal name used by provider adapter files.
 type ProviderExecutor = Executor
 
-// NewExecutor constructs a new provider execution engine.
+// NewExecutor constructs a new provider execution engine. A nil
+// modelRoutes disables catalog route-override lookup (mapping @path only).
 func NewExecutor(
 	mediaReader taskmedia.UploadReader,
 	resultMaterializer taskmedia.ResultMaterializer,
 	publicOrigins config.PublicOriginsConfig,
+	gatewayFactory runtimeports.GatewayClientFactory,
+	modelRoutes runtimeports.ModelRouteOverrideReader,
 ) *Executor {
 	executor := &Executor{
 		mediaReader:        mediaReader,
 		resultMaterializer: resultMaterializer,
 		publicOrigins:      publicOrigins,
+		gatewayFactory:     gatewayFactory,
+		modelRoutes:        modelRoutes,
 	}
 	if resolver, ok := mediaReader.(taskmedia.RuntimeMediaResolver); ok {
 		executor.mediaResolver = resolver
@@ -198,28 +157,11 @@ func NewExecutor(
 	return executor
 }
 
-func (c *Executor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*taskmedia.StoredObject, bool, error) {
-	trimmed := strings.TrimSpace(ref)
-	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return nil, false, nil
-	}
-	if c == nil || c.mediaReader == nil {
-		return nil, true, fmt.Errorf("存储服务未初始化，无法读取上传文件: %q", ref)
-	}
-	obj, err := c.mediaReader.ReadUploadObject(ctx, trimmed, maxBytes)
-	if err != nil {
-		return nil, true, err
-	}
-	if obj == nil {
-		return nil, true, fmt.Errorf("存储服务返回空上传文件: %q", ref)
-	}
-	return obj, true, nil
-}
-
 type providerCallResult struct {
 	ImageURL          string
 	ImageURLs         []string
 	Model             string
+	Receipt           runtimeports.GatewayReceipt
 	RawOutputPreview  string
 	ParsedOutputKind  string
 	ParsedOutputCount int
@@ -228,148 +170,10 @@ type providerCallResult struct {
 type ProviderCallTimeline = runtimeports.ProviderCallTimeline
 type ProviderCallOutput = runtimeports.ProviderCallOutput
 
-type resolvedProviderExecution struct {
-	accountID               int64
-	accountName             string
-	providerEndpointID      int64
-	providerEndpointName    string
-	providerEndpointBaseURL string
-	apiType                 string
-	protocol                string
-	apiKey                  string
-	resolvedModel           string
-	runtimeOperation        workflow.RuntimeOperation
-	adapter                 providerRuntimeAdapter
-	timeout                 time.Duration
-	finalization            providerResultFinalizer
-	request                 providerRequest
-}
-
-func (e resolvedProviderExecution) adapterAccount() *accounts.ApiAccount {
-	return &accounts.ApiAccount{
-		ID:                 e.accountID,
-		Name:               e.accountName,
-		ProviderEndpointID: e.providerEndpointID,
-		ApiType:            e.apiType,
-		Protocol:           e.protocol,
-		ApiKey:             e.apiKey,
-		SecretConfigured:   e.apiKey != "",
-		ProxyURL:           e.providerEndpointBaseURL,
-		Timeout:            int(e.timeout / time.Second),
-	}
-}
-
-type providerRuntimeAdapter int
-
-const (
-	providerRuntimeAdapterModelImage providerRuntimeAdapter = iota + 1
-	providerRuntimeAdapterCutout
-	providerRuntimeAdapterUpscale
-	providerRuntimeAdapterFluxFill
-)
+// Adapter identity lives in domain (single enum); this package switches on
+// domain.ProviderRuntimeAdapter* directly instead of converting.
 
 // CallDrawingAPIWithAssignment executes drawing operation for an assigned account.
-func (c *Executor) CallDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (ProviderCallOutput, error) {
-	return c.callDrawingAPIWithAssignment(ctx, account, task, assignment)
-}
-
-func (c *Executor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (ProviderCallOutput, error) {
-	correlationID := task.EnsureCorrelationID()
-
-	exec, err := c.resolveProviderExecution(ctx, account, task, assignment)
-	if err != nil {
-		return ProviderCallOutput{}, err
-	}
-	slog.Info("calling provider API", "account_name", exec.accountName, "provider_endpoint_id", exec.providerEndpointID, "task_id", task.TaskID, "correlation_id", correlationID)
-	output := ProviderCallOutput{}
-	providerStartedAt := time.Now()
-	output.Timeline.ProviderStartedAt = &providerStartedAt
-	callResult, err := c.callProviderBatchWithRequest(ctx, exec)
-	providerFinishedAt := time.Now()
-	output.Timeline.ProviderFinishedAt = &providerFinishedAt
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return output, err
-		}
-		return output, newExecutionFailureError(
-			tasks.ExecutionStageProvider,
-			providerFailureCategory(err),
-			fmt.Errorf("调用 API 失败 (服务端点: %s): %w", exec.providerEndpointName, err),
-		)
-	}
-	imageURLs := normalizeProviderResultImageURLs(callResult)
-	if len(imageURLs) == 0 {
-		return output, newExecutionFailureError(
-			tasks.ExecutionStageProvider,
-			tasks.FailureCategoryProviderError,
-			fmt.Errorf("API 未返回图片"),
-		)
-	}
-	finalizeStartedAt := time.Now()
-	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
-	markFinalizeFinished := func() {
-		if output.Timeline.FinalizeFinishedAt != nil {
-			return
-		}
-		finalizeFinishedAt := time.Now()
-		output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
-	}
-	finalization := exec.finalization.finalize(ctx, task.UserID, task.TaskID, imageURLs)
-	imageURLs, taskOutputs, err := finalization.completedOutputs()
-	if err != nil {
-		markFinalizeFinished()
-		if errors.Is(err, context.Canceled) {
-			return output, err
-		}
-		if _, _, ok := executionFailureDetails(err); ok {
-			return output, err
-		}
-		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
-	}
-	if len(imageURLs) == 0 {
-		markFinalizeFinished()
-		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf("finalizer 未返回图片"))
-	}
-	imageURL := imageURLs[0]
-	finalizeFinishedAt := time.Now()
-	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
-
-	result := baseProviderTaskResult(task, exec, callResult, imageURLs, parsedOutputStatusValid)
-	result["status"] = tasks.ResultStatusSuccess
-	result["image_url"] = imageURL
-	result["image_urls"] = imageURLs
-	if strings.TrimSpace(callResult.Model) != "" {
-		result["model"] = strings.TrimSpace(callResult.Model)
-	}
-
-	resultJSON, err := marshalProviderTaskResult(task.TaskID, result)
-	if err != nil {
-		return ProviderCallOutput{}, err
-	}
-	output.Result = resultJSON
-	output.Outputs = taskOutputs
-	return output, nil
-}
-
-func baseProviderTaskResult(task *tasks.TaskPayload, exec resolvedProviderExecution, callResult providerCallResult, imageURLs []string, parsedStatus string) map[string]interface{} {
-	result := map[string]interface{}{
-		"task_id":                task.TaskID,
-		"correlation_id":         task.EffectiveCorrelationID(),
-		"account_id":             exec.accountID,
-		"provider_endpoint_id":   exec.providerEndpointID,
-		"provider_endpoint_name": exec.providerEndpointName,
-		"api_type":               exec.apiType,
-	}
-	result["parsed_output_status"] = parsedStatus
-	result["parsed_output"] = map[string]interface{}{
-		"kind":        resolvedProviderParsedOutputKind(callResult),
-		"image_count": resolvedProviderParsedOutputCount(callResult, imageURLs),
-	}
-	if strings.TrimSpace(callResult.RawOutputPreview) != "" {
-		result["raw_provider_output_preview"] = strings.TrimSpace(callResult.RawOutputPreview)
-	}
-	return result
-}
 
 func resolvedProviderParsedOutputKind(callResult providerCallResult) string {
 	if strings.TrimSpace(callResult.ParsedOutputKind) != "" {
@@ -383,138 +187,6 @@ func resolvedProviderParsedOutputCount(callResult providerCallResult, imageURLs 
 		return callResult.ParsedOutputCount
 	}
 	return len(imageURLs)
-}
-
-type providerExecutionInputs struct {
-	apiKey               string
-	baseURL              string
-	apiType              string
-	protocol             string
-	providerEndpointID   int64
-	providerEndpointName string
-}
-
-func validateProviderExecutionInputs(ctx context.Context, account *accounts.RuntimeAccountAccess, assignment taskqueueports.TaskAssignment) (providerExecutionInputs, error) {
-	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
-		return providerExecutionInputs{}, fmt.Errorf("assignment account identity is invalid")
-	}
-	apiKey := strings.TrimSpace(account.APIKey)
-	if assignment.ProviderEndpointID <= 0 ||
-		strings.TrimSpace(assignment.ProviderEndpointName) == "" ||
-		strings.TrimSpace(assignment.ProviderEndpointBaseURL) == "" ||
-		strings.TrimSpace(assignment.ProviderEndpointProtocol) == "" ||
-		strings.TrimSpace(assignment.APIType) == "" {
-		return providerExecutionInputs{}, fmt.Errorf("assignment provider endpoint snapshot is incomplete")
-	}
-	baseURL, err := outbound.ValidateConfiguredEndpoint(
-		strings.TrimSpace(assignment.ProviderEndpointBaseURL),
-		outbound.AllowHosts(ctx)...,
-	)
-	if err != nil {
-		return providerExecutionInputs{}, fmt.Errorf("ProviderEndpoint snapshot URL 不可用")
-	}
-	apiType := strings.ToLower(strings.TrimSpace(assignment.APIType))
-	if !workflow.IsSupportedProviderAPIType(apiType) {
-		return providerExecutionInputs{}, fmt.Errorf("assignment API type is unsupported: %s", assignment.APIType)
-	}
-	return providerExecutionInputs{
-		apiKey:               apiKey,
-		baseURL:              baseURL,
-		apiType:              apiType,
-		protocol:             strings.TrimSpace(assignment.ProviderEndpointProtocol),
-		providerEndpointID:   assignment.ProviderEndpointID,
-		providerEndpointName: strings.TrimSpace(assignment.ProviderEndpointName),
-	}, nil
-}
-
-type providerExecutionPlan struct {
-	params        providerTaskParams
-	operation     workflow.RuntimeOperation
-	adapter       providerRuntimeAdapter
-	timeout       time.Duration
-	resolvedModel string
-}
-
-func (c *Executor) resolveProviderExecutionPlan(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, inputs providerExecutionInputs, assignment taskqueueports.TaskAssignment) (providerExecutionPlan, error) {
-	params, err := c.parseAndNormalizeTaskParams(ctx, task)
-	if err != nil {
-		return providerExecutionPlan{}, err
-	}
-	if params.ExecutionPlan == nil {
-		return providerExecutionPlan{}, fmt.Errorf("drawing task requires a durable execution plan")
-	}
-	plan := *params.ExecutionPlan
-	operation := plan.RuntimeOperation()
-	adapter, err := providerRuntimeAdapterFor(inputs.apiType, inputs.protocol, operation)
-	if err != nil {
-		return providerExecutionPlan{}, err
-	}
-	resolvedModel := strings.TrimSpace(assignment.ResolvedModel)
-	modelRequired := plan.RoutingRequirement().ModelRequirement() == workflow.RoutingModelRequired
-	if modelRequired && resolvedModel == "" {
-		return providerExecutionPlan{}, fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name)
-	}
-	if !modelRequired && resolvedModel != "" {
-		return providerExecutionPlan{}, fmt.Errorf("modelless operation must not carry a resolved model")
-	}
-	params, err = c.resolveRuntimeProviderTaskParams(ctx, params)
-	if err != nil {
-		return providerExecutionPlan{}, err
-	}
-	return providerExecutionPlan{
-		params:        params,
-		operation:     operation,
-		adapter:       adapter,
-		timeout:       resolveProviderTimeout(account, adapter),
-		resolvedModel: resolvedModel,
-	}, nil
-}
-
-func (c *Executor) resolveProviderExecution(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueueports.TaskAssignment) (resolvedProviderExecution, error) {
-	if account == nil || account.ID <= 0 || assignment.AccountID != account.ID {
-		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("assignment account identity is invalid"))
-	}
-	if strings.TrimSpace(account.APIKey) == "" {
-		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryAuth, fmt.Errorf("账号 %s 的 API Key 为空", account.Name))
-	}
-	inputs, err := validateProviderExecutionInputs(ctx, account, assignment)
-	if err != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			err,
-		)
-	}
-	plan, err := c.resolveProviderExecutionPlan(ctx, account, task, inputs, assignment)
-	if err != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
-	}
-	request, err := plan.params.providerRequest(task.Prompt, plan.resolvedModel)
-	if err != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, err)
-	}
-	resolved := resolvedProviderExecution{
-		accountID:               account.ID,
-		accountName:             strings.TrimSpace(account.Name),
-		providerEndpointID:      inputs.providerEndpointID,
-		providerEndpointName:    inputs.providerEndpointName,
-		providerEndpointBaseURL: inputs.baseURL,
-		apiType:                 inputs.apiType,
-		protocol:                inputs.protocol,
-		apiKey:                  inputs.apiKey,
-		resolvedModel:           plan.resolvedModel,
-		runtimeOperation:        plan.operation,
-		adapter:                 plan.adapter,
-		timeout:                 plan.timeout,
-		request:                 request,
-	}
-	adapterAccount := resolved.adapterAccount()
-	resolved.finalization = providerResultFinalizer{
-		executor:      c,
-		correlationID: task.EffectiveCorrelationID(),
-		account:       adapterAccount,
-	}
-	return resolved, nil
 }
 
 func (c *Executor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.TaskPayload) (providerTaskParams, error) {
@@ -560,73 +232,10 @@ func (c *Executor) resolveRuntimeProviderTaskParams(ctx context.Context, params 
 	return resolved, nil
 }
 
-func (c *Executor) callProviderWithRequest(ctx context.Context, exec resolvedProviderExecution) (providerCallResult, error) {
-	account := exec.adapterAccount()
-	// The dispatcher owns only protocol/operation selection. Concrete adapters
-	// keep their provider-specific HTTP and payload contracts.
-	switch exec.adapter {
-	case providerRuntimeAdapterCutout:
-		return c.callCutout(ctx, account, exec.request, exec.timeout)
-	case providerRuntimeAdapterUpscale:
-		return c.callUpscale(ctx, account, exec.request, exec.timeout)
-	case providerRuntimeAdapterFluxFill:
-		return c.callFluxFill(ctx, account, exec.request, exec.runtimeOperation, exec.timeout)
-	case providerRuntimeAdapterModelImage:
-		if workflow.IsGoogleNativeAPIType(exec.apiType) {
-			return c.callGoogleProviderWithRequest(ctx, account, exec.apiType, exec.request, exec.timeout)
-		}
-		return c.callOpenAIWithRequest(ctx, account, exec.request, exec.timeout)
-	default:
-		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", exec.adapter)
-	}
-}
-
-func providerRuntimeAdapterFor(apiType string, protocol string, operation workflow.RuntimeOperation) (providerRuntimeAdapter, error) {
-	apiType = strings.ToLower(strings.TrimSpace(apiType))
-	if !workflow.IsSupportedProviderAPIType(apiType) {
-		return 0, fmt.Errorf("unsupported API type %q", apiType)
-	}
-	canonical, known := providerendpoints.CanonicalProtocol(protocol)
-	if !known {
-		return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)
-	}
-	if !providerendpoints.ProtocolSupportsAPIType(canonical, apiType) {
-		return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
-	}
-	route, ok := providerendpoints.RuntimeAdapterFor(canonical, string(operation))
-	if !ok {
-		return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)
-	}
-	switch route {
-	case providerendpoints.RuntimeAdapterModelImage:
-		return providerRuntimeAdapterModelImage, nil
-	case providerendpoints.RuntimeAdapterCutout:
-		return providerRuntimeAdapterCutout, nil
-	case providerendpoints.RuntimeAdapterUpscale:
-		return providerRuntimeAdapterUpscale, nil
-	case providerendpoints.RuntimeAdapterFluxFill:
-		return providerRuntimeAdapterFluxFill, nil
-	}
-	return 0, fmt.Errorf("unsupported provider runtime adapter %q", route)
-}
-
-func (c *Executor) callProviderBatchWithRequest(ctx context.Context, exec resolvedProviderExecution) (providerCallResult, error) {
-	if exec.adapter != providerRuntimeAdapterModelImage {
-		exec.request = exec.request.withOutputCount(1)
-		return c.callProviderWithRequest(ctx, exec)
-	}
-	orchestrator := newProviderBatchOrchestrator(func(callCtx context.Context, request providerRequest) (providerCallResult, error) {
-		current := exec
-		current.request = request
-		return c.callProviderWithRequest(callCtx, current)
-	})
-	return orchestrator.run(ctx, exec.request)
-}
-
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return "", newExecutionFailureError(
+		return "", runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
 			fmt.Errorf("序列化任务结果失败 (task_id=%s): %w", taskID, err),
@@ -635,12 +244,12 @@ func marshalProviderTaskResult(taskID string, result map[string]interface{}) (st
 	return string(resultJSON), nil
 }
 
-func (c *Executor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, correlationID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {
+func (c *Executor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, correlationID string, imageURLs []string) ([]string, []tasks.TaskOutput, error) {
 	if len(imageURLs) == 0 {
 		return imageURLs, nil, nil
 	}
 	if c.resultMaterializer == nil {
-		return nil, nil, newExecutionFailureError(
+		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: 存储服务未初始化"),
@@ -654,27 +263,27 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 	slog.Info("provider result materialization started", "task_id", taskID, "correlation_id", correlationID, "image_count", len(imageURLs))
 
 	materialized, storeErr := c.resultMaterializer.MaterializeRemoteResults(ctx, userID, taskID, imageURLs, taskmedia.ResultMaterializeOptions{
-		AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicOrigins),
+		AllowHosts: trustedImageDownloadHosts(ctx, c.publicOrigins),
 	})
 	if storeErr != nil {
 		if errors.Is(storeErr, context.Canceled) {
 			return nil, nil, storeErr
 		}
-		return nil, nil, newExecutionFailureError(
+		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: %w", storeErr),
 		)
 	}
 	if len(materialized.Items) == 0 {
-		return nil, nil, newExecutionFailureError(
+		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: materializer returned no image URLs"),
 		)
 	}
 	if len(materialized.Items) != len(imageURLs) {
-		return nil, nil, newExecutionFailureError(
+		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: materializer returned inconsistent result counts: source=%d items=%d", len(imageURLs), len(materialized.Items)),
@@ -727,18 +336,7 @@ func normalizeProviderResultImageURLs(result providerCallResult) []string {
 	return urls
 }
 
-func resolveRuntimeAccountTimeout(account *accounts.RuntimeAccountAccess) time.Duration {
-	if account == nil {
-		return time.Duration(accountlimits.NormalizeTimeoutSeconds(0)) * time.Second
-	}
-	timeoutSeconds := accountlimits.NormalizeTimeoutSeconds(account.Timeout)
-	return time.Duration(timeoutSeconds) * time.Second
-}
-
-func resolveProviderTimeout(account *accounts.RuntimeAccountAccess, adapter providerRuntimeAdapter) time.Duration {
-	timeout := resolveRuntimeAccountTimeout(account)
-	if adapter == providerRuntimeAdapterFluxFill && timeout < minimumFluxFillTimeout {
-		return minimumFluxFillTimeout
-	}
-	return timeout
+func resolveProviderPublicImageURL(c *Executor, ref, label string) (string, error) {
+	var baseParsedURL = c.publicOrigins.APIParsedURL()
+	return domain.ResolveProviderPublicImageURL(baseParsedURL, ref, label)
 }

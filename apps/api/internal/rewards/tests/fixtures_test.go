@@ -49,9 +49,7 @@ type (
 	CodeKey                     = rewards.CodeKey
 	CodeKeyring                 = rewards.CodeKeyring
 
-	redemptionHandlerOptions    = rewards.RedemptionHandlerOptions
-	redemptionMetricObservation = rewards.RedemptionMetricObservation
-	redemptionOutcome           = rewards.RedemptionOutcome
+	redemptionHandlerOptions = rewards.RedemptionHandlerOptions
 )
 
 var (
@@ -71,12 +69,7 @@ const (
 	RewardCodeStatusDisabled  = ports.RewardCodeStatusDisabled
 	RewardCodeStatusEnabled   = ports.RewardCodeStatusEnabled
 
-	defaultRedemptionAttemptLimit  = rewards.DefaultRedemptionAttemptLimit
-	redemptionOutcomeRateLimited   = rewards.RedemptionOutcomeRateLimited
-	redemptionOutcomeSuccess       = rewards.RedemptionOutcomeSuccess
-	redemptionOutcomeReplayed      = rewards.RedemptionOutcomeReplayed
-	redemptionOutcomeInvalid       = rewards.RedemptionOutcomeInvalid
-	redemptionOutcomeInternalError = rewards.RedemptionOutcomeInternalError
+	defaultRedemptionAttemptLimit = rewards.DefaultRedemptionAttemptLimit
 )
 
 var (

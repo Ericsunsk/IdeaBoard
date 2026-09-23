@@ -1,10 +1,10 @@
-package billing
+package httpapi
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
+	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billing/application"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
@@ -15,14 +15,14 @@ import (
 const maxBillingRequestBytes = 64 << 10
 
 type QuoteService interface {
-	QuoteAtResolution(context.Context, string, OutputResolution, int64) (Quote, error)
+	QuoteAtResolution(context.Context, string, billing.OutputResolution, int64) (billing.Quote, error)
 }
 
 type BillableCatalogService interface {
-	List(context.Context) ([]BillableItemCatalogCard, error)
-	PublishPrices(context.Context, string, map[OutputResolution]int64, int64) (map[OutputResolution]PriceInfo, error)
-	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
-	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
+	List(context.Context) ([]application.BillableItemCatalogCard, error)
+	PublishPrices(context.Context, string, map[billing.OutputResolution]int64, int64) (map[billing.OutputResolution]billing.PriceInfo, error)
+	SetAvailability(context.Context, string, bool, int64) (billing.AvailabilityInfo, error)
+	DeleteArchived(context.Context, string, int64) (billing.ArchivedItemDeleteResult, error)
 }
 
 type Handler struct {
@@ -53,15 +53,15 @@ func (h *Handler) Quote(c *gin.Context) {
 		return
 	}
 	if h == nil || h.quoter == nil {
-		writeError(c, ErrServiceUnavailable)
+		writeError(c, billing.ErrServiceUnavailable)
 		return
 	}
 	var request quoteRequest
 	if err := decodeStrictJSON(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeBillingInputError(c)
 		return
 	}
-	resolution, err := NormalizeOutputResolution(request.OutputResolution)
+	resolution, err := billing.NormalizeOutputResolution(request.OutputResolution)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -81,12 +81,12 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 	}
 	var request createPriceRequest
 	if err := decodeStrictJSON(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeBillingInputError(c)
 		return
 	}
-	prices := make(map[OutputResolution]int64, len(request.Prices))
+	prices := make(map[billing.OutputResolution]int64, len(request.Prices))
 	for rawResolution, unitCredits := range request.Prices {
-		resolution, err := NormalizeOutputResolution(rawResolution)
+		resolution, err := billing.NormalizeOutputResolution(rawResolution)
 		if err != nil {
 			writeError(c, err)
 			return
@@ -94,11 +94,11 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 		prices[resolution] = unitCredits
 	}
 	if len(prices) == 0 {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeBillingInputError(c)
 		return
 	}
 	if h == nil || h.catalog == nil {
-		writeError(c, ErrServiceUnavailable)
+		writeError(c, billing.ErrServiceUnavailable)
 		return
 	}
 	published, err := h.catalog.PublishPrices(c.Request.Context(), c.Param("sku"), prices, admin.UserID())
@@ -116,11 +116,11 @@ func (h *Handler) SetAvailability(c *gin.Context) {
 	}
 	var request setAvailabilityRequest
 	if err := decodeStrictJSON(c, &request); err != nil || request.Enabled == nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		writeBillingInputError(c)
 		return
 	}
 	if h == nil || h.catalog == nil {
-		writeError(c, ErrServiceUnavailable)
+		writeError(c, billing.ErrServiceUnavailable)
 		return
 	}
 	availability, err := h.catalog.SetAvailability(c.Request.Context(), c.Param("sku"), *request.Enabled, admin.UserID())
@@ -136,7 +136,7 @@ func (h *Handler) ListBillableCatalog(c *gin.Context) {
 		return
 	}
 	if h == nil || h.catalog == nil {
-		writeError(c, ErrServiceUnavailable)
+		writeError(c, billing.ErrServiceUnavailable)
 		return
 	}
 	items, err := h.catalog.List(c.Request.Context())
@@ -153,7 +153,7 @@ func (h *Handler) DeleteArchivedItem(c *gin.Context) {
 		return
 	}
 	if h == nil || h.catalog == nil {
-		writeError(c, ErrServiceUnavailable)
+		writeError(c, billing.ErrServiceUnavailable)
 		return
 	}
 	result, err := h.catalog.DeleteArchived(c.Request.Context(), c.Param("sku"), admin.UserID())
@@ -166,25 +166,4 @@ func (h *Handler) DeleteArchivedItem(c *gin.Context) {
 
 func decodeStrictJSON(c *gin.Context, destination any) error {
 	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxBillingRequestBytes, destination)
-}
-
-func writeError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, ErrInvalidSKU), errors.Is(err, ErrInvalidQuantity), errors.Is(err, ErrInvalidCatalogEntry), errors.Is(err, ErrInvalidOutputResolution):
-		response.Error(c, http.StatusBadRequest, "参数错误")
-	case errors.Is(err, ErrSKUNotFound):
-		response.Error(c, http.StatusNotFound, "SKU 不存在")
-	case errors.Is(err, ErrPricingUnavailable):
-		response.Error(c, http.StatusUnprocessableEntity, "SKU 当前不可计价")
-	case errors.Is(err, ErrItemNotArchived):
-		response.Error(c, http.StatusConflict, "仅已归档功能可以删除")
-	case errors.Is(err, ErrArchivedItemInUse):
-		response.Error(c, http.StatusConflict, "功能已有历史计费记录，无法删除")
-	case errors.Is(err, ErrQuoteTotalExceeded):
-		response.Error(c, http.StatusUnprocessableEntity, "Idea报价超过允许上限")
-	case errors.Is(err, ErrServiceUnavailable):
-		response.InternalError(c, http.StatusServiceUnavailable, "计费服务暂不可用", err)
-	default:
-		response.InternalError(c, http.StatusInternalServerError, "计费操作失败", err)
-	}
 }

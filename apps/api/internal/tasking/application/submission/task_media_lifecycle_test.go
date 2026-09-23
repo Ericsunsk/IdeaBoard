@@ -2,7 +2,6 @@ package submission
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -16,6 +15,8 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestStoreSubmitTaskClaimsMediaRefInTaskRiverTransaction(t *testing.T) {
@@ -44,7 +45,7 @@ func TestStoreSubmitTaskClaimsMediaRefInTaskRiverTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err := q.ScheduleUnreferencedMediaAssetsForReclamation(t.Context(), dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
-				ReclaimAfter: sql.NullTime{Time: time.Now().Add(-time.Second), Valid: true}, MediaAssetIds: []int64{assetID},
+				ReclaimAfter: pgtype.Timestamptz{Time: time.Now().Add(-time.Second), Valid: true}, MediaAssetIds: []int64{assetID},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -97,10 +98,10 @@ func TestStoreSubmitTaskClaimsMediaRefInTaskRiverTransaction(t *testing.T) {
 	}
 }
 
-func assertMediaRefCount(t *testing.T, db *sql.DB, assetID int64, refType string, want int) {
+func assertMediaRefCount(t *testing.T, db *pgxpool.Pool, assetID int64, refType string, want int) {
 	t.Helper()
 	var count int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM media_refs WHERE media_asset_id=$1 AND ref_type=$2`, assetID, refType).Scan(&count); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM media_refs WHERE media_asset_id=$1 AND ref_type=$2`, assetID, refType).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != want {
@@ -161,7 +162,7 @@ func TestStoreSubmitTaskRollsBackTaskWhenMediaClaimFails(t *testing.T) {
 		t.Fatal("expected media claim failure")
 	}
 	var taskCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, owner.ID).Scan(&taskCount); err != nil {
+	if err := db.QueryRow(t.Context(), `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, owner.ID).Scan(&taskCount); err != nil {
 		t.Fatal(err)
 	}
 	if taskCount != 0 {

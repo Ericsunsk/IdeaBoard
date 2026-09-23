@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
+	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
@@ -22,7 +24,7 @@ import (
 
 func gatewayTestFactory(serverURL string) runtimeports.GatewayClientFactory {
 	return func(context.Context) (runtimeports.GatewayClient, error) {
-		return NewGatewayClient(GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
+		return infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{BaseURL: serverURL, Token: "test-token"})
 	}
 }
 
@@ -134,6 +136,11 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set(runtimeports.GatewayHeaderModel, "openrouter/google/actual-image-model")
+		w.Header().Set(runtimeports.GatewayHeaderStep, "provider-1")
+		w.Header().Set(runtimeports.GatewayHeaderCacheStatus, "HIT")
+		w.Header().Set(runtimeports.GatewayHeaderLogID, "log-1")
+		w.Header().Set(runtimeports.GatewayHeaderEventID, "event-1")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,` + rawImagePayload + `"}}]}}]}`))
 	}))
@@ -190,8 +197,11 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 	if len(output.Outputs) != 1 {
 		t.Fatalf("outputs len = %d, want 1", len(output.Outputs))
 	}
-	if output.ResolvedModel != "openrouter/google/gemini-3.1-flash-lite-image" {
+	if output.ResolvedModel != "openrouter/google/actual-image-model" {
 		t.Fatalf("resolved model = %q", output.ResolvedModel)
+	}
+	if output.GatewayStep != "provider-1" || !output.CacheHit || output.ReceiptLogID != "log-1" || output.ReceiptEventID != "event-1" {
+		t.Fatalf("gateway receipt = %+v", output)
 	}
 	if len(materializer.remoteSourceURLs) != 1 || !strings.HasPrefix(materializer.remoteSourceURLs[0], "data:image/png;base64,") {
 		t.Fatalf("unexpected materializer source URLs: %#v", materializer.remoteSourceURLs)
@@ -259,9 +269,23 @@ func TestCallGatewayAPIOpenRouterResolvesRelativeUploads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := BuildGatewayRequestBody(executor, providerReq, "openrouter", "google/gemini-3.1-flash-lite-image", workflow.RuntimeOperationRender, "")
+	imageURLs, err := resolveDialectImageURLs(executor, providerReq)
 	if err != nil {
-		t.Fatalf("BuildGatewayRequestBody returned error: %v", err)
+		t.Fatalf("resolveDialectImageURLs returned error: %v", err)
+	}
+	route, err := dialects.Resolve(workflow.RuntimeOperationRender, "openrouter", "google/gemini-3.1-flash-lite-image", "", "")
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	dialect := route.Dialect
+	body, err := dialect.Encode(dialects.Request{
+		Prompt:    task.Prompt,
+		Model:     "google/gemini-3.1-flash-lite-image",
+		Operation: workflow.RuntimeOperationRender,
+		Images:    imageURLs,
+	})
+	if err != nil {
+		t.Fatalf("dialect Encode returned error: %v", err)
 	}
 	var gotRequest struct {
 		Model    string `json:"model"`

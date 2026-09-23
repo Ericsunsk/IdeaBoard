@@ -1,4 +1,4 @@
-package searchcatalog
+package application
 
 import (
 	"context"
@@ -6,17 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/searchcatalog/domain"
+	"ideaboard/api/internal/searchcatalog/ports"
 )
 
 const (
@@ -29,44 +26,6 @@ const (
 
 var ErrNoSearchProviders = errors.New("no search providers are enabled")
 
-type Result struct {
-	ID           string   `json:"id"`
-	Provider     Provider `json:"provider"`
-	Title        string   `json:"title"`
-	Description  string   `json:"description,omitempty"`
-	Author       string   `json:"author"`
-	AuthorURL    string   `json:"author_url"`
-	SourceURL    string   `json:"source_url"`
-	ThumbnailURL string   `json:"thumbnail_url"`
-	PreviewURL   string   `json:"preview_url"`
-	OriginalURL  string   `json:"original_url"`
-	Width        int      `json:"width"`
-	Height       int      `json:"height"`
-	MediaKind    string   `json:"media_kind"`
-}
-
-type ProviderStatus struct {
-	Provider        Provider        `json:"provider"`
-	Status          string          `json:"status"`
-	FailureCategory FailureCategory `json:"failure_category,omitempty"`
-	LatencyMS       int64           `json:"latency_ms"`
-}
-
-type SearchResponse struct {
-	Query          string           `json:"query"`
-	Results        []Result         `json:"results"`
-	NextCursor     string           `json:"next_cursor,omitempty"`
-	HasMore        bool             `json:"has_more"`
-	Partial        bool             `json:"-"`
-	ProviderStatus []ProviderStatus `json:"-"`
-}
-
-type SearchRequest struct {
-	Query string
-	Page  int
-	Limit int
-}
-
 type searchCursor struct {
 	Unsplash     int  `json:"unsplash"`
 	Pexels       int  `json:"pexels"`
@@ -74,67 +33,55 @@ type searchCursor struct {
 	PexelsDone   bool `json:"pexels_done,omitempty"`
 }
 
+// providerConfigSource is the narrow settings seam the search service
+// needs: provider listing plus key resolution. The settings-backed
+// repository satisfies it structurally.
+type providerConfigSource interface {
+	List(context.Context) ([]domain.ProviderConfig, error)
+	APIKey(context.Context, domain.Provider) (string, error)
+}
+
 type SearchService struct {
-	configs  *ConfigRepository
-	adapters map[Provider]searchAdapter
-	metrics  SearchMetrics
-}
-
-type searchAdapter interface {
-	Provider() Provider
-	Search(context.Context, string, SearchRequest) (adapterPage, error)
-}
-
-type adapterPage struct {
-	Results []Result
-	HasMore bool
+	configs  providerConfigSource
+	adapters map[domain.Provider]ports.SearchProviderAdapter
 }
 
 type providerCall struct {
-	provider Provider
-	page     adapterPage
-	status   ProviderStatus
+	provider domain.Provider
+	page     ports.SearchProviderPage
+	status   domain.ProviderStatus
 	err      error
 }
 
-func NewSearchService(configs *ConfigRepository, metrics ...SearchMetrics) *SearchService {
-	adapters := map[Provider]searchAdapter{
-		ProviderUnsplash: &unsplashAdapter{},
-		ProviderPexels:   &pexelsAdapter{},
+func NewSearchService(configs providerConfigSource, adapters []ports.SearchProviderAdapter) *SearchService {
+	byProvider := make(map[domain.Provider]ports.SearchProviderAdapter, len(adapters))
+	for _, adapter := range adapters {
+		if adapter != nil {
+			byProvider[adapter.Provider()] = adapter
+		}
 	}
-	recorder := SearchMetrics(noopSearchMetrics{})
-	if len(metrics) > 0 && metrics[0] != nil {
-		recorder = metrics[0]
-	}
-	return &SearchService{configs: configs, adapters: adapters, metrics: recorder}
+	return &SearchService{configs: configs, adapters: byProvider}
 }
 
-func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, limit int) (response SearchResponse, err error) {
-	started := time.Now()
-	page := searchPage(rawCursor)
-	metricStatuses := []ProviderStatus(nil)
-	defer func() {
-		recordSearchObservation(s, started, page, metricStatuses, response, err)
-	}()
+func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, limit int) (response domain.SearchResponse, err error) {
 	query, limit, cursor, err := normalizeSearchInput(rawQuery, rawCursor, limit)
 	if err != nil {
-		return SearchResponse{}, err
+		return domain.SearchResponse{}, err
 	}
 	if s == nil || s.configs == nil {
-		return SearchResponse{Query: query, Results: []Result{}, HasMore: false}, nil
+		return domain.SearchResponse{Query: query, Results: []domain.Result{}, HasMore: false}, nil
 	}
 	active, keys, err := s.resolveProviders(ctx, cursor)
 	if err != nil {
-		return SearchResponse{}, err
+		return domain.SearchResponse{}, err
 	}
 	if len(active) == 0 {
-		return SearchResponse{Query: query, Results: []Result{}, HasMore: false}, nil
+		return domain.SearchResponse{Query: query, Results: []domain.Result{}, HasMore: false}, nil
 	}
 	resultsByProvider := s.fetchProviderPages(ctx, query, limit, cursor, active, keys)
 	allResults, statuses, pages, hasMore, failures := aggregateProviderResults(active, resultsByProvider, limit)
-	metricStatuses = statuses
 	if failures == len(active) {
-		return SearchResponse{}, fmt.Errorf("all search providers failed")
+		return domain.SearchResponse{}, fmt.Errorf("all search providers failed")
 	}
 	allResults = dedupeResults(allResults)
 	if len(allResults) > limit {
@@ -144,31 +91,7 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 	if hasMore {
 		next = encodeCursor(nextCursor(cursor, active, statuses, pages))
 	}
-	return SearchResponse{Query: query, Results: allResults, NextCursor: next, HasMore: hasMore, Partial: failures > 0, ProviderStatus: statuses}, nil
-}
-
-func searchPage(rawCursor string) string {
-	if strings.TrimSpace(rawCursor) == "" {
-		return "first"
-	}
-	return "append"
-}
-
-func recordSearchObservation(s *SearchService, started time.Time, page string, metricStatuses []ProviderStatus, response SearchResponse, err error) {
-	if s == nil || s.metrics == nil {
-		return
-	}
-	outcome := "success"
-	if err != nil {
-		outcome = "failure"
-	} else if response.Partial {
-		outcome = "partial"
-	}
-	statuses := response.ProviderStatus
-	if len(statuses) == 0 {
-		statuses = metricStatuses
-	}
-	s.metrics.RecordSearch(SearchObservation{Duration: time.Since(started), Page: page, Outcome: outcome, ResultCount: len(response.Results), ProviderStatus: statuses})
+	return domain.SearchResponse{Query: query, Results: allResults, NextCursor: next, HasMore: hasMore, Partial: failures > 0, ProviderStatus: statuses}, nil
 }
 
 func normalizeSearchInput(rawQuery, rawCursor string, limit int) (string, int, searchCursor, error) {
@@ -189,16 +112,16 @@ func normalizeSearchInput(rawQuery, rawCursor string, limit int) (string, int, s
 	return query, limit, cursor, nil
 }
 
-func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCursor) ([]Provider, map[Provider]string, error) {
+func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCursor) ([]domain.Provider, map[domain.Provider]string, error) {
 	configs, err := s.configs.List(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	active := make([]Provider, 0, len(configs))
-	keys := make(map[Provider]string, len(configs))
+	active := make([]domain.Provider, 0, len(configs))
+	keys := make(map[domain.Provider]string, len(configs))
 	availableProviders := 0
 	for _, config := range configs {
-		if !isCatalogProvider(config.Provider) || !config.Enabled || config.TestState != TestStatePassed {
+		if !isCatalogProvider(config.Provider) || !config.Enabled || config.TestState != domain.TestStatePassed {
 			continue
 		}
 		key, keyErr := s.configs.APIKey(ctx, config.Provider)
@@ -218,7 +141,7 @@ func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCurso
 	return active, keys, nil
 }
 
-func (s *SearchService) fetchProviderPages(ctx context.Context, query string, limit int, cursor searchCursor, active []Provider, keys map[Provider]string) map[Provider]providerCall {
+func (s *SearchService) fetchProviderPages(ctx context.Context, query string, limit int, cursor searchCursor, active []domain.Provider, keys map[domain.Provider]string) map[domain.Provider]providerCall {
 	calls := make(chan providerCall, len(active))
 	var wait sync.WaitGroup
 	for _, provider := range active {
@@ -230,23 +153,23 @@ func (s *SearchService) fetchProviderPages(ctx context.Context, query string, li
 	}
 	wait.Wait()
 	close(calls)
-	results := make(map[Provider]providerCall, len(active))
+	results := make(map[domain.Provider]providerCall, len(active))
 	for call := range calls {
 		results[call.provider] = call
 	}
 	return results
 }
 
-func (s *SearchService) fetchProviderPage(ctx context.Context, query string, limit int, cursor searchCursor, provider Provider, key string) providerCall {
+func (s *SearchService) fetchProviderPage(ctx context.Context, query string, limit int, cursor searchCursor, provider domain.Provider, key string) providerCall {
 	started := time.Now()
 	adapter := s.adapters[provider]
 	if adapter == nil {
-		return providerCall{provider: provider, status: ProviderStatus{Provider: provider, Status: "failed", FailureCategory: FailureUnknown, LatencyMS: time.Since(started).Milliseconds()}, err: errors.New("provider adapter unavailable")}
+		return providerCall{provider: provider, status: domain.ProviderStatus{Provider: provider, Status: "failed", FailureCategory: domain.FailureUnknown, LatencyMS: time.Since(started).Milliseconds()}, err: errors.New("provider adapter unavailable")}
 	}
 	callCtx, cancel := context.WithTimeout(ctx, searchTimeout)
-	page, callErr := adapter.Search(callCtx, key, SearchRequest{Query: query, Page: cursor.page(provider), Limit: limit})
+	page, callErr := adapter.Search(callCtx, key, ports.SearchRequest{Query: query, Page: cursor.page(provider), Limit: limit})
 	cancel()
-	status := ProviderStatus{Provider: provider, Status: "ok", LatencyMS: time.Since(started).Milliseconds()}
+	status := domain.ProviderStatus{Provider: provider, Status: "ok", LatencyMS: time.Since(started).Milliseconds()}
 	if callErr != nil {
 		status.Status = "failed"
 		status.FailureCategory = classifyProviderError(callErr)
@@ -254,10 +177,10 @@ func (s *SearchService) fetchProviderPage(ctx context.Context, query string, lim
 	return providerCall{provider: provider, page: page, status: status, err: callErr}
 }
 
-func aggregateProviderResults(active []Provider, resultsByProvider map[Provider]providerCall, limit int) ([]Result, []ProviderStatus, map[Provider]adapterPage, bool, int) {
-	allResults := make([]Result, 0, limit*len(active))
-	statuses := make([]ProviderStatus, 0, len(active))
-	pages := make(map[Provider]adapterPage, len(active))
+func aggregateProviderResults(active []domain.Provider, resultsByProvider map[domain.Provider]providerCall, limit int) ([]domain.Result, []domain.ProviderStatus, map[domain.Provider]ports.SearchProviderPage, bool, int) {
+	allResults := make([]domain.Result, 0, limit*len(active))
+	statuses := make([]domain.ProviderStatus, 0, len(active))
+	pages := make(map[domain.Provider]ports.SearchProviderPage, len(active))
 	hasMore := false
 	failures := 0
 	for _, provider := range active {
@@ -275,8 +198,8 @@ func aggregateProviderResults(active []Provider, resultsByProvider map[Provider]
 	return allResults, statuses, pages, hasMore, failures
 }
 
-func isCatalogProvider(provider Provider) bool {
-	return provider == ProviderUnsplash || provider == ProviderPexels
+func isCatalogProvider(provider domain.Provider) bool {
+	return provider == domain.ProviderUnsplash || provider == domain.ProviderPexels
 }
 
 func normalizeQuery(raw string) (string, error) {
@@ -307,7 +230,7 @@ func encodeCursor(cursor searchCursor) string {
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
-func nextCursor(cursor searchCursor, active []Provider, statuses []ProviderStatus, pages map[Provider]adapterPage) searchCursor {
+func nextCursor(cursor searchCursor, active []domain.Provider, statuses []domain.ProviderStatus, pages map[domain.Provider]ports.SearchProviderPage) searchCursor {
 	for _, provider := range active {
 		failed := false
 		for _, status := range statuses {
@@ -323,7 +246,7 @@ func nextCursor(cursor searchCursor, active []Provider, statuses []ProviderStatu
 			cursor.setDone(provider)
 			continue
 		}
-		if provider == ProviderUnsplash {
+		if provider == domain.ProviderUnsplash {
 			cursor.Unsplash++
 		} else {
 			cursor.Pexels++
@@ -332,31 +255,31 @@ func nextCursor(cursor searchCursor, active []Provider, statuses []ProviderStatu
 	return cursor
 }
 
-func (c searchCursor) done(provider Provider) bool {
-	if provider == ProviderPexels {
+func (c searchCursor) done(provider domain.Provider) bool {
+	if provider == domain.ProviderPexels {
 		return c.PexelsDone
 	}
 	return c.UnsplashDone
 }
 
-func (c *searchCursor) setDone(provider Provider) {
-	if provider == ProviderPexels {
+func (c *searchCursor) setDone(provider domain.Provider) {
+	if provider == domain.ProviderPexels {
 		c.PexelsDone = true
 		return
 	}
 	c.UnsplashDone = true
 }
 
-func (c searchCursor) page(provider Provider) int {
-	if provider == ProviderPexels {
+func (c searchCursor) page(provider domain.Provider) int {
+	if provider == domain.ProviderPexels {
 		return c.Pexels
 	}
 	return c.Unsplash
 }
 
-func dedupeResults(results []Result) []Result {
+func dedupeResults(results []domain.Result) []domain.Result {
 	seen := make(map[string]struct{}, len(results))
-	output := make([]Result, 0, len(results))
+	output := make([]domain.Result, 0, len(results))
 	for _, result := range results {
 		key := string(result.Provider) + ":" + result.ID
 		if result.ID == "" || result.ThumbnailURL == "" || result.PreviewURL == "" || result.SourceURL == "" {
@@ -371,9 +294,9 @@ func dedupeResults(results []Result) []Result {
 	return output
 }
 
-func filterProviderResults(provider Provider, results []Result) []Result {
+func filterProviderResults(provider domain.Provider, results []domain.Result) []domain.Result {
 	allowedHosts := providerResultHosts(provider)
-	filtered := make([]Result, 0, len(results))
+	filtered := make([]domain.Result, 0, len(results))
 	for _, result := range results {
 		if !isProviderURL(result.ThumbnailURL, allowedHosts) ||
 			!isProviderURL(result.PreviewURL, allowedHosts) ||
@@ -394,8 +317,8 @@ func filterProviderResults(provider Provider, results []Result) []Result {
 	return filtered
 }
 
-func providerResultHosts(provider Provider) []string {
-	if provider == ProviderPexels {
+func providerResultHosts(provider domain.Provider) []string {
+	if provider == domain.ProviderPexels {
 		return []string{"images.pexels.com", "pexels.com", "www.pexels.com"}
 	}
 	return []string{"images.unsplash.com", "plus.unsplash.com", "unsplash.com", "www.unsplash.com"}
@@ -415,140 +338,9 @@ func isProviderURL(raw string, allowedHosts []string) bool {
 	return false
 }
 
-type unsplashAdapter struct{}
-
-func (*unsplashAdapter) Provider() Provider { return ProviderUnsplash }
-
-type unsplashPhoto struct {
-	ID, Description, AltDescription string
-	Width, Height                   int
-	URLs                            struct {
-		Thumb, Small, Regular, Raw string
-	} `json:"urls"`
-	User struct {
-		Name  string
-		Links struct {
-			HTML string `json:"html"`
-		} `json:"links"`
-	} `json:"user"`
-	Links struct {
-		HTML string `json:"html"`
-	} `json:"links"`
-}
-
-func (a *unsplashAdapter) Search(ctx context.Context, key string, search SearchRequest) (adapterPage, error) {
-	endpoint := "https://api.unsplash.com/photos"
-	if search.Query != "" {
-		endpoint = "https://api.unsplash.com/search/photos"
-	}
-	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
-	query := strings.TrimSpace(search.Query)
-	if query != "" {
-		values.Set("query", query)
-	}
-	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
-	request.Header.Set("Authorization", "Client-ID "+key)
-	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, searchTimeout, append(outbound.AllowHosts(ctx), "api.unsplash.com", "images.unsplash.com", "plus.unsplash.com", "unsplash.com")...)
-	if err != nil {
-		return adapterPage{}, err
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBody))
-	if err != nil {
-		return adapterPage{}, err
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return adapterPage{}, fmt.Errorf("unsplash status %d", response.StatusCode)
-	}
-	var photos []unsplashPhoto
-	hasMore := false
-	if query == "" {
-		if err := json.Unmarshal(body, &photos); err != nil {
-			return adapterPage{}, err
-		}
-		hasMore = len(photos) == search.Limit
-	} else {
-		var payload struct {
-			Results    []unsplashPhoto `json:"results"`
-			TotalPages int             `json:"total_pages"`
-		}
-		if err := json.Unmarshal(body, &payload); err != nil {
-			return adapterPage{}, err
-		}
-		photos, hasMore = payload.Results, payload.TotalPages == 0 || search.Page < payload.TotalPages
-	}
-	results := make([]Result, 0, len(photos))
-	for _, item := range photos {
-		results = append(results, Result{ID: item.ID, Provider: ProviderUnsplash, Title: firstNonEmpty(item.Description, item.AltDescription), Description: item.AltDescription, Author: item.User.Name, AuthorURL: item.User.Links.HTML, SourceURL: item.Links.HTML, ThumbnailURL: item.URLs.Thumb, PreviewURL: firstNonEmpty(item.URLs.Regular, item.URLs.Small), OriginalURL: item.URLs.Raw, Width: item.Width, Height: item.Height, MediaKind: "image"})
-	}
-	return adapterPage{Results: results, HasMore: hasMore}, nil
-}
-
-type pexelsAdapter struct{}
-
-func (*pexelsAdapter) Provider() Provider { return ProviderPexels }
-func (a *pexelsAdapter) Search(ctx context.Context, key string, search SearchRequest) (adapterPage, error) {
-	endpoint := "https://api.pexels.com/v1/curated"
-	if search.Query != "" {
-		endpoint = "https://api.pexels.com/v1/search"
-	}
-	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
-	query := strings.TrimSpace(search.Query)
-	if query != "" {
-		values.Set("query", query)
-	}
-	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
-	request.Header.Set("Authorization", key)
-	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, searchTimeout, append(outbound.AllowHosts(ctx), "api.pexels.com", "images.pexels.com", "pexels.com")...)
-	if err != nil {
-		return adapterPage{}, err
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBody))
-	if err != nil {
-		return adapterPage{}, err
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return adapterPage{}, fmt.Errorf("pexels status %d", response.StatusCode)
-	}
-	var payload struct {
-		Photos []struct {
-			ID              int    `json:"id"`
-			Width           int    `json:"width"`
-			Height          int    `json:"height"`
-			Alt             string `json:"alt"`
-			Photographer    string `json:"photographer"`
-			PhotographerURL string `json:"photographer_url"`
-			URL             string `json:"url"`
-			Src             struct {
-				Medium   string `json:"medium"`
-				Large    string `json:"large"`
-				Original string `json:"original"`
-			} `json:"src"`
-		} `json:"photos"`
-		NextPage string `json:"next_page"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return adapterPage{}, err
-	}
-	results := make([]Result, 0, len(payload.Photos))
-	for _, item := range payload.Photos {
-		results = append(results, Result{ID: strconv.Itoa(item.ID), Provider: ProviderPexels, Title: item.Alt, Description: item.Alt, Author: item.Photographer, AuthorURL: item.PhotographerURL, SourceURL: item.URL, ThumbnailURL: item.Src.Medium, PreviewURL: item.Src.Large, OriginalURL: item.Src.Original, Width: item.Width, Height: item.Height, MediaKind: "image"})
-	}
-	return adapterPage{Results: results, HasMore: payload.NextPage != ""}, nil
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
-}
-func classifyProviderError(err error) FailureCategory {
+func classifyProviderError(err error) domain.FailureCategory {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return FailureNetwork
+		return domain.FailureNetwork
 	}
-	return FailureUnknown
+	return domain.FailureUnknown
 }

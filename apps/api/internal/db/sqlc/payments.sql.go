@@ -7,11 +7,8 @@ package dbsqlc
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const bindPaymentOrderCheckout = `-- name: BindPaymentOrderCheckout :one
@@ -26,15 +23,15 @@ RETURNING id, public_order_number, public_token, user_id, client_idempotency_key
 `
 
 type BindPaymentOrderCheckoutParams struct {
-	ID                      uuid.UUID      `json:"id"`
-	StripeCustomerID        string         `json:"stripe_customer_id"`
-	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
-	CheckoutUrl             string         `json:"checkout_url"`
-	ExpiresAt               time.Time      `json:"expires_at"`
+	ID                      pgtype.UUID        `json:"id"`
+	StripeCustomerID        string             `json:"stripe_customer_id"`
+	StripeCheckoutSessionID pgtype.Text        `json:"stripe_checkout_session_id"`
+	CheckoutUrl             string             `json:"checkout_url"`
+	ExpiresAt               pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, bindPaymentOrderCheckout,
+	row := q.db.QueryRow(ctx, bindPaymentOrderCheckout,
 		arg.ID,
 		arg.StripeCustomerID,
 		arg.StripeCheckoutSessionID,
@@ -113,21 +110,21 @@ ORDER BY orders.id
 `
 
 type ClaimDuePaymentOrderReconciliationsParams struct {
-	StaleBefore time.Time `json:"stale_before"`
-	NowAt       time.Time `json:"now_at"`
-	RowLimit    int32     `json:"row_limit"`
-	ClaimToken  uuid.UUID `json:"claim_token"`
-	ClaimUntil  time.Time `json:"claim_until"`
+	StaleBefore pgtype.Timestamptz `json:"stale_before"`
+	NowAt       pgtype.Timestamptz `json:"now_at"`
+	RowLimit    int32              `json:"row_limit"`
+	ClaimToken  pgtype.UUID        `json:"claim_token"`
+	ClaimUntil  pgtype.Timestamptz `json:"claim_until"`
 }
 
 type ClaimDuePaymentOrderReconciliationsRow struct {
-	PaymentOrder    PaymentOrder  `json:"payment_order"`
-	ClaimToken      uuid.NullUUID `json:"claim_token"`
-	ClaimGeneration int64         `json:"claim_generation"`
+	PaymentOrder    PaymentOrder `json:"payment_order"`
+	ClaimToken      pgtype.UUID  `json:"claim_token"`
+	ClaimGeneration int64        `json:"claim_generation"`
 }
 
 func (q *Queries) ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error) {
-	rows, err := q.db.QueryContext(ctx, claimDuePaymentOrderReconciliations,
+	rows, err := q.db.Query(ctx, claimDuePaymentOrderReconciliations,
 		arg.StaleBefore,
 		arg.NowAt,
 		arg.RowLimit,
@@ -181,9 +178,6 @@ func (q *Queries) ClaimDuePaymentOrderReconciliations(ctx context.Context, arg C
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -197,16 +191,16 @@ WHERE id = $1 AND completed_at IS NULL
 `
 
 type CompletePaymentCheckoutShutdownParams struct {
-	ID          uuid.UUID    `json:"id"`
-	CompletedAt sql.NullTime `json:"completed_at"`
+	ID          pgtype.UUID        `json:"id"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 }
 
 func (q *Queries) CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, completePaymentCheckoutShutdown, arg.ID, arg.CompletedAt)
+	result, err := q.db.Exec(ctx, completePaymentCheckoutShutdown, arg.ID, arg.CompletedAt)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const completePaymentOrderReconciliationClaim = `-- name: CompletePaymentOrderReconciliationClaim :execrows
@@ -229,19 +223,19 @@ WHERE payment_order_id = $7::UUID
 `
 
 type CompletePaymentOrderReconciliationClaimParams struct {
-	CheckedAt       time.Time `json:"checked_at"`
-	NextAttemptAt   time.Time `json:"next_attempt_at"`
-	ErrorCode       string    `json:"error_code"`
-	ErrorSummary    string    `json:"error_summary"`
-	ClearAnomaly    bool      `json:"clear_anomaly"`
-	MarkAnomalous   bool      `json:"mark_anomalous"`
-	PaymentOrderID  uuid.UUID `json:"payment_order_id"`
-	ClaimToken      uuid.UUID `json:"claim_token"`
-	ClaimGeneration int64     `json:"claim_generation"`
+	CheckedAt       pgtype.Timestamptz `json:"checked_at"`
+	NextAttemptAt   pgtype.Timestamptz `json:"next_attempt_at"`
+	ErrorCode       string             `json:"error_code"`
+	ErrorSummary    string             `json:"error_summary"`
+	ClearAnomaly    bool               `json:"clear_anomaly"`
+	MarkAnomalous   bool               `json:"mark_anomalous"`
+	PaymentOrderID  pgtype.UUID        `json:"payment_order_id"`
+	ClaimToken      pgtype.UUID        `json:"claim_token"`
+	ClaimGeneration int64              `json:"claim_generation"`
 }
 
 func (q *Queries) CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, completePaymentOrderReconciliationClaim,
+	result, err := q.db.Exec(ctx, completePaymentOrderReconciliationClaim,
 		arg.CheckedAt,
 		arg.NextAttemptAt,
 		arg.ErrorCode,
@@ -255,7 +249,7 @@ func (q *Queries) CompletePaymentOrderReconciliationClaim(ctx context.Context, a
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const countAdminPaymentOrders = `-- name: CountAdminPaymentOrders :one
@@ -272,16 +266,16 @@ WHERE ($1::TEXT = '' OR orders.public_order_number = $1::TEXT)
 `
 
 type CountAdminPaymentOrdersParams struct {
-	OrderNumber     string    `json:"order_number"`
-	HasUserPublicID bool      `json:"has_user_public_id"`
-	UserPublicID    uuid.UUID `json:"user_public_id"`
-	DisplayName     string    `json:"display_name"`
-	Status          string    `json:"status"`
-	AnomalyOnly     bool      `json:"anomaly_only"`
+	OrderNumber     string      `json:"order_number"`
+	HasUserPublicID bool        `json:"has_user_public_id"`
+	UserPublicID    pgtype.UUID `json:"user_public_id"`
+	DisplayName     string      `json:"display_name"`
+	Status          string      `json:"status"`
+	AnomalyOnly     bool        `json:"anomaly_only"`
 }
 
 func (q *Queries) CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAdminPaymentOrders,
+	row := q.db.QueryRow(ctx, countAdminPaymentOrders,
 		arg.OrderNumber,
 		arg.HasUserPublicID,
 		arg.UserPublicID,
@@ -335,42 +329,42 @@ WHERE orders.public_order_number = $1::TEXT
 `
 
 type GetAdminPaymentOrderRow struct {
-	ID                      uuid.UUID      `json:"id"`
-	PublicOrderNumber       string         `json:"public_order_number"`
-	UserID                  int64          `json:"user_id"`
-	UserPublicID            uuid.UUID      `json:"user_public_id"`
-	DisplayName             string         `json:"display_name"`
-	Status                  string         `json:"status"`
-	IdeaQuantity            int64          `json:"idea_quantity"`
-	BaseCurrency            string         `json:"base_currency"`
-	BaseAmountMinor         int64          `json:"base_amount_minor"`
-	PaidSubtotalMinor       sql.NullInt64  `json:"paid_subtotal_minor"`
-	PaidTaxMinor            sql.NullInt64  `json:"paid_tax_minor"`
-	PaidTotalMinor          sql.NullInt64  `json:"paid_total_minor"`
-	PaidCurrency            string         `json:"paid_currency"`
-	StripeAccountID         string         `json:"stripe_account_id"`
-	StripeCustomerID        string         `json:"stripe_customer_id"`
-	StripeProductID         string         `json:"stripe_product_id"`
-	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
-	StripePaymentIntentID   string         `json:"stripe_payment_intent_id"`
-	StripeChargeID          string         `json:"stripe_charge_id"`
-	TermsVersion            string         `json:"terms_version"`
-	RefundPolicyVersion     string         `json:"refund_policy_version"`
-	ReceiptUrl              string         `json:"receipt_url"`
-	ExpiresAt               time.Time      `json:"expires_at"`
-	PaidAt                  sql.NullTime   `json:"paid_at"`
-	CreditedAt              sql.NullTime   `json:"credited_at"`
-	CreatedAt               time.Time      `json:"created_at"`
-	UpdatedAt               time.Time      `json:"updated_at"`
-	LastErrorCode           sql.NullString `json:"last_error_code"`
-	LastErrorSummary        sql.NullString `json:"last_error_summary"`
-	LastCheckedAt           sql.NullTime   `json:"last_checked_at"`
-	NextAttemptAt           sql.NullTime   `json:"next_attempt_at"`
-	AnomalousAt             sql.NullTime   `json:"anomalous_at"`
+	ID                      pgtype.UUID        `json:"id"`
+	PublicOrderNumber       string             `json:"public_order_number"`
+	UserID                  int64              `json:"user_id"`
+	UserPublicID            pgtype.UUID        `json:"user_public_id"`
+	DisplayName             string             `json:"display_name"`
+	Status                  string             `json:"status"`
+	IdeaQuantity            int64              `json:"idea_quantity"`
+	BaseCurrency            string             `json:"base_currency"`
+	BaseAmountMinor         int64              `json:"base_amount_minor"`
+	PaidSubtotalMinor       pgtype.Int8        `json:"paid_subtotal_minor"`
+	PaidTaxMinor            pgtype.Int8        `json:"paid_tax_minor"`
+	PaidTotalMinor          pgtype.Int8        `json:"paid_total_minor"`
+	PaidCurrency            string             `json:"paid_currency"`
+	StripeAccountID         string             `json:"stripe_account_id"`
+	StripeCustomerID        string             `json:"stripe_customer_id"`
+	StripeProductID         string             `json:"stripe_product_id"`
+	StripeCheckoutSessionID pgtype.Text        `json:"stripe_checkout_session_id"`
+	StripePaymentIntentID   string             `json:"stripe_payment_intent_id"`
+	StripeChargeID          string             `json:"stripe_charge_id"`
+	TermsVersion            string             `json:"terms_version"`
+	RefundPolicyVersion     string             `json:"refund_policy_version"`
+	ReceiptUrl              string             `json:"receipt_url"`
+	ExpiresAt               pgtype.Timestamptz `json:"expires_at"`
+	PaidAt                  pgtype.Timestamptz `json:"paid_at"`
+	CreditedAt              pgtype.Timestamptz `json:"credited_at"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+	LastErrorCode           pgtype.Text        `json:"last_error_code"`
+	LastErrorSummary        pgtype.Text        `json:"last_error_summary"`
+	LastCheckedAt           pgtype.Timestamptz `json:"last_checked_at"`
+	NextAttemptAt           pgtype.Timestamptz `json:"next_attempt_at"`
+	AnomalousAt             pgtype.Timestamptz `json:"anomalous_at"`
 }
 
 func (q *Queries) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error) {
-	row := q.db.QueryRowContext(ctx, getAdminPaymentOrder, orderNumber)
+	row := q.db.QueryRow(ctx, getAdminPaymentOrder, orderNumber)
 	var i GetAdminPaymentOrderRow
 	err := row.Scan(
 		&i.ID,
@@ -415,8 +409,8 @@ FROM payment_checkout_shutdowns
 WHERE id = $1
 `
 
-func (q *Queries) GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) (PaymentCheckoutShutdown, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentCheckoutShutdown, id)
+func (q *Queries) GetPaymentCheckoutShutdown(ctx context.Context, id pgtype.UUID) (PaymentCheckoutShutdown, error) {
+	row := q.db.QueryRow(ctx, getPaymentCheckoutShutdown, id)
 	var i PaymentCheckoutShutdown
 	err := row.Scan(
 		&i.ID,
@@ -444,7 +438,7 @@ type GetPaymentCustomerParams struct {
 }
 
 func (q *Queries) GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentCustomer, arg.UserID, arg.StripeAccountID, arg.StripeMode)
+	row := q.db.QueryRow(ctx, getPaymentCustomer, arg.UserID, arg.StripeAccountID, arg.StripeMode)
 	var i PaymentCustomer
 	err := row.Scan(
 		&i.UserID,
@@ -464,12 +458,12 @@ WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
 `
 
 type GetPaymentOrderByCheckoutSessionParams struct {
-	StripeAccountID         string         `json:"stripe_account_id"`
-	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
+	StripeAccountID         string      `json:"stripe_account_id"`
+	StripeCheckoutSessionID pgtype.Text `json:"stripe_checkout_session_id"`
 }
 
 func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByCheckoutSession, arg.StripeAccountID, arg.StripeCheckoutSessionID)
+	row := q.db.QueryRow(ctx, getPaymentOrderByCheckoutSession, arg.StripeAccountID, arg.StripeCheckoutSessionID)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -516,12 +510,12 @@ FOR UPDATE
 `
 
 type GetPaymentOrderByCheckoutSessionForUpdateParams struct {
-	StripeAccountID         string         `json:"stripe_account_id"`
-	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
+	StripeAccountID         string      `json:"stripe_account_id"`
+	StripeCheckoutSessionID pgtype.Text `json:"stripe_checkout_session_id"`
 }
 
 func (q *Queries) GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context, arg GetPaymentOrderByCheckoutSessionForUpdateParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByCheckoutSessionForUpdate, arg.StripeAccountID, arg.StripeCheckoutSessionID)
+	row := q.db.QueryRow(ctx, getPaymentOrderByCheckoutSessionForUpdate, arg.StripeAccountID, arg.StripeCheckoutSessionID)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -566,8 +560,8 @@ FROM payment_orders
 WHERE id = $1
 `
 
-func (q *Queries) GetPaymentOrderByID(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByID, id)
+func (q *Queries) GetPaymentOrderByID(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, getPaymentOrderByID, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -613,8 +607,8 @@ WHERE id = $1
 FOR UPDATE
 `
 
-func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByIDForUpdate, id)
+func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, getPaymentOrderByIDForUpdate, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -665,7 +659,7 @@ type GetPaymentOrderByIdempotencyParams struct {
 }
 
 func (q *Queries) GetPaymentOrderByIdempotency(ctx context.Context, arg GetPaymentOrderByIdempotencyParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByIdempotency, arg.UserID, arg.ClientIdempotencyKey)
+	row := q.db.QueryRow(ctx, getPaymentOrderByIdempotency, arg.UserID, arg.ClientIdempotencyKey)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -711,12 +705,12 @@ WHERE public_token = $1 AND user_id = $2
 `
 
 type GetPaymentOrderByPublicTokenParams struct {
-	PublicToken uuid.UUID `json:"public_token"`
-	UserID      int64     `json:"user_id"`
+	PublicToken pgtype.UUID `json:"public_token"`
+	UserID      int64       `json:"user_id"`
 }
 
 func (q *Queries) GetPaymentOrderByPublicToken(ctx context.Context, arg GetPaymentOrderByPublicTokenParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentOrderByPublicToken, arg.PublicToken, arg.UserID)
+	row := q.db.QueryRow(ctx, getPaymentOrderByPublicToken, arg.PublicToken, arg.UserID)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -769,7 +763,7 @@ WHERE singleton_id = 1
 `
 
 func (q *Queries) GetPaymentStripeConfiguration(ctx context.Context) (PaymentStripeConfiguration, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentStripeConfiguration)
+	row := q.db.QueryRow(ctx, getPaymentStripeConfiguration)
 	var i PaymentStripeConfiguration
 	err := row.Scan(
 		&i.SingletonID,
@@ -790,8 +784,8 @@ FROM payment_stripe_credentials
 WHERE id = $1
 `
 
-func (q *Queries) GetPaymentStripeCredential(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentStripeCredential, id)
+func (q *Queries) GetPaymentStripeCredential(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error) {
+	row := q.db.QueryRow(ctx, getPaymentStripeCredential, id)
 	var i PaymentStripeCredential
 	err := row.Scan(
 		&i.ID,
@@ -817,8 +811,8 @@ JOIN payment_stripe_credentials credentials ON credentials.id = orders.stripe_cr
 WHERE orders.id = $1
 `
 
-func (q *Queries) GetPaymentStripeCredentialForOrder(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentStripeCredentialForOrder, id)
+func (q *Queries) GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error) {
+	row := q.db.QueryRow(ctx, getPaymentStripeCredentialForOrder, id)
 	var i PaymentStripeCredential
 	err := row.Scan(
 		&i.ID,
@@ -845,7 +839,7 @@ WHERE orders.public_order_number = $1
 `
 
 func (q *Queries) GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentStripeCredentialForOrderNumber, publicOrderNumber)
+	row := q.db.QueryRow(ctx, getPaymentStripeCredentialForOrderNumber, publicOrderNumber)
 	var i PaymentStripeCredential
 	err := row.Scan(
 		&i.ID,
@@ -879,16 +873,16 @@ VALUES ($1, $2, 'stripe_configuration', 'current', $3, $4, $5, $6::JSONB)
 `
 
 type InsertPaymentAdminActionParams struct {
-	ActionType   string          `json:"action_type"`
-	ActorID      int64           `json:"actor_id"`
-	Outcome      string          `json:"outcome"`
-	ErrorCode    string          `json:"error_code"`
-	ErrorSummary string          `json:"error_summary"`
-	Metadata     json.RawMessage `json:"metadata"`
+	ActionType   string `json:"action_type"`
+	ActorID      int64  `json:"actor_id"`
+	Outcome      string `json:"outcome"`
+	ErrorCode    string `json:"error_code"`
+	ErrorSummary string `json:"error_summary"`
+	Metadata     []byte `json:"metadata"`
 }
 
 func (q *Queries) InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error {
-	_, err := q.db.ExecContext(ctx, insertPaymentAdminAction,
+	_, err := q.db.Exec(ctx, insertPaymentAdminAction,
 		arg.ActionType,
 		arg.ActorID,
 		arg.Outcome,
@@ -906,12 +900,12 @@ RETURNING id, stripe_credential_id, stripe_account_id, cutoff_at, created_at, co
 `
 
 type InsertPaymentCheckoutShutdownParams struct {
-	StripeCredentialID uuid.UUID `json:"stripe_credential_id"`
-	StripeAccountID    string    `json:"stripe_account_id"`
+	StripeCredentialID pgtype.UUID `json:"stripe_credential_id"`
+	StripeAccountID    string      `json:"stripe_account_id"`
 }
 
 func (q *Queries) InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error) {
-	row := q.db.QueryRowContext(ctx, insertPaymentCheckoutShutdown, arg.StripeCredentialID, arg.StripeAccountID)
+	row := q.db.QueryRow(ctx, insertPaymentCheckoutShutdown, arg.StripeCredentialID, arg.StripeAccountID)
 	var i PaymentCheckoutShutdown
 	err := row.Scan(
 		&i.ID,
@@ -952,24 +946,24 @@ RETURNING id, public_order_number, public_token, user_id, client_idempotency_key
 `
 
 type InsertPaymentOrderIntentParams struct {
-	ID                   uuid.UUID `json:"id"`
-	PublicOrderNumber    string    `json:"public_order_number"`
-	PublicToken          uuid.UUID `json:"public_token"`
-	UserID               int64     `json:"user_id"`
-	ClientIdempotencyKey string    `json:"client_idempotency_key"`
-	RequestHash          string    `json:"request_hash"`
-	StripeCredentialID   uuid.UUID `json:"stripe_credential_id"`
-	StripeAccountID      string    `json:"stripe_account_id"`
-	StripeProductID      string    `json:"stripe_product_id"`
-	IdeaQuantity         int64     `json:"idea_quantity"`
-	TermsVersion         string    `json:"terms_version"`
-	RefundPolicyVersion  string    `json:"refund_policy_version"`
-	ReturnBaseUrl        string    `json:"return_base_url"`
-	ExpiresAt            time.Time `json:"expires_at"`
+	ID                   pgtype.UUID        `json:"id"`
+	PublicOrderNumber    string             `json:"public_order_number"`
+	PublicToken          pgtype.UUID        `json:"public_token"`
+	UserID               int64              `json:"user_id"`
+	ClientIdempotencyKey string             `json:"client_idempotency_key"`
+	RequestHash          string             `json:"request_hash"`
+	StripeCredentialID   pgtype.UUID        `json:"stripe_credential_id"`
+	StripeAccountID      string             `json:"stripe_account_id"`
+	StripeProductID      string             `json:"stripe_product_id"`
+	IdeaQuantity         int64              `json:"idea_quantity"`
+	TermsVersion         string             `json:"terms_version"`
+	RefundPolicyVersion  string             `json:"refund_policy_version"`
+	ReturnBaseUrl        string             `json:"return_base_url"`
+	ExpiresAt            pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, insertPaymentOrderIntent,
+	row := q.db.QueryRow(ctx, insertPaymentOrderIntent,
 		arg.ID,
 		arg.PublicOrderNumber,
 		arg.PublicToken,
@@ -1042,21 +1036,21 @@ RETURNING id, account_id, mode, charges_enabled, payment_method_configuration_id
 `
 
 type InsertPaymentStripeCredentialParams struct {
-	ID                           uuid.UUID      `json:"id"`
-	AccountID                    string         `json:"account_id"`
-	Mode                         string         `json:"mode"`
-	ChargesEnabled               bool           `json:"charges_enabled"`
-	PaymentMethodConfigurationID sql.NullString `json:"payment_method_configuration_id"`
-	StripeProductID              string         `json:"stripe_product_id"`
-	StripeWebhookEndpointID      string         `json:"stripe_webhook_endpoint_id"`
-	ApiKeyCiphertext             string         `json:"api_key_ciphertext"`
-	WebhookSecretCiphertext      string         `json:"webhook_secret_ciphertext"`
-	SecretMaterialKind           string         `json:"secret_material_kind"`
-	CreatedBy                    int64          `json:"created_by"`
+	ID                           pgtype.UUID `json:"id"`
+	AccountID                    string      `json:"account_id"`
+	Mode                         string      `json:"mode"`
+	ChargesEnabled               bool        `json:"charges_enabled"`
+	PaymentMethodConfigurationID pgtype.Text `json:"payment_method_configuration_id"`
+	StripeProductID              string      `json:"stripe_product_id"`
+	StripeWebhookEndpointID      string      `json:"stripe_webhook_endpoint_id"`
+	ApiKeyCiphertext             string      `json:"api_key_ciphertext"`
+	WebhookSecretCiphertext      string      `json:"webhook_secret_ciphertext"`
+	SecretMaterialKind           string      `json:"secret_material_kind"`
+	CreatedBy                    int64       `json:"created_by"`
 }
 
 func (q *Queries) InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error) {
-	row := q.db.QueryRowContext(ctx, insertPaymentStripeCredential,
+	row := q.db.QueryRow(ctx, insertPaymentStripeCredential,
 		arg.ID,
 		arg.AccountID,
 		arg.Mode,
@@ -1117,19 +1111,19 @@ ON CONFLICT (stripe_event_id) DO NOTHING
 `
 
 type InsertPaymentWebhookEventParams struct {
-	StripeEventID    string       `json:"stripe_event_id"`
-	EventType        string       `json:"event_type"`
-	StripeObjectID   string       `json:"stripe_object_id"`
-	PaymentIntentID  string       `json:"payment_intent_id"`
-	ChargeID         string       `json:"charge_id"`
-	Livemode         bool         `json:"livemode"`
-	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
-	ProcessingResult string       `json:"processing_result"`
-	ProcessedAt      sql.NullTime `json:"processed_at"`
+	StripeEventID    string             `json:"stripe_event_id"`
+	EventType        string             `json:"event_type"`
+	StripeObjectID   string             `json:"stripe_object_id"`
+	PaymentIntentID  string             `json:"payment_intent_id"`
+	ChargeID         string             `json:"charge_id"`
+	Livemode         bool               `json:"livemode"`
+	StripeCreatedAt  pgtype.Timestamptz `json:"stripe_created_at"`
+	ProcessingResult string             `json:"processing_result"`
+	ProcessedAt      pgtype.Timestamptz `json:"processed_at"`
 }
 
 func (q *Queries) InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, insertPaymentWebhookEvent,
+	result, err := q.db.Exec(ctx, insertPaymentWebhookEvent,
 		arg.StripeEventID,
 		arg.EventType,
 		arg.StripeObjectID,
@@ -1143,7 +1137,7 @@ func (q *Queries) InsertPaymentWebhookEvent(ctx context.Context, arg InsertPayme
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const listActivePaymentCheckoutShutdowns = `-- name: ListActivePaymentCheckoutShutdowns :many
@@ -1154,7 +1148,7 @@ ORDER BY created_at, id
 `
 
 func (q *Queries) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error) {
-	rows, err := q.db.QueryContext(ctx, listActivePaymentCheckoutShutdowns)
+	rows, err := q.db.Query(ctx, listActivePaymentCheckoutShutdowns)
 	if err != nil {
 		return nil, err
 	}
@@ -1174,9 +1168,6 @@ func (q *Queries) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]Pay
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1192,7 +1183,7 @@ ORDER BY created_at, id
 `
 
 func (q *Queries) ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error) {
-	rows, err := q.db.QueryContext(ctx, listActivePaymentOrders, userID)
+	rows, err := q.db.Query(ctx, listActivePaymentOrders, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1238,9 +1229,6 @@ func (q *Queries) ListActivePaymentOrders(ctx context.Context, userID int64) ([]
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1263,22 +1251,22 @@ LIMIT $2::INTEGER
 `
 
 type ListAdminPaymentOrderWebhookEventsParams struct {
-	PaymentOrderID uuid.UUID `json:"payment_order_id"`
-	RowLimit       int32     `json:"row_limit"`
+	PaymentOrderID pgtype.UUID `json:"payment_order_id"`
+	RowLimit       int32       `json:"row_limit"`
 }
 
 type ListAdminPaymentOrderWebhookEventsRow struct {
-	EventType        string       `json:"event_type"`
-	StripeObjectID   string       `json:"stripe_object_id"`
-	ProcessingResult string       `json:"processing_result"`
-	ErrorSummary     string       `json:"error_summary"`
-	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
-	ReceivedAt       time.Time    `json:"received_at"`
-	ProcessedAt      sql.NullTime `json:"processed_at"`
+	EventType        string             `json:"event_type"`
+	StripeObjectID   string             `json:"stripe_object_id"`
+	ProcessingResult string             `json:"processing_result"`
+	ErrorSummary     string             `json:"error_summary"`
+	StripeCreatedAt  pgtype.Timestamptz `json:"stripe_created_at"`
+	ReceivedAt       pgtype.Timestamptz `json:"received_at"`
+	ProcessedAt      pgtype.Timestamptz `json:"processed_at"`
 }
 
 func (q *Queries) ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminPaymentOrderWebhookEvents, arg.PaymentOrderID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listAdminPaymentOrderWebhookEvents, arg.PaymentOrderID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -1298,9 +1286,6 @@ func (q *Queries) ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg Li
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1343,39 +1328,39 @@ LIMIT $10::INTEGER
 `
 
 type ListAdminPaymentOrdersParams struct {
-	OrderNumber     string        `json:"order_number"`
-	HasUserPublicID bool          `json:"has_user_public_id"`
-	UserPublicID    uuid.UUID     `json:"user_public_id"`
-	DisplayName     string        `json:"display_name"`
-	Status          string        `json:"status"`
-	AnomalyOnly     bool          `json:"anomaly_only"`
-	CursorSet       bool          `json:"cursor_set"`
-	CursorCreatedAt sql.NullTime  `json:"cursor_created_at"`
-	CursorID        uuid.NullUUID `json:"cursor_id"`
-	PageLimit       int32         `json:"page_limit"`
+	OrderNumber     string             `json:"order_number"`
+	HasUserPublicID bool               `json:"has_user_public_id"`
+	UserPublicID    pgtype.UUID        `json:"user_public_id"`
+	DisplayName     string             `json:"display_name"`
+	Status          string             `json:"status"`
+	AnomalyOnly     bool               `json:"anomaly_only"`
+	CursorSet       bool               `json:"cursor_set"`
+	CursorCreatedAt pgtype.Timestamptz `json:"cursor_created_at"`
+	CursorID        pgtype.UUID        `json:"cursor_id"`
+	PageLimit       int32              `json:"page_limit"`
 }
 
 type ListAdminPaymentOrdersRow struct {
-	ID                uuid.UUID     `json:"id"`
-	PublicOrderNumber string        `json:"public_order_number"`
-	UserPublicID      uuid.UUID     `json:"user_public_id"`
-	DisplayName       string        `json:"display_name"`
-	Status            string        `json:"status"`
-	IdeaQuantity      int64         `json:"idea_quantity"`
-	BaseCurrency      string        `json:"base_currency"`
-	BaseAmountMinor   int64         `json:"base_amount_minor"`
-	PaidTotalMinor    sql.NullInt64 `json:"paid_total_minor"`
-	PaidCurrency      string        `json:"paid_currency"`
-	PaidAt            sql.NullTime  `json:"paid_at"`
-	CreditedAt        sql.NullTime  `json:"credited_at"`
-	CreatedAt         time.Time     `json:"created_at"`
-	UpdatedAt         time.Time     `json:"updated_at"`
-	AnomalousAt       sql.NullTime  `json:"anomalous_at"`
-	LastCheckedAt     sql.NullTime  `json:"last_checked_at"`
+	ID                pgtype.UUID        `json:"id"`
+	PublicOrderNumber string             `json:"public_order_number"`
+	UserPublicID      pgtype.UUID        `json:"user_public_id"`
+	DisplayName       string             `json:"display_name"`
+	Status            string             `json:"status"`
+	IdeaQuantity      int64              `json:"idea_quantity"`
+	BaseCurrency      string             `json:"base_currency"`
+	BaseAmountMinor   int64              `json:"base_amount_minor"`
+	PaidTotalMinor    pgtype.Int8        `json:"paid_total_minor"`
+	PaidCurrency      string             `json:"paid_currency"`
+	PaidAt            pgtype.Timestamptz `json:"paid_at"`
+	CreditedAt        pgtype.Timestamptz `json:"credited_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	AnomalousAt       pgtype.Timestamptz `json:"anomalous_at"`
+	LastCheckedAt     pgtype.Timestamptz `json:"last_checked_at"`
 }
 
 func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminPaymentOrders,
+	rows, err := q.db.Query(ctx, listAdminPaymentOrders,
 		arg.OrderNumber,
 		arg.HasUserPublicID,
 		arg.UserPublicID,
@@ -1416,9 +1401,6 @@ func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPayme
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1437,14 +1419,14 @@ LIMIT $4
 `
 
 type ListPaymentOrdersForCheckoutShutdownParams struct {
-	StripeAccountID    string    `json:"stripe_account_id"`
-	StripeCredentialID uuid.UUID `json:"stripe_credential_id"`
-	CreatedAt          time.Time `json:"created_at"`
-	Limit              int32     `json:"limit"`
+	StripeAccountID    string             `json:"stripe_account_id"`
+	StripeCredentialID pgtype.UUID        `json:"stripe_credential_id"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	Limit              int32              `json:"limit"`
 }
 
 func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error) {
-	rows, err := q.db.QueryContext(ctx, listPaymentOrdersForCheckoutShutdown,
+	rows, err := q.db.Query(ctx, listPaymentOrdersForCheckoutShutdown,
 		arg.StripeAccountID,
 		arg.StripeCredentialID,
 		arg.CreatedAt,
@@ -1495,9 +1477,6 @@ func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg 
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1534,28 +1513,28 @@ LIMIT $6::INTEGER
 `
 
 type ListPaymentRechargeHistoryParams struct {
-	UserID       int64         `json:"user_id"`
-	CutoffAt     time.Time     `json:"cutoff_at"`
-	CursorSet    bool          `json:"cursor_set"`
-	CursorPaidAt sql.NullTime  `json:"cursor_paid_at"`
-	CursorID     uuid.NullUUID `json:"cursor_id"`
-	PageLimit    int32         `json:"page_limit"`
+	UserID       int64              `json:"user_id"`
+	CutoffAt     pgtype.Timestamptz `json:"cutoff_at"`
+	CursorSet    bool               `json:"cursor_set"`
+	CursorPaidAt pgtype.Timestamptz `json:"cursor_paid_at"`
+	CursorID     pgtype.UUID        `json:"cursor_id"`
+	PageLimit    int32              `json:"page_limit"`
 }
 
 type ListPaymentRechargeHistoryRow struct {
-	ID                   uuid.UUID     `json:"id"`
-	OccurredAt           time.Time     `json:"occurred_at"`
-	IdeaQuantity         int64         `json:"idea_quantity"`
-	Status               string        `json:"status"`
-	PaidTotalMinor       sql.NullInt64 `json:"paid_total_minor"`
-	PaidCurrency         string        `json:"paid_currency"`
-	ReceiptUrl           string        `json:"receipt_url"`
-	RefundedIdeaQuantity int64         `json:"refunded_idea_quantity"`
-	RefundedAmountMinor  int64         `json:"refunded_amount_minor"`
+	ID                   pgtype.UUID        `json:"id"`
+	OccurredAt           pgtype.Timestamptz `json:"occurred_at"`
+	IdeaQuantity         int64              `json:"idea_quantity"`
+	Status               string             `json:"status"`
+	PaidTotalMinor       pgtype.Int8        `json:"paid_total_minor"`
+	PaidCurrency         string             `json:"paid_currency"`
+	ReceiptUrl           string             `json:"receipt_url"`
+	RefundedIdeaQuantity int64              `json:"refunded_idea_quantity"`
+	RefundedAmountMinor  int64              `json:"refunded_amount_minor"`
 }
 
 func (q *Queries) ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPaymentRechargeHistory,
+	rows, err := q.db.Query(ctx, listPaymentRechargeHistory,
 		arg.UserID,
 		arg.CutoffAt,
 		arg.CursorSet,
@@ -1585,9 +1564,6 @@ func (q *Queries) ListPaymentRechargeHistory(ctx context.Context, arg ListPaymen
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1612,19 +1588,19 @@ LIMIT $1::INTEGER
 `
 
 type ListPaymentReconciliationAnomaliesRow struct {
-	ID                uuid.UUID    `json:"id"`
-	PublicOrderNumber string       `json:"public_order_number"`
-	UserID            int64        `json:"user_id"`
-	Status            string       `json:"status"`
-	LastErrorCode     string       `json:"last_error_code"`
-	LastErrorSummary  string       `json:"last_error_summary"`
-	LastCheckedAt     sql.NullTime `json:"last_checked_at"`
-	AnomalousAt       sql.NullTime `json:"anomalous_at"`
-	CreatedAt         time.Time    `json:"created_at"`
+	ID                pgtype.UUID        `json:"id"`
+	PublicOrderNumber string             `json:"public_order_number"`
+	UserID            int64              `json:"user_id"`
+	Status            string             `json:"status"`
+	LastErrorCode     string             `json:"last_error_code"`
+	LastErrorSummary  string             `json:"last_error_summary"`
+	LastCheckedAt     pgtype.Timestamptz `json:"last_checked_at"`
+	AnomalousAt       pgtype.Timestamptz `json:"anomalous_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
 func (q *Queries) ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPaymentReconciliationAnomalies, rowLimit)
+	rows, err := q.db.Query(ctx, listPaymentReconciliationAnomalies, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -1647,9 +1623,6 @@ func (q *Queries) ListPaymentReconciliationAnomalies(ctx context.Context, rowLim
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1663,7 +1636,7 @@ ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error) {
-	rows, err := q.db.QueryContext(ctx, listPaymentStripeCredentials)
+	rows, err := q.db.Query(ctx, listPaymentStripeCredentials)
 	if err != nil {
 		return nil, err
 	}
@@ -1689,9 +1662,6 @@ func (q *Queries) ListPaymentStripeCredentials(ctx context.Context) ([]PaymentSt
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1707,7 +1677,7 @@ LIMIT 1001
 `
 
 func (q *Queries) ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrder, error) {
-	rows, err := q.db.QueryContext(ctx, listUnsettledPaymentOrders)
+	rows, err := q.db.Query(ctx, listUnsettledPaymentOrders)
 	if err != nil {
 		return nil, err
 	}
@@ -1752,9 +1722,6 @@ func (q *Queries) ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrde
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1771,7 +1738,7 @@ ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error) {
-	rows, err := q.db.QueryContext(ctx, listUserPendingPaymentOrders, userID)
+	rows, err := q.db.Query(ctx, listUserPendingPaymentOrders, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1817,9 +1784,6 @@ func (q *Queries) ListUserPendingPaymentOrders(ctx context.Context, userID int64
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -1834,8 +1798,8 @@ WHERE id = $1 AND status = 'checkout_open'
 RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
-func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, markPaymentOrderAsyncPending, id)
+func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, markPaymentOrderAsyncPending, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -1883,12 +1847,12 @@ RETURNING id, public_order_number, public_token, user_id, client_idempotency_key
 `
 
 type MarkPaymentOrderCancelledParams struct {
-	ID     uuid.UUID `json:"id"`
-	UserID int64     `json:"user_id"`
+	ID     pgtype.UUID `json:"id"`
+	UserID int64       `json:"user_id"`
 }
 
 func (q *Queries) MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, markPaymentOrderCancelled, arg.ID, arg.UserID)
+	row := q.db.QueryRow(ctx, markPaymentOrderCancelled, arg.ID, arg.UserID)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -1937,13 +1901,13 @@ RETURNING id, public_order_number, public_token, user_id, client_idempotency_key
 `
 
 type MarkPaymentOrderCreditedParams struct {
-	ID                  uuid.UUID      `json:"id"`
-	CreditTransactionID sql.NullString `json:"credit_transaction_id"`
-	CreditedAt          sql.NullTime   `json:"credited_at"`
+	ID                  pgtype.UUID        `json:"id"`
+	CreditTransactionID pgtype.Text        `json:"credit_transaction_id"`
+	CreditedAt          pgtype.Timestamptz `json:"credited_at"`
 }
 
 func (q *Queries) MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, markPaymentOrderCredited, arg.ID, arg.CreditTransactionID, arg.CreditedAt)
+	row := q.db.QueryRow(ctx, markPaymentOrderCredited, arg.ID, arg.CreditTransactionID, arg.CreditedAt)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -1990,8 +1954,8 @@ WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending
 RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
-func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, markPaymentOrderExpired, id)
+func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, markPaymentOrderExpired, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -2038,8 +2002,8 @@ WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending
 RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
-func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, markPaymentOrderFailed, id)
+func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (PaymentOrder, error) {
+	row := q.db.QueryRow(ctx, markPaymentOrderFailed, id)
 	var i PaymentOrder
 	err := row.Scan(
 		&i.ID,
@@ -2087,14 +2051,14 @@ WHERE stripe_event_id = $1
 `
 
 type MarkPaymentWebhookEventProcessedParams struct {
-	StripeEventID    string       `json:"stripe_event_id"`
-	ProcessingResult string       `json:"processing_result"`
-	ErrorSummary     string       `json:"error_summary"`
-	ProcessedAt      sql.NullTime `json:"processed_at"`
+	StripeEventID    string             `json:"stripe_event_id"`
+	ProcessingResult string             `json:"processing_result"`
+	ErrorSummary     string             `json:"error_summary"`
+	ProcessedAt      pgtype.Timestamptz `json:"processed_at"`
 }
 
 func (q *Queries) MarkPaymentWebhookEventProcessed(ctx context.Context, arg MarkPaymentWebhookEventProcessedParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, markPaymentWebhookEventProcessed,
+	result, err := q.db.Exec(ctx, markPaymentWebhookEventProcessed,
 		arg.StripeEventID,
 		arg.ProcessingResult,
 		arg.ErrorSummary,
@@ -2103,7 +2067,7 @@ func (q *Queries) MarkPaymentWebhookEventProcessed(ctx context.Context, arg Mark
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const recordPaymentOrderPaid = `-- name: RecordPaymentOrderPaid :one
@@ -2127,22 +2091,22 @@ RETURNING id, public_order_number, public_token, user_id, client_idempotency_key
 `
 
 type RecordPaymentOrderPaidParams struct {
-	ID                      uuid.UUID      `json:"id"`
-	StripeCustomerID        string         `json:"stripe_customer_id"`
-	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
-	ExpiresAt               time.Time      `json:"expires_at"`
-	StripePaymentIntentID   string         `json:"stripe_payment_intent_id"`
-	StripeChargeID          string         `json:"stripe_charge_id"`
-	PaidSubtotalMinor       sql.NullInt64  `json:"paid_subtotal_minor"`
-	PaidTaxMinor            sql.NullInt64  `json:"paid_tax_minor"`
-	PaidTotalMinor          sql.NullInt64  `json:"paid_total_minor"`
-	PaidCurrency            string         `json:"paid_currency"`
-	ReceiptUrl              string         `json:"receipt_url"`
-	PaidAt                  sql.NullTime   `json:"paid_at"`
+	ID                      pgtype.UUID        `json:"id"`
+	StripeCustomerID        string             `json:"stripe_customer_id"`
+	StripeCheckoutSessionID pgtype.Text        `json:"stripe_checkout_session_id"`
+	ExpiresAt               pgtype.Timestamptz `json:"expires_at"`
+	StripePaymentIntentID   string             `json:"stripe_payment_intent_id"`
+	StripeChargeID          string             `json:"stripe_charge_id"`
+	PaidSubtotalMinor       pgtype.Int8        `json:"paid_subtotal_minor"`
+	PaidTaxMinor            pgtype.Int8        `json:"paid_tax_minor"`
+	PaidTotalMinor          pgtype.Int8        `json:"paid_total_minor"`
+	PaidCurrency            string             `json:"paid_currency"`
+	ReceiptUrl              string             `json:"receipt_url"`
+	PaidAt                  pgtype.Timestamptz `json:"paid_at"`
 }
 
 func (q *Queries) RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error) {
-	row := q.db.QueryRowContext(ctx, recordPaymentOrderPaid,
+	row := q.db.QueryRow(ctx, recordPaymentOrderPaid,
 		arg.ID,
 		arg.StripeCustomerID,
 		arg.StripeCheckoutSessionID,
@@ -2222,15 +2186,15 @@ RETURNING singleton_id,
 `
 
 type ReplacePaymentStripeConfigurationParams struct {
-	ActiveCredentialID uuid.UUID `json:"active_credential_id"`
-	ProductTaxCode     string    `json:"product_tax_code"`
-	PurchasesEnabled   bool      `json:"purchases_enabled"`
-	UpdatedBy          int64     `json:"updated_by"`
-	ExpectedRevision   int64     `json:"expected_revision"`
+	ActiveCredentialID pgtype.UUID `json:"active_credential_id"`
+	ProductTaxCode     string      `json:"product_tax_code"`
+	PurchasesEnabled   bool        `json:"purchases_enabled"`
+	UpdatedBy          int64       `json:"updated_by"`
+	ExpectedRevision   int64       `json:"expected_revision"`
 }
 
 func (q *Queries) ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error) {
-	row := q.db.QueryRowContext(ctx, replacePaymentStripeConfiguration,
+	row := q.db.QueryRow(ctx, replacePaymentStripeConfiguration,
 		arg.ActiveCredentialID,
 		arg.ProductTaxCode,
 		arg.PurchasesEnabled,
@@ -2267,7 +2231,7 @@ type UpsertPaymentCustomerParams struct {
 }
 
 func (q *Queries) UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error) {
-	row := q.db.QueryRowContext(ctx, upsertPaymentCustomer,
+	row := q.db.QueryRow(ctx, upsertPaymentCustomer,
 		arg.UserID,
 		arg.StripeAccountID,
 		arg.StripeMode,

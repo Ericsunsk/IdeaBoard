@@ -2,10 +2,12 @@ package statistics
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -13,7 +15,7 @@ import (
 
 const taskStatsTestParams = `{"schema_version":5}`
 
-func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
+func createTaskStatsTestTask(t testing.TB, db *pgxpool.Pool, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
 	if task.Params == "" {
 		task.Params = taskStatsTestParams
@@ -22,14 +24,14 @@ func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repositor
 		accountID := tasks.IDValue(task.AccountID)
 		if task.AssignedProviderEndpointID == nil {
 			var id int64
-			if err := db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&id); err != nil {
+			if err := db.QueryRow(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task stats fixture provider endpoint: %w", err)
 			}
 			task.AssignedProviderEndpointID = testPtr(id)
 		}
 		if task.AssignedCredentialID == nil {
 			var id int64
-			if err := db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err != nil {
+			if err := db.QueryRow(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err != nil {
 				return fmt.Errorf("load task stats fixture credential: %w", err)
 			}
 			task.AssignedCredentialID = testPtr(id)

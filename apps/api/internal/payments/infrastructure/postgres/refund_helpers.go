@@ -1,7 +1,8 @@
 package postgres
 
 import (
-	"database/sql"
+	"github.com/jackc/pgx/v5/pgtype"
+
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
@@ -19,7 +20,7 @@ func validateExternalRefund(order paymentRefundOrderFacts, provider paymentports
 	return nil
 }
 
-func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSubtotal, paidTotal sql.NullInt64, paidAt sql.NullTime, now time.Time) error {
+func validatePendingRefundEligibility(order paymentsdomain.PaymentOrder, paidSubtotal, paidTotal pgtype.Int8, paidAt pgtype.Timestamptz, now time.Time) error {
 	if order.Status != paymentsdomain.PaymentOrderCredited || order.StripeChargeID == "" || order.IdeaQuantity <= 0 || !paidSubtotal.Valid || paidSubtotal.Int64 <= 0 || !paidTotal.Valid || paidTotal.Int64 <= 0 || !paidAt.Valid {
 		return paymentcontracts.ErrRefundOrderNotEligible
 	}

@@ -6,7 +6,6 @@ import (
 	"ideaboard/api/internal/credits"
 
 	"context"
-	"database/sql"
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/infrastructure/postgres"
@@ -21,6 +20,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,12 +49,12 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 	createProtectedAuthTables(t, ctx, db)
 	runtimeRole := fmt.Sprintf("credits_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+	if _, err := db.Exec(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
 		t.Fatalf("create runtime role error = %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP OWNED BY `+roleSQL)
+		_, _ = db.Exec(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
 	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), postgres.RuntimePrivilegePolicy()}
 	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
@@ -135,18 +135,18 @@ SELECT transaction_id FROM execute_credit_command_v2(
 	if err == nil || !strings.Contains(err.Error(), "invalid credit command") {
 		t.Fatalf("runtime direct non-admin deduction error = %v, want invalid credit command", err)
 	}
-	runtimeConn, err := db.Conn(ctx)
+	runtimeConn, err := db.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("open runtime privilege verification connection error = %v", err)
 	}
-	defer runtimeConn.Close()
-	if _, err := runtimeConn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
+	defer runtimeConn.Release()
+	if _, err := runtimeConn.Exec(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE(runtime verification) error = %v", err)
 	}
 	if err := dbprivileges.Verify(ctx, runtimeConn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
-	if _, err := runtimeConn.ExecContext(ctx, `RESET ROLE`); err != nil {
+	if _, err := runtimeConn.Exec(ctx, `RESET ROLE`); err != nil {
 		t.Fatalf("RESET ROLE(runtime verification) error = %v", err)
 	}
 
@@ -186,7 +186,7 @@ INSERT INTO credit_wallet_restrictions (
 	var canExecutePurchase bool
 	var canCreateRestriction bool
 	var canReleaseRestriction bool
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
        has_table_privilege($1, '"user"', 'INSERT'),
@@ -236,7 +236,7 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 	var securityDefiner bool
 	var functionConfig string
 	var trustedSchema string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), ''), current_schema()
 FROM pg_proc
 WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
@@ -246,7 +246,7 @@ WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,te
 	if !securityDefiner || !isTrustedFunctionSearchPath(functionConfig, trustedSchema) {
 		t.Fatalf("command function security_definer=%v config=%v", securityDefiner, functionConfig)
 	}
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)'::regprocedure`,
@@ -262,7 +262,7 @@ WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,t
 	} {
 		var restrictionSecurityDefiner bool
 		var restrictionFunctionConfig string
-		if err := db.QueryRowContext(ctx, `
+		if err := db.QueryRow(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = $1::regprocedure`, functionName).Scan(&restrictionSecurityDefiner, &restrictionFunctionConfig); err != nil {
@@ -273,7 +273,7 @@ WHERE oid = $1::regprocedure`, functionName).Scan(&restrictionSecurityDefiner, &
 		}
 	}
 	var postingFunctionConfig string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
 WHERE oid = 'apply_credit_posting_balances()'::regprocedure`,
@@ -292,11 +292,11 @@ func isTrustedFunctionSearchPath(config string, schemaName string) bool {
 }
 
 func createProtectedAuthTables(t *testing.T, ctx context.Context, db interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }) {
 	t.Helper()
 	for _, tableName := range []string{"user", "session", "account", "verification"} {
-		if _, err := db.ExecContext(ctx,
+		if _, err := db.Exec(ctx,
 			`CREATE TABLE `+pgx.Identifier{tableName}.Sanitize()+` (id TEXT PRIMARY KEY)`); err != nil {
 			t.Fatalf("create protected Auth table %s error = %v", tableName, err)
 		}

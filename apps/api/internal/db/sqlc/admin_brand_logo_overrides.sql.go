@@ -21,21 +21,22 @@ type DeleteAdminBrandLogoOverrideParams struct {
 }
 
 func (q *Queries) DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteAdminBrandLogoOverride, arg.Scope, arg.TargetKey)
+	result, err := q.db.Exec(ctx, deleteAdminBrandLogoOverride, arg.Scope, arg.TargetKey)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const listAdminBrandLogoOverrides = `-- name: ListAdminBrandLogoOverrides :many
 SELECT scope, target_key, logo_key, created_at, updated_at
 FROM admin_brand_logo_overrides
 ORDER BY scope ASC, target_key ASC
+LIMIT 500
 `
 
 func (q *Queries) ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error) {
-	rows, err := q.db.QueryContext(ctx, listAdminBrandLogoOverrides)
+	rows, err := q.db.Query(ctx, listAdminBrandLogoOverrides)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +54,6 @@ func (q *Queries) ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrand
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -78,7 +76,7 @@ type UpsertAdminBrandLogoOverrideParams struct {
 }
 
 func (q *Queries) UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error) {
-	row := q.db.QueryRowContext(ctx, upsertAdminBrandLogoOverride, arg.Scope, arg.TargetKey, arg.LogoKey)
+	row := q.db.QueryRow(ctx, upsertAdminBrandLogoOverride, arg.Scope, arg.TargetKey, arg.LogoKey)
 	var i AdminBrandLogoOverride
 	err := row.Scan(
 		&i.Scope,

@@ -2,19 +2,20 @@ package statistics
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
-	accounts "ideaboard/api/internal/accountpool/accounts/domain"
-	accountrepo "ideaboard/api/internal/accountpool/accounts/infrastructure/postgres"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
-func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *sql.DB) {
+func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *pgxpool.Pool) {
 	t.Helper()
 
 	secretstest.EnableEncryption(t)
@@ -24,29 +25,34 @@ func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *s
 	return svc, taskRepo, db
 }
 
-func seedStatisticsAccount(t testing.TB, ctx context.Context, db *sql.DB, name string) *accounts.ApiAccount {
+type statisticsAccountRef struct {
+	ID                 int64
+	ProviderEndpointID int64
+}
+
+func seedStatisticsAccount(t testing.TB, ctx context.Context, db *pgxpool.Pool, name string) *statisticsAccountRef {
 	t.Helper()
-	accountRepo := accountrepo.NewRepository(db)
 	var channelID int64
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`, name+"-channel", "https://example.com/"+name).Scan(&channelID); err != nil {
 		t.Fatalf("create channel failed: %v", err)
 	}
-	account := &accounts.ApiAccount{
-		Name:               name,
-		ProviderEndpointID: channelID,
-		ApiType:            "openai-compatible",
-		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:             "test",
-		ProxyURL:           "https://example.com/" + name,
-		Status:             1,
-	}
-	if err := accountRepo.Create(ctx, account); err != nil {
+	var accountID int64
+	if err := db.QueryRow(ctx, `
+INSERT INTO api_accounts (name, provider_endpoint_id, max_concurrent, timeout, extra_config, status, weight)
+VALUES ($1, $2, 3, 120, '', 1, 1)
+RETURNING id`, name, channelID).Scan(&accountID); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
-	return account
+	if _, err := db.Exec(ctx, `
+INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, key_version, fingerprint, status)
+VALUES ($1, 'encrypted', 'stats-fixture-secret', 'test-key-v1', $2, 'active')`,
+		accountID, "stats-fixture-"+name); err != nil {
+		t.Fatalf("create account secret failed: %v", err)
+	}
+	return &statisticsAccountRef{ID: accountID, ProviderEndpointID: channelID}
 }
 
 func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
@@ -217,6 +223,189 @@ func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 	}
 	if len(stats.Trend) != 6 || len(stats.Trend[0].Segments) != 1 || stats.Trend[0].Segments[0].Label != "model-a" {
 		t.Fatalf("trend model bucket mismatch: %+v", stats.Trend)
+	}
+}
+
+func TestGetStatisticsTrendCarriesDailyCapturedCredits(t *testing.T) {
+	ctx := context.Background()
+	svc, _, db := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	yesterdayStart := todayStart.AddDate(0, 0, -1)
+	today := todayStart.Format(statisticsDateLayout)
+	yesterday := yesterdayStart.Format(statisticsDateLayout)
+
+	seedCaptureLedger(t, db, 42, []captureLedgerSeed{
+		{Amount: 100, CreatedAt: todayStart.Add(2 * time.Hour)},
+		{Amount: 50, CreatedAt: todayStart.Add(10 * time.Hour)},
+		{Amount: 70, CreatedAt: yesterdayStart.Add(3 * time.Hour)},
+	})
+
+	stats, err := svc.GetStatistics(ctx, "7d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	if len(stats.Trend) != 7 {
+		t.Fatalf("trend len=%d, want 7", len(stats.Trend))
+	}
+	byDate := make(map[string]AdminStatisticsTrendItem, len(stats.Trend))
+	for _, item := range stats.Trend {
+		byDate[item.Date] = item
+	}
+	if got := byDate[today].CapturedCredits; got != 150 {
+		t.Fatalf("today captured_credits=%d, want 150", got)
+	}
+	if got := byDate[yesterday].CapturedCredits; got != 70 {
+		t.Fatalf("yesterday captured_credits=%d, want 70", got)
+	}
+	zeroDays := 0
+	for _, item := range stats.Trend {
+		if item.Date != today && item.Date != yesterday {
+			if item.CapturedCredits != 0 {
+				t.Fatalf("day %s captured_credits=%d, want 0", item.Date, item.CapturedCredits)
+			}
+			zeroDays++
+		}
+	}
+	if zeroDays != 5 {
+		t.Fatalf("days without captures=%d, want 5", zeroDays)
+	}
+}
+
+func TestGetStatisticsOneDayTrendCarriesDailyCapturedCredits(t *testing.T) {
+	ctx := context.Background()
+	svc, _, db := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	seedCaptureLedger(t, db, 42, []captureLedgerSeed{
+		{Amount: 80, CreatedAt: todayStart.Add(9 * time.Hour)},
+	})
+
+	stats, err := svc.GetStatistics(ctx, "1d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	if len(stats.Trend) != 6 {
+		t.Fatalf("trend len=%d, want 6", len(stats.Trend))
+	}
+	for _, item := range stats.Trend {
+		if item.CapturedCredits != 80 {
+			t.Fatalf("intraday bucket %s captured_credits=%d, want 80", item.Date, item.CapturedCredits)
+		}
+	}
+}
+
+func TestGetStatisticsTrendNetOfRefunds(t *testing.T) {
+	// 净值口径：当日 capture 减当日 refund（refund 金额为正数 magnitude，
+	// 按自身事件日归属，不追溯 capture 日）。
+	ctx := context.Background()
+	svc, _, db := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	today := todayStart.Format(statisticsDateLayout)
+
+	seedCaptureLedger(t, db, 42, []captureLedgerSeed{
+		{Amount: 100, CreatedAt: todayStart.Add(2 * time.Hour)},
+	})
+	// refund 与其 postings 必须同事务：余额触发器在提交时校验。
+	refundTx, err := db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatalf("begin refund fixture failed: %v", err)
+	}
+	if _, err := refundTx.Exec(ctx, `
+INSERT INTO credit_transactions (
+  transaction_id, wallet_user_id, command_type, related_transaction_id,
+  idempotency_key, request_hash, actor_type, actor_id, source, reason,
+  business_reference_type, business_reference_id,
+  command_amount, posting_count, available_balance_after, reserved_balance_after, created_at
+) VALUES ('stats_ref_42_0', 42, 'refund', 'stats_cap_42_0', 'stats:refund:42:0',
+  repeat('b', 64), 'service', 'stats-test', 'stats_test', 'statistics trend refund fixture',
+  'stats_test', 'stats:refund:42:0', 30, 2, 0, 0, $1)`,
+		todayStart.Add(5*time.Hour)); err != nil {
+		_ = refundTx.Rollback(ctx)
+		t.Fatalf("insert refund transaction failed: %v", err)
+	}
+	if _, err := refundTx.Exec(ctx, `
+INSERT INTO credit_postings (transaction_id, account_id, amount)
+SELECT 'stats_ref_42_0', id, CASE WHEN account_role = 'system_revenue' THEN -30 ELSE 30 END
+FROM credit_accounts WHERE shard_key LIKE 'stats-test-%' AND wallet_user_id IS NULL`); err != nil {
+		_ = refundTx.Rollback(ctx)
+		t.Fatalf("insert refund postings failed: %v", err)
+	}
+	if err := refundTx.Commit(ctx); err != nil {
+		t.Fatalf("commit refund fixture failed: %v", err)
+	}
+
+	stats, err := svc.GetStatistics(ctx, "7d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	byDate := make(map[string]AdminStatisticsTrendItem, len(stats.Trend))
+	for _, item := range stats.Trend {
+		byDate[item.Date] = item
+	}
+	if got := byDate[today].CapturedCredits; got != 70 {
+		t.Fatalf("today captured_credits=%d, want 70 (100 capture - 30 refund)", got)
+	}
+}
+
+type captureLedgerSeed struct {
+	Amount    int64
+	CreatedAt time.Time
+}
+
+func seedCaptureLedger(t *testing.T, db *pgxpool.Pool, userID int64, rows []captureLedgerSeed) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := db.Exec(ctx, `INSERT INTO credit_wallets (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, userID); err != nil {
+		t.Fatalf("seed capture wallet failed: %v", err)
+	}
+	issuanceShard := fmt.Sprintf("stats-test-issuance-%d", userID)
+	revenueShard := fmt.Sprintf("stats-test-revenue-%d", userID)
+	if _, err := db.Exec(ctx, `INSERT INTO credit_accounts (account_role, shard_key) VALUES ('system_issuance', $1) ON CONFLICT DO NOTHING`, issuanceShard); err != nil {
+		t.Fatalf("seed capture issuance account failed: %v", err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO credit_accounts (account_role, shard_key) VALUES ('system_revenue', $1) ON CONFLICT DO NOTHING`, revenueShard); err != nil {
+		t.Fatalf("seed capture revenue account failed: %v", err)
+	}
+	var issuanceID, revenueID int64
+	if err := db.QueryRow(ctx, `SELECT id FROM credit_accounts WHERE wallet_user_id IS NULL AND account_role = 'system_issuance' AND shard_key = $1`, issuanceShard).Scan(&issuanceID); err != nil {
+		t.Fatalf("load capture issuance account failed: %v", err)
+	}
+	if err := db.QueryRow(ctx, `SELECT id FROM credit_accounts WHERE wallet_user_id IS NULL AND account_role = 'system_revenue' AND shard_key = $1`, revenueShard).Scan(&revenueID); err != nil {
+		t.Fatalf("load capture revenue account failed: %v", err)
+	}
+	for i, row := range rows {
+		transactionID := fmt.Sprintf("stats_cap_%d_%d", userID, i)
+		idempotencyKey := fmt.Sprintf("stats:capture:%d:%d", userID, i)
+		tx, err := db.BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			t.Fatalf("begin capture fixture failed: %v", err)
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO credit_transactions (
+  transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+  actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
+  command_amount, posting_count, available_balance_after, reserved_balance_after, created_at
+) VALUES ($1, $2, 'capture', $3, repeat('c', 64), 'service', 'stats-test', 'stats_test',
+          'statistics trend fixture', 'stats_test', $3, $4, 2, 0, 0, $5)`,
+			transactionID, userID, idempotencyKey, row.Amount, row.CreatedAt); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("insert capture transaction failed: %v", err)
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO credit_postings (transaction_id, account_id, amount)
+VALUES ($1, $2, $3), ($1, $4, $5)`, transactionID, revenueID, row.Amount, issuanceID, -row.Amount); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("insert capture postings failed: %v", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatalf("commit capture fixture failed: %v", err)
+		}
 	}
 }
 
@@ -539,7 +728,6 @@ func TestBackfillStatisticsDoesNotUseSingleEnabledAccountModelFallback(t *testin
 		AssignedProviderEndpointID: testPtr(account.ProviderEndpointID),
 		AccountID:                  testPtr(account.ID),
 		FeatureSlug:                "fusion",
-		APIType:                    "openai-compatible",
 		Status:                     tasks.StatusCompleted,
 		Result:                     `{}`,
 		CreatedAt:                  created,
@@ -561,7 +749,7 @@ func TestBackfillStatisticsDoesNotUseSingleEnabledAccountModelFallback(t *testin
 
 	var userID, accountID, channelID int64
 	var featureSlug, apiType string
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT user_id, account_id, provider_endpoint_id, feature_slug, api_type
 FROM task_stat_events
 WHERE task_id = 'single-model-fallback'`,
@@ -684,29 +872,26 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 func TestGetStatisticsKeepsUnknownWhenAccountHasMultipleModels(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
-	accountRepo := accountrepo.NewRepository(db)
 	var channelID int64
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', 'stats-channel-multi', 'https://example.com/stats-multi', 1)
 RETURNING id`).Scan(&channelID); err != nil {
 		t.Fatalf("create channel failed: %v", err)
 	}
 
-	account := &accounts.ApiAccount{
-		Name:               "acc-multi",
-		ProviderEndpointID: channelID,
-		ApiType:            "openai-compatible",
-		Models: []accounts.AccountModel{
-			{Name: "a", Enabled: true},
-			{Name: "b", Enabled: true},
-		},
-		ApiKey:   "test",
-		ProxyURL: "https://example.com/multi",
-		Status:   1,
-	}
-	if err := accountRepo.Create(ctx, account); err != nil {
+	var accountID int64
+	if err := db.QueryRow(ctx, `
+INSERT INTO api_accounts (name, provider_endpoint_id, max_concurrent, timeout, extra_config, status, weight)
+VALUES ('acc-multi', $1, 3, 120, '', 1, 1)
+RETURNING id`, channelID).Scan(&accountID); err != nil {
 		t.Fatalf("create account failed: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, key_version, fingerprint, status)
+VALUES ($1, 'encrypted', 'stats-fixture-secret', 'test-key-v1', 'stats-fixture-acc-multi', 'active')`,
+		accountID); err != nil {
+		t.Fatalf("create account secret failed: %v", err)
 	}
 
 	created := time.Now().Add(-3 * time.Hour)
@@ -714,8 +899,8 @@ RETURNING id`).Scan(&channelID); err != nil {
 	task := &tasks.Task{
 		TaskID:                     "repair-multi-1",
 		UserID:                     12,
-		AssignedProviderEndpointID: testPtr(account.ProviderEndpointID),
-		AccountID:                  testPtr(account.ID),
+		AssignedProviderEndpointID: testPtr(channelID),
+		AccountID:                  testPtr(accountID),
 		Status:                     tasks.StatusCompleted,
 		Result:                     `{}`,
 		CreatedAt:                  created,
@@ -777,9 +962,9 @@ type taskStatEventSeed struct {
 	LatencySeconds float64
 }
 
-func insertTaskDailyStat(t *testing.T, db *sql.DB, stat taskDailyStatSeed) {
+func insertTaskDailyStat(t *testing.T, db *pgxpool.Pool, stat taskDailyStatSeed) {
 	t.Helper()
-	_, err := db.ExecContext(
+	_, err := db.Exec(
 		context.Background(),
 		`INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -790,7 +975,7 @@ func insertTaskDailyStat(t *testing.T, db *sql.DB, stat taskDailyStatSeed) {
 	}
 }
 
-func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
+func insertTaskStatEvent(t *testing.T, db *pgxpool.Pool, event taskStatEventSeed) {
 	t.Helper()
 	occurredAt := event.OccurredAt
 	if occurredAt.IsZero() {
@@ -803,7 +988,7 @@ func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 	if event.OutputCount == 0 {
 		event.OutputCount = 1
 	}
-	_, err := db.ExecContext(
+	_, err := db.Exec(
 		context.Background(),
 		`INSERT INTO task_stat_events (task_id, occurred_at, stat_date, model_name, user_key, status, output_count, latency_seconds)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -814,10 +999,10 @@ func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 	}
 }
 
-func countTaskStatEventsByDate(t *testing.T, db *sql.DB, statDate time.Time) int64 {
+func countTaskStatEventsByDate(t *testing.T, db *pgxpool.Pool, statDate time.Time) int64 {
 	t.Helper()
 	var count int64
-	if err := db.QueryRowContext(
+	if err := db.QueryRow(
 		context.Background(),
 		`SELECT count(*) FROM task_stat_events WHERE stat_date = $1`,
 		statDate.Format(statisticsDateLayout),

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,10 +11,14 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/secrets"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const storageSecretAccessKeyName = "secret_access_key"
@@ -32,13 +35,13 @@ type storageProfileSaveOptions struct {
 }
 
 type Repository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
 var _ ports.ProfileRepository = (*Repository)(nil)
 
-func NewRepository(db *sql.DB) *Repository {
+func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
@@ -138,7 +141,7 @@ func applyStorageProfileTx(ctx context.Context, q *dbsqlc.Queries, id string) er
 	}
 	rows, err := q.SetCurrentStorageProfile(ctx, dbsqlc.SetCurrentStorageProfileParams{
 		ProfileID: id,
-		UpdatedBy: sql.NullInt64{},
+		UpdatedBy: pgtype.Int8{},
 	})
 	if err != nil {
 		return err
@@ -189,8 +192,8 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile domain.Storag
 		Builtin:   profile.Builtin,
 		Status:    status,
 		Config:    configJSON,
-		CreatedBy: sql.NullInt64{},
-		UpdatedBy: sql.NullInt64{},
+		CreatedBy: pgtype.Int8{},
+		UpdatedBy: pgtype.Int8{},
 	})
 	if err != nil {
 		return err
@@ -219,8 +222,8 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile domain.Storag
 		SecretPayload:      encrypted,
 		Fingerprint:        fingerprint,
 		KeyVersion:         "",
-		RotatedAt:          sql.NullTime{Time: time.Now(), Valid: true},
-		ExpiresAt:          sql.NullTime{},
+		RotatedAt:          pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		ExpiresAt:          pgtype.Timestamptz{},
 	})
 	if database.IsDuplicateConstraintError(err) {
 		return domain.ErrStorageSecretVersionConflict
@@ -317,22 +320,18 @@ func storageSecretVersionFromRow(row dbsqlc.StorageProfileSecretVersion) domain.
 		SecretName:     row.SecretName,
 		VersionNumber:  row.VersionNumber,
 		Status:         row.Status,
-		RotatedAt:      row.RotatedAt,
+		RotatedAt:      dbutil.TimeValue(row.RotatedAt),
 		ExpiresAt:      timePtr(row.ExpiresAt),
 		RetiredAt:      timePtr(row.RetiredAt),
 		RevokedAt:      timePtr(row.RevokedAt),
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		CreatedAt:      dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:      dbutil.TimeValue(row.UpdatedAt),
 		HasSecretValue: strings.TrimSpace(row.SecretPayload) != "" || strings.TrimSpace(row.SecretRef) != "",
 	}
 }
 
-func timePtr(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	out := value.Time
-	return &out
+func timePtr(value pgtype.Timestamptz) *time.Time {
+	return dbutil.TimePtr(value)
 }
 
 func storageProfileConfigForDB(profile domain.StorageProfile) (json.RawMessage, string, error) {

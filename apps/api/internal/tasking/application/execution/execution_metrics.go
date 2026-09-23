@@ -3,10 +3,8 @@ package execution
 import (
 	"context"
 	"fmt"
-	taskqueueports "ideaboard/api/internal/tasking/ports/queue"
 	"time"
 
-	"ideaboard/api/internal/platform/database"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -25,32 +23,11 @@ func (s *Service) RecordExecutionSnapshot(ctx context.Context, snapshot tasks.Ta
 	return err
 }
 
-func (s *Service) StartTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
+func (s *Service) FinalizeExecutionAttempt(ctx context.Context, finish tasks.ExecutionAttemptFinish) (int64, error) {
 	if s == nil || s.taskRepo == nil {
-		return tasks.TaskAttemptRef{}, fmt.Errorf("task execution attempt store not configured")
+		return 0, fmt.Errorf("task execution attempt store not configured")
 	}
-	ref, err := s.taskRepo.CreateTaskAttempt(ctx, start)
-	if database.IsNotFound(err) {
-		return tasks.TaskAttemptRef{}, ErrTaskStateConflict
-	}
-	return ref, err
-}
-
-func (s *Service) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) error {
-	if s == nil || s.taskRepo == nil {
-		return fmt.Errorf("task execution attempt store not configured")
-	}
-	updated, err := s.taskRepo.FinishTaskAttempt(ctx, finish)
-	if err != nil {
-		return err
-	}
-	if updated == 0 {
-		return ErrTaskStateConflict
-	}
-	if updated != 1 {
-		return fmt.Errorf("finish task attempt affected %d rows, want 1", updated)
-	}
-	return nil
+	return s.taskRepo.FinalizeExecutionAttempt(ctx, finish)
 }
 
 func (s *Service) RecordTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot) error {
@@ -69,7 +46,7 @@ func (s *Service) recordTaskCancelled(ctx context.Context, snapshot tasks.TaskCa
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionCancel, snapshot.TaskID, taskqueueports.TaskAssignment{}, rows)
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionCancel, snapshot.TaskID, rows)
 	if err != nil {
 		return err
 	}
@@ -98,7 +75,7 @@ func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, cu
 		TaskID:           taskID,
 		CurrentStage:     tasks.StringPtr(currentStage),
 		BottleneckSource: tasks.StringPtr(bottleneckSource),
-		TotalLatencyMS:   int64Ptr(totalLatencyMS),
+		TotalLatencyMS:   tasks.Int64Ptr(totalLatencyMS),
 	}
 	if currentStage == tasks.ExecutionStageFailed {
 		patch.FailureStage = tasks.StringPtr(failureStage)
@@ -109,8 +86,4 @@ func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, cu
 		patch.FailureCategory = &empty
 	}
 	return s.taskRepo.PatchExecutionMetrics(ctx, patch)
-}
-
-func int64Ptr(value int64) *int64 {
-	return &value
 }

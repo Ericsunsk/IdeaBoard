@@ -1,4 +1,4 @@
-package searchcatalog
+package infrastructure
 
 import (
 	"context"
@@ -7,76 +7,120 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/searchcatalog/domain"
+	"ideaboard/api/internal/searchcatalog/ports"
 )
 
 const providerTestTimeout = 8 * time.Second
 
-type providerAdapter interface {
-	Provider() Provider
-	Test(context.Context, string) (FailureCategory, string, error)
-}
+// providerOutbound is the shared standard outbound client for supplier
+// calls: timeout cap, bounded retries and Retry-After respect match the
+// gateway migration (#766). Per-call Timeout/Target stay explicit so
+// Unsplash and Pexels remain separately observable.
+var providerOutbound = outboundhttp.NewClient(outboundhttp.Config{})
+
+// providerTarget names supplier egress in outbound logs/metrics.
+const (
+	unsplashTarget = "unsplash"
+	pexelsTarget   = "pexels"
+)
 
 type httpProviderAdapter struct {
-	provider Provider
+	provider domain.Provider
 	request  func(context.Context, string) (*http.Request, error)
 }
 
-func newProviderAdapters() []providerAdapter {
-	return []providerAdapter{
-		&httpProviderAdapter{provider: ProviderUnsplash, request: unsplashTestRequest},
-		&httpProviderAdapter{provider: ProviderPexels, request: pexelsTestRequest},
+// NewProviderTestAdapters returns one connection-test adapter per web search
+// supplier, in display order.
+func NewProviderTestAdapters() []ports.ProviderTestAdapter {
+	return []ports.ProviderTestAdapter{
+		&httpProviderAdapter{provider: domain.ProviderUnsplash, request: unsplashTestRequest},
+		&httpProviderAdapter{provider: domain.ProviderPexels, request: pexelsTestRequest},
 	}
 }
 
-func (a *httpProviderAdapter) Provider() Provider { return a.provider }
+func (a *httpProviderAdapter) Provider() domain.Provider { return a.provider }
 
-func (a *httpProviderAdapter) Test(ctx context.Context, apiKey string) (FailureCategory, string, error) {
+func (a *httpProviderAdapter) Test(ctx context.Context, apiKey string) (domain.FailureCategory, string, error) {
 	request, err := a.request(ctx, apiKey)
 	if err != nil {
-		return FailureUnknown, "请求构造失败", err
+		return domain.FailureUnknown, "请求构造失败", err
 	}
 	allowHosts := append(outbound.AllowHosts(ctx), a.providerHost())
-	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, providerTestTimeout, allowHosts...)
+	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+		Timeout:    providerTestTimeout,
+		AllowHosts: allowHosts,
+		Target:     a.providerTarget(),
+	})
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return FailureNetwork, "请求超时", err
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return providerTestStatusFailure(statusErr.StatusCode)
 		}
-		return FailureNetwork, "网络不可达", err
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return domain.FailureNetwork, "请求超时", err
+		}
+		return domain.FailureNetwork, "网络不可达", err
 	}
 	defer response.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, 64*1024))
 	if readErr != nil {
-		return FailureResponse, "响应读取失败", readErr
+		return domain.FailureResponse, "响应读取失败", readErr
 	}
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return FailureCredentials, "凭证无效或无权访问", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureCredentials, "凭证无效或无权访问", fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode == http.StatusTooManyRequests {
-		return FailureQuota, "请求频率或配额受限", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureQuota, "请求频率或配额受限", fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return FailureUnknown, "供应商拒绝了测试请求", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureUnknown, "供应商拒绝了测试请求", fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if len(body) == 0 {
-		return FailureResponse, "供应商返回为空响应", errors.New("empty provider response")
+		return domain.FailureResponse, "供应商返回为空响应", errors.New("empty provider response")
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return FailureResponse, "供应商响应格式无效", err
+		return domain.FailureResponse, "供应商响应格式无效", err
 	}
 	return "", "连接测试通过", nil
 }
 
 func (a *httpProviderAdapter) providerHost() string {
-	if a.provider == ProviderPexels {
+	if a.provider == domain.ProviderPexels {
 		return "api.pexels.com"
 	}
 	return "api.unsplash.com"
+}
+
+func (a *httpProviderAdapter) providerTarget() string {
+	if a.provider == domain.ProviderPexels {
+		return pexelsTarget
+	}
+	return unsplashTarget
+}
+
+// providerTestStatusFailure maps a terminal supplier status to the same
+// failure categories as a single-shot response, so bounded retries never
+// change connection-test verdicts: exhausted 429/5xx answers classify
+// exactly like the responses they replace.
+func providerTestStatusFailure(status int) (domain.FailureCategory, string, error) {
+	err := fmt.Errorf("provider returned status %d", status)
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return domain.FailureCredentials, "凭证无效或无权访问", err
+	case http.StatusTooManyRequests:
+		return domain.FailureQuota, "请求频率或配额受限", err
+	default:
+		return domain.FailureUnknown, "供应商拒绝了测试请求", err
+	}
 }
 
 func unsplashTestRequest(ctx context.Context, apiKey string) (*http.Request, error) {
@@ -99,4 +143,167 @@ func pexelsTestRequest(ctx context.Context, apiKey string) (*http.Request, error
 
 func urlQueryEscape(value string) string {
 	return strings.NewReplacer("%", "%25", "&", "%26", "?", "%3F", "#", "%23", "+", "%2B", " ", "%20").Replace(value)
+}
+
+// providerSearchTimeout bounds one supplier page fetch; the application
+// holds its own orchestration timeout separately.
+const providerSearchTimeout = 12 * time.Second
+
+// maxProviderBody caps one supplier page payload.
+const maxProviderBody = 4 << 20
+
+type unsplashAdapter struct{}
+
+// NewUnsplashAdapter serves Unsplash result pages through the shared
+// provider contract.
+func NewUnsplashAdapter() ports.SearchProviderAdapter { return &unsplashAdapter{} }
+
+// NewPexelsAdapter serves Pexels result pages through the shared provider
+// contract.
+func NewPexelsAdapter() ports.SearchProviderAdapter { return &pexelsAdapter{} }
+
+func (*unsplashAdapter) Provider() domain.Provider { return domain.ProviderUnsplash }
+
+type unsplashPhoto struct {
+	ID, Description, AltDescription string
+	Width, Height                   int
+	URLs                            struct {
+		Thumb, Small, Regular, Raw string
+	} `json:"urls"`
+	User struct {
+		Name  string
+		Links struct {
+			HTML string `json:"html"`
+		} `json:"links"`
+	} `json:"user"`
+	Links struct {
+		HTML string `json:"html"`
+	} `json:"links"`
+}
+
+func (unsplashAdapter) Search(ctx context.Context, key string, search ports.SearchRequest) (ports.SearchProviderPage, error) {
+	endpoint := "https://api.unsplash.com/photos"
+	if search.Query != "" {
+		endpoint = "https://api.unsplash.com/search/photos"
+	}
+	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
+	query := strings.TrimSpace(search.Query)
+	if query != "" {
+		values.Set("query", query)
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
+	request.Header.Set("Authorization", "Client-ID "+key)
+	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+		Timeout:    providerSearchTimeout,
+		AllowHosts: append(outbound.AllowHosts(ctx), "api.unsplash.com", "images.unsplash.com", "plus.unsplash.com", "unsplash.com"),
+		Target:     unsplashTarget,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return ports.SearchProviderPage{}, fmt.Errorf("unsplash status %d", statusErr.StatusCode)
+		}
+		return ports.SearchProviderPage{}, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBody))
+	if err != nil {
+		return ports.SearchProviderPage{}, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return ports.SearchProviderPage{}, fmt.Errorf("unsplash status %d", response.StatusCode)
+	}
+	var photos []unsplashPhoto
+	hasMore := false
+	if query == "" {
+		if err := json.Unmarshal(body, &photos); err != nil {
+			return ports.SearchProviderPage{}, err
+		}
+		hasMore = len(photos) == search.Limit
+	} else {
+		var payload struct {
+			Results    []unsplashPhoto `json:"results"`
+			TotalPages int             `json:"total_pages"`
+		}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return ports.SearchProviderPage{}, err
+		}
+		photos, hasMore = payload.Results, payload.TotalPages == 0 || search.Page < payload.TotalPages
+	}
+	results := make([]domain.Result, 0, len(photos))
+	for _, item := range photos {
+		results = append(results, domain.Result{ID: item.ID, Provider: domain.ProviderUnsplash, Title: firstNonEmpty(item.Description, item.AltDescription), Description: item.AltDescription, Author: item.User.Name, AuthorURL: item.User.Links.HTML, SourceURL: item.Links.HTML, ThumbnailURL: item.URLs.Thumb, PreviewURL: firstNonEmpty(item.URLs.Regular, item.URLs.Small), OriginalURL: item.URLs.Raw, Width: item.Width, Height: item.Height, MediaKind: "image"})
+	}
+	return ports.SearchProviderPage{Results: results, HasMore: hasMore}, nil
+}
+
+type pexelsAdapter struct{}
+
+func (*pexelsAdapter) Provider() domain.Provider { return domain.ProviderPexels }
+func (pexelsAdapter) Search(ctx context.Context, key string, search ports.SearchRequest) (ports.SearchProviderPage, error) {
+	endpoint := "https://api.pexels.com/v1/curated"
+	if search.Query != "" {
+		endpoint = "https://api.pexels.com/v1/search"
+	}
+	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
+	query := strings.TrimSpace(search.Query)
+	if query != "" {
+		values.Set("query", query)
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+values.Encode(), nil)
+	request.Header.Set("Authorization", key)
+	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
+		Timeout:    providerSearchTimeout,
+		AllowHosts: append(outbound.AllowHosts(ctx), "api.pexels.com", "images.pexels.com", "pexels.com"),
+		Target:     pexelsTarget,
+	})
+	if err != nil {
+		var statusErr *outboundhttp.HTTPStatusError
+		if errors.As(err, &statusErr) {
+			return ports.SearchProviderPage{}, fmt.Errorf("pexels status %d", statusErr.StatusCode)
+		}
+		return ports.SearchProviderPage{}, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBody))
+	if err != nil {
+		return ports.SearchProviderPage{}, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return ports.SearchProviderPage{}, fmt.Errorf("pexels status %d", response.StatusCode)
+	}
+	var payload struct {
+		Photos []struct {
+			ID              int    `json:"id"`
+			Width           int    `json:"width"`
+			Height          int    `json:"height"`
+			Alt             string `json:"alt"`
+			Photographer    string `json:"photographer"`
+			PhotographerURL string `json:"photographer_url"`
+			URL             string `json:"url"`
+			Src             struct {
+				Medium   string `json:"medium"`
+				Large    string `json:"large"`
+				Original string `json:"original"`
+			} `json:"src"`
+		} `json:"photos"`
+		NextPage string `json:"next_page"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ports.SearchProviderPage{}, err
+	}
+	results := make([]domain.Result, 0, len(payload.Photos))
+	for _, item := range payload.Photos {
+		results = append(results, domain.Result{ID: strconv.Itoa(item.ID), Provider: domain.ProviderPexels, Title: item.Alt, Description: item.Alt, Author: item.Photographer, AuthorURL: item.PhotographerURL, SourceURL: item.URL, ThumbnailURL: item.Src.Medium, PreviewURL: item.Src.Large, OriginalURL: item.Src.Original, Width: item.Width, Height: item.Height, MediaKind: "image"})
+	}
+	return ports.SearchProviderPage{Results: results, HasMore: payload.NextPage != ""}, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

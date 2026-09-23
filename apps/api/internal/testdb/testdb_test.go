@@ -2,9 +2,11 @@ package testdb
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestCanonicalSchemaSnapshotIsReadable(t *testing.T) {
@@ -37,7 +39,7 @@ func TestOpenAppliesCanonicalSnapshotAndKeepsSchemasIsolated(t *testing.T) {
 	assertRelationExists(t, first, "ai_search_operations")
 
 	const isolatedUserID = int64(987654321)
-	if _, err := first.ExecContext(t.Context(), `
+	if _, err := first.Exec(t.Context(), `
 INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, 'testdb-isolation', 'I65432', 'user', 1)
 `, isolatedUserID); err != nil {
@@ -45,7 +47,7 @@ VALUES ($1, 'testdb-isolation', 'I65432', 'user', 1)
 	}
 
 	var exists bool
-	if err := second.QueryRowContext(t.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, isolatedUserID).Scan(&exists); err != nil {
+	if err := second.QueryRow(t.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, isolatedUserID).Scan(&exists); err != nil {
 		t.Fatalf("query second isolated schema: %v", err)
 	}
 	if exists {
@@ -65,11 +67,11 @@ func TestOpenWithPoolUsesTheSnapshotSchema(t *testing.T) {
 	}
 }
 
-func assertRelationExists(t *testing.T, db *sql.DB, relation string) {
+func assertRelationExists(t *testing.T, db *pgxpool.Pool, relation string) {
 	t.Helper()
 
-	var resolved sql.NullString
-	if err := db.QueryRowContext(context.Background(), `SELECT to_regclass($1)`, relation).Scan(&resolved); err != nil {
+	var resolved pgtype.Text
+	if err := db.QueryRow(context.Background(), `SELECT to_regclass($1)`, relation).Scan(&resolved); err != nil {
 		t.Fatalf("resolve relation %q: %v", relation, err)
 	}
 	if !resolved.Valid || resolved.String == "" {

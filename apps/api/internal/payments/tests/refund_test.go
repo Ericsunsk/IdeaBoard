@@ -5,13 +5,15 @@ import (
 	payments "ideaboard/api/internal/payments"
 
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"sync"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/credits"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
@@ -116,7 +118,7 @@ func TestPaymentRefundReservesIdeasIdempotentlyAndReleasesOnFailure(t *testing.T
 		t.Fatalf("settled Wallet=%+v error=%v", wallet, err)
 	}
 	var commandType string
-	if err := db.QueryRowContext(t.Context(), `SELECT command_type FROM credit_transactions WHERE transaction_id = $1`, succeeded.CreditTransactionID).Scan(&commandType); err != nil || commandType != "purchase_refund" {
+	if err := db.QueryRow(t.Context(), `SELECT command_type FROM credit_transactions WHERE transaction_id = $1`, succeeded.CreditTransactionID).Scan(&commandType); err != nil || commandType != "purchase_refund" {
 		t.Fatalf("purchase_refund transaction type=%q error=%v", commandType, err)
 	}
 }
@@ -159,7 +161,7 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 	if _, err := repo.MarkPaymentRefundSucceeded(t.Context(), refund.ID, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(t.Context(), `UPDATE payment_refunds SET status = 'pending', credit_transaction_id = '', succeeded_at = NULL WHERE id = $1::uuid`, refund.ID); err == nil {
+	if _, err := db.Exec(t.Context(), `UPDATE payment_refunds SET status = 'pending', credit_transaction_id = '', succeeded_at = NULL WHERE id = $1::uuid`, refund.ID); err == nil {
 		t.Fatal("terminal refund facts unexpectedly regressed")
 	}
 }
@@ -257,10 +259,10 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 	}
 }
 
-func createCreditedRefundOrder(t *testing.T, db *sql.DB, repo *paymentpostgres.Repository, paidAt time.Time) paymentsdomain.PaymentOrder {
+func createCreditedRefundOrder(t *testing.T, db *pgxpool.Pool, repo *paymentpostgres.Repository, paidAt time.Time) paymentsdomain.PaymentOrder {
 	t.Helper()
 	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
-	if _, err := db.ExecContext(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
+	if _, err := db.Exec(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
 		t.Fatal(err)
 	}
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260804-REFUND000001", 500)

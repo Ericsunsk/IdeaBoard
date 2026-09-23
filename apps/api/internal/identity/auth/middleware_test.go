@@ -80,9 +80,7 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
-	if err := db.Close(); err != nil {
-		t.Fatalf("close test db failed: %v", err)
-	}
+	db.Close()
 
 	router := gin.New()
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{

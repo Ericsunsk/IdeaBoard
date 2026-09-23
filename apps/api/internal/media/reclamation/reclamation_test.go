@@ -2,15 +2,19 @@ package reclamation
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"io/fs"
 	"testing"
+
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
@@ -118,10 +122,10 @@ func TestReclaimWorkerRecoversAStaleClaim(t *testing.T) {
 	if _, err := q.ClaimDueMediaAssetReclamation(t.Context(), dbsqlc.ClaimDueMediaAssetReclamationParams{
 		ID:                assetID,
 		ReclaimGeneration: generation,
-		ClaimedAt:         sql.NullTime{Time: staleClaimedAt, Valid: true},
-		ClaimToken:        uuid.NullUUID{UUID: uuid.New(), Valid: true},
-		NowAt:             sql.NullTime{Time: now, Valid: true},
-		StaleClaimBefore:  sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+		ClaimedAt:         pgtype.Timestamptz{Time: staleClaimedAt, Valid: true},
+		ClaimToken:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		NowAt:             pgtype.Timestamptz{Time: now, Valid: true},
+		StaleClaimBefore:  pgtype.Timestamptz{Time: now.Add(-ClaimLeaseDuration), Valid: true},
 	}); err != nil {
 		t.Fatalf("seed stale reclamation claim: %v", err)
 	}
@@ -146,14 +150,14 @@ func TestReclaimWorkerDoesNotStealFreshClaim(t *testing.T) {
 	q := dbsqlc.New(db)
 	assetID, generation := seedDueMediaAsset(t, db, q)
 	now := time.Now()
-	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	claimToken := pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	if _, err := q.ClaimDueMediaAssetReclamation(t.Context(), dbsqlc.ClaimDueMediaAssetReclamationParams{
 		ID:                assetID,
 		ReclaimGeneration: generation,
-		ClaimedAt:         sql.NullTime{Time: now, Valid: true},
+		ClaimedAt:         pgtype.Timestamptz{Time: now, Valid: true},
 		ClaimToken:        claimToken,
-		NowAt:             sql.NullTime{Time: now, Valid: true},
-		StaleClaimBefore:  sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+		NowAt:             pgtype.Timestamptz{Time: now, Valid: true},
+		StaleClaimBefore:  pgtype.Timestamptz{Time: now.Add(-ClaimLeaseDuration), Valid: true},
 	}); err != nil {
 		t.Fatalf("seed fresh reclamation claim: %v", err)
 	}
@@ -180,12 +184,12 @@ func TestReclaimWorkerRetriesAfterObjectDeleteLosesItsClaim(t *testing.T) {
 	q := dbsqlc.New(db)
 	assetID, generation := seedDueMediaAsset(t, db, q)
 	now := time.Now()
-	replacementToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	replacementToken := pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	deleteCalls := 0
 	storage := objectDeleterFunc(func(context.Context, string, string) error {
 		deleteCalls++
 		if deleteCalls == 1 {
-			if _, err := db.ExecContext(t.Context(), `
+			if _, err := db.Exec(t.Context(), `
 UPDATE media_assets
 SET reclaim_started_at = $1,
     reclaim_claim_token = $2
@@ -227,13 +231,13 @@ func TestReclaimWorkerIgnoresCompletedGenerationAfterUndoAndReschedule(t *testin
 
 	cancelled, err := q.CancelMediaAssetReclamation(t.Context(), dbsqlc.CancelMediaAssetReclamationParams{
 		MediaAssetIds:    []int64{assetID},
-		StaleClaimBefore: sql.NullTime{Time: time.Now(), Valid: true},
+		StaleClaimBefore: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
 	if err != nil || len(cancelled) != 1 {
 		t.Fatalf("cancel first generation = %v err=%v", cancelled, err)
 	}
 	if err := q.ScheduleUnreferencedMediaAssetsForReclamation(t.Context(), dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
-		ReclaimAfter:  sql.NullTime{Time: time.Now().Add(-time.Second), Valid: true},
+		ReclaimAfter:  pgtype.Timestamptz{Time: time.Now().Add(-time.Second), Valid: true},
 		MediaAssetIds: []int64{assetID},
 	}); err != nil {
 		t.Fatalf("schedule second generation: %v", err)
@@ -267,7 +271,7 @@ func TestReclaimWorkerIgnoresCompletedGenerationAfterUndoAndReschedule(t *testin
 	}
 }
 
-func seedDueMediaAsset(t *testing.T, db *sql.DB, q *dbsqlc.Queries) (int64, int64) {
+func seedDueMediaAsset(t *testing.T, db *pgxpool.Pool, q *dbsqlc.Queries) (int64, int64) {
 	t.Helper()
 	owner := &identitydomain.User{DisplayName: "reclaim-owner", Status: 1, Role: "user"}
 	if err := identitypostgres.NewRepository(db).Create(context.Background(), owner); err != nil {
@@ -288,7 +292,7 @@ func seedDueMediaAsset(t *testing.T, db *sql.DB, q *dbsqlc.Queries) (int64, int6
 		t.Fatalf("create media asset: %v", err)
 	}
 	if err := q.ScheduleUnreferencedMediaAssetsForReclamation(context.Background(), dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
-		ReclaimAfter:  sql.NullTime{Time: time.Now().Add(-time.Second), Valid: true},
+		ReclaimAfter:  pgtype.Timestamptz{Time: time.Now().Add(-time.Second), Valid: true},
 		MediaAssetIds: []int64{assetID},
 	}); err != nil {
 		t.Fatalf("schedule media asset: %v", err)
@@ -323,5 +327,15 @@ func TestReclaimWorkerTimeoutStaysBelowClaimLease(t *testing.T) {
 	timeout := worker.Timeout(&river.Job[ReclaimJobArgs]{})
 	if timeout <= 0 || timeout >= ClaimLeaseDuration {
 		t.Fatalf("reclaim timeout=%s, claim lease=%s", timeout, ClaimLeaseDuration)
+	}
+	if timeout != taskqueue.RiverJobTimeoutMediaReclamation {
+		t.Fatalf("reclaim timeout=%s, want matrix %s", timeout, taskqueue.RiverJobTimeoutMediaReclamation)
+	}
+}
+
+func TestScheduleWorkerPinsTimeoutMatrix(t *testing.T) {
+	worker := &ScheduleWorker{}
+	if timeout := worker.Timeout(&river.Job[ScheduleJobArgs]{}); timeout != taskqueue.RiverJobTimeoutMediaReclamationSchedule {
+		t.Fatalf("reclamation schedule timeout=%s, want matrix %s", timeout, taskqueue.RiverJobTimeoutMediaReclamationSchedule)
 	}
 }

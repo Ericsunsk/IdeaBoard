@@ -123,7 +123,10 @@ func normalizePricingVariants(raw []OutputResolution) ([]OutputResolution, error
 	return variants, nil
 }
 
-func (definition BillableItemDefinition) pricingVariants() []OutputResolution {
+// ResolvedPricingVariants returns the definition's normalized pricing
+// variants, defaulting when empty. Registry construction normalizes the
+// field; this re-applies the same rule for inputs arriving off-registry.
+func (definition BillableItemDefinition) ResolvedPricingVariants() []OutputResolution {
 	variants, err := normalizePricingVariants(definition.PricingVariants)
 	if err != nil {
 		return nil
@@ -172,7 +175,7 @@ type Quote struct {
 	TotalCredits int64 `json:"total_credits"`
 }
 
-func normalizeDisplayName(value string) (string, error) {
+func NormalizeDisplayName(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" || len(value) > 120 {
 		return "", ErrInvalidCatalogEntry
@@ -180,7 +183,7 @@ func normalizeDisplayName(value string) (string, error) {
 	return value, nil
 }
 
-func normalizeDescription(value string) (string, error) {
+func NormalizeDescription(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if len(value) > 1000 {
 		return "", ErrInvalidCatalogEntry

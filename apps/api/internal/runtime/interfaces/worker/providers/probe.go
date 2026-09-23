@@ -8,6 +8,7 @@ import (
 	"time"
 
 	runtimeports "ideaboard/api/internal/runtime/ports"
+	"ideaboard/api/internal/workflow"
 )
 
 // ProbeVerdict is the observable outcome of one model probe. Probes run
@@ -49,7 +50,7 @@ func ProbeModel(
 	resp, err := client.Do(ctx, runtimeports.GatewayRequest{
 		Endpoint: runtimeports.GatewayEndpoint{
 			Kind:     runtimeports.GatewayEndpointProviderNative,
-			Provider: gatewayProviderPath(strings.TrimSpace(provider)),
+			Provider: workflow.GatewayProviderPath(strings.TrimSpace(provider)),
 			Path:     path,
 		},
 		Model:       strings.TrimSpace(model),

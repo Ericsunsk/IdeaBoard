@@ -34,7 +34,7 @@ func TestRuntimeSettingsOutboundPolicyUpdatePersistsAuditAndAppliesImmediately(t
 	var actionType string
 	var actorID int64
 	var metadataRaw []byte
-	if err := db.QueryRowContext(ctx, `
+	if err := db.QueryRow(ctx, `
 SELECT action_type, actor_id, metadata
 FROM system_settings_admin_actions
 ORDER BY id DESC
@@ -84,7 +84,7 @@ func TestRuntimeSettingsOutboundPolicyUsesClosedDefaultWhenConfigIsMissing(t *te
 	ctx := context.Background()
 	db := testdb.Open(t)
 	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
-	if _, err := db.ExecContext(ctx, `DELETE FROM system_configs WHERE config_key = $1`, outboundPolicyAllowHostsKey); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM system_configs WHERE config_key = $1`, outboundPolicyAllowHostsKey); err != nil {
 		t.Fatalf("delete outbound policy default: %v", err)
 	}
 
@@ -98,7 +98,7 @@ func TestRuntimeSettingsOutboundPolicyFailsClosedWhenConfigIsInvalid(t *testing.
 	ctx := context.Background()
 	db := testdb.Open(t)
 	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
-	if _, err := db.ExecContext(ctx, `
+	if _, err := db.Exec(ctx, `
 UPDATE system_configs
 SET value = 'not-json'
 WHERE config_key = $1`, outboundPolicyAllowHostsKey); err != nil {

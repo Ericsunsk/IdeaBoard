@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
@@ -29,8 +32,8 @@ func TestUpsertMediaAssetRejectsOwnerTakeover(t *testing.T) {
 	}
 
 	_, err = q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(ownerB.ID, "asset-b", "shared/key.png"))
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("cross-owner UpsertMediaAsset error = %v, want sql.ErrNoRows", err)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("cross-owner UpsertMediaAsset error = %v, want pgx.ErrNoRows", err)
 	}
 }
 
@@ -70,8 +73,8 @@ func TestUpsertMediaRefRejectsOwnerTakeoverOnConflict(t *testing.T) {
 		t.Fatalf("owner UpsertMediaRef returned error: %v", err)
 	}
 	_, err = q.UpsertMediaRef(ctx, mediaRefParamsForTest(assetID, ownerB.ID, "ref-conflict"))
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("cross-owner conflict UpsertMediaRef error = %v, want sql.ErrNoRows", err)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("cross-owner conflict UpsertMediaRef error = %v, want pgx.ErrNoRows", err)
 	}
 }
 
@@ -134,7 +137,7 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 	}
 
 	remoteParams := taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/remote.png")
-	remoteParams.MediaAssetID = sql.NullInt64{}
+	remoteParams.MediaAssetID = pgtype.Int8{}
 	remoteParams.OutputKind = "remote"
 	remoteParams.Url = "https://provider.example/result.png"
 	remoteParams.ResultIndex = 1
@@ -143,7 +146,7 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 	}
 
 	assetWithoutMedia := taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/missing.png")
-	assetWithoutMedia.MediaAssetID = sql.NullInt64{}
+	assetWithoutMedia.MediaAssetID = pgtype.Int8{}
 	if _, err := q.CreateTaskOutput(ctx, assetWithoutMedia); err == nil {
 		t.Fatal("asset output without media_asset_id should fail")
 	}
@@ -187,24 +190,24 @@ func TestInsertTaskOutputsReusesReadyMaterializedAssetAndPersistsLineage(t *test
 		t.Fatalf("insert task outputs: %v", err)
 	}
 	var taskOutputAssetID int64
-	if err := db.QueryRowContext(ctx, `SELECT media_asset_id FROM task_outputs WHERE task_id = $1`, "task-result-convergence").Scan(&taskOutputAssetID); err != nil {
+	if err := db.QueryRow(ctx, `SELECT media_asset_id FROM task_outputs WHERE task_id = $1`, "task-result-convergence").Scan(&taskOutputAssetID); err != nil {
 		t.Fatalf("load task output asset: %v", err)
 	}
 	if taskOutputAssetID != outputID {
 		t.Fatalf("task output asset=%d, want materialized asset %d", taskOutputAssetID, outputID)
 	}
 	var taskOutputRefs, lineageRows int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE media_asset_id = $1 AND ref_type = 'task_output'`, outputID).Scan(&taskOutputRefs); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_refs WHERE media_asset_id = $1 AND ref_type = 'task_output'`, outputID).Scan(&taskOutputRefs); err != nil {
 		t.Fatalf("count task output refs: %v", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_asset_sources WHERE media_asset_id = $1`, outputID).Scan(&lineageRows); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_asset_sources WHERE media_asset_id = $1`, outputID).Scan(&lineageRows); err != nil {
 		t.Fatalf("count task output lineage: %v", err)
 	}
 	if taskOutputRefs != 1 || lineageRows != 1 {
 		t.Fatalf("task output refs/lineage=%d/%d, want 1/1", taskOutputRefs, lineageRows)
 	}
 	var assetCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1 AND storage_key = $2`, owner.ID, "outputs/result.png").Scan(&assetCount); err != nil {
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1 AND storage_key = $2`, owner.ID, "outputs/result.png").Scan(&assetCount); err != nil {
 		t.Fatalf("count output assets: %v", err)
 	}
 	if assetCount != 1 {
@@ -212,7 +215,7 @@ func TestInsertTaskOutputsReusesReadyMaterializedAssetAndPersistsLineage(t *test
 	}
 }
 
-func createMediaOwnerForTest(t *testing.T, db *sql.DB, displayName string, storageUID string) *identitydomain.User {
+func createMediaOwnerForTest(t *testing.T, db *pgxpool.Pool, displayName string, storageUID string) *identitydomain.User {
 	t.Helper()
 	repo := identitypostgres.NewRepository(db)
 	user := &identitydomain.User{
@@ -262,7 +265,7 @@ func mediaRefParamsForTest(assetID int64, ownerID int64, refID string) dbsqlc.Up
 func taskOutputParamsForTest(taskID string, mediaAssetID int64, storageKey string) dbsqlc.CreateTaskOutputParams {
 	return dbsqlc.CreateTaskOutputParams{
 		TaskID:       taskID,
-		MediaAssetID: sql.NullInt64{Int64: mediaAssetID, Valid: true},
+		MediaAssetID: pgtype.Int8{Int64: mediaAssetID, Valid: true},
 		OutputKind:   "asset",
 		Role:         "image",
 		Url:          "",

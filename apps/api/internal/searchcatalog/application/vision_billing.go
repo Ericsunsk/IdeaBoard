@@ -1,4 +1,4 @@
-package searchcatalog
+package application
 
 import (
 	"context"
@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	billingapplication "ideaboard/api/internal/billing/application"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/platform/idempotency"
+	searchdomain "ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,10 +23,13 @@ import (
 )
 
 const (
-	visionSearchSKU           = "ai-search:vision"
-	visionBillingKeyMaxLength = 160
-	visionPendingAfter        = 15 * time.Minute
+	visionSearchSKU    = "ai-search:vision"
+	visionPendingAfter = 15 * time.Minute
 )
+
+// visionBillingKeyMaxLength follows the platform idempotency bound so vision
+// and tasking reject the same oversized keys with idempotency_key_required.
+const visionBillingKeyMaxLength = idempotency.MaxKeyLength
 
 var (
 	ErrVisionIdempotencyKeyRequired = errors.New("vision search idempotency key is required")
@@ -33,45 +39,45 @@ var (
 )
 
 type VisionBillingResult struct {
-	VisionExtraction
+	searchdomain.VisionExtraction
 	OperationID string `json:"operation_id"`
 	Status      string `json:"status"`
 	Replayed    bool   `json:"replayed,omitempty"`
 }
 
-type visionOperationFailure struct {
+type VisionOperationFailure struct {
 	Code       string
 	Message    string
 	HTTPStatus int
 }
 
-func (e *visionOperationFailure) Error() string { return e.Message }
+func (e *VisionOperationFailure) Error() string { return e.Message }
 
-type visionBillingPending struct {
+type VisionBillingPending struct {
 	OperationID string
 }
 
-func (e *visionBillingPending) Error() string {
+func (e *VisionBillingPending) Error() string {
 	return "vision search operation is pending reconciliation"
 }
 
 type VisionBillingService struct {
 	pool    *pgxpool.Pool
-	catalog *billing.BillableItemCatalog
+	catalog *billingapplication.BillableItemCatalog
 	credits *credits.Service
 	vision  *VisionSearchService
 }
 
-func NewVisionBillingService(pool *pgxpool.Pool, catalog *billing.BillableItemCatalog, creditService *credits.Service, vision *VisionSearchService) *VisionBillingService {
+func NewVisionBillingService(pool *pgxpool.Pool, catalog *billingapplication.BillableItemCatalog, creditService *credits.Service, vision *VisionSearchService) *VisionBillingService {
 	return &VisionBillingService{pool: pool, catalog: catalog, credits: creditService, vision: vision}
 }
 
-func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempotencyKey string, input VisionInput) (VisionBillingResult, error) {
+func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempotencyKey string, input searchdomain.VisionInput) (VisionBillingResult, error) {
 	if s == nil || s.pool == nil || s.catalog == nil || s.credits == nil || s.vision == nil {
-		return VisionBillingResult{}, ErrVisionUnavailable
+		return VisionBillingResult{}, searchdomain.ErrVisionUnavailable
 	}
 	if userID <= 0 {
-		return VisionBillingResult{}, ErrVisionInput
+		return VisionBillingResult{}, searchdomain.ErrVisionInput
 	}
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if idempotencyKey == "" || len(idempotencyKey) > visionBillingKeyMaxLength {
@@ -96,14 +102,14 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 	if providerErr != nil {
 		if isVisionUncertain(providerErr) {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, &visionBillingPending{OperationID: reserved.result.OperationID}
+			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, &VisionBillingPending{OperationID: reserved.result.OperationID}
 		}
 		code, message, status := visionFailureDetails(providerErr)
 		if err := s.release(context.WithoutCancel(ctx), reserved.result.OperationID, userID, code, message); err != nil {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
 			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: release: %w", ErrVisionSettlement, err)
 		}
-		return VisionBillingResult{}, &visionOperationFailure{Code: code, Message: message, HTTPStatus: status}
+		return VisionBillingResult{}, &VisionOperationFailure{Code: code, Message: message, HTTPStatus: status}
 	}
 
 	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, userID, extraction.Query); err != nil {
@@ -142,7 +148,7 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 		existing.Status = status
 		existing.Replayed = true
 		if status == "failed" {
-			return visionReservation{result: existing, failure: &visionOperationFailure{Code: errorCode, Message: errorMessage, HTTPStatus: httpStatusForVisionCode(errorCode)}}, nil
+			return visionReservation{result: existing, failure: &VisionOperationFailure{Code: errorCode, Message: errorMessage, HTTPStatus: httpStatusForVisionCode(errorCode)}}, nil
 		}
 		if status != "pending" {
 			return visionReservation{result: existing}, nil
@@ -271,16 +277,24 @@ func (s *VisionBillingService) ReconcilePending(ctx context.Context) error {
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
+			rows.Close()
 			return err
 		}
 		operationIDs = append(operationIDs, id)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	// Release the read connection before opening one transaction per operation.
+	// This keeps reconciliation bounded by the pool even when the batch is full.
+	rows.Close()
 	for _, id := range operationIDs {
 		if err := s.reconcileOne(ctx, id); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID string) error {
@@ -319,11 +333,11 @@ func (s *VisionBillingService) reconcileOne(ctx context.Context, operationID str
 	return tx.Commit(ctx)
 }
 
-func validateVisionInput(input VisionInput) error {
-	if len(input.Images) < 1 || len(input.Images) > visionMaxImages {
-		return ErrVisionInput
+func validateVisionInput(input searchdomain.VisionInput) error {
+	if len(input.Images) < 1 || len(input.Images) > searchdomain.VisionMaxImages {
+		return searchdomain.ErrVisionInput
 	}
-	if err := validateVisionImages(input.Images); err != nil {
+	if err := ValidateVisionImages(input.Images); err != nil {
 		return err
 	}
 	if utf8RuneCount(strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")) > MaxSearchQueryRunes {
@@ -332,7 +346,7 @@ func validateVisionInput(input VisionInput) error {
 	return nil
 }
 
-func hashVisionInput(input VisionInput) string {
+func hashVisionInput(input searchdomain.VisionInput) string {
 	hash := sha256.New()
 	hash.Write([]byte(strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")))
 	for _, image := range input.Images {
@@ -350,28 +364,28 @@ func isVisionUncertain(err error) bool {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
-	var providerErr *visionProviderError
-	return errors.As(err, &providerErr) && (providerErr.kind == visionProviderFailureNetwork || providerErr.kind == visionProviderFailureTimeout)
+	var providerErr *searchdomain.VisionProviderError
+	return errors.As(err, &providerErr) && (providerErr.Kind == searchdomain.VisionProviderFailureNetwork || providerErr.Kind == searchdomain.VisionProviderFailureTimeout)
 }
 
 func visionFailureDetails(err error) (string, string, int) {
-	var providerErr *visionProviderError
+	var providerErr *searchdomain.VisionProviderError
 	if errors.As(err, &providerErr) {
-		switch providerErr.kind {
-		case visionProviderFailureCredentials:
+		switch providerErr.Kind {
+		case searchdomain.VisionProviderFailureCredentials:
 			return "vision_search_credentials", "视觉搜索凭证无效", 502
-		case visionProviderFailureQuota:
+		case searchdomain.VisionProviderFailureQuota:
 			return "vision_search_quota", "视觉搜索权限或配额不可用", 502
-		case visionProviderFailureResponse:
+		case searchdomain.VisionProviderFailureResponse:
 			return "vision_search_schema_error", "视觉搜索返回格式无效", 502
 		}
 	}
 	switch {
-	case errors.Is(err, ErrVisionSchema):
+	case errors.Is(err, searchdomain.ErrVisionSchema):
 		return "vision_search_schema_error", "视觉搜索返回格式无效", 502
-	case errors.Is(err, ErrVisionNotConfigured):
+	case errors.Is(err, searchdomain.ErrVisionNotConfigured):
 		return "vision_search_not_configured", "视觉搜索暂未配置", 503
-	case errors.Is(err, ErrVisionInput), errors.Is(err, ErrVisionImageInvalid), errors.Is(err, ErrVisionImageUnavailable):
+	case errors.Is(err, searchdomain.ErrVisionInput), errors.Is(err, searchdomain.ErrVisionImageInvalid), errors.Is(err, searchdomain.ErrVisionImageUnavailable):
 		return "vision_search_input_invalid", "视觉搜索输入无效", 400
 	default:
 		return "vision_search_provider_error", "视觉搜索暂时不可用", 502
@@ -379,6 +393,16 @@ func visionFailureDetails(err error) (string, string, int) {
 }
 
 func httpStatusForVisionCode(code string) int {
+	switch code {
+	case "pricing_unavailable":
+		return 503
+	case "wallet_restricted":
+		return 409
+	case string(idempotency.CodeConflict):
+		return 409
+	case string(idempotency.CodeRequired):
+		return 400
+	}
 	if strings.HasSuffix(code, "not_configured") {
 		return 503
 	}

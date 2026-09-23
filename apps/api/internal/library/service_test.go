@@ -10,7 +10,6 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/lib/pq"
 )
 
 func TestServiceSaveAssetIsIdempotentAndMovesExistingAsset(t *testing.T) {
@@ -137,13 +136,9 @@ func integrationAsset(id string) AssetInput {
 }
 
 func TestIsUniqueViolationMatchesDriverErrorShapes(t *testing.T) {
-	// Production handles run on the pgx stdlib driver (*pgconn.PgError); the
-	// pq shape is kept as defense for any database/sql handle. Both must map.
+	// Production handles run on pgx (*pgconn.PgError).
 	if !isUniqueViolation(&pgconn.PgError{Code: "23505"}) {
 		t.Fatal("pgx unique violation should map")
-	}
-	if !isUniqueViolation(&pq.Error{Code: "23505"}) {
-		t.Fatal("pq unique violation should map")
 	}
 	if isUniqueViolation(&pgconn.PgError{Code: "23503"}) {
 		t.Fatal("foreign-key violation must not map")

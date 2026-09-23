@@ -27,8 +27,6 @@ func newRootCommand() *cobra.Command {
 		newInitAdminCommand(),
 		newFinalizeMigrateCommand(),
 		newInitCreditWalletsCommand(),
-		newPreflightCommand(),
-		newRepairCommand(),
 		newMediaReclamationCommand(),
 	)
 	return root
@@ -80,50 +78,6 @@ func newInitCreditWalletsCommand() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func newPreflightCommand() *cobra.Command {
-	preflight := &cobra.Command{
-		Use:   "preflight",
-		Short: "Read-only startup safety checks",
-	}
-	preflight.AddCommand(&cobra.Command{
-		Use:   "task-leases",
-		Short: "Report running tasks missing a lease token",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			runPreflight()
-			return nil
-		},
-	})
-	return preflight
-}
-
-func newRepairCommand() *cobra.Command {
-	repair := &cobra.Command{
-		Use:   "repair",
-		Short: "Bounded repair operations (safe by default)",
-	}
-	taskLeases := &cobra.Command{
-		Use:   "task-leases",
-		Short: "Reset running tasks missing a lease token back to pending",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
-			to, _ := cmd.Flags().GetString("to")
-			yes, _ := cmd.Flags().GetBool("yes")
-			limit, _ := cmd.Flags().GetInt("limit")
-			opts := resolveRepairTaskLeasesOptions(dryRun, cmd.Flags().Changed("dry-run"), to, yes, limit)
-			runRepairTaskLeases(opts)
-			return nil
-		},
-	}
-	taskLeases.Flags().Bool("dry-run", true, "preview only; no mutation")
-	taskLeases.Flags().String("to", "", "target status for mutation (supported: pending)")
-	taskLeases.Flags().Bool("yes", false, "confirm mutation")
-	taskLeases.Flags().Int("limit", defaultRepairLimit, "max rows to update")
-	repair.AddCommand(taskLeases)
-	return repair
 }
 
 func newMediaReclamationCommand() *cobra.Command {

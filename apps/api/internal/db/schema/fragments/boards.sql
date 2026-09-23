@@ -50,6 +50,9 @@ CREATE TABLE board_share_tokens (
   revoked_at TIMESTAMPTZ(3),
   revoked_by BIGINT,
   expires_at TIMESTAMPTZ(3),
+  idempotency_key VARCHAR(128) NOT NULL DEFAULT '',
+  request_hash VARCHAR(64) NOT NULL DEFAULT '',
+  token_secret TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_board_share_tokens_token_hash UNIQUE (token_hash),
@@ -57,6 +60,7 @@ CREATE TABLE board_share_tokens (
   CONSTRAINT ck_board_share_tokens_usage CHECK (usage_count >= 0 AND (max_uses IS NULL OR max_uses > 0)),
   CONSTRAINT ck_board_share_tokens_token_hash_not_blank CHECK (btrim(token_hash) <> ''),
   CONSTRAINT ck_board_share_tokens_token_prefix_not_blank CHECK (btrim(token_prefix) <> ''),
+  CONSTRAINT ck_board_share_tokens_idempotency CHECK ((idempotency_key = '' AND request_hash = '') OR (idempotency_key <> '' AND request_hash <> '')),
   CONSTRAINT ck_board_share_tokens_revoked_at CHECK (NOT revoked OR revoked_at IS NOT NULL),
   CONSTRAINT fk_board_share_tokens_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
   CONSTRAINT fk_board_share_tokens_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
@@ -65,3 +69,4 @@ CREATE TABLE board_share_tokens (
 
 CREATE INDEX idx_board_share_token_board ON board_share_tokens (board_id, created_at DESC);
 CREATE INDEX idx_board_share_token_active ON board_share_tokens (token_hash) WHERE NOT revoked;
+CREATE UNIQUE INDEX uq_board_share_tokens_creator_idempotency ON board_share_tokens (created_by, idempotency_key) WHERE idempotency_key <> '';

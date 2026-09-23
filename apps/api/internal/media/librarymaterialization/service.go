@@ -5,7 +5,6 @@ package librarymaterialization
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -19,6 +18,8 @@ import (
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/outbound"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type mediaStore interface {
@@ -43,7 +44,7 @@ type Service struct {
 
 var processMaterializationGate = newMaterializationGate()
 
-func NewService(db *sql.DB, storageService mediaStore, registry assets.LibraryMaterializationRegistry) *Service {
+func NewService(db *pgxpool.Pool, storageService mediaStore, registry assets.LibraryMaterializationRegistry) *Service {
 	return newService(storageService, registry, newPostgresLibraryAssetLocker(db), processMaterializationGate)
 }
 
@@ -120,9 +121,9 @@ func (s *Service) materializeLocked(ctx context.Context, input library.Materiali
 	return materializedResult(asset), nil
 }
 
-type postgresLibraryAssetLocker struct{ db *sql.DB }
+type postgresLibraryAssetLocker struct{ db *pgxpool.Pool }
 
-func newPostgresLibraryAssetLocker(db *sql.DB) *postgresLibraryAssetLocker {
+func newPostgresLibraryAssetLocker(db *pgxpool.Pool) *postgresLibraryAssetLocker {
 	return &postgresLibraryAssetLocker{db: db}
 }
 
@@ -130,17 +131,17 @@ func (l *postgresLibraryAssetLocker) Lock(ctx context.Context, libraryAssetID in
 	if l == nil || l.db == nil {
 		return nil, errors.New("library materialization lock database is unavailable")
 	}
-	conn, err := l.db.Conn(ctx)
+	conn, err := l.db.Acquire(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("acquire connection: %w", err)
 	}
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", libraryAssetID); err != nil {
-		_ = conn.Close()
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", libraryAssetID); err != nil {
+		conn.Release()
 		return nil, err
 	}
 	return func() {
-		_, _ = conn.ExecContext(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1)", libraryAssetID)
-		_ = conn.Close()
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1)", libraryAssetID)
+		conn.Release()
 	}, nil
 }
 
