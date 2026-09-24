@@ -965,14 +965,6 @@ type TaskStatEvent struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
-type TaskSubmissionClaim struct {
-	UserID         int64              `json:"user_id"`
-	ClientActionID string             `json:"client_action_id"`
-	TaskID         string             `json:"task_id"`
-	RequestHash    string             `json:"request_hash"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-}
-
 type UploadSession struct {
 	InternalID        int64              `json:"internal_id"`
 	PublicID          string             `json:"public_id"`

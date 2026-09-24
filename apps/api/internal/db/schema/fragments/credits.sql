@@ -860,8 +860,8 @@ BEGIN
   JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
     AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
     AND holds.status = settlements.state
-  LEFT JOIN tasks ON tasks.task_id = snapshots.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.task_id IS NULL
+  LEFT JOIN tasks ON tasks.public_id = snapshots.task_id
+  WHERE snapshots.total_credits > 0 AND tasks.public_id IS NULL
     AND settlements.state IN ('held', 'captured', 'released')
     AND (settlements.state = 'held' OR EXISTS (
       SELECT 1 FROM credit_transactions terminal
@@ -926,44 +926,44 @@ BEGIN
   INSERT INTO reconciliation_scan
   SELECT CASE
       WHEN tasks.status IN ('pending', 'running') THEN 'active_task_not_held'
-      WHEN tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN 'terminal_task_settlement_mismatch'
+      WHEN tasks.status IN ('completed', 'failed', 'cancelled') THEN 'terminal_task_settlement_mismatch'
     END,
-    'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+    'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
       jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
       'capture_transaction_id', settlements.capture_transaction_id, 'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   WHERE snapshots.total_credits > 0 AND (
     (tasks.status IN ('pending', 'running') AND (settlements.state IS DISTINCT FROM 'held' OR holds.status IS DISTINCT FROM 'held'))
-    OR (tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') AND (
-      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id)
+    OR (tasks.status IN ('completed', 'failed', 'cancelled') AND (
+      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id)
       OR settlements.state IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
       OR holds.status IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
     )));
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
     jsonb_build_object('task_status', tasks.status, 'expected_count',
       (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
       (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END),
       'actual_count', COUNT(terminals.transaction_id))
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = snapshots.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release')
     AND terminals.wallet_user_id = snapshots.user_id
-    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
-  GROUP BY snapshots.user_id, tasks.task_id, tasks.status, settlements.captured_credits, settlements.released_credits
+    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.public_id
+  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled')
+  GROUP BY snapshots.user_id, tasks.public_id, tasks.status, settlements.captured_credits, settlements.released_credits
   HAVING COUNT(terminals.transaction_id) <>
     (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
     (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END);

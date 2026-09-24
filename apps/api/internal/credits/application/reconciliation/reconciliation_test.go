@@ -392,11 +392,11 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 		t.Fatal(err)
 	}
 
-	const missingSnapshotTaskID = "reconcile-missing-billing-snapshot"
+	const missingSnapshotTaskID = "task_reconcile_missing_billing_snapshot"
 	missingSnapshotHold := createReconciliationTaskFixture(t, db, service, missingSnapshotTaskID, "pending", "", userID, priceID, priceVersion)
-	const missingTaskTraceID = "reconcile-missing-task-trace"
+	const missingTaskTraceID = "task_reconcile_missing_task_trace"
 	createReconciliationTaskFixture(t, db, service, missingTaskTraceID, "pending", "", userID, priceID, priceVersion)
-	const brokenTaskTraceID = "reconcile-broken-task-trace"
+	const brokenTaskTraceID = "task_reconcile_broken_task_trace"
 	createReconciliationTaskFixture(t, db, service, brokenTaskTraceID, "pending", "", userID, priceID, priceVersion)
 
 	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
@@ -417,10 +417,10 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots ENABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE task_id = $1`, missingTaskTraceID); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE public_id = $1`, missingTaskTraceID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE task_id = $1`, brokenTaskTraceID); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE public_id = $1`, brokenTaskTraceID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
@@ -508,9 +508,7 @@ WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at
 		t.Fatalf("Task trace finding should remain reported after unrelated recovery, got %d links", got)
 	}
 
-	if _, err := db.Exec(ctx, `INSERT INTO tasks (task_id,user_id,prompt,user_prompt,params,status,error_msg,result) VALUES ($1,$2,'p','p','{}','pending','','')`, missingTaskTraceID, userID); err != nil {
-		t.Fatal(err)
-	}
+	insertReconciliationWorkspaceTask(t, db, missingTaskTraceID, userID, "pending", "")
 	executeReconciliationRun(t, service)
 	for _, finding := range []ports.ReconciliationFinding{billingSnapshotFinding, taskTraceFinding} {
 		var status string
@@ -537,7 +535,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 		t.Fatal(err)
 	}
 
-	const capturedTaskID = "reconcile-corrupt-captured-terminal"
+	const capturedTaskID = "task_reconcile_corrupt_captured"
 	capturedHold := createReconciliationTaskFixture(t, db, service, capturedTaskID, "completed", "", userID, priceID, priceVersion)
 	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
 	if err != nil {
@@ -547,7 +545,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 		t.Fatal(err)
 	}
 
-	const releasedTaskID = "reconcile-corrupt-released-terminal"
+	const releasedTaskID = "task_reconcile_corrupt_released"
 	releasedHold := createReconciliationTaskFixture(t, db, service, releasedTaskID, "failed", "provider failed", userID, priceID, priceVersion)
 	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
 	if err != nil {
@@ -556,7 +554,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, releasedTaskID, release.TransactionID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE task_id IN ($1, $2)`, capturedTaskID, releasedTaskID); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM tasks WHERE public_id IN ($1, $2)`, capturedTaskID, releasedTaskID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
@@ -682,16 +680,16 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 		t.Fatal(err)
 	}
 
-	releasedHold := createReconciliationTaskFixture(t, db, service, "reconcile-running-released", "pending", "", 93, priceID, priceVersion)
-	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "reconcile-running-released")})
+	releasedHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_running_released", "pending", "", 93, priceID, priceVersion)
+	release, err := service.Release(ctx, ports.ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("release:running", "task_reconcile_running_released")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "reconcile-running-released", release.TransactionID); err != nil {
+	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 5, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_reconcile_running_released", release.TransactionID); err != nil {
 		t.Fatal(err)
 	}
-	createReconciliationTaskFixture(t, db, service, "reconcile-completed-held", "completed", "", 93, priceID, priceVersion)
-	createReconciliationTaskFixture(t, db, service, "reconcile-failed-held", "failed", "provider failed", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, db, service, "task_reconcile_completed_held", "completed", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, db, service, "task_reconcile_failed_held", "failed", "provider failed", 93, priceID, priceVersion)
 
 	missingTaskMetadata := taskReconciliationMetadata("hold:missing-task:1", "reconcile-missing-task")
 	if _, err := service.Hold(ctx, ports.HoldCommand{UserID: 93, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: missingTaskMetadata}); err != nil {
@@ -736,15 +734,11 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 		t.Fatal(err)
 	}
 
-	missingBillingHold := createReconciliationTaskFixture(t, db, service, "reconcile-missing-billing-facts", "pending", "", 93, priceID, priceVersion)
-	missingRunningHold := createReconciliationTaskFixture(t, db, service, "reconcile-running-missing-billing-facts", "pending", "", 93, priceID, priceVersion)
-	if _, err := db.Exec(ctx, `ALTER TABLE tasks DROP CONSTRAINT ck_tasks_assignment_pair`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(ctx, `ALTER TABLE tasks DROP CONSTRAINT ck_tasks_lease_status`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(ctx, `UPDATE tasks SET status='running' WHERE task_id='reconcile-running-missing-billing-facts'`); err != nil {
+	missingBillingHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
+	missingRunningHold := createReconciliationTaskFixture(t, db, service, "task_reconcile_running_missing_billing_facts", "pending", "", 93, priceID, priceVersion)
+	// The workspace-scoped tasks table carries no assignment or lease guard
+	// that blocks this transition, so the status flip needs no bypass.
+	if _, err := db.Exec(ctx, `UPDATE tasks SET status='running' WHERE public_id='task_reconcile_running_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
@@ -753,7 +747,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if _, err := db.Exec(ctx, `
 UPDATE task_billing_settlements
 SET state = 'captured', actual_output_count = 1, captured_credits = 5, settled_at = clock_timestamp()
-WHERE task_id = 'reconcile-completed-held'`); err != nil {
+WHERE task_id = 'task_reconcile_completed_held'`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_snapshots DROP CONSTRAINT task_billing_snapshot_hold_fk`); err != nil {
@@ -762,10 +756,10 @@ WHERE task_id = 'reconcile-completed-held'`); err != nil {
 	if _, err := db.Exec(ctx, `ALTER TABLE credit_holds DROP CONSTRAINT fk_credit_holds_hold_transaction_id`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'reconcile-missing-billing-facts'`); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'reconcile-running-missing-billing-facts'`); err != nil {
+	if _, err := db.Exec(ctx, `DELETE FROM task_billing_settlements WHERE task_id = 'task_reconcile_running_missing_billing_facts'`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `DELETE FROM credit_holds WHERE hold_transaction_id = $1`, missingBillingHold); err != nil {
@@ -882,23 +876,23 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	capturedHold := createReconciliationTaskFixture(t, db, service, "active-captured", "pending", "", 93, priceID, priceVersion)
-	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "active-captured")})
+	capturedHold := createReconciliationTaskFixture(t, db, service, "task_active_captured", "pending", "", 93, priceID, priceVersion)
+	capture, err := service.Capture(ctx, ports.CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Amount: testhelpers.MustCreditAmount(t, 5), Metadata: taskReconciliationMetadata("capture:active", "task_active_captured")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "active-captured", capture.TransactionID); err != nil {
+	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 1, captured_credits = 5, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "task_active_captured", capture.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
-	createReconciliationTaskFixture(t, db, service, "active-free", "pending", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, db, service, "task_active_free", "pending", "", 93, priceID, priceVersion)
 	if _, err := db.Exec(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'free', settled_at = clock_timestamp() WHERE task_id = 'active-free'`); err != nil {
+	if _, err := db.Exec(ctx, `UPDATE task_billing_settlements SET state = 'free', settled_at = clock_timestamp() WHERE task_id = 'task_active_free'`); err != nil {
 		t.Fatal(err)
 	}
-	createReconciliationTaskFixture(t, db, service, "active-held", "pending", "", 93, priceID, priceVersion)
+	createReconciliationTaskFixture(t, db, service, "task_active_held", "pending", "", 93, priceID, priceVersion)
 
 	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
@@ -920,12 +914,12 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 			}
 		}
 	}
-	for _, taskID := range []string{"active-captured", "active-free"} {
+	for _, taskID := range []string{"task_active_captured", "task_active_free"} {
 		if !foundSubjects[taskID] {
 			t.Errorf("missing active_task_not_held for %q; got %v", taskID, foundSubjects)
 		}
 	}
-	if foundSubjects["active-held"] {
+	if foundSubjects["task_active_held"] {
 		t.Fatal("normally held active task was reported")
 	}
 }
@@ -966,19 +960,60 @@ func createReconciliationTaskFixture(t *testing.T, db *pgxpool.Pool, service *cr
 	if err != nil {
 		t.Fatal(err)
 	}
-	completedAt := "NULL"
-	if status == "completed" || status == "failed" {
-		completedAt = "clock_timestamp()"
-	}
-	query := `INSERT INTO tasks (task_id,user_id,prompt,user_prompt,params,status,error_msg,result,completed_at) VALUES ($1,$2,'p','p','{}',$3,$4,'',` + completedAt + `)`
-	if _, err := db.Exec(t.Context(), query, taskID, userID, status, errorMessage); err != nil {
-		t.Fatal(err)
-	}
+	insertReconciliationWorkspaceTask(t, db, taskID, userID, status, errorMessage)
 	insertReconciliationTaskBillingSnapshot(t, db, taskID, userID, priceID, priceVersion, hold.TransactionID)
 	if _, err := db.Exec(t.Context(), `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, taskID); err != nil {
 		t.Fatal(err)
 	}
 	return hold.TransactionID
+}
+
+// insertReconciliationWorkspaceTask inserts a workspace-scoped tasks row for
+// taskID, which is also the row's public_id (task_...) and the key carried by
+// task_billing_snapshots.task_id and the Credit Ledger business reference.
+func insertReconciliationWorkspaceTask(t testing.TB, db *pgxpool.Pool, taskID string, userID int64, status, errorMessage string) {
+	t.Helper()
+	workspaceID, billingAccountID := ensureReconciliationWorkspace(t, db, userID)
+	completedAt := "NULL"
+	if status == "completed" || status == "failed" {
+		completedAt = "clock_timestamp()"
+	}
+	query := `INSERT INTO tasks (public_id,workspace_id,submitter_user_id,billing_account_id,workflow_type,workflow_input,status,error_message,completed_at) VALUES ($1,$2,$3,$4,'test-feature','{}',$5,$6,` + completedAt + `)`
+	if _, err := db.Exec(t.Context(), query, taskID, workspaceID, userID, billingAccountID, status, errorMessage); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ensureReconciliationWorkspace returns one live personal Workspace and its
+// billing account for userID, creating them on first use. Tasks rows require
+// both foreign keys; the pair is shared by every fixture task of the test.
+func ensureReconciliationWorkspace(t testing.TB, db *pgxpool.Pool, userID int64) (int64, int64) {
+	t.Helper()
+	ctx := t.Context()
+	suffix := strconv.FormatInt(userID, 10)
+	if _, err := db.Exec(ctx, `
+INSERT INTO workspaces (public_id, owner_user_id, name)
+SELECT $1, $2, 'reconciliation fixture'
+WHERE NOT EXISTS (
+  SELECT 1 FROM workspaces WHERE owner_user_id = $2 AND organization_id IS NULL AND archived_at IS NULL
+)`, "ws_reconciliation_"+suffix, userID); err != nil {
+		t.Fatal(err)
+	}
+	var workspaceID int64
+	if err := db.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE owner_user_id = $1 AND organization_id IS NULL AND archived_at IS NULL`, userID).Scan(&workspaceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `
+INSERT INTO billing_accounts (public_id, workspace_id)
+SELECT $1, $2
+WHERE NOT EXISTS (SELECT 1 FROM billing_accounts WHERE workspace_id = $2)`, "ba_reconciliation_"+suffix, workspaceID); err != nil {
+		t.Fatal(err)
+	}
+	var billingAccountID int64
+	if err := db.QueryRow(ctx, `SELECT internal_id FROM billing_accounts WHERE workspace_id = $1`, workspaceID).Scan(&billingAccountID); err != nil {
+		t.Fatal(err)
+	}
+	return workspaceID, billingAccountID
 }
 
 func insertReconciliationTaskBillingSnapshot(t testing.TB, db *pgxpool.Pool, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {

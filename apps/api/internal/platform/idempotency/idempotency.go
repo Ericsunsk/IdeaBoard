@@ -11,11 +11,12 @@
 //     `platform/apperror` (wire codes `idempotency_key_required` and
 //     `idempotency_conflict`). Rewards maps the same outcomes onto its
 //     existing `reward_*` namespace instead of minting new codes.
-//   - Replay within ReplayTTL (24h) returns the first result. Task and
-//     reward-create replay through their durable uniqueness facts
-//     (task_submission_claims, reward_codes.created_by+idempotency_key,
-//     reward_redemptions natural user+code dedup); board POSTs replay
-//     through the process-local Store below.
+//   - Replay within ReplayTTL (24h) returns the first result.
+//     Reward-create replays through its durable uniqueness facts
+//     (reward_codes.created_by+idempotency_key, reward_redemptions
+//     natural user+code dedup); board POSTs replay through the
+//     process-local Store below. Task submit stays fail-closed until its
+//     workspace-scoped store lands, so it never reaches this store.
 package idempotency
 
 import (
@@ -147,8 +148,9 @@ func HashRequest(parts ...string) string {
 
 // Store is a process-local first-result replay cache for POST writes whose
 // service layer has no durable idempotency fact (board share/member paths).
-// Task submit and reward create/redeem replay through their durable facts
-// and never use this store. Entries expire after TTL; methods are nil-safe
+// Reward create/redeem replay through their durable facts and never use
+// this store; task submit stays fail-closed until its workspace-scoped
+// store lands. Entries expire after TTL; methods are nil-safe
 // so handlers constructed without a store still enforce keys and skip replay.
 type Store struct {
 	mu         sync.Mutex

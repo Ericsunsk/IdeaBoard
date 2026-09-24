@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tenancy"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,28 +55,42 @@ func (s *BillingAccountStore) dbWithContext(ctx context.Context) *dbsqlc.Queries
 // on first read (Get-or-Create). Owner CHECK (workspace_id NOT NULL) is
 // preserved; organization-owned accounts are #804-future and stay NULL here.
 //
-// Concurrency note: billing_accounts has no workspace unique constraint
-// (migration avoided per #804 minimal-diff). Concurrent first reads may
-// insert duplicate rows; the follow-up GetBillingAccountByWorkspaceID reads
-// LIMIT 1. A unique partial index on workspace_id is the #805 follow-up if
-// duplicates are observed.
+// Concurrency note: ux_billing_accounts_workspace (partial unique index,
+// baseline) collapses concurrent first reads to one row; the loser reads
+// back the winner on the 23505 duplicate error below. The follow-up
+// GetBillingAccountByWorkspaceID reads LIMIT 1.
 func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (BillingAccount, error) {
 	if s == nil || s.q == nil {
 		return BillingAccount{}, errors.New("tenancy: billing account store not configured")
 	}
 	key := pgtype.Int8{Int64: workspaceInternalID, Valid: workspaceInternalID > 0}
-	if row, err := s.q.GetBillingAccountByWorkspaceID(ctx, key); err == nil {
+	queries := s.dbWithContext(ctx)
+	if row, err := queries.GetBillingAccountByWorkspaceID(ctx, key); err == nil {
 		return mapBillingAccount(row, workspacePublicID), nil
 	} else if !database.IsNotFound(err) {
 		return BillingAccount{}, err
 	}
-	created, err := s.q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		WorkspaceID: key,
+	// Every billing_accounts row carries a ba_-prefixed public_id per the
+	// contract kernel (chk_billing_accounts_public_id); mint one through
+	// the tenancy seam like the workspace lifecycle does.
+	publicID, err := tenancy.NewBillingAccountPublicID()
+	if err != nil {
+		return BillingAccount{}, err
+	}
+	created, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
+		PublicID:       publicID,
+		WorkspaceID:    key,
+		OrganizationID: pgtype.Int8{},
 	})
 	if err != nil {
-		// Best-effort convergence on concurrent insert: re-read.
-		if row, readErr := s.q.GetBillingAccountByWorkspaceID(ctx, key); readErr == nil {
-			return mapBillingAccount(row, workspacePublicID), nil
+		// Best-effort convergence on concurrent first read: the
+		// ux_billing_accounts_workspace loser reads back the winner.
+		// Non-duplicate errors (including a ba_ public_id collision,
+		// which re-reads as not-found) surface unchanged.
+		if database.IsDuplicateConstraintError(err) {
+			if row, readErr := queries.GetBillingAccountByWorkspaceID(ctx, key); readErr == nil {
+				return mapBillingAccount(row, workspacePublicID), nil
+			}
 		}
 		return BillingAccount{}, err
 	}

@@ -17,9 +17,8 @@ import (
 //   - Scope: the dedup tuple is principal + operation + key. Scope()
 //     binds principal + operation; the key travels in the header. The
 //     process-local Store additionally takes the internal numeric user id
-//     where available (durable uniqueness facts such as
-//     task_submission_claims remain the source of truth per DESIGN 3; the
-//     store never replaces them).
+//     where available (durable uniqueness facts remain the source of truth
+//     per DESIGN 3; the store never replaces them).
 //   - Replay vs conflict: reusing a key with the same request hash replays
 //     the first result within the TTL; reuse with a different hash is a
 //     409 (CodeIdempotencyConflict, or CodeTaskIdempotencyConflict for

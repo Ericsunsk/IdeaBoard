@@ -16,6 +16,9 @@ const (
 	UserPrefix         = contract.PrefixUser
 	OrganizationPrefix = contract.PrefixOrganization
 	WorkspacePrefix    = contract.PrefixWorkspace
+	// BillingAccountPrefix aliases the contract kernel so the two can
+	// never drift; billing_accounts.public_id carries ba_ per #804.
+	BillingAccountPrefix = contract.PrefixBillingAccount
 )
 
 // FormatUserPublicID renders the external user identifier. The users table
@@ -52,4 +55,10 @@ func NewWorkspacePublicID() (string, error) {
 // NewOrganizationPublicID mints an opaque org_ public identifier.
 func NewOrganizationPublicID() (string, error) {
 	return contract.MintPublicID(OrganizationPrefix, 12)
+}
+
+// NewBillingAccountPublicID mints an opaque ba_ public identifier for the
+// workspace-owned billing account (#804).
+func NewBillingAccountPublicID() (string, error) {
+	return contract.MintPublicID(BillingAccountPrefix, 12)
 }

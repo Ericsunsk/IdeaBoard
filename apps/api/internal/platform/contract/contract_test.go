@@ -274,6 +274,7 @@ func TestPublicIDValidators(t *testing.T) {
 		"asset_abc123":  IsAssetID,
 		"upload_abc123": IsUploadID,
 		"evt_abc123":    IsEventID,
+		"ba_abc123":     IsBillingAccountID,
 		"usr_a-1_B2":    IsUserID,
 		"task_550e8400": IsTaskID,
 	}
@@ -300,7 +301,7 @@ func TestPublicIDValidators(t *testing.T) {
 }
 
 func TestMintPublicID(t *testing.T) {
-	for _, prefix := range []string{PrefixWorkspace, PrefixBoard, PrefixUpload, PrefixAsset} {
+	for _, prefix := range []string{PrefixWorkspace, PrefixBoard, PrefixUpload, PrefixAsset, PrefixBillingAccount} {
 		first, err := MintPublicID(prefix, 12)
 		if err != nil {
 			t.Fatalf("MintPublicID(%q): %v", prefix, err)

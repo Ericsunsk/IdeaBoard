@@ -1,2 +1,4 @@
-h1:a38+7eNwtn3Pc4337OS6B730B9XD9LQVu0V2/6dXHe8=
+h1:CrzgrJFWJA1jQ+2g2Z2yM1Hnj+5lTHh5sGa2wekh924=
 20260924000001_baseline.sql h1:GybISD0x6RAoxNvufRMGxI0ccXE47THODLbLalut5Jg=
+20260924000002_drop_task_submission_claims.sql h1:hhkoO9VibQf0H+Hjne37MX8QQsFzLWddBqqaDj+gWNs=
+20260924000003_fix_reconciliation_tasks_public_id.sql h1:MZNfkEOs/ZV29+lIe6sTgFRXo21AHrLp2TPxIX+pDzo=

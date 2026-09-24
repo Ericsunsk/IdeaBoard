@@ -1022,8 +1022,8 @@ BEGIN
   JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
     AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
     AND holds.status = settlements.state
-  LEFT JOIN tasks ON tasks.task_id = snapshots.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.task_id IS NULL
+  LEFT JOIN tasks ON tasks.public_id = snapshots.task_id
+  WHERE snapshots.total_credits > 0 AND tasks.public_id IS NULL
     AND settlements.state IN ('held', 'captured', 'released')
     AND (settlements.state = 'held' OR EXISTS (
       SELECT 1 FROM credit_transactions terminal
@@ -1088,44 +1088,44 @@ BEGIN
   INSERT INTO reconciliation_scan
   SELECT CASE
       WHEN tasks.status IN ('pending', 'running') THEN 'active_task_not_held'
-      WHEN tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN 'terminal_task_settlement_mismatch'
+      WHEN tasks.status IN ('completed', 'failed', 'cancelled') THEN 'terminal_task_settlement_mismatch'
     END,
-    'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+    'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
       jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
       'capture_transaction_id', settlements.capture_transaction_id, 'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   WHERE snapshots.total_credits > 0 AND (
     (tasks.status IN ('pending', 'running') AND (settlements.state IS DISTINCT FROM 'held' OR holds.status IS DISTINCT FROM 'held'))
-    OR (tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') AND (
-      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id)
+    OR (tasks.status IN ('completed', 'failed', 'cancelled') AND (
+      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id)
       OR settlements.state IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
       OR holds.status IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
     )));
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
     jsonb_build_object('task_status', tasks.status, 'expected_count',
       (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
       (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END),
       'actual_count', COUNT(terminals.transaction_id))
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = snapshots.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release')
     AND terminals.wallet_user_id = snapshots.user_id
-    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
-  GROUP BY snapshots.user_id, tasks.task_id, tasks.status, settlements.captured_credits, settlements.released_credits
+    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.public_id
+  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled')
+  GROUP BY snapshots.user_id, tasks.public_id, tasks.status, settlements.captured_credits, settlements.released_credits
   HAVING COUNT(terminals.transaction_id) <>
     (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
     (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END);
@@ -3303,36 +3303,6 @@ $$;
 
 
 --
--- Name: guard_task_submission_claim(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION guard_task_submission_claim() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  valid_claim BOOLEAN;
-BEGIN
-  IF TG_OP <> 'INSERT' THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB208', MESSAGE = 'task submission claims are immutable';
-  END IF;
-  SELECT EXISTS (
-    SELECT 1
-    FROM task_billing_snapshots snapshots
-    JOIN tasks ON tasks.task_id = snapshots.task_id
-    WHERE snapshots.task_id = NEW.task_id
-      AND snapshots.user_id = NEW.user_id
-      AND tasks.user_id = NEW.user_id
-      AND tasks.client_action_id = NEW.client_action_id
-  ) INTO valid_claim;
-  IF NOT valid_claim THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB209', MESSAGE = 'task submission claim does not match Task Billing facts';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: prevent_billing_admin_action_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3773,22 +3743,6 @@ CREATE TABLE task_billing_snapshots (
 
 
 --
--- Name: task_submission_claims; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE task_submission_claims (
-    user_id bigint NOT NULL,
-    client_action_id character varying(128) NOT NULL,
-    task_id character varying(64) NOT NULL,
-    request_hash character varying(64) NOT NULL,
-    created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT task_submission_claims_client_action_id_check CHECK ((btrim((client_action_id)::text) <> ''::text)),
-    CONSTRAINT task_submission_claims_request_hash_check CHECK (((request_hash)::text ~ '^[0-9a-f]{64}$'::text)),
-    CONSTRAINT task_submission_claims_user_id_check CHECK ((user_id > 0))
-);
-
-
---
 -- Name: billing_admin_actions billing_admin_actions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3862,22 +3816,6 @@ ALTER TABLE ONLY task_billing_snapshots
 
 
 --
--- Name: task_submission_claims task_submission_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_pkey PRIMARY KEY (user_id, client_action_id);
-
-
---
--- Name: task_submission_claims task_submission_claims_task_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_task_id_key UNIQUE (task_id);
-
-
---
 -- Name: idx_billing_admin_actions_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3943,13 +3881,6 @@ CREATE TRIGGER task_billing_snapshots_validate_insert BEFORE INSERT ON task_bill
 
 
 --
--- Name: task_submission_claims task_submission_claims_guard; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_submission_claims_guard BEFORE INSERT OR DELETE OR UPDATE ON task_submission_claims FOR EACH ROW EXECUTE FUNCTION guard_task_submission_claim();
-
-
---
 -- Name: billing_price_versions billing_price_versions_sku_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4006,14 +3937,6 @@ ALTER TABLE ONLY task_billing_snapshots
 
 ALTER TABLE ONLY task_billing_snapshots
     ADD CONSTRAINT task_billing_snapshots_sku_fkey FOREIGN KEY (sku) REFERENCES billing_skus(sku) ON UPDATE RESTRICT ON DELETE RESTRICT;
-
-
---
--- Name: task_submission_claims task_submission_claims_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_task_id_fkey FOREIGN KEY (task_id) REFERENCES task_billing_snapshots(task_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
 
 --

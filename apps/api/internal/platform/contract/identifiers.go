@@ -24,6 +24,10 @@ const (
 	PrefixAsset        = "asset_"
 	PrefixUpload       = "upload_"
 	PrefixEvent        = "evt_"
+	// Workspace billing account prefix (#804/#809). It matches the
+	// billing_accounts public_id CHECK (ba_%), so the postgres ensure
+	// path passes minted ids through opaquely.
+	PrefixBillingAccount = "ba_"
 	// Workspace library durable prefixes (#809). They match the
 	// library_folders / library_assets / library_materializations
 	// public_id CHECKs (lfolder_% / lasset_% / lmat_%), so the
@@ -44,6 +48,7 @@ var knownPrefixes = []string{
 	PrefixAsset,
 	PrefixUpload,
 	PrefixEvent,
+	PrefixBillingAccount,
 	PrefixLibraryFolder,
 	PrefixLibraryAsset,
 	PrefixLibraryMaterialization,
@@ -94,6 +99,9 @@ func IsUploadID(id string) bool { return IsValidPublicID(PrefixUpload, id) }
 
 // IsEventID reports whether id is a well-formed evt_ identifier.
 func IsEventID(id string) bool { return IsValidPublicID(PrefixEvent, id) }
+
+// IsBillingAccountID reports whether id is a well-formed ba_ identifier.
+func IsBillingAccountID(id string) bool { return IsValidPublicID(PrefixBillingAccount, id) }
 
 // IsLibraryFolderID reports whether id is a well-formed lfolder_ identifier.
 func IsLibraryFolderID(id string) bool { return IsValidPublicID(PrefixLibraryFolder, id) }
