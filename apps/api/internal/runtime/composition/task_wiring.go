@@ -40,6 +40,11 @@ type appTaskServices struct {
 	taskStatsService *taskstats.Service
 	userEvents       *events.UserEventHub
 	monitor          *taskqueue.RiverQueue
+	// workspaceTaskQueue carries the River client for the v1 workspace
+	// task surface (workspacetasks.Enqueuer). Built here where the
+	// riverClient exists; consumed by http_wiring.go. Nil only when the
+	// River client failed to build (startup already failed then).
+	workspaceTaskQueue *workspaceTaskEnqueuer
 }
 
 type appWorkerRuntime struct {
@@ -262,6 +267,10 @@ func newAppTaskRuntime(
 		taskService:      taskService,
 		taskStatsService: taskstats.NewService(legacyTasks),
 		userEvents:       userEventHub,
+		// #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
+		// production River client (workspace_task_execute kind; worker
+		// consumption is Phase-4b).
+		workspaceTaskQueue: newWorkspaceTaskEnqueuer(riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault),
 	}, appWorkerRuntime{
 		riverClient:  riverClient,
 		eventBus:     eventBus,

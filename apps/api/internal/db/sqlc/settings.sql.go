@@ -582,18 +582,12 @@ SET name = EXCLUDED.name,
     config = EXCLUDED.config,
     updated_by = EXCLUDED.updated_by,
     deleted_at = CASE WHEN EXCLUDED.status = 'deleted' THEN COALESCE(storage_profiles.deleted_at, now()) ELSE NULL END
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM media_assets
-    WHERE media_assets.storage_profile_id = storage_profiles.profile_id
-  )
-  OR (
+WHERE
     storage_profiles.provider = EXCLUDED.provider
     AND COALESCE(storage_profiles.config->>'endpoint', '') = COALESCE(EXCLUDED.config->>'endpoint', '')
     AND COALESCE(storage_profiles.config->>'bucket_name', '') = COALESCE(EXCLUDED.config->>'bucket_name', '')
     AND COALESCE(storage_profiles.config->>'region_id', '') = COALESCE(EXCLUDED.config->>'region_id', '')
     AND COALESCE(storage_profiles.config->>'force_path_style', 'false') = COALESCE(EXCLUDED.config->>'force_path_style', 'false')
-  )
 `
 
 type UpsertStorageProfileParams struct {
@@ -609,6 +603,10 @@ type UpsertStorageProfileParams struct {
 	UpdatedBy pgtype.Int8 `json:"updated_by"`
 }
 
+// #809 hard cut: the locator-immutability guard used to consult
+// media_assets.storage_profile_id, which no longer exists in the
+// workspace model (the prevent_referenced_storage_profile_locator_change
+// trigger was removed with it). Only same-locator updates may proceed.
 func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertStorageProfile,
 		arg.ProfileID,

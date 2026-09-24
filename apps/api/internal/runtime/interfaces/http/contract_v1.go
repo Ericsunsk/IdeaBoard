@@ -52,6 +52,17 @@ type ContractV1Deps struct {
 	TaskHolder WorkspaceTaskHolder
 	TaskQueue  WorkspaceTaskEnqueuer
 	TaskAssets WorkspaceTaskAssetReader
+	// Media is the workspace-scoped upload-session + media-asset
+	// surface (issue #803, restored in #820). Nil keeps the
+	// upload/media surface fail-closed with 501 until the postgres
+	// store lands; tests inject the in-memory implementation.
+	// MediaObjects reads stored bytes for the content/derivative
+	// endpoints (nil fails binary reads closed with 503 while
+	// metadata keeps working); MediaRenderer is the optional
+	// derivative renderer (nil skips generation, tiers stay pending).
+	Media         WorkspaceMediaStore
+	MediaObjects  WorkspaceMediaObjects
+	MediaRenderer v1MediaRenderer
 	// Events is the workspace event hot log + SSE replay window (issue
 	// #807). Nil normalizes to a process-local log; tests inject a
 	// fresh instance per engine for isolation.
@@ -161,12 +172,11 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
 	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
 	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
-	// Workspace upload sessions + media assets (issue #803) were
-	// removed with the legacy media workspaceuploads package (#809
-	// phase 3b-03, issue #813): the routes below stay unregistered
-	// until the workspace-scoped replacement lands, and unknown v1
-	// paths fail closed with 501. media.asset_ready and
-	// media.asset_archived are not emitted while the surface is down.
+	// Workspace upload sessions + media assets (issue #803, restored
+	// in #820): the routes below serve the workspace-scoped
+	// replacement; media.asset_ready and media.asset_archived emit
+	// after their commits.
+	handler.registerMediaRoutes(group)
 	handler.registerBoardRoutes(group)
 	handler.registerLibraryRoutes(group)
 	handler.registerSearchRoutes(group)

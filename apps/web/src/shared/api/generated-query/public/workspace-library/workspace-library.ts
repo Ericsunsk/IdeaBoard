@@ -308,7 +308,7 @@ export const getRenameWorkspaceLibraryFolderUrl = (workspaceId: string, folderId
 }
 
 /**
- * Malformed libf_ shapes (including legacy integer ids, which v1 never accepts), unknown ids, and cross-workspace ids converge to 404 library_folder_not_found. No Idempotency-Key is required.
+ * Malformed lfolder_ shapes (including legacy integer ids, which v1 never accepts), unknown ids, and cross-workspace ids converge to 404 library_folder_not_found. No Idempotency-Key is required.
  * @summary Rename a workspace library folder (members only)
  */
 export const renameWorkspaceLibraryFolder = async (
@@ -1248,7 +1248,7 @@ export const getGetWorkspaceLibraryMaterializationUrl = (
 }
 
 /**
- * Status-addressable job record (pending -> running -> completed|failed); terminal states are immutable. Malformed libm_ shapes and unknown ids converge to 404 library_materialization_not_found.
+ * Status-addressable job record (pending -> running -> completed|failed); terminal states are immutable. Malformed lmat_ shapes and unknown ids converge to 404 library_materialization_not_found.
  * @summary Get a library materialization job snapshot (members only)
  */
 export const getWorkspaceLibraryMaterialization = async (

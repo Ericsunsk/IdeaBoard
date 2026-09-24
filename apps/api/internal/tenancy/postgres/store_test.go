@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tenancy"
 	"ideaboard/api/internal/testdb"
@@ -154,7 +155,14 @@ func TestBillingAccountOwnerStubProvesSeam(t *testing.T) {
 		t.Fatalf("ensure personal workspace failed: %v", err)
 	}
 	queries := dbsqlc.New(db)
+	// The #804 hard cut requires a ba_-prefixed public_id on every billing
+	// account row; mint one through the contract kernel like production code.
+	billingPublicID, err := contract.MintPublicID("ba_", 12)
+	if err != nil {
+		t.Fatalf("mint billing account public id failed: %v", err)
+	}
 	stub, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
+		PublicID:    billingPublicID,
 		WorkspaceID: dbutil.NullInt64(&workspace.InternalID),
 	})
 	if err != nil {

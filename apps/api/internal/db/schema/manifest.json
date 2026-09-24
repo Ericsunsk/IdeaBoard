@@ -6,11 +6,12 @@
     {"name": "organization", "path": "fragments/organization.sql", "depends_on": ["identity"]},
     {"name": "workspace", "path": "fragments/workspace.sql", "depends_on": ["identity", "organization"]},
     {"name": "credits", "path": "fragments/credits.sql", "depends_on": ["identity"]},
-    {"name": "account_pool", "path": "fragments/account_pool.sql", "depends_on": ["identity"]},
     {"name": "platform", "path": "fragments/platform.sql", "depends_on": ["identity"]},
-    {"name": "tasks", "path": "fragments/tasks.sql", "depends_on": ["identity", "account_pool"]},
-    {"name": "media", "path": "fragments/media.sql", "depends_on": ["identity", "tasks"]},
+    {"name": "account_pool", "path": "fragments/account_pool.sql", "depends_on": ["identity", "platform"]},
+    {"name": "media", "path": "fragments/media.sql", "depends_on": ["identity"]},
+    {"name": "tasks", "path": "fragments/tasks.sql", "depends_on": ["identity", "account_pool", "media"]},
     {"name": "library", "path": "fragments/library.sql", "depends_on": ["identity", "media"]},
+    {"name": "events", "path": "fragments/events.sql", "depends_on": ["identity", "workspace"]},
     {"name": "search", "path": "fragments/search.sql", "depends_on": ["identity", "credits"]},
     {"name": "usage", "path": "fragments/usage.sql", "depends_on": ["tasks"]},
     {"name": "workflow", "path": "fragments/workflow.sql", "depends_on": ["platform"]},
@@ -18,6 +19,7 @@
     {"name": "rewards", "path": "fragments/rewards.sql", "depends_on": ["identity", "credits"]},
     {"name": "billing", "path": "fragments/billing.sql", "depends_on": ["credits"]},
     {"name": "payments", "path": "fragments/payments.sql", "depends_on": ["identity", "credits", "billing"]},
+    {"name": "control_audit", "path": "fragments/control_audit.sql", "depends_on": ["identity"]},
     {"name": "integrity", "path": "fragments/integrity.sql", "depends_on": ["identity", "boards", "media", "tasks", "credits", "payments"]},
     {"name": "bootstrap", "path": "fragments/bootstrap.sql", "depends_on": ["platform", "integrity"]}
   ]

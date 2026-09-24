@@ -299,7 +299,7 @@ func TestV1VisionQueryLifecycle(t *testing.T) {
 			Provider: "unsplash", SourceID: "v1",
 			SourceURL: v1TestAssetURL, PreviewURL: v1TestAssetURL, OriginalURL: v1TestAssetURL,
 			Title: "dunes", Width: 100, Height: 80,
-		}}, "liba_visionref000000001")
+		}}, "lasset_visionref000000001")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +366,7 @@ func TestV1VisionQueryLifecycle(t *testing.T) {
 		library.V1SaveAssetInput{Asset: library.AssetInput{
 			Provider: "unsplash", SourceID: "foreign",
 			SourceURL: v1TestAssetURL, PreviewURL: v1TestAssetURL, OriginalURL: v1TestAssetURL,
-		}}, "liba_foreign00000000001")
+		}}, "lasset_foreign00000000001")
 	if err != nil {
 		t.Fatal(err)
 	}

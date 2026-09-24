@@ -41,9 +41,12 @@ import (
 // (media_assets with public_id asset_%), so every ingestion/read method below
 // that depended on them fails closed. Derivative-tier methods that still map
 // to the surviving media_derivatives queries (GetMediaDerivativeByAssetTier,
-// GetProcessingInputManifestObject,
+// ListMediaAssetSources, UpsertMediaAssetSource) stay live. Queries that
+// JOINed the replaced user-scoped media_assets columns
+// (GetProcessingInputManifestObject,
 // GetReadyMediaDerivativeStorageLocationByAssetID, ListMediaDerivativesByAsset,
-// UpsertMediaDerivative, UpsertMediaAssetSource) stay live. The
+// UpsertMediaDerivative, MarkMediaDerivativeReady) were removed with the
+// #809 schema repair; their Go call sites fail closed below. The
 // workspace-scoped media asset store lands in Phase 4; until then legacy
 // upload/ingestion paths (/api/user boards uploads, preparation,
 // library materialization) fail closed through these stubs.
@@ -157,41 +160,8 @@ func (r *MediaAssetRegistry) resolveManifestRefs(ctx context.Context, userID int
 	return resolved, nil
 }
 
-func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int64, ref tasks.MediaRef) (tasks.TaskInputManifestRef, error) {
-	if ref.AssetID <= 0 {
-		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaNotFound, "media.manifest.resolve", "invalid asset id", nil)
-	}
-	row, err := r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
-	if database.IsNotFound(err) {
-		// Assets whose processing-input was never materialized (e.g. task
-		// outputs created before their first chained use) render it on
-		// demand here instead of failing the submission.
-		if r.processingInputMaterializer == nil {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
-		}
-		if materializeErr := r.processingInputMaterializer(ctx, ref.AssetID, userID); materializeErr != nil {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", materializeErr)
-		}
-		row, err = r.q.GetProcessingInputManifestObject(ctx, dbsqlc.GetProcessingInputManifestObjectParams{MediaAssetID: ref.AssetID, OwnerUserID: userID})
-		if database.IsNotFound(err) {
-			return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeMediaProcessing, "media.manifest.resolve", "processing-input derivative is not ready", err)
-		}
-	}
-	if err != nil {
-		return tasks.TaskInputManifestRef{}, mediaerrors.New(mediaerrors.CodeStorageTransient, "media.manifest.resolve", "load processing-input derivative failed", err)
-	}
-	if r.integrityVerifier == nil {
-		return tasks.TaskInputManifestRef{}, fmt.Errorf("media integrity verifier is unavailable")
-	}
-	if err := r.integrityVerifier.Verify(ctx, row.StorageProfileID, row.StorageKey, row.ChecksumSha256, row.MimeType, row.SizeBytes); err != nil {
-		return tasks.TaskInputManifestRef{}, err
-	}
-	return tasks.TaskInputManifestRef{
-		AssetID: row.AssetID, DerivativeID: row.DerivativeID, DerivativeTier: row.Tier,
-		StorageProfileID: row.StorageProfileID, ObjectKey: row.StorageKey,
-		ObjectGeneration: row.ObjectGeneration, ChecksumSHA256: row.ChecksumSha256,
-		MIMEType: row.MimeType, SizeBytes: row.SizeBytes, Role: ref.Role, Weight: ref.Weight,
-	}, nil
+func (r *MediaAssetRegistry) resolveManifestRef(_ context.Context, _ int64, _ tasks.MediaRef) (tasks.TaskInputManifestRef, error) {
+	return tasks.TaskInputManifestRef{}, errLegacyMediaAssetsRemoved
 }
 
 func (r *MediaAssetRegistry) GetByAssetID(_ context.Context, _ int64, _ string) (dbsqlc.MediaAsset, error) {
@@ -228,13 +198,8 @@ func (r *MediaAssetRegistry) RetireMissingOwnedMediaAsset(_ context.Context, _, 
 	return errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
-		return nil, fmt.Errorf("invalid media derivative lookup")
-	}
-	return r.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
-		MediaAssetID: assetID, OwnerUserID: ownerUserID,
-	})
+func (r *MediaAssetRegistry) ListDerivatives(_ context.Context, _, _ int64) ([]dbsqlc.MediaDerivative, error) {
+	return nil, errLegacyMediaAssetsRemoved
 }
 
 func ingestionMetadata(origin ingestion.OriginFacts, completion ingestion.Completion) ([]byte, error) {
@@ -281,21 +246,8 @@ func (r *MediaAssetRegistry) LocateStoredUpload(_ context.Context, _ ports.Store
 	return ports.StoredUploadLocation{}, false, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error) {
-	if r == nil || r.q == nil || lookup.AssetID <= 0 || strings.TrimSpace(lookup.Tier) == "" {
-		return ports.StoredUploadLocation{}, false, fmt.Errorf("invalid media derivative lookup")
-	}
-	row, err := r.q.GetReadyMediaDerivativeStorageLocationByAssetID(ctx, dbsqlc.GetReadyMediaDerivativeStorageLocationByAssetIDParams{
-		MediaAssetID: lookup.AssetID,
-		Tier:         strings.TrimSpace(lookup.Tier),
-	})
-	if database.IsNotFound(err) {
-		return ports.StoredUploadLocation{}, false, nil
-	}
-	if err != nil {
-		return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media derivative: %w", err)
-	}
-	return ports.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+func (r *MediaAssetRegistry) LocateStoredDerivative(_ context.Context, _ ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error) {
+	return ports.StoredUploadLocation{}, false, errLegacyMediaAssetsRemoved
 }
 
 func (r *MediaAssetRegistry) ValidateProcessingInputReadiness(ctx context.Context, userID int64, assetIDs []int64) error {

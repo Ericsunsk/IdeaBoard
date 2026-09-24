@@ -14,8 +14,11 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
+	"ideaboard/api/internal/library"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
+	"ideaboard/api/internal/media/workspacemedia"
+	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
@@ -98,6 +101,7 @@ func newAppRouter(
 	// reader lands; the v1 vision flow resolves refs via the workspace store.
 	visionHandler := searchhttp.NewVisionHandler(visionService, searchhttp.NewVisionInputReader(nil))
 	visionHandler.SetBillingService(searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, visionService))
+	mediaService := workspacemedia.NewService(repos.db)
 
 	router := gin.New()
 	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
@@ -113,9 +117,36 @@ func newAppRouter(
 		ContractV1: httpapi.ContractV1Deps{
 			Store: tenancypg.NewStore(repos.db),
 			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
-			// #813 (#809 phase 3b-03): the workspace upload/media
-			// surface is unregistered while its replacement lands;
-			// unknown v1 upload/media paths fail closed with 501.
+			// #818 (#809 Phase 4-01): workspace-scoped library postgres
+			// store. Folder/asset routes are live; materialization
+			// stays fail-closed (503) until its Media/billing adapters
+			// land in #820.
+			// #820 (#809 Phase 4-03): workspace-scoped media postgres
+			// store. Upload/media routes are live; binary reads ride
+			// the storage service, derivative generation runs
+			// best-effort without a renderer (tiers stay pending).
+			Library: httpapi.ContractV1LibraryDeps{Store: library.NewService(repos.db)},
+			Media:   mediaService,
+			// Binary reads ride the storage service (missing bytes
+			// fail closed per endpoint); the derivative renderer
+			// stays nil until the rendering seam lands, so
+			// generation is skipped while metadata keeps working.
+			MediaObjects: services.storageService,
+			// #821 (#809 Phase 4-04): workspace-scoped task postgres
+			// store + production settlement adapters. Task routes
+			// are live: Quote via the billing catalog, Hold/Capture/
+			// Release via credits.Commands, enqueue via the River
+			// client (workspace_task_execute kind; worker consumption
+			// is Phase-4b), input/output asset gates via the media
+			// TaskAssetAdapter. Settlement is compensating
+			// (Quote->Hold->Insert->Enqueue with Release/Delete
+			// rollback), not yet a single shared PG transaction;
+			// see workspace_task_adapters.go.
+			Tasks:      taskpostgres.NewStore(repos.db),
+			TaskQuoter: &workspaceTaskQuoter{catalog: services.billingCatalog},
+			TaskHolder: newWorkspaceTaskHolder(services.creditService),
+			TaskQueue:  taskServices.workspaceTaskQueue,
+			TaskAssets: &workspacemedia.TaskAssetAdapter{Store: mediaService},
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning

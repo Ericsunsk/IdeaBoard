@@ -16,7 +16,10 @@ CREATE TABLE workspaces (
   archived_at TIMESTAMPTZ NULL,
   CONSTRAINT uq_workspaces_public_id UNIQUE (public_id),
   CONSTRAINT chk_workspaces_public_id CHECK (public_id LIKE 'ws\_%'),
-  CONSTRAINT chk_workspaces_owner CHECK (organization_id IS NOT NULL OR owner_user_id IS NOT NULL)
+  CONSTRAINT chk_workspaces_owner_xor CHECK (
+    (organization_id IS NOT NULL AND owner_user_id IS NULL)
+    OR (organization_id IS NULL AND owner_user_id IS NOT NULL)
+  )
 );
 
 -- Personal workspace idempotency: at most one live personal Workspace per user.
@@ -33,19 +36,24 @@ CREATE TABLE workspace_memberships (
 
 CREATE INDEX idx_workspace_memberships_user ON workspace_memberships (user_id, workspace_id);
 
--- Billing Account owner stub (#801). The full Billing Account lifecycle
--- (identity, wallet binding, provider state) belongs to #804. This stub only
--- reserves the owner columns so workspace/organization work converges without
--- inventing the billing contract: a Billing Account is owned by a Workspace
--- (initial owner) or by an Organization.
+-- Billing Account foundation (#804). A Billing Account is owned by exactly
+-- one Workspace (initial owner) or exactly one Organization. The public_id
+-- is the API-facing identifier per contract kernel (#800).
 CREATE TABLE billing_accounts (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
   workspace_id BIGINT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   organization_id BIGINT NULL REFERENCES organizations(internal_id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_billing_accounts_owner CHECK (workspace_id IS NOT NULL OR organization_id IS NOT NULL)
+  CONSTRAINT uq_billing_accounts_public_id UNIQUE (public_id),
+  CONSTRAINT chk_billing_accounts_public_id CHECK (public_id LIKE 'ba\_%'),
+  CONSTRAINT chk_billing_accounts_owner_xor CHECK (
+    (workspace_id IS NOT NULL AND organization_id IS NULL)
+    OR (workspace_id IS NULL AND organization_id IS NOT NULL)
+  )
 );
 
-CREATE INDEX idx_billing_accounts_workspace ON billing_accounts (workspace_id) WHERE workspace_id IS NOT NULL;
-CREATE INDEX idx_billing_accounts_organization ON billing_accounts (organization_id) WHERE organization_id IS NOT NULL;
+-- 1:1 relationship: each workspace has exactly one billing account
+CREATE UNIQUE INDEX ux_billing_accounts_workspace ON billing_accounts (workspace_id) WHERE workspace_id IS NOT NULL;
+CREATE UNIQUE INDEX ux_billing_accounts_organization ON billing_accounts (organization_id) WHERE organization_id IS NOT NULL;

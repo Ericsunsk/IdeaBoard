@@ -33,6 +33,8 @@ tags:
     description: Workspace-scoped async task lifecycle (submit, read, cancel, outputs, quotes).
   - name: WorkspaceLibrary
     description: Workspace-scoped library folders, saved provider references, and materializations.
+  - name: WorkspaceMedia
+    description: Workspace-scoped upload sessions, media assets, and derivatives.
   - name: WorkspaceSearch
     description: Workspace-scoped provider search and vision queries.
 paths:
@@ -1646,6 +1648,306 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/uploads:
+    post:
+      tags: [WorkspaceMedia]
+      operationId: createWorkspaceUpload
+      summary: Declare a workspace upload session (members only, 201)
+      description: >-
+        Reserves a server-side slot for one upload (same-origin-slot
+        target). Completion echoes the declaration and materializes the
+        media asset. Requires the Idempotency-Key header (scope
+        upload:create): key reuse with a different request renders 409
+        upload_idempotency_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadRequest'
+      responses:
+        '201':
+          description: Upload session declared.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: State conflict or idempotency conflict (upload_state_conflict, upload_idempotency_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/uploads/{upload_id}:
+    get:
+      tags: [WorkspaceMedia]
+      operationId: getWorkspaceUpload
+      summary: Get a workspace upload session (members only)
+      description: >-
+        Resolves one upload session. Malformed upload_ shapes, unknown
+        ids, and cross-workspace ids converge to 404 upload_not_found;
+        expired sessions render 410 upload_expired.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UploadId'
+      responses:
+        '200':
+          description: Upload session.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Upload session expired (upload_expired).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/uploads/{upload_id}/complete:
+    post:
+      tags: [WorkspaceMedia]
+      operationId: completeWorkspaceUpload
+      summary: Complete a workspace upload session (members only, 200 + asset)
+      description: >-
+        Verifies the completion echo against the declaration and
+        materializes the media asset atomically. Requires the
+        Idempotency-Key header (scope upload:complete): key reuse with
+        a different request renders 409 upload_idempotency_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/UploadId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteUploadRequest'
+      responses:
+        '200':
+          description: Upload completed with its media asset.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteUploadEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: State conflict or idempotency conflict (upload_state_conflict, upload_idempotency_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '410':
+          description: Upload session expired (upload_expired).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /workspaces/{workspace_id}/media-assets:
+    get:
+      tags: [WorkspaceMedia]
+      operationId: listWorkspaceMediaAssets
+      summary: List workspace media assets with cursor pagination (members only)
+      description: >-
+        Lists live workspace media assets newest-first. Unknown
+        workspaces list empty at the store layer; non-members converge
+        to 404 workspace_not_found at the handler gate.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated media asset list.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMediaAssets'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/media-assets/{asset_id}:
+    get:
+      tags: [WorkspaceMedia]
+      operationId: getWorkspaceMediaAsset
+      summary: Get a workspace media asset (members only)
+      description: >-
+        Resolves one media asset. Malformed asset_ shapes, unknown ids,
+        and cross-workspace ids converge to 404 media_not_found.
+        Archived assets stay readable (archived_at set).
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Media asset metadata.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAssetEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspace_id}/media-assets/{asset_id}/content:
+    get:
+      tags: [WorkspaceMedia]
+      operationId: contentWorkspaceMediaAsset
+      summary: Read workspace media asset bytes (members only)
+      description: >-
+        Serves the stored bytes (never the JSON envelope, never storage
+        keys). Errors are plain non-JSON statuses: archived assets 410,
+        non-ready assets 409, missing bytes 404/503.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Media bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          description: Media asset archived (media_archived).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant}:
+    get:
+      tags: [WorkspaceMedia]
+      operationId: derivativeWorkspaceMediaAsset
+      summary: Read a workspace media asset derivative (members only)
+      description: >-
+        Serves one generation-matched stored derivative row. Tiers
+        without a stored row stay 409 until generation materializes
+        them; there is no imgproxy pull-through on the v1 path.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+        - name: variant
+          in: path
+          required: true
+          description: Display tier variant.
+          schema:
+            type: string
+            enum: [thumb, preview, large-preview]
+      responses:
+        '200':
+          description: Derivative bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workspaces/{workspace_id}/media-assets/{asset_id}/archive:
+    post:
+      tags: [WorkspaceMedia]
+      operationId: archiveWorkspaceMediaAsset
+      summary: Archive a workspace media asset (owner/admin only, 200)
+      description: >-
+        Stamps the archive lifecycle marker. Repeat archives converge on
+        the stored row so idempotent replays never 404. Requires the
+        Idempotency-Key header (scope media:archive): key reuse with a
+        different request renders 409 media_idempotency_conflict.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Archived media asset metadata.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaAssetEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Idempotency conflict (media_idempotency_conflict).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /workspaces/{workspace_id}/library/folders:
     get:
       tags: [WorkspaceLibrary]
@@ -1719,7 +2021,7 @@ paths:
       operationId: renameWorkspaceLibraryFolder
       summary: Rename a workspace library folder (members only)
       description: >-
-        Malformed libf_ shapes (including legacy integer ids, which v1
+        Malformed lfolder_ shapes (including legacy integer ids, which v1
         never accepts), unknown ids, and cross-workspace ids converge to
         404 library_folder_not_found. No Idempotency-Key is required.
       parameters:
@@ -1798,7 +2100,7 @@ paths:
         - name: folder_id
           in: query
           required: false
-          description: Filter to one libf_ folder.
+          description: Filter to one lfolder_ folder.
           schema:
             type: string
       responses:
@@ -2033,7 +2335,7 @@ paths:
       description: >-
         Status-addressable job record (pending -> running ->
         completed|failed); terminal states are immutable. Malformed
-        libm_ shapes and unknown ids converge to 404
+        lmat_ shapes and unknown ids converge to 404
         library_materialization_not_found.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -2120,7 +2422,7 @@ paths:
       operationId: createWorkspaceVisionQuery
       summary: File a vision query from text plus owned library refs (members only)
       description: >-
-        Inputs reference owned workspace library assets by liba_ id
+        Inputs reference owned workspace library assets by lasset_ id
         (resolved server-side; unknown, malformed, or cross-workspace
         refs converge to 404 library_asset_not_found); client bytes
         never cross this boundary, so there is no multipart surface.
@@ -2319,21 +2621,21 @@ components:
       name: folder_id
       in: path
       required: true
-      description: Opaque libf_ library folder identifier (malformed shapes, including legacy integer ids, converge to 404 library_folder_not_found).
+      description: Opaque lfolder_ library folder identifier (malformed shapes, including legacy integer ids, converge to 404 library_folder_not_found).
       schema:
         $ref: '#/components/schemas/LibraryFolderId'
     LibraryAssetId:
       name: asset_id
       in: path
       required: true
-      description: Opaque liba_ library asset identifier (malformed shapes, including legacy integer ids, converge to 404 library_asset_not_found).
+      description: Opaque lasset_ library asset identifier (malformed shapes, including legacy integer ids, converge to 404 library_asset_not_found).
       schema:
         $ref: '#/components/schemas/LibraryAssetId'
     MaterializationId:
       name: materialization_id
       in: path
       required: true
-      description: Opaque libm_ materialization job identifier (malformed shapes converge to 404 library_materialization_not_found).
+      description: Opaque lmat_ materialization job identifier (malformed shapes converge to 404 library_materialization_not_found).
       schema:
         $ref: '#/components/schemas/LibraryMaterializationId'
   headers:
@@ -3540,15 +3842,15 @@ components:
           $ref: '#/components/schemas/WorkspaceCheckoutSession'
     LibraryFolderId:
       type: string
-      pattern: '^libf_[A-Za-z0-9]+$'
+      pattern: '^lfolder_[A-Za-z0-9]+$'
       description: Opaque public library folder identifier.
     LibraryAssetId:
       type: string
-      pattern: '^liba_[A-Za-z0-9]+$'
+      pattern: '^lasset_[A-Za-z0-9]+$'
       description: Opaque public library asset identifier.
     LibraryMaterializationId:
       type: string
-      pattern: '^libm_[A-Za-z0-9]+$'
+      pattern: '^lmat_[A-Za-z0-9]+$'
       description: Opaque public library materialization job identifier.
     VisionQueryId:
       type: string
@@ -3703,6 +4005,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WorkspaceTask'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    PaginatedMediaAssets:
+      type: object
+      required: [data, meta]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAsset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     CreateWorkspaceTaskRequest:
@@ -3973,7 +4286,7 @@ components:
           properties:
             folder_id:
               type: string
-              description: Target libf_ folder; empty unfiles the asset.
+              description: Target lfolder_ folder; empty files the asset into Quick Saves.
     ResolveLibraryAssetItem:
       type: object
       required: [provider]

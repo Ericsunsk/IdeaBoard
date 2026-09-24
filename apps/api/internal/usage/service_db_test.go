@@ -46,11 +46,8 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 		"usage-free-pending",
 	}
 	billingWriter, request := newDurableUsageBilling(t, ctx, pool, creditService)
-	seedDurableUsageSnapshots(t, ctx, db, pool, billingWriter, request, userID, taskIDs)
-	seedDurableUsageSnapshots(t, ctx, db, pool, billingWriter, request, 902, []string{"usage-other-user"})
-	setUsageTaskStatus(t, ctx, db, taskIDs[0], "completed")
-	setUsageTaskStatus(t, ctx, db, taskIDs[1], "failed")
-	setUsageTaskStatus(t, ctx, db, taskIDs[2], "cancelled")
+	seedDurableUsageSnapshots(t, ctx, pool, billingWriter, request, userID, taskIDs)
+	seedDurableUsageSnapshots(t, ctx, pool, billingWriter, request, 902, []string{"usage-other-user"})
 
 	newUsageService := func() *Service {
 		return NewService(creditService, taskbilling.NewUsageStore(db), ServiceOptions{Now: func() time.Time {
@@ -148,7 +145,6 @@ func usageCreditMetadata(key string) domain.CommandMetadata {
 func seedDurableUsageSnapshots(
 	t *testing.T,
 	ctx context.Context,
-	db *pgxpool.Pool,
 	pool *pgxpool.Pool,
 	billingWriter *taskbilling.Service,
 	request taskbilling.Request,
@@ -157,7 +153,6 @@ func seedDurableUsageSnapshots(
 ) {
 	t.Helper()
 	for _, taskID := range taskIDs {
-		seedUsageTask(t, ctx, db, taskID, userID)
 		tx, err := pool.Begin(ctx)
 		if err != nil {
 			t.Fatalf("begin task billing fixture: %v", err)
@@ -202,32 +197,5 @@ func usagePriceInput(sku billing.SKU, displayName string, unitCredits int64) bil
 		},
 		UnitCredits: unitCredits,
 		ActorID:     1,
-	}
-}
-
-func seedUsageTask(t *testing.T, ctx context.Context, db *pgxpool.Pool, taskID string, userID int64) {
-	t.Helper()
-	if _, err := db.Exec(ctx, `
-INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result, created_at, updated_at)
-VALUES ($1, $2, 'usage task', 'usage task', '{}', 'pending', '', '', clock_timestamp(), clock_timestamp())`, taskID, userID); err != nil {
-		t.Fatalf("seed task %s: %v", taskID, err)
-	}
-}
-
-func setUsageTaskStatus(t *testing.T, ctx context.Context, db *pgxpool.Pool, taskID, status string) {
-	t.Helper()
-	var query string
-	switch status {
-	case "completed":
-		query = `UPDATE tasks SET status = 'completed', completed_at = clock_timestamp() WHERE task_id = $1`
-	case "failed":
-		query = `UPDATE tasks SET status = 'failed', error_msg = 'fixture failure', completed_at = clock_timestamp() WHERE task_id = $1`
-	case "cancelled":
-		query = `UPDATE tasks SET status = 'cancelled', completed_at = clock_timestamp(), cancelled_at = clock_timestamp(), cancel_reason = 'fixture cancellation' WHERE task_id = $1`
-	default:
-		t.Fatalf("unsupported fixture status %q", status)
-	}
-	if _, err := db.Exec(ctx, query, taskID); err != nil {
-		t.Fatalf("set task %s status %s: %v", taskID, status, err)
 	}
 }

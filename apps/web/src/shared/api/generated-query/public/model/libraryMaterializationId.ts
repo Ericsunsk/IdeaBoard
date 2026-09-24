@@ -16,6 +16,6 @@
 
 /**
  * Opaque public library materialization job identifier.
- * @pattern ^libm_[A-Za-z0-9]+$
+ * @pattern ^lmat_[A-Za-z0-9]+$
  */
 export type LibraryMaterializationId = string

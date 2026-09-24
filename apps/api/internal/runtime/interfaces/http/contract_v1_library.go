@@ -20,7 +20,7 @@ package httpapi
 // Auth model: ResolvePrincipal + RequireWorkspaceCapability for the
 // explicit workspace context. Any workspace member reads and writes;
 // outsiders (no membership) converge to 404 workspace_not_found.
-// Resource ids are libf_/liba_/libm_ opaque segments: malformed shapes
+// Resource ids are lfolder_/lasset_/lmat_ opaque segments: malformed shapes
 // (including legacy integer ids, which v1 never accepts), unknown ids,
 // and cross-workspace ids converge to the matching *_not_found 404
 // (Baseline 4 anti-enumeration). Integer-ID tolerance removal from the
@@ -182,6 +182,8 @@ func renderLibraryError(c *gin.Context, err error) {
 			"单次最多解析 20 条", contract.FieldErrors{Fields: map[string]string{"items": "too_many"}})
 	case errors.Is(err, library.ErrV1FolderNameConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "同名文件夹已存在")
+	case errors.Is(err, library.ErrSystemFolderImmutable):
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "系统文件夹不可操作")
 	case errors.Is(err, library.ErrInvalidFolderName):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			"文件夹名称非法", contract.FieldErrors{Fields: map[string]string{"name": "invalid"}})
@@ -1052,28 +1054,28 @@ func (h *contractV1Handler) getLibraryMaterialization(c *gin.Context) {
 //	  get: {operationId: listWorkspaceLibraryFolders, parameters: [WorkspaceId, Cursor, PageSize]}
 //	  post: {operationId: createWorkspaceLibraryFolder, parameters: [WorkspaceId, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/folders/{folder_id}:
-//	  patch: {operationId: renameWorkspaceLibraryFolder, parameters: [WorkspaceId, {name: folder_id, in: path, required: true, schema: {type: string, pattern: '^libf_'}}]}
+//	  patch: {operationId: renameWorkspaceLibraryFolder, parameters: [WorkspaceId, {name: folder_id, in: path, required: true, schema: {type: string, pattern: '^lfolder_'}}]}
 //	  delete: {operationId: deleteWorkspaceLibraryFolder, parameters: [WorkspaceId, {folder_id path}, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/assets:
 //	  get: {operationId: listWorkspaceLibraryAssets, parameters: [WorkspaceId, Cursor, PageSize, {name: folder_id, in: query, schema: {type: string}}]}
 //	  post: {operationId: saveWorkspaceLibraryAsset, parameters: [WorkspaceId, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/assets/{asset_id}:
-//	  patch: {operationId: moveWorkspaceLibraryAsset, parameters: [WorkspaceId, {name: asset_id, in: path, required: true, schema: {type: string, pattern: '^liba_'}}]}
+//	  patch: {operationId: moveWorkspaceLibraryAsset, parameters: [WorkspaceId, {name: asset_id, in: path, required: true, schema: {type: string, pattern: '^lasset_'}}]}
 //	  delete: {operationId: deleteWorkspaceLibraryAsset, parameters: [WorkspaceId, {asset_id path}, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/asset-resolutions:
 //	  post: {operationId: resolveWorkspaceLibraryAssets, parameters: [WorkspaceId]}
 //	/workspaces/{workspace_id}/library/materializations:
 //	  post: {operationId: createWorkspaceLibraryMaterialization, parameters: [WorkspaceId, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/materializations/{materialization_id}:
-//	  get: {operationId: getWorkspaceLibraryMaterialization, parameters: [WorkspaceId, {name: materialization_id, in: path, required: true, schema: {type: string, pattern: '^libm_'}}]}
+//	  get: {operationId: getWorkspaceLibraryMaterialization, parameters: [WorkspaceId, {name: materialization_id, in: path, required: true, schema: {type: string, pattern: '^lmat_'}}]}
 //
 // Schemas (assets are provider URL + source metadata only, never bytes):
 //
-//	LibraryFolder: {id: {pattern: '^libf_'}, workspace_id, name: {minLength: 1, maxLength: 100}, created_at: date-time, updated_at: date-time}
-//	LibraryAsset: {id: {pattern: '^liba_'}, workspace_id, folder_id?: {pattern: '^libf_'}, provider: {enum: [unsplash, pexels]}, source_id, source_url: uri, preview_url: uri, original_url: uri, title?, author?, width: int32>=0, height: int32>=0, created_at, updated_at}
+//	LibraryFolder: {id: {pattern: '^lfolder_'}, workspace_id, name: {minLength: 1, maxLength: 100}, created_at: date-time, updated_at: date-time}
+//	LibraryAsset: {id: {pattern: '^lasset_'}, workspace_id, folder_id?: {pattern: '^lfolder_'}, provider: {enum: [unsplash, pexels]}, source_id, source_url: uri, preview_url: uri, original_url: uri, title?, author?, width: int32>=0, height: int32>=0, created_at, updated_at}
 //	SaveLibraryAssetRequest: {data: {provider, source_id, source_url?: uri, preview_url?: uri, original_url?: uri, title?, author?, width?, height?, folder_id?}} (dedup on provider+source_id: 200 existing vs 201 created)
 //	ResolveLibraryAssetsRequest: {data: {items: {type: array, maxItems: 20, items: {provider, source_id?, source_url?}}}}; ResolveLibraryAssetsResponse: {items: [{provider, source_id?, status: {enum: [resolved, unresolved]}, asset?: LibraryAsset}]}
-//	LibraryMaterialization: {id: {pattern: '^libm_'}, workspace_id, library_asset_id: {pattern: '^liba_'}, status: {enum: [pending, running, completed, failed]}, media_asset_id?: {pattern: '^asset_'}, error_code?, error_message?, replayed?: boolean, created_at, updated_at}
+//	LibraryMaterialization: {id: {pattern: '^lmat_'}, workspace_id, library_asset_id: {pattern: '^lasset_'}, status: {enum: [pending, running, completed, failed]}, media_asset_id?: {pattern: '^asset_'}, error_code?, error_message?, replayed?: boolean, created_at, updated_at}
 //
 // Error codes frozen: library_folder_not_found (404), library_asset_not_found (404),
 // library_materialization_not_found (404), library_idempotency_conflict (409); reused kernel codes

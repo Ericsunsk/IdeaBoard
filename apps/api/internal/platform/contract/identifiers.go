@@ -24,6 +24,14 @@ const (
 	PrefixAsset        = "asset_"
 	PrefixUpload       = "upload_"
 	PrefixEvent        = "evt_"
+	// Workspace library durable prefixes (#809). They match the
+	// library_folders / library_assets / library_materializations
+	// public_id CHECKs (lfolder_% / lasset_% / lmat_%), so the
+	// postgres store passes minted ids through opaquely. The compact
+	// libf_/liba_/libm_ shapes from the #806 additive phase are retired.
+	PrefixLibraryFolder          = "lfolder_"
+	PrefixLibraryAsset           = "lasset_"
+	PrefixLibraryMaterialization = "lmat_"
 )
 
 // knownPrefixes lists every kernel prefix for PrefixOf.
@@ -36,6 +44,9 @@ var knownPrefixes = []string{
 	PrefixAsset,
 	PrefixUpload,
 	PrefixEvent,
+	PrefixLibraryFolder,
+	PrefixLibraryAsset,
+	PrefixLibraryMaterialization,
 }
 
 // IsValidPublicID reports whether id carries prefix with a non-empty
@@ -83,6 +94,17 @@ func IsUploadID(id string) bool { return IsValidPublicID(PrefixUpload, id) }
 
 // IsEventID reports whether id is a well-formed evt_ identifier.
 func IsEventID(id string) bool { return IsValidPublicID(PrefixEvent, id) }
+
+// IsLibraryFolderID reports whether id is a well-formed lfolder_ identifier.
+func IsLibraryFolderID(id string) bool { return IsValidPublicID(PrefixLibraryFolder, id) }
+
+// IsLibraryAssetID reports whether id is a well-formed lasset_ identifier.
+func IsLibraryAssetID(id string) bool { return IsValidPublicID(PrefixLibraryAsset, id) }
+
+// IsLibraryMaterializationID reports whether id is a well-formed lmat_ identifier.
+func IsLibraryMaterializationID(id string) bool {
+	return IsValidPublicID(PrefixLibraryMaterialization, id)
+}
 
 // MintPublicID mints an opaque public identifier with the given prefix and
 // nbytes of crypto randomness (hex-encoded). It is the single mint behind

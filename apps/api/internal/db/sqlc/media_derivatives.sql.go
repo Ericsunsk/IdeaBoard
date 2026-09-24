@@ -10,6 +10,7 @@ import (
 )
 
 const deleteMediaDerivativesByAsset = `-- name: DeleteMediaDerivativesByAsset :exec
+
 DELETE FROM media_derivatives
 WHERE media_asset_id = $1
   AND owner_user_id = $2
@@ -20,6 +21,19 @@ type DeleteMediaDerivativesByAssetParams struct {
 	OwnerUserID  int64 `json:"owner_user_id"`
 }
 
+// Legacy media derivative queries (#809 schema repair).
+//
+// The generated media_derivatives.sql.go output survived Phase 3b without its
+// query source, which breaks the schema-release sqlc drift check. This file
+// restores the source for the queries that still validate against the
+// workspace schema: they touch only the retained legacy shells
+// (media_derivatives, media_asset_sources) and never the replaced
+// user-scoped media_assets columns. Queries that JOINed the old
+// media_assets(id, owner_user_id, status, object_generation, deleted_at)
+// shape (GetProcessingInputManifestObject,
+// GetReadyMediaDerivativeStorageLocationByAssetID, ListMediaDerivativesByAsset,
+// MarkMediaDerivativeReady, UpsertMediaDerivative) cannot validate against
+// the workspace model and stay removed; their Go call sites fail closed.
 func (q *Queries) DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error {
 	_, err := q.db.Exec(ctx, deleteMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
 	return err
@@ -73,86 +87,6 @@ func (q *Queries) GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMedi
 	return i, err
 }
 
-const getProcessingInputManifestObject = `-- name: GetProcessingInputManifestObject :one
-SELECT a.asset_id, d.id AS media_derivative_id, d.derivative_id, d.tier,
-  d.storage_profile_id, d.storage_key, d.object_generation,
-  d.checksum_sha256, d.mime_type, d.size_bytes
-FROM media_derivatives AS d
-JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
-WHERE d.media_asset_id = $1
-  AND d.owner_user_id = $2
-  AND d.tier = 'processing-input'
-  AND d.status = 'ready'
-  AND d.source_object_generation = a.object_generation
-  AND a.status = 'ready'
-  AND a.deleted_at IS NULL
-`
-
-type GetProcessingInputManifestObjectParams struct {
-	MediaAssetID int64 `json:"media_asset_id"`
-	OwnerUserID  int64 `json:"owner_user_id"`
-}
-
-type GetProcessingInputManifestObjectRow struct {
-	AssetID           string `json:"asset_id"`
-	MediaDerivativeID int64  `json:"media_derivative_id"`
-	DerivativeID      string `json:"derivative_id"`
-	Tier              string `json:"tier"`
-	StorageProfileID  string `json:"storage_profile_id"`
-	StorageKey        string `json:"storage_key"`
-	ObjectGeneration  int64  `json:"object_generation"`
-	ChecksumSha256    string `json:"checksum_sha256"`
-	MimeType          string `json:"mime_type"`
-	SizeBytes         int64  `json:"size_bytes"`
-}
-
-func (q *Queries) GetProcessingInputManifestObject(ctx context.Context, arg GetProcessingInputManifestObjectParams) (GetProcessingInputManifestObjectRow, error) {
-	row := q.db.QueryRow(ctx, getProcessingInputManifestObject, arg.MediaAssetID, arg.OwnerUserID)
-	var i GetProcessingInputManifestObjectRow
-	err := row.Scan(
-		&i.AssetID,
-		&i.MediaDerivativeID,
-		&i.DerivativeID,
-		&i.Tier,
-		&i.StorageProfileID,
-		&i.StorageKey,
-		&i.ObjectGeneration,
-		&i.ChecksumSha256,
-		&i.MimeType,
-		&i.SizeBytes,
-	)
-	return i, err
-}
-
-const getReadyMediaDerivativeStorageLocationByAssetID = `-- name: GetReadyMediaDerivativeStorageLocationByAssetID :one
-SELECT d.storage_profile_id, d.storage_key
-FROM media_derivatives AS d
-JOIN media_assets AS a ON a.id = d.media_asset_id AND a.owner_user_id = d.owner_user_id
-WHERE d.media_asset_id = $1
-  AND d.tier = $2
-  AND d.status = 'ready'
-  AND d.source_object_generation = a.object_generation
-  AND a.status = 'ready'
-  AND a.deleted_at IS NULL
-`
-
-type GetReadyMediaDerivativeStorageLocationByAssetIDParams struct {
-	MediaAssetID int64  `json:"media_asset_id"`
-	Tier         string `json:"tier"`
-}
-
-type GetReadyMediaDerivativeStorageLocationByAssetIDRow struct {
-	StorageProfileID string `json:"storage_profile_id"`
-	StorageKey       string `json:"storage_key"`
-}
-
-func (q *Queries) GetReadyMediaDerivativeStorageLocationByAssetID(ctx context.Context, arg GetReadyMediaDerivativeStorageLocationByAssetIDParams) (GetReadyMediaDerivativeStorageLocationByAssetIDRow, error) {
-	row := q.db.QueryRow(ctx, getReadyMediaDerivativeStorageLocationByAssetID, arg.MediaAssetID, arg.Tier)
-	var i GetReadyMediaDerivativeStorageLocationByAssetIDRow
-	err := row.Scan(&i.StorageProfileID, &i.StorageKey)
-	return i, err
-}
-
 const listMediaAssetSources = `-- name: ListMediaAssetSources :many
 SELECT id, media_asset_id, source_asset_id, owner_user_id, source_role, source_index, metadata, created_at
 FROM media_asset_sources
@@ -195,147 +129,6 @@ func (q *Queries) ListMediaAssetSources(ctx context.Context, arg ListMediaAssetS
 	return items, nil
 }
 
-const listMediaDerivativesByAsset = `-- name: ListMediaDerivativesByAsset :many
-SELECT media_derivatives.id, media_derivatives.derivative_id, media_derivatives.media_asset_id, media_derivatives.owner_user_id,
-  media_derivatives.tier, media_derivatives.format, media_derivatives.status, media_derivatives.storage_profile_id,
-  media_derivatives.storage_key, media_derivatives.mime_type, media_derivatives.width, media_derivatives.height,
-  media_derivatives.size_bytes, media_derivatives.checksum_sha256, media_derivatives.source_object_generation,
-  media_derivatives.object_generation, media_derivatives.attempt_count, media_derivatives.error_code, media_derivatives.error_message,
-  media_derivatives.created_at, media_derivatives.updated_at, media_derivatives.ready_at, media_derivatives.verified_at,
-  media_derivatives.last_attempt_at
-FROM media_derivatives
-JOIN media_assets AS a ON a.id = media_derivatives.media_asset_id AND a.owner_user_id = media_derivatives.owner_user_id
-WHERE media_derivatives.media_asset_id = $1
-  AND media_derivatives.owner_user_id = $2
-  AND (media_derivatives.status <> 'ready' OR media_derivatives.source_object_generation = a.object_generation)
-ORDER BY CASE tier WHEN 'thumb' THEN 1 WHEN 'preview' THEN 2 WHEN 'large-preview' THEN 3 WHEN 'processing-input' THEN 4 ELSE 5 END,
-  format ASC
-`
-
-type ListMediaDerivativesByAssetParams struct {
-	MediaAssetID int64 `json:"media_asset_id"`
-	OwnerUserID  int64 `json:"owner_user_id"`
-}
-
-func (q *Queries) ListMediaDerivativesByAsset(ctx context.Context, arg ListMediaDerivativesByAssetParams) ([]MediaDerivative, error) {
-	rows, err := q.db.Query(ctx, listMediaDerivativesByAsset, arg.MediaAssetID, arg.OwnerUserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []MediaDerivative
-	for rows.Next() {
-		var i MediaDerivative
-		if err := rows.Scan(
-			&i.ID,
-			&i.DerivativeID,
-			&i.MediaAssetID,
-			&i.OwnerUserID,
-			&i.Tier,
-			&i.Format,
-			&i.Status,
-			&i.StorageProfileID,
-			&i.StorageKey,
-			&i.MimeType,
-			&i.Width,
-			&i.Height,
-			&i.SizeBytes,
-			&i.ChecksumSha256,
-			&i.SourceObjectGeneration,
-			&i.ObjectGeneration,
-			&i.AttemptCount,
-			&i.ErrorCode,
-			&i.ErrorMessage,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.ReadyAt,
-			&i.VerifiedAt,
-			&i.LastAttemptAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const markMediaDerivativeReady = `-- name: MarkMediaDerivativeReady :one
-UPDATE media_derivatives
-SET status = 'ready', format = $1, storage_key = $2, mime_type = $3,
-    width = $4, height = $5, size_bytes = $6,
-    checksum_sha256 = $7, source_object_generation = $8, object_generation = object_generation + 1,
-    ready_at = now(), verified_at = now(), error_code = '', error_message = ''
-WHERE media_derivatives.id = $9
-  AND EXISTS (
-    SELECT 1 FROM media_assets AS a
-    WHERE a.id = media_derivatives.media_asset_id
-      AND a.owner_user_id = media_derivatives.owner_user_id
-      AND a.status = 'ready'
-      AND a.deleted_at IS NULL
-      AND a.object_generation = $8
-  )
-RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
-`
-
-type MarkMediaDerivativeReadyParams struct {
-	Format                 string `json:"format"`
-	StorageKey             string `json:"storage_key"`
-	MimeType               string `json:"mime_type"`
-	Width                  int32  `json:"width"`
-	Height                 int32  `json:"height"`
-	SizeBytes              int64  `json:"size_bytes"`
-	ChecksumSha256         string `json:"checksum_sha256"`
-	SourceObjectGeneration int64  `json:"source_object_generation"`
-	ID                     int64  `json:"id"`
-}
-
-func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDerivativeReadyParams) (MediaDerivative, error) {
-	row := q.db.QueryRow(ctx, markMediaDerivativeReady,
-		arg.Format,
-		arg.StorageKey,
-		arg.MimeType,
-		arg.Width,
-		arg.Height,
-		arg.SizeBytes,
-		arg.ChecksumSha256,
-		arg.SourceObjectGeneration,
-		arg.ID,
-	)
-	var i MediaDerivative
-	err := row.Scan(
-		&i.ID,
-		&i.DerivativeID,
-		&i.MediaAssetID,
-		&i.OwnerUserID,
-		&i.Tier,
-		&i.Format,
-		&i.Status,
-		&i.StorageProfileID,
-		&i.StorageKey,
-		&i.MimeType,
-		&i.Width,
-		&i.Height,
-		&i.SizeBytes,
-		&i.ChecksumSha256,
-		&i.SourceObjectGeneration,
-		&i.ObjectGeneration,
-		&i.AttemptCount,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.ReadyAt,
-		&i.VerifiedAt,
-		&i.LastAttemptAt,
-	)
-	return i, err
-}
-
 const upsertMediaAssetSource = `-- name: UpsertMediaAssetSource :one
 INSERT INTO media_asset_sources (
   media_asset_id, source_asset_id, owner_user_id, source_role, source_index, metadata
@@ -371,81 +164,4 @@ func (q *Queries) UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAss
 	var id int64
 	err := row.Scan(&id)
 	return id, err
-}
-
-const upsertMediaDerivative = `-- name: UpsertMediaDerivative :one
-INSERT INTO media_derivatives (
-  derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id, source_object_generation
-)
-SELECT
-  $1, $2, $3, $4, $5,
-  'pending', a.storage_profile_id, a.object_generation
-FROM media_assets AS a
-WHERE a.id = $2
-  AND a.owner_user_id = $3
-  AND a.deleted_at IS NULL
-ON CONFLICT (media_asset_id, tier) DO UPDATE
-SET status = CASE
-      WHEN media_derivatives.status IN ('obsolete', 'failed')
-        OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN 'pending'
-      ELSE media_derivatives.status
-    END,
-    storage_profile_id = EXCLUDED.storage_profile_id,
-    source_object_generation = EXCLUDED.source_object_generation,
-    attempt_count = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
-      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN 0 ELSE media_derivatives.attempt_count END,
-    error_code = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
-      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN '' ELSE media_derivatives.error_code END,
-    error_message = CASE WHEN media_derivatives.status IN ('obsolete', 'failed')
-      OR media_derivatives.source_object_generation <> EXCLUDED.source_object_generation THEN '' ELSE media_derivatives.error_message END
-WHERE media_derivatives.owner_user_id = EXCLUDED.owner_user_id
-RETURNING id, derivative_id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
-  storage_key, mime_type, width, height, size_bytes, checksum_sha256, source_object_generation, object_generation, attempt_count,
-  error_code, error_message, created_at, updated_at, ready_at, verified_at, last_attempt_at
-`
-
-type UpsertMediaDerivativeParams struct {
-	DerivativeID string `json:"derivative_id"`
-	MediaAssetID int64  `json:"media_asset_id"`
-	OwnerUserID  int64  `json:"owner_user_id"`
-	Tier         string `json:"tier"`
-	Format       string `json:"format"`
-}
-
-func (q *Queries) UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error) {
-	row := q.db.QueryRow(ctx, upsertMediaDerivative,
-		arg.DerivativeID,
-		arg.MediaAssetID,
-		arg.OwnerUserID,
-		arg.Tier,
-		arg.Format,
-	)
-	var i MediaDerivative
-	err := row.Scan(
-		&i.ID,
-		&i.DerivativeID,
-		&i.MediaAssetID,
-		&i.OwnerUserID,
-		&i.Tier,
-		&i.Format,
-		&i.Status,
-		&i.StorageProfileID,
-		&i.StorageKey,
-		&i.MimeType,
-		&i.Width,
-		&i.Height,
-		&i.SizeBytes,
-		&i.ChecksumSha256,
-		&i.SourceObjectGeneration,
-		&i.ObjectGeneration,
-		&i.AttemptCount,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.ReadyAt,
-		&i.VerifiedAt,
-		&i.LastAttemptAt,
-	)
-	return i, err
 }

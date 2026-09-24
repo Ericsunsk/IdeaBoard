@@ -10,8 +10,8 @@ import (
 
 func TestTaskParamsColumnSupportsSubmitLimit(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "params TEXT NOT NULL") {
-		t.Fatalf("tasks.params must use TEXT to support submit params limit")
+	if !strings.Contains(schema, "workflow_input JSONB NOT NULL") {
+		t.Fatalf("tasks.workflow_input must use JSONB to support submit params limit")
 	}
 }
 
@@ -24,8 +24,8 @@ func TestTaskResultColumnSupportsProviderMetadata(t *testing.T) {
 
 func TestTaskOutputUsesTaskResultIndex(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, result_index)") {
-		t.Fatalf("task_outputs must keep task_id/result_index index")
+	if !strings.Contains(schema, "CREATE INDEX idx_task_outputs_task ON task_outputs (task_id, output_index)") {
+		t.Fatalf("task_outputs must keep task_id/output_index index")
 	}
 	if strings.Contains(schema, "sort_index") {
 		t.Fatalf("task_outputs must not retain sort_index")
@@ -34,7 +34,7 @@ func TestTaskOutputUsesTaskResultIndex(t *testing.T) {
 
 func TestTaskOutputCascadesWithTaskDelete(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "CONSTRAINT fk_task_outputs_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE") {
+	if !strings.Contains(schema, "task_id BIGINT NOT NULL REFERENCES tasks(internal_id) ON DELETE CASCADE") {
 		t.Fatalf("task_outputs must cascade when parent task is deleted")
 	}
 }
@@ -64,9 +64,9 @@ func TestTaskOutputSchemaStoresRelationOnly(t *testing.T) {
 		}
 	}
 	for _, expected := range []string{
-		"output_kind VARCHAR(32) NOT NULL DEFAULT 'asset'",
-		"CONSTRAINT ck_task_outputs_output_kind CHECK (output_kind IN ('asset', 'remote'))",
-		"CONSTRAINT ck_task_outputs_output_kind_shape CHECK",
+		"output_kind TEXT NOT NULL",
+		"CONSTRAINT chk_task_outputs_kind CHECK (output_kind IN ('media_asset','remote_url'))",
+		"CONSTRAINT chk_task_outputs_kind_shape CHECK",
 	} {
 		if !strings.Contains(taskOutputs, expected) {
 			t.Fatalf("task_outputs missing relation-only contract: %s", expected)
@@ -244,8 +244,10 @@ func TestTaskExecutionMetricsCascadesWithTaskDelete(t *testing.T) {
 	if !strings.Contains(schema, "CREATE TABLE task_execution_metrics") {
 		t.Fatalf("task_execution_metrics table must exist")
 	}
-	if !strings.Contains(schema, "CONSTRAINT fk_task_execution_metrics_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE") {
-		t.Fatalf("task_execution_metrics must cascade when parent task is deleted")
+	// #809 hard cut: the legacy shell stays for compiling stubs, but its
+	// dangling FK to the replaced user-scoped tasks(task_id) is dropped.
+	if strings.Contains(schema, "REFERENCES tasks(task_id)") {
+		t.Fatalf("legacy shells must not reference the replaced tasks(task_id)")
 	}
 }
 

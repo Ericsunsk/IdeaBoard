@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -137,17 +138,15 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 	backendSlugs := SupportedFeatureSlugs()
 	assertSameFeatureSlugs(t, "frontend shared contract", backendSlugs, frontendSlugs)
 
-	openAPIRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "api", "openapi.yaml"))
+	publicAPIRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "api", "openapi.public.yaml"))
 	if err != nil {
-		t.Fatalf("read OpenAPI: %v", err)
+		t.Fatalf("read PublicAPI: %v", err)
 	}
-	assertSameFeatureSlugs(t, "OpenAPI", backendSlugs, extractOpenAPIWorkflowFeatureSlugs(t, string(openAPIRaw)))
-	assertSameFeatureSlugs(
-		t,
-		"OpenAPI canonical contract",
-		SupportedFeatureSlugs(),
-		extractOpenAPIStringEnum(t, string(openAPIRaw), "CanonicalWorkflowFeatureSlug"),
-	)
+	// Post-#809 the legacy openapi.yaml (WorkflowFeatureSlug +
+	// CanonicalWorkflowFeatureSlug) is deleted; WorkflowKind in the Public
+	// contract is the canonical slug registry (backend registry includes
+	// the `generation` slug, matched 1:1 here).
+	assertSameFeatureSlugs(t, "PublicAPI WorkflowKind", backendSlugs, extractPublicWorkflowKindSlugs(t, string(publicAPIRaw)))
 
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
@@ -275,36 +274,24 @@ func extractFrontendWorkflowFeatureKeys(t *testing.T, source string) map[string]
 	return keys
 }
 
-func extractOpenAPIWorkflowFeatureSlugs(t *testing.T, source string) []string {
+// extractPublicWorkflowKindSlugs parses the flow-style WorkflowKind enum
+// from openapi.public.yaml (e.g. `enum: [generation, inpaint, ...]`).
+func extractPublicWorkflowKindSlugs(t *testing.T, source string) []string {
 	t.Helper()
-	blockRe := regexp.MustCompile(`(?m)^    WorkflowFeatureSlug:\n      type: string\n      enum:\n((?:        - [a-z0-9-]+\n)+)`)
+	blockRe := regexp.MustCompile(`(?m)^    WorkflowKind:\n      type: string\n      enum: \[([^\]]+)\]`)
 	match := blockRe.FindStringSubmatch(source)
 	if match == nil {
-		t.Fatal("OpenAPI WorkflowFeatureSlug enum not found")
+		t.Fatal("PublicAPI WorkflowKind enum not found")
 	}
-	entryRe := regexp.MustCompile(`(?m)^        - ([a-z0-9-]+)$`)
-	entries := entryRe.FindAllStringSubmatch(match[1], -1)
-	slugs := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		slugs = append(slugs, entry[1])
+	slugs := make([]string, 0, 8)
+	for _, raw := range strings.Split(match[1], ",") {
+		slug := strings.TrimSpace(raw)
+		if slug == "" {
+			t.Fatal("PublicAPI WorkflowKind enum contains an empty entry")
+		}
+		slugs = append(slugs, slug)
 	}
 	return slugs
-}
-
-func extractOpenAPIStringEnum(t *testing.T, source, schemaName string) []string {
-	t.Helper()
-	blockRe := regexp.MustCompile(`(?m)^    ` + regexp.QuoteMeta(schemaName) + `:\n      type: string\n      enum:\n((?:        - [a-z0-9-]+\n)+)`)
-	match := blockRe.FindStringSubmatch(source)
-	if match == nil {
-		t.Fatalf("OpenAPI %s enum not found", schemaName)
-	}
-	entryRe := regexp.MustCompile(`(?m)^        - ([a-z0-9-]+)$`)
-	entries := entryRe.FindAllStringSubmatch(match[1], -1)
-	values := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		values = append(values, entry[1])
-	}
-	return values
 }
 
 func extractWorkflowFeatureReferences(t *testing.T, label, source string, featureKeys map[string]string) []string {

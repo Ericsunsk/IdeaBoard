@@ -15,6 +15,6 @@
  */
 
 export type MoveLibraryAssetRequestData = {
-  /** Target libf_ folder; empty unfiles the asset. */
+  /** Target lfolder_ folder; empty files the asset into Quick Saves. */
   folder_id?: string
 }

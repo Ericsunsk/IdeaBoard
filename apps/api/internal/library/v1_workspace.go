@@ -12,10 +12,11 @@ package library
 // handlers fail closed with 501 when the store is nil.
 //
 // Invariants owned here:
-//   - External ids mint libf_/liba_/libm_ via contract.MintPublicID (local
-//     prefix consts like boards' sht_ pattern since the kernel lacks
-//     them); integer database ids are never exposed. v1 lookups reject
-//     legacy integer ids as malformed (404, never a distinct status).
+//   - External ids mint lfolder_/lasset_/lmat_ via contract.MintPublicID,
+//     matching the workspace library tables' public_id CHECKs
+//     (lfolder_% / lasset_% / lmat_%, #809); integer database ids are
+//     never exposed. v1 lookups reject legacy integer ids as malformed
+//     (404, never a distinct status).
 //   - Assets are saved external references ONLY: provider URL + source
 //     metadata. No bytes are stored, fetched, or proxied here. Asset
 //     resolution matches already-saved workspace assets by
@@ -44,14 +45,15 @@ import (
 )
 
 const (
-	// V1FolderPrefix mints libf_ folder ids. Exported so sibling
+	// V1FolderPrefix mints lfolder_ folder ids (contract kernel prefix,
+	// matching the library_folders public_id CHECK). Exported so sibling
 	// contexts (search vision refs) and handlers validate shape through
 	// the kernel helper instead of copying the literal.
-	V1FolderPrefix = "libf_"
-	// V1AssetPrefix mints liba_ asset ids.
-	V1AssetPrefix = "liba_"
-	// V1MaterializationPrefix mints libm_ materialization ids.
-	V1MaterializationPrefix = "libm_"
+	V1FolderPrefix = contract.PrefixLibraryFolder
+	// V1AssetPrefix mints lasset_ asset ids.
+	V1AssetPrefix = contract.PrefixLibraryAsset
+	// V1MaterializationPrefix mints lmat_ materialization ids.
+	V1MaterializationPrefix = contract.PrefixLibraryMaterialization
 	// V1MaxResolveItems bounds one typed batch resolve (fail-closed 400
 	// above it; the endpoint is a lookup, not a proxy).
 	V1MaxResolveItems = 20
@@ -71,30 +73,37 @@ var (
 	ErrV1FolderNameConflict = errors.New("library v1 folder name already exists")
 	// ErrV1ResolveTooMany reports a resolve batch above V1MaxResolveItems.
 	ErrV1ResolveTooMany = errors.New("library v1 resolve batch too large")
+	// ErrV1MaterializationUnavailable reports that the durable
+	// materialization job surface has no postgres mapping yet. The
+	// workspace tables exist but completing a job needs a managed Media
+	// Asset link (media resolution + settlement land in #820); the
+	// postgres Service fails these methods closed so handlers render 503
+	// instead of half-persisting jobs.
+	ErrV1MaterializationUnavailable = errors.New("library v1 materialization is unavailable")
 )
 
-// NewV1FolderPublicID mints an opaque libf_ public identifier.
+// NewV1FolderPublicID mints an opaque lfolder_ public identifier.
 func NewV1FolderPublicID() (string, error) {
 	return contract.MintPublicID(V1FolderPrefix, 12)
 }
 
-// NewV1AssetPublicID mints an opaque liba_ public identifier.
+// NewV1AssetPublicID mints an opaque lasset_ public identifier.
 func NewV1AssetPublicID() (string, error) {
 	return contract.MintPublicID(V1AssetPrefix, 12)
 }
 
-// NewV1MaterializationPublicID mints an opaque libm_ public identifier.
+// NewV1MaterializationPublicID mints an opaque lmat_ public identifier.
 func NewV1MaterializationPublicID() (string, error) {
 	return contract.MintPublicID(V1MaterializationPrefix, 12)
 }
 
-// IsV1FolderID reports libf_ shape (opaque URL segment for {folder_id}).
+// IsV1FolderID reports lfolder_ shape (opaque URL segment for {folder_id}).
 func IsV1FolderID(id string) bool { return contract.IsValidPublicID(V1FolderPrefix, id) }
 
-// IsV1AssetID reports liba_ shape (opaque URL segment for {asset_id}).
+// IsV1AssetID reports lasset_ shape (opaque URL segment for {asset_id}).
 func IsV1AssetID(id string) bool { return contract.IsValidPublicID(V1AssetPrefix, id) }
 
-// IsV1MaterializationID reports libm_ shape.
+// IsV1MaterializationID reports lmat_ shape.
 func IsV1MaterializationID(id string) bool {
 	return contract.IsValidPublicID(V1MaterializationPrefix, id)
 }

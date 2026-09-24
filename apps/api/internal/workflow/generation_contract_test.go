@@ -43,13 +43,11 @@ func TestGenerationContractMatchesFrontendAndOpenAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	openapi, err := os.ReadFile(filepath.Join(root, "apps/api/openapi.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	want := []string{"text-to-image", "image-to-image"}
 	assertSameContractValues(t, "frontend generation primitives", want, extractTypeScriptStringObject(t, string(frontend), "GENERATION_PRIMITIVE"))
-	assertSameContractValues(t, "OpenAPI generation primitives", want, extractOpenAPIStringEnum(t, string(openapi), "GenerationPrimitive"))
+	// Post-#809 the legacy openapi.yaml is deleted and the new Public/Control
+	// contracts carry no GenerationPrimitive schema; the frontend-vs-backend
+	// primitive check above plus TestParseGenerationPrimitive own this seam.
 	if !regexp.MustCompile(`REQUESTED_OUTPUT_COUNT_OPTIONS\s*=\s*\[1, 2, 3, 4\]\s+as const`).Match(frontend) {
 		t.Fatal("frontend output count contract mismatch")
 	}

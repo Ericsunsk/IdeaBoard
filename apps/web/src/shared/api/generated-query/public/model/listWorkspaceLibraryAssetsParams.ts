@@ -29,7 +29,7 @@ export type ListWorkspaceLibraryAssetsParams = {
    */
   page_size?: PageSizeParameter
   /**
-   * Filter to one libf_ folder.
+   * Filter to one lfolder_ folder.
    */
   folder_id?: string
 }

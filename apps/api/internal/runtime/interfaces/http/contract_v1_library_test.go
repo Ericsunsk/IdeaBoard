@@ -197,8 +197,8 @@ func TestV1LibraryFolderLifecycle(t *testing.T) {
 		t.Fatalf("create folder = %d %v, want 201", status, first)
 	}
 	folderID := first["data"].(map[string]any)["id"].(string)
-	if !strings.HasPrefix(folderID, "libf_") {
-		t.Fatalf("folder id = %q, want libf_...", folderID)
+	if !strings.HasPrefix(folderID, "lfolder_") {
+		t.Fatalf("folder id = %q, want lfolder_...", folderID)
 	}
 
 	status, replay := create(fx.owner, "folder-key-1", "inspo")
@@ -248,7 +248,7 @@ func TestV1LibraryFolderLifecycle(t *testing.T) {
 
 	// Malformed + unknown folder ids converge to 404 (legacy integer
 	// ids are malformed on v1, never a distinct status).
-	for _, id := range []string{"42", "nope", "libf_doesnotexist00000000"} {
+	for _, id := range []string{"42", "nope", "lfolder_doesnotexist00000000"} {
 		status, _, payload := doV1(t, fx.engine, v1Call{method: http.MethodPatch,
 			path: fx.foldersPath() + "/" + id, userID: fx.owner, body: `{"data":{"name":"x"}}`})
 		if status != http.StatusNotFound || v1ErrorCode(t, payload) != string(contract.CodeLibraryFolderNotFound) {
@@ -292,8 +292,8 @@ func TestV1LibraryAssetSaveMoveDelete(t *testing.T) {
 		t.Fatalf("save = %d %v, want 201", status, first)
 	}
 	assetID := first["data"].(map[string]any)["id"].(string)
-	if !strings.HasPrefix(assetID, "liba_") {
-		t.Fatalf("asset id = %q, want liba_...", assetID)
+	if !strings.HasPrefix(assetID, "lasset_") {
+		t.Fatalf("asset id = %q, want lasset_...", assetID)
 	}
 
 	// Duplicate save (different key, same provider+source) returns the
@@ -323,7 +323,7 @@ func TestV1LibraryAssetSaveMoveDelete(t *testing.T) {
 	if status, moved := move(secondID, ""); status != http.StatusOK || moved["data"].(map[string]any)["folder_id"] != nil {
 		t.Fatalf("unfile = %d %v, want folder cleared", status, moved)
 	}
-	if status, payload := move(secondID, "libf_doesnotexist00000000"); status != http.StatusNotFound ||
+	if status, payload := move(secondID, "lfolder_doesnotexist00000000"); status != http.StatusNotFound ||
 		v1ErrorCode(t, payload) != string(contract.CodeLibraryFolderNotFound) {
 		t.Fatalf("move unknown folder = %d %v, want 404", status, payload)
 	}
@@ -449,8 +449,8 @@ func TestV1LibraryMaterialization(t *testing.T) {
 		t.Fatalf("materialize = %d %v, want 202", status, created)
 	}
 	data := created["data"].(map[string]any)
-	if !strings.HasPrefix(data["id"].(string), "libm_") {
-		t.Fatalf("materialization id = %v, want libm_...", data["id"])
+	if !strings.HasPrefix(data["id"].(string), "lmat_") {
+		t.Fatalf("materialization id = %v, want lmat_...", data["id"])
 	}
 	if data["status"] != "completed" || data["media_asset_id"] != "asset_abc123def456" {
 		t.Fatalf("materialization = %v, want completed + asset_ link", data)
@@ -475,7 +475,7 @@ func TestV1LibraryMaterialization(t *testing.T) {
 		t.Fatalf("get = %d %v, want completed", status, got)
 	}
 	status, _, unknown := doV1(t, fx.engine, v1Call{method: http.MethodGet,
-		path: fx.materializationsPath() + "/libm_doesnotexist0000000", userID: fx.owner})
+		path: fx.materializationsPath() + "/lmat_doesnotexist0000000", userID: fx.owner})
 	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(contract.CodeLibraryMaterializationNotFound) {
 		t.Fatalf("unknown job = %d %v, want 404", status, unknown)
 	}

@@ -17,7 +17,7 @@ package searchcatalog
 //     are 422s at the handler (ErrV1SearchQueryEmpty/TooLong), never
 //     silent empty pages.
 //   - Vision-query inputs reference owned workspace library assets by
-//     liba_ id (shape-checked here, existence-checked against the
+//     lasset_ id (shape-checked here, existence-checked against the
 //     workspace library store at the handler); client bytes never cross
 //     the v1 vision boundary, so no multipart surface is introduced.
 //   - Vision billing reuses the ai-search:vision SKU semantics from the
@@ -126,7 +126,7 @@ type V1VisionQueryInput struct {
 }
 
 // ValidateV1VisionQueryInput enforces text/refs presence, the 200-rune
-// text bound, at most 4 refs, and liba_ shape per ref (existence and
+// text bound, at most 4 refs, and lasset_ shape per ref (existence and
 // workspace binding are checked against the library store at the
 // handler; hidden refs converge to 404 there).
 func ValidateV1VisionQueryInput(input V1VisionQueryInput) (V1VisionQueryInput, error) {

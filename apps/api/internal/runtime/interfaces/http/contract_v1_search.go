@@ -34,7 +34,7 @@ package httpapi
 // (V1CreditSettler Hold/Capture/Release with caller idempotency keys;
 // no direct ledger writes here) against a server-side quote for the
 // ai-search:vision SKU. Vision inputs reference owned workspace
-// library assets by liba_ id (resolved server-side; cross-workspace
+// library assets by lasset_ id (resolved server-side; cross-workspace
 // refs converge to 404 library_asset_not_found); client bytes never
 // cross this boundary, so no multipart surface is introduced. Provider
 // image fetch for extraction stays #808-owned (Control provider
@@ -542,7 +542,7 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // Schemas (results are provider URL + source metadata only, never bytes):
 //
 //	WorkspaceSearchResult: {provider: {enum: [unsplash, pexels]}, source_id, title?, author?, source_url: uri, preview_url: uri, original_url: uri, width: integer>=0, height: integer>=0}
-//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, maxItems: 4, items: {type: string, pattern: '^liba_'}}}} (at least one of user_text/refs required; refs resolve against owned workspace library assets, no client bytes)
+//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, maxItems: 4, items: {type: string, pattern: '^lasset_'}}}} (at least one of user_text/refs required; refs resolve against owned workspace library assets, no client bytes)
 //	WorkspaceVisionQuery: {operation_id: {pattern: '^visq_'}, status: {const: succeeded}, query: string, replayed?: boolean, created_at: date-time}
 //
 // Error codes frozen: search_provider_unavailable (503), search_vision_provider_error (502),

@@ -5,10 +5,8 @@ CREATE TRIGGER set_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE 
 CREATE TRIGGER set_task_execution_metrics_updated_at BEFORE UPDATE ON task_execution_metrics FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_execution_attempts_updated_at BEFORE UPDATE ON task_execution_attempts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_cancellations_updated_at BEFORE UPDATE ON task_cancellations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_media_assets_updated_at BEFORE UPDATE ON media_assets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_media_refs_updated_at BEFORE UPDATE ON media_refs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_media_derivatives_updated_at BEFORE UPDATE ON media_derivatives FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_task_outputs_updated_at BEFORE UPDATE ON task_outputs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_daily_stats_updated_at BEFORE UPDATE ON task_daily_stats FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_stat_events_updated_at BEFORE UPDATE ON task_stat_events FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_daily_stat_backfills_updated_at BEFORE UPDATE ON task_daily_stat_backfills FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -19,9 +17,8 @@ CREATE TRIGGER set_storage_profiles_updated_at BEFORE UPDATE ON storage_profiles
 CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON storage_profile_secret_versions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_boards_updated_at BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER set_board_members_updated_at BEFORE UPDATE ON board_members FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER set_board_memberships_updated_at BEFORE UPDATE ON board_memberships FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_board_share_tokens_updated_at BEFORE UPDATE ON board_share_tokens FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-ALTER TABLE media_assets ADD CONSTRAINT fk_media_assets_storage_profile_id FOREIGN KEY (storage_profile_id) REFERENCES storage_profiles(profile_id) ON DELETE RESTRICT;
 ALTER TABLE payment_webhook_events ADD CONSTRAINT payment_webhook_events_payment_order_id_fkey FOREIGN KEY (payment_order_id) REFERENCES payment_orders(id) ON DELETE RESTRICT;
 
 ALTER TABLE credit_transactions

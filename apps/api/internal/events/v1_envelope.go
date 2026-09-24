@@ -10,7 +10,7 @@ package events
 // a new versioned data schema; existing (type, version) pairs never
 // change shape. Internal DB rows and task structs are NEVER exposed:
 // producers map domain facts to opaque public ids (task_, board_,
-// asset_, libm_, liba_, ws_, usr_) before minting.
+// asset_, lmat_, lasset_, ws_, usr_) before minting.
 //
 // Publishing rule (exactly-once-from-domain-boundary): domain services
 // stage facts during settlement and emit envelopes ONLY after the commit
@@ -308,7 +308,7 @@ func validateV1ResourceID(resourceType, id string) error {
 		}
 	case V1ResourceLibraryMaterialization:
 		if !isV1MaterializationID(id) {
-			return fmt.Errorf("events: library_materialization resource id must be libm_ opaque")
+			return fmt.Errorf("events: library_materialization resource id must be lmat_ opaque")
 		}
 	case V1ResourceCheckoutSession:
 		if id == "" {
@@ -318,15 +318,15 @@ func validateV1ResourceID(resourceType, id string) error {
 	return nil
 }
 
-// isV1MaterializationID validates the libm_ shape without importing the
+// isV1MaterializationID validates the lmat_ shape without importing the
 // library context (platform must not depend on business contexts).
 func isV1MaterializationID(id string) bool {
-	return contract.IsValidPublicID("libm_", id)
+	return contract.IsValidPublicID(contract.PrefixLibraryMaterialization, id)
 }
 
-// IsV1LibraryAssetID validates the liba_ shape (same layering note).
+// IsV1LibraryAssetID validates the lasset_ shape (same layering note).
 func IsV1LibraryAssetID(id string) bool {
-	return contract.IsValidPublicID("liba_", id)
+	return contract.IsValidPublicID(contract.PrefixLibraryAsset, id)
 }
 
 func validateV1Data(typ string, raw json.RawMessage) error {
@@ -433,10 +433,10 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 			return err
 		}
 		if !isV1MaterializationID(stringField("materialization_id")) {
-			return fmt.Errorf("events: materialization id must be libm_ opaque")
+			return fmt.Errorf("events: materialization id must be lmat_ opaque")
 		}
 		if !IsV1LibraryAssetID(stringField("library_asset_id")) {
-			return fmt.Errorf("events: library asset id must be liba_ opaque")
+			return fmt.Errorf("events: library asset id must be lasset_ opaque")
 		}
 		if !contract.IsValidPublicID(contract.PrefixAsset, stringField("media_asset_id")) {
 			return fmt.Errorf("events: media asset id must be asset_ opaque")
@@ -446,10 +446,10 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 			return err
 		}
 		if !isV1MaterializationID(stringField("materialization_id")) {
-			return fmt.Errorf("events: materialization id must be libm_ opaque")
+			return fmt.Errorf("events: materialization id must be lmat_ opaque")
 		}
 		if !IsV1LibraryAssetID(stringField("library_asset_id")) {
-			return fmt.Errorf("events: library asset id must be liba_ opaque")
+			return fmt.Errorf("events: library asset id must be lasset_ opaque")
 		}
 	}
 	return nil

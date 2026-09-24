@@ -181,10 +181,17 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: joinBoardByToken",
 			"operationId: getBoardDocument",
 			"operationId: replaceBoardDocument",
-			// #817 (Phase 3b-08): workspace upload/media surface stays
-			// unregistered while its replacement lands (contract_v1
-			// upload/media routes removed in #813); the 8 upload/media
-			// operationIds are intentionally absent here until Phase 4.
+			// #820/#821 (#809 Phase 4-03/4-04): workspace upload/media
+			// surface restored (contract_v1 upload/media routes live);
+			// the 8 upload/media operationIds are pinned here.
+			"operationId: createWorkspaceUpload",
+			"operationId: getWorkspaceUpload",
+			"operationId: completeWorkspaceUpload",
+			"operationId: listWorkspaceMediaAssets",
+			"operationId: getWorkspaceMediaAsset",
+			"operationId: contentWorkspaceMediaAsset",
+			"operationId: derivativeWorkspaceMediaAsset",
+			"operationId: archiveWorkspaceMediaAsset",
 			"operationId: getWorkspaceBillingAccount",
 			"operationId: getWorkspaceCreditsBalance",
 			"operationId: createWorkspaceCheckoutSession",

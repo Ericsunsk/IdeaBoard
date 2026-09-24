@@ -11,34 +11,159 @@ import (
 )
 
 type Querier interface {
+	// ArchiveMediaAsset stamps the archive lifecycle marker. Repeat
+	// archives miss (archived_at IS NULL guard); the caller reads back
+	// the stored row so replays converge instead of 404ing.
+	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
 	ArchiveOrganization(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
+	// CancelWorkspaceTask flips a live task to cancelled (chk constraint
+	// requires cancelled_at) and releases the lease. The tasks table carries
+	// no cancel_reason column, so the reason is recorded in the
+	// workflow_input envelope for read-back parity.
+	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
+	// ClaimTask fences one pending task for the worker: pending -> running with
+	// the lease token. Zero rows means already claimed/converged or invisible;
+	// the caller distinguishes via GetWorkspaceTaskByPublicID.
+	ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTaskParams) (Task, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
+	// CompleteUploadSession flips a live session to completed with its
+	// reserved storage key. The durable Media Asset row is inserted
+	// separately in the same caller-owned transaction.
+	CompleteUploadSession(ctx context.Context, arg CompleteUploadSessionParams) (UploadSession, error)
+	// CompleteWorkspaceTask flips a live task to completed and releases the
+	// lease. Outputs are inserted separately in the same caller-owned
+	// transaction (see InsertWorkspaceTaskOutput).
+	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
+	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
 	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
 	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
+	CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error)
+	// Workspace-scoped library queries (#818, Phase 4-01 of #809).
+	//
+	// All lookups are keyed by workspace first: every folder/asset row is
+	// addressed as (workspace_id, public_id) so cross-workspace ids miss by
+	// construction and read as not found (never a distinct status).
+	// Durable public ids follow the schema CHECK patterns
+	// (lfolder_% / lasset_% / lmat_%); callers mint them through the library
+	// seam (NewV1FolderPublicID / NewV1AssetPublicID) and pass them opaquely.
+	// Integer database ids (internal_id) never leave the store.
+	//
+	// Folder uniqueness is (workspace_id, name) per
+	// uq_library_folders_workspace_name; the *_CI lookup additionally guards
+	// the seam's case-insensitive contract (parity with the in-memory store)
+	// while the constraint remains the race backstop. System folders carry
+	// (is_system, is_default) = (TRUE, TRUE) per
+	// chk_library_folders_system_shape and are immutable: rename/delete
+	// statements exclude them and the store maps the miss explicitly.
+	//
+	// Assets always live in a folder (folder_id NOT NULL): the workspace
+	// Quick Saves system folder is the unfiled bucket. Save/move callers
+	// pass an empty folder to mean Quick Saves and the store ensures it.
+	// Title/author have no durable columns (the workspace tables keep
+	// provider URL + source metadata only); they are validated by the seam
+	// and intentionally not persisted here.
+	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
+	// CreateMediaAsset inserts the durable asset row. Width/height ride
+	// NULL when unknown (0 maps to NULL; the image CHECK passes on NULL
+	// and read-back maps NULL to 0).
+	CreateMediaAsset(ctx context.Context, arg CreateMediaAssetParams) (MediaAsset, error)
 	// Organization tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
+	// Workspace-scoped media queries (#820, Phase 4-03 of #809).
+	//
+	// Upload sessions are durable coordination rows (unlike the pre-#809
+	// ephemeral process-local sessions): pending -> transferring ->
+	// completed, with transferring -> failed and pending/transferring ->
+	// expired. Completion-only durability: only a successful complete
+	// creates the durable Media Asset row; abandoned sessions linger as
+	// pending/transferring rows until lazily expired on read (no sweeper).
+	// The chk_upload_sessions_completion gate requires completed_at +
+	// storage_key on completed rows and expired_at on expired rows.
+	//
+	// Media Assets are immutable content references (public_id LIKE
+	// 'asset_%', kernel PrefixAsset). There is no status column: an asset
+	// row exists only after a successful completion, so existence means
+	// ready; archived_at marks the archive lifecycle (metadata stays
+	// readable, bytes go 410). Image rows carry width/height (NULL reads
+	// back as 0); non-image kinds leave dimensions NULL.
+	//
+	// Derivatives live in media_asset_derivatives keyed by
+	// (asset_id, variant_name) -- NOT separate media_asset rows. Inserts
+	// upsert so regeneration converges.
+	//
+	// Every lookup scopes by workspace public_id first so cross-workspace
+	// ids miss by construction and read as not found (never a distinct
+	// status). Membership gating stays at the v1 handler layer; the
+	// repository enforces scoping + transitions.
+	CreateUploadSession(ctx context.Context, arg CreateUploadSessionParams) (UploadSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	// Workspace tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
+	// Workspace-scoped task queries (#819, Phase 4-02). The tasks table is the
+	// workspace-scoped async job resource (public_id LIKE 'task_%'):
+	// lease_token is required when status='running' and empty otherwise
+	// (chk_tasks_lease_status); terminal timestamps follow
+	// chk_tasks_terminal_consistency. Every query scopes by workspace public_id
+	// so cross-workspace ids stay invisible (ErrNotFound), never 403.
+	// Workspace membership gating stays at the v1 handler layer
+	// (taskWorkspaceContext); the repository enforces scoping + transitions.
+	CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
+	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
+	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
+	// Legacy media derivative queries (#809 schema repair).
+	//
+	// The generated media_derivatives.sql.go output survived Phase 3b without its
+	// query source, which breaks the schema-release sqlc drift check. This file
+	// restores the source for the queries that still validate against the
+	// workspace schema: they touch only the retained legacy shells
+	// (media_derivatives, media_asset_sources) and never the replaced
+	// user-scoped media_assets columns. Queries that JOINed the old
+	// media_assets(id, owner_user_id, status, object_generation, deleted_at)
+	// shape (GetProcessingInputManifestObject,
+	// GetReadyMediaDerivativeStorageLocationByAssetID, ListMediaDerivativesByAsset,
+	// MarkMediaDerivativeReady, UpsertMediaDerivative) cannot validate against
+	// the workspace model and stay removed; their Go call sites fail closed.
+	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
 	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	DeleteWorkspaceMembership(ctx context.Context, arg DeleteWorkspaceMembershipParams) (int64, error)
+	// DeleteWorkspaceTask removes a task row (settlement compensation rollback
+	// on enqueue failure). Outputs cascade.
+	DeleteWorkspaceTask(ctx context.Context, arg DeleteWorkspaceTaskParams) (int64, error)
+	EnsureQuickSavesFolder(ctx context.Context, arg EnsureQuickSavesFolderParams) error
+	// ExpireUploadSession lazily expires a live session past its TTL.
+	ExpireUploadSession(ctx context.Context, arg ExpireUploadSessionParams) (UploadSession, error)
+	// FailUploadSession flips a live session to failed (chk gate carries
+	// no extra columns for failed rows; the reason stays server-side).
+	FailUploadSession(ctx context.Context, arg FailUploadSessionParams) (UploadSession, error)
+	// FailWorkspaceTask flips a live task to failed with the terminal error
+	// (chk_tasks_terminal_consistency requires a non-blank error_message) and
+	// releases the lease.
+	FailWorkspaceTask(ctx context.Context, arg FailWorkspaceTaskParams) (Task, error)
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
+	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
+	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
+	GetLibraryFolderByPublicID(ctx context.Context, arg GetLibraryFolderByPublicIDParams) (LibraryFolder, error)
+	GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg GetLibraryFolderByWorkspaceAndNameCIParams) (LibraryFolder, error)
+	// GetMediaAssetByPublicID returns the asset row including archived
+	// ones (archived assets stay metadata-readable; bytes go 410).
+	GetMediaAssetByPublicID(ctx context.Context, arg GetMediaAssetByPublicIDParams) (MediaAsset, error)
+	GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMediaDerivativeByAssetTierParams) (MediaDerivative, error)
 	GetOrganizationByInternalID(ctx context.Context, internalID int64) (Organization, error)
 	GetOrganizationByPublicID(ctx context.Context, publicID string) (Organization, error)
 	GetOrganizationMembership(ctx context.Context, arg GetOrganizationMembershipParams) (OrganizationMembership, error)
@@ -55,7 +180,9 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
+	GetQuickSavesFolder(ctx context.Context, workspaceID int64) (LibraryFolder, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
+	GetUploadSessionByPublicID(ctx context.Context, arg GetUploadSessionByPublicIDParams) (UploadSession, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
@@ -65,7 +192,12 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
 	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
+	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
+	// id for output association. Minimal lookup only; the full media surface
+	// belongs to #820.
+	GetWorkspaceMediaAssetID(ctx context.Context, arg GetWorkspaceMediaAssetIDParams) (int64, error)
 	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
+	GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspaceTaskByPublicIDParams) (Task, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	// Control Plane audit record writes (#809). Best-effort durable sink
 	// behind the control guard's structured slog record; audit failures
@@ -83,12 +215,28 @@ type Querier interface {
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
 	InsertWorkspaceMembershipIgnore(ctx context.Context, arg InsertWorkspaceMembershipIgnoreParams) (int64, error)
+	// InsertWorkspaceTaskOutput appends one output ref to a workspace-scoped
+	// task. Scoping resolves atomically in the SELECT so outputs can never
+	// attach to a cross-workspace task id.
+	InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorkspaceTaskOutputParams) (TaskOutput, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
+	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
+	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
+	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
+	ListLibraryFolders(ctx context.Context, arg ListLibraryFoldersParams) ([]LibraryFolder, error)
+	// ListMediaAssetDerivatives returns stored variants for one asset
+	// (internal id already resolved in the workspace scope).
+	ListMediaAssetDerivatives(ctx context.Context, assetID int64) ([]MediaAssetDerivative, error)
+	ListMediaAssetSources(ctx context.Context, arg ListMediaAssetSourcesParams) ([]MediaAssetSource, error)
+	// ListMediaAssets pages live (non-archived) workspace assets
+	// newest-first with limit/offset (the v1 layer converts cursor to
+	// offset and over-fetches by one for has_more).
+	ListMediaAssets(ctx context.Context, arg ListMediaAssetsParams) ([]MediaAsset, error)
 	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
@@ -99,11 +247,22 @@ type Querier interface {
 	ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error)
 	ListSystemConfigsByKeys(ctx context.Context, configKeys []string) ([]SystemConfig, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
+	// ListTaskMediaAssets queries media by task: asset rows attached to a
+	// workspace-scoped task via task_outputs, ordered by output_index.
+	// Remote-URL outputs carry no asset and are excluded. The output role
+	// rides in task_outputs.metadata (see #819's mapping); it is
+	// projected alongside the asset row.
+	ListTaskMediaAssets(ctx context.Context, arg ListTaskMediaAssetsParams) ([]ListTaskMediaAssetsRow, error)
 	ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrder, error)
 	ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
+	ListWorkspaceTaskOutputs(ctx context.Context, arg ListWorkspaceTaskOutputsParams) ([]TaskOutput, error)
+	// ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
+	// (internal task ids resolved from the same page).
+	ListWorkspaceTaskOutputsByTaskIDs(ctx context.Context, taskIds []int64) ([]TaskOutput, error)
+	ListWorkspaceTasks(ctx context.Context, arg ListWorkspaceTasksParams) ([]Task, error)
 	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
 	LockAIGatewayModelMappingWrite(ctx context.Context) error
@@ -115,11 +274,26 @@ type Querier interface {
 	MarkPaymentOrderFailed(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	MarkPaymentWebhookEventProcessed(ctx context.Context, arg MarkPaymentWebhookEventProcessedParams) (int64, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
+	// MarkUploadSessionTransferring signals transfer start (first read
+	// after create). Zero rows means already moved or invisible; the
+	// caller distinguishes via GetUploadSessionByPublicID.
+	MarkUploadSessionTransferring(ctx context.Context, arg MarkUploadSessionTransferringParams) (UploadSession, error)
+	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error)
+	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error)
+	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error)
+	// RetryWorkspaceTask consumes one retry budget entry: a live task returns
+	// to pending with retry_count incremented, the lease released (pending rows
+	// must carry an empty lease_token), and the fresh execution token recorded
+	// in the workflow_input envelope.
+	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
+	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
+	// (read-modify-write merge: unknown keys from other writers survive).
+	UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaAssetMetadataParams) (MediaAsset, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (int64, error)
 	UpdateOrganizationName(ctx context.Context, arg UpdateOrganizationNameParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
@@ -132,8 +306,16 @@ type Querier interface {
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
+	// UpsertMediaAssetDerivative records one materialized derivative
+	// variant. Regeneration converges on (asset_id, variant_name).
+	UpsertMediaAssetDerivative(ctx context.Context, arg UpsertMediaAssetDerivativeParams) (MediaAssetDerivative, error)
+	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
+	// #809 hard cut: the locator-immutability guard used to consult
+	// media_assets.storage_profile_id, which no longer exists in the
+	// workspace model (the prevent_referenced_storage_profile_locator_change
+	// trigger was removed with it). Only same-locator updates may proceed.
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertWorkspaceMembership(ctx context.Context, arg UpsertWorkspaceMembershipParams) error
