@@ -50,26 +50,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
-const deleteBoardMembersByUserID = `-- name: DeleteBoardMembersByUserID :exec
-DELETE FROM board_members
-WHERE user_id = $1
-`
-
-func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID int64) error {
-	_, err := q.db.Exec(ctx, deleteBoardMembersByUserID, userID)
-	return err
-}
-
-const deleteUserBoardsByUserID = `-- name: DeleteUserBoardsByUserID :exec
-DELETE FROM boards
-WHERE owner_user_id = $1
-`
-
-func (q *Queries) DeleteUserBoardsByUserID(ctx context.Context, userID int64) error {
-	_, err := q.db.Exec(ctx, deleteUserBoardsByUserID, userID)
-	return err
-}
-
 const deleteUserByID = `-- name: DeleteUserByID :execrows
 DELETE FROM users
 WHERE id = $1

@@ -142,8 +142,7 @@ CREATE INDEX idx_workspace_memberships_user ON workspace_memberships (user_id, w
 -- Boards and collaboration (#802). Boards are workspace-scoped with separate
 -- ACL from workspace membership. Document snapshots use optimistic concurrency
 -- (ETag/If-Match). Revisions are immutable. Share tokens enable public join.
--- Temporary _v2 suffix to coexist with legacy user-scoped boards until #809.
-CREATE TABLE boards_v2 (
+CREATE TABLE boards (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
@@ -151,89 +150,88 @@ CREATE TABLE boards_v2 (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
-  CONSTRAINT uq_boards_v2_public_id UNIQUE (public_id),
-  CONSTRAINT chk_boards_v2_public_id CHECK (public_id LIKE 'board\_%'),
-  CONSTRAINT chk_boards_v2_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
+  CONSTRAINT uq_boards_public_id UNIQUE (public_id),
+  CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
+  CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
 );
 
-CREATE INDEX idx_boards_v2_workspace ON boards_v2 (workspace_id, created_at DESC) WHERE archived_at IS NULL;
-CREATE INDEX idx_boards_v2_archived ON boards_v2 (workspace_id, archived_at DESC) WHERE archived_at IS NOT NULL;
+CREATE INDEX idx_boards_workspace ON boards (workspace_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_boards_archived ON boards (workspace_id, archived_at DESC) WHERE archived_at IS NOT NULL;
 
 -- Board document snapshots with optimistic concurrency. The etag is a hash
 -- of (document_version || snapshot_data) for conflict detection. Document
 -- schema evolution uses a versioned discriminated union (not modeled here).
-CREATE TABLE board_documents_v2 (
-  board_id BIGINT PRIMARY KEY REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+CREATE TABLE board_documents (
+  board_id BIGINT PRIMARY KEY REFERENCES boards(internal_id) ON DELETE CASCADE,
   document_version INT NOT NULL DEFAULT 1,
   snapshot_data JSONB NOT NULL,
   etag TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_board_documents_v2_version_positive CHECK (document_version > 0),
-  CONSTRAINT chk_board_documents_v2_etag CHECK (length(etag) BETWEEN 8 AND 128)
+  CONSTRAINT chk_board_documents_version_positive CHECK (document_version > 0),
+  CONSTRAINT chk_board_documents_etag CHECK (length(etag) BETWEEN 8 AND 128)
 );
 
 -- Immutable revision history. Each write creates a new revision referencing
 -- the prior one. Revision data may be delta or full snapshot (not prescribed).
-CREATE TABLE board_revisions_v2 (
+CREATE TABLE board_revisions (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
-  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
   revision_number INT NOT NULL,
   author_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  parent_revision_id BIGINT NULL REFERENCES board_revisions_v2(internal_id) ON DELETE RESTRICT,
+  parent_revision_id BIGINT NULL REFERENCES board_revisions(internal_id) ON DELETE RESTRICT,
   revision_data JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_board_revisions_v2_public_id UNIQUE (public_id),
-  CONSTRAINT uq_board_revisions_v2_board_number UNIQUE (board_id, revision_number),
-  CONSTRAINT chk_board_revisions_v2_public_id CHECK (public_id LIKE 'rev\_%'),
-  CONSTRAINT chk_board_revisions_v2_number_positive CHECK (revision_number > 0)
+  CONSTRAINT uq_board_revisions_public_id UNIQUE (public_id),
+  CONSTRAINT uq_board_revisions_board_number UNIQUE (board_id, revision_number),
+  CONSTRAINT chk_board_revisions_public_id CHECK (public_id LIKE 'rev\_%'),
+  CONSTRAINT chk_board_revisions_number_positive CHECK (revision_number > 0)
 );
 
-CREATE INDEX idx_board_revisions_v2_board_created ON board_revisions_v2 (board_id, created_at DESC);
-CREATE INDEX idx_board_revisions_v2_author ON board_revisions_v2 (author_user_id, created_at DESC);
+CREATE INDEX idx_board_revisions_board_created ON board_revisions (board_id, created_at DESC);
+CREATE INDEX idx_board_revisions_author ON board_revisions (author_user_id, created_at DESC);
 
 -- Board membership ACL, separate from workspace membership. Role enforcement
 -- at application layer: owner > editor > viewer.
-CREATE TABLE board_memberships_v2 (
-  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+CREATE TABLE board_memberships (
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
 );
 
-CREATE INDEX idx_board_memberships_v2_user ON board_memberships_v2 (user_id, board_id);
+CREATE INDEX idx_board_memberships_user ON board_memberships (user_id, board_id);
 
 -- Share tokens enable public join with configurable role. Token creation,
 -- join, and revocation are idempotent commands (Idempotency-Key required).
-CREATE TABLE board_share_tokens_v2 (
+CREATE TABLE board_share_tokens (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
-  board_id BIGINT NOT NULL REFERENCES boards_v2(internal_id) ON DELETE CASCADE,
+  board_id BIGINT NOT NULL REFERENCES boards(internal_id) ON DELETE CASCADE,
   token_secret TEXT NOT NULL,
   granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
   created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   revoked_at TIMESTAMPTZ NULL,
   revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT uq_board_share_tokens_v2_public_id UNIQUE (public_id),
-  CONSTRAINT uq_board_share_tokens_v2_secret UNIQUE (token_secret),
-  CONSTRAINT chk_board_share_tokens_v2_public_id CHECK (public_id LIKE 'bst\_%'),
-  CONSTRAINT chk_board_share_tokens_v2_secret CHECK (length(token_secret) >= 32),
-  CONSTRAINT chk_board_share_tokens_v2_revocation CHECK (
+  CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
+  CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
+  CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
+  CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
+  CONSTRAINT chk_board_share_tokens_revocation CHECK (
     (revoked_at IS NULL AND revoked_by_user_id IS NULL)
     OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)
   )
 );
 
-CREATE INDEX idx_board_share_tokens_v2_board ON board_share_tokens_v2 (board_id) WHERE revoked_at IS NULL;
-CREATE INDEX idx_board_share_tokens_v2_secret ON board_share_tokens_v2 (token_secret) WHERE revoked_at IS NULL;
+CREATE INDEX idx_board_share_tokens_board ON board_share_tokens (board_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_board_share_tokens_secret ON board_share_tokens (token_secret) WHERE revoked_at IS NULL;
 
 -- Upload sessions and Media Assets (#803). Upload sessions have explicit
 -- lifecycle (pending → completed/expired/failed). Only successful completion
 -- creates a durable Media Asset. Storage keys are never exposed in the API.
--- Temporary _v2 suffix to coexist with legacy user-scoped media until #809.
-CREATE TABLE upload_sessions_v2 (
+CREATE TABLE upload_sessions (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
@@ -246,29 +244,29 @@ CREATE TABLE upload_sessions_v2 (
   completed_at TIMESTAMPTZ NULL,
   expired_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_upload_sessions_v2_public_id UNIQUE (public_id),
-  CONSTRAINT chk_upload_sessions_v2_public_id CHECK (public_id LIKE 'upload\_%'),
-  CONSTRAINT chk_upload_sessions_v2_size_positive CHECK (declared_size_bytes > 0),
-  CONSTRAINT chk_upload_sessions_v2_status CHECK (status IN ('pending','transferring','completed','expired','failed')),
-  CONSTRAINT chk_upload_sessions_v2_completion CHECK (
+  CONSTRAINT uq_upload_sessions_public_id UNIQUE (public_id),
+  CONSTRAINT chk_upload_sessions_public_id CHECK (public_id LIKE 'upload\_%'),
+  CONSTRAINT chk_upload_sessions_size_positive CHECK (declared_size_bytes > 0),
+  CONSTRAINT chk_upload_sessions_status CHECK (status IN ('pending','transferring','completed','expired','failed')),
+  CONSTRAINT chk_upload_sessions_completion CHECK (
     (status = 'completed' AND completed_at IS NOT NULL AND storage_key IS NOT NULL)
     OR (status = 'expired' AND expired_at IS NOT NULL)
     OR (status IN ('pending','transferring','failed'))
   )
 );
 
-CREATE INDEX idx_upload_sessions_v2_workspace ON upload_sessions_v2 (workspace_id, created_at DESC);
-CREATE INDEX idx_upload_sessions_v2_uploader ON upload_sessions_v2 (uploader_user_id, created_at DESC);
-CREATE INDEX idx_upload_sessions_v2_pending ON upload_sessions_v2 (created_at) WHERE status IN ('pending','transferring');
+CREATE INDEX idx_upload_sessions_workspace ON upload_sessions (workspace_id, created_at DESC);
+CREATE INDEX idx_upload_sessions_uploader ON upload_sessions (uploader_user_id, created_at DESC);
+CREATE INDEX idx_upload_sessions_pending ON upload_sessions (created_at) WHERE status IN ('pending','transferring');
 
 -- Media Assets are immutable references to stored content with typed metadata.
 -- Assets are created only from successful upload completion. Content delivery
 -- supports original and derivative variants without exposing storage_key.
-CREATE TABLE media_assets_v2 (
+CREATE TABLE media_assets (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
-  upload_session_id BIGINT NOT NULL REFERENCES upload_sessions_v2(internal_id) ON DELETE RESTRICT,
+  upload_session_id BIGINT NOT NULL REFERENCES upload_sessions(internal_id) ON DELETE RESTRICT,
   owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   storage_key TEXT NOT NULL,
   mime_type TEXT NOT NULL,
@@ -281,27 +279,27 @@ CREATE TABLE media_assets_v2 (
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
-  CONSTRAINT uq_media_assets_v2_public_id UNIQUE (public_id),
-  CONSTRAINT uq_media_assets_v2_storage_key UNIQUE (storage_key),
-  CONSTRAINT chk_media_assets_v2_public_id CHECK (public_id LIKE 'asset\_%'),
-  CONSTRAINT chk_media_assets_v2_size_positive CHECK (size_bytes > 0),
-  CONSTRAINT chk_media_assets_v2_media_kind CHECK (media_kind IN ('image','video','audio','document','other')),
-  CONSTRAINT chk_media_assets_v2_dimensions CHECK (
+  CONSTRAINT uq_media_assets_public_id UNIQUE (public_id),
+  CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_key),
+  CONSTRAINT chk_media_assets_public_id CHECK (public_id LIKE 'asset\_%'),
+  CONSTRAINT chk_media_assets_size_positive CHECK (size_bytes > 0),
+  CONSTRAINT chk_media_assets_media_kind CHECK (media_kind IN ('image','video','audio','document','other')),
+  CONSTRAINT chk_media_assets_dimensions CHECK (
     (media_kind = 'image' AND width > 0 AND height > 0)
     OR (media_kind != 'image')
   ),
-  CONSTRAINT chk_media_assets_v2_metadata CHECK (jsonb_typeof(metadata) = 'object')
+  CONSTRAINT chk_media_assets_metadata CHECK (jsonb_typeof(metadata) = 'object')
 );
 
-CREATE INDEX idx_media_assets_v2_workspace ON media_assets_v2 (workspace_id, created_at DESC) WHERE archived_at IS NULL;
-CREATE INDEX idx_media_assets_v2_owner ON media_assets_v2 (owner_user_id, created_at DESC);
-CREATE INDEX idx_media_assets_v2_upload ON media_assets_v2 (upload_session_id);
+CREATE INDEX idx_media_assets_workspace ON media_assets (workspace_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_media_assets_owner ON media_assets (owner_user_id, created_at DESC);
+CREATE INDEX idx_media_assets_upload ON media_assets (upload_session_id);
 
 -- Media Asset derivatives (thumbnails, transcodes). Storage and delivery
 -- follow the same storage_key hiding rule as originals.
-CREATE TABLE media_asset_derivatives_v2 (
+CREATE TABLE media_asset_derivatives (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  asset_id BIGINT NOT NULL REFERENCES media_assets_v2(internal_id) ON DELETE CASCADE,
+  asset_id BIGINT NOT NULL REFERENCES media_assets(internal_id) ON DELETE CASCADE,
   variant_name TEXT NOT NULL,
   storage_key TEXT NOT NULL,
   mime_type TEXT NOT NULL,
@@ -309,13 +307,13 @@ CREATE TABLE media_asset_derivatives_v2 (
   width INT NULL,
   height INT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_media_asset_derivatives_v2_asset_variant UNIQUE (asset_id, variant_name),
-  CONSTRAINT uq_media_asset_derivatives_v2_storage_key UNIQUE (storage_key),
-  CONSTRAINT chk_media_asset_derivatives_v2_size_positive CHECK (size_bytes > 0),
-  CONSTRAINT chk_media_asset_derivatives_v2_variant CHECK (length(btrim(variant_name)) BETWEEN 1 AND 64)
+  CONSTRAINT uq_media_asset_derivatives_asset_variant UNIQUE (asset_id, variant_name),
+  CONSTRAINT uq_media_asset_derivatives_storage_key UNIQUE (storage_key),
+  CONSTRAINT chk_media_asset_derivatives_size_positive CHECK (size_bytes > 0),
+  CONSTRAINT chk_media_asset_derivatives_variant CHECK (length(btrim(variant_name)) BETWEEN 1 AND 64)
 );
 
-CREATE INDEX idx_media_asset_derivatives_v2_asset ON media_asset_derivatives_v2 (asset_id);
+CREATE INDEX idx_media_asset_derivatives_asset ON media_asset_derivatives (asset_id);
 
 -- Billing Account foundation (#804). A Billing Account is owned by exactly
 -- one Workspace (initial owner) or exactly one Organization. The public_id
@@ -780,7 +778,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 
-CREATE FUNCTION execute_credit_command_v2(
+CREATE FUNCTION execute_credit_command(
   p_command_type TEXT, p_user_id BIGINT, p_amount BIGINT, p_related_transaction_id TEXT,
   p_idempotency_key TEXT, p_actor_type TEXT, p_actor_id TEXT, p_source TEXT, p_reason TEXT,
   p_business_reference_type TEXT, p_business_reference_id TEXT
@@ -977,13 +975,13 @@ DECLARE trusted_schema TEXT := current_schema();
 BEGIN
   EXECUTE format('ALTER FUNCTION %I.create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
   EXECUTE format('ALTER FUNCTION %I.release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
-  EXECUTE format('ALTER FUNCTION %I.execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
+  EXECUTE format('ALTER FUNCTION %I.execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp', trusted_schema, trusted_schema);
 END;
 $$;
 
 REVOKE ALL ON FUNCTION create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
 
 CREATE FUNCTION start_credit_reconciliation(
@@ -2264,104 +2262,6 @@ CREATE TRIGGER system_settings_admin_actions_append_only BEFORE DELETE OR UPDATE
 --
 --
 CREATE TABLE tasks (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  task_id VARCHAR(64) NOT NULL,
-  user_id BIGINT NOT NULL,
-  client_action_id VARCHAR(128) NOT NULL DEFAULT '',
-  assigned_provider_endpoint_id BIGINT,
-  assigned_credential_id BIGINT,
-  account_id BIGINT,
-  prompt TEXT NOT NULL,
-  user_prompt TEXT NOT NULL,
-  params TEXT NOT NULL,
-  feature_slug VARCHAR(64) NOT NULL DEFAULT '',
-  priority INTEGER NOT NULL DEFAULT 2,
-  status VARCHAR(32) NOT NULL DEFAULT 'pending',
-  lease_token VARCHAR(128) NOT NULL DEFAULT '',
-  retry_count INTEGER NOT NULL DEFAULT 0,
-  attempt_seq INTEGER NOT NULL DEFAULT 0,
-  error_msg TEXT NOT NULL,
-  result TEXT NOT NULL,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  completed_at TIMESTAMPTZ(3),
-  cancelled_at TIMESTAMPTZ(3),
-  cancelled_by BIGINT,
-  cancel_reason TEXT NOT NULL DEFAULT '',
-  CONSTRAINT uq_tasks_task_id UNIQUE (task_id),
-  CONSTRAINT ck_tasks_client_action_id_trimmed CHECK (client_action_id = btrim(client_action_id)),
-  CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'cancelled_with_results')),
-  CONSTRAINT ck_tasks_priority CHECK (priority BETWEEN 1 AND 4),
-  CONSTRAINT ck_tasks_retry_count_non_negative CHECK (retry_count >= 0),
-  CONSTRAINT ck_tasks_attempt_seq_non_negative CHECK (attempt_seq >= 0),
-  CONSTRAINT ck_tasks_assignment_pair CHECK (
-    (account_id IS NULL AND assigned_provider_endpoint_id IS NULL AND assigned_credential_id IS NULL)
-    OR (account_id IS NOT NULL AND assigned_provider_endpoint_id IS NOT NULL AND assigned_credential_id IS NOT NULL)
-  ),
-  CONSTRAINT ck_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
-  CONSTRAINT ck_tasks_terminal_consistency CHECK (
-    (
-      status IN ('pending', 'running')
-      AND completed_at IS NULL
-      AND cancelled_at IS NULL
-      AND cancelled_by IS NULL
-      AND cancel_reason = ''
-    )
-    OR (
-      status = 'completed'
-      AND completed_at IS NOT NULL
-      AND cancelled_at IS NULL
-      AND cancelled_by IS NULL
-      AND cancel_reason = ''
-    )
-    OR (
-      status = 'failed'
-      AND completed_at IS NOT NULL
-      AND cancelled_at IS NULL
-      AND cancelled_by IS NULL
-      AND cancel_reason = ''
-      AND btrim(error_msg) <> ''
-    )
-    OR (
-      status IN ('cancelled', 'cancelled_with_results')
-      AND completed_at IS NOT NULL
-      AND cancelled_at IS NOT NULL
-      AND btrim(cancel_reason) <> ''
-    )
-  ),
-  CONSTRAINT ck_tasks_assigned_provider_endpoint_id_positive CHECK (assigned_provider_endpoint_id IS NULL OR assigned_provider_endpoint_id > 0),
-  CONSTRAINT ck_tasks_assigned_credential_id_positive CHECK (assigned_credential_id IS NULL OR assigned_credential_id > 0),
-  CONSTRAINT ck_tasks_account_id_positive CHECK (account_id IS NULL OR account_id > 0),
-  CONSTRAINT ck_tasks_cancelled_by_positive CHECK (cancelled_by IS NULL OR cancelled_by > 0),
-  CONSTRAINT fk_tasks_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tasks_account_id FOREIGN KEY (account_id) REFERENCES api_accounts(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_tasks_assigned_credential_id FOREIGN KEY (assigned_credential_id) REFERENCES api_account_secrets(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_tasks_account_credential FOREIGN KEY (assigned_credential_id, account_id) REFERENCES api_account_secrets(id, account_id) ON DELETE RESTRICT,
-  CONSTRAINT fk_tasks_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_tasks_assigned_provider_endpoint_id FOREIGN KEY (assigned_provider_endpoint_id) REFERENCES provider_endpoints(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_tasks_account_provider_endpoint FOREIGN KEY (account_id, assigned_provider_endpoint_id) REFERENCES api_accounts(id, provider_endpoint_id) ON DELETE RESTRICT
-);
-
-CREATE INDEX idx_tasks_user_id ON tasks (user_id);
-CREATE UNIQUE INDEX uq_tasks_user_client_action_id ON tasks (user_id, client_action_id) WHERE client_action_id <> '';
-CREATE INDEX idx_tasks_account_id ON tasks (account_id) WHERE account_id IS NOT NULL;
-CREATE INDEX idx_tasks_assigned_credential_id ON tasks (assigned_credential_id) WHERE assigned_credential_id IS NOT NULL;
-CREATE INDEX idx_tasks_status ON tasks (status);
-CREATE INDEX idx_tasks_lease_token ON tasks (lease_token);
-CREATE INDEX idx_tasks_created_at ON tasks (created_at);
-CREATE INDEX idx_tasks_running_account ON tasks (account_id) WHERE status = 'running' AND account_id IS NOT NULL;
-CREATE INDEX idx_tasks_user_created_at ON tasks (user_id, created_at DESC);
-CREATE INDEX idx_tasks_status_created_at ON tasks (status, created_at DESC);
-CREATE INDEX idx_tasks_account_status_created_at ON tasks (account_id, status, created_at DESC) WHERE account_id IS NOT NULL;
-CREATE INDEX idx_tasks_assigned_provider_endpoint_created_at ON tasks (assigned_provider_endpoint_id, created_at DESC) WHERE assigned_provider_endpoint_id IS NOT NULL;
-CREATE INDEX idx_tasks_feature_created_at ON tasks (feature_slug, created_at DESC) WHERE feature_slug <> '';
-CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results');
-CREATE INDEX idx_tasks_pending_updated_at ON tasks (updated_at) WHERE status = 'pending';
-
--- Workspace-scoped task lifecycle (#805). Tasks are async jobs for AI workflows
--- with explicit lifecycle, billing settlement, retry, and cancellation.
--- Temporary _v2 suffix to coexist with legacy user-scoped tasks until #809.
-CREATE TABLE tasks_v2 (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
@@ -2380,49 +2280,49 @@ CREATE TABLE tasks_v2 (
   completed_at TIMESTAMPTZ NULL,
   cancelled_at TIMESTAMPTZ NULL,
   cancelled_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT uq_tasks_v2_public_id UNIQUE (public_id),
-  CONSTRAINT chk_tasks_v2_public_id CHECK (public_id LIKE 'task\_%'),
-  CONSTRAINT chk_tasks_v2_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
-  CONSTRAINT chk_tasks_v2_priority CHECK (priority BETWEEN 1 AND 4),
-  CONSTRAINT chk_tasks_v2_retry_count CHECK (retry_count >= 0),
-  CONSTRAINT chk_tasks_v2_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
-  CONSTRAINT chk_tasks_v2_lease_status CHECK (status = 'running' OR lease_token = ''),
-  CONSTRAINT chk_tasks_v2_terminal_consistency CHECK (
+  CONSTRAINT uq_tasks_public_id UNIQUE (public_id),
+  CONSTRAINT chk_tasks_public_id CHECK (public_id LIKE 'task\_%'),
+  CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
+  CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),
+  CONSTRAINT chk_tasks_retry_count CHECK (retry_count >= 0),
+  CONSTRAINT chk_tasks_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
+  CONSTRAINT chk_tasks_terminal_consistency CHECK (
     (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
     OR (status = 'completed' AND completed_at IS NOT NULL AND cancelled_at IS NULL)
     OR (status = 'failed' AND completed_at IS NOT NULL AND cancelled_at IS NULL)
     OR (status = 'cancelled' AND cancelled_at IS NOT NULL)
   ),
-  CONSTRAINT chk_tasks_v2_workflow_input CHECK (jsonb_typeof(workflow_input) = 'object')
+  CONSTRAINT chk_tasks_workflow_input CHECK (jsonb_typeof(workflow_input) = 'object')
 );
 
-CREATE INDEX idx_tasks_v2_workspace ON tasks_v2 (workspace_id, created_at DESC);
-CREATE INDEX idx_tasks_v2_status ON tasks_v2 (status, created_at) WHERE status IN ('pending','running');
-CREATE INDEX idx_tasks_v2_submitter ON tasks_v2 (submitter_user_id, created_at DESC);
-CREATE INDEX idx_tasks_v2_billing ON tasks_v2 (billing_account_id, created_at DESC);
+CREATE INDEX idx_tasks_workspace ON tasks (workspace_id, created_at DESC);
+CREATE INDEX idx_tasks_status ON tasks (status, created_at) WHERE status IN ('pending','running');
+CREATE INDEX idx_tasks_submitter ON tasks (submitter_user_id, created_at DESC);
+CREATE INDEX idx_tasks_billing ON tasks (billing_account_id, created_at DESC);
 
 -- Task outputs reference Media Assets or remote URLs without exposing storage keys.
-CREATE TABLE task_outputs_v2 (
+CREATE TABLE task_outputs (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  task_id BIGINT NOT NULL REFERENCES tasks_v2(internal_id) ON DELETE CASCADE,
+  task_id BIGINT NOT NULL REFERENCES tasks(internal_id) ON DELETE CASCADE,
   output_index INT NOT NULL,
   output_kind TEXT NOT NULL,
-  media_asset_id BIGINT NULL REFERENCES media_assets_v2(internal_id) ON DELETE RESTRICT,
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   remote_url TEXT NULL,
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_task_outputs_v2_task_index UNIQUE (task_id, output_index),
-  CONSTRAINT chk_task_outputs_v2_index CHECK (output_index >= 0),
-  CONSTRAINT chk_task_outputs_v2_kind CHECK (output_kind IN ('media_asset','remote_url')),
-  CONSTRAINT chk_task_outputs_v2_kind_shape CHECK (
+  CONSTRAINT uq_task_outputs_task_index UNIQUE (task_id, output_index),
+  CONSTRAINT chk_task_outputs_index CHECK (output_index >= 0),
+  CONSTRAINT chk_task_outputs_kind CHECK (output_kind IN ('media_asset','remote_url')),
+  CONSTRAINT chk_task_outputs_kind_shape CHECK (
     (output_kind = 'media_asset' AND media_asset_id IS NOT NULL AND remote_url IS NULL)
     OR (output_kind = 'remote_url' AND media_asset_id IS NULL AND remote_url IS NOT NULL)
   ),
-  CONSTRAINT chk_task_outputs_v2_metadata CHECK (jsonb_typeof(metadata) = 'object')
+  CONSTRAINT chk_task_outputs_metadata CHECK (jsonb_typeof(metadata) = 'object')
 );
 
-CREATE INDEX idx_task_outputs_v2_task ON task_outputs_v2 (task_id, output_index);
-CREATE INDEX idx_task_outputs_v2_media ON task_outputs_v2 (media_asset_id) WHERE media_asset_id IS NOT NULL;
+CREATE INDEX idx_task_outputs_task ON task_outputs (task_id, output_index);
+CREATE INDEX idx_task_outputs_media ON task_outputs (media_asset_id) WHERE media_asset_id IS NOT NULL;
 
 CREATE TABLE task_execution_metrics (
   task_id VARCHAR(64) PRIMARY KEY,
@@ -2530,54 +2430,6 @@ CREATE INDEX idx_task_execution_attempts_status_created_at ON task_execution_att
 CREATE INDEX idx_task_execution_attempts_running_created_at ON task_execution_attempts (created_at) WHERE status = 'running';
 
 -- Legacy user-scoped media tables (deprecated, remove in #809)
-
-CREATE TABLE media_assets (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  asset_id VARCHAR(64) NOT NULL,
-  owner_user_id BIGINT NOT NULL,
-  storage_profile_id VARCHAR(64) NOT NULL DEFAULT 'builtin-local',
-  storage_key TEXT NOT NULL,
-  url TEXT NOT NULL DEFAULT '',
-  source_url TEXT NOT NULL DEFAULT '',
-  media_kind VARCHAR(32) NOT NULL DEFAULT 'image',
-  mime_type VARCHAR(64) NOT NULL DEFAULT '',
-  width INTEGER NOT NULL DEFAULT 0,
-  height INTEGER NOT NULL DEFAULT 0,
-  size_bytes BIGINT NOT NULL DEFAULT 0,
-  checksum_sha256 VARCHAR(64) NOT NULL DEFAULT '',
-  object_generation BIGINT NOT NULL DEFAULT 1,
-  status VARCHAR(32) NOT NULL DEFAULT 'ready',
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  deleted_at TIMESTAMPTZ(3),
-  reclaim_after TIMESTAMPTZ(3),
-  reclaim_started_at TIMESTAMPTZ(3),
-  reclaim_claim_token UUID,
-  reclaim_generation BIGINT NOT NULL DEFAULT 0,
-  CONSTRAINT uq_media_assets_asset_id UNIQUE (asset_id),
-  CONSTRAINT uq_media_assets_id_owner UNIQUE (id, owner_user_id),
-  CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_profile_id, storage_key),
-  CONSTRAINT ck_media_assets_media_kind CHECK (media_kind IN ('image', 'video', 'audio', 'document', 'other')),
-  CONSTRAINT ck_media_assets_status CHECK (status IN ('pending', 'uploading', 'ready', 'quarantined', 'deleted', 'failed', 'missing', 'invalid')),
-  CONSTRAINT ck_media_assets_asset_id_not_blank CHECK (btrim(asset_id) <> ''),
-  CONSTRAINT ck_media_assets_storage_profile_id_not_blank CHECK (btrim(storage_profile_id) <> ''),
-  CONSTRAINT ck_media_assets_storage_key_not_blank CHECK (btrim(storage_key) <> ''),
-  CONSTRAINT ck_media_assets_dimensions CHECK (width >= 0 AND height >= 0 AND size_bytes >= 0),
-  CONSTRAINT ck_media_assets_object_generation CHECK (object_generation > 0),
-  CONSTRAINT ck_media_assets_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),
-  CONSTRAINT ck_media_assets_deleted_state CHECK ((status = 'deleted') = (deleted_at IS NOT NULL)),
-  CONSTRAINT fk_media_assets_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE RESTRICT
-);
-
-CREATE INDEX idx_media_assets_owner_status ON media_assets (owner_user_id, status, updated_at DESC);
-CREATE INDEX idx_media_assets_owner_active_updated ON media_assets (owner_user_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL;
-CREATE INDEX idx_media_assets_storage_key ON media_assets (storage_profile_id, storage_key);
-CREATE INDEX idx_media_assets_reclamation_due ON media_assets (reclaim_after, id) WHERE deleted_at IS NULL AND reclaim_after IS NOT NULL;
-CREATE UNIQUE INDEX uq_media_assets_owned_checksum
-  ON media_assets (owner_user_id, storage_profile_id, checksum_sha256)
-  WHERE checksum_sha256 <> '' AND status = 'ready' AND deleted_at IS NULL;
-
 -- Media lineage is intentionally metadata-only for now. It records where an
 -- asset came from without introducing a Media Transformation execution model.
 CREATE TABLE media_asset_sources (
@@ -2727,188 +2579,6 @@ CREATE INDEX idx_media_refs_task ON media_refs (task_id, ref_type);
 
 
 -- Legacy user-scoped board tables (deprecated, remove in #809)
-
-CREATE TABLE boards (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  owner_user_id BIGINT NOT NULL,
-  created_by BIGINT NOT NULL,
-  name VARCHAR(60) NOT NULL,
-  state JSONB NOT NULL,
-  revision BIGINT NOT NULL DEFAULT 1,
-  state_schema_version INTEGER NOT NULL DEFAULT 1,
-  last_saved_by BIGINT,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_boards_board_id UNIQUE (board_id),
-  CONSTRAINT ck_boards_revision CHECK (revision > 0),
-  CONSTRAINT ck_boards_state_schema_version CHECK (state_schema_version > 0),
-  CONSTRAINT fk_boards_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_boards_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_boards_last_saved_by FOREIGN KEY (last_saved_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE UNIQUE INDEX uq_boards_owner_name ON boards (owner_user_id, lower(name));
-CREATE INDEX idx_boards_owner_updated ON boards (owner_user_id, updated_at);
-
-CREATE TABLE board_members (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  user_id BIGINT NOT NULL,
-  role VARCHAR(20) NOT NULL,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_board_member UNIQUE (board_id, user_id),
-  CONSTRAINT ck_board_members_role CHECK (role IN ('editor', 'viewer')),
-  CONSTRAINT fk_board_members_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
-  CONSTRAINT fk_board_members_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_board_member_user ON board_members (user_id, board_id);
-
-CREATE TABLE board_share_tokens (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  board_id VARCHAR(100) NOT NULL,
-  token_hash VARCHAR(128) NOT NULL,
-  token_prefix VARCHAR(16) NOT NULL,
-  role VARCHAR(20) NOT NULL,
-  created_by BIGINT NOT NULL,
-  revoked BOOLEAN NOT NULL DEFAULT FALSE,
-  usage_count BIGINT NOT NULL DEFAULT 0,
-  max_uses INTEGER,
-  last_used_at TIMESTAMPTZ(3),
-  revoked_at TIMESTAMPTZ(3),
-  revoked_by BIGINT,
-  expires_at TIMESTAMPTZ(3),
-  idempotency_key VARCHAR(128) NOT NULL DEFAULT '',
-  request_hash VARCHAR(64) NOT NULL DEFAULT '',
-  token_secret TEXT NOT NULL DEFAULT '',
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_board_share_tokens_token_hash UNIQUE (token_hash),
-  CONSTRAINT ck_board_share_tokens_role CHECK (role IN ('editor', 'viewer')),
-  CONSTRAINT ck_board_share_tokens_usage CHECK (usage_count >= 0 AND (max_uses IS NULL OR max_uses > 0)),
-  CONSTRAINT ck_board_share_tokens_token_hash_not_blank CHECK (btrim(token_hash) <> ''),
-  CONSTRAINT ck_board_share_tokens_token_prefix_not_blank CHECK (btrim(token_prefix) <> ''),
-  CONSTRAINT ck_board_share_tokens_idempotency CHECK ((idempotency_key = '' AND request_hash = '') OR (idempotency_key <> '' AND request_hash <> '')),
-  CONSTRAINT ck_board_share_tokens_revoked_at CHECK (NOT revoked OR revoked_at IS NOT NULL),
-  CONSTRAINT fk_board_share_tokens_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE,
-  CONSTRAINT fk_board_share_tokens_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_board_share_tokens_revoked_by FOREIGN KEY (revoked_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_board_share_token_board ON board_share_tokens (board_id, created_at DESC);
-CREATE INDEX idx_board_share_token_active ON board_share_tokens (token_hash) WHERE NOT revoked;
-CREATE UNIQUE INDEX uq_board_share_tokens_creator_idempotency ON board_share_tokens (created_by, idempotency_key) WHERE idempotency_key <> '';
-CREATE TABLE task_outputs (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  task_id VARCHAR(64) NOT NULL,
-  media_asset_id BIGINT,
-  output_kind VARCHAR(32) NOT NULL DEFAULT 'asset',
-  role VARCHAR(32) NOT NULL DEFAULT 'image',
-  url TEXT NOT NULL DEFAULT '',
-  source_url TEXT NOT NULL DEFAULT '',
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  result_index INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT fk_task_outputs_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
-  CONSTRAINT fk_task_outputs_media_asset_id FOREIGN KEY (media_asset_id) REFERENCES media_assets(id) ON DELETE RESTRICT,
-  CONSTRAINT ck_task_outputs_output_kind CHECK (output_kind IN ('asset', 'remote')),
-  CONSTRAINT ck_task_outputs_role_not_blank CHECK (btrim(role) <> ''),
-  CONSTRAINT ck_task_outputs_result_index_non_negative CHECK (result_index >= 0),
-  CONSTRAINT ck_task_outputs_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),
-  CONSTRAINT ck_task_outputs_output_kind_shape CHECK (
-    (output_kind = 'asset' AND media_asset_id IS NOT NULL AND btrim(url) = '')
-    OR (output_kind = 'remote' AND media_asset_id IS NULL AND btrim(url) <> '')
-  )
-);
-
-CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, result_index);
-CREATE UNIQUE INDEX uq_task_outputs_task_result_index ON task_outputs (task_id, result_index);
-CREATE INDEX idx_task_outputs_media_asset_id ON task_outputs (media_asset_id);
-
-CREATE OR REPLACE FUNCTION enforce_task_output_media_asset_owner()
-RETURNS trigger AS $$
-DECLARE
-  task_owner_id BIGINT;
-  asset_owner_id BIGINT;
-BEGIN
-  IF NEW.media_asset_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT t.user_id, a.owner_user_id
-  INTO task_owner_id, asset_owner_id
-  FROM tasks AS t
-  JOIN media_assets AS a ON a.id = NEW.media_asset_id
-  WHERE t.task_id = NEW.task_id;
-
-  IF task_owner_id IS NULL THEN
-    RAISE EXCEPTION 'task output media ownership check failed for task_id %, media_asset_id %', NEW.task_id, NEW.media_asset_id;
-  END IF;
-  IF task_owner_id IS DISTINCT FROM asset_owner_id THEN
-    RAISE EXCEPTION 'task output media asset owner does not match task owner';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER enforce_task_output_media_asset_owner BEFORE INSERT OR UPDATE OF task_id, media_asset_id ON task_outputs FOR EACH ROW EXECUTE FUNCTION enforce_task_output_media_asset_owner();
-CREATE TABLE library_folders (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  owner_user_id BIGINT NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  is_system BOOLEAN NOT NULL DEFAULT FALSE,
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_library_folders_id_owner UNIQUE (id, owner_user_id),
-  CONSTRAINT ck_library_folders_name_not_blank CHECK (btrim(name) <> ''),
-  CONSTRAINT ck_library_folders_system_shape CHECK (NOT is_system OR is_default),
-  CONSTRAINT fk_library_folders_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE UNIQUE INDEX uq_library_folders_owner_name_ci
-  ON library_folders (owner_user_id, lower(name));
-
-CREATE INDEX idx_library_folders_owner_order
-  ON library_folders (owner_user_id, is_system DESC, is_default DESC, created_at ASC, id ASC);
-
-CREATE TABLE library_assets (
-  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-  owner_user_id BIGINT NOT NULL,
-  folder_id BIGINT NOT NULL,
-  provider VARCHAR(32) NOT NULL,
-  source_id VARCHAR(128) NOT NULL,
-  source_url TEXT NOT NULL,
-  preview_url TEXT NOT NULL,
-  original_url TEXT NOT NULL,
-  title VARCHAR(255) NOT NULL DEFAULT '',
-  author VARCHAR(255) NOT NULL DEFAULT '',
-  width INTEGER NOT NULL DEFAULT 0,
-  height INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_library_assets_owner_provider_source UNIQUE (owner_user_id, provider, source_id),
-  CONSTRAINT ck_library_assets_provider CHECK (provider IN ('unsplash', 'pexels')),
-  CONSTRAINT ck_library_assets_source_id_not_blank CHECK (btrim(source_id) <> ''),
-  CONSTRAINT ck_library_assets_source_url_not_blank CHECK (btrim(source_url) <> ''),
-  CONSTRAINT ck_library_assets_preview_url_not_blank CHECK (btrim(preview_url) <> ''),
-  CONSTRAINT ck_library_assets_original_url_not_blank CHECK (btrim(original_url) <> ''),
-  CONSTRAINT ck_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
-  CONSTRAINT fk_library_assets_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_library_assets_folder_owner FOREIGN KEY (folder_id, owner_user_id)
-    REFERENCES library_folders(id, owner_user_id) ON DELETE RESTRICT,
-  CONSTRAINT uq_library_assets_id_owner UNIQUE (id, owner_user_id)
-);
-
-CREATE INDEX idx_library_assets_owner_folder_order
-  ON library_assets (owner_user_id, folder_id, created_at DESC, id DESC);
-
-CREATE INDEX idx_library_assets_owner_order
-  ON library_assets (owner_user_id, created_at DESC, id DESC);
-
 -- A Library asset is URL-backed until a user imports it. This association is
 -- intentionally not a media_ref: only actual Canvas/Task use keeps Media
 -- alive, so unused imports remain reclaimable.
@@ -2929,8 +2599,7 @@ CREATE INDEX idx_library_asset_media_assets_owner ON library_asset_media_assets 
 
 -- Workspace-scoped library and search (#806). Library assets are saved external
 -- references, not managed Media Assets. Folders and visibility are workspace-scoped.
--- Temporary _v2 suffix to coexist with legacy user-scoped library until #809.
-CREATE TABLE library_folders_v2 (
+CREATE TABLE library_folders (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
@@ -2939,20 +2608,20 @@ CREATE TABLE library_folders_v2 (
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_library_folders_v2_public_id UNIQUE (public_id),
-  CONSTRAINT uq_library_folders_v2_workspace_name UNIQUE (workspace_id, name),
-  CONSTRAINT chk_library_folders_v2_public_id CHECK (public_id LIKE 'lfolder\_%'),
-  CONSTRAINT chk_library_folders_v2_name CHECK (length(btrim(name)) BETWEEN 1 AND 100),
-  CONSTRAINT chk_library_folders_v2_system_shape CHECK (NOT is_system OR is_default)
+  CONSTRAINT uq_library_folders_public_id UNIQUE (public_id),
+  CONSTRAINT uq_library_folders_workspace_name UNIQUE (workspace_id, name),
+  CONSTRAINT chk_library_folders_public_id CHECK (public_id LIKE 'lfolder\_%'),
+  CONSTRAINT chk_library_folders_name CHECK (length(btrim(name)) BETWEEN 1 AND 100),
+  CONSTRAINT chk_library_folders_system_shape CHECK (NOT is_system OR is_default)
 );
 
-CREATE INDEX idx_library_folders_v2_workspace ON library_folders_v2 (workspace_id, created_at);
+CREATE INDEX idx_library_folders_workspace ON library_folders (workspace_id, created_at);
 
-CREATE TABLE library_assets_v2 (
+CREATE TABLE library_assets (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
-  folder_id BIGINT NOT NULL REFERENCES library_folders_v2(internal_id) ON DELETE RESTRICT,
+  folder_id BIGINT NOT NULL REFERENCES library_folders(internal_id) ON DELETE RESTRICT,
   provider TEXT NOT NULL,
   source_id TEXT NOT NULL,
   source_url TEXT NOT NULL,
@@ -2962,41 +2631,41 @@ CREATE TABLE library_assets_v2 (
   height INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_library_assets_v2_public_id UNIQUE (public_id),
-  CONSTRAINT uq_library_assets_v2_workspace_source UNIQUE (workspace_id, provider, source_id),
-  CONSTRAINT chk_library_assets_v2_public_id CHECK (public_id LIKE 'lasset\_%'),
-  CONSTRAINT chk_library_assets_v2_provider CHECK (provider IN ('unsplash','pexels')),
-  CONSTRAINT chk_library_assets_v2_source_id CHECK (length(btrim(source_id)) > 0),
-  CONSTRAINT chk_library_assets_v2_dimensions CHECK (width >= 0 AND height >= 0)
+  CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
+  CONSTRAINT uq_library_assets_workspace_source UNIQUE (workspace_id, provider, source_id),
+  CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
+  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels')),
+  CONSTRAINT chk_library_assets_source_id CHECK (length(btrim(source_id)) > 0),
+  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0)
 );
 
-CREATE INDEX idx_library_assets_v2_workspace ON library_assets_v2 (workspace_id, created_at DESC);
-CREATE INDEX idx_library_assets_v2_folder ON library_assets_v2 (folder_id, created_at DESC);
+CREATE INDEX idx_library_assets_workspace ON library_assets (workspace_id, created_at DESC);
+CREATE INDEX idx_library_assets_folder ON library_assets (folder_id, created_at DESC);
 
 -- Materialization creates a durable job that eventually produces a Media Asset.
-CREATE TABLE library_materializations_v2 (
+CREATE TABLE library_materializations (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
-  library_asset_id BIGINT NOT NULL REFERENCES library_assets_v2(internal_id) ON DELETE CASCADE,
+  library_asset_id BIGINT NOT NULL REFERENCES library_assets(internal_id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'pending',
-  media_asset_id BIGINT NULL REFERENCES media_assets_v2(internal_id) ON DELETE RESTRICT,
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   error_message TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ NULL,
-  CONSTRAINT uq_library_materializations_v2_public_id UNIQUE (public_id),
-  CONSTRAINT chk_library_materializations_v2_public_id CHECK (public_id LIKE 'lmat\_%'),
-  CONSTRAINT chk_library_materializations_v2_status CHECK (status IN ('pending','processing','completed','failed')),
-  CONSTRAINT chk_library_materializations_v2_completion CHECK (
+  CONSTRAINT uq_library_materializations_public_id UNIQUE (public_id),
+  CONSTRAINT chk_library_materializations_public_id CHECK (public_id LIKE 'lmat\_%'),
+  CONSTRAINT chk_library_materializations_status CHECK (status IN ('pending','processing','completed','failed')),
+  CONSTRAINT chk_library_materializations_completion CHECK (
     (status = 'completed' AND media_asset_id IS NOT NULL AND completed_at IS NOT NULL)
     OR (status = 'failed' AND completed_at IS NOT NULL)
     OR (status IN ('pending','processing'))
   )
 );
 
-CREATE INDEX idx_library_materializations_v2_workspace ON library_materializations_v2 (workspace_id, created_at DESC);
-CREATE INDEX idx_library_materializations_v2_library_asset ON library_materializations_v2 (library_asset_id);
-CREATE INDEX idx_library_materializations_v2_status ON library_materializations_v2 (status, created_at);
+CREATE INDEX idx_library_materializations_workspace ON library_materializations (workspace_id, created_at DESC);
+CREATE INDEX idx_library_materializations_library_asset ON library_materializations (library_asset_id);
+CREATE INDEX idx_library_materializations_status ON library_materializations (status, created_at);
 
 -- Workspace event streams and webhook delivery (#807). Events share one envelope
 -- for SSE and signed webhooks. NATS JetStream is the transport, PostgreSQL tracks
@@ -4039,7 +3708,8 @@ CREATE TABLE billing_admin_actions (
     CONSTRAINT ck_billing_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
     CONSTRAINT ck_billing_admin_actions_price_scope CHECK (((((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('delete_archived'::character varying)::text])) AND (price_version_id IS NULL)) OR (((action_type)::text = ANY (ARRAY[('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text])) AND (price_version_id IS NOT NULL)))),
     CONSTRAINT ck_billing_admin_actions_reason CHECK ((((reason)::text = btrim((reason)::text, '
-'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
+
+'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
 
