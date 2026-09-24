@@ -59,9 +59,6 @@
               <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
               <span class="truncate font-medium">{{ t('search.savePopover.quickSaves') }}</span>
             </div>
-            <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
-              quickSavesCount
-            }}</span>
           </button>
 
           <button
@@ -79,9 +76,6 @@
               />
               <span class="truncate font-medium">{{ folder.name }}</span>
             </div>
-            <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
-              folder.asset_count
-            }}</span>
           </button>
         </div>
       </div>
@@ -134,17 +128,10 @@ let pendingOpen: OpenRequest | null = null
 const searchSavePopoverContentClass =
   'search-save-popover ib-page-chrome-surface rounded-ib-control p-1.5'
 
-const quickSavesFolder = computed(() =>
-  folders.value.find((folder) => folder.name.toLowerCase() === 'quick saves' || folder.is_default),
-)
-const quickSavesCount = computed(() => quickSavesFolder.value?.asset_count ?? 0)
 const displayFolders = computed(() =>
   folders.value.filter(
     (folder) =>
-      !folder.is_system &&
-      !folder.is_default &&
-      folder.name.toLowerCase() !== 'all assets' &&
-      folder.name.toLowerCase() !== 'quick saves',
+      folder.name.toLowerCase() !== 'all assets' && folder.name.toLowerCase() !== 'quick saves',
   ),
 )
 const showQuickSaves = computed(() => {
@@ -270,7 +257,7 @@ function handlePopoverHide() {
   emit('anchor-changed', null)
 }
 
-async function persist(folderId?: number, newFolderName?: string) {
+async function persist(folderId?: string, newFolderName?: string) {
   const request = activeRequest.value
   if (!request || saving.value) return
   saving.value = true
@@ -289,7 +276,7 @@ async function persist(folderId?: number, newFolderName?: string) {
   }
 }
 
-async function saveTo(folderId?: number) {
+async function saveTo(folderId?: string) {
   if (!folderFactsReady.value && !(await loadFolders())) return
   void persist(folderId)
 }

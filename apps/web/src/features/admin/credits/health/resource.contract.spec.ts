@@ -9,9 +9,9 @@ describe('Admin Credit Health resource', () => {
   it('shares one query key and request across multiple consumers', async () => {
     let requests = 0
     useMswHandlers(
-      http.get('/api/admin/credits/health', () => {
+      http.get('/api/control/v1/credits/health', () => {
         requests += 1
-        return HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() })
+        return HttpResponse.json({ data: makeHealth() })
       }),
     )
     const Consumer = defineComponent({

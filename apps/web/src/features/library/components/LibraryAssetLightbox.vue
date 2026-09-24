@@ -32,8 +32,8 @@
           <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
           <div class="flex items-center gap-2">
             <a
-              v-if="asset.source_url"
-              :href="asset.source_url"
+              v-if="asset.sourceUrl"
+              :href="asset.sourceUrl"
               target="_blank"
               rel="noreferrer"
               class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
@@ -59,7 +59,7 @@
           @click.stop
         >
           <img
-            :src="asset.original_url || asset.preview_url"
+            :src="asset.originalUrl || asset.previewUrl"
             :alt="asset.title || t('library.states.savedReference')"
             class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
           />
@@ -73,7 +73,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
-import type { LibraryAssetView } from '../resource'
+import type { LibraryAssetView } from '../transfer'
 
 const props = defineProps<{
   asset: LibraryAssetView | null

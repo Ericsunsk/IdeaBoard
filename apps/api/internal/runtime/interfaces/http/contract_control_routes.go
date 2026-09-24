@@ -193,6 +193,14 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 		controlRoute{Operation: "platform.get_outbound_policy", Route: "GET /platform/settings/outbound-policy"}, d.getControlOutboundPolicy))
 	control.PUT("/platform/settings/outbound-policy", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.update_outbound_policy", Route: "PUT /platform/settings/outbound-policy", Mutation: true}, d.updateControlOutboundPolicy))
+	control.GET("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.get_mail_setting", Route: "GET /platform/settings/mail"}, d.getControlMailSetting))
+	control.PUT("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true}, d.updateControlMailSetting))
+	control.DELETE("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.delete_mail_setting", Route: "DELETE /platform/settings/mail", Mutation: true}, d.deleteControlMailSetting))
+	control.POST("/platform/settings/mail/test", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test", Mutation: true}, d.testControlMailSetting))
 }
 
 // registerControlProxiedRoutes mounts the platform-config families that

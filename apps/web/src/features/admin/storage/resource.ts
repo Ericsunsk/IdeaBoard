@@ -1,20 +1,50 @@
+import { api } from '../../../shared/api/client'
 import {
-  applyAdminStorageProfile,
-  createAdminStorageProfile,
-  deleteAdminStorageProfile,
-  getAdminStorageBucketInfo,
-  listAdminStorageProfiles,
-  listAdminStorageProviders,
-  testAdminStorageProfile,
-  updateAdminStorageProfile,
-} from '../../../shared/api/generated-query/admin-storage/admin-storage'
-import type {
-  StorageProfile as GeneratedStorageProfile,
-  StorageProfilePayload as GeneratedStorageProfilePayload,
-  StorageProviderMeta as GeneratedStorageProviderMeta,
-} from '../../../shared/api/generated-query/model'
-import { resolveApiData } from '../../../shared/api/apiResponse'
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../shared/api/apiResponse'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
+
+// Admin storage boundary (issue #809). The generated `admin-storage`
+// client is gone but the backend admin plane still serves
+// `/api/admin/storage/*` with the shared envelope, so this boundary
+// transports through the central `api.request` with local wire types.
+export type GeneratedStorageProviderMeta = {
+  provider: string
+  label: string
+  description: string
+  builtin: boolean
+  create_allowed: boolean
+  supports_test: boolean
+  supports_bucket_info: boolean
+  fields?: Array<{
+    key: string
+    label: string
+    type: string
+    placeholder?: string
+    hint?: string
+    required?: boolean
+    secret?: boolean
+  }>
+}
+
+export type GeneratedStorageProfile = {
+  id: string
+  name: string
+  provider: string
+  enabled: boolean
+  is_current: boolean
+  builtin: boolean
+  secret_configured?: boolean
+  config: Record<string, unknown>
+}
+
+export type GeneratedStorageProfilePayload = {
+  name: string
+  provider: string
+  enabled: boolean
+  config: Record<string, unknown>
+}
 
 export type SaveStorageProfileInput =
   | {
@@ -56,27 +86,44 @@ export function createAdminStorageResource(): AdminStorageResource {
 }
 
 async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
-  const data = await resolveApiData(listAdminStorageProviders(), '加载存储供应商失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ providers: GeneratedStorageProviderMeta[] }>>(
+      '/admin/storage/providers',
+      { method: 'GET' },
+    ),
+    '加载存储供应商失败',
+  )
   return (data.providers ?? []).map(normalizeGeneratedProvider)
 }
 
 async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
-  const data = await resolveApiData(listAdminStorageProfiles(), '加载存储配置失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ profiles: GeneratedStorageProfile[] }>>(
+      '/admin/storage/profiles',
+      { method: 'GET' },
+    ),
+    '加载存储配置失败',
+  )
   return (data.profiles ?? []).map(normalizeGeneratedProfile)
 }
 
 async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
 ): Promise<StorageProfileCommandResult> {
-  const requestParams = input.apply ? { apply: true } : undefined
-  const request = input.id
-    ? updateAdminStorageProfile(
-        input.id,
-        input.payload as GeneratedStorageProfilePayload,
-        requestParams,
-      )
-    : createAdminStorageProfile(input.payload as GeneratedStorageProfilePayload, requestParams)
-  const data = await resolveApiData(request, '保存存储配置失败')
+  const query = input.apply ? '?apply=true' : ''
+  const url = input.id
+    ? `/admin/storage/profiles/${encodeURIComponent(input.id)}${query}`
+    : `/admin/storage/profiles${query}`
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ message: string; profile: GeneratedStorageProfile }>>(
+      url,
+      {
+        method: input.id ? 'PUT' : 'POST',
+        body: input.payload as unknown as Record<string, unknown>,
+      },
+    ),
+    '保存存储配置失败',
+  )
   return {
     message: data.message,
     profile: normalizeGeneratedProfile(data.profile),
@@ -84,7 +131,13 @@ async function saveAdminStorageProfile(
 }
 
 async function applyAdminStorageProfileRecord(id: string): Promise<StorageProfileCommandResult> {
-  const data = await resolveApiData(applyAdminStorageProfile(id), '设为当前失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ message: string; profile: GeneratedStorageProfile }>>(
+      `/admin/storage/profiles/${encodeURIComponent(id)}/apply`,
+      { method: 'POST' },
+    ),
+    '设为当前失败',
+  )
   return {
     message: data.message,
     profile: normalizeGeneratedProfile(data.profile),
@@ -92,15 +145,33 @@ async function applyAdminStorageProfileRecord(id: string): Promise<StorageProfil
 }
 
 async function testAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
-  return resolveApiData(testAdminStorageProfile(id), '连接失败')
+  return resolveApiData(
+    api.request<ApiResponseWithData<{ message: string }>>(
+      `/admin/storage/profiles/${encodeURIComponent(id)}/test`,
+      { method: 'POST' },
+    ),
+    '连接失败',
+  )
 }
 
 async function deleteAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
-  return resolveApiData(deleteAdminStorageProfile(id), '删除失败')
+  return resolveApiData(
+    api.request<ApiResponseWithData<{ message: string }>>(
+      `/admin/storage/profiles/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    ),
+    '删除失败',
+  )
 }
 
 async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
-  const data = await resolveApiData(getAdminStorageBucketInfo(id), '获取 Bucket 信息失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ info: { domains?: string[] } }>>(
+      `/admin/storage/profiles/${encodeURIComponent(id)}/bucket-info`,
+      { method: 'GET' },
+    ),
+    '获取 Bucket 信息失败',
+  )
   return data.info.domains ?? []
 }
 

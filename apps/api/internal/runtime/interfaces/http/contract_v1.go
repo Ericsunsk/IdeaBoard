@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/media/workspaceuploads"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -36,22 +35,6 @@ type ContractV1Deps struct {
 	// postgres workspace-board mapping lands (#809); tests inject the
 	// in-memory implementation.
 	Boards boards.WorkspaceBoardStore
-	// UploadSessions coordinates ephemeral upload transfer state (issue
-	// #803). Sessions never touch PostgreSQL (completion-only
-	// durability); the process-local store is the production backend
-	// and tests inject a fresh instance per engine.
-	UploadSessions workspaceuploads.SessionStore
-	// WorkspaceAssets persists workspace-bound media assets (issue
-	// #803). Production wires the postgres sibling (existing
-	// media_assets table, metadata workspace binding, no new columns);
-	// tests inject the in-memory sibling. Nil keeps the upload/media
-	// surface fail-closed with 501.
-	WorkspaceAssets workspaceuploads.AssetStore
-	// MediaObjects reads stored bytes for the v1 content/derivative
-	// endpoints (issue #803). Production wires *storage.Service;
-	// tests inject fakes. Nil fails binary reads closed with 503
-	// while metadata endpoints keep working.
-	MediaObjects V1MediaObjectReader
 	// Library is the workspace-scoped library + materialization surface
 	// (issue #806). Zero value keeps the surface fail-closed (501/503);
 	// tests inject the in-memory store plus fakes.
@@ -178,17 +161,12 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	group.PATCH("/organizations/:organization_id", handler.updateOrganization)
 	group.GET("/organizations/:organization_id/workspaces", handler.listOrganizationWorkspaces)
 	group.POST("/organizations/:organization_id/workspaces", handler.createOrganizationWorkspace)
-	// Workspace upload sessions + media assets (issue #803). The
-	// :archive sub-resource form keeps Gin routing collision-free
-	// (documented deviation from the `:archive` action suffix).
-	group.POST("/workspaces/:workspace_id/uploads", handler.createUploadSession)
-	group.GET("/workspaces/:workspace_id/uploads/:upload_id", handler.getUploadSession)
-	group.POST("/workspaces/:workspace_id/uploads/:upload_id/complete", handler.completeUploadSession)
-	group.GET("/workspaces/:workspace_id/media-assets", handler.listMediaAssets)
-	group.GET("/workspaces/:workspace_id/media-assets/:asset_id", handler.getMediaAsset)
-	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/content", handler.contentMediaAsset)
-	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", handler.derivativeMediaAsset)
-	group.POST("/workspaces/:workspace_id/media-assets/:asset_id/archive", handler.archiveMediaAsset)
+	// Workspace upload sessions + media assets (issue #803) were
+	// removed with the legacy media workspaceuploads package (#809
+	// phase 3b-03, issue #813): the routes below stay unregistered
+	// until the workspace-scoped replacement lands, and unknown v1
+	// paths fail closed with 501. media.asset_ready and
+	// media.asset_archived are not emitted while the surface is down.
 	handler.registerBoardRoutes(group)
 	handler.registerLibraryRoutes(group)
 	handler.registerSearchRoutes(group)

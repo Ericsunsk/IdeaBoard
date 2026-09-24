@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
 import { searchInspiration } from './resource'
 
-const generated = vi.hoisted(() => ({
-  search: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../shared/api/generated-query/search/search', () => ({
-  searchInspiration: generated.search,
+vi.mock('../../../shared/api/client', () => ({
+  api: { request: transport.request },
 }))
 
 describe('searchResource', () => {
@@ -22,7 +22,7 @@ describe('searchResource', () => {
 
   it('dedupes identical in-flight query pages', async () => {
     let resolveRequest: ((value: unknown) => void) | undefined
-    generated.search.mockReturnValue(
+    transport.request.mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve
       }),
@@ -30,7 +30,7 @@ describe('searchResource', () => {
 
     const first = searchInspiration({ query: 'warm shadows', cursor: 'cursor-a', limit: 24 })
     const second = searchInspiration({ query: 'warm shadows', cursor: 'cursor-a', limit: 24 })
-    expect(generated.search).toHaveBeenCalledOnce()
+    expect(transport.request).toHaveBeenCalledOnce()
 
     resolveRequest?.({
       code: 0,
@@ -52,11 +52,11 @@ describe('searchResource', () => {
         name: 'AbortError',
       },
     )
-    expect(generated.search).not.toHaveBeenCalled()
+    expect(transport.request).not.toHaveBeenCalled()
   })
 
   it('passes the normalized query through the feature adapter', async () => {
-    generated.search.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       data: { query: 'warm cafe', results: [], has_more: false },
     })
@@ -65,11 +65,11 @@ describe('searchResource', () => {
       query: 'warm cafe',
     })
 
-    expect(generated.search).toHaveBeenCalledWith(
-      expect.objectContaining({
-        q: 'warm cafe',
-      }),
+    expect(transport.request).toHaveBeenCalledWith(
+      expect.stringContaining('/search?'),
       expect.anything(),
     )
+    const url = String(transport.request.mock.calls[0]?.[0] ?? '')
+    expect(url).toContain('q=warm+cafe')
   })
 })

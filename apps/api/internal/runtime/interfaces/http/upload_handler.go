@@ -11,10 +11,8 @@ import (
 	"sync"
 
 	"ideaboard/api/internal/boards"
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/imageformat"
-	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
@@ -171,41 +169,13 @@ func profileAvatarContentHandler(h UploadDeps) gin.HandlerFunc {
 
 func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		release, ok := acquireUploadSlot(c.Request.Context(), h.UploadSettings)
-		if !ok {
-			response.Error(c, 429, "当前上传请求过多，请稍后重试")
-			return
-		}
-		defer release()
-
-		file, ok := parseBoardUploadFile(c)
-		if !ok {
-			return
-		}
-		userID, ok := requireAuthenticatedUserID(c)
-		if !ok {
-			return
-		}
-		board, storeOpts, ok := resolveBoardUploadTarget(c, h, userID)
-		if !ok {
-			return
-		}
-		prepared, ok := prepareBoardUpload(c, h, file, storeOpts)
-		if !ok {
-			return
-		}
-		boardAsset, found, ok := findExistingBoardAsset(c, h, board.OwnerUserID, prepared)
-		if !ok {
-			return
-		}
-		if found {
-			response.SuccessDTO(c, newUploadImageResponseFromAsset(boardAsset))
-			return
-		}
-		payload, ok := persistBoardAsset(c, h, board, file, storeOpts, prepared)
-		if ok {
-			response.SuccessDTO(c, payload)
-		}
+		// #817 (Phase 3b-08): legacy board uploads rode the deleted
+		// user-scoped boards + media_assets stores (BoardService +
+		// MediaAssets stubs fail closed). Fail closed with 501 until the
+		// workspace-scoped upload/media replacement lands in Phase 4.
+		// Avatar uploads (uploadProfileAvatarHandler) stay live.
+		response.Error(c, 501, "上传失败")
+		_ = h
 	}
 }
 
@@ -265,162 +235,6 @@ func prepareBoardUpload(c *gin.Context, h UploadDeps, file *multipart.FileHeader
 	return prepared, true
 }
 
-func findExistingBoardAsset(c *gin.Context, h UploadDeps, ownerUserID int64, prepared *ports.StoredUploadRef) (dbsqlc.MediaAsset, bool, bool) {
-	if prepared.ChecksumSHA256 == "" {
-		return dbsqlc.MediaAsset{}, false, true
-	}
-	// Reuse an existing ready asset for identical bytes owned by this user.
-	// This keeps duplicate uploads from creating another physical object while
-	// preserving the existing board snapshot contract (asset ID + stable URL).
-	existing, found, err := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), ownerUserID, prepared.StorageProfile, prepared.ChecksumSHA256)
-	if err != nil {
-		response.InternalError(c, 500, "上传失败", err)
-		return dbsqlc.MediaAsset{}, false, false
-	}
-	if !found {
-		return dbsqlc.MediaAsset{}, false, true
-	}
-	return confirmDedupedBoardAsset(c, h.StorageService, h.MediaAssets, ownerUserID, existing)
-}
-
-// dedupeObjectProber is the narrow storage capability the dedupe liveness
-// gate needs. *storage.Service satisfies it implicitly; tests substitute fakes.
-type dedupeObjectProber interface {
-	ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error)
-}
-
-// dedupeAssetRetirer releases the checksum slot held by a dead deduped row.
-type dedupeAssetRetirer interface {
-	RetireMissingOwnedMediaAsset(ctx context.Context, ownerUserID, assetID int64) error
-}
-
-type dedupeDerivativeLocator interface {
-	LocateStoredDerivative(ctx context.Context, lookup ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error)
-}
-
-// confirmDedupedBoardAsset verifies that a checksum-deduped asset and its
-// provider-neutral processing-input are still usable before serving it. Either
-// object can disappear while the rows survive (e.g. wiped with a deleted
-// board), and serving such a row wedges clients on derivatives that can never
-// materialize. A verifiably missing object retires the dead row — freeing the
-// checksum slot — so this upload falls through to a fresh persist with the
-// bytes already in hand.
-// Transient storage errors fail open to preserve existing behavior.
-func confirmDedupedBoardAsset(c *gin.Context, prober dedupeObjectProber, retirer dedupeAssetRetirer, ownerUserID int64, existing dbsqlc.MediaAsset) (dbsqlc.MediaAsset, bool, bool) {
-	if prober == nil {
-		return existing, true, true
-	}
-	ctx := c.Request.Context()
-	probeErr := func() error {
-		probe, err := prober.ReadObjectAtProfile(ctx, existing.StorageProfileID, existing.StorageKey, 1)
-		if err != nil {
-			return err
-		}
-		if probe == nil || len(probe.Data) == 0 {
-			return domain.ErrStoredObjectNotFound
-		}
-		locator, ok := retirer.(dedupeDerivativeLocator)
-		if !ok {
-			return nil
-		}
-		location, found, err := locator.LocateStoredDerivative(ctx, ports.StoredDerivativeLookup{AssetID: existing.ID, Tier: "processing-input"})
-		if err != nil {
-			return err
-		}
-		if !found || strings.TrimSpace(location.StorageProfileID) == "" || strings.TrimSpace(location.StorageKey) == "" {
-			return domain.ErrStoredObjectNotFound
-		}
-		derivative, err := prober.ReadObjectAtProfile(ctx, location.StorageProfileID, location.StorageKey, 1)
-		if err != nil {
-			return err
-		}
-		if derivative == nil || len(derivative.Data) == 0 {
-			return domain.ErrStoredObjectNotFound
-		}
-		return nil
-	}()
-	if probeErr == nil {
-		return existing, true, true
-	}
-	if !errors.Is(probeErr, domain.ErrStoredObjectNotFound) {
-		slog.Warn("dedupe asset liveness probe failed", "asset_id", existing.AssetID, "err", probeErr)
-		return existing, true, true
-	}
-	if retirer == nil {
-		return existing, true, true
-	}
-	if err := retirer.RetireMissingOwnedMediaAsset(ctx, ownerUserID, existing.ID); err != nil {
-		slog.Warn("retire missing deduped asset failed", "asset_id", existing.AssetID, "err", err)
-		response.InternalError(c, 500, "上传失败", err)
-		return dbsqlc.MediaAsset{}, false, false
-	}
-	slog.Info("retired deduped media asset with missing object", "asset_id", existing.AssetID)
-	return dbsqlc.MediaAsset{}, false, true
-}
-
-func persistBoardAsset(c *gin.Context, h UploadDeps, board *boards.Board, file *multipart.FileHeader, storeOpts ports.StorageStoreOptions, prepared *ports.StoredUploadRef) (uploadImageResponse, bool) {
-	handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
-		OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
-		StorageKey: prepared.StorageKey, URL: prepared.URL,
-		Origin: ingestion.BoardUploadFacts{BoardID: board.BoardID},
-	})
-	if err != nil {
-		response.InternalError(c, 500, "上传失败", err)
-		return uploadImageResponse{}, false
-	}
-	storeOpts.ObjectKey = prepared.StorageKey
-	stored, err := h.StorageService.UploadRefAtProfile(c.Request.Context(), prepared.StorageProfile, file, storeOpts)
-	if err != nil {
-		_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
-		response.InternalError(c, 500, "上传失败", err)
-		return uploadImageResponse{}, false
-	}
-	stored.Width = prepared.Width
-	stored.Height = prepared.Height
-	stored.MIMEType = prepared.MIMEType
-	stored.Animated = prepared.Animated
-	asset, err := h.MediaAssets.GetByID(c.Request.Context(), board.OwnerUserID, handle.AssetID)
-	if err != nil {
-		_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
-		_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
-		response.InternalError(c, 500, "上传失败", err)
-		return uploadImageResponse{}, false
-	}
-	// Browser-visible board media must always use the authenticated
-	// same-origin delivery route, regardless of whether the backing profile
-	// is local or S3-compatible. Keep provider URLs server-side only.
-	stored.URL = mediaAssetOriginalDeliveryURL(asset.AssetID)
-	if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
-		return convergeBoardAssetCompletionFailure(c, h, board.OwnerUserID, handle, stored, err)
-	}
-	payload := newUploadImageResponseFromStored("url", stored)
-	payload.AssetID = asset.AssetID
-	return payload, true
-}
-
-func convergeBoardAssetCompletionFailure(c *gin.Context, h UploadDeps, ownerUserID int64, handle ingestion.Handle, stored *ports.StoredUploadRef, completionErr error) (uploadImageResponse, bool) {
-	// A concurrent identical upload may have committed first and won the
-	// checksum unique index. Re-read the canonical asset before surfacing an
-	// error so the loser still succeeds without retaining its object.
-	if existing, found, lookupErr := h.MediaAssets.FindReadyOwnedMediaAssetByChecksum(c.Request.Context(), ownerUserID, stored.StorageProfile, stored.ChecksumSHA256); lookupErr == nil && found {
-		// The lookup may return this very handle's asset when Complete
-		// committed the row before failing (e.g. a deferred post-commit
-		// step). That object is live and owned by the returned asset:
-		// deleting it would destroy a healthy upload.
-		if existing.ID == handle.AssetID {
-			return newUploadImageResponseFromAsset(existing), true
-		}
-		cleanupCtx := context.WithoutCancel(c.Request.Context())
-		_ = h.StorageService.DeleteObjectByStorageProfile(cleanupCtx, stored.StorageProfile, stored.StorageKey)
-		_ = h.MediaAssets.Fail(cleanupCtx, handle, completionErr)
-		return newUploadImageResponseFromAsset(existing), true
-	}
-	_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, completionErr)
-	_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
-	response.InternalError(c, 500, "上传失败", completionErr)
-	return uploadImageResponse{}, false
-}
-
 func newUploadImageResponseFromStored(urlKey string, stored *ports.StoredUploadRef) uploadImageResponse {
 	payload := uploadImageResponse{}
 	if stored == nil {
@@ -435,20 +249,6 @@ func newUploadImageResponseFromStored(urlKey string, stored *ports.StoredUploadR
 	payload.Height = stored.Height
 	payload.Mime = stored.MIMEType
 	if ext := imageformat.ImageExtensionFromMIME(stored.MIMEType); ext != "" {
-		payload.Ext = strings.TrimPrefix(ext, ".")
-	}
-	return payload
-}
-
-func newUploadImageResponseFromAsset(asset dbsqlc.MediaAsset) uploadImageResponse {
-	payload := uploadImageResponse{
-		URL:     mediaAssetOriginalDeliveryURL(asset.AssetID),
-		AssetID: asset.AssetID,
-		Width:   int(asset.Width),
-		Height:  int(asset.Height),
-		Mime:    asset.MimeType,
-	}
-	if ext := imageformat.ImageExtensionFromMIME(asset.MimeType); ext != "" {
 		payload.Ext = strings.TrimPrefix(ext, ".")
 	}
 	return payload

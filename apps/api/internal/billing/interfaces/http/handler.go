@@ -1,10 +1,7 @@
 package httpapi
 
 import (
-	"context"
-
 	"ideaboard/api/internal/billing"
-	"ideaboard/api/internal/billing/application"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
@@ -13,17 +10,6 @@ import (
 )
 
 const maxBillingRequestBytes = 64 << 10
-
-type QuoteService interface {
-	QuoteAtResolution(context.Context, string, billing.OutputResolution, int64) (billing.Quote, error)
-}
-
-type BillableCatalogService interface {
-	List(context.Context) ([]application.BillableItemCatalogCard, error)
-	PublishPrices(context.Context, string, map[billing.OutputResolution]int64, int64) (map[billing.OutputResolution]billing.PriceInfo, error)
-	SetAvailability(context.Context, string, bool, int64) (billing.AvailabilityInfo, error)
-	DeleteArchived(context.Context, string, int64) (billing.ArchivedItemDeleteResult, error)
-}
 
 type Handler struct {
 	quoter  QuoteService

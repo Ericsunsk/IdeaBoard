@@ -6,21 +6,17 @@ const controlMocks = vi.hoisted(() => ({
   createControlCreditRefund: vi.fn(),
   getControlCreditWallet: vi.fn(),
   listControlCreditLedger: vi.fn(),
-}))
-
-const legacyMocks = vi.hoisted(() => ({
-  getAdminCreditHealth: vi.fn(),
-  getAdminCreditReconciliationRun: vi.fn(),
-  listAdminCreditReconciliationFindingQueue: vi.fn(),
-  listAdminCreditReconciliationRuns: vi.fn(),
-  startAdminCreditReconciliation: vi.fn(),
+  getControlCreditHealth: vi.fn(),
+  startControlReconciliation: vi.fn(),
+  listControlReconciliationRuns: vi.fn(),
+  getControlReconciliationRun: vi.fn(),
+  listControlReconciliationFindings: vi.fn(),
 }))
 
 vi.mock(
   '../../../../shared/api/generated-query/control/control-credits/control-credits',
   () => controlMocks,
 )
-vi.mock('../../../../shared/api/generated-query/admin-credits/admin-credits', () => legacyMocks)
 
 import { adminCreditsBillingApi } from './api'
 
@@ -70,11 +66,11 @@ describe('credits billing API adapter', () => {
       open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
       restricted_wallet_count: 0,
     }
-    legacyMocks.startAdminCreditReconciliation.mockResolvedValue(success(run))
-    legacyMocks.listAdminCreditReconciliationRuns.mockResolvedValue(success(runs))
-    legacyMocks.getAdminCreditReconciliationRun.mockResolvedValue(success(run))
-    legacyMocks.listAdminCreditReconciliationFindingQueue.mockResolvedValue(success(findings))
-    legacyMocks.getAdminCreditHealth.mockResolvedValue(success(health))
+    controlMocks.startControlReconciliation.mockResolvedValue({ data: run })
+    controlMocks.listControlReconciliationRuns.mockResolvedValue({ data: runs })
+    controlMocks.getControlReconciliationRun.mockResolvedValue({ data: run })
+    controlMocks.listControlReconciliationFindings.mockResolvedValue({ data: findings })
+    controlMocks.getControlCreditHealth.mockResolvedValue({ data: health })
   })
 
   it('reads wallets and ledgers from control and maps them to the dialog model', async () => {
@@ -137,7 +133,7 @@ describe('credits billing API adapter', () => {
     )
   })
 
-  it('keeps reconciliation and health reads on the legacy adapter', async () => {
+  it('reads reconciliation and health through the control adapter', async () => {
     const startedRun = await adminCreditsBillingApi.startReconciliation({
       reason: '运营例行检查',
     })
@@ -180,6 +176,3 @@ describe('credits billing API adapter', () => {
   })
 })
 
-function success<T>(data: T) {
-  return { code: 0, msg: 'ok', data }
-}

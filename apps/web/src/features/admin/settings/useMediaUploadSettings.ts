@@ -1,15 +1,23 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed } from 'vue'
+import { api } from '../../../shared/api/client'
 import {
-  getGetAdminMediaUploadSettingQueryKey,
-  updateAdminMediaUploadSetting,
-  useGetAdminMediaUploadSetting,
-} from '../../../shared/api/generated-query/admin-settings/admin-settings'
-import type { MediaUploadSetting } from '../../../shared/api/generated-query/model'
-import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
+  createApiDataSelector,
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../shared/api/apiResponse'
 import type { AdminMediaUploadSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
+
+// Admin media upload boundary (issue #809). Transports through the central
+// `api.request` against the surviving `/api/admin/settings/media-upload`
+// route with a local view type.
+export type MediaUploadSetting = {
+  upload_max_concurrent: number
+}
+
+const ADMIN_MEDIA_UPLOAD_QUERY_KEY = ['admin', 'settings', 'media-upload'] as const
 
 export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
   upload_max_concurrent: 8,
@@ -22,14 +30,30 @@ const selectMediaUploadSetting = createApiDataSelector<MediaUploadSetting>('加�
 
 export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSettingsFeedback }) {
   const queryClient = useQueryClient()
-  const query = useGetAdminMediaUploadSetting<MediaUploadSetting>({
-    query: { select: selectMediaUploadSetting },
+  const query = useQuery<
+    ApiResponseWithData<MediaUploadSetting>,
+    Error,
+    MediaUploadSetting
+  >({
+    queryKey: ADMIN_MEDIA_UPLOAD_QUERY_KEY,
+    queryFn: ({ signal }) =>
+      api.request<ApiResponseWithData<MediaUploadSetting>>('/admin/settings/media-upload', {
+        method: 'GET',
+        ...(signal == null ? {} : { signal }),
+      }),
+    select: selectMediaUploadSetting,
   })
   const setting = computed(() => query.data.value)
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (draft: MediaUploadSetting) =>
-      resolveApiData(updateAdminMediaUploadSetting(draft), '保存上传设置失败'),
+      resolveApiData(
+        api.request<ApiResponseWithData<MediaUploadSetting>>('/admin/settings/media-upload', {
+          method: 'PUT',
+          body: draft as unknown as Record<string, unknown>,
+        }),
+        '保存上传设置失败',
+      ),
   })
   const saving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
@@ -44,7 +68,7 @@ export function useMediaUploadSettings(options: { feedback: AdminMediaUploadSett
     save: (draft) => saveMutation.mutateAsync(draft),
     synchronizeCache: async (savedSetting) => {
       writeMediaUploadQueryCache(queryClient, savedSetting)
-      await queryClient.invalidateQueries({ queryKey: getGetAdminMediaUploadSettingQueryKey() })
+      await queryClient.invalidateQueries({ queryKey: ADMIN_MEDIA_UPLOAD_QUERY_KEY })
     },
     feedback: options.feedback,
   })
@@ -96,7 +120,7 @@ function normalizeConcurrentValue(value: unknown, fallback: number): number {
 }
 
 function writeMediaUploadQueryCache(queryClient: QueryClient, setting: MediaUploadSetting) {
-  queryClient.setQueryData(getGetAdminMediaUploadSettingQueryKey(), {
+  queryClient.setQueryData(ADMIN_MEDIA_UPLOAD_QUERY_KEY, {
     code: 0,
     msg: 'ok',
     data: setting,

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import * as adminTasksApi from '../../../../shared/api/generated-query/admin-tasks/admin-tasks'
+import * as monitorResource from './resource'
 import { cancelAdminTaskByID, getAdminTaskDetail, getAdminTaskList } from './resource'
 
 describe('task monitor resource', () => {
-  it('does not expose physical task deletion through the generated admin task contract', () => {
-    expect(adminTasksApi).not.toHaveProperty('deleteAdminTasks')
-    expect(adminTasksApi).not.toHaveProperty('useDeleteAdminTasks')
+  it('does not expose physical task deletion through the admin task resource seam', () => {
+    expect(monitorResource).not.toHaveProperty('deleteAdminTaskByID')
+    expect(monitorResource).not.toHaveProperty('removeAdminTask')
   })
 
   it('cancels one active task through the typed admin task resource seam', async () => {

@@ -8,7 +8,10 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
-import { requireApiData } from './apiResponse'
+import {
+  requireApiData,
+  type ApiResponseWithData,
+} from './apiResponse'
 import { api } from './client'
 import {
   workspaceMediaAssetContentSuffix,
@@ -19,18 +22,59 @@ import { subscribeUserEvent } from './userEventStream'
 import { subscribeWorkspaceMediaInvalidation } from './workspaceEventStream'
 import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
-import {
-  getGetUserMediaAssetMetadataUrl,
-  getGetUserMediaAssetMetadataBatchUrl,
-  getGetUserMediaAssetDerivativeContentUrl,
-  getGetUserMediaAssetOriginalContentUrl,
-} from './generated-query/user-assets/user-assets'
-import type {
-  ApiResponseMediaAssetMetadata,
-  ApiResponseMediaAssetMetadataBatch,
-  MediaAssetDeliveryVariant as GeneratedMediaAssetDeliveryVariant,
-  MediaAssetMetadata,
-} from './generated-query/model'
+// Legacy user media-asset delivery endpoints (issue #809). The backend user
+// plane still serves `/api/user/media-assets/*`, so this boundary keeps the
+// same URL shapes the deleted generated client produced (single source of
+// truth here, never hand-concatenated at call sites).
+function getUserMediaAssetMetadataUrl(assetId: string): string {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}`
+}
+
+function getUserMediaAssetMetadataBatchUrl(): string {
+  return '/user/media-assets/delivery/batch'
+}
+
+function getUserMediaAssetOriginalContentUrl(assetId: string): string {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}/original/content`
+}
+
+function getUserMediaAssetDerivativeContentUrl(
+  assetId: string,
+  tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input',
+): string {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/content`
+}
+
+export type MediaAssetDeliveryVariantStatus = 'pending' | 'processing' | 'ready' | 'failed'
+
+export type MediaAssetDeliveryVariant = {
+  status: MediaAssetDeliveryVariantStatus
+  format?: string
+  url?: string
+  width?: number
+  height?: number
+  size_bytes?: number
+  error_code?: string
+}
+
+export type MediaAssetDeliveryMetadata = {
+  asset_id: string
+  status: string
+  mime_type: string
+  width: number
+  height: number
+  size_bytes: number
+  original: MediaAssetDeliveryVariant
+  derivatives: { [key: string]: MediaAssetDeliveryVariant }
+}
+
+export type MediaAssetDeliveryMetadataBatch = {
+  items: MediaAssetDeliveryMetadata[]
+}
+
+export type ApiResponseMediaAssetMetadata = ApiResponseWithData<MediaAssetDeliveryMetadata>
+export type ApiResponseMediaAssetMetadataBatch =
+  ApiResponseWithData<MediaAssetDeliveryMetadataBatch>
 
 export type MediaAssetDeliveryTier =
   'thumb' | 'preview' | 'large-preview' | 'processing-input' | 'original'
@@ -40,8 +84,8 @@ export type MediaAssetDeliveryStatus =
 /** Canonical delivery identity: string `asset_...`. No numeric legacy. */
 export type MediaAssetId = string
 
-export type MediaAssetDeliveryMetadata = MediaAssetMetadata
-export type MediaAssetDeliveryVariant = GeneratedMediaAssetDeliveryVariant
+
+
 
 export class MediaAssetDerivativeNotReadyError extends Error {
   readonly tier: Exclude<MediaAssetDeliveryTier, 'original'>
@@ -197,7 +241,7 @@ export async function getMediaAssetMetadata(
   if (existing) return existing
 
   const request = api
-    .request<ApiResponseMediaAssetMetadata>(getGetUserMediaAssetMetadataUrl(normalized), {
+    .request<ApiResponseMediaAssetMetadata>(getUserMediaAssetMetadataUrl(normalized), {
       method: 'GET',
       signal: options.signal,
     })
@@ -249,7 +293,7 @@ export async function getMediaAssetMetadataBatch(
   const existing = metadataBatchRequests.get(requestKey)
   if (existing) return existing
   const request = api
-    .request<ApiResponseMediaAssetMetadataBatch>(getGetUserMediaAssetMetadataBatchUrl(), {
+    .request<ApiResponseMediaAssetMetadataBatch>(getUserMediaAssetMetadataBatchUrl(), {
       method: 'POST',
       signal: options.signal,
       body: JSON.stringify({ asset_ids: sortedIDs }),
@@ -276,7 +320,7 @@ export async function getMediaAssetMetadataBatch(
 }
 
 export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
-  return resolveApiUrl(getGetUserMediaAssetOriginalContentUrl(assetId.trim()))
+  return resolveApiUrl(getUserMediaAssetOriginalContentUrl(assetId.trim()))
 }
 
 /**
@@ -290,7 +334,7 @@ export function resolveMediaAssetDerivativeURL(
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input' = 'large-preview',
 ): string {
   const normalized = assetId.trim()
-  return resolveApiUrl(getGetUserMediaAssetDerivativeContentUrl(normalized, tier))
+  return resolveApiUrl(getUserMediaAssetDerivativeContentUrl(normalized, tier))
 }
 
 /**

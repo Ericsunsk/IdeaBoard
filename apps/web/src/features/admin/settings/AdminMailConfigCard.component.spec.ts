@@ -5,10 +5,16 @@ import type { AdminMailConfigResource } from './mailConfigResource'
 import type { MailConfigSummary } from './mailConfigTypes'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('test reason'))
 
 vi.mock('../shared/lib/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/lib/toast')>()),
   useAdminToast: () => toast,
+}))
+
+vi.mock('../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
 }))
 
 const summary: MailConfigSummary = {
@@ -41,9 +47,12 @@ function renderCard() {
 describe('AdminMailConfigCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMock.mockResolvedValue(true)
+    readReasonMock.mockReturnValue('test reason')
     vi.mocked(resource.get).mockResolvedValue(summary)
     vi.mocked(resource.update).mockResolvedValue({ ...summary, readiness: 'not_tested' })
-    vi.mocked(resource.test).mockResolvedValue()
+    vi.mocked(resource.clear).mockResolvedValue(undefined)
+    vi.mocked(resource.test).mockResolvedValue(undefined)
   })
 
   it('renders only the safe configuration metadata and never hydrates the API Key', async () => {
@@ -84,14 +93,29 @@ describe('AdminMailConfigCard', () => {
     await user.click(screen.getByRole('button', { name: '保存邮件配置' }))
 
     await waitFor(() =>
-      expect(resource.update).toHaveBeenCalledWith({
-        from_name: 'IdeaBoard Ops',
-        from_email: 'noreply@example.com',
-        reply_to: 'support@example.com',
-      }),
+      expect(resource.update).toHaveBeenCalledWith(
+        {
+          from_name: 'IdeaBoard Ops',
+          from_email: 'noreply@example.com',
+          reply_to: 'support@example.com',
+        },
+        { operatorReason: 'test reason' },
+      ),
     )
+    expect(confirmMock).toHaveBeenCalledOnce()
     expect((screen.getByLabelText('Resend API Key') as HTMLInputElement).value).toBe('')
     expect(toast.success).toHaveBeenCalledWith('邮件配置已保存，请发送 Test Email')
+  })
+
+  it('aborts the save when the operator cancels the confirm dialog', async () => {
+    confirmMock.mockResolvedValueOnce(false)
+    const { user } = renderCard()
+    await screen.findByText('Ready')
+
+    await user.click(screen.getByRole('button', { name: '保存邮件配置' }))
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledOnce())
+    expect(resource.update).not.toHaveBeenCalled()
   })
 
   it('sends a Test Email and reloads the readiness metadata', async () => {
@@ -101,7 +125,11 @@ describe('AdminMailConfigCard', () => {
     await user.type(screen.getByLabelText('测试收件地址'), 'ops@example.com')
     await user.click(screen.getByRole('button', { name: '发送 Test Email' }))
 
-    await waitFor(() => expect(resource.test).toHaveBeenCalledWith('ops@example.com'))
+    await waitFor(() =>
+      expect(resource.test).toHaveBeenCalledWith('ops@example.com', {
+        operatorReason: 'test reason',
+      }),
+    )
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
     expect(toast.success).toHaveBeenCalledWith('Test Email 已发送')
   })

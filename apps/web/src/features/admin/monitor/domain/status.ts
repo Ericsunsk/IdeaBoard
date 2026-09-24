@@ -1,7 +1,7 @@
 import {
   ListAdminTasksStatus,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../../../../shared/api/generated-query/model/index'
+} from '../../../../shared/domain/taskMetricTokens'
 
 type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
 

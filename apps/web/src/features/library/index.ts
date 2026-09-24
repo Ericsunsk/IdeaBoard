@@ -5,12 +5,11 @@
  * this barrel. Deep relative imports into Library internals are not allowed
  * outside this feature.
  */
-export * from './resource'
+export * from './workspace'
 export * from './transfer'
 export * from './folderFacts'
 export * from './confirmations'
 export * from './useLibraryWorkspace'
-export * from './workspace'
 
 /** Lazily load the floating island shell to keep it out of the initial bundle. */
 export const loadLibraryFloatingIsland = () => import('./components/LibraryFloatingIsland.vue')

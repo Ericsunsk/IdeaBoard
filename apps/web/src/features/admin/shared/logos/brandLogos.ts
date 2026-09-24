@@ -1,9 +1,69 @@
 import { ref } from 'vue'
-import type {
-  AdminBrandLogoOverrideScope,
-  AdminBrandLogoOverrideUpdateLogoKey,
-} from '../../../../shared/api/generated-query/model'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
+
+// Brand logo override vocabulary (issue #809). The legacy generated models
+// are gone; this module owns the scope/key sets its pickers and resources
+// share. Values mirror the backend override registry.
+const AdminBrandLogoOverrideScope = {
+  'provider-endpoint': 'provider-endpoint',
+  'storage-profile': 'storage-profile',
+  'search-provider': 'search-provider',
+  'oauth-provider': 'oauth-provider',
+} as const
+
+type AdminBrandLogoOverrideScope =
+  (typeof AdminBrandLogoOverrideScope)[keyof typeof AdminBrandLogoOverrideScope]
+
+const AdminBrandLogoOverrideUpdateLogoKey = {
+  flux: 'flux',
+  midjourney: 'midjourney',
+  stability: 'stability',
+  fal: 'fal',
+  replicate: 'replicate',
+  ideogram: 'ideogram',
+  recraft: 'recraft',
+  runway: 'runway',
+  zhipu: 'zhipu',
+  aliyun: 'aliyun',
+  doubao: 'doubao',
+  moonshot: 'moonshot',
+  minimax: 'minimax',
+  baidu: 'baidu',
+  tencent: 'tencent',
+  lingyi: 'lingyi',
+  openai: 'openai',
+  gemini: 'gemini',
+  anthropic: 'anthropic',
+  deepseek: 'deepseek',
+  cloudflare: 'cloudflare',
+  siliconflow: 'siliconflow',
+  mistral: 'mistral',
+  groq: 'groq',
+  together: 'together',
+  fireworks: 'fireworks',
+  huggingface: 'huggingface',
+  perplexity: 'perplexity',
+  cohere: 'cohere',
+  novita: 'novita',
+  lepton: 'lepton',
+  google: 'google',
+  azure: 'azure',
+  bedrock: 'bedrock',
+  ollama: 'ollama',
+  amazons3: 'amazons3',
+  'cloudflare-r2': 'cloudflare-r2',
+  alibabacloud: 'alibabacloud',
+  'tencent-cos': 'tencent-cos',
+  minio: 'minio',
+  unsplash: 'unsplash',
+  pexels: 'pexels',
+  github: 'github',
+  'google-oauth': 'google-oauth',
+  discord: 'discord',
+} as const
+
+type AdminBrandLogoOverrideUpdateLogoKey =
+  (typeof AdminBrandLogoOverrideUpdateLogoKey)[keyof typeof AdminBrandLogoOverrideUpdateLogoKey]
 
 // Provider 品牌图走后端 models.dev 透传（GET /admin/settings/ai-gateway/brand-logo），
 // 前端不再 bundle 任何 provider SVG：上游缺失时后端回默认图，卡片不断图。

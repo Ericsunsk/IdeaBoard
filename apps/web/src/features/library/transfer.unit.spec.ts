@@ -12,7 +12,8 @@ import {
   writeLibraryFolderMoveTransfer,
   writeSearchReferenceTransfer,
 } from './transfer'
-import type { LibraryAssetView, LibrarySearchReference } from './resource'
+import type { LibrarySearchReference } from './workspace'
+import type { LibraryAssetView } from './transfer'
 
 function transfer(): DataTransfer {
   const values = new Map<string, string>()
@@ -44,19 +45,20 @@ const reference: LibrarySearchReference = {
 }
 
 const asset: LibraryAssetView = {
-  id: 42,
+  id: 'liba_asset0042',
+  workspaceId: 'ws_test123',
   provider: 'pexels',
-  source_id: 'photo-42',
-  source_url: 'https://pexels.com/photo/photo-42',
-  preview_url: 'https://images.pexels.com/photo-42',
-  original_url: 'https://images.pexels.com/photo-42',
+  sourceId: 'photo-42',
+  sourceUrl: 'https://pexels.com/photo/photo-42',
+  previewUrl: 'https://images.pexels.com/photo-42',
+  originalUrl: 'https://images.pexels.com/photo-42',
   title: 'Blue shadow',
   author: 'B. Creator',
   width: 800,
   height: 800,
-  folder_id: 1,
-  created_at: '2026-08-22T00:00:00Z',
-  updated_at: '2026-08-22T00:00:00Z',
+  folderId: 'libf_folder0001',
+  createdAt: '2026-08-22T00:00:00Z',
+  updatedAt: '2026-08-22T00:00:00Z',
 }
 
 describe('transfer', () => {
@@ -86,7 +88,7 @@ describe('transfer', () => {
       asset: {
         assetId: asset.id,
         title: asset.title,
-        previewUrl: asset.preview_url,
+        previewUrl: asset.previewUrl,
         width: asset.width,
         height: asset.height,
       },
@@ -118,9 +120,16 @@ describe('transfer', () => {
     const invalidFolderMove = transfer()
     invalidFolderMove.setData(
       LIBRARY_FOLDER_MOVE_MIME,
-      JSON.stringify({ type: 'library-folder-move', assetId: 0 }),
+      JSON.stringify({ type: 'library-folder-move', assetId: '7' }),
     )
     expect(readLibraryFolderMoveTransfer(invalidFolderMove)).toBeNull()
+
+    const legacyNumericMove = transfer()
+    legacyNumericMove.setData(
+      LIBRARY_FOLDER_MOVE_MIME,
+      JSON.stringify({ type: 'library-folder-move', assetId: 7 }),
+    )
+    expect(readLibraryFolderMoveTransfer(legacyNumericMove)).toBeNull()
 
     const malformedCanvasImport = transfer()
     malformedCanvasImport.setData(

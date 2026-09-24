@@ -1,7 +1,7 @@
 import {
   GetAdminStatisticsRange,
   type GetAdminStatisticsRange as GetAdminStatisticsRangeValue,
-} from '../../../../shared/api/generated-query/model'
+} from '../../statistics/resource'
 import {
   buildChartTimeBuckets,
   resolveChartTimeTickDensity,

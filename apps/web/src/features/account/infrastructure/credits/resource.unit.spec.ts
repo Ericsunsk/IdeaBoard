@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchCreditWallet } from './resource'
 
-const generated = vi.hoisted(() => ({
-  getUserCreditWallet: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/user-credits/user-credits', () => generated)
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
+}))
 
 describe('creditsResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('reads only the authenticated user wallet endpoint', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       data: { user_id: 7, status: 'active', available_credits: 128, reserved_credits: 4 },
     })
@@ -20,11 +22,14 @@ describe('creditsResource', () => {
       user_id: 7,
       available_credits: 128,
     })
-    expect(generated.getUserCreditWallet).toHaveBeenCalledWith()
+    expect(transport.request).toHaveBeenCalledWith(
+      '/user/credits/wallet',
+      expect.objectContaining({ method: 'GET' }),
+    )
   })
 
   it('surfaces API feedback instead of returning an empty wallet', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 404,
       msg: 'Idea钱包不存在',
       message_safe: true,
@@ -34,7 +39,7 @@ describe('creditsResource', () => {
   })
 
   it('uses the resource fallback when API feedback contains sensitive details', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({ code: 500, msg: 'api_key=exposed' })
+    transport.request.mockResolvedValue({ code: 500, msg: 'api_key=exposed' })
 
     await expect(fetchCreditWallet()).rejects.toThrow('Could not load your Ideas balance.')
   })

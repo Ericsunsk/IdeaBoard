@@ -1,35 +1,58 @@
-import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from 'vue'
+import {
+  computed,
+  onScopeDispose,
+  ref,
+  toValue,
+  watch,
+  type ComputedRef,
+  type MaybeRefOrGetter,
+  type Ref,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppToast } from '../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { i18n } from '../../shared/i18n'
 import {
-  createFolder,
-  getLibraryAssets,
+  assertLibraryFolderId,
   libraryAssetKey,
-  moveAsset,
-  removeAsset,
-  removeFolder,
-  renameFolder,
-  type LibraryAssetView,
-  type LibraryFolderView,
-} from './resource'
+  listAllWorkspaceLibraryFolders,
+  requireWorkspaceId,
+  workspaceLibraryApi,
+  type WorkspaceLibraryAsset,
+} from './workspace'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
   type LibraryFolderFacts,
+  type LibraryFolderView,
   type LibraryMutationPublisher,
 } from './folderFacts'
-import { stripUndefined } from '../../shared/api/stripUndefined'
+import type { LibraryAssetView } from './transfer'
 
 export type LibraryFolderTab = {
   queryKey: string
   name: string
-  assetCount: number
   isMutable: boolean
 }
 
+export const LIBRARY_ALL_FOLDER_KEY = 'all'
+
+function isLibraryAllFolderKey(value: string): boolean {
+  return value === LIBRARY_ALL_FOLDER_KEY
+}
+
+function asFolderKey(value: unknown): string {
+  if (typeof value !== 'string' || !value) return LIBRARY_ALL_FOLDER_KEY
+  if (value === LIBRARY_ALL_FOLDER_KEY) return value
+  try {
+    return assertLibraryFolderId(value)
+  } catch {
+    return LIBRARY_ALL_FOLDER_KEY
+  }
+}
+
 export type LibraryWorkspaceOptions = {
+  workspaceId: MaybeRefOrGetter<string | null | undefined>
   syncRoute?: boolean
   autoLoad?: boolean
   initialFolder?: string
@@ -37,14 +60,20 @@ export type LibraryWorkspaceOptions = {
   mutationPublisher?: LibraryMutationPublisher
 }
 
-function normalizeFolderQuery(value: unknown): string {
-  if (typeof value !== 'string' || !value) return 'all'
-  if (value === 'quick-saves') return value
-  const parsed = Number(value)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? String(parsed) : 'all'
+function resolveWorkspaceId(source: LibraryWorkspaceOptions['workspaceId']): string {
+  return requireWorkspaceId(toValue(source))
 }
 
-export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
+async function fetchLibraryAssetPage(workspaceId: string, folderKey: string, cursor: string) {
+  return workspaceLibraryApi.listAssets(workspaceId, {
+    ...(cursor ? { cursor } : {}),
+    pageSize: 24,
+    ...(isLibraryAllFolderKey(folderKey) ? {} : { folderId: folderKey }),
+  })
+}
+
+export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
+  workspaceId: ComputedRef<string | null>
   folders: Readonly<Ref<LibraryFolderView[]>>
   folderTabs: ComputedRef<LibraryFolderTab[]>
   assets: Ref<LibraryAssetView[]>
@@ -58,10 +87,11 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   loadAssets: (reset?: boolean) => Promise<void>
   loadFolders: () => Promise<void>
   initialize: () => Promise<void>
+  resetWorkspace: () => Promise<void>
   createNewFolder: (name: string) => Promise<void>
   renameFolder: (key: string, name: string) => Promise<void>
   deleteFolder: (key: string) => Promise<boolean>
-  moveSelectedAsset: (assetID: number, folderKey: string) => Promise<boolean>
+  moveSelectedAsset: (assetID: string, folderKey: string) => Promise<boolean>
   requestRemove: (asset: LibraryAssetView) => Promise<void>
   retry: () => Promise<void>
   setActiveAsset: (asset: LibraryAssetView | null) => void
@@ -71,8 +101,19 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   const syncRoute = options.syncRoute ?? true
   const autoLoad = options.autoLoad ?? true
   const toast = useAppToast()
+  const workspaceId = computed(() => {
+    try {
+      return resolveWorkspaceId(options.workspaceId)
+    } catch {
+      return null
+    }
+  })
   const ownedFolderFacts = !options.folderFacts
-  const folderFacts = options.folderFacts ?? createLibraryFolderFacts()
+  const folderFacts =
+    options.folderFacts ??
+    createLibraryFolderFacts(() =>
+      listAllWorkspaceLibraryFolders(resolveWorkspaceId(options.workspaceId)),
+    )
   const mutationPublisher = options.mutationPublisher ?? createLibraryMutationPublisher(folderFacts)
   const folders = folderFacts.folders
   const assets = ref<LibraryAssetView[]>([])
@@ -83,67 +124,37 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   const activeAsset = ref<LibraryAssetView | null>(null)
   let assetRequestID = 0
   const selectedFolder = ref(
-    normalizeFolderQuery(syncRoute ? route.query.folder : options.initialFolder),
+    asFolderKey(syncRoute ? route.query.folder : options.initialFolder),
   )
   const folderTabs = computed(() => {
-    const tabs = folders.value.map((folder) => {
-      const name =
-        folder.query_key === 'all'
-          ? i18n.global.t('library.folders.allAssets')
-          : folder.query_key === 'quick-saves'
-            ? i18n.global.t('library.folders.quickSaves')
-            : folder.name
-      return {
-        queryKey: folder.query_key,
-        name,
-        assetCount: folder.asset_count,
-        isMutable: !folder.is_system && !folder.is_virtual,
-      }
-    })
-    if (!tabs.some((tab) => tab.queryKey === 'all')) {
+    const tabs = folders.value.map((folder) => ({
+      queryKey: folder.id,
+      name: folder.name,
+      isMutable: true,
+    }))
+    if (!tabs.some((tab) => tab.queryKey === LIBRARY_ALL_FOLDER_KEY)) {
       tabs.unshift({
-        queryKey: 'all',
+        queryKey: LIBRARY_ALL_FOLDER_KEY,
         name: i18n.global.t('library.folders.allAssets'),
-        assetCount: 0,
-        isMutable: false,
-      })
-    }
-    if (!tabs.some((tab) => tab.queryKey === 'quick-saves')) {
-      tabs.splice(1, 0, {
-        queryKey: 'quick-saves',
-        name: i18n.global.t('library.folders.quickSaves'),
-        assetCount: 0,
         isMutable: false,
       })
     }
     return tabs
   })
-  function assetParams(folderKey: string, cursor?: string) {
-    const numericFolderID = Number(folderKey)
-    return stripUndefined({
-      folder_id:
-        Number.isSafeInteger(numericFolderID) && numericFolderID > 0
-          ? numericFolderID
-          : (folderKey as 'all' | 'quick-saves'),
-      cursor: cursor || undefined,
-      limit: 24,
-    })
-  }
 
   async function loadAssets(reset = true) {
     if (!reset && (loading.value || !hasMore.value)) return
     const requestID = ++assetRequestID
     const requestFolder = selectedFolder.value
     const requestCursor = reset ? '' : nextCursor.value
+    loading.value = true
     if (reset) {
-      loading.value = true
       nextCursor.value = ''
       errorMessage.value = ''
-    } else {
-      loading.value = true
     }
     try {
-      const page = await getLibraryAssets(assetParams(requestFolder, requestCursor))
+      const wid = resolveWorkspaceId(options.workspaceId)
+      const page = await fetchLibraryAssetPage(wid, requestFolder, requestCursor)
       if (requestID !== assetRequestID || requestFolder !== selectedFolder.value) return
       assets.value = reset ? page.items : [...assets.value, ...page.items]
       nextCursor.value = page.nextCursor
@@ -171,46 +182,54 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   }
 
   function selectFolder(key: string) {
-    selectedFolder.value = key
-    if (syncRoute) void router.replace({ query: key === 'all' ? {} : { folder: key } })
+    const normalized = asFolderKey(key)
+    selectedFolder.value = normalized
+    if (syncRoute) {
+      void router.replace({
+        query: normalized === LIBRARY_ALL_FOLDER_KEY ? {} : { folder: normalized },
+      })
+    }
     void loadAssets(true)
   }
 
   async function createNewFolder(name: string) {
-    const folder = await createFolder(name)
+    const wid = resolveWorkspaceId(options.workspaceId)
+    const folder = await workspaceLibraryApi.createFolder(wid, name)
     await mutationPublisher.publishMutation({
       kind: 'folder-created',
-      affectedFolderKeys: [folder.query_key],
+      affectedFolderKeys: [folder.id],
       galleryEffect: 'selection-will-reload',
     })
-    selectFolder(folder.query_key)
+    selectFolder(folder.id)
     toast.success(i18n.global.t('library.toasts.folderCreated'))
   }
 
   async function renameFolderByKey(key: string, name: string) {
-    const folder = folders.value.find((item) => item.query_key === key)
-    if (!folder || folder.is_system || folder.is_virtual) return
-    const updated = await renameFolder(folder.id, name)
+    const folder = folders.value.find((item) => item.id === key)
+    if (!folder || isLibraryAllFolderKey(key)) return
+    const wid = resolveWorkspaceId(options.workspaceId)
+    const updated = await workspaceLibraryApi.renameFolder(wid, folder.id, name)
     await mutationPublisher.publishMutation({
       kind: 'folder-renamed',
-      affectedFolderKeys: [updated.query_key],
+      affectedFolderKeys: [updated.id],
       galleryEffect: 'none',
     })
     toast.success(i18n.global.t('library.toasts.folderRenamed'))
   }
 
-  async function deleteFolder(key: string): Promise<boolean> {
-    const folder = folders.value.find((item) => item.query_key === key)
-    if (!folder || folder.is_system || folder.is_virtual) return false
+  async function deleteFolderByKey(key: string): Promise<boolean> {
+    const folder = folders.value.find((item) => item.id === key)
+    if (!folder || isLibraryAllFolderKey(key)) return false
     try {
-      await removeFolder(folder.id)
+      const wid = resolveWorkspaceId(options.workspaceId)
+      await workspaceLibraryApi.deleteFolder(wid, folder.id)
       const selectedFolderWasDeleted = selectedFolder.value === key
       await mutationPublisher.publishMutation({
         kind: 'folder-deleted',
         affectedFolderKeys: [key],
         galleryEffect: selectedFolderWasDeleted ? 'selection-will-reload' : 'none',
       })
-      if (selectedFolder.value === key) selectFolder('quick-saves')
+      if (selectedFolder.value === key) selectFolder(LIBRARY_ALL_FOLDER_KEY)
       toast.success(i18n.global.t('library.toasts.folderDeleted'))
       return true
     } catch (error) {
@@ -219,21 +238,28 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     }
   }
 
-  async function moveSelectedAsset(assetID: number, folderKey: string): Promise<boolean> {
+  async function moveSelectedAsset(assetID: string, folderKey: string): Promise<boolean> {
     const asset = assets.value.find((item) => item.id === assetID)
     if (!asset) return false
-    const folder = folders.value.find((item) => item.query_key === folderKey)
-    if (!folder || folder.is_virtual || folder.id === asset.folder_id) return false
+    const normalized = asFolderKey(folderKey)
+    if (isLibraryAllFolderKey(normalized)) return false
+    const folder = folders.value.find((item) => item.id === normalized)
+    if (!folder || folder.id === asset.folderId) return false
     try {
-      const updated = await moveAsset(asset.id, folder.id)
-      if (selectedFolder.value !== 'all' && selectedFolder.value !== folderKey) {
+      const wid = resolveWorkspaceId(options.workspaceId)
+      const updated = await workspaceLibraryApi.moveAsset(wid, asset.id, folder.id)
+      if (selectedFolder.value !== LIBRARY_ALL_FOLDER_KEY && selectedFolder.value !== normalized) {
         assets.value = assets.value.filter((item) => item.id !== asset.id)
       } else {
         assets.value = assets.value.map((item) => (item.id === updated.id ? updated : item))
       }
       await mutationPublisher.publishMutation({
         kind: 'asset-moved',
-        affectedFolderKeys: ['all', String(asset.folder_id), folderKey],
+        affectedFolderKeys: [
+          LIBRARY_ALL_FOLDER_KEY,
+          ...(asset.folderId ? [asset.folderId] : []),
+          normalized,
+        ],
         galleryEffect: 'none',
       })
       toast.success(i18n.global.t('library.toasts.assetMoved'))
@@ -246,14 +272,18 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
 
   async function requestRemove(asset: LibraryAssetView) {
     try {
-      await removeAsset(asset.id)
+      const wid = resolveWorkspaceId(options.workspaceId)
+      await workspaceLibraryApi.deleteAsset(wid, asset.id)
       assets.value = assets.value.filter((item) => item.id !== asset.id)
       await mutationPublisher.publishMutation({
         kind: 'asset-removed',
         provider: asset.provider,
-        sourceID: asset.source_id,
-        assetKey: libraryAssetKey(asset.provider, asset.source_id),
-        affectedFolderKeys: ['all', String(asset.folder_id)],
+        sourceID: asset.sourceId,
+        assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+        affectedFolderKeys: [
+          LIBRARY_ALL_FOLDER_KEY,
+          ...(asset.folderId ? [asset.folderId] : []),
+        ],
         galleryEffect: 'none',
       })
       toast.success(i18n.global.t('library.toasts.removedFromLibrary'))
@@ -271,11 +301,22 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     await Promise.all([loadFolders(), loadAssets(true)])
   }
 
+  async function resetWorkspace() {
+    assetRequestID += 1
+    selectedFolder.value = LIBRARY_ALL_FOLDER_KEY
+    assets.value = []
+    nextCursor.value = ''
+    hasMore.value = false
+    activeAsset.value = null
+    folderFacts.reset()
+    await initialize()
+  }
+
   if (syncRoute) {
     watch(
       () => route.query.folder,
       (value) => {
-        const next = normalizeFolderQuery(value)
+        const next = asFolderKey(value)
         if (next !== selectedFolder.value) {
           selectedFolder.value = next
           void loadAssets(true)
@@ -289,6 +330,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   if (ownedFolderFacts) onScopeDispose(folderFacts.dispose)
 
   return {
+    workspaceId,
     folders,
     folderTabs,
     assets,
@@ -302,13 +344,14 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     loadAssets,
     loadFolders,
     initialize,
+    resetWorkspace,
     createNewFolder,
     renameFolder: renameFolderByKey,
-    deleteFolder,
+    deleteFolder: deleteFolderByKey,
     moveSelectedAsset,
     requestRemove,
     retry,
-    setActiveAsset: (asset) => {
+    setActiveAsset: (asset: WorkspaceLibraryAsset | null) => {
       activeAsset.value = asset
     },
   }

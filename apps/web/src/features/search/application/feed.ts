@@ -1,6 +1,6 @@
-import { nextTick, ref, type Ref } from 'vue'
+import { nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
-import { libraryAssetKey, lookupSavedAssetKeys } from '../../library'
+import { libraryAssetKey, lookupWorkspaceSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../domain/models'
 import {
   generateRandomInspirationCursor,
@@ -12,7 +12,7 @@ import type { SearchFeedPersistence, SearchFeedSnapshot } from '../ports/persist
 export type SearchFeedDependencies = {
   randomCursor: () => string
   search: typeof searchInspiration
-  lookupSavedKeys: typeof lookupSavedAssetKeys
+  lookupSavedKeys: typeof lookupWorkspaceSavedAssetKeys
   persistence: SearchFeedPersistence
   restoreScroll: (scrollY: number) => void
 }
@@ -20,7 +20,7 @@ export type SearchFeedDependencies = {
 const defaults: SearchFeedDependencies = {
   randomCursor: generateRandomInspirationCursor,
   search: searchInspiration,
-  lookupSavedKeys: lookupSavedAssetKeys,
+  lookupSavedKeys: lookupWorkspaceSavedAssetKeys,
   persistence: createBrowserSearchFeedPersistence(),
   restoreScroll(scrollY) {
     window.scrollTo({ top: scrollY, behavior: 'instant' })
@@ -33,6 +33,7 @@ type SearchFeedOptions = {
   cacheScope?: string | undefined
   scrollContainer?: Ref<HTMLElement | null> | undefined
   isAuthenticated?: (() => boolean) | undefined
+  workspaceId?: MaybeRefOrGetter<string | null | undefined> | undefined
 }
 
 /**
@@ -118,10 +119,13 @@ export function createSearchFeed(
 
   async function refreshSavedKeys(items: SearchResult[], generation: number): Promise<void> {
     if (items.length === 0 || !isAuthenticated()) return
+    const workspaceId = options.workspaceId == null ? null : toValue(options.workspaceId)
+    if (!workspaceId) return
     const lookupStartedAtRevision = savedMutationRevision
     try {
       const saved = await dependencies.lookupSavedKeys(
-        items.map((result) => ({ provider: result.provider, source_id: result.id })),
+        workspaceId,
+        items.map((result) => ({ provider: result.provider, sourceId: result.id })),
       )
       if (generation !== loadGeneration) return
       const nextKeys = new Set(savedKeys.value)

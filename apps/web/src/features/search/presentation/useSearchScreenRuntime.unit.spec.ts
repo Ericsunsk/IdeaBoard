@@ -64,6 +64,10 @@ vi.mock('../application/useSearchSession', () => ({
   },
 }))
 
+vi.mock('../../workspace', () => ({
+  useWorkspaceSelection: () => ({ selectedId: ref('ws_test123') }),
+}))
+
 vi.mock('../../library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../library')>()
   return {

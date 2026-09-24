@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchCurrentUserInfo } from './userSession'
+import { fetchCurrentUserInfo, toSessionUser } from './userSession'
 
 const mocks = vi.hoisted(() => ({
-  getUserInfo: vi.fn(),
+  getMe: vi.fn(),
 }))
 
-vi.mock('./generated-query/user/user', () => ({
-  getUserInfo: mocks.getUserInfo,
+vi.mock('./generated-query/public/me/me', () => ({
+  getMe: mocks.getMe,
 }))
 
 describe('user session API boundary', () => {
@@ -15,34 +15,47 @@ describe('user session API boundary', () => {
   })
 
   it('returns the session data without the transport envelope', async () => {
-    const user = {
-      public_id: '00000000-0000-4000-8000-000000000007',
+    const me = {
+      id: 'usr_000000000000000000000007',
+      public_id: 'usr_000000000000000000000007',
       display_name: 'Alice',
-      storage_namespace: 'USER0007',
       avatar: '',
       role: 'user',
-      status: 1,
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:00.000Z',
     }
-    mocks.getUserInfo.mockResolvedValue({ code: 0, msg: 'ok', data: { user } })
+    mocks.getMe.mockResolvedValue({ data: me })
 
-    await expect(fetchCurrentUserInfo()).resolves.toEqual({ user })
+    await expect(fetchCurrentUserInfo()).resolves.toEqual({
+      user: {
+        public_id: 'usr_000000000000000000000007',
+        display_name: 'Alice',
+        role: 'user',
+      },
+    })
   })
 
-  it('rejects a successful HTTP response with a failed business code', async () => {
-    mocks.getUserInfo.mockResolvedValue({ code: 503, msg: 'dial tcp 127.0.0.1:5432' })
+  it('rejects when the principal request fails', async () => {
+    mocks.getMe.mockRejectedValue(
+      Object.assign(new Error('Could not load your session. Please sign in again.'), {
+        status: 503,
+      }),
+    )
 
     await expect(fetchCurrentUserInfo()).rejects.toThrow(
       'Could not load your session. Please sign in again.',
     )
   })
 
-  it('rejects a malformed successful response without a user', async () => {
-    mocks.getUserInfo.mockResolvedValue({ code: 0, msg: 'ok', data: {} })
+  it('rejects a malformed successful response without a principal', async () => {
+    mocks.getMe.mockResolvedValue({ data: {} })
 
     await expect(fetchCurrentUserInfo()).rejects.toThrow(
       'Could not load your session. Please sign in again.',
     )
+  })
+
+  it('drops unknown principal fields to undefined instead of leaking them', () => {
+    expect(toSessionUser(null)).toBeNull()
+    expect(toSessionUser({})).toBeNull()
+    expect(toSessionUser({ data: undefined })).toBeNull()
   })
 })

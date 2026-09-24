@@ -9,7 +9,6 @@ import (
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/boards"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
-	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	storagepostgres "ideaboard/api/internal/media/storage/infrastructure/postgres"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
@@ -23,7 +22,6 @@ import (
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
-	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,7 +40,6 @@ type appDatabaseOpeners struct {
 type appRepositories struct {
 	db                 *pgxpool.Pool
 	userRepo           *identitypostgres.Repository
-	taskRepo           *taskstore.Repository
 	taskBillingUsage   *taskbilling.UsageStore
 	systemConfigRepo   *settings.SystemConfigRepository
 	featurePromptRepo  *prompts.FeaturePromptRepository
@@ -50,7 +47,6 @@ type appRepositories struct {
 	mediaAssetRegistry *assets.MediaAssetRegistry
 	boardRepo          *boards.Repository
 	paymentRepo        *paymentpostgres.Repository
-	libraryRepo        *library.Repository
 	adminBrandLogoRepo *adminbranding.Repository
 }
 
@@ -142,7 +138,6 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		database.RuntimePrivilegePolicy(),
 		creditpostgres.RuntimePrivilegePolicy(),
 		billingpostgres.RuntimePrivilegePolicy(),
-		taskstore.RuntimePrivilegePolicy(),
 		workerriver.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
 		paymentpostgres.RuntimePrivilegePolicy(),
@@ -169,11 +164,9 @@ func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (conf
 }
 
 func newAppRepositories(ctx context.Context, db *pgxpool.Pool) (appRepositories, error) {
-	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
 		db:                 db,
 		userRepo:           identitypostgres.NewRepository(db),
-		taskRepo:           taskRepo,
 		taskBillingUsage:   taskbilling.NewUsageStore(db),
 		systemConfigRepo:   settings.NewSystemConfigRepository(db),
 		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
@@ -181,7 +174,6 @@ func newAppRepositories(ctx context.Context, db *pgxpool.Pool) (appRepositories,
 		mediaAssetRegistry: assets.NewMediaAssetRegistry(db),
 		boardRepo:          boards.NewRepository(db),
 		paymentRepo:        paymentpostgres.NewRepository(db),
-		libraryRepo:        library.NewRepository(db),
 		adminBrandLogoRepo: adminbranding.NewRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {

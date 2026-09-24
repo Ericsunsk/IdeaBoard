@@ -1,5 +1,4 @@
 export { loadFabricMaskPainter } from './loader.ts'
-export { createNoopWorldCaptureToCanvas } from './worldCapture.ts'
 export type {
   WorldCaptureIntent,
   WorldCaptureResult,

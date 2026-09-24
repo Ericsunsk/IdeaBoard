@@ -1,15 +1,15 @@
-import { libraryAssetKey, type LibraryAssetView } from '../../library'
+import { libraryAssetKey, type WorkspaceLibraryAsset } from '../../library'
 import type { SearchResult, VisionReference } from '../domain/models'
 
 export function searchReferenceKey(provider: string, sourceID: string): string {
   return libraryAssetKey(provider, sourceID)
 }
 
-export function toVisionReference(asset: LibraryAssetView): VisionReference {
+export function toVisionReference(asset: WorkspaceLibraryAsset): VisionReference {
   return {
     libraryAssetID: asset.id,
-    previewUrl: asset.preview_url,
-    key: searchReferenceKey(asset.provider, asset.source_id),
+    previewUrl: asset.previewUrl,
+    key: searchReferenceKey(asset.provider, asset.sourceId),
   }
 }
 

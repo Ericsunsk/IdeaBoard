@@ -27,7 +27,6 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
-	"ideaboard/api/internal/media/workspaceuploads"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -103,8 +102,6 @@ type v1EventsFixture struct {
 	tasks        *workspacetasks.InMemoryStore
 	boards       *boards.InMemoryWorkspaceBoardStore
 	boardID      string
-	sessions     *workspaceuploads.InMemorySessionStore
-	assets       *workspaceuploads.InMemoryAssetStore
 	lib          *library.InMemoryWorkspaceLibraryStore
 	eventLog     *events.WorkspaceEventLog
 	webhooks     *events.WebhookStore
@@ -121,8 +118,6 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	dir := newStaticUserDirectory()
 	tasks := workspacetasks.NewInMemoryStoreForTests()
 	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests()
-	sessions := workspaceuploads.NewInMemorySessionStore()
-	assets := workspaceuploads.NewInMemoryAssetStore()
 	libStore := library.NewInMemoryWorkspaceLibraryStoreForTests()
 	lib := libStore
 	quoter := &fakeTaskQuoter{}
@@ -165,8 +160,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
 		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets,
-		Boards:         boardsStore,
-		UploadSessions: sessions, WorkspaceAssets: assets,
+		Boards:   boardsStore,
 		Library:  ContractV1LibraryDeps{Store: libStore, Materializer: materializer, Billing: &fakeLibraryBilling{}, Quoter: &fakeLibraryQuoter{amount: 5}},
 		Events:   eventLog,
 		Webhooks: webhooks,
@@ -190,7 +184,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	}
 	return &v1EventsFixture{
 		engine: router, store: store, dir: dir, ws: ws, tasks: tasks,
-		boards: boardsStore, boardID: boardID, sessions: sessions, assets: assets,
+		boards: boardsStore, boardID: boardID,
 		lib: lib, eventLog: eventLog, webhooks: webhooks, sender: sender,
 		scheduler: scheduler, holder: holder, materializer: materializer,
 	}
@@ -380,38 +374,6 @@ func TestV1BoardProducersEmit(t *testing.T) {
 				t.Fatal("share_revoked must never carry the bearer")
 			}
 		}
-	}
-}
-
-func TestV1MediaProducersEmit(t *testing.T) {
-	fx := newV1EventsFixture(t)
-	uploadsPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/uploads"
-	status, created := v1CreateUpload(t, fx.engine, fx.ws.PublicID, 3, "evt-up-1", v1UploadCreateBody())
-	if status != http.StatusCreated {
-		t.Fatalf("upload create = %d %v, want 201", status, created)
-	}
-	uploadID := created["data"].(map[string]any)["id"].(string)
-	completeBody := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":1024,"mime_type":"image/png","media_kind":"image","width":4,"height":3}}`, v1UploadTestChecksum)
-	status, _, completed := doV1(t, fx.engine, v1Call{
-		method: http.MethodPost, path: uploadsPath + "/" + uploadID + "/complete", userID: 3,
-		body: completeBody, headers: map[string]string{contract.IdempotencyKeyHeader: "evt-up-complete-1"},
-	})
-	if status != http.StatusOK {
-		t.Fatalf("complete = %d %v, want 200", status, completed)
-	}
-	assetID := completed["data"].(map[string]any)["asset"].(map[string]any)["id"].(string)
-	archivePath := "/api/v1/workspaces/" + fx.ws.PublicID + "/media-assets/" + assetID + "/archive"
-	status, _ = eventIDEM(t, fx.engine, http.MethodPost, archivePath, 2, "evt-arch-1", "", nil)
-	if status != http.StatusOK {
-		t.Fatalf("archive = %d, want 200", status)
-	}
-	types := fx.logTypes()
-	counts := map[string]int{}
-	for _, typ := range types {
-		counts[typ]++
-	}
-	if counts[events.EventV1MediaAssetReady] != 1 || counts[events.EventV1MediaAssetArchived] != 1 {
-		t.Fatalf("media emission=%v, want 1x ready + 1x archived", counts)
 	}
 }
 

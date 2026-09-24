@@ -1,17 +1,40 @@
-import { resolveApiData } from '../../../../shared/api/apiResponse'
+import { api } from '../../../../shared/api/client'
 import {
-  getAdminStripeConfiguration,
-  updateAdminStripeConfiguration,
-} from '../../../../shared/api/generated-query/admin-payments/admin-payments'
-import type {
-  StripeConfigurationSummary as ApiStripeConfigurationSummary,
-  UpdateStripeConfigurationRequest,
-} from '../../../../shared/api/generated-query/model'
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../../shared/api/apiResponse'
 import type {
   AdminStripeSettingsResource,
   SaveStripeConfigurationInput,
   StripeConfigurationSummary,
 } from './types'
+
+// Admin Stripe settings boundary (issue #809). The generated
+// `admin-payments` client is gone but the backend admin plane still serves
+// `/api/admin/payments/stripe-config` with the shared envelope, so this
+// boundary transports through the central `api.request` with local wire
+// types.
+export type ApiStripeConfigurationSummary = {
+  configured: boolean
+  api_key_configured: boolean
+  webhook_secret_configured: boolean
+  account_id?: string
+  mode?: 'test' | 'live'
+  charges_enabled: boolean
+  payment_method_configuration_id?: string
+  product_tax_code: string
+  product_ready: boolean
+  webhook_ready: boolean
+  purchases_enabled: boolean
+  updated_at?: string
+}
+
+export type UpdateStripeConfigurationRequest = {
+  api_key?: string
+  payment_method_configuration_id: string
+  product_tax_code: string
+  purchases_enabled: boolean
+}
 
 export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
   return {
@@ -21,7 +44,13 @@ export function createAdminStripeSettingsResource(): AdminStripeSettingsResource
 }
 
 export async function getStripeConfiguration(): Promise<StripeConfigurationSummary> {
-  const data = await resolveApiData(getAdminStripeConfiguration(), '加载 Stripe 设置失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<ApiStripeConfigurationSummary>>(
+      '/admin/payments/stripe-config',
+      { method: 'GET' },
+    ),
+    '加载 Stripe 设置失败',
+  )
   return normalizeStripeConfiguration(data)
 }
 
@@ -34,7 +63,16 @@ export async function saveStripeConfiguration(
     product_tax_code: input.productTaxCode.trim(),
     purchases_enabled: input.purchasesEnabled,
   }
-  const data = await resolveApiData(updateAdminStripeConfiguration(body), '保存 Stripe 设置失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<ApiStripeConfigurationSummary>>(
+      '/admin/payments/stripe-config',
+      {
+        method: 'PUT',
+        body: body as unknown as Record<string, unknown>,
+      },
+    ),
+    '保存 Stripe 设置失败',
+  )
   return normalizeStripeConfiguration(data)
 }
 

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/testdb"
@@ -161,49 +160,6 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 
 	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertRequest{Name: "Renamed Board", State: validBoardState(CurrentBoardStateSchemaVersion, 300)}); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("editor rename err = %v, want ErrPermissionDenied", err)
-	}
-}
-
-func TestBoardServiceShareJoinReadsTypedMediaRefs(t *testing.T) {
-	db := testdb.Open(t)
-	userRepo := identitypostgres.NewRepository(db)
-	repo := NewRepository(db)
-	service := NewService(repo, userRepo)
-	q := dbsqlc.New(db)
-	ctx := context.Background()
-
-	owner := createBoardTestUser(t, userRepo, "share-media-owner")
-	joiner := createBoardTestUser(t, userRepo, "share-media-joiner")
-	assetID := seedBoardMediaAsset(t, q, owner.ID, "share-board-media", "uploads/tasks/42/share-output.png")
-	state := validBoardState(CurrentBoardStateSchemaVersion, 100)
-	state["mediaRefs"] = []StateMediaRef{{
-		MediaAssetID: assetID,
-		RefType:      "board_node",
-		RefID:        "image-1",
-		Role:         "result",
-	}}
-
-	const boardID = "share-media-board"
-	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertRequest{Name: "Share Media Board", State: state}); err != nil {
-		t.Fatalf("create board failed: %v", err)
-	}
-	token, err := service.CreateShareToken(ctx, owner.ID, boardID, string(RoleViewer), nil)
-	if err != nil {
-		t.Fatalf("create share token failed: %v", err)
-	}
-	joined, err := service.JoinBoardByShareToken(ctx, joiner.ID, token.Token)
-	if err != nil {
-		t.Fatalf("join board failed: %v", err)
-	}
-	if joined.Role != RoleViewer {
-		t.Fatalf("joined role = %s, want viewer", joined.Role)
-	}
-	var envelope BoardStateEnvelope
-	if err := json.Unmarshal([]byte(joined.Board.State), &envelope); err != nil {
-		t.Fatalf("decode joined board state failed: %v", err)
-	}
-	if len(envelope.MediaRefs) != 1 || envelope.MediaRefs[0].MediaAssetID != assetID || envelope.MediaRefs[0].RefType != "board_node" {
-		t.Fatalf("joined board media refs = %#v, want typed board_node ref", envelope.MediaRefs)
 	}
 }
 

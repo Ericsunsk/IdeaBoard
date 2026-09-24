@@ -128,6 +128,8 @@ import AdminButton from '../shared/components/AdminButton.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import SettingEditorCard from './SettingEditorCard.vue'
 import { createAdminSearchProviderResource } from './searchProviderResource'
@@ -152,6 +154,7 @@ const emit = defineEmits<{
 
 const defaultResource = createAdminSearchProviderResource()
 const feedback = useAdminSearchProviderFeedback()
+const confirm = useAdminConfirm()
 const resource = computed(() => props.resource ?? defaultResource)
 
 const form = useForm({
@@ -213,13 +216,25 @@ function resetDraft() {
 
 const saveKey = form.handleSubmit(async (values) => {
   const key = values.apiKey.trim()
+  // Control Plane writes require an operator reason (audit); a cancelled
+  // dialog aborts the save silently.
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: `保存 ${providerLabel.value} API Key`,
+    message: '保存新 Key 会重置测试状态并停用该供应商，保存后需重新测试。该操作将记录操作人与原因。',
+    confirmLabel: '保存 Key',
+  })
+  if (!operatorReason) return
   saving.value = true
   operationError.value = ''
   try {
     // 保存新 Key 会重置测试状态（后端 saveLifecycle），落盘后必须重新测试；
     // 若之前已启用会一并停用，避免未经测试的 Key 生效。
     const wasEnabled = props.config.enabled
-    await resource.value.update(props.provider, { api_key: key, enabled: false })
+    await resource.value.update(
+      props.provider,
+      { api_key: key, enabled: false },
+      { operatorReason },
+    )
     resetDraft()
     emit('change')
     feedback.keySaved(providerLabel.value, wasEnabled)
@@ -231,10 +246,16 @@ const saveKey = form.handleSubmit(async (values) => {
 })
 
 async function runTest() {
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: `测试${providerLabel.value}连接`,
+    message: '将使用已保存的 Key 发起一次真实连接测试。该操作将记录操作人与原因。',
+    confirmLabel: '测试连接',
+  })
+  if (!operatorReason) return
   testing.value = true
   operationError.value = ''
   try {
-    await resource.value.test(props.provider)
+    await resource.value.test(props.provider, { operatorReason })
     emit('change')
     feedback.testPassed(providerLabel.value)
   } catch (err) {
@@ -247,10 +268,18 @@ async function runTest() {
 }
 
 async function setEnabled(enabled: boolean) {
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: `${enabled ? '启用' : '停用'}${providerLabel.value}`,
+    message: enabled
+      ? '启用后该供应商将承接图片搜索流量。该操作将记录操作人与原因。'
+      : '停用后该供应商不再承接图片搜索流量。该操作将记录操作人与原因。',
+    confirmLabel: enabled ? '启用' : '停用',
+  })
+  if (!operatorReason) return
   saving.value = true
   operationError.value = ''
   try {
-    await resource.value.update(props.provider, { enabled })
+    await resource.value.update(props.provider, { enabled }, { operatorReason })
     emit('change')
     feedback.toggled(providerLabel.value, enabled)
   } catch (err) {

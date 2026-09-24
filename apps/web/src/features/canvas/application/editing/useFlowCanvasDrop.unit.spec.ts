@@ -25,7 +25,7 @@ function transfer(): DataTransfer {
 }
 
 const asset: CanvasLibraryImportDescriptor = {
-  assetId: 17,
+  assetId: 'liba_asset0017',
   title: 'Drop asset',
   previewUrl: 'https://images.unsplash.com/drop-17-preview',
   width: 1200,
@@ -92,7 +92,7 @@ describe('useFlowCanvasDrop', () => {
     const dataTransfer = transfer()
     dataTransfer.setData(
       CANVAS_LIBRARY_IMPORT_MIME,
-      JSON.stringify({ type: 'canvas-library-import', asset: { ...asset, assetId: 0 } }),
+      JSON.stringify({ type: 'canvas-library-import', asset: { ...asset, assetId: 'not-a-library-id' } }),
     )
 
     await harness.drop.onCanvasDrop({

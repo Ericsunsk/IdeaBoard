@@ -26,7 +26,6 @@ import (
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/storage"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
@@ -78,7 +77,6 @@ func newContractInventoryRouter() *gin.Engine {
 			PaymentUserHandler:     &paymenthttp.UserCheckoutHandler{},
 			UserEventStreamHandler: &UserEventStreamHandler{},
 			VisionHandler:          &searchhttp.VisionHandler{},
-			LibraryHandler:         &library.Handler{},
 		},
 		PublicSearchHandler: &searchhttp.SearchHandler{},
 		AdminRoutes: AdminRouteDeps{
@@ -183,10 +181,10 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: joinBoardByToken",
 			"operationId: getBoardDocument",
 			"operationId: replaceBoardDocument",
-			"operationId: createUploadSession",
-			"operationId: completeUploadSession",
-			"operationId: listMediaAssets",
-			"operationId: archiveMediaAsset",
+			// #817 (Phase 3b-08): workspace upload/media surface stays
+			// unregistered while its replacement lands (contract_v1
+			// upload/media routes removed in #813); the 8 upload/media
+			// operationIds are intentionally absent here until Phase 4.
 			"operationId: getWorkspaceBillingAccount",
 			"operationId: getWorkspaceCreditsBalance",
 			"operationId: createWorkspaceCheckoutSession",
@@ -223,6 +221,8 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: createControlCreditCorrection",
 			"operationId: cancelControlTask",
 			"operationId: getControlMonitor",
+			"operationId: getControlMailSetting",
+			"operationId: updateControlMailSetting",
 		},
 		"openapi.events.yaml": {
 			"pattern: '^evt_",
@@ -230,9 +230,9 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"Last-Event-ID",
 			"X-Webhook-Signature",
 		},
-		"openapi.yaml": {
-			"operationId: getUserInfo",
-		},
+		// Legacy openapi.yaml was deleted by the #809 hard cut; its absence
+		// is asserted by TestContractInventoryLegacyMarkersStayDeleted and
+		// TestContractInventoryLegacyGrepWarning below, not by markers here.
 	}
 	files := make([]string, 0, len(want))
 	for name := range want {
@@ -254,27 +254,16 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 
 // TestContractInventoryLegacyGrepWarning lists legacy references, undocumented
 // endpoints/error codes/event types and generated-client drift as warnings.
-// It stays green until #809 turns these into hard failures.
+// Post-#809 the legacy openapi.yaml file itself must be gone (hard failure);
+// the remaining route-catalog warnings stay advisory.
 func TestContractInventoryLegacyGrepWarning(t *testing.T) {
-	// Legacy paths in openapi.yaml are server-relative: servers is /api while
-	// paths are /user/* and /admin/*.
-	legacyPaths := []string{"/user", "/admin"}
-	legacyRefs := 0
-	legacyFile, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "openapi.yaml"))
-	if err != nil {
-		t.Fatalf("read legacy openapi.yaml: %v", err)
+	// The legacy spec was deleted by the #809 hard cut: fail if it returns.
+	legacySpec := filepath.Join("..", "..", "..", "..", "openapi.yaml")
+	if _, err := os.Stat(legacySpec); err == nil {
+		t.Fatalf("legacy openapi.yaml must stay deleted post-#809 hard cut")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat legacy openapi.yaml: %v", err)
 	}
-	for _, line := range strings.Split(string(legacyFile), "\n") {
-		trimmed := strings.TrimSpace(line)
-		for _, prefix := range legacyPaths {
-			if trimmed == prefix+":" || strings.HasPrefix(trimmed, prefix+"/") {
-				legacyRefs++
-				break
-			}
-		}
-	}
-	t.Logf("WARNING (hard fail deferred to #809): legacy openapi.yaml still documents %d /user|/admin paths; "+
-		"do not delete legacy paths/operationIds in #800", legacyRefs)
 
 	router := newContractInventoryRouter()
 	var undocumented []string

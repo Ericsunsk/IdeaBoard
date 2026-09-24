@@ -1,4 +1,7 @@
-import type { LibraryAssetView, LibrarySearchReference } from './resource'
+import type { LibrarySearchReference, WorkspaceLibraryAsset } from './workspace'
+import { assertLibraryAssetId } from './workspace'
+
+export type LibraryAssetView = WorkspaceLibraryAsset
 
 export const SEARCH_REFERENCE_MIME = 'application/x-ideaboard-search-reference'
 export const LIBRARY_FOLDER_MOVE_MIME = 'application/x-ideaboard-library-folder-move'
@@ -11,11 +14,11 @@ type SearchReferencePayload = {
 
 type LibraryFolderMovePayload = {
   type: 'library-folder-move'
-  assetId: number
+  assetId: string
 }
 
 export type CanvasLibraryImportDescriptor = {
-  assetId: number
+  assetId: string
   title: string
   previewUrl: string
   width: number
@@ -42,7 +45,7 @@ export function writeSearchReferenceTransfer(
   dataTransfer.effectAllowed = 'copy'
 }
 
-export function writeLibraryFolderMoveTransfer(dataTransfer: DataTransfer, assetId: number): void {
+export function writeLibraryFolderMoveTransfer(dataTransfer: DataTransfer, assetId: string): void {
   setPayload(dataTransfer, LIBRARY_FOLDER_MOVE_MIME, {
     type: 'library-folder-move',
     assetId,
@@ -51,12 +54,12 @@ export function writeLibraryFolderMoveTransfer(dataTransfer: DataTransfer, asset
 }
 
 export function toCanvasLibraryImportDescriptor(
-  asset: LibraryAssetView,
+  asset: WorkspaceLibraryAsset,
 ): CanvasLibraryImportDescriptor {
   return {
     assetId: asset.id,
-    title: asset.title,
-    previewUrl: asset.preview_url,
+    title: asset.title ?? '',
+    previewUrl: asset.previewUrl,
     width: asset.width,
     height: asset.height,
   }
@@ -96,15 +99,21 @@ function isSearchReference(value: unknown): value is LibrarySearchReference {
   )
 }
 
-function isValidAssetID(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0
+function isValidLibraryAssetID(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    assertLibraryAssetId(value)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function isCanvasLibraryImportDescriptor(value: unknown): value is CanvasLibraryImportDescriptor {
   if (!value || typeof value !== 'object') return false
   const asset = value as Partial<CanvasLibraryImportDescriptor>
   return (
-    isValidAssetID(asset.assetId) &&
+    isValidLibraryAssetID(asset.assetId) &&
     typeof asset.title === 'string' &&
     typeof asset.previewUrl === 'string' &&
     typeof asset.width === 'number' &&
@@ -129,7 +138,7 @@ export function readSearchReferenceTransfer(
 
 export function readLibraryFolderMoveTransfer(
   dataTransfer: DataTransfer | null | undefined,
-): number | null {
+): string | null {
   const payload = readPayload(dataTransfer, LIBRARY_FOLDER_MOVE_MIME)
   if (
     payload &&
@@ -138,7 +147,7 @@ export function readLibraryFolderMoveTransfer(
     'assetId' in payload
   ) {
     const assetId = (payload as Partial<LibraryFolderMovePayload>).assetId
-    return isValidAssetID(assetId) ? assetId : null
+    return isValidLibraryAssetID(assetId) ? assetId : null
   }
   return null
 }

@@ -1,13 +1,30 @@
+import { api } from '../../../../shared/api/client'
 import {
-  getAdminRewardCodeRedemption,
-  listAdminRewardCodeRedemptions,
-} from '../../../../shared/api/generated-query/admin-rewards/admin-rewards'
-import type {
-  AdminRewardCodeRedemptionDetail as GeneratedRedemptionDetail,
-  AdminRewardCodeRedemptionPage as GeneratedRedemptionPage,
-  AdminRewardCodeRedemptionSummary as GeneratedRedemption,
-} from '../../../../shared/api/generated-query/model'
-import { resolveApiData } from '../../../../shared/api/apiResponse'
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../../shared/api/apiResponse'
+
+// Admin reward redemption boundary (issue #809). Transports through the
+// central `api.request` against the surviving
+// `/api/admin/rewards/codes/:id/redemptions*` routes with local view types.
+export type GeneratedRedemption = {
+  id: number
+  reward_code_id: number
+  user_public_id: string
+  display_name: string
+  credited_amount: number
+  redeemed_at: string
+}
+
+export type GeneratedRedemptionDetail = GeneratedRedemption & {
+  credit_transaction_id: string
+  masked_code_hint: string
+}
+
+export type GeneratedRedemptionPage = {
+  redemptions: GeneratedRedemption[]
+  next_before_id?: number
+}
 
 export type RewardCodeRedemption = {
   id: number
@@ -44,17 +61,25 @@ export type RewardCodeRedemptionResource = {
   ) => Promise<RewardCodeRedemptionDetail>
 }
 
+function redemptionsUrl(rewardCodeId: number, beforeId?: number, limit?: number): string {
+  const search = new URLSearchParams()
+  if (beforeId !== undefined) search.append('before_id', String(beforeId))
+  if (limit !== undefined) search.append('limit', String(limit))
+  const query = search.toString()
+  const base = `/admin/rewards/codes/${encodeURIComponent(String(rewardCodeId))}/redemptions`
+  return query ? `${base}?${query}` : base
+}
+
 export function createRewardCodeRedemptionResource(): RewardCodeRedemptionResource {
   return {
     list: async (rewardCodeId, { beforeId, limit = 20, signal } = {}) => {
       const page: GeneratedRedemptionPage = await resolveApiData(
-        listAdminRewardCodeRedemptions(
-          rewardCodeId,
+        api.request<ApiResponseWithData<GeneratedRedemptionPage>>(
+          redemptionsUrl(rewardCodeId, beforeId, limit),
           {
-            ...(beforeId !== undefined ? { before_id: beforeId } : {}),
-            limit,
+            method: 'GET',
+            ...(signal == null ? {} : { signal }),
           },
-          signal ? { signal } : undefined,
         ),
         '加载兑换记录失败',
       )
@@ -65,7 +90,13 @@ export function createRewardCodeRedemptionResource(): RewardCodeRedemptionResour
     },
     get: async (rewardCodeId, redemptionId, { signal } = {}) => {
       const detail: GeneratedRedemptionDetail = await resolveApiData(
-        getAdminRewardCodeRedemption(rewardCodeId, redemptionId, signal ? { signal } : undefined),
+        api.request<ApiResponseWithData<GeneratedRedemptionDetail>>(
+          `/admin/rewards/codes/${encodeURIComponent(String(rewardCodeId))}/redemptions/${encodeURIComponent(String(redemptionId))}`,
+          {
+            method: 'GET',
+            ...(signal == null ? {} : { signal }),
+          },
+        ),
         '加载兑换详情失败',
       )
       return {

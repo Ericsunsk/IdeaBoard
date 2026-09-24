@@ -1,17 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiResponseAdminBrandLogoOverrideList } from '../../../../shared/api/generated-query/model'
+import type { ApiResponseAdminBrandLogoOverrideList } from './brandLogoResource'
 import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from './brandLogos'
 import { createAdminBrandLogoResource, hydrateAdminBrandLogoOverrides } from './brandLogoResource'
 
-const api = vi.hoisted(() => ({
-  set: vi.fn(),
-  remove: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/admin-brand-logos/admin-brand-logos', () => ({
-  getListAdminBrandLogoOverridesQueryKey: () => ['admin', 'brand-logo-overrides'],
-  setAdminBrandLogoOverride: api.set,
-  deleteAdminBrandLogoOverride: api.remove,
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
 }))
 
 type QueryCache = {
@@ -49,8 +46,7 @@ function override(
 
 describe('adminBrandLogoResource', () => {
   beforeEach(() => {
-    api.set.mockReset()
-    api.remove.mockReset()
+    transport.request.mockReset()
     replaceAdminBrandLogoOverrides([])
   })
 
@@ -64,7 +60,7 @@ describe('adminBrandLogoResource', () => {
     const initial = override('provider-endpoint', '1', 'flux')
     const saved = override('provider-endpoint', '2', 'minio')
     const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [initial] } })
-    api.set.mockResolvedValue({ code: 0, msg: 'success', data: saved })
+    transport.request.mockResolvedValue({ code: 0, msg: 'success', data: saved })
 
     await createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio')
 
@@ -80,7 +76,7 @@ describe('adminBrandLogoResource', () => {
     const existing = override('storage-profile', 'r2-main', 'minio')
     const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [existing] } })
     hydrateAdminBrandLogoOverrides([existing])
-    api.remove.mockResolvedValue({ code: 0, msg: 'success' })
+    transport.request.mockResolvedValue({ code: 0, msg: 'success' })
 
     await createAdminBrandLogoResource(cache as never).remove('storage-profile', 'r2-main')
 
@@ -92,7 +88,7 @@ describe('adminBrandLogoResource', () => {
     const existing = override('provider-endpoint', '1', 'flux')
     const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [existing] } })
     hydrateAdminBrandLogoOverrides([existing])
-    api.set.mockRejectedValue(new Error('offline'))
+    transport.request.mockRejectedValue(new Error('offline'))
 
     await expect(
       createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio'),

@@ -1,8 +1,17 @@
-import type {
-  CreditLedgerTransaction,
-  CreditReconciliationRun,
-} from '../../../../shared/api/generated-query/model'
+import type { CreditReconciliationRun } from './api'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
+
+// Ledger command vocabulary (issue #809). The legacy generated
+// `CreditLedgerTransaction` model is gone; the control ledger types the
+// command as a plain string, so this module owns the known command set.
+export type CreditLedgerCommandType =
+  | 'grant'
+  | 'deduction'
+  | 'hold'
+  | 'capture'
+  | 'release'
+  | 'refund'
+  | 'correction'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
@@ -25,7 +34,7 @@ export function formatAdminDateTimeWithSeconds(value?: string) {
   return Number.isNaN(date.getTime()) ? '-' : dateTimeFormat.format(date)
 }
 
-const commandLabels: Record<CreditLedgerTransaction['command_type'], string> = {
+const commandLabels: Record<CreditLedgerCommandType, string> = {
   grant: '赠送',
   deduction: '扣减',
   hold: '冻结',
@@ -35,15 +44,15 @@ const commandLabels: Record<CreditLedgerTransaction['command_type'], string> = {
   correction: '修正',
 }
 
-export function getCreditCommandLabel(command: CreditLedgerTransaction['command_type']) {
-  return commandLabels[command]
+export function getCreditCommandLabel(command: string) {
+  return (commandLabels as Record<string, string>)[command] ?? command
 }
 
-export function getCreditCommandSign(command: CreditLedgerTransaction['command_type']) {
+export function getCreditCommandSign(command: string) {
   return command === 'grant' || command === 'release' || command === 'refund' ? '+' : '-'
 }
 
-export function getCreditCommandSeverity(command: CreditLedgerTransaction['command_type']) {
+export function getCreditCommandSeverity(command: string) {
   if (command === 'grant' || command === 'release' || command === 'refund') return 'success'
   if (command === 'deduction' || command === 'capture') return 'danger'
   return 'warn'

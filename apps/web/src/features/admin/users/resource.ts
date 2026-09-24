@@ -53,8 +53,8 @@ export type AdminUsersPage = {
   hasMore: boolean
 }
 
-export const ADMIN_USERS_PAGE_SIZE_DEFAULT = 10
-export const ADMIN_USERS_PAGE_SIZE_MAX = 100
+const ADMIN_USERS_PAGE_SIZE_DEFAULT = 10
+const ADMIN_USERS_PAGE_SIZE_MAX = 100
 
 function normalizeRole(value: ControlUser['role']): AdminUsersRoleFilterValue {
   return value === 'admin' ? 'admin' : 'user'

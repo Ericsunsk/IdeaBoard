@@ -43,14 +43,6 @@ func TestPublisherStampsSchemaVersionAndCarriesFacts(t *testing.T) {
 	}
 }
 
-func TestPublisherDefaultsTypeAndSchema(t *testing.T) {
-	var p *UserEventPublisher
-	p.Publish(1, Event{Status: "ready"})
-	// When the hub is nil, Publish must not panic. The behaviour is
-	// covered by the runtime contract; the test just guards against
-	// a nil deref regression.
-}
-
 func TestAllEventTypeConstantsAreDistinct(t *testing.T) {
 	constants := map[string]struct{}{
 		EventTypeUpdated:         {},

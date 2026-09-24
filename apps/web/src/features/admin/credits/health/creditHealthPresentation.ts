@@ -1,4 +1,4 @@
-import type { CreditHealthStatus } from '../../../../shared/api/generated-query/model'
+import type { CreditHealthStatus } from '../shared/api'
 
 export type CreditHealthTone = 'neutral' | 'success' | 'warning' | 'danger'
 

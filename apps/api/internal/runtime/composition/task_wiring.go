@@ -9,15 +9,8 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users/ports"
-	derivativeprocessing "ideaboard/api/internal/media/derivatives/application/processing"
-	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
-	derivativeevents "ideaboard/api/internal/media/derivatives/infrastructure/events"
-	derivativerendering "ideaboard/api/internal/media/derivatives/infrastructure/rendering"
 	"ideaboard/api/internal/media/preparation"
-	"ideaboard/api/internal/media/reclamation"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
-	"ideaboard/api/internal/media/storage/application/integrity"
-	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/application/orchestration"
 	"ideaboard/api/internal/runtime/domain"
@@ -131,18 +124,26 @@ func newAppTaskRuntime(
 ) (appTaskServices, appWorkerRuntime, error) {
 	workerConcurrency := cfg.Worker.EffectiveConcurrency()
 
+	// Fail-closed legacy task persistence (#816 Phase 3b-07): the deleted
+	// postgres adapter is replaced by this stub until the workspace-scoped
+	// store lands in Phase 4a. Startup recovery below is a no-op; every
+	// other legacy task path returns an explicit error instead of panicking
+	// on a nil store.
+	legacyTasks := &legacyTaskStore{}
 	taskBillingService := taskbilling.NewService(services.billingCatalog, services.creditService)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
 	taskMediaAuthorizer := storageauth.NewTaskMediaAuthorizer(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
-	runtimeTaskMediaStore := storagetaskmedia.NewRuntimeTaskMediaStore(services.storageService, repos.mediaAssetRegistry)
+	// Legacy storage taskmedia seam removed (#815): the worker surfaces
+	// explicit storage-unavailable errors when media materialization is
+	// attempted without a materializer.
 	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer, repos.mediaAssetRegistry)
 	userEventHub := events.NewUserEventHub()
 	taskEventHub := taskservice.NewEventHub()
-	taskEvents, eventBus, err := eventinterfaces.NewTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub, repos.taskRepo, userEventHub)
+	taskEvents, eventBus, err := eventinterfaces.NewTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub, legacyTasks, userEventHub)
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
@@ -162,11 +163,11 @@ func newAppTaskRuntime(
 		})
 	}
 	riverTaskWorker := workerriver.NewRiverTaskWorker(workerriver.RiverTaskWorkerDeps{
-		TaskRepo:           repos.taskRepo.Runtime(),
+		TaskRepo:           legacyTasks,
 		Enqueuer:           riverQueue,
 		CancelStore:        postgresRuntimeStore,
-		MediaReader:        runtimeTaskMediaStore,
-		ResultMaterializer: runtimeTaskMediaStore,
+		MediaReader:        nil,
+		ResultMaterializer: nil,
 		TaskEvents:         taskEvents,
 		PublicOrigins:      cfg.PublicOrigins,
 		ModelResolver:      aiGatewayRepo,
@@ -175,19 +176,10 @@ func newAppTaskRuntime(
 		REDMetrics:         redMetrics,
 	})
 	creditPeriodicJobs := workerbilling.CreditReconciliationPeriodicJobs()
-	reclamationPeriodicJobs := reclamation.PeriodicJobs()
-	retentionService := taskretention.NewService(repos.taskRepo)
+	retentionService := taskretention.NewService(legacyTasks)
 	retentionPeriodicJobs := workerretention.PeriodicJobs()
 	paymentPeriodicJobs := workerbilling.PaymentReconciliationPeriodicJobs()
 	checkoutShutdownPeriodicJobs := workerbilling.PaymentCheckoutShutdownPeriodicJobs()
-	mediaDerivativeEvents := derivativeevents.NewUserEventPublisher(userEventHub)
-	mediaDerivativeService := derivativeprocessing.NewService(
-		dbs.db,
-		services.storageService,
-		integrity.NewIntegrityVerifier(services.storageService, integrity.IntegrityConfig{MaxBytes: derivativedomain.MaxOutputBytes + 1}),
-		derivativerendering.NewRenderer(),
-		mediaDerivativeEvents,
-	)
 	if err := eventinterfaces.ConfigureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
@@ -196,9 +188,8 @@ func newAppTaskRuntime(
 	}
 	visionBillingService := searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
 	visionBillingPeriodicJobs := visionbilling.VisionBillingPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(retentionPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs))
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(retentionPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
-	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
 	periodicJobs = append(periodicJobs, retentionPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
@@ -208,7 +199,6 @@ func newAppTaskRuntime(
 		Concurrency: workerConcurrency,
 		AdditionalQueues: map[string]river.QueueConfig{
 			workerbilling.CreditReconciliationQueue:    {MaxWorkers: 1},
-			reclamation.QueueName:                      {MaxWorkers: 1},
 			workerretention.QueueName:                  {MaxWorkers: 1},
 			workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
@@ -217,9 +207,7 @@ func newAppTaskRuntime(
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationScheduleWorker(services.creditService))
-			river.AddWorker(workers, reclamation.NewReclaimWorker(dbs.db, services.storageService))
 			river.AddWorker(workers, workerretention.NewTaskRetentionWorker(retentionService, cfg.Worker.EffectiveTaskRetentionDays()))
-			river.AddWorker(workers, reclamation.NewScheduleWorker(dbs.db))
 			river.AddWorker(workers, workerbilling.NewPaymentReconciliationWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, workerbilling.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
@@ -233,10 +221,7 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
-	repos.mediaAssetRegistry.SetProcessingInputMaterializer(func(ctx context.Context, assetID, ownerUserID int64) error {
-		return mediaDerivativeService.MaterializeProcessingInput(ctx, assetID, ownerUserID)
-	})
-	recoveryCoord := orchestration.NewTaskRecoveryCoordinator(repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient})
+	recoveryCoord := orchestration.NewTaskRecoveryCoordinator(legacyTasks, riverTaskWorker, riverStartupJobCanceller{client: riverClient})
 	if _, err := recoveryCoord.RecoverRunningTasks(ctx); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
@@ -247,7 +232,7 @@ func newAppTaskRuntime(
 
 	submissionStore := tasksubmission.NewStore(
 		dbs.riverPool,
-		repos.taskRepo.Submission(),
+		legacyTasks,
 		taskqueue.NewTransactionalEnqueuer(riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault),
 		taskBillingService,
 	)
@@ -260,13 +245,13 @@ func newAppTaskRuntime(
 			MediaPreparer:  generationMediaPreparer,
 			MediaManifest:  repos.mediaAssetRegistry,
 		}),
-		TaskRepo:            repos.taskRepo.Queries(),
+		TaskRepo:            legacyTasks,
 		SubmissionStore:     submissionStore,
 		CancelStore:         postgresRuntimeStore,
 		TaskBilling:         taskBillingService,
-		AdminBillingHistory: repos.taskRepo.Billing(),
-		AdminTaskTrace:      repos.taskRepo.Trace(),
-		AdminTaskListRead:   repos.taskRepo.Trace(),
+		AdminBillingHistory: legacyTasks,
+		AdminTaskTrace:      legacyTasks,
+		AdminTaskListRead:   legacyTasks,
 		BillableItems:       services.billableItemRegistry,
 		UserResolver:        taskUserResolver{repo: repos.userRepo},
 	}, taskservice.ServiceOptions{
@@ -275,7 +260,7 @@ func newAppTaskRuntime(
 
 	return appTaskServices{
 		taskService:      taskService,
-		taskStatsService: taskstats.NewService(repos.taskRepo.Statistics()),
+		taskStatsService: taskstats.NewService(legacyTasks),
 		userEvents:       userEventHub,
 	}, appWorkerRuntime{
 		riverClient:  riverClient,
@@ -298,7 +283,6 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 		workerbilling.PaymentCheckoutShutdownQueue,
 		workerretention.QueueName,
 		visionbilling.VisionBillingQueue,
-		reclamation.QueueName,
 	}
 	stats := make(map[string]redmetrics.RiverQueueStats, len(queues))
 	for _, name := range queues {

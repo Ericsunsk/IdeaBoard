@@ -35,9 +35,9 @@ describe('AdminCreditHealthPage', () => {
     delayNextFindingPage = false
     releaseNextFindingPage = undefined
     useMswHandlers(
-      http.get('/api/admin/credits/reconciliation/findings', async ({ request }) => {
+      http.get('/api/control/v1/credits/reconciliation/findings', async ({ request }) => {
         if (findingsShouldFail) {
-          return HttpResponse.json({ code: 503, msg: 'unavailable' }, { status: 503 })
+          return HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
         }
         const query = new URL(request.url).searchParams
         const status = query.get('status')
@@ -54,9 +54,7 @@ describe('AdminCreditHealthPage', () => {
           })
         }
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             findings:
               status === 'resolved'
                 ? [
@@ -89,11 +87,9 @@ describe('AdminCreditHealthPage', () => {
 
   it('shows one operational health panel while an active Run preserves the trusted result', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makeHealth({
+                    data: makeHealth({
             status: 'attention',
             active_run: makeRun({ id: 12, status: 'running', completed_at: undefined }),
             latest_successful_run: makeRun({ id: 11, status: 'completed' }),
@@ -116,10 +112,10 @@ describe('AdminCreditHealthPage', () => {
   it('recovers from an initial load failure', async () => {
     let shouldFail = true
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         shouldFail
-          ? HttpResponse.json({ code: 503, msg: 'unavailable' }, { status: 503 })
-          : HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+          ? HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
+          : HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()
@@ -134,10 +130,10 @@ describe('AdminCreditHealthPage', () => {
   it('keeps cached health visible when a background refresh fails and offers recovery', async () => {
     let shouldFail = false
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         shouldFail
-          ? HttpResponse.json({ code: 503, msg: 'unavailable' }, { status: 503 })
-          : HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+          ? HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
+          : HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user, queryClient } = renderPage()
@@ -159,17 +155,15 @@ describe('AdminCreditHealthPage', () => {
     const requests: unknown[] = []
     let health = makeHealth()
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: health }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: health }),
       ),
-      http.post('/api/admin/credits/reconciliation/runs', async ({ request }) => {
+      http.post('/api/control/v1/credits/reconciliation/runs', async ({ request }) => {
         requests.push(await request.json())
         const activeRun = makeRun({ id: 14, status: 'queued', completed_at: undefined })
         health = makeHealth({ active_run: activeRun })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: activeRun,
+                    data: activeRun,
         })
       }),
     )
@@ -193,16 +187,14 @@ describe('AdminCreditHealthPage', () => {
   it('shows keyset-paginated check history and expands technical details on demand', async () => {
     const runRequests: Array<string | null> = []
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
-      http.get('/api/admin/credits/reconciliation/runs', ({ request }) => {
+      http.get('/api/control/v1/credits/reconciliation/runs', ({ request }) => {
         const beforeId = new URL(request.url).searchParams.get('before_id')
         runRequests.push(beforeId)
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             runs:
               beforeId === null
                 ? [
@@ -223,11 +215,9 @@ describe('AdminCreditHealthPage', () => {
           },
         })
       }),
-      http.get('/api/admin/credits/reconciliation/runs/:runId', ({ params }) =>
+      http.get('/api/control/v1/credits/reconciliation/runs/:runId', ({ params }) =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makeRun({
+                    data: makeRun({
             id: Number(params.runId),
             trigger: 'manual',
             requested_by: 7,
@@ -277,8 +267,8 @@ describe('AdminCreditHealthPage', () => {
 
   it('shows a global open finding queue and opens complete diagnostics without manual resolution actions', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()
@@ -309,8 +299,8 @@ describe('AdminCreditHealthPage', () => {
 
   it('supports only open and resolved views and resets keyset pagination on view changes', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()
@@ -332,8 +322,8 @@ describe('AdminCreditHealthPage', () => {
   it('does not leak open rows while the resolved view is loading', async () => {
     delayResolvedFindings = true
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()
@@ -352,8 +342,8 @@ describe('AdminCreditHealthPage', () => {
   it('does not display previous-page rows while the next keyset page is loading', async () => {
     delayNextFindingPage = true
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()
@@ -372,8 +362,8 @@ describe('AdminCreditHealthPage', () => {
   it('renders finding empty state and recovers from an initial queue error', async () => {
     findingsShouldFail = true
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      http.get('/api/control/v1/credits/health', () =>
+        HttpResponse.json({ data: makeHealth() }),
       ),
     )
     const { user } = renderPage()

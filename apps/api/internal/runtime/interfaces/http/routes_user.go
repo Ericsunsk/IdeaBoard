@@ -41,18 +41,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	if h.VisionHandler != nil {
 		userAPI.POST(RouteUserVisionExtract, requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
 	}
-	if h.LibraryHandler != nil {
-		userAPI.GET("/library/folders", h.LibraryHandler.ListFolders)
-		userAPI.POST("/library/folders", h.LibraryHandler.CreateFolder)
-		userAPI.PATCH("/library/folders/:folder_id", h.LibraryHandler.RenameFolder)
-		userAPI.DELETE("/library/folders/:folder_id", h.LibraryHandler.DeleteFolder)
-		userAPI.GET("/library/assets", h.LibraryHandler.ListAssets)
-		userAPI.POST("/library/assets", h.LibraryHandler.SaveAsset)
-		userAPI.POST("/library/assets/lookup", h.LibraryHandler.LookupAssets)
-		userAPI.POST("/library/assets/:asset_id/materialize", h.LibraryHandler.MaterializeAsset)
-		userAPI.PATCH("/library/assets/:asset_id", h.LibraryHandler.MoveAsset)
-		userAPI.DELETE("/library/assets/:asset_id", h.LibraryHandler.DeleteAsset)
-	}
 }
 
 func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {

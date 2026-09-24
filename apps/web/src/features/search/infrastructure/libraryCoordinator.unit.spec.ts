@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSearchLibraryCoordinator } from './libraryCoordinator'
 
+const WORKSPACE_ID = 'ws_test123'
+
 const mocks = vi.hoisted(() => ({
-  getLibraryFolders: vi.fn(),
-  saveSearchReference: vi.fn(),
-  removeSearchReference: vi.fn(),
+  listFolders: vi.fn(),
+  saveAsset: vi.fn(),
+  resolveAssets: vi.fn(),
+  deleteAsset: vi.fn(),
 }))
 
 vi.mock('../../library', async (importOriginal) => {
@@ -13,10 +16,11 @@ vi.mock('../../library', async (importOriginal) => {
     ...actual,
     // Route the shared Folder facts through the stubbed loader so refresh
     // behavior is observable without reaching past the public entrypoint.
-    createLibraryFolderFacts: () => actual.createLibraryFolderFacts(mocks.getLibraryFolders),
-    getLibraryFolders: mocks.getLibraryFolders,
-    saveSearchReference: mocks.saveSearchReference,
-    removeSearchReference: mocks.removeSearchReference,
+    createLibraryFolderFacts: (fetchFolders?: () => Promise<never[]>) =>
+      actual.createLibraryFolderFacts(fetchFolders ?? mocks.listFolders),
+    listAllWorkspaceLibraryFolders: mocks.listFolders,
+    saveWorkspaceSearchReference: mocks.saveAsset,
+    removeWorkspaceSearchReference: mocks.deleteAsset,
     libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
   }
 })
@@ -36,32 +40,32 @@ const reference = {
 describe('Search Library coordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.getLibraryFolders.mockResolvedValue([])
+    mocks.listFolders.mockResolvedValue([])
   })
 
   it('refreshes the shared Folder facts after save and remove mutations', async () => {
-    mocks.saveSearchReference.mockResolvedValue({
-      id: 1,
+    mocks.saveAsset.mockResolvedValue({
+      id: 'liba_asset0001',
       provider: 'unsplash',
-      source_id: 'image-1',
+      sourceId: 'image-1',
     })
-    const coordinator = createSearchLibraryCoordinator()
+    const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
     const outcomes: unknown[] = []
     coordinator.subscribe((outcome) => outcomes.push(outcome))
 
     await coordinator.saveReference(reference)
     await coordinator.removeReference('unsplash', 'image-1')
 
-    expect(mocks.saveSearchReference).toHaveBeenCalledWith(reference, undefined, undefined)
-    expect(mocks.removeSearchReference).toHaveBeenCalledWith('unsplash', 'image-1')
-    expect(mocks.getLibraryFolders).toHaveBeenCalledTimes(2)
+    expect(mocks.saveAsset).toHaveBeenCalledWith(WORKSPACE_ID, reference, undefined, undefined)
+    expect(mocks.deleteAsset).toHaveBeenCalledWith(WORKSPACE_ID, 'unsplash', 'image-1')
+    expect(mocks.listFolders).toHaveBeenCalledTimes(2)
     expect(outcomes).toEqual([
       {
         kind: 'asset-saved',
         provider: 'unsplash',
         sourceID: 'image-1',
         assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all', 'quick-saves'],
+        affectedFolderKeys: ['all'],
         galleryEffect: 'reload-current',
       },
       {
@@ -69,20 +73,20 @@ describe('Search Library coordinator', () => {
         provider: 'unsplash',
         sourceID: 'image-1',
         assetKey: 'unsplash:image-1',
-        affectedFolderKeys: ['all', 'quick-saves'],
+        affectedFolderKeys: ['all'],
         galleryEffect: 'reload-current',
       },
     ])
   })
 
   it('publishes successful save and remove outcomes when the Folder refresh fails', async () => {
-    mocks.getLibraryFolders.mockRejectedValue(new Error('Folder refresh unavailable'))
-    mocks.saveSearchReference.mockResolvedValue({
-      id: 1,
+    mocks.listFolders.mockRejectedValue(new Error('Folder refresh unavailable'))
+    mocks.saveAsset.mockResolvedValue({
+      id: 'liba_asset0001',
       provider: 'unsplash',
-      source_id: 'image-1',
+      sourceId: 'image-1',
     })
-    const coordinator = createSearchLibraryCoordinator()
+    const coordinator = createSearchLibraryCoordinator({ workspaceId: WORKSPACE_ID })
     const outcomes: string[] = []
     coordinator.subscribe((outcome) => outcomes.push(outcome.kind))
 
@@ -90,5 +94,13 @@ describe('Search Library coordinator', () => {
     await coordinator.removeReference('unsplash', 'image-1')
 
     expect(outcomes).toEqual(['asset-saved', 'asset-removed'])
+  })
+
+  it('fails closed without a workspace', async () => {
+    const coordinator = createSearchLibraryCoordinator({ workspaceId: null })
+    await expect(coordinator.saveReference(reference)).rejects.toThrow()
+    await expect(coordinator.removeReference('unsplash', 'image-1')).rejects.toThrow()
+    expect(mocks.saveAsset).not.toHaveBeenCalled()
+    expect(mocks.deleteAsset).not.toHaveBeenCalled()
   })
 })

@@ -9,7 +9,6 @@ import (
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/media/workspaceuploads"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -120,7 +119,7 @@ func renderTaskError(c *gin.Context, err error) {
 		return
 	}
 	switch {
-	case errors.Is(err, workspacetasks.ErrNotFound), errors.Is(err, workspaceuploads.ErrNotFound):
+	case errors.Is(err, workspacetasks.ErrNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
 	case errors.Is(err, workspacetasks.ErrForbidden):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, "权限不足")

@@ -1670,6 +1670,137 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/mail:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlMailSetting
+      summary: Read the mail setting
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Mail setting.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlMailConfigEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlMailSetting
+      summary: Update the mail setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlMailConfigRequest'
+      responses:
+        '200':
+          description: Mail setting updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlMailConfigEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+    delete:
+      tags: [ControlPlatform]
+      operationId: deleteControlMailSetting
+      summary: Clear the mail setting (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Mail setting cleared.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/mail/test:
+    post:
+      tags: [ControlPlatform]
+      operationId: testControlMailSetting
+      summary: Send a mail setting test email (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlMailTestRequest'
+      responses:
+        '200':
+          description: Mail test email sent.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAckEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /platform/ai-gateway:
     get:
       tags: [ControlPlatform]
@@ -3120,6 +3251,78 @@ components:
             type: string
         reason:
           type: string
+    ControlMailConfig:
+      type: object
+      required: [configured, api_key_configured, from_name, from_email, reply_to, config_version, readiness]
+      additionalProperties: false
+      properties:
+        configured:
+          type: boolean
+        api_key_configured:
+          type: boolean
+        from_name:
+          type: string
+        from_email:
+          type: string
+        reply_to:
+          type: string
+        config_version:
+          type: integer
+        readiness:
+          type: string
+          enum: [not_configured, not_tested, ready, unavailable]
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_tested_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_test_error_code:
+          type: string
+          nullable: true
+    ControlMailConfigEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlMailConfig'
+    ControlMailConfigRequest:
+      type: object
+      required: [from_name, from_email]
+      additionalProperties: false
+      properties:
+        api_key:
+          type: string
+          description: Resend API key; omit to keep the stored key.
+        from_name:
+          type: string
+        from_email:
+          type: string
+        reply_to:
+          type: string
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+    ControlMailTestRequest:
+      type: object
+      required: [recipient]
+      additionalProperties: false
+      properties:
+        recipient:
+          type: string
+          format: email
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
     PaginatedControlUsers:
       type: object
       required: [data, meta]

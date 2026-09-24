@@ -222,8 +222,9 @@ type AssetInfo struct {
 	Archived    bool
 }
 
-// AssetReader checks byte-verified readiness. Production adapts
-// workspaceuploads.AssetStore; tests stub it.
+// AssetReader checks byte-verified readiness. Production adapts the
+// workspace media asset store (#813 removed the legacy postgres
+// sibling; the replacement re-wires this seam); tests stub it.
 type AssetReader interface {
 	GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error)
 }

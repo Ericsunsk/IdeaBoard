@@ -147,6 +147,8 @@ import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { secretField } from '../shared/lib/secretSchema'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import { useAdminMailSettingsFeedback } from './useSettingsFeedback'
 import SettingEditorCard from './SettingEditorCard.vue'
@@ -160,6 +162,7 @@ const props = defineProps<{
 }>()
 const defaultResource = createAdminMailConfigResource()
 const feedback = useAdminMailSettingsFeedback()
+const confirm = useAdminConfirm()
 const summary = ref<MailConfigSummary | null>(null)
 const loading = ref(false)
 const saving = ref(false)
@@ -245,6 +248,14 @@ function reset() {
 }
 
 const save = form.handleSubmit(async (values) => {
+  // Control Plane writes require an operator reason (audit); a cancelled
+  // dialog aborts the save silently.
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: '保存邮件配置',
+    message: '确定保存邮件发送配置吗？该操作将记录操作人与原因。',
+    confirmLabel: '保存邮件配置',
+  })
+  if (!operatorReason) return
   saving.value = true
   try {
     const payload: {
@@ -262,7 +273,7 @@ const save = form.handleSubmit(async (values) => {
     if (values.reply_to.trim()) {
       payload.reply_to = values.reply_to.trim()
     }
-    const updated = await resource.value.update(payload)
+    const updated = await resource.value.update(payload, { operatorReason })
     populate(updated)
     feedback.saved()
   } catch (err) {
@@ -273,9 +284,15 @@ const save = form.handleSubmit(async (values) => {
 })
 
 async function clear() {
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: '删除邮件配置',
+    message: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人与原因。',
+    confirmLabel: '删除配置',
+  })
+  if (!operatorReason) return
   saving.value = true
   try {
-    await resource.value.clear()
+    await resource.value.clear({ operatorReason })
     await load()
     feedback.cleared()
   } catch (err) {
@@ -291,10 +308,16 @@ async function sendTest() {
     testError.value = '请输入有效的测试收件地址'
     return
   }
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: '发送 Test Email',
+    message: `将向 ${target} 发送一封真实 Test Email。该操作将记录操作人与原因。`,
+    confirmLabel: '发送 Test Email',
+  })
+  if (!operatorReason) return
   testError.value = ''
   testing.value = true
   try {
-    await resource.value.test(target)
+    await resource.value.test(target, { operatorReason })
     await load()
     feedback.testSent()
   } catch (err) {

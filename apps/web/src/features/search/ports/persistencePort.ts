@@ -18,7 +18,7 @@ export type SearchFeedPersistence = {
 export type CachedVisionReference = {
   key: string
   previewUrl: string
-  libraryAssetID?: number
+  libraryAssetID?: string
   externalReference?: VisionExternalReference
 }
 

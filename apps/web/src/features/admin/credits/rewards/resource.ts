@@ -1,18 +1,54 @@
+import { api } from '../../../../shared/api/client'
 import {
-  createAdminRewardCode,
-  deleteAdminRewardCode,
-  searchAdminRewardCodes,
-  setAdminRewardCodeEnabled,
-  updateAdminRewardCode,
-} from '../../../../shared/api/generated-query/admin-rewards/admin-rewards'
-import type {
-  CreatedRewardCode as GeneratedCreatedRewardCode,
-  RewardCode as GeneratedRewardCode,
-  RewardCodePage as GeneratedRewardCodePage,
-  UpdatedRewardCode as GeneratedUpdatedRewardCode,
-} from '../../../../shared/api/generated-query/model'
-import { resolveApiData } from '../../../../shared/api/apiResponse'
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../../shared/api/apiResponse'
 import { shanghaiDateTimeInputToISO } from './rewardCodeTime'
+
+// Admin reward code boundary (issue #809). The generated `admin-rewards`
+// client is gone but the backend admin plane still serves
+// `/api/admin/rewards/codes/*` with the shared envelope, so this boundary
+// transports through the central `api.request` with local view types.
+const RewardCodeStatus = {
+  disabled: 'disabled',
+  expired: 'expired',
+  exhausted: 'exhausted',
+  enabled: 'enabled',
+} as const
+
+type RewardCodeStatus = (typeof RewardCodeStatus)[keyof typeof RewardCodeStatus]
+
+export type GeneratedRewardCode = {
+  id: number
+  display_name: string
+  masked_code_hint: string
+  credit_amount: number
+  max_redemptions: number
+  redemption_count: number
+  expires_at?: string
+  enabled: boolean
+  status: RewardCodeStatus
+  created_at: string
+  updated_at: string
+}
+
+export type GeneratedCreatedRewardCode = {
+  reward_code: GeneratedRewardCode
+  plaintext: string
+  replayed: boolean
+}
+
+export type GeneratedUpdatedRewardCode = {
+  reward_code: GeneratedRewardCode
+  plaintext?: string
+  replayed?: boolean
+}
+
+export type GeneratedRewardCodePage = {
+  reward_codes: GeneratedRewardCode[]
+  total: number
+  next_before_id?: number
+}
 
 export type RewardCode = {
   id: number
@@ -23,12 +59,10 @@ export type RewardCode = {
   redemptionCount: number
   expiresAt?: string | undefined
   enabled: boolean
-  status: GeneratedRewardCode['status']
+  status: RewardCodeStatus
   createdAt: string
   updatedAt: string
 }
-
-export type RewardCodeStatus = RewardCode['status']
 
 // 状态筛选哨兵（对齐用户管理页）：'all' 表示不过滤，落 query 前归一为 undefined。
 export const REWARD_CODE_STATUS_FILTER_ALL = 'all' as const
@@ -91,14 +125,18 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
     search: async ({ query, status, beforeId, limit = 20, signal }) =>
       toRewardCodePage(
         await resolveApiData(
-          searchAdminRewardCodes(
+          api.request<ApiResponseWithData<GeneratedRewardCodePage>>(
+            '/admin/rewards/codes/search',
             {
-              ...(query.trim() ? { query: query.trim() } : {}),
-              ...(status ? { status } : {}),
-              ...(beforeId !== undefined ? { before_id: beforeId } : {}),
-              limit,
+              method: 'POST',
+              body: {
+                ...(query.trim() ? { query: query.trim() } : {}),
+                ...(status ? { status } : {}),
+                ...(beforeId !== undefined ? { before_id: beforeId } : {}),
+                limit,
+              } as unknown as Record<string, unknown>,
+              ...(signal == null ? {} : { signal }),
             },
-            signal ? { signal } : undefined,
           ),
           '加载兑换码失败',
         ),
@@ -107,14 +145,20 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
       const expiresAt = shanghaiDateTimeInputToISO(input.expiresAt)
       return toCreatedRewardCode(
         await resolveApiData(
-          createAdminRewardCode({
-            display_name: input.displayName.trim(),
-            code: input.code.trim(),
-            credit_amount: input.creditAmount,
-            max_redemptions: input.maxRedemptions,
-            idempotency_key: input.idempotencyKey,
-            ...(expiresAt ? { expires_at: expiresAt } : {}),
-          }),
+          api.request<ApiResponseWithData<GeneratedCreatedRewardCode>>(
+            '/admin/rewards/codes',
+            {
+              method: 'POST',
+              body: {
+                display_name: input.displayName.trim(),
+                code: input.code.trim(),
+                credit_amount: input.creditAmount,
+                max_redemptions: input.maxRedemptions,
+                idempotency_key: input.idempotencyKey,
+                ...(expiresAt ? { expires_at: expiresAt } : {}),
+              } as unknown as Record<string, unknown>,
+            },
+          ),
           '创建兑换码失败',
         ),
       )
@@ -122,25 +166,43 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
     update: async (id, input) =>
       toUpdatedRewardCode(
         await resolveApiData(
-          updateAdminRewardCode(id, {
-            display_name: input.displayName.trim(),
-            credit_amount: input.creditAmount,
-            max_redemptions: input.maxRedemptions,
-            expires_at: shanghaiDateTimeInputToISO(input.expiresAt) ?? null,
-            ...(input.code?.trim() ? { code: input.code.trim() } : {}),
-          }),
+          api.request<ApiResponseWithData<GeneratedUpdatedRewardCode>>(
+            `/admin/rewards/codes/${encodeURIComponent(String(id))}`,
+            {
+              method: 'PATCH',
+              body: {
+                display_name: input.displayName.trim(),
+                credit_amount: input.creditAmount,
+                max_redemptions: input.maxRedemptions,
+                expires_at: shanghaiDateTimeInputToISO(input.expiresAt) ?? null,
+                ...(input.code?.trim() ? { code: input.code.trim() } : {}),
+              } as unknown as Record<string, unknown>,
+            },
+          ),
           '更新兑换码失败',
         ),
       ),
     setEnabled: async (id, enabled) =>
       toRewardCode(
         await resolveApiData(
-          setAdminRewardCodeEnabled(id, { enabled }),
+          api.request<ApiResponseWithData<GeneratedRewardCode>>(
+            `/admin/rewards/codes/${encodeURIComponent(String(id))}/enabled`,
+            {
+              method: 'PATCH',
+              body: { enabled } as unknown as Record<string, unknown>,
+            },
+          ),
           enabled ? '启用兑换码失败' : '停用兑换码失败',
         ),
       ),
     delete: async (id) => {
-      await resolveApiData(deleteAdminRewardCode(id), '删除兑换码失败')
+      await resolveApiData(
+        api.request<ApiResponseWithData<unknown>>(
+          `/admin/rewards/codes/${encodeURIComponent(String(id))}`,
+          { method: 'DELETE' },
+        ),
+        '删除兑换码失败',
+      )
     },
   }
 }

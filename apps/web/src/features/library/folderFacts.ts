@@ -1,6 +1,8 @@
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
 import { i18n } from '../../shared/i18n'
-import { getLibraryFolders, type LibraryFolderView } from './resource'
+import type { WorkspaceLibraryFolder } from './workspace'
+
+export type LibraryFolderView = WorkspaceLibraryFolder
 
 export type LibraryFolderFacts = {
   folders: Readonly<ShallowRef<LibraryFolderView[]>>
@@ -81,11 +83,13 @@ export function createLibraryMutationPublisher(
 }
 
 /**
- * Owns one identity-scoped Folder snapshot. Consumers share this boundary so
- * mutations cannot leave independently loaded Folder lists out of sync.
+ * Owns one workspace-scoped Folder snapshot. Consumers share this boundary
+ * so mutations cannot leave independently loaded Folder lists out of sync.
+ * The fetch closes over the caller's workspace id (resolved per call from
+ * `features/workspace`, never duplicated here).
  */
 export function createLibraryFolderFacts(
-  fetchFolders: () => Promise<LibraryFolderView[]> = getLibraryFolders,
+  fetchFolders: () => Promise<LibraryFolderView[]>,
 ): LibraryFolderFacts {
   const folders = shallowRef<LibraryFolderView[]>([])
   const loading = ref(false)

@@ -53,6 +53,7 @@ function createFeed(deps: SearchFeedDependencies, query = 'cafe') {
       submittedQuery: ref(query),
       keepResultsOnNextLoad: ref(false),
       cacheScope: 'user-1',
+      workspaceId: 'ws_test123',
     },
     deps,
   )
@@ -85,7 +86,9 @@ describe('createSearchFeed interface', () => {
     expect(deps.restoreScroll).toHaveBeenCalledWith(420)
     expect(feed.results.value).toEqual([fresh])
     expect(lookupSavedKeys).toHaveBeenCalledOnce()
-    expect(lookupSavedKeys).toHaveBeenCalledWith([{ provider: 'unsplash', source_id: 'fresh' }])
+    expect(lookupSavedKeys).toHaveBeenCalledWith('ws_test123', [
+      { provider: 'unsplash', sourceId: 'fresh' },
+    ])
     expect(feed.savedKeys.value).toEqual(new Set(['unsplash:fresh']))
     expect(storage.write).toHaveBeenCalledWith(
       {
@@ -126,7 +129,9 @@ describe('createSearchFeed interface', () => {
     expect(feed.results.value).toEqual([cached])
     expect(feed.hasError.value).toBe(true)
     expect(feed.hasMore.value).toBe(true)
-    expect(lookupSavedKeys).toHaveBeenCalledWith([{ provider: 'unsplash', source_id: 'cached' }])
+    expect(lookupSavedKeys).toHaveBeenCalledWith('ws_test123', [
+      { provider: 'unsplash', sourceId: 'cached' },
+    ])
 
     await feed.load(false)
 
@@ -271,6 +276,27 @@ describe('createSearchFeed interface', () => {
 
     await feed.load(true)
 
+    expect(lookupSavedKeys).not.toHaveBeenCalled()
+  })
+
+  it('skips the saved-state lookup without a workspace selection', async () => {
+    const lookupSavedKeys = vi.fn(async () => new Set<string>())
+    const feed = createSearchFeed(
+      {
+        submittedQuery: ref('cafe'),
+        keepResultsOnNextLoad: ref(false),
+        cacheScope: 'user-1',
+        workspaceId: null,
+      },
+      dependencies({
+        lookupSavedKeys,
+        search: vi.fn(async () => page([result('public')])),
+      }),
+    )
+
+    await feed.load(true)
+
+    expect(feed.results.value).toEqual([result('public')])
     expect(lookupSavedKeys).not.toHaveBeenCalled()
   })
 

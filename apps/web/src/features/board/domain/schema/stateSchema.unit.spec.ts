@@ -116,6 +116,38 @@ describe('boardStateSchema', () => {
     }
   })
 
+  it('accepts opaque workspace Library ids on import facts', () => {
+    const state = makeBoardState({
+      imageNodes: [
+        {
+          ...makePendingImageNodeSnapshot(),
+          libraryImport: {
+            state: 'pending',
+            libraryAssetId: 'liba_asset0007',
+          },
+        },
+      ],
+    })
+
+    const parsed = v.safeParse(boardStateSchema, state)
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.imageNodes[0]?.libraryImport).toEqual({
+        state: 'pending',
+        libraryAssetId: 'liba_asset0007',
+      })
+    }
+
+    const malformed = {
+      ...state,
+      imageNodes: (state.imageNodes as unknown[]).map((node) => ({
+        ...(node as Record<string, unknown>),
+        libraryImport: { state: 'pending', libraryAssetId: 'not-a-library-id' },
+      })),
+    }
+    expect(v.safeParse(boardStateSchema, malformed).success).toBe(false)
+  })
+
   it('rejects transient provider URLs inside Library import facts', () => {
     const validState = makeBoardState({ imageNodes: [makePendingImageNodeSnapshot()] })
     const state = {

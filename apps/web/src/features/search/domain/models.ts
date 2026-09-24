@@ -32,7 +32,7 @@ export type VisionExternalReference = {
 
 export type VisionReference = {
   file?: File | undefined
-  libraryAssetID?: number | undefined
+  libraryAssetID?: string | undefined
   externalReference?: VisionExternalReference | undefined
   previewUrl: string
   key: string

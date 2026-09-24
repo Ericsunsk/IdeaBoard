@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
 	"ideaboard/api/internal/media/storage"
@@ -121,7 +120,6 @@ type UserRouteDeps struct {
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
 	VisionHandler          *searchhttp.VisionHandler
-	LibraryHandler         *library.Handler
 }
 
 type AdminRouteDeps struct {

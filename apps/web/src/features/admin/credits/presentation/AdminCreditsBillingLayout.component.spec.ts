@@ -31,11 +31,9 @@ describe('AdminCreditsBillingLayout', () => {
 
   it('shows a non-healthy Badge on the health navigation entry', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             status: 'critical',
             open_findings: { total: 1, warning: 0, error: 0, critical: 1, high_risk: 1 },
             restricted_wallet_count: 1,
@@ -57,11 +55,9 @@ describe('AdminCreditsBillingLayout', () => {
 
   it('exposes only the canonical reward code navigation entry', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             status: 'healthy',
             open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
             restricted_wallet_count: 0,
@@ -87,11 +83,9 @@ describe('AdminCreditsBillingLayout', () => {
 
   it('exposes the payment order navigation entry and routes through the Credits layout', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             status: 'healthy',
             open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
             restricted_wallet_count: 0,
@@ -114,11 +108,9 @@ describe('AdminCreditsBillingLayout', () => {
 
   it('opens Stripe settings from the gear left of the billing navigation', async () => {
     useMswHandlers(
-      http.get('/api/admin/credits/health', () =>
+      http.get('/api/control/v1/credits/health', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             status: 'healthy',
             open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
             restricted_wallet_count: 0,
@@ -127,9 +119,7 @@ describe('AdminCreditsBillingLayout', () => {
       ),
       http.get('/api/admin/payments/stripe-config', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
+                    data: {
             configured: false,
             api_key_configured: false,
             webhook_secret_configured: false,

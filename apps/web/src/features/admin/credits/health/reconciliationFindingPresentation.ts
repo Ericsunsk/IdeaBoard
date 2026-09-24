@@ -1,7 +1,7 @@
 import type {
   CreditReconciliationFinding,
   CreditReconciliationFindingType,
-} from '../../../../shared/api/generated-query/model'
+} from '../shared/api'
 
 interface FindingTypePresentation {
   title: string

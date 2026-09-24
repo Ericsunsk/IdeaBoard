@@ -75,14 +75,16 @@ import AdminTextarea from '../shared/components/AdminTextarea.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import SettingEditorCard from './SettingEditorCard.vue'
+import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { useAdminOutboundPolicyFeedback } from './useSettingsFeedback'
 
 const props = defineProps<{ class?: HTMLAttributes['class'] }>()
 
 const feedback = useAdminOutboundPolicyFeedback()
+const confirm = useAdminConfirm()
 const { error, form, loading, refetch, reset, save, saving, setting, validationError } =
-  useOutboundPolicy({ feedback })
+  useOutboundPolicy({ feedback, confirm })
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
 const statusLabel = computed(() => {

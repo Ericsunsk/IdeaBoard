@@ -134,10 +134,13 @@ export interface BoardStateMediaRef {
  * Durable intent to materialize an owned Library asset into a Canvas image.
  * The source remains owned by Library until materialization succeeds, so this
  * fact never carries provider URLs or a temporary media reference.
+ *
+ * `libraryAssetId` accepts the workspace opaque id (`liba_...`); the numeric
+ * form stays valid only so legacy persisted snapshots keep loading.
  */
 export type LibraryImportFact =
-  | { state: 'pending'; libraryAssetId: number }
-  | { state: 'failed'; libraryAssetId: number; failureMessage: string }
+  | { state: 'pending'; libraryAssetId: number | string }
+  | { state: 'failed'; libraryAssetId: number | string; failureMessage: string }
 
 export interface ImageNodeItem {
   id: number

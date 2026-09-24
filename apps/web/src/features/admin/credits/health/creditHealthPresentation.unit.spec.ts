@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CreditHealthStatus } from '../../../../shared/api/generated-query/model'
+import { CreditHealthStatus } from '../shared/api'
 import { getCreditHealthPresentation } from './creditHealthPresentation'
 
 describe('credit health presentation', () => {

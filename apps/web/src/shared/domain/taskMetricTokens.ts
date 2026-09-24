@@ -1,7 +1,19 @@
-import {
-  ListAdminTasksStatus,
-  type ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../api/generated-query/model'
+// Task status filter vocabulary (issue #809). The legacy generated
+// `ListAdminTasksStatus` enum is gone; the Control Plane types the status
+// filter as a plain string, so this shared domain module owns the frozen
+// value set. Feature code imports it from here, never generated code.
+export const ListAdminTasksStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const
+
+export type ListAdminTasksStatus =
+  (typeof ListAdminTasksStatus)[keyof typeof ListAdminTasksStatus]
+
+export type ListAdminTasksStatusValue = ListAdminTasksStatus
 
 export type TaskMetricKey = 'all' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 

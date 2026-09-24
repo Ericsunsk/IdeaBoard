@@ -235,7 +235,7 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   }
 
   function addLibraryAsset(asset: LibraryAssetView) {
-    const key = searchReferenceKey(asset.provider, asset.source_id)
+    const key = searchReferenceKey(asset.provider, asset.sourceId)
     if (collection.has(key)) return
     if (!canAddReference.value) {
       toast.warning(i18n.global.t('search.errors.maxReferenceImages'))

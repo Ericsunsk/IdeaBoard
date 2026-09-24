@@ -5,10 +5,16 @@ import type { AdminSearchProviderResource } from './searchProviderResource'
 import type { SearchProviderConfig } from './searchProviderTypes'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('test reason'))
 
 vi.mock('../shared/lib/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/lib/toast')>()),
   useAdminToast: () => toast,
+}))
+
+vi.mock('../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
 }))
 
 function createConfig(overrides: Partial<SearchProviderConfig> = {}): SearchProviderConfig {
@@ -41,6 +47,8 @@ describe('AdminSearchProviderCard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMock.mockResolvedValue(true)
+    readReasonMock.mockReturnValue('test reason')
     resource = createResource()
     resource.test.mockResolvedValue({ provider: 'unsplash', test_state: 'passed', message: 'ok' })
   })
@@ -79,11 +87,30 @@ describe('AdminSearchProviderCard', () => {
     await user.click(screen.getByRole('button', { name: '保存 Key' }))
 
     await waitFor(() =>
-      expect(resource.update).toHaveBeenCalledWith('unsplash', {
-        api_key: 'new-secret',
-        enabled: false,
-      }),
+      expect(resource.update).toHaveBeenCalledWith(
+        'unsplash',
+        {
+          api_key: 'new-secret',
+          enabled: false,
+        },
+        { operatorReason: 'test reason' },
+      ),
     )
+    expect(confirmMock).toHaveBeenCalledOnce()
+  })
+
+  it('aborts the save when the operator cancels the confirm dialog', async () => {
+    confirmMock.mockResolvedValueOnce(false)
+    const { user } = renderCard(createConfig({ test_state: 'passed', enabled: true }), resource)
+
+    await user.type(screen.getByLabelText('Unsplash API Key'), 'new-secret')
+    await user.click(screen.getByRole('button', { name: '保存 Key' }))
+
+    await waitFor(() => {
+      expect(confirmMock).toHaveBeenCalledOnce()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(resource.update).not.toHaveBeenCalled()
   })
 
   it('runs the connection test against the saved key', async () => {
@@ -91,7 +118,9 @@ describe('AdminSearchProviderCard', () => {
 
     await user.click(screen.getByRole('button', { name: '测试连接' }))
 
-    await waitFor(() => expect(resource.test).toHaveBeenCalledWith('unsplash'))
+    await waitFor(() =>
+      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: 'test reason' }),
+    )
     expect(toast.success).toHaveBeenCalledWith('Unsplash 连接测试通过')
   })
 
@@ -108,7 +137,13 @@ describe('AdminSearchProviderCard', () => {
     const { user } = renderCard(createConfig({ test_state: 'passed' }), resource)
 
     await user.click(screen.getByRole('button', { name: '启用' }))
-    await waitFor(() => expect(resource.update).toHaveBeenCalledWith('unsplash', { enabled: true }))
+    await waitFor(() =>
+      expect(resource.update).toHaveBeenCalledWith(
+        'unsplash',
+        { enabled: true },
+        { operatorReason: 'test reason' },
+      ),
+    )
   })
 
   it('surfaces test failure state for retry', async () => {
@@ -126,6 +161,8 @@ describe('AdminSearchProviderCard', () => {
     expect(screen.getByText('connection refused')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '测试连接' }))
-    await waitFor(() => expect(resource.test).toHaveBeenCalledWith('unsplash'))
+    await waitFor(() =>
+      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: 'test reason' }),
+    )
   })
 })

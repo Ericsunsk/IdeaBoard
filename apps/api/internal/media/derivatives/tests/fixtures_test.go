@@ -1,18 +1,13 @@
 package tests
 
 import (
-	"context"
-
 	"ideaboard/api/internal/media/derivatives/domain"
-	eventsinfra "ideaboard/api/internal/media/derivatives/infrastructure/events"
-	"ideaboard/api/internal/media/derivatives/infrastructure/rendering"
 )
 
 type (
-	Event              = domain.Event
-	TierSpec           = domain.TierSpec
-	InputProfile       = domain.InputProfile
-	UserEventPublisher = eventsinfra.UserEventPublisher
+	Event        = domain.Event
+	TierSpec     = domain.TierSpec
+	InputProfile = domain.InputProfile
 )
 
 const (
@@ -37,7 +32,3 @@ var (
 	ProcessingInputProfile = domain.ProcessingInputProfile
 	ErrRepairNotPossible   = domain.ErrRepairNotPossible
 )
-
-func render(data []byte, maxSide int) ([]byte, int, int, string, error) {
-	return rendering.GoRenderer{}.Render(context.Background(), data, "", maxSide)
-}

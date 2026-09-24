@@ -1,12 +1,22 @@
 import { onScopeDispose, ref } from 'vue'
-import { createLibraryFolderFacts, createLibraryMutationPublisher } from '../../../../library'
+import {
+  createLibraryFolderFacts,
+  createLibraryMutationPublisher,
+  listAllWorkspaceLibraryFolders,
+  requireWorkspaceId,
+} from '../../../../library'
+import { getWorkspaceSelectionStore } from '../../../../workspace'
 
 /** Owns Canvas-local Library visibility and its shared Library coordination facts. */
 export function useCanvasLibraryIsland() {
   const open = ref(false)
   const mounted = ref(false)
   const focusWithin = ref(false)
-  const folderFacts = createLibraryFolderFacts()
+  const folderFacts = createLibraryFolderFacts(() =>
+    listAllWorkspaceLibraryFolders(
+      requireWorkspaceId(getWorkspaceSelectionStore().getSelectedId()),
+    ),
+  )
   const mutationPublisher = createLibraryMutationPublisher(folderFacts)
 
   onScopeDispose(folderFacts.dispose)

@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchUsage, usageQueryKeys } from './resource'
 
-const generated = vi.hoisted(() => ({
-  getUserUsage: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/user-usage/user-usage', () => generated)
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
+}))
 
 describe('usageResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('reads lifetime and the server-owned trend in one authenticated request', async () => {
-    generated.getUserUsage.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       data: {
         timezone: 'Asia/Shanghai',
@@ -31,16 +33,16 @@ describe('usageResource', () => {
       lifetime: { total_credits: 12 },
       trend: [{ date: '2026-07-13', credits: 12 }],
     })
-    expect(generated.getUserUsage).toHaveBeenCalledOnce()
-    expect(generated.getUserUsage).toHaveBeenCalledWith(
-      { range: '7d' },
-      { signal: controller.signal },
+    expect(transport.request).toHaveBeenCalledOnce()
+    expect(transport.request).toHaveBeenCalledWith(
+      '/user/usage?range=7d',
+      expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
     expect(usageQueryKeys.current('7d')).toEqual(['user', 'usage', 'current', '7d'])
   })
 
   it('surfaces API feedback instead of manufacturing an empty trend', async () => {
-    generated.getUserUsage.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 500,
       msg: '用量统计暂不可用',
       message_safe: true,
@@ -50,7 +52,7 @@ describe('usageResource', () => {
   })
 
   it('uses the resource fallback when API feedback exposes internal transport details', async () => {
-    generated.getUserUsage.mockResolvedValue({ code: 500, msg: 'dial tcp 127.0.0.1:5432' })
+    transport.request.mockResolvedValue({ code: 500, msg: 'dial tcp 127.0.0.1:5432' })
 
     await expect(fetchUsage('30d')).rejects.toThrow('Could not load usage statistics.')
   })

@@ -413,6 +413,7 @@ function readUpsertBoardPayload(boardId: string): { state?: BoardState } {
   )
   if (!call) throw new Error(`Missing upsert call for ${boardId}`)
   const body = call[1]?.body
-  if (typeof body !== 'string') throw new Error(`Missing upsert body for ${boardId}`)
-  return JSON.parse(body) as { state?: BoardState }
+  if (typeof body === 'string') return JSON.parse(body) as { state?: BoardState }
+  if (body && typeof body === 'object') return body as { state?: BoardState }
+  throw new Error(`Missing upsert body for ${boardId}`)
 }

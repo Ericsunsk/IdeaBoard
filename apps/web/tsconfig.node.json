@@ -2,7 +2,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    // DOM is typecheck-only here: scripts/seoStaticHtmlVitePlugin.ts imports the
+    // shared SEO descriptor module that also powers the client router guard, so
+    // the node project must see DOM globals. No runtime behavior change.
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,

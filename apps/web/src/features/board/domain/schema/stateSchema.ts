@@ -58,14 +58,23 @@ const imageNodeOutputItemSchema = v.strictObject({
   mediaAssetId: v.optional(positiveIntegerSchema),
 })
 
+const libraryAssetOpaqueIdSchema = v.pipe(
+  v.string(),
+  v.regex(/^liba_[A-Za-z0-9_-]+$/),
+)
+
+// Numeric ids stay valid only so legacy persisted snapshots keep loading;
+// new facts always carry the opaque workspace id.
+const libraryAssetIdSchema = v.union([positiveIntegerSchema, libraryAssetOpaqueIdSchema])
+
 const libraryImportFactSchema = v.union([
   v.strictObject({
     state: v.literal('pending'),
-    libraryAssetId: positiveIntegerSchema,
+    libraryAssetId: libraryAssetIdSchema,
   }),
   v.strictObject({
     state: v.literal('failed'),
-    libraryAssetId: positiveIntegerSchema,
+    libraryAssetId: libraryAssetIdSchema,
     failureMessage: v.pipe(nonEmptyStringSchema, v.maxLength(500)),
   }),
 ])

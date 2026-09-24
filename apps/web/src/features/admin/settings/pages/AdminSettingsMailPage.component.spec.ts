@@ -11,16 +11,19 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 describe('AdminSettingsMailPage', () => {
   beforeEach(() => {
     useMswHandlers(
-      http.get('/api/admin/settings/mail', () =>
+      http.get('/api/control/v1/platform/settings/mail', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             configured: true,
+            api_key_configured: false,
             from_name: 'IdeaBoard Admin',
             from_email: 'admin@example.com',
             reply_to: 'reply@example.com',
-            verified: true,
+            config_version: 1,
+            readiness: 'not_tested',
+            updated_at: null,
+            last_tested_at: null,
+            last_test_error_code: null,
           },
         }),
       ),

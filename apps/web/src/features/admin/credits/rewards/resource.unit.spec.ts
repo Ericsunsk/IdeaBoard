@@ -1,20 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAdminRewardCodeResource } from './resource'
 
-const generated = vi.hoisted(() => ({
-  create: vi.fn(),
-  delete: vi.fn(),
-  search: vi.fn(),
-  setEnabled: vi.fn(),
-  update: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/admin-rewards/admin-rewards', () => ({
-  createAdminRewardCode: generated.create,
-  deleteAdminRewardCode: generated.delete,
-  searchAdminRewardCodes: generated.search,
-  setAdminRewardCodeEnabled: generated.setEnabled,
-  updateAdminRewardCode: generated.update,
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
 }))
 
 const rewardCode = {
@@ -34,7 +26,7 @@ describe('AdminRewardCodeResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('maps search metadata without exposing digest or plaintext', async () => {
-    generated.search.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: { reward_codes: [rewardCode], total: 42, next_before_id: 6 },
@@ -48,9 +40,13 @@ describe('AdminRewardCodeResource', () => {
       signal,
     })
 
-    expect(generated.search).toHaveBeenCalledWith(
-      { query: '新用户奖励', status: 'enabled', before_id: 8, limit: 20 },
-      { signal },
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes/search',
+      expect.objectContaining({
+        method: 'POST',
+        body: { query: '新用户奖励', status: 'enabled', before_id: 8, limit: 20 },
+        signal,
+      }),
     )
     expect(page).toEqual({
       rewardCodes: [
@@ -67,7 +63,7 @@ describe('AdminRewardCodeResource', () => {
   })
 
   it('omits an empty query and unset status from the body', async () => {
-    generated.search.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: { reward_codes: [], total: 0 },
@@ -75,11 +71,14 @@ describe('AdminRewardCodeResource', () => {
 
     await createAdminRewardCodeResource().search({ query: '   ' })
 
-    expect(generated.search).toHaveBeenCalledWith({ limit: 20 }, undefined)
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes/search',
+      expect.objectContaining({ method: 'POST', body: { limit: 20 } }),
+    )
   })
 
   it('preserves the client idempotency key and converts Shanghai expiration', async () => {
-    generated.create.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: { reward_code: rewardCode, plaintext: 'ABCD12342026', replayed: false },
@@ -94,14 +93,20 @@ describe('AdminRewardCodeResource', () => {
       idempotencyKey: 'stable-create-key',
     })
 
-    expect(generated.create).toHaveBeenCalledWith({
-      display_name: '新用户奖励',
-      code: 'ABCD-1234-2026',
-      credit_amount: 80,
-      max_redemptions: 100,
-      expires_at: '2026-07-31T16:00:00.000Z',
-      idempotency_key: 'stable-create-key',
-    })
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes',
+      expect.objectContaining({
+        method: 'POST',
+        body: {
+          display_name: '新用户奖励',
+          code: 'ABCD-1234-2026',
+          credit_amount: 80,
+          max_redemptions: 100,
+          expires_at: '2026-07-31T16:00:00.000Z',
+          idempotency_key: 'stable-create-key',
+        },
+      }),
+    )
     expect(result).toEqual({
       rewardCode: expect.objectContaining({ id: 7, displayName: '新用户奖励' }),
       plaintext: 'ABCD12342026',
@@ -109,31 +114,32 @@ describe('AdminRewardCodeResource', () => {
     })
   })
 
-  it('maps atomic rule and Code updates, enabled intent, and delete through generated APIs', async () => {
-    generated.update.mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: {
-        reward_code: {
-          ...rewardCode,
-          display_name: '八月奖励',
-          masked_code_hint: '•••• WXYZ',
-          expires_at: undefined,
+  it('maps atomic rule and Code updates, enabled intent, and delete through admin APIs', async () => {
+    transport.request
+      .mockResolvedValueOnce({
+        code: 0,
+        msg: 'ok',
+        data: {
+          reward_code: {
+            ...rewardCode,
+            display_name: '八月奖励',
+            masked_code_hint: '•••• WXYZ',
+            expires_at: undefined,
+          },
+          plaintext: 'NEWC-ODE1-WXYZ',
+          replayed: false,
         },
-        plaintext: 'NEWC-ODE1-WXYZ',
-        replayed: false,
-      },
-    })
-    generated.setEnabled.mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: { ...rewardCode, enabled: false, status: 'disabled' },
-    })
-    generated.delete.mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: { reward_code_id: 7 },
-    })
+      })
+      .mockResolvedValueOnce({
+        code: 0,
+        msg: 'ok',
+        data: { ...rewardCode, enabled: false, status: 'disabled' },
+      })
+      .mockResolvedValueOnce({
+        code: 0,
+        msg: 'ok',
+        data: { reward_code_id: 7 },
+      })
     const resource = createAdminRewardCodeResource()
 
     await expect(
@@ -149,26 +155,41 @@ describe('AdminRewardCodeResource', () => {
       plaintext: 'NEWC-ODE1-WXYZ',
       replayed: false,
     })
-    expect(generated.update).toHaveBeenCalledWith(7, {
-      display_name: '八月奖励',
-      credit_amount: 120,
-      max_redemptions: 0,
-      expires_at: null,
-      code: 'NEWC-ODE1-WXYZ',
-    })
+    expect(transport.request).toHaveBeenNthCalledWith(
+      1,
+      '/admin/rewards/codes/7',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: {
+          display_name: '八月奖励',
+          credit_amount: 120,
+          max_redemptions: 0,
+          expires_at: null,
+          code: 'NEWC-ODE1-WXYZ',
+        },
+      }),
+    )
 
     await expect(resource.setEnabled(7, false)).resolves.toMatchObject({
       enabled: false,
       status: 'disabled',
     })
-    expect(generated.setEnabled).toHaveBeenCalledWith(7, { enabled: false })
+    expect(transport.request).toHaveBeenNthCalledWith(
+      2,
+      '/admin/rewards/codes/7/enabled',
+      expect.objectContaining({ method: 'PATCH', body: { enabled: false } }),
+    )
 
     await expect(resource.delete(7)).resolves.toBeUndefined()
-    expect(generated.delete).toHaveBeenCalledWith(7)
+    expect(transport.request).toHaveBeenNthCalledWith(
+      3,
+      '/admin/rewards/codes/7',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 
   it('omits Code from a rule-only update', async () => {
-    generated.update.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: { reward_code: rewardCode },
@@ -181,11 +202,17 @@ describe('AdminRewardCodeResource', () => {
       expiresAt: '',
     })
 
-    expect(generated.update).toHaveBeenCalledWith(7, {
-      display_name: '新用户奖励',
-      credit_amount: 80,
-      max_redemptions: 100,
-      expires_at: null,
-    })
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes/7',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: {
+          display_name: '新用户奖励',
+          credit_amount: 80,
+          max_redemptions: 100,
+          expires_at: null,
+        },
+      }),
+    )
   })
 })

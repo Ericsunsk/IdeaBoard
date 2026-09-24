@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref, toRaw, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import type { AdminOutboundPolicyFeedback } from './useSettingsFeedback'
 import {
   DEFAULT_OUTBOUND_POLICY_FORM,
@@ -13,7 +15,10 @@ import {
 } from './outboundPolicyContract'
 import { outboundPolicyQueryKey, useOutboundPolicyResource } from './outboundPolicyResource'
 
-export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedback }) {
+export function useOutboundPolicy(options: {
+  feedback: AdminOutboundPolicyFeedback
+  confirm: AdminConfirmPort
+}) {
   const queryClient = useQueryClient()
   const resource = useOutboundPolicyResource()
   const setting = computed(() => resource.query.data.value)
@@ -26,7 +31,10 @@ export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedba
   const validationError = ref('')
   const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
   const saveMutation = useMutation({
-    mutationFn: (draft: OutboundPolicyForm) => resource.update(outboundPolicyFormToRequest(draft)),
+    mutationFn: (input: { draft: OutboundPolicyForm; operatorReason: string }) =>
+      resource.update(outboundPolicyFormToRequest(input.draft), {
+        operatorReason: input.operatorReason,
+      }),
     onSuccess: async (savedSetting) => {
       hydrate(savedSetting)
       writeOutboundPolicyQueryCache(queryClient, savedSetting)
@@ -52,8 +60,20 @@ export function useOutboundPolicy(options: { feedback: AdminOutboundPolicyFeedba
       return false
     }
 
+    // Control Plane writes require an operator reason (audit). Collect it
+    // through the shared confirm dialog; a cancelled dialog aborts silently.
+    const operatorReason = await confirmSettingsSave(options.confirm, {
+      title: '保存访问策略',
+      message: '确定保存私有地址访问策略吗？该操作将记录操作人与原因。',
+      confirmLabel: '保存访问策略',
+    })
+    if (!operatorReason) return false
+
     try {
-      await saveMutation.mutateAsync(normalizeOutboundPolicyFormValue(form.value))
+      await saveMutation.mutateAsync({
+        draft: normalizeOutboundPolicyFormValue(form.value),
+        operatorReason,
+      })
       options.feedback.saved()
       return true
     } catch (error) {

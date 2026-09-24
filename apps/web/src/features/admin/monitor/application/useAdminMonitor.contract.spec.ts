@@ -1,14 +1,14 @@
 import { computed, nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  ListAdminTasksStatus,
-  type ApiResponseAdminTaskListData,
-  type AdminMonitorListItem,
-  type ListAdminTasksParams,
-  type MonitorData,
-  type MonitorResponse,
-  type MonitorStats,
-} from '../../../../shared/api/generated-query/model/index'
+import { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
+import type {
+  ApiResponseAdminTaskListData,
+  AdminMonitorListItem,
+  ListAdminTasksParams,
+  MonitorData,
+  MonitorResponse,
+  MonitorStats,
+} from '../infrastructure/resource'
 import { useAdminTaskList } from './useAdminTaskList'
 import { useAdminTaskRuntimeSnapshot } from './useAdminTaskRuntimeSnapshot'
 import { ADMIN_MONITOR_PAGE_SIZE } from '../domain/displayPolicy'
@@ -22,16 +22,17 @@ const mockState = vi.hoisted(() => ({
   taskListParams: undefined as MaybeRefOrGetter<ListAdminTasksParams> | undefined,
 }))
 
-vi.mock('../../../../shared/api/generated-query/admin-tasks/admin-tasks', () => ({
-  useListAdminTasks: vi.fn((params: MaybeRefOrGetter<ListAdminTasksParams>) => {
-    mockState.taskListParams = params
-    return mockState.listAdminTasksReturn
-  }),
-}))
-
-vi.mock('../../../../shared/api/generated-query/admin-monitor/admin-monitor', () => ({
-  useGetAdminMonitor: vi.fn(() => mockState.getAdminMonitorReturn),
-}))
+vi.mock('../infrastructure/resource', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../infrastructure/resource')>()
+  return {
+    ...original,
+    useAdminTaskListResource: vi.fn((params: MaybeRefOrGetter<ListAdminTasksParams>) => {
+      mockState.taskListParams = params
+      return mockState.listAdminTasksReturn
+    }),
+    useAdminMonitorResource: vi.fn(() => mockState.getAdminMonitorReturn),
+  }
+})
 
 vi.mock('../../shared/composables/useQueryPolling', () => ({
   useQueryPolling: vi.fn(

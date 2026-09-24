@@ -1,17 +1,17 @@
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library'
-import type { LibraryAssetView } from '../../library'
+import type { WorkspaceLibraryAsset } from '../../library'
 import type { LibrarySearchReference } from '../domain/authAction'
 
 export type SearchLibraryCoordinator = LibraryMutationPublisher & {
   folderFacts: LibraryFolderFacts
   saveReference: (
     reference: LibrarySearchReference,
-    folderID?: number,
+    folderID?: string,
     newFolderName?: string,
-  ) => Promise<LibraryAssetView>
+  ) => Promise<WorkspaceLibraryAsset>
   saveReferences: (
     references: LibrarySearchReference[],
-  ) => Promise<PromiseSettledResult<LibraryAssetView>[]>
+  ) => Promise<PromiseSettledResult<WorkspaceLibraryAsset>[]>
   removeReference: (provider: 'unsplash' | 'pexels', sourceID: string) => Promise<void>
   reset: () => void
   dispose: () => void

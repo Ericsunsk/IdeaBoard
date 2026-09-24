@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchRewardRedemptions, redeemRewardCode, rewardRedemptionsQueryKeys } from './resource'
 
-const generated = vi.hoisted(() => ({
-  listUserRewardRedemptions: vi.fn(),
-  redeemUserReward: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/user-rewards/user-rewards', () => generated)
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
+}))
 
 describe('rewardsResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('reads a cursor page through the feature resource boundary', async () => {
-    generated.listUserRewardRedemptions.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       data: {
         redemptions: [
@@ -35,15 +36,15 @@ describe('rewardsResource', () => {
       redemptions: [{ id: 42, reward_code_display_name: '夏日灵感奖励' }],
       next_before_id: 40,
     })
-    expect(generated.listUserRewardRedemptions).toHaveBeenCalledWith(
-      { before_id: 50, limit: 20 },
-      { signal: controller.signal },
+    expect(transport.request).toHaveBeenCalledWith(
+      '/user/rewards/redemptions?before_id=50&limit=20',
+      expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
     expect(rewardRedemptionsQueryKeys.all).toEqual(['user', 'rewards', 'redemptions'])
   })
 
   it('surfaces API feedback instead of manufacturing an empty page', async () => {
-    generated.listUserRewardRedemptions.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 500,
       msg: '奖励服务暂不可用',
       message_safe: true,
@@ -60,7 +61,7 @@ describe('rewardsResource', () => {
     [429, 'Too many attempts. Please try again later.'],
     [500, 'Network error. Please try again.'],
   ])('maps redemption HTTP %d to stable user copy', async (status, message) => {
-    generated.redeemUserReward.mockRejectedValue(
+    transport.request.mockRejectedValue(
       Object.assign(new Error('unsafe upstream detail'), { status }),
     )
 
@@ -68,7 +69,7 @@ describe('rewardsResource', () => {
   })
 
   it('maps redemption transport failures to stable user copy', async () => {
-    generated.redeemUserReward.mockRejectedValue(new Error('fetch failed'))
+    transport.request.mockRejectedValue(new Error('fetch failed'))
 
     await expect(redeemRewardCode('IDEA2026')).rejects.toThrow('Network error. Please try again.')
   })

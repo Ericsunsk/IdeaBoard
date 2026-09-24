@@ -1,14 +1,12 @@
 import { computed, ref, watch } from 'vue'
-import type {
-  ListAdminTasksParams,
-  ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../../../../shared/api/generated-query/model/index'
+import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
 import { usePagePagination } from '../../shared/composables/usePagePagination'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { useQueryPolling } from '../../shared/composables/useQueryPolling'
 import {
   useAdminTaskListResource,
   type AdminMonitorListItemModel,
+  type ListAdminTasksParams,
 } from '../infrastructure/resource'
 import {
   ADMIN_MONITOR_PAGE_SIZE,

@@ -71,14 +71,12 @@ function readLibraryImportNode(nodes: Node[], nodeId: string): LibraryImportNode
 }
 
 function isValidMaterialization(value: {
-  mediaAssetId: number
+  mediaAssetId: string
   url: string
   width: number
   height: number
 }): boolean {
-  return (
-    Number.isInteger(value.mediaAssetId) && value.mediaAssetId > 0 && value.url.trim().length > 0
-  )
+  return value.mediaAssetId.trim().length > 0 && value.url.trim().length > 0
 }
 
 /**
@@ -126,7 +124,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
 
   function clearFactWithMaterializedMedia(
     nodeId: string,
-    libraryAssetId: number,
+    libraryAssetId: string,
     attachment: BoardAttachment,
     materialized: Awaited<ReturnType<LibraryAssetMaterializer>>,
     fallbackRatio: number,
@@ -158,7 +156,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
 
   function failImport(
     nodeId: string,
-    libraryAssetId: number,
+    libraryAssetId: string,
     attachment: BoardAttachment,
     error: unknown,
     notify: boolean,
@@ -182,7 +180,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
 
   function materializePending(
     nodeId: string,
-    libraryAssetId: number,
+    libraryAssetId: string,
     fallbackRatio: number,
     attachment: BoardAttachment,
     notifyFailure: boolean,
@@ -261,6 +259,9 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
       if (!current) return
       const fact = current.snapshot.libraryImport
       if (fact?.state !== 'pending') return
+      // Legacy numeric facts cannot resume on the workspace API (integer
+      // ids converge to 404); only opaque ids materialize.
+      if (typeof fact.libraryAssetId !== 'string') return
       if (
         materializePending(
           node.id,
@@ -281,6 +282,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     const fact = current?.snapshot.libraryImport
     const attachment = options.readAttachment()
     if (!current || fact?.state !== 'failed' || !attachment) return false
+    if (typeof fact.libraryAssetId !== 'string') return false
     options.updateImageSnapshot(nodeId, (snapshot) => retryLibraryImport(snapshot) ?? snapshot)
     options.refreshNodeInternals([nodeId])
     return materializePending(

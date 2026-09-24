@@ -1,10 +1,11 @@
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
-import { libraryAssetKey, type LibrarySearchReference } from '../../library'
+import { libraryAssetKey } from '../../library'
+import type { LibrarySearchReference } from '../domain/authAction'
 import {
   getLibraryIslandState,
   setLibraryIslandState,
@@ -53,6 +54,7 @@ type SearchSessionOptions = {
   cacheScope?: string
   scrollContainer?: Ref<HTMLElement | null>
   isAuthenticated?: () => boolean
+  workspaceId?: MaybeRefOrGetter<string | null | undefined>
   requireLogin?: (action: SearchAuthAction) => void
   initialVisionReferences?: VisionReference[]
   route?: ReturnType<typeof useRoute>
@@ -77,6 +79,7 @@ function useSearchQueryState(
     cacheScope,
     scrollContainer: options.scrollContainer,
     isAuthenticated,
+    workspaceId: options.workspaceId,
   })
   const vision = useVisionQueryLifecycle({
     draftQuery,

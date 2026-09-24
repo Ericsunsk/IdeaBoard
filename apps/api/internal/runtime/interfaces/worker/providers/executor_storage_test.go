@@ -10,15 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	mediaassets "ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/media/storage"
-	storagetaskmedia "ideaboard/api/internal/media/storage/application/taskmedia"
-	"ideaboard/api/internal/media/storage/infrastructure/postgres"
 	"ideaboard/api/internal/platform/config"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
-	"ideaboard/api/internal/testdb"
 )
 
 func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
@@ -118,17 +113,10 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 		_ = os.Chdir(oldWd)
 	})
 
-	db := testdb.Open(t)
-	storageService := storage.NewService(postgres.NewRepository(db), nil, "")
-	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
-		t.Fatalf("ensure default storage profiles: %v", err)
-	}
-	mediaStore := storagetaskmedia.NewRuntimeTaskMediaStore(storageService, mediaassets.NewMediaAssetRegistry(db))
-
-	return &ProviderExecutor{
-		mediaReader:        mediaStore,
-		resultMaterializer: mediaStore,
-	}
+	// Legacy storage taskmedia seam removed (#815): callers override
+	// mediaResolver/resultMaterializer with test fakes as needed; the
+	// zero executor surfaces explicit unavailable errors otherwise.
+	return &ProviderExecutor{}
 }
 
 func TestMaterializeProviderResultImagesFailsWhenMaterializerMissing(t *testing.T) {

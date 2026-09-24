@@ -86,7 +86,7 @@ function createHarness(initialNodes: Node[] = []) {
     isCurrentAttachment: () => true,
   })
   const materializeLibraryAsset = vi.fn(async () => ({
-    mediaAssetId: 43,
+    mediaAssetId: 'asset_media0043',
     url: 'https://example.com/materialized.png',
     width: 200,
     height: 100,
@@ -254,7 +254,7 @@ describe('useCanvasGraphEditing', () => {
       files: [new File(['ignored'], 'should-not-upload.png', { type: 'image/png' })],
     } as unknown as DataTransfer
     const asset: CanvasLibraryImportDescriptor = {
-      assetId: 42,
+      assetId: 'liba_asset0042',
       previewUrl: 'https://images.unsplash.com/dragged-asset-preview',
       title: 'Dragged asset',
       width: 1200,
@@ -269,7 +269,7 @@ describe('useCanvasGraphEditing', () => {
     } as unknown as DragEvent)
     await Promise.resolve()
 
-    expect(harness.materializeLibraryAsset).toHaveBeenCalledWith(42)
+    expect(harness.materializeLibraryAsset).toHaveBeenCalledWith('liba_asset0042')
     expect(harness.upload).not.toHaveBeenCalled()
     expect(harness.nodes.value).toContainEqual(
       expect.objectContaining({
@@ -278,7 +278,6 @@ describe('useCanvasGraphEditing', () => {
           kind: 'image',
           snapshotNode: expect.objectContaining({
             sourceImageUrl: 'https://example.com/materialized.png',
-            sourceMediaAssetId: 43,
           }),
         }),
       }),

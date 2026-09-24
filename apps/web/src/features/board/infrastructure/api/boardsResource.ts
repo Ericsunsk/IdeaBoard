@@ -1,18 +1,31 @@
+import { api } from '../../../../shared/api/client'
 import {
-  deleteUserBoard,
-  joinBoardByShareToken,
-  listUserBoards,
-  upsertUserBoard,
-} from '../../../../shared/api/generated-query/boards/boards'
-import type {
-  ApiResponseBase,
-  BoardStateEnvelope,
-  UserBoardItem,
-} from '../../../../shared/api/generated-query/model'
-import { resolveApiData, resolveApiOk } from '../../../../shared/api/apiResponse'
+  resolveApiData,
+  resolveApiOk,
+  type ApiResponseBase,
+  type ApiResponseWithData,
+} from '../../../../shared/api/apiResponse'
 import { i18n } from '../../../../shared/i18n'
+import type { BoardState } from '../../domain'
 
-export type { ApiResponseBase, BoardStateEnvelope, UserBoardItem }
+// User board sync boundary (issue #809). The generated `boards` client is
+// gone but the backend user plane still serves `/api/user/boards/*` with the
+// shared envelope, so this boundary transports through the central
+// `api.request`. The board document shape is owned by the board domain
+// (`BoardState`); this module only moves it across the wire.
+export type { ApiResponseBase }
+export type BoardStateEnvelope = BoardState
+
+export type UserBoardItem = {
+  board_id: string
+  name: string
+  state: BoardStateEnvelope
+  access_role?: 'owner' | 'editor' | 'viewer'
+  revision: number
+  state_schema_version: number
+  created_at: number
+  updated_at: number
+}
 
 export type SaveUserBoardPayload = {
   name: string
@@ -23,24 +36,47 @@ export type SaveUserBoardPayload = {
 }
 
 export async function fetchUserBoards(): Promise<UserBoardItem[]> {
-  const data = await resolveApiData(listUserBoards(), i18n.global.t('workspace.sync.listFailed'))
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<{ list: UserBoardItem[] }>>('/user/boards', {
+      method: 'GET',
+    }),
+    i18n.global.t('workspace.sync.listFailed'),
+  )
   return Array.isArray(data.list) ? data.list : []
 }
 
 export async function saveUserBoard(boardId: string, payload: SaveUserBoardPayload) {
   return resolveApiData(
-    upsertUserBoard(boardId, payload),
+    api.request<ApiResponseWithData<{ board: UserBoardItem; new_revision: number }>>(
+      `/user/boards/${encodeURIComponent(boardId)}`,
+      {
+        method: 'PUT',
+        body: payload as unknown as Record<string, unknown>,
+      },
+    ),
     i18n.global.t('workspace.sync.saveFailed'),
   )
 }
 
 export async function removeUserBoard(boardId: string): Promise<void> {
-  await resolveApiOk(deleteUserBoard(boardId), i18n.global.t('workspace.sync.deleteFailed'))
+  await resolveApiOk(
+    api.request<{ code: number; msg: string }>(
+      `/user/boards/${encodeURIComponent(boardId)}`,
+      { method: 'DELETE' },
+    ),
+    i18n.global.t('workspace.sync.deleteFailed'),
+  )
 }
 
 export async function joinUserBoardByShareToken(token: string) {
   return resolveApiData(
-    joinBoardByShareToken({ token }),
+    api.request<ApiResponseWithData<{ board: UserBoardItem }>>(
+      '/user/boards/share-tokens/join',
+      {
+        method: 'POST',
+        body: { token } as unknown as Record<string, unknown>,
+      },
+    ),
     i18n.global.t('workspace.joinSharedBoard.joinFailed'),
   )
 }

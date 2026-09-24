@@ -12,7 +12,7 @@ const walletQueryRoot = ['control', 'credits', 'wallets'] as const
 
 export type AdminCreditLedgerTransaction = ControlLedgerTransaction
 
-export const ADMIN_CREDIT_LEDGER_PAGE_SIZE = 25
+const ADMIN_CREDIT_LEDGER_PAGE_SIZE = 25
 
 interface AdminCreditLedgerCriteria {
   userPublicId: string

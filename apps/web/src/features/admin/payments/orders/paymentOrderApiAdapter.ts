@@ -1,6 +1,5 @@
 import { api } from '../../../../shared/api/client'
 import { resolveApiData } from '../../../../shared/api/apiResponse'
-import { getCreateAdminPaymentRefundUrl } from '../../../../shared/api/generated-query/admin-payments/admin-payments'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 export type PaymentOrderApiUser = {
@@ -151,7 +150,7 @@ export function createAdminPaymentOrderApiAdapter(
     refund: (publicOrderNumber, input) =>
       resolveApiData(
         transport.request<ApiEnvelope<PaymentOrderApiRefund>>(
-          getCreateAdminPaymentRefundUrl(publicOrderNumber.trim().toUpperCase()),
+          `/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}/refunds`,
           { method: 'POST', body: input },
         ),
         '发起退款失败',

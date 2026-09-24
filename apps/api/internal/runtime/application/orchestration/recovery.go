@@ -7,15 +7,22 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/runtime/ports"
-	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 
 	"github.com/riverqueue/river/rivertype"
 )
 
 const StartupRecoveryFinalFailureReason = "服务重启，任务已停止"
 
+// StartupRecoveredTask moved here from the deleted legacy taskstore
+// (#816 Phase 3b-07): startup recovery coordinates over this row
+// projection, and the workspace-scoped store (Phase 4a) will re-supply it.
+type StartupRecoveredTask struct {
+	TaskID     string
+	RiverJobID int64
+}
+
 type StartupRecoveryTaskStore interface {
-	ListRunningTasksForStartupRecovery(ctx context.Context) ([]taskstore.StartupRecoveredTask, error)
+	ListRunningTasksForStartupRecovery(ctx context.Context) ([]StartupRecoveredTask, error)
 }
 
 type StartupRecoveryFinalFailures interface {
@@ -62,7 +69,7 @@ func (c *TaskRecoveryCoordinator) RecoverRunningTasks(ctx context.Context) (int,
 		return 0, fmt.Errorf("startup recovery final failure orchestrator is nil")
 	}
 
-	durableTasks := make([]taskstore.StartupRecoveredTask, 0, len(recoveredTasks))
+	durableTasks := make([]StartupRecoveredTask, 0, len(recoveredTasks))
 	var recoveryErrs []error
 	for _, task := range recoveredTasks {
 		if err := c.finalFailures.ConvergeFinalFailureDurably(ctx, task.TaskID, task.RiverJobID, StartupRecoveryFinalFailureReason); err != nil {
@@ -85,7 +92,7 @@ func (c *TaskRecoveryCoordinator) RecoverRunningTasks(ctx context.Context) (int,
 
 var _ ports.StartupRecoveryCoordinator = (*TaskRecoveryCoordinator)(nil)
 
-func cancelRecoveredRiverJobs(ctx context.Context, canceller StartupRecoveryRiverJobCanceller, recoveredTasks []taskstore.StartupRecoveredTask) (int, error) {
+func cancelRecoveredRiverJobs(ctx context.Context, canceller StartupRecoveryRiverJobCanceller, recoveredTasks []StartupRecoveredTask) (int, error) {
 	if len(recoveredTasks) == 0 {
 		return 0, nil
 	}

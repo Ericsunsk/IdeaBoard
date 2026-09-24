@@ -1,9 +1,4 @@
-import {
-  uploadUserBoardAsset,
-  uploadUserProfileAvatar,
-} from './generated-query/user-assets/user-assets'
-import type { UploadAvatarMetadata, UploadImageMetadata } from './generated-query/model'
-import { resolveApiData } from './apiResponse'
+import { resolveApiData, type ApiResponseWithData } from './apiResponse'
 import { api } from './client'
 import {
   buildContractRequestHeaders,
@@ -16,6 +11,41 @@ import { i18n } from '../i18n'
 
 export const UPLOAD_OPERATION_TIMEOUT_MS = 5 * 60 * 1000
 
+// Legacy user upload endpoints (issue #809). The backend user plane still
+// serves board-asset and profile-avatar uploads with the shared
+// `{code, msg, data}` envelope, so this boundary posts FormData through the
+// central `api.request` instead of the deleted generated client.
+export type UploadImageMetadata = {
+  url: string
+  asset_id: string
+  width?: number
+  height?: number
+  mime?: string
+  ext?: string
+}
+
+export type UploadAvatarMetadata = {
+  avatar: string
+  width?: number
+  height?: number
+  mime?: string
+  ext?: string
+}
+
+function getUploadBoardAssetUrl(boardId: string): string {
+  return `/user/boards/${encodeURIComponent(boardId)}/uploads`
+}
+
+function getUploadProfileAvatarUrl(): string {
+  return '/user/profile/avatar'
+}
+
+function toUploadFormData(file: File): FormData {
+  const formData = new FormData()
+  formData.append('file', file)
+  return formData
+}
+
 function getUploadRequestOptions(): RequestInit {
   return { timeout: UPLOAD_OPERATION_TIMEOUT_MS } as RequestInit
 }
@@ -24,7 +54,14 @@ export const uploadApi = {
   upload: async (file: File, boardId: string): Promise<UploadImageMetadata> => {
     const normalizedBoardId = boardId.trim()
     const data = await resolveApiData(
-      uploadUserBoardAsset(normalizedBoardId, { file }, getUploadRequestOptions()),
+      api.request<ApiResponseWithData<UploadImageMetadata>>(
+        getUploadBoardAssetUrl(normalizedBoardId),
+        {
+          method: 'POST',
+          body: toUploadFormData(file),
+          ...getUploadRequestOptions(),
+        },
+      ),
       i18n.global.t('common.errors.uploadFailed'),
     )
     if (!data.url?.trim()) throw new Error(i18n.global.t('common.errors.uploadFailed'))
@@ -35,7 +72,11 @@ export const uploadApi = {
   },
   uploadAvatar: async (file: File): Promise<UploadAvatarMetadata> => {
     const data = await resolveApiData(
-      uploadUserProfileAvatar({ file }, getUploadRequestOptions()),
+      api.request<ApiResponseWithData<UploadAvatarMetadata>>(getUploadProfileAvatarUrl(), {
+        method: 'POST',
+        body: toUploadFormData(file),
+        ...getUploadRequestOptions(),
+      }),
       i18n.global.t('common.errors.avatarUploadFailed'),
     )
     if (!data.avatar?.trim()) throw new Error(i18n.global.t('common.errors.avatarUploadFailed'))

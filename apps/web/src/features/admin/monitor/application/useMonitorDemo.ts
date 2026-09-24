@@ -5,7 +5,7 @@ import { createDemoTaskDetail, createDemoMonitorList, createDemoMonitorStats } f
 import type { TimeRangePreset } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'
-import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/api/generated-query/model/index'
+import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
 
 type MonitorDemoOptions = {
   filterStatus: Ref<ListAdminTasksStatusValue | null>

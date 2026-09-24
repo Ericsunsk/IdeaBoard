@@ -1,14 +1,35 @@
-import { resolveApiData } from '../../../shared/api/apiResponse'
+import { api } from '../../../shared/api/client'
 import {
-  getAdminOAuthProviderSettings,
-  updateAdminOAuthProviderSettings,
-} from '../../../shared/api/generated-query/admin-users/admin-users'
-import type {
-  ApiResponseOAuthProviderSettings,
-  OAuthProviderSettings,
-  OAuthProviderSettingsUpdate,
-} from '../../../shared/api/generated-query/model'
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../shared/api/apiResponse'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
+
+// Admin OAuth provider boundary (issue #809). The generated `admin-users`
+// client is gone but the backend admin plane still serves
+// `/api/admin/users/oauth-providers/:provider` (GET/PUT) with the shared
+// envelope, so this boundary transports through the central `api.request`
+// with local wire types.
+export type OAuthProviderSettings = {
+  provider: string
+  enabled: boolean
+  configured: boolean
+  available: boolean
+  client_id: string
+  client_secret_configured: boolean
+  scopes: string[]
+  config_version: number
+  callback_url: string
+  updated_at: string | null
+}
+
+export type OAuthProviderSettingsUpdate = {
+  enabled: boolean
+  client_id: string
+  client_secret?: string
+}
+
+export type ApiResponseOAuthProviderSettings = ApiResponseWithData<OAuthProviderSettings>
 
 export type OAuthProviderSettingsSummary = {
   enabled: boolean
@@ -40,13 +61,24 @@ type OAuthProviderSettingsApi = {
   ): Promise<ApiResponseOAuthProviderSettings>
 }
 
-const generatedApi: OAuthProviderSettingsApi = {
-  getSettings: getAdminOAuthProviderSettings,
-  updateSettings: updateAdminOAuthProviderSettings,
+const userOAuthProviderApi: OAuthProviderSettingsApi = {
+  getSettings: (provider) =>
+    api.request<ApiResponseOAuthProviderSettings>(
+      `/admin/users/oauth-providers/${encodeURIComponent(provider)}`,
+      { method: 'GET' },
+    ),
+  updateSettings: (provider, input) =>
+    api.request<ApiResponseOAuthProviderSettings>(
+      `/admin/users/oauth-providers/${encodeURIComponent(provider)}`,
+      {
+        method: 'PUT',
+        body: input as unknown as Record<string, unknown>,
+      },
+    ),
 }
 
 export function createOAuthProviderSettingsResource(
-  api: OAuthProviderSettingsApi = generatedApi,
+  api: OAuthProviderSettingsApi = userOAuthProviderApi,
 ): OAuthProviderSettingsResource {
   return {
     async get(provider) {

@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { billingRecordsQueryKeys, fetchBillingRecords } from './resource'
 
-const generated = vi.hoisted(() => ({
-  listUserBillingRecords: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/user-billing/user-billing', () => generated)
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
+}))
 
 describe('billingResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('reads a cursor page through the feature resource boundary', async () => {
-    generated.listUserBillingRecords.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       data: {
         records: [
@@ -35,15 +37,15 @@ describe('billingResource', () => {
       records: [{ record_id: 'record-1', title: '局部重绘' }],
       next_before_sequence: 88,
     })
-    expect(generated.listUserBillingRecords).toHaveBeenCalledWith(
-      { before_sequence: 99, limit: 20 },
-      { signal: controller.signal },
+    expect(transport.request).toHaveBeenCalledWith(
+      '/user/billing/records?before_sequence=99&limit=20',
+      expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
     expect(billingRecordsQueryKeys.all).toEqual(['user', 'billing', 'records'])
   })
 
   it('surfaces API feedback instead of manufacturing an empty page', async () => {
-    generated.listUserBillingRecords.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 500,
       msg: '账单服务暂不可用',
       message_safe: true,
@@ -53,7 +55,7 @@ describe('billingResource', () => {
   })
 
   it('uses the resource fallback when API feedback contains credential details', async () => {
-    generated.listUserBillingRecords.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 500,
       msg: 'credential=exposed',
     })

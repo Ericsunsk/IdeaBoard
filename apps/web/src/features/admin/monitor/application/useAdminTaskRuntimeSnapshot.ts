@@ -1,11 +1,7 @@
 import { computed, ref, watch } from 'vue'
-import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import type { MonitorResponse } from '../../../../shared/api/generated-query/model/index'
-import { createApiDataSelector } from '../../../../shared/api/apiResponse'
+import { useAdminMonitorResource, type MonitorResponse } from '../infrastructure/resource'
 import { useQueryPolling } from '../../shared/composables/useQueryPolling'
 import { useAdminMonitorStream } from './useAdminMonitorStream'
-
-const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控数据失败')
 
 export function useAdminTaskRuntimeSnapshot() {
   const stream = useAdminMonitorStream()
@@ -16,12 +12,11 @@ export function useAdminTaskRuntimeSnapshot() {
     isEnabled: () => !stream.isConnected.value,
   })
 
-  const monitorQuery = useGetAdminMonitor<MonitorResponse>({
+  const monitorQuery = useAdminMonitorResource({
     query: {
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
-      select: selectAdminMonitor,
     },
   })
 

@@ -1,11 +1,23 @@
 import type { MaybeRefOrGetter } from 'vue'
 import { watch } from 'vue'
-import { useListAdminBrandLogoOverrides } from '../../../../shared/api/generated-query/admin-brand-logos/admin-brand-logos'
-import { hydrateAdminBrandLogoOverrides } from './brandLogoResource'
+import { useQuery } from '@tanstack/vue-query'
+import { api } from '../../../../shared/api/client'
+import {
+  ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY,
+  hydrateAdminBrandLogoOverrides,
+  type ApiResponseAdminBrandLogoOverrideList,
+} from './brandLogoResource'
 
 export function useBrandLogoOverrides(enabled: MaybeRefOrGetter<boolean>) {
-  const query = useListAdminBrandLogoOverrides({
-    query: { enabled, staleTime: Infinity },
+  const query = useQuery({
+    queryKey: ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY,
+    queryFn: ({ signal }) =>
+      api.request<ApiResponseAdminBrandLogoOverrideList>('/admin/brand-logo-overrides', {
+        method: 'GET',
+        ...(signal == null ? {} : { signal }),
+      }),
+    enabled,
+    staleTime: Infinity,
   })
 
   watch(

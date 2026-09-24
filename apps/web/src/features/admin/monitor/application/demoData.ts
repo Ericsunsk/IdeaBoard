@@ -1,7 +1,6 @@
 import { adminTaskStatuses } from '../domain/status'
 import { getAdminWorkflowFeatureMeta } from '../../shared/lib/workflowFeatureAdminMeta'
-import type { AdminMonitorDetailModel } from '../infrastructure/resource'
-import type { AdminTaskBillingSnapshot } from '../../../../shared/api/generated-query/model/index'
+import type { AdminMonitorDetailModel, AdminTaskBillingSnapshot } from '../infrastructure/resource'
 import type { AdminTaskRow } from './useAdminTaskList'
 
 export const DEMO_MODE_QUERY_VALUE = '1'

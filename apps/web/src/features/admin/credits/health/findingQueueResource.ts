@@ -1,7 +1,7 @@
 import type {
   CreditReconciliationFinding,
   ListAdminCreditReconciliationFindingQueueParams,
-} from '../../../../shared/api/generated-query/model'
+} from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 

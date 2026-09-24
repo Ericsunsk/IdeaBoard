@@ -292,6 +292,7 @@
       v-model:expanded="libraryIslandExpanded"
       presentation="search"
       :open="libraryIslandOpen"
+      :workspace-id="libraryWorkspaceId"
       :folder-facts="libraryFolderFacts"
       :mutation-publisher="libraryMutationPublisher"
       :reference-keys="references.map((reference) => reference.key)"
@@ -416,6 +417,7 @@ const {
 const { count: selectedBatchCount } = selection
 const { visible: lightboxVisible, activeResult } = preview
 const { savePopoverAnchor } = searchScreen
+const { workspaceId: libraryWorkspaceId } = searchScreen
 const {
   clear: handleClearSearch,
   submit: submitQuery,

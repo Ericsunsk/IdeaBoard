@@ -32,6 +32,7 @@
         <CanvasLibraryFloatingIsland
           presentation="canvas"
           :open="canvasLibrary.view.open.value"
+          :workspace-id="canvasWorkspaceId"
           :folder-facts="canvasLibrary.view.folderFacts"
           :mutation-publisher="canvasLibrary.view.mutationPublisher"
           @add-to-canvas="addLibraryAssetToCanvas"
@@ -143,6 +144,7 @@ import {
   CANVAS_VIEWPORT_MIN_ZOOM,
 } from '../../infrastructure/browser/canvasViewportStorage.ts'
 import { useWorkspaceAccountControls, type WorkspaceNavigationAdapter } from '../../../workspace'
+import { getWorkspaceSelectionStore } from '../../../workspace'
 import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
@@ -176,6 +178,17 @@ const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
 const duplicateModifierPressed = ref(false)
 const canvasLibrary = useCanvasLibraryIsland()
+// Workspace id comes from the shared selection store (primed from persisted
+// selection); no workspace query is issued from the Canvas screen.
+const workspaceSelectionStore = getWorkspaceSelectionStore()
+workspaceSelectionStore.getSelectedId()
+const canvasWorkspaceId = workspaceSelectionStore.selectedId
+
+function requireCanvasWorkspaceId(): string {
+  const workspaceId = canvasWorkspaceId.value
+  if (!workspaceId) throw new Error('Library workspace is unavailable.')
+  return workspaceId
+}
 const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
 const { openNodeImagePreview, openImageUrlPreview } = useCanvasImageLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
@@ -189,7 +202,8 @@ const workspace = useCanvasWorkspaceRuntime({
   uploadApi,
   graphEditingBrowser,
   graphInteractionBrowser,
-  materializeLibraryAsset: materializeLibraryAssetForCanvas,
+  materializeLibraryAsset: (assetId) =>
+    materializeLibraryAssetForCanvas(requireCanvasWorkspaceId(), assetId),
   openNodeImagePreview,
   openImageUrlPreview,
   imageWorkflowUi: imageToolUi.imageWorkflowUi,

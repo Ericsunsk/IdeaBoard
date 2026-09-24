@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -15,123 +15,55 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	mediaerrors "ideaboard/api/internal/media/errors"
 	"ideaboard/api/internal/media/ingestion"
-	"ideaboard/api/internal/media/reclamation"
-	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskmedia "ideaboard/api/internal/tasking/ports/media"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func (r *MediaAssetRegistry) Begin(ctx context.Context, request ingestion.Request) (ingestion.Handle, error) {
-	if r == nil || r.db == nil || r.q == nil || request.OwnerUserID <= 0 || request.Origin == nil {
-		return ingestion.Handle{}, fmt.Errorf("invalid media ingestion request")
-	}
-	switch facts := request.Origin.(type) {
-	case ingestion.BoardUploadFacts:
-		return r.beginBoardUpload(ctx, request, facts)
-	case ingestion.GenerationPreparationFacts:
-		return r.beginGenerationPreparation(ctx, request, facts)
-	case ingestion.TaskResultFacts:
-		return r.beginTaskResult(ctx, request, facts)
-	case ingestion.LibraryMaterializationFacts:
-		return r.beginLibraryMaterialization(ctx, request, facts)
-	default:
-		return ingestion.Handle{}, fmt.Errorf("unsupported media ingestion origin %q", request.Origin.IngestionOrigin())
-	}
+// errLegacyMediaAssetsRemoved is the #817 (Phase 3b-08) fail-closed stand-in
+// for the deleted legacy user-scoped media_assets postgres adapter.
+//
+// All user-scoped media_asset sqlc queries (MarkMediaAssetReady,
+// MarkReadyMediaAssetFailed, MarkMediaAssetFailed,
+// GetReadyLibraryMaterializedMediaAsset, BeginLibraryMaterializedMediaAsset,
+// UpsertLibraryAssetMediaLink, CreateBoardUploadMediaAsset,
+// GetMediaAssetByStorageLocator, BeginTaskResultMediaAsset,
+// CreatePreparedMediaAsset, UpsertMediaRef, FindPreparedGenerationMedia,
+// FindIngestingPreparedGenerationMedia, ListReadyOwnedMediaAssetIDsByStorageKey,
+// FindReadyOwnedMediaAssetIDByURL, GetReadyMediaAssetStorageLocationByID,
+// FindMediaAssetStorageLocationByURL, ListMediaAssetStorageLocationsByKey,
+// GetMediaAssetByAssetIDForOwner, GetMediaAssetByIDForOwner,
+// FindReadyOwnedMediaAssetByChecksum, SoftDeleteMediaAssetByID,
+// CreateBoardUploadMediaAsset, Begin*MediaAsset, etc.) were removed with the
+// media_assets table rename to the workspace-scoped model
+// (media_assets with public_id asset_%), so every ingestion/read method below
+// that depended on them fails closed. Derivative-tier methods that still map
+// to the surviving media_derivatives queries (GetMediaDerivativeByAssetTier,
+// GetProcessingInputManifestObject,
+// GetReadyMediaDerivativeStorageLocationByAssetID, ListMediaDerivativesByAsset,
+// UpsertMediaDerivative, UpsertMediaAssetSource) stay live. The
+// workspace-scoped media asset store lands in Phase 4; until then legacy
+// upload/ingestion paths (/api/user boards uploads, preparation,
+// library materialization) fail closed through these stubs.
+
+var errLegacyMediaAssetsRemoved = errors.New("legacy media asset store removed (#817 Phase 3b-08): workspace-scoped store lands in Phase 4")
+
+func (r *MediaAssetRegistry) Begin(_ context.Context, _ ingestion.Request) (ingestion.Handle, error) {
+	return ingestion.Handle{}, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) Complete(ctx context.Context, handle ingestion.Handle, completion ingestion.Completion) error {
-	if r == nil || r.db == nil || handle.AssetID <= 0 || handle.OwnerUserID <= 0 || handle.Origin == nil {
-		return fmt.Errorf("invalid media asset completion")
-	}
-	if strings.TrimSpace(completion.StorageKey) == "" || strings.TrimSpace(completion.StorageKey) != strings.TrimSpace(handle.StorageKey) {
-		return fmt.Errorf("media asset completion storage key does not match ingestion handle")
-	}
-	if r.integrityVerifier == nil {
-		return fmt.Errorf("media asset integrity verifier is not configured")
-	}
-	if err := r.integrityVerifier.Verify(ctx, handle.StorageProfile, completion.StorageKey, completion.ChecksumSHA256, completion.MIMEType, completion.SizeBytes); err != nil {
-		return fmt.Errorf("verify completed media asset: %w", err)
-	}
-	metadata, err := ingestionMetadata(handle.Origin, completion)
-	if err != nil {
-		return err
-	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin media asset completion: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-	q := dbsqlc.New(tx)
-	if _, err := q.MarkMediaAssetReady(ctx, dbsqlc.MarkMediaAssetReadyParams{
-		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, StorageKey: completion.StorageKey,
-		Url: completion.URL, SourceUrl: completion.SourceURL,
-		MimeType: completion.MIMEType, Width: int32(completion.Width), Height: int32(completion.Height), SizeBytes: completion.SizeBytes,
-		ChecksumSha256: completion.ChecksumSHA256, Metadata: metadata,
-	}); err != nil {
-		return fmt.Errorf("complete media asset: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit media asset completion: %w", err)
-	}
-	committed = true
-	// Display tiers resolve on demand through imgproxy. Only the
-	// provider-neutral processing-input derivative materializes here,
-	// synchronously, so providers never wait on a queue. The asset row is
-	// already committed at this point; if materialization fails, explicitly
-	// transition the asset to failed before returning so callers can safely
-	// delete the uploaded object without leaving a ready-but-unusable row.
-	if r.processingInputMaterializer != nil {
-		if err := r.processingInputMaterializer(ctx, handle.AssetID, handle.OwnerUserID); err != nil {
-			failErr := r.markReadyAssetFailed(context.WithoutCancel(ctx), handle, err)
-			if failErr != nil {
-				return fmt.Errorf("materialize processing-input: %w; mark asset failed: %w", err, failErr)
-			}
-			return fmt.Errorf("materialize processing-input: %w", err)
-		}
-	}
-	return nil
+func (r *MediaAssetRegistry) Complete(_ context.Context, _ ingestion.Handle, _ ingestion.Completion) error {
+	return errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) markReadyAssetFailed(ctx context.Context, handle ingestion.Handle, cause error) error {
-	if r == nil || r.q == nil || handle.OwnerUserID <= 0 || handle.AssetID <= 0 {
-		return fmt.Errorf("invalid media asset failure")
-	}
-	message := "media asset ingestion failed"
-	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
-		message = cause.Error()
-	}
-	_, err := r.q.MarkReadyMediaAssetFailed(ctx, dbsqlc.MarkReadyMediaAssetFailedParams{
-		ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, ErrorMessage: message,
-	})
-	if database.IsNotFound(err) {
-		return nil
-	}
-	return err
+func (r *MediaAssetRegistry) markReadyAssetFailed(_ context.Context, _ ingestion.Handle, _ error) error {
+	return errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) Fail(ctx context.Context, handle ingestion.Handle, cause error) error {
-	if r == nil || r.q == nil || handle.OwnerUserID <= 0 || handle.AssetID <= 0 {
-		return fmt.Errorf("invalid media asset failure")
-	}
-	message := "media asset ingestion failed"
-	if cause != nil && strings.TrimSpace(cause.Error()) != "" {
-		message = cause.Error()
-	}
-	_, err := r.q.MarkMediaAssetFailed(ctx, dbsqlc.MarkMediaAssetFailedParams{ID: handle.AssetID, OwnerUserID: handle.OwnerUserID, ErrorMessage: message})
-	if database.IsNotFound(err) {
-		return nil
-	}
-	return err
+func (r *MediaAssetRegistry) Fail(_ context.Context, _ ingestion.Handle, _ error) error {
+	return errLegacyMediaAssetsRemoved
 }
 
 type MediaAssetRegistry struct {
@@ -154,63 +86,8 @@ type PreparedGenerationMedia struct {
 	StorageKey     string
 }
 
-func (r *MediaAssetRegistry) FindReadyLibraryMaterializedMedia(ctx context.Context, ownerUserID, libraryAssetID int64) (dbsqlc.MediaAsset, bool, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 || libraryAssetID <= 0 {
-		return dbsqlc.MediaAsset{}, false, fmt.Errorf("invalid library materialized media lookup")
-	}
-	asset, err := r.q.GetReadyLibraryMaterializedMediaAsset(ctx, dbsqlc.GetReadyLibraryMaterializedMediaAssetParams{
-		OwnerUserID: ownerUserID, LibraryAssetID: libraryAssetID,
-	})
-	if database.IsNotFound(err) {
-		return dbsqlc.MediaAsset{}, false, nil
-	}
-	if err != nil {
-		return dbsqlc.MediaAsset{}, false, fmt.Errorf("lookup materialized library media: %w", err)
-	}
-	return asset, true, nil
-}
-
-func (r *MediaAssetRegistry) beginLibraryMaterialization(ctx context.Context, request ingestion.Request, facts ingestion.LibraryMaterializationFacts) (ingestion.Handle, error) {
-	if facts.LibraryAssetID <= 0 || strings.TrimSpace(request.StorageProfile) == "" || strings.TrimSpace(request.StorageKey) == "" {
-		return ingestion.Handle{}, fmt.Errorf("invalid library materialized media")
-	}
-	assetID, err := newMediaAssetID()
-	if err != nil {
-		return ingestion.Handle{}, err
-	}
-	metadata, err := ingestionMetadata(request.Origin, ingestion.Completion{})
-	if err != nil {
-		return ingestion.Handle{}, err
-	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("begin library materialized media transaction: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-	q := dbsqlc.New(tx)
-	assetIDValue, err := q.BeginLibraryMaterializedMediaAsset(ctx, dbsqlc.BeginLibraryMaterializedMediaAssetParams{
-		AssetID: assetID, OwnerUserID: request.OwnerUserID, StorageProfileID: request.StorageProfile, StorageKey: request.StorageKey,
-		Url: request.URL, SourceUrl: request.SourceURL, Metadata: metadata,
-		ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
-	})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("begin library materialized media: %w", err)
-	}
-	if err := q.UpsertLibraryAssetMediaLink(ctx, dbsqlc.UpsertLibraryAssetMediaLinkParams{
-		LibraryAssetID: facts.LibraryAssetID, OwnerUserID: request.OwnerUserID, MediaAssetID: assetIDValue,
-	}); err != nil {
-		return ingestion.Handle{}, fmt.Errorf("link library materialized media: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return ingestion.Handle{}, fmt.Errorf("commit library materialized media transaction: %w", err)
-	}
-	committed = true
-	return ingestionHandle(assetIDValue, assetID, false, request), nil
+func (r *MediaAssetRegistry) FindReadyLibraryMaterializedMedia(_ context.Context, _, _ int64) (dbsqlc.MediaAsset, bool, error) {
+	return dbsqlc.MediaAsset{}, false, errLegacyMediaAssetsRemoved
 }
 
 func NewMediaAssetRegistry(db *pgxpool.Pool) *MediaAssetRegistry {
@@ -317,60 +194,29 @@ func (r *MediaAssetRegistry) resolveManifestRef(ctx context.Context, userID int6
 	}, nil
 }
 
-func (r *MediaAssetRegistry) GetByAssetID(ctx context.Context, ownerUserID int64, assetID string) (dbsqlc.MediaAsset, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 || strings.TrimSpace(assetID) == "" {
-		return dbsqlc.MediaAsset{}, fmt.Errorf("invalid media asset lookup")
-	}
-	return r.q.GetMediaAssetByAssetIDForOwner(ctx, dbsqlc.GetMediaAssetByAssetIDForOwnerParams{
-		AssetID: assetID, OwnerUserID: ownerUserID,
-	})
+func (r *MediaAssetRegistry) GetByAssetID(_ context.Context, _ int64, _ string) (dbsqlc.MediaAsset, error) {
+	return dbsqlc.MediaAsset{}, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) GetByID(ctx context.Context, ownerUserID, assetID int64) (dbsqlc.MediaAsset, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
-		return dbsqlc.MediaAsset{}, fmt.Errorf("invalid media asset lookup")
-	}
-	return r.q.GetMediaAssetByIDForOwner(ctx, dbsqlc.GetMediaAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
+func (r *MediaAssetRegistry) GetByID(_ context.Context, _, _ int64) (dbsqlc.MediaAsset, error) {
+	return dbsqlc.MediaAsset{}, errLegacyMediaAssetsRemoved
 }
 
 // AuthorizeMediaAsset verifies that a ready, non-deleted asset belongs to the owner.
 // The method intentionally exposes no storage details to task intake.
-func (r *MediaAssetRegistry) AuthorizeMediaAsset(ctx context.Context, ownerUserID, assetID int64) error {
-	asset, err := r.GetByID(ctx, ownerUserID, assetID)
-	if err != nil {
-		return err
-	}
-	if strings.ToLower(strings.TrimSpace(asset.Status)) != "ready" {
-		return fmt.Errorf("媒体资产尚未就绪")
-	}
-	return nil
+func (r *MediaAssetRegistry) AuthorizeMediaAsset(_ context.Context, _, _ int64) error {
+	return errLegacyMediaAssetsRemoved
 }
 
 // FindReadyOwnedMediaAssetByChecksum returns an existing ready asset for the
 // same owner, storage profile, and content digest. Restricting the profile
 // keeps the returned URL valid when operators switch storage backends.
-func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetByChecksum(ctx context.Context, ownerUserID int64, storageProfileID, checksum string) (dbsqlc.MediaAsset, bool, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 || strings.TrimSpace(storageProfileID) == "" || strings.TrimSpace(checksum) == "" {
-		return dbsqlc.MediaAsset{}, false, fmt.Errorf("invalid media checksum lookup")
-	}
-	asset, err := r.q.FindReadyOwnedMediaAssetByChecksum(ctx, dbsqlc.FindReadyOwnedMediaAssetByChecksumParams{
-		OwnerUserID: ownerUserID, StorageProfileID: strings.TrimSpace(storageProfileID), ChecksumSha256: strings.TrimSpace(checksum),
-	})
-	if database.IsNotFound(err) {
-		return dbsqlc.MediaAsset{}, false, nil
-	}
-	if err != nil {
-		return dbsqlc.MediaAsset{}, false, fmt.Errorf("find media asset by checksum: %w", err)
-	}
-	return asset, true, nil
+func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetByChecksum(_ context.Context, _ int64, _, _ string) (dbsqlc.MediaAsset, bool, error) {
+	return dbsqlc.MediaAsset{}, false, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetIDByChecksum(ctx context.Context, ownerUserID int64, storageProfileID, checksum string) (int64, bool, error) {
-	asset, found, err := r.FindReadyOwnedMediaAssetByChecksum(ctx, ownerUserID, storageProfileID, checksum)
-	if err != nil || !found {
-		return 0, found, err
-	}
-	return asset.ID, true, nil
+func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetIDByChecksum(_ context.Context, _ int64, _, _ string) (int64, bool, error) {
+	return 0, false, errLegacyMediaAssetsRemoved
 }
 
 // RetireMissingOwnedMediaAsset soft-deletes a ready asset whose backing object
@@ -378,14 +224,8 @@ func (r *MediaAssetRegistry) FindReadyOwnedMediaAssetIDByChecksum(ctx context.Co
 // checksum dedupe slot so the next upload of identical bytes persists fresh
 // instead of re-serving an asset that can never materialize derivatives.
 // Missing rows are a no-op success so concurrent healers converge.
-func (r *MediaAssetRegistry) RetireMissingOwnedMediaAsset(ctx context.Context, ownerUserID, assetID int64) error {
-	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
-		return fmt.Errorf("invalid media asset retirement")
-	}
-	_, err := r.q.SoftDeleteMediaAssetByID(ctx, dbsqlc.SoftDeleteMediaAssetByIDParams{
-		ID: assetID, OwnerUserID: ownerUserID,
-	})
-	return err
+func (r *MediaAssetRegistry) RetireMissingOwnedMediaAsset(_ context.Context, _, _ int64) error {
+	return errLegacyMediaAssetsRemoved
 }
 
 func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {
@@ -395,140 +235,6 @@ func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, a
 	return r.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
 		MediaAssetID: assetID, OwnerUserID: ownerUserID,
 	})
-}
-
-func (r *MediaAssetRegistry) beginBoardUpload(ctx context.Context, request ingestion.Request, facts ingestion.BoardUploadFacts) (ingestion.Handle, error) {
-	boardID := strings.TrimSpace(facts.BoardID)
-	storageProfileID := strings.TrimSpace(request.StorageProfile)
-	storageKey := strings.TrimSpace(request.StorageKey)
-	url := strings.TrimSpace(request.URL)
-	if boardID == "" || storageProfileID == "" || storageKey == "" || url == "" {
-		return ingestion.Handle{}, fmt.Errorf("incomplete board upload media asset")
-	}
-	assetID, err := newMediaAssetID()
-	if err != nil {
-		return ingestion.Handle{}, err
-	}
-	metadata, err := ingestionMetadata(request.Origin, ingestion.Completion{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("encode board upload media metadata: %w", err)
-	}
-	registeredAt := r.now()
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("begin board upload media registration: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-	q := dbsqlc.New(tx)
-	id, err := q.CreateBoardUploadMediaAsset(ctx, dbsqlc.CreateBoardUploadMediaAssetParams{
-		AssetID:          assetID,
-		OwnerUserID:      request.OwnerUserID,
-		StorageProfileID: storageProfileID,
-		StorageKey:       storageKey,
-		Url:              url,
-		MimeType:         "",
-		Width:            0,
-		Height:           0,
-		SizeBytes:        0,
-		ChecksumSha256:   "",
-		Status:           "uploading",
-		Metadata:         metadata,
-		ReclaimAfter:     pgtype.Timestamptz{Time: registeredAt.Add(reclamation.GracePeriod), Valid: true},
-	})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("register board upload media asset: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return ingestion.Handle{}, fmt.Errorf("commit board upload media registration: %w", err)
-	}
-	committed = true
-	return ingestionHandle(id, assetID, false, request), nil
-}
-
-func (r *MediaAssetRegistry) beginTaskResult(ctx context.Context, request ingestion.Request, facts ingestion.TaskResultFacts) (ingestion.Handle, error) {
-	if facts.ResultIndex < 0 {
-		return ingestion.Handle{}, fmt.Errorf("invalid task result ingestion")
-	}
-	taskID := strings.TrimSpace(facts.TaskID)
-	profileID := strings.TrimSpace(request.StorageProfile)
-	storageKey := strings.TrimSpace(request.StorageKey)
-	if taskID == "" || profileID == "" || storageKey == "" {
-		return ingestion.Handle{}, fmt.Errorf("incomplete task result ingestion")
-	}
-	assetID, err := newMediaAssetID()
-	if err != nil {
-		return ingestion.Handle{}, err
-	}
-	metadata, err := ingestionMetadata(request.Origin, ingestion.Completion{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("encode task result ingestion metadata: %w", err)
-	}
-	existingReady := false
-	if existing, lookupErr := r.q.GetMediaAssetByStorageLocator(ctx, dbsqlc.GetMediaAssetByStorageLocatorParams{StorageProfileID: profileID, StorageKey: storageKey}); lookupErr == nil {
-		existingReady = existing.Status == "ready"
-	} else if !database.IsNotFound(lookupErr) {
-		return ingestion.Handle{}, fmt.Errorf("check task result ingestion state: %w", lookupErr)
-	}
-	id, err := r.q.BeginTaskResultMediaAsset(ctx, dbsqlc.BeginTaskResultMediaAssetParams{
-		AssetID: assetID, OwnerUserID: request.OwnerUserID, StorageProfileID: profileID,
-		StorageKey: storageKey, Url: strings.TrimSpace(request.URL), SourceUrl: strings.TrimSpace(request.SourceURL),
-		Metadata: metadata, ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
-	})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("begin task result ingestion: %w", err)
-	}
-	return ingestionHandle(id, assetID, existingReady, request), nil
-}
-
-func (r *MediaAssetRegistry) beginGenerationPreparation(ctx context.Context, request ingestion.Request, facts ingestion.GenerationPreparationFacts) (ingestion.Handle, error) {
-	if facts.InputIndex < 0 {
-		return ingestion.Handle{}, fmt.Errorf("invalid prepared generation media")
-	}
-	if strings.TrimSpace(request.StorageProfile) == "" || strings.TrimSpace(request.StorageKey) == "" || strings.TrimSpace(request.URL) == "" || strings.TrimSpace(facts.RefID) == "" || strings.TrimSpace(facts.Role) == "" {
-		return ingestion.Handle{}, fmt.Errorf("incomplete prepared generation media")
-	}
-	assetID, err := newMediaAssetID()
-	if err != nil {
-		return ingestion.Handle{}, err
-	}
-	metadata, err := ingestionMetadata(request.Origin, ingestion.Completion{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("encode prepared media metadata: %w", err)
-	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("begin prepared media registration: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-	q := dbsqlc.New(tx)
-	asset, err := q.CreatePreparedMediaAsset(ctx, dbsqlc.CreatePreparedMediaAssetParams{
-		AssetID: assetID, OwnerUserID: request.OwnerUserID, StorageProfileID: request.StorageProfile,
-		StorageKey: request.StorageKey, Url: request.URL, SourceUrl: request.SourceURL, MimeType: "",
-		Width: 0, Height: 0, SizeBytes: 0, Metadata: metadata,
-		ChecksumSha256: "", Status: "uploading",
-		ReclaimAfter: pgtype.Timestamptz{Time: r.now().Add(reclamation.GracePeriod), Valid: true},
-	})
-	if err != nil {
-		return ingestion.Handle{}, fmt.Errorf("register prepared media asset: %w", err)
-	}
-	if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{MediaAssetID: asset, OwnerUserID: request.OwnerUserID, RefType: "prompt_reference", RefID: facts.RefID, TaskID: "", Role: facts.Role, InputIndex: int32(facts.InputIndex), Metadata: metadata}); err != nil {
-		return ingestion.Handle{}, fmt.Errorf("register prepared media ref: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return ingestion.Handle{}, fmt.Errorf("commit prepared media registration: %w", err)
-	}
-	committed = true
-	return ingestionHandle(asset, assetID, false, request), nil
 }
 
 func ingestionMetadata(origin ingestion.OriginFacts, completion ingestion.Completion) ([]byte, error) {
@@ -559,127 +265,20 @@ func ingestionMetadata(origin ingestion.OriginFacts, completion ingestion.Comple
 	}
 }
 
-func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ownerUserID int64, refID, role string, inputIndex int) (PreparedGenerationMedia, bool, error) {
-	if r == nil || r.q == nil {
-		return PreparedGenerationMedia{}, false, fmt.Errorf("media asset registry is unavailable")
-	}
-	row, err := r.q.FindPreparedGenerationMedia(ctx, dbsqlc.FindPreparedGenerationMediaParams{OwnerUserID: ownerUserID, RefID: refID, Role: role, InputIndex: int32(inputIndex)})
-	if err != nil {
-		if database.IsNotFound(err) {
-			return PreparedGenerationMedia{}, false, nil
-		}
-		return PreparedGenerationMedia{}, false, err
-	}
-	return PreparedGenerationMedia{AssetID: row.ID, StorageProfile: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+func (r *MediaAssetRegistry) FindPreparedGenerationMedia(_ context.Context, _ int64, _, _ string, _ int) (PreparedGenerationMedia, bool, error) {
+	return PreparedGenerationMedia{}, false, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) FindIngestingPreparedGenerationMedia(ctx context.Context, ownerUserID int64, refID, role string, inputIndex int) (PreparedGenerationMedia, bool, error) {
-	if r == nil || r.q == nil {
-		return PreparedGenerationMedia{}, false, fmt.Errorf("media asset registry is unavailable")
-	}
-	row, err := r.q.FindIngestingPreparedGenerationMedia(ctx, dbsqlc.FindIngestingPreparedGenerationMediaParams{OwnerUserID: ownerUserID, RefID: refID, Role: role, InputIndex: int32(inputIndex)})
-	if database.IsNotFound(err) {
-		return PreparedGenerationMedia{}, false, nil
-	}
-	if err != nil {
-		return PreparedGenerationMedia{}, false, err
-	}
-	return PreparedGenerationMedia{AssetID: row.ID, StorageProfile: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+func (r *MediaAssetRegistry) FindIngestingPreparedGenerationMedia(_ context.Context, _ int64, _, _ string, _ int) (PreparedGenerationMedia, bool, error) {
+	return PreparedGenerationMedia{}, false, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ownerUserID int64, source string) (int64, bool, error) {
-	if r == nil || r.q == nil || ownerUserID <= 0 {
-		return 0, false, fmt.Errorf("media asset registry is unavailable")
-	}
-	trimmed := strings.TrimSpace(source)
-	if trimmed == "" {
-		return 0, false, nil
-	}
-	if strings.HasPrefix(trimmed, "/uploads/") {
-		resource, parseErr := domain.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
-		if parseErr != nil {
-			//nolint:nilerr // unparsable source means not reusable, not a failure
-			return 0, false, nil
-		}
-		ids, err := r.q.ListReadyOwnedMediaAssetIDsByStorageKey(ctx, dbsqlc.ListReadyOwnedMediaAssetIDsByStorageKeyParams{
-			OwnerUserID: ownerUserID,
-			StorageKey:  resource.ObjectKey,
-		})
-		if err != nil {
-			return 0, false, fmt.Errorf("find reusable media asset by storage key: %w", err)
-		}
-		switch len(ids) {
-		case 0:
-			return 0, false, nil
-		case 1:
-			return ids[0], true, nil
-		default:
-			return 0, false, fmt.Errorf("reusable media asset storage key is ambiguous")
-		}
-	}
-	parsed, parseErr := url.Parse(trimmed)
-	if parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || !strings.HasPrefix(parsed.Path, "/uploads/") {
-		//nolint:nilerr // non-upload URL means not reusable, not a failure
-		return 0, false, nil
-	}
-	assetID, err := r.q.FindReadyOwnedMediaAssetIDByURL(ctx, dbsqlc.FindReadyOwnedMediaAssetIDByURLParams{
-		OwnerUserID: ownerUserID,
-		Url:         trimmed,
-	})
-	if database.IsNotFound(err) {
-		return 0, false, nil
-	}
-	if err != nil {
-		return 0, false, fmt.Errorf("find reusable media asset by URL: %w", err)
-	}
-	return assetID, true, nil
+func (r *MediaAssetRegistry) FindReusableGenerationMedia(_ context.Context, _ int64, _ string) (int64, bool, error) {
+	return 0, false, errLegacyMediaAssetsRemoved
 }
 
-func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
-	if r == nil || r.q == nil {
-		return ports.StoredUploadLocation{}, false, fmt.Errorf("media asset registry is unavailable")
-	}
-	if lookup.AssetID > 0 {
-		row, err := r.q.GetReadyMediaAssetStorageLocationByID(ctx, lookup.AssetID)
-		if err == nil {
-			return ports.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
-		}
-		if !database.IsNotFound(err) {
-			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by ID: %w", err)
-		}
-		return ports.StoredUploadLocation{}, false, nil
-	}
-	if rawURL := strings.TrimSpace(lookup.URL); rawURL != "" {
-		row, err := r.q.FindMediaAssetStorageLocationByURL(ctx, rawURL)
-		if err == nil {
-			return ports.StoredUploadLocation{
-				StorageProfileID: row.StorageProfileID,
-				StorageKey:       row.StorageKey,
-			}, true, nil
-		}
-		if !database.IsNotFound(err) {
-			return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by URL: %w", err)
-		}
-	}
-
-	storageKey := strings.TrimSpace(lookup.ObjectKey)
-	if storageKey == "" {
-		return ports.StoredUploadLocation{}, false, nil
-	}
-	rows, err := r.q.ListMediaAssetStorageLocationsByKey(ctx, storageKey)
-	if err != nil {
-		return ports.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by storage key: %w", err)
-	}
-	if len(rows) == 0 {
-		return ports.StoredUploadLocation{}, false, nil
-	}
-	if len(rows) > 1 {
-		return ports.StoredUploadLocation{}, false, fmt.Errorf("media asset storage key is ambiguous")
-	}
-	return ports.StoredUploadLocation{
-		StorageProfileID: rows[0].StorageProfileID,
-		StorageKey:       rows[0].StorageKey,
-	}, true, nil
+func (r *MediaAssetRegistry) LocateStoredUpload(_ context.Context, _ ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
+	return ports.StoredUploadLocation{}, false, errLegacyMediaAssetsRemoved
 }
 
 func (r *MediaAssetRegistry) LocateStoredDerivative(ctx context.Context, lookup ports.StoredDerivativeLookup) (ports.StoredUploadLocation, bool, error) {

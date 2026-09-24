@@ -1,4 +1,4 @@
-import type { FeaturePrompt } from '../../../shared/api/generated-query/model'
+import type { FeaturePrompt } from './api'
 import { fetchAdminFeaturePrompts, saveAdminFeaturePrompt } from './api'
 
 export type { FeaturePrompt }

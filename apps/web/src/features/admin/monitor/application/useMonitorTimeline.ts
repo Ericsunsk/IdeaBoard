@@ -13,7 +13,7 @@ import {
 } from '../../../../shared/domain/taskMetricTokens'
 import { timeRangePresets, type TimeRangePresetKey } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
-import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/api/generated-query/model/index'
+import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
 
 type MonitorTimelineOptions = {
   isDemoMode: Ref<boolean>

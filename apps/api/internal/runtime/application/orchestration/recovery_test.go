@@ -6,12 +6,11 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/runtime/application/orchestration"
-	taskstore "ideaboard/api/internal/tasking/infrastructure/postgres"
 )
 
 func TestRecoverRunningTasksAfterStartupConvergesDurablyBeforeCancellingJobs(t *testing.T) {
 	ctx := context.Background()
-	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
+	store := &fakeStartupRecoveryTaskStore{tasks: []orchestration.StartupRecoveredTask{
 		{TaskID: "task-a", RiverJobID: 101},
 		{TaskID: "task-b", RiverJobID: 202},
 	}}
@@ -48,7 +47,7 @@ func TestRecoverRunningTasksAfterStartupReturnsStoreError(t *testing.T) {
 }
 
 func TestRecoverRunningTasksAfterStartupOnlyCancelsDurablyConvergedJobs(t *testing.T) {
-	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
+	store := &fakeStartupRecoveryTaskStore{tasks: []orchestration.StartupRecoveredTask{
 		{TaskID: "durable", RiverJobID: 301},
 		{TaskID: "not-durable", RiverJobID: 302},
 	}}
@@ -71,7 +70,7 @@ func TestRecoverRunningTasksAfterStartupOnlyCancelsDurablyConvergedJobs(t *testi
 }
 
 func TestRecoverRunningTasksAfterStartupDoesNotFailOnBestEffortCleanup(t *testing.T) {
-	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
+	store := &fakeStartupRecoveryTaskStore{tasks: []orchestration.StartupRecoveredTask{
 		{TaskID: "durable", RiverJobID: 401},
 	}}
 	finalFailures := &recordingStartupRecoveryFinalFailures{}
@@ -90,7 +89,7 @@ func TestRecoverRunningTasksAfterStartupDoesNotFailOnBestEffortCleanup(t *testin
 	}
 }
 
-func assertRecoveryCalls(t *testing.T, calls []finalFailureCall, tasks []taskstore.StartupRecoveredTask) {
+func assertRecoveryCalls(t *testing.T, calls []finalFailureCall, tasks []orchestration.StartupRecoveredTask) {
 	t.Helper()
 	if len(calls) != len(tasks) {
 		t.Fatalf("final failure calls=%d, want %d", len(calls), len(tasks))
@@ -115,17 +114,17 @@ func assertCancelledRiverJobs(t *testing.T, got, want []int64) {
 }
 
 type fakeStartupRecoveryTaskStore struct {
-	tasks []taskstore.StartupRecoveredTask
+	tasks []orchestration.StartupRecoveredTask
 	err   error
 	calls int
 }
 
-func (f *fakeStartupRecoveryTaskStore) ListRunningTasksForStartupRecovery(context.Context) ([]taskstore.StartupRecoveredTask, error) {
+func (f *fakeStartupRecoveryTaskStore) ListRunningTasksForStartupRecovery(context.Context) ([]orchestration.StartupRecoveredTask, error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err
 	}
-	return append([]taskstore.StartupRecoveredTask(nil), f.tasks...), nil
+	return append([]orchestration.StartupRecoveredTask(nil), f.tasks...), nil
 }
 
 type finalFailureCall struct {

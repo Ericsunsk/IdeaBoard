@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
 import { createLibraryFolderFacts } from './folderFacts'
+import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from './workspace'
+
+const WORKSPACE_ID = 'ws_test123'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string> },
   replace: vi.fn(async () => undefined),
-  getLibraryFolders: vi.fn(),
-  getLibraryAssets: vi.fn(),
+  listFolders: vi.fn(),
+  listAssets: vi.fn(),
   createFolder: vi.fn(),
   renameFolder: vi.fn(),
   removeFolder: vi.fn(),
   removeAsset: vi.fn(),
+  moveAsset: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }))
@@ -24,16 +28,56 @@ vi.mock('../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
 }))
 
-vi.mock('./resource', () => ({
-  createFolder: mocks.createFolder,
-  getLibraryAssets: mocks.getLibraryAssets,
-  getLibraryFolders: mocks.getLibraryFolders,
-  libraryAssetKey: (provider: string, sourceID: string) => `${provider}:${sourceID}`,
-  moveAsset: vi.fn(),
-  removeAsset: mocks.removeAsset,
-  removeFolder: mocks.removeFolder,
-  renameFolder: mocks.renameFolder,
-}))
+vi.mock('./workspace', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./workspace')>()
+  return {
+    ...actual,
+    listAllWorkspaceLibraryFolders: mocks.listFolders,
+    workspaceLibraryApi: {
+      listFolders: vi.fn(),
+      createFolder: mocks.createFolder,
+      renameFolder: mocks.renameFolder,
+      deleteFolder: mocks.removeFolder,
+      listAssets: mocks.listAssets,
+      saveAsset: vi.fn(),
+      moveAsset: mocks.moveAsset,
+      deleteAsset: mocks.removeAsset,
+      resolveAssets: vi.fn(),
+      createMaterialization: vi.fn(),
+      getMaterialization: vi.fn(),
+    },
+  }
+})
+
+function folder(id: string, name: string): WorkspaceLibraryFolder {
+  return {
+    id,
+    workspaceId: WORKSPACE_ID,
+    name,
+    createdAt: '2026-09-24T00:00:00Z',
+    updatedAt: '2026-09-24T00:00:00Z',
+  }
+}
+
+function asset(overrides: Partial<WorkspaceLibraryAsset> = {}): WorkspaceLibraryAsset {
+  return {
+    id: 'liba_asset0009',
+    workspaceId: WORKSPACE_ID,
+    folderId: 'libf_folder0003',
+    provider: 'pexels',
+    sourceId: 'deleted-image',
+    sourceUrl: 'https://example.com/source',
+    previewUrl: 'https://example.com/preview',
+    originalUrl: 'https://example.com/original',
+    title: 'Deleted image',
+    author: 'IdeaBoard',
+    width: 100,
+    height: 100,
+    createdAt: '2026-09-24T00:00:00Z',
+    updatedAt: '2026-09-24T00:00:00Z',
+    ...overrides,
+  }
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -47,76 +91,74 @@ describe('useLibraryWorkspace', () => {
   beforeEach(() => {
     mocks.route.query = {}
     vi.clearAllMocks()
-    mocks.getLibraryFolders.mockResolvedValue([])
+    mocks.listFolders.mockResolvedValue([])
   })
 
   it('ignores an older Folder response after the user changes selection', async () => {
     const allPage = deferred<{
-      items: Array<{ id: number }>
+      items: Array<{ id: string }>
       nextCursor: string
       hasMore: boolean
     }>()
-    const quickSavesPage = deferred<{
-      items: Array<{ id: number }>
+    const folderPage = deferred<{
+      items: Array<{ id: string }>
       nextCursor: string
       hasMore: boolean
     }>()
-    mocks.getLibraryAssets.mockImplementation(
-      ({ folder_id }: { folder_id: number | 'all' | 'quick-saves' }) =>
-        folder_id === 'quick-saves' ? quickSavesPage.promise : allPage.promise,
+    mocks.listAssets.mockImplementation((workspaceId: string, options: { folderId?: string }) =>
+      options.folderId ? folderPage.promise : allPage.promise,
     )
 
-    const workspace = useLibraryWorkspace()
-    await vi.waitFor(() => expect(mocks.getLibraryAssets).toHaveBeenCalledOnce())
-    workspace.selectFolder('quick-saves')
-    await vi.waitFor(() => expect(mocks.getLibraryAssets).toHaveBeenCalledTimes(2))
+    const workspace = useLibraryWorkspace({ workspaceId: WORKSPACE_ID })
+    await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledOnce())
+    workspace.selectFolder('libf_folder0002')
+    await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledTimes(2))
 
-    quickSavesPage.resolve({ items: [{ id: 2 }], nextCursor: '', hasMore: false })
-    await vi.waitFor(() => expect(workspace.assets.value).toEqual([{ id: 2 }]))
-    allPage.resolve({ items: [{ id: 1 }], nextCursor: '', hasMore: false })
+    folderPage.resolve({ items: [{ id: 'liba_asset0002' }], nextCursor: '', hasMore: false })
+    await vi.waitFor(() =>
+      expect(workspace.assets.value).toEqual([{ id: 'liba_asset0002' }]),
+    )
+    allPage.resolve({ items: [{ id: 'liba_asset0001' }], nextCursor: '', hasMore: false })
     await allPage.promise
 
-    expect(workspace.selectedFolder.value).toBe('quick-saves')
-    expect(workspace.assets.value).toEqual([{ id: 2 }])
+    expect(workspace.selectedFolder.value).toBe('libf_folder0002')
+    expect(workspace.assets.value).toEqual([{ id: 'liba_asset0002' }])
   })
 
   it('publishes Folder create, rename, and delete through one shared snapshot', async () => {
-    const original = {
-      id: 1,
-      query_key: '1',
-      name: 'Original',
-      is_system: false,
-      is_default: false,
-      is_virtual: false,
-      asset_count: 0,
-    }
+    const original = folder('libf_folder0001', 'Original')
     const renamed = { ...original, name: 'Renamed' }
-    const facts = createLibraryFolderFacts()
-    mocks.getLibraryFolders
+    const fetchFolders = vi
+      .fn<() => Promise<WorkspaceLibraryFolder[]>>()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([original])
       .mockResolvedValueOnce([renamed])
       .mockResolvedValueOnce([])
+    const facts = createLibraryFolderFacts(fetchFolders)
     mocks.createFolder.mockResolvedValue(original)
     mocks.renameFolder.mockResolvedValue(renamed)
     mocks.removeFolder.mockResolvedValue(undefined)
-    mocks.getLibraryAssets.mockResolvedValue({ items: [], nextCursor: '', hasMore: false })
-    const workspace = useLibraryWorkspace({ autoLoad: false, folderFacts: facts })
+    mocks.listAssets.mockResolvedValue({ items: [], nextCursor: '', hasMore: false })
+    const workspace = useLibraryWorkspace({
+      workspaceId: WORKSPACE_ID,
+      autoLoad: false,
+      folderFacts: facts,
+    })
 
     await workspace.loadFolders()
     expect(facts.folders.value).toEqual([])
 
     await workspace.createNewFolder('Original')
     expect(facts.folders.value).toEqual([original])
-    expect(mocks.getLibraryAssets).toHaveBeenCalledOnce()
+    expect(mocks.listAssets).toHaveBeenCalledOnce()
 
-    await workspace.renameFolder('1', 'Renamed')
+    await workspace.renameFolder('libf_folder0001', 'Renamed')
     expect(facts.folders.value).toEqual([renamed])
-    expect(mocks.getLibraryAssets).toHaveBeenCalledOnce()
+    expect(mocks.listAssets).toHaveBeenCalledOnce()
 
-    await workspace.deleteFolder('1')
+    await workspace.deleteFolder('libf_folder0001')
     expect(facts.folders.value).toEqual([])
-    expect(mocks.getLibraryAssets).toHaveBeenCalledTimes(2)
+    expect(mocks.listAssets).toHaveBeenCalledTimes(2)
   })
 
   it('publishes the removed asset identity for the Search feed coordination', async () => {
@@ -130,26 +172,12 @@ describe('useLibraryWorkspace', () => {
     }
     mocks.removeAsset.mockResolvedValue(undefined)
     const workspace = useLibraryWorkspace({
+      workspaceId: WORKSPACE_ID,
       autoLoad: false,
       mutationPublisher: publisher,
     })
-    const asset = {
-      id: 9,
-      folder_id: 3,
-      provider: 'pexels' as const,
-      source_id: 'deleted-image',
-      source_url: 'https://example.com/source',
-      preview_url: 'https://example.com/preview',
-      original_url: 'https://example.com/original',
-      title: 'Deleted image',
-      author: 'IdeaBoard',
-      width: 100,
-      height: 100,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    }
 
-    await workspace.requestRemove(asset)
+    await workspace.requestRemove(asset())
 
     expect(outcomes).toEqual([
       {
@@ -157,7 +185,7 @@ describe('useLibraryWorkspace', () => {
         provider: 'pexels',
         sourceID: 'deleted-image',
         assetKey: 'pexels:deleted-image',
-        affectedFolderKeys: ['all', '3'],
+        affectedFolderKeys: ['all', 'libf_folder0003'],
         galleryEffect: 'none',
       },
     ])

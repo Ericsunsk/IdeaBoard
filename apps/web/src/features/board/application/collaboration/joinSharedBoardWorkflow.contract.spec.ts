@@ -109,10 +109,10 @@ function expectJoinRequestBody() {
     '/user/boards/share-tokens/join',
     expect.objectContaining({
       method: 'POST',
-      headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
     }),
   )
   const body = mocks.request.mock.calls[0]?.[1]?.body
-  if (typeof body !== 'string') throw new Error('Missing join request body')
-  return JSON.parse(body) as Record<string, unknown>
+  if (typeof body === 'string') return JSON.parse(body) as Record<string, unknown>
+  if (body && typeof body === 'object') return body as Record<string, unknown>
+  throw new Error('Missing join request body')
 }

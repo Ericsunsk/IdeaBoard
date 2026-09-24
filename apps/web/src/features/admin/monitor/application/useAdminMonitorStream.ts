@@ -1,11 +1,11 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { useDocumentVisibility, useEventSource } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import { getGetAdminMonitorQueryKey } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import type {
-  ApiResponseMonitor,
-  MonitorResponse,
-} from '../../../../shared/api/generated-query/model/index'
+import {
+  getAdminMonitorQueryKey,
+  type ApiResponseMonitor,
+  type MonitorResponse,
+} from '../infrastructure/resource'
 import { requireApiData } from '../../../../shared/api/apiResponse'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
 
@@ -76,7 +76,7 @@ export function useAdminMonitorStream() {
         status.value = 'degraded'
         return
       }
-      queryClient.setQueryData(getGetAdminMonitorQueryKey(), parsed.response)
+      queryClient.setQueryData(getAdminMonitorQueryKey(), parsed.response)
       snapshot.value = parsed.snapshot
       status.value = 'connected'
     } catch {

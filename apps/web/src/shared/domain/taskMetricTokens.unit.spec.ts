@@ -3,9 +3,9 @@ import {
   getTaskMetricByStatus,
   taskMetricDefinitions,
   monitorChartSpecs,
+  ListAdminTasksStatus,
   type TaskMetricStatsSnapshot,
 } from './taskMetricTokens'
-import { ListAdminTasksStatus } from '../api/generated-query/model'
 
 describe('taskMetricTokens', () => {
   it('defines the 6 core observability metrics in canonical lifecycle order', () => {

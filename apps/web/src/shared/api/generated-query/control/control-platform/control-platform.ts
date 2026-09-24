@@ -50,6 +50,10 @@ import type {
   BackfillControlStatistics200,
   BackfillControlStatisticsBody,
   BadRequestResponse,
+  ControlAckEnvelope,
+  ControlMailConfigEnvelope,
+  ControlMailConfigRequest,
+  ControlMailTestRequest,
   ControlObjectEnvelope,
   ControlOutboundPolicyRequest,
   CreateControlStorageProfile200,
@@ -1042,6 +1046,387 @@ export const useUpdateControlOutboundPolicy = <
   TContext
 > => {
   return useMutation(getUpdateControlOutboundPolicyMutationOptions(options), queryClient)
+}
+export const getGetControlMailSettingUrl = () => {
+  return `/platform/settings/mail`
+}
+
+/**
+ * @summary Read the mail setting
+ */
+export const getControlMailSetting = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlMailConfigEnvelope> => {
+  return controlMutator<ControlMailConfigEnvelope>(getGetControlMailSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlMailSettingQueryKey = () => {
+  return ['platform', 'settings', 'mail'] as const
+}
+
+export const getGetControlMailSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlMailSetting>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getControlMailSetting>>, TError, TData>>
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlMailSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlMailSetting>>> = ({ signal }) =>
+    getControlMailSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getControlMailSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetControlMailSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlMailSetting>>
+>
+export type GetControlMailSettingQueryError = UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Read the mail setting
+ */
+
+export function useGetControlMailSetting<
+  TData = Awaited<ReturnType<typeof getControlMailSetting>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlMailSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlMailSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateControlMailSettingUrl = () => {
+  return `/platform/settings/mail`
+}
+
+/**
+ * @summary Update the mail setting (operator reason required)
+ */
+export const updateControlMailSetting = async (
+  controlMailConfigRequest: ControlMailConfigRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlMailConfigEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlMailConfigEnvelope>(getUpdateControlMailSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlMailConfigRequest),
+  })
+}
+
+export const getUpdateControlMailSettingMutationKey = () => ['updateControlMailSetting'] as const
+
+export const getUpdateControlMailSettingMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateControlMailSetting>>,
+    TError,
+    UpdateControlMailSettingMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateControlMailSetting>>,
+  TError,
+  UpdateControlMailSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateControlMailSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateControlMailSetting>>,
+    UpdateControlMailSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateControlMailSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateControlMailSettingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateControlMailSetting>>
+>
+export type UpdateControlMailSettingMutationBody = ControlMailConfigRequest
+export type UpdateControlMailSettingMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type UpdateControlMailSettingMutationVariables = { data: ControlMailConfigRequest }
+
+/**
+ * @summary Update the mail setting (operator reason required)
+ */
+export const useUpdateControlMailSetting = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateControlMailSetting>>,
+      TError,
+      UpdateControlMailSettingMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateControlMailSetting>>,
+  TError,
+  UpdateControlMailSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateControlMailSettingMutationOptions(options), queryClient)
+}
+export const getDeleteControlMailSettingUrl = () => {
+  return `/platform/settings/mail`
+}
+
+/**
+ * @summary Clear the mail setting (operator reason required)
+ */
+export const deleteControlMailSetting = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlAckEnvelope> => {
+  return controlMutator<ControlAckEnvelope>(getDeleteControlMailSettingUrl(), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getDeleteControlMailSettingMutationKey = () => ['deleteControlMailSetting'] as const
+
+export const getDeleteControlMailSettingMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteControlMailSetting>>,
+    TError,
+    void,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteControlMailSetting>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = getDeleteControlMailSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteControlMailSetting>>,
+    void
+  > = () => {
+    return deleteControlMailSetting(requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeleteControlMailSettingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteControlMailSetting>>
+>
+
+export type DeleteControlMailSettingMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+
+/**
+ * @summary Clear the mail setting (operator reason required)
+ */
+export const useDeleteControlMailSetting = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteControlMailSetting>>,
+      TError,
+      void,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteControlMailSetting>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDeleteControlMailSettingMutationOptions(options), queryClient)
+}
+export const getTestControlMailSettingUrl = () => {
+  return `/platform/settings/mail/test`
+}
+
+/**
+ * @summary Send a mail setting test email (operator reason required)
+ */
+export const testControlMailSetting = async (
+  controlMailTestRequest: ControlMailTestRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlAckEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlAckEnvelope>(getTestControlMailSettingUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlMailTestRequest),
+  })
+}
+
+export const getTestControlMailSettingMutationKey = () => ['testControlMailSetting'] as const
+
+export const getTestControlMailSettingMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testControlMailSetting>>,
+    TError,
+    TestControlMailSettingMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testControlMailSetting>>,
+  TError,
+  TestControlMailSettingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTestControlMailSettingMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testControlMailSetting>>,
+    TestControlMailSettingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return testControlMailSetting(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type TestControlMailSettingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testControlMailSetting>>
+>
+export type TestControlMailSettingMutationBody = ControlMailTestRequest
+export type TestControlMailSettingMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type TestControlMailSettingMutationVariables = { data: ControlMailTestRequest }
+
+/**
+ * @summary Send a mail setting test email (operator reason required)
+ */
+export const useTestControlMailSetting = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof testControlMailSetting>>,
+      TError,
+      TestControlMailSettingMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof testControlMailSetting>>,
+  TError,
+  TestControlMailSettingMutationVariables,
+  TContext
+> => {
+  return useMutation(getTestControlMailSettingMutationOptions(options), queryClient)
 }
 export const getGetControlAIGatewayUrl = () => {
   return `/platform/ai-gateway`

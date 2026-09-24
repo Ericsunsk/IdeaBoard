@@ -47,8 +47,11 @@ import (
 //	                        Stripe inbound webhooks stay distinct: they emit
 //	                        internal user events, never workspace envelopes
 //	                        (orders are user-scoped, no workspace mapping).
-//	media.asset_ready       completeUploadOnce after CompleteSession.
-//	media.asset_archived    archiveMediaAsset once-fn after ArchiveAsset.
+//	media.asset_ready       REMOVED with the workspace upload surface
+//	                        (#809 phase 3b-03, issue #813): not emitted
+//	                        while the replacement lands.
+//	media.asset_archived    REMOVED with the workspace media surface
+//	                        (same issue): not emitted while down.
 //	board.document_replaced replaceBoardDocument once-fn after ReplaceDocument.
 //	board.member_changed    member-add/member-remove once-fns after the
 //	                        roster commit; member role update emits after its

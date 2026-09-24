@@ -1,22 +1,35 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
+import { api } from '../../../shared/api/client'
 import {
-  getGetAdminRateLimitSettingsQueryKey,
-  getGetAdminRegistrationSettingQueryKey,
-  updateAdminRateLimitSettings,
-  updateAdminRegistrationSetting,
-  useGetAdminRateLimitSettings,
-  useGetAdminRegistrationSetting,
-} from '../../../shared/api/generated-query/admin-settings/admin-settings'
-import type {
-  ApiResponseRegistrationSetting,
-  ApiResponseRegistrationSettingData,
-  RateLimitSetting,
-} from '../../../shared/api/generated-query/model'
-import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
+  createApiDataSelector,
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../shared/api/apiResponse'
 import type { AdminAccessSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
+
+// Admin access (rate limit + registration) boundary (issue #809). The
+// generated `admin-settings` client is gone but the backend admin plane
+// still serves `/api/admin/settings/rate-limit` and
+// `/api/admin/settings/registration` with the shared envelope, so this
+// composable transports through the central `api.request` with local view
+// types. Control-plane mutations with operator reasons stay a residual.
+export type RateLimitSetting = {
+  window_seconds: number
+  max_requests: number
+}
+
+export type RegistrationSettingData = {
+  enabled: boolean
+}
+
+export type ApiResponseRegistrationSetting = ApiResponseWithData<RegistrationSettingData>
+export type ApiResponseRegistrationSettingData = RegistrationSettingData
+
+const ADMIN_RATE_LIMIT_QUERY_KEY = ['admin', 'settings', 'rate-limit'] as const
+const ADMIN_REGISTRATION_QUERY_KEY = ['admin', 'settings', 'registration'] as const
 
 export const RATE_LIMIT_MAX_REQUESTS = 10_000
 export const RATE_LIMIT_MAX_WINDOW_SECONDS = 3_600
@@ -40,23 +53,42 @@ const selectRegistrationSetting =
 
 export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedback }) {
   const queryClient = useQueryClient()
-  const registrationSettingQuery =
-    useGetAdminRegistrationSetting<ApiResponseRegistrationSettingData>({
-      query: { select: selectRegistrationSetting },
-    })
-  const rateLimitSettingsQuery = useGetAdminRateLimitSettings<RateLimitSetting>({
-    query: { select: selectRateLimitSetting },
+  const registrationSettingQuery = useQuery<
+    ApiResponseRegistrationSetting,
+    Error,
+    ApiResponseRegistrationSettingData
+  >({
+    queryKey: ADMIN_REGISTRATION_QUERY_KEY,
+    queryFn: ({ signal }) =>
+      api.request<ApiResponseRegistrationSetting>('/admin/settings/registration', {
+        method: 'GET',
+        ...(signal == null ? {} : { signal }),
+      }),
+    select: selectRegistrationSetting,
+  })
+  const rateLimitSettingsQuery = useQuery<
+    ApiResponseWithData<RateLimitSetting>,
+    Error,
+    RateLimitSetting
+  >({
+    queryKey: ADMIN_RATE_LIMIT_QUERY_KEY,
+    queryFn: ({ signal }) =>
+      api.request<ApiResponseWithData<RateLimitSetting>>('/admin/settings/rate-limit', {
+        method: 'GET',
+        ...(signal == null ? {} : { signal }),
+      }),
+    select: selectRateLimitSetting,
   })
   const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
   const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value)
 
   function invalidateRegistrationSettingQuery() {
-    return queryClient.invalidateQueries({ queryKey: getGetAdminRegistrationSettingQueryKey() })
+    return queryClient.invalidateQueries({ queryKey: ADMIN_REGISTRATION_QUERY_KEY })
   }
 
   function writeRegistrationSettingQueryCache(setting: ApiResponseRegistrationSettingData) {
     queryClient.setQueryData<ApiResponseRegistrationSetting>(
-      getGetAdminRegistrationSettingQueryKey(),
+      ADMIN_REGISTRATION_QUERY_KEY,
       (previous) => ({
         code: previous?.code ?? 0,
         msg: previous?.msg ?? 'ok',
@@ -67,7 +99,13 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
 
   const updateRegistrationSettingMutation = useMutation({
     mutationFn: (enabled: boolean) =>
-      resolveApiData(updateAdminRegistrationSetting({ enabled }), '更新注册状态失败'),
+      resolveApiData(
+        api.request<ApiResponseRegistrationSetting>('/admin/settings/registration', {
+          method: 'PUT',
+          body: { enabled } as unknown as Record<string, unknown>,
+        }),
+        '更新注册状态失败',
+      ),
     onSuccess: async (setting) => {
       registrationEnabled.value = setting.enabled
       writeRegistrationSettingQueryCache(setting)
@@ -83,9 +121,12 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
   const saveRateLimitMutation = useMutation({
     mutationFn: (draft: AdminAccessRateLimitForm) =>
       resolveApiData(
-        updateAdminRateLimitSettings({
-          window_seconds: Number(draft.window_seconds),
-          max_requests: Number(draft.max_requests),
+        api.request<ApiResponseWithData<RateLimitSetting>>('/admin/settings/rate-limit', {
+          method: 'PUT',
+          body: {
+            window_seconds: Number(draft.window_seconds),
+            max_requests: Number(draft.max_requests),
+          } as unknown as Record<string, unknown>,
         }),
         '保存访问限流失败',
       ),
@@ -115,7 +156,7 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
         window_seconds: Number(savedSetting.window_seconds),
         max_requests: Number(savedSetting.max_requests),
       })
-      await queryClient.invalidateQueries({ queryKey: getGetAdminRateLimitSettingsQueryKey() })
+      await queryClient.invalidateQueries({ queryKey: ADMIN_RATE_LIMIT_QUERY_KEY })
     },
     feedback: {
       loadFailed: options.feedback.loadFailed,
@@ -211,7 +252,7 @@ function isSameRateLimitSetting(
 }
 
 function writeRateLimitSettingQueryCache(queryClient: QueryClient, setting: RateLimitSetting) {
-  queryClient.setQueryData(getGetAdminRateLimitSettingsQueryKey(), {
+  queryClient.setQueryData(ADMIN_RATE_LIMIT_QUERY_KEY, {
     code: 0,
     msg: 'ok',
     data: setting,

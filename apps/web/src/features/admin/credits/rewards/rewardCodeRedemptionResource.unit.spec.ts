@@ -1,21 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRewardCodeRedemptionResource } from './rewardCodeRedemptionResource'
 
-const generated = vi.hoisted(() => ({
-  detail: vi.fn(),
-  list: vi.fn(),
+const transport = vi.hoisted(() => ({
+  request: vi.fn(),
 }))
 
-vi.mock('../../../../shared/api/generated-query/admin-rewards/admin-rewards', () => ({
-  getAdminRewardCodeRedemption: generated.detail,
-  listAdminRewardCodeRedemptions: generated.list,
+vi.mock('../../../../shared/api/client', () => ({
+  api: { request: transport.request },
 }))
 
 describe('RewardCodeRedemptionResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('maps a keyset page to RewardCode vocabulary and forwards cancellation', async () => {
-    generated.list.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: {
@@ -49,11 +47,14 @@ describe('RewardCodeRedemptionResource', () => {
       ],
       nextBeforeId: 40,
     })
-    expect(generated.list).toHaveBeenCalledWith(7, { before_id: 60, limit: 10 }, { signal })
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes/7/redemptions?before_id=60&limit=10',
+      expect.objectContaining({ method: 'GET', signal }),
+    )
   })
 
   it('maps technical detail without exposing Identity PII or Code secrets', async () => {
-    generated.detail.mockResolvedValue({
+    transport.request.mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: {
@@ -79,6 +80,9 @@ describe('RewardCodeRedemptionResource', () => {
       creditTransactionId: 'credit-transaction-9001',
       maskedCodeHint: '•••• 2026',
     })
-    expect(generated.detail).toHaveBeenCalledWith(7, 51, { signal })
+    expect(transport.request).toHaveBeenCalledWith(
+      '/admin/rewards/codes/7/redemptions/51',
+      expect.objectContaining({ method: 'GET', signal }),
+    )
   })
 })

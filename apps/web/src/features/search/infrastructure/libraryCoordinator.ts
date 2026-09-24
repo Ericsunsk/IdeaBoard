@@ -1,56 +1,76 @@
 import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
-import { inject, provide, type InjectionKey } from 'vue'
-import { createLibraryFolderFacts, createLibraryMutationPublisher } from '../../library'
+import { inject, provide, toValue, type InjectionKey, type MaybeRefOrGetter } from 'vue'
 import {
-  removeSearchReference,
-  saveSearchReference,
+  createLibraryFolderFacts,
+  createLibraryMutationPublisher,
   libraryAssetKey,
-  type LibrarySearchReference,
+  listAllWorkspaceLibraryFolders,
+  removeWorkspaceSearchReference,
+  requireWorkspaceId,
+  saveWorkspaceSearchReference,
 } from '../../library'
+import type { LibrarySearchReference } from '../domain/authAction'
+
+export type SearchLibraryCoordinatorOptions = {
+  workspaceId: MaybeRefOrGetter<string | null | undefined>
+}
 
 /**
  * The Search screen's one coordination boundary for Library Folder facts and
  * mutations. Library still owns its resource operations and asset gallery.
+ * The workspace id resolves per call from `features/workspace` selection so
+ * workspace switches never reuse a stale id.
  */
-export function createSearchLibraryCoordinator(): SearchLibraryCoordinator {
-  const folderFacts = createLibraryFolderFacts()
+export function createSearchLibraryCoordinator(
+  options: SearchLibraryCoordinatorOptions,
+): SearchLibraryCoordinator {
+  const folderFacts = createLibraryFolderFacts(() =>
+    listAllWorkspaceLibraryFolders(requireWorkspaceId(toValue(options.workspaceId))),
+  )
   const mutationPublisher = createLibraryMutationPublisher(folderFacts)
+
+  function resolveWorkspaceId(): string {
+    return requireWorkspaceId(toValue(options.workspaceId))
+  }
 
   async function saveReference(
     reference: LibrarySearchReference,
-    folderID?: number,
+    folderID?: string,
     newFolderName?: string,
   ) {
-    const asset = await saveSearchReference(reference, folderID, newFolderName)
+    const asset = await saveWorkspaceSearchReference(
+      resolveWorkspaceId(),
+      reference,
+      folderID,
+      newFolderName,
+    )
     await mutationPublisher.publishMutation({
       kind: 'asset-saved',
       provider: asset.provider,
-      sourceID: asset.source_id,
-      assetKey: libraryAssetKey(asset.provider, asset.source_id),
-      affectedFolderKeys: [
-        'all',
-        ...(folderID ? [String(folderID)] : newFolderName ? [] : ['quick-saves']),
-      ],
+      sourceID: asset.sourceId,
+      assetKey: libraryAssetKey(asset.provider, asset.sourceId),
+      affectedFolderKeys: ['all', ...(folderID ? [folderID] : [])],
       galleryEffect: 'reload-current',
     })
     return asset
   }
 
   async function removeReference(provider: 'unsplash' | 'pexels', sourceID: string) {
-    await removeSearchReference(provider, sourceID)
+    await removeWorkspaceSearchReference(resolveWorkspaceId(), provider, sourceID)
     await mutationPublisher.publishMutation({
       kind: 'asset-removed',
       provider,
       sourceID,
       assetKey: libraryAssetKey(provider, sourceID),
-      affectedFolderKeys: ['all', 'quick-saves'],
+      affectedFolderKeys: ['all'],
       galleryEffect: 'reload-current',
     })
   }
 
   async function saveReferences(references: LibrarySearchReference[]) {
+    const workspaceId = resolveWorkspaceId()
     const results = await Promise.allSettled(
-      references.map((reference) => saveSearchReference(reference)),
+      references.map((reference) => saveWorkspaceSearchReference(workspaceId, reference)),
     )
     const outcomes = results.flatMap((result) =>
       result.status === 'fulfilled'
@@ -58,9 +78,9 @@ export function createSearchLibraryCoordinator(): SearchLibraryCoordinator {
             {
               kind: 'asset-saved' as const,
               provider: result.value.provider,
-              sourceID: result.value.source_id,
-              assetKey: libraryAssetKey(result.value.provider, result.value.source_id),
-              affectedFolderKeys: ['all', 'quick-saves'],
+              sourceID: result.value.sourceId,
+              assetKey: libraryAssetKey(result.value.provider, result.value.sourceId),
+              affectedFolderKeys: ['all'],
               galleryEffect: 'reload-current' as const,
             },
           ]

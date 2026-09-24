@@ -1,29 +1,9 @@
+import { api } from '../../../../shared/api/client'
 import {
-  detectAdminGatewayModels,
-  getAdminAIGatewayConfig,
-  getAdminGatewayModelReference,
-  listAdminGatewayModelCatalog,
-  listAdminGatewayModelMappings,
-  listAdminGatewayModelsObserved,
-  listAdminGatewayProviders,
-  previewAdminGatewayRoute,
-  saveAdminGatewayModelCatalog,
-  saveAdminGatewayModelMapping,
-  testAdminGatewayConnection,
-  updateAdminAIGatewayConfig,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
-import type {
-  GatewayConfigSummary,
-  GatewayConnectionTest,
-  GatewayModelCatalogItem,
-  GatewayModelDetection,
-  GatewayModelObserved,
-  GatewayModelReference,
-  GatewayProviderOption,
-  GatewayRoutePreview,
-} from '../../../../shared/api/generated-query/model'
-import type { UpdateGatewayConfigRequest } from '../../../../shared/api/generated-query/model/updateGatewayConfigRequest'
-import { resolveApiData, resolveApiOk } from '../../../../shared/api/apiResponse'
+  resolveApiData,
+  resolveApiOk,
+  type ApiResponseWithData,
+} from '../../../../shared/api/apiResponse'
 import type {
   AdminModelItem,
   ModelObservedSnapshot,
@@ -31,10 +11,147 @@ import type {
 } from '../domain/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/catalogData'
 
-export type {
-  DetectedGatewayModel,
-  GatewayProviderOption,
-} from '../../../../shared/api/generated-query/model'
+// Admin AI gateway boundary (issue #809). The generated `admin-settings`
+// client is gone but the backend admin plane still serves
+// `/api/admin/settings/ai-gateway/*` with the shared envelope, so this
+// boundary transports through the central `api.request` with local wire
+// types. Callers keep importing these names, never generated code directly.
+export type GatewayConfigSummary = {
+  base_url?: string
+  account_id?: string
+  gateway_id?: string
+  token_configured: boolean
+  is_first_party?: boolean
+  updated_at?: string | null
+}
+
+export type GatewayConnectionTest = {
+  reachable: boolean
+  status_code: number
+  latency_ms: number
+  message: string
+}
+
+export type GatewayModelCatalogItem = {
+  id: string
+  name: string
+  provider: string
+  mode?: string
+  description: string
+  context_or_resolution: string
+  capabilities: string[]
+  hosting: string
+  terms_url: string
+  docs_url: string
+  custom_path?: string
+  custom_params?: string
+  description_enriched?: boolean
+  supports_prompt_caching?: boolean
+}
+
+export type DetectedGatewayModel = {
+  id: string
+  name: string
+  provider: string
+  mode?: string
+  description?: string
+  description_enriched?: boolean
+  context_or_resolution?: string
+  context_limit?: number
+  capabilities?: string[]
+  modalities?: { input?: string[]; output?: string[] }
+  supports_prompt_caching?: boolean
+}
+
+export type GatewayModelDetection = {
+  models: DetectedGatewayModel[]
+  configured_providers: number
+}
+
+export type GatewayModelSKUMargin = {
+  sku: string
+  display_name: string
+  feature: string
+  on_sale: boolean
+  unit_credits_by_variant: Record<string, number>
+  actual_cost_credits?: number | null
+  has_actual_cost: boolean
+  cost_source: string
+  cost_note: string
+  margin_credits?: number | null
+  margin_status: string
+}
+
+export type GatewayModelObserved = {
+  model: string
+  provider: string
+  window_days: number
+  window_since: string
+  attempts_total: number
+  completed: number
+  failed: number
+  cache_hits: number
+  success_rate?: number | null
+  cache_hit_rate?: number | null
+  top_failure_stage?: string
+  top_failure_category?: string
+  top_failure_count?: number
+  has_observations: boolean
+  has_sku_margin: boolean
+  sku_margins: GatewayModelSKUMargin[]
+}
+
+export type GatewayModelReference = {
+  model_id: string
+  provider?: string
+  name?: string
+  input_usd_per_mtok?: number
+  output_usd_per_mtok?: number
+  context_limit?: number
+  last_updated?: string
+  reasoning?: boolean
+  tool_call?: boolean
+  temperature?: boolean
+  attachment?: boolean
+  structured_output?: boolean
+  open_weights?: boolean
+  modalities?: { input?: string[]; output?: string[] }
+  knowledge?: string
+  release_date?: string
+  family?: string
+  status?: string
+  source: string
+  note: string
+  found: boolean
+  error_code?: string
+  message?: string
+}
+
+export type GatewayProviderOption = {
+  slug: string
+  display_name: string
+  id_prefix: string
+}
+
+export type GatewayRoutePreview = {
+  provider_slug: string
+  is_first_party: boolean
+  target_path: string
+  path_source: string
+  path_source_label: string
+}
+
+export type GatewayModelMapping = {
+  feature: string
+  model: string
+}
+
+export type UpdateGatewayConfigRequest = {
+  base_url?: string
+  token?: string
+  account_id?: string
+  gateway_id?: string
+}
 
 export type GatewayConnectionSummary = GatewayConfigSummary
 
@@ -158,14 +275,23 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
 }
 
 async function listModelCatalog(): Promise<AdminModelItem[]> {
-  const data = await resolveApiData(listAdminGatewayModelCatalog(), '加载模型库失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<GatewayModelCatalogItem[]>>(
+      '/admin/settings/ai-gateway/catalog',
+      { method: 'GET' },
+    ),
+    '加载模型库失败',
+  )
   if (!Array.isArray(data)) throw new Error('加载模型库失败')
   return data.map(toAdminModelItem)
 }
 
 async function saveModelCatalog(items: AdminModelItem[]): Promise<void> {
   await resolveApiOk(
-    saveAdminGatewayModelCatalog({ items: items.map(toGatewayCatalogItem) }),
+    api.request<{ code: number; msg: string }>('/admin/settings/ai-gateway/catalog', {
+      method: 'PUT',
+      body: { items: items.map(toGatewayCatalogItem) } as unknown as Record<string, unknown>,
+    }),
     '保存模型库失败',
   )
 }
@@ -176,11 +302,17 @@ async function previewModelRoute(input: {
   customParams?: string | undefined
 }): Promise<GatewayRoutePreview> {
   const data = await resolveApiData(
-    previewAdminGatewayRoute({
-      model_id: input.modelId,
-      ...(input.customPath ? { custom_path: input.customPath } : {}),
-      ...(input.customParams ? { custom_params: input.customParams } : {}),
-    }),
+    api.request<ApiResponseWithData<GatewayRoutePreview>>(
+      '/admin/settings/ai-gateway/route-preview',
+      {
+        method: 'POST',
+        body: {
+          model_id: input.modelId,
+          ...(input.customPath ? { custom_path: input.customPath } : {}),
+          ...(input.customParams ? { custom_params: input.customParams } : {}),
+        } as unknown as Record<string, unknown>,
+      },
+    ),
     '路由透视失败',
   )
   if (!data) throw new Error('路由透视失败')
@@ -188,8 +320,12 @@ async function previewModelRoute(input: {
 }
 
 async function detectGatewayModels(provider?: string): Promise<GatewayModelDetection> {
+  const query = provider?.trim() ? `?provider=${encodeURIComponent(provider.trim())}` : ''
   const data = await resolveApiData(
-    detectAdminGatewayModels(provider ? { provider } : undefined),
+    api.request<ApiResponseWithData<GatewayModelDetection>>(
+      `/admin/settings/ai-gateway/detect-models${query}`,
+      { method: 'GET' },
+    ),
     '探测网关模型失败',
   )
   if (!data) throw new Error('探测网关模型失败')
@@ -197,7 +333,13 @@ async function detectGatewayModels(provider?: string): Promise<GatewayModelDetec
 }
 
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
-  const data = await resolveApiData(listAdminGatewayProviders(), '加载供应商列表失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<GatewayProviderOption[]>>(
+      '/admin/settings/ai-gateway/providers',
+      { method: 'GET' },
+    ),
+    '加载供应商列表失败',
+  )
   if (!Array.isArray(data)) throw new Error('加载供应商列表失败')
   return data
 }
@@ -239,13 +381,19 @@ async function getModelReference(input: {
   model?: string | undefined
   refresh?: boolean | undefined
 }): Promise<ModelReferenceSnapshot> {
+  const search = new URLSearchParams()
+  if (input.modelId?.trim()) search.append('model_id', input.modelId.trim())
+  if (input.provider?.trim()) search.append('provider', input.provider.trim())
+  if (input.model?.trim()) search.append('model', input.model.trim())
+  if (input.refresh) search.append('refresh', 'true')
+  const query = search.toString()
   const data = await resolveApiData(
-    getAdminGatewayModelReference({
-      ...(input.modelId?.trim() ? { model_id: input.modelId.trim() } : {}),
-      ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
-      ...(input.model?.trim() ? { model: input.model.trim() } : {}),
-      ...(input.refresh ? { refresh: true } : {}),
-    }),
+    api.request<ApiResponseWithData<GatewayModelReference>>(
+      query
+        ? `/admin/settings/ai-gateway/models-reference?${query}`
+        : '/admin/settings/ai-gateway/models-reference',
+      { method: 'GET' },
+    ),
     '加载参照价失败',
   )
   if (!data) throw new Error('加载参照价失败')
@@ -287,19 +435,34 @@ function toAdminModelObserved(item: GatewayModelObserved): ModelObservedSnapshot
 }
 
 async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
-  const data = await resolveApiData(listAdminGatewayModelsObserved(), '加载观测数据失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<GatewayModelObserved[]>>(
+      '/admin/settings/ai-gateway/models-observed',
+      { method: 'GET' },
+    ),
+    '加载观测数据失败',
+  )
   if (!Array.isArray(data)) throw new Error('加载观测数据失败')
   return data.map(toAdminModelObserved)
 }
 
 async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
-  const response = await getAdminAIGatewayConfig()
+  const response = await api.request<ApiResponseWithData<GatewayConfigSummary>>(
+    '/admin/settings/ai-gateway',
+    { method: 'GET' },
+  )
   if (!response.data) throw new Error('AI 网关配置不存在')
   return response.data
 }
 
 async function updateGatewayConnection(input: UpdateGatewayConfigRequest): Promise<void> {
-  await resolveApiOk(updateAdminAIGatewayConfig(input), '保存 AI 网关配置失败')
+  await resolveApiOk(
+    api.request<{ code: number; msg: string }>('/admin/settings/ai-gateway', {
+      method: 'PUT',
+      body: input as unknown as Record<string, unknown>,
+    }),
+    '保存 AI 网关配置失败',
+  )
 }
 
 async function testGatewayConnection(input: {
@@ -309,10 +472,16 @@ async function testGatewayConnection(input: {
   // 服务端探活：浏览器读不到跨域状态码，fetch 恒报成功是误报。
   // token 仅用于本次探测，不做任何持久化。
   const data: GatewayConnectionTest | null | undefined = await resolveApiData(
-    testAdminGatewayConnection({
-      base_url: input.base_url.trim(),
-      ...(input.token?.trim() ? { token: input.token.trim() } : {}),
-    }),
+    api.request<ApiResponseWithData<GatewayConnectionTest>>(
+      '/admin/settings/ai-gateway/test-connection',
+      {
+        method: 'POST',
+        body: {
+          base_url: input.base_url.trim(),
+          ...(input.token?.trim() ? { token: input.token.trim() } : {}),
+        } as unknown as Record<string, unknown>,
+      },
+    ),
     '网关连接测试失败',
   )
   if (!data) throw new Error('网关连接测试失败')
@@ -324,7 +493,13 @@ async function testGatewayConnection(input: {
 }
 
 async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
-  const data = await resolveApiData(listAdminGatewayModelMappings(), '加载模型映射失败')
+  const data = await resolveApiData(
+    api.request<ApiResponseWithData<GatewayModelMapping[]>>(
+      '/admin/settings/ai-gateway/models',
+      { method: 'GET' },
+    ),
+    '加载模型映射失败',
+  )
   return (data ?? []).map((item) => ({
     feature: item.feature,
     model: item.model,
@@ -332,5 +507,14 @@ async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
 }
 
 async function saveGatewayModelMapping(feature: string, model: string): Promise<void> {
-  await resolveApiOk(saveAdminGatewayModelMapping(feature, { model }), '保存模型映射失败')
+  await resolveApiOk(
+    api.request<{ code: number; msg: string }>(
+      `/admin/settings/ai-gateway/models/${encodeURIComponent(feature)}`,
+      {
+        method: 'PUT',
+        body: { model } as unknown as Record<string, unknown>,
+      },
+    ),
+    '保存模型映射失败',
+  )
 }

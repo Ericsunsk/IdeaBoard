@@ -248,11 +248,24 @@ func (s *Service) storeOriginalThenPreview(ctx context.Context, planned *ports.S
 
 // sqlc's generated struct stays inside Media; only the Library-owned result
 // crosses the context boundary.
+//
+// #817 (Phase 3b-08): the legacy user-scoped media_assets row is gone; this
+// maps the workspace-scoped row (public_id asset_%). The materialization
+// path itself is fail-closed through the assets registry stubs until the
+// workspace-scoped store lands in Phase 4, so this mapping never executes
+// today — it only keeps the orphaned service compiling.
 func materializedResult(asset dbsqlc.MediaAsset) library.MaterializedAsset {
+	width, height := int32(0), int32(0)
+	if asset.Width.Valid {
+		width = asset.Width.Int32
+	}
+	if asset.Height.Valid {
+		height = asset.Height.Int32
+	}
 	return library.MaterializedAsset{
-		MediaAssetID: asset.ID, AssetID: asset.AssetID,
-		URL:   "/api/user/media-assets/" + asset.AssetID + "/original/content",
-		Width: asset.Width, Height: asset.Height, MIMEType: asset.MimeType,
+		MediaAssetID: asset.InternalID, AssetID: asset.PublicID,
+		URL:   "/api/user/media-assets/" + asset.PublicID + "/original/content",
+		Width: width, Height: height, MIMEType: asset.MimeType,
 		Extension: imageformat.ImageExtensionFromMIME(asset.MimeType),
 	}
 }

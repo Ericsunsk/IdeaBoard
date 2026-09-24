@@ -109,7 +109,6 @@
                   />
                   <Folder v-else class="size-3 opacity-80" aria-hidden="true" />
                   <span>{{ folder.name }}</span>
-                  <span class="text-[10px] opacity-70 font-mono">{{ folder.assetCount }}</span>
                 </button>
               </div>
 
@@ -244,7 +243,7 @@ import {
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../folderFacts'
-import type { LibraryAssetView } from '../resource'
+import type { LibraryAssetView } from '../transfer'
 import type { CanvasLibraryImportDescriptor } from '../transfer'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
@@ -263,6 +262,7 @@ import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 
 const props = defineProps<{
   open: boolean
+  workspaceId: string | null
   folderFacts: LibraryFolderFacts
   mutationPublisher: LibraryMutationPublisher
   referenceKeys?: string[]
@@ -289,6 +289,7 @@ const searchIslandClass = computed(() =>
 const confirmDialog = useUserConfirmDialog()
 const toast = useAppToast()
 const workspace = useLibraryWorkspace({
+  workspaceId: () => props.workspaceId,
   syncRoute: false,
   autoLoad: false,
   folderFacts: props.folderFacts,
@@ -426,6 +427,15 @@ watch(
     }
   },
   { immediate: true },
+)
+
+watch(
+  () => props.workspaceId,
+  (next, previous) => {
+    if (next !== previous && props.open && initialized.value) {
+      void workspace.resetWorkspace()
+    }
+  },
 )
 
 let unsubscribeMutation = () => {}

@@ -1,17 +1,27 @@
-import type { QueryClient } from '@tanstack/vue-query'
+import { useQuery, type QueryClient } from '@tanstack/vue-query'
 import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
+import { api } from '../api/client'
 import {
-  getGetSiteBrandingSettingQueryKey,
-  getSiteBrandingSetting,
-  useGetSiteBrandingSetting,
-} from '../api/generated-query/settings/settings'
-import type { ApiResponseBrandingSetting, BrandingSetting } from '../api/generated-query/model'
-import { createApiDataSelector, resolveApiData } from '../api/apiResponse'
+  createApiDataSelector,
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../api/apiResponse'
 import { i18n } from '../i18n'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
-export const SITE_BRANDING_QUERY_KEY = getGetSiteBrandingSettingQueryKey()
+// Public site branding (issue #809). The backend still serves
+// `GET /api/settings/branding` with the shared `{code, msg, data}` envelope,
+// so this composable keeps its query key and helper surface and transports
+// through the central `api.request` instead of the deleted generated client.
+export type BrandingSetting = {
+  project_name: string
+  logo_url: string
+}
+
+export type ApiResponseBrandingSetting = ApiResponseWithData<BrandingSetting>
+
+export const SITE_BRANDING_QUERY_KEY = ['settings', 'branding'] as const
 
 export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
   project_name: 'IdeaBoard',
@@ -27,19 +37,36 @@ const selectSiteBranding = createApiDataSelector<BrandingSetting>(
 
 export async function fetchSiteBranding(): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
-    await resolveApiData(getSiteBrandingSetting(), i18n.global.t('account.branding.loadFailed')),
+    await resolveApiData(
+      api.request<ApiResponseBrandingSetting>('/settings/branding', { method: 'GET' }),
+      i18n.global.t('account.branding.loadFailed'),
+    ),
   )
+}
+
+async function fetchSiteBrandingEnvelope(
+  signal?: AbortSignal,
+): Promise<ApiResponseBrandingSetting> {
+  return api.request<ApiResponseBrandingSetting>('/settings/branding', {
+    method: 'GET',
+    ...(signal == null ? {} : { signal }),
+  })
 }
 
 export function useSiteBranding(options?: { enabled?: MaybeRef<boolean> }) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
-  const brandingQuery = useGetSiteBrandingSetting<BrandingSetting>({
-    query: {
-      enabled: isEnabled,
-      select: selectSiteBranding,
-    },
+  const brandingQuery = useQuery<
+    ApiResponseBrandingSetting,
+    Error,
+    BrandingSetting,
+    readonly ['settings', 'branding']
+  >({
+    queryKey: SITE_BRANDING_QUERY_KEY,
+    queryFn: ({ signal }) => fetchSiteBrandingEnvelope(signal),
+    enabled: isEnabled,
+    select: selectSiteBranding,
   })
   const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value))
   const projectName = computed(() => branding.value.project_name)

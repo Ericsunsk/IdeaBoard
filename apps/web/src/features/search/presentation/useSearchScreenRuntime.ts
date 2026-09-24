@@ -23,6 +23,7 @@ import {
   createSearchLibraryCoordinator,
   provideSearchLibraryCoordinator,
 } from '../infrastructure/libraryCoordinator'
+import { useWorkspaceSelection } from '../../workspace'
 import { type SearchResult, type VisionReference } from '../domain/models'
 import { useSearchSession } from '../application/useSearchSession'
 import {
@@ -193,7 +194,9 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
   const route = useRoute()
   const router = useRouter()
   const toast = useAppToast()
-  const libraryCoordinator = createSearchLibraryCoordinator()
+  const { selectedId: selectedWorkspaceId } = useWorkspaceSelection()
+  const workspaceIdSource = () => selectedWorkspaceId.value
+  const libraryCoordinator = createSearchLibraryCoordinator({ workspaceId: workspaceIdSource })
   provideSearchLibraryCoordinator(libraryCoordinator)
   const scopeKey = computed(() => options.userPublicID.value ?? 'anonymous')
   const current = shallowRef(createScopedSession(scopeKey.value))
@@ -235,6 +238,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
         route,
         router,
         toast,
+        workspaceId: workspaceIdSource,
       }),
     )
     if (!scopedSession) throw new Error('Failed to create Search session')
@@ -292,6 +296,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
     libraryIslandMounted,
     isTriggerHoveredDuringDrag,
   )
+  const workspaceId = computed(() => selectedWorkspaceId.value)
 
   const commands = {
     ...createSearchSessionCommands(session),
@@ -386,6 +391,9 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
   watch(view.library.open, (open) => {
     if (open) libraryIslandMounted.value = true
   })
+  watch(selectedWorkspaceId, (next, previous) => {
+    if (next !== previous) libraryCoordinator.reset()
+  })
   watch(
     scopeKey,
     (nextScope, previousScope) => {
@@ -408,7 +416,7 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
     libraryCoordinator.dispose()
   })
 
-  return { view, commands, savePopoverAnchor }
+  return { view, commands, savePopoverAnchor, workspaceId }
 }
 
 function isSavePopoverController(value: unknown): value is SearchSavePopoverController {

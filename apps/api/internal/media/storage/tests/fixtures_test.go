@@ -14,7 +14,6 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/media/storage/application/authorization"
 	"ideaboard/api/internal/media/storage/application/integrity"
-	"ideaboard/api/internal/media/storage/application/taskmedia"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/infrastructure/local"
 	"ideaboard/api/internal/media/storage/infrastructure/postgres"
@@ -58,7 +57,6 @@ type (
 	ReadableUploadAccess          = ports.ReadableUploadAccess
 	ReadableUploadAccessResult    = ports.ReadableUploadAccessResult
 	TaskMediaAuthorizer           = authorization.TaskMediaAuthorizer
-	RuntimeTaskMediaStore         = taskmedia.RuntimeTaskMediaStore
 	IntegrityVerifier             = integrity.IntegrityVerifier
 	IntegrityConfig               = integrity.IntegrityConfig
 	S3CompatibleService           = s3.S3CompatibleService
@@ -108,7 +106,6 @@ var (
 	NewStorageProfileRepository       = newStorageProfileRepository
 	NewTaskMediaAuthorizer            = authorization.NewTaskMediaAuthorizer
 	NewReadableUploadAccess           = authorization.NewReadableUploadAccess
-	NewRuntimeTaskMediaStore          = taskmedia.NewRuntimeTaskMediaStore
 	NewIntegrityVerifier              = integrity.NewIntegrityVerifier
 	ParseUploadResource               = domain.ParseUploadResource
 	NormalizeUploadObjectKey          = domain.NormalizeUploadObjectKey

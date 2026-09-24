@@ -14,11 +14,8 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/library"
-	"ideaboard/api/internal/media/librarymaterialization"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
-	"ideaboard/api/internal/media/workspaceuploads"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
@@ -94,11 +91,12 @@ func newAppRouter(
 		aiGatewayRepo,
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
-	libraryMaterializer := librarymaterialization.NewService(repos.db, services.storageService, repos.mediaAssetRegistry)
-	libraryService := library.NewService(repos.libraryRepo, libraryMaterializer)
-	libraryHandler := library.NewHandler(libraryService)
 	visionService := searchapplication.NewVisionSearchService(visionModelAdapter{repo: aiGatewayRepo}, visionGatewayAdapter{repo: aiGatewayRepo, metrics: redMetrics})
-	visionHandler := searchhttp.NewVisionHandler(visionService, searchhttp.NewVisionInputReader(libraryService))
+	// #809 legacy removal: the user-scoped library service is deleted, so
+	// the vision reader runs without a library asset source. Library
+	// references fail closed (ErrVisionInput) until a workspace-scoped
+	// reader lands; the v1 vision flow resolves refs via the workspace store.
+	visionHandler := searchhttp.NewVisionHandler(visionService, searchhttp.NewVisionInputReader(nil))
 	visionHandler.SetBillingService(searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, visionService))
 
 	router := gin.New()
@@ -115,13 +113,9 @@ func newAppRouter(
 		ContractV1: httpapi.ContractV1Deps{
 			Store: tenancypg.NewStore(repos.db),
 			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
-			// Upload sessions are process-local ephemeral coordination
-			// (never durable); workspace assets reuse media_assets via
-			// the postgres sibling; bytes read through the storage
-			// service gateway seam.
-			UploadSessions:  workspaceuploads.NewInMemorySessionStore(),
-			WorkspaceAssets: workspaceuploads.NewPostgresAssetStore(repos.db),
-			MediaObjects:    services.storageService,
+			// #813 (#809 phase 3b-03): the workspace upload/media
+			// surface is unregistered while its replacement lands;
+			// unknown v1 upload/media paths fail closed with 501.
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning
@@ -167,6 +161,7 @@ func newAppRouter(
 			SearchProviders:   searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
 			FeaturePrompts:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			Monitor:           taskStatsHandler,
+			Mail:              services.authServiceClient,
 		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		UserRoutes: httpapi.UserRouteDeps{
@@ -188,8 +183,7 @@ func newAppRouter(
 				Reader:     services.storageService,
 				ReadAccess: uploadReadAccess,
 			},
-			VisionHandler:  visionHandler,
-			LibraryHandler: libraryHandler,
+			VisionHandler: visionHandler,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: identityhttp.NewAdminHandler(

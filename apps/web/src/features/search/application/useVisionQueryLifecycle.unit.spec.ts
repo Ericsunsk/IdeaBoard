@@ -50,10 +50,10 @@ function createLifecycle(options: { authenticated?: boolean; scope?: string } = 
 }
 
 const libraryAsset = {
-  id: 7,
+  id: 'liba_asset0007',
   provider: 'unsplash',
-  source_id: 'photo-1',
-  preview_url: 'https://images.example/photo-1.jpg',
+  sourceId: 'photo-1',
+  previewUrl: 'https://images.example/photo-1.jpg',
 }
 
 describe('useVisionQueryLifecycle', () => {
@@ -69,7 +69,7 @@ describe('useVisionQueryLifecycle', () => {
         {
           key: 'unsplash:cached',
           previewUrl: 'https://images.example/cached.jpg',
-          libraryAssetID: 1,
+          libraryAssetID: 'liba_cached0001',
         },
       ],
       'user-a',
@@ -105,7 +105,7 @@ describe('useVisionQueryLifecycle', () => {
     } as never)
 
     expect(lifecycle.references.value).toHaveLength(3)
-    expect(lifecycle.references.value[0]?.libraryAssetID).toBe(7)
+    expect(lifecycle.references.value[0]?.libraryAssetID).toBe('liba_asset0007')
     expect(lifecycle.references.value[1]?.file).toBeInstanceOf(File)
     expect(lifecycle.references.value[2]?.externalReference).toEqual({
       provider: 'pexels',
@@ -162,7 +162,7 @@ describe('useVisionQueryLifecycle', () => {
     await lifecycle.submit()
     const textChangedKey = mocks.extractVisionSearch.mock.calls[1]?.[0].idempotencyKey
     expect(textChangedKey).not.toBe(firstKey)
-    lifecycle.addLibraryAsset({ ...libraryAsset, id: 8, source_id: 'photo-2' } as never)
+    lifecycle.addLibraryAsset({ ...libraryAsset, id: 'liba_asset0008', sourceId: 'photo-2' } as never)
     await lifecycle.submit()
     expect(mocks.extractVisionSearch.mock.calls[2]?.[0].idempotencyKey).not.toBe(textChangedKey)
     lifecycle.dispose()

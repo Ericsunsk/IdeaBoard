@@ -4,6 +4,9 @@ import {
   parseContractEnvelope,
   requireContractData,
 } from '../../shared/api/contractKernel'
+import { getMediaAssetMetadata } from '../../shared/api/mediaAssetDelivery'
+import { resolveAssetUrl } from '../../shared/config/runtimeUrls'
+import { createUniqueId } from '../../shared/utils/ids'
 import { i18n } from '../../shared/i18n'
 
 // Workspace-scoped library resource (issue #806).
@@ -13,13 +16,21 @@ import { i18n } from '../../shared/i18n'
 // `{ error: { code, message, details, request_id } }`). Pages and
 // components must consume this module, never generated code directly.
 //
-// Migration note: `useLibraryWorkspace` and the floating island still
-// read the legacy `user-library` generated client (integer ids). They
-// move onto this module once `generated-query/public` regenerates from
-// `openapi.public.yaml` (regeneration TODO, owned by the #802-804
-// merger follow-up); the legacy integer-id surface is removed in #809.
-// This module never accepts integer ids: malformed ids throw before any
-// network call, matching the backend 404 posture.
+// This module is the SOLE library transport: the legacy user-scoped
+// `resource.ts` (integer ids, `/user/library/*`) is deleted. All ids are
+// opaque (`ws_` / `libf_` / `liba_` / `libm_`); malformed ids throw before
+// any network call, matching the backend 404 posture. Payloads map
+// snake_case to camelCase at this boundary; callers only see camelCase.
+//
+// Backend notes callers must respect:
+// - Folders are plain workspace folders: no system/virtual taxonomy, no
+//   `quick-saves`, no asset counts. The island synthesizes the virtual
+//   `all` aggregate client-side; saving without a folder leaves the asset
+//   unfiled (visible under `all`). Deleting a folder unfiles its assets.
+// - Asset save is idempotent on `(workspace, provider, source_id)`.
+// - Materialization is an async job (`pending -> running ->
+//   completed|failed`); `materializeLibraryAssetForCanvas` polls the job
+//   and resolves display media through the shared delivery boundary.
 
 const LIBRARY_ID_RE = /^(?:libf|liba|libm)_[A-Za-z0-9_-]+$/
 
@@ -265,6 +276,17 @@ function workspaceLibraryHeaders(
   })
 }
 
+// Mutating endpoints require an `Idempotency-Key` (per-endpoint scope, see
+// openapi). Default to a scoped unique key so callers stay replay-safe
+// without threading keys through every island/popover call.
+function withLibraryIdempotency(
+  options: WorkspaceLibraryRequestOptions,
+  scope: string,
+): WorkspaceLibraryRequestOptions {
+  if (options.idempotencyKey) return options
+  return { ...options, idempotencyKey: `${scope}:${createUniqueId()}` }
+}
+
 export type WorkspaceLibraryPage<T> = {
   items: T[]
   nextCursor: string
@@ -327,9 +349,10 @@ export const workspaceLibraryApi = {
     name: string,
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<WorkspaceLibraryFolder> => {
+    const effective = withLibraryIdempotency(options, 'library:folder-create')
     const response = await api.request<unknown>(workspaceLibraryFoldersSuffix(workspaceId), {
       method: 'POST',
-      headers: workspaceLibraryHeaders(options),
+      headers: workspaceLibraryHeaders(effective),
       body: JSON.stringify({ data: { name } }),
       signal: options.signal,
     })
@@ -369,9 +392,10 @@ export const workspaceLibraryApi = {
     folderId: string,
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<void> => {
+    const effective = withLibraryIdempotency(options, 'library:folder-delete')
     await api.request<unknown>(workspaceLibraryFolderSuffix(workspaceId, folderId), {
       method: 'DELETE',
-      headers: workspaceLibraryHeaders(options),
+      headers: workspaceLibraryHeaders(effective),
       signal: options.signal,
     })
   },
@@ -402,9 +426,10 @@ export const workspaceLibraryApi = {
     input: WorkspaceLibraryAssetInput,
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<WorkspaceLibraryAsset> => {
+    const effective = withLibraryIdempotency(options, 'library:asset-save')
     const response = await api.request<unknown>(workspaceLibraryAssetsSuffix(workspaceId), {
       method: 'POST',
-      headers: workspaceLibraryHeaders(options),
+      headers: workspaceLibraryHeaders(effective),
       body: JSON.stringify({
         data: {
           provider: input.provider,
@@ -457,9 +482,10 @@ export const workspaceLibraryApi = {
     assetId: string,
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<void> => {
+    const effective = withLibraryIdempotency(options, 'library:asset-delete')
     await api.request<unknown>(workspaceLibraryAssetSuffix(workspaceId, assetId), {
       method: 'DELETE',
-      headers: workspaceLibraryHeaders(options),
+      headers: workspaceLibraryHeaders(effective),
       signal: options.signal,
     })
   },
@@ -499,11 +525,12 @@ export const workspaceLibraryApi = {
     libraryAssetId: string,
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<WorkspaceLibraryMaterialization> => {
+    const effective = withLibraryIdempotency(options, 'library:materialize')
     const response = await api.request<unknown>(
       workspaceLibraryMaterializationsSuffix(workspaceId),
       {
         method: 'POST',
-        headers: workspaceLibraryHeaders(options),
+        headers: workspaceLibraryHeaders(effective),
         body: JSON.stringify({ data: { library_asset_id: assertLibraryAssetId(libraryAssetId) } }),
         signal: options.signal,
       },
@@ -536,4 +563,276 @@ export const workspaceLibraryApi = {
       ),
     )
   },
+}
+
+// ---------------------------------------------------------------------------
+// Use-case layer (migrated from the deleted legacy `resource.ts`).
+//
+// Pure helpers keep their behavior; transport closes over an explicit
+// workspace id resolved from `features/workspace` (never duplicated here).
+// Callers pass `MaybeRefOrGetter`-style sources; this module resolves them
+// per call so workspace switches never use a stale id.
+
+/** Cross-surface save identity: `provider:source_id`. */
+export function libraryAssetKey(provider: string, sourceID: string): string {
+  return `${provider}:${sourceID}`
+}
+
+/** Returns a bandwidth-bounded URL for Library cards without changing the saved original. */
+export function resolveLibraryAssetCardURL(
+  asset: Pick<WorkspaceLibraryAsset, 'provider' | 'previewUrl'>,
+): string {
+  const source = asset.previewUrl.trim()
+  if (!source) return ''
+  try {
+    const url = new URL(source)
+    if (asset.provider === 'unsplash' && url.hostname.endsWith('images.unsplash.com')) {
+      url.searchParams.set('auto', 'format')
+      url.searchParams.set('fit', 'crop')
+      url.searchParams.set('w', '480')
+      url.searchParams.set('q', '75')
+    } else if (asset.provider === 'pexels' && url.hostname.endsWith('images.pexels.com')) {
+      url.searchParams.set('auto', 'compress')
+      url.searchParams.set('cs', 'tinysrgb')
+      url.searchParams.set('w', '480')
+    }
+    return url.toString()
+  } catch {
+    return source
+  }
+}
+
+/**
+ * Provider reference handed between Search/Feed and Library. Snake_case is
+ * the DnD wire contract (shared with search `domain/authAction`); the save
+ * input below maps it to camelCase at this boundary.
+ */
+export type LibrarySearchReference = {
+  provider: 'unsplash' | 'pexels'
+  id: string
+  source_url: string
+  preview_url: string
+  original_url: string
+  title: string
+  author: string
+  width: number
+  height: number
+}
+
+export function toWorkspaceLibraryAssetInput(
+  reference: LibrarySearchReference,
+  folderId?: string,
+): WorkspaceLibraryAssetInput {
+  if (folderId != null) assertLibraryFolderId(folderId)
+  return {
+    provider: reference.provider,
+    sourceId: reference.id,
+    sourceUrl: reference.source_url,
+    previewUrl: reference.preview_url,
+    originalUrl: reference.original_url,
+    title: reference.title,
+    author: reference.author,
+    width: reference.width,
+    height: reference.height,
+    ...(folderId == null ? {} : { folderId }),
+  }
+}
+
+/** Fail-closed workspace resolution: throws before any network call when unset. */
+export function requireWorkspaceId(value: string | null | undefined): string {
+  if (value == null || !value.trim()) throw new Error('Library workspace is unavailable.')
+  return assertWorkspaceId(value)
+}
+
+const LIBRARY_FOLDER_PAGE_SIZE = 100
+const LIBRARY_FOLDER_MAX_PAGES = 10
+
+/** Loads every workspace folder (cursor loop, bounded) for folder-facts snapshots. */
+export async function listAllWorkspaceLibraryFolders(
+  workspaceId: string,
+  options: WorkspaceLibraryRequestOptions = {},
+): Promise<WorkspaceLibraryFolder[]> {
+  const folders: WorkspaceLibraryFolder[] = []
+  let cursor: string | undefined
+  for (let page = 0; page < LIBRARY_FOLDER_MAX_PAGES; page += 1) {
+    const result = await workspaceLibraryApi.listFolders(workspaceId, {
+      ...options,
+      ...(cursor == null ? {} : { cursor }),
+      pageSize: LIBRARY_FOLDER_PAGE_SIZE,
+    })
+    folders.push(...result.items)
+    if (!result.hasMore || !result.nextCursor) return folders
+    cursor = result.nextCursor
+  }
+  return folders
+}
+
+export type WorkspaceLibrarySavedKey = {
+  provider: string
+  sourceId: string
+}
+
+/**
+ * Saved-state lookup for the Search feed: resolves references against saved
+ * workspace assets only (nothing is fetched) and returns `provider:source_id`
+ * keys for the resolved ones. Chunked to the backend batch bound.
+ */
+export async function lookupWorkspaceSavedAssetKeys(
+  workspaceId: string,
+  keys: WorkspaceLibrarySavedKey[],
+  options: WorkspaceLibraryRequestOptions = {},
+): Promise<Set<string>> {
+  const saved = new Set<string>()
+  for (let index = 0; index < keys.length; index += WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS) {
+    const chunk = keys.slice(index, index + WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS)
+    if (chunk.length === 0) continue
+    const results = await workspaceLibraryApi.resolveAssets(
+      workspaceId,
+      chunk.map((key) => ({ provider: key.provider, sourceId: key.sourceId })),
+      options,
+    )
+    for (const result of results) {
+      if (result.status !== 'resolved' || !result.asset) continue
+      saved.add(libraryAssetKey(result.asset.provider, result.asset.sourceId))
+    }
+  }
+  return saved
+}
+
+/** Saves a Search reference; creates the folder first when a new name is given. */
+export async function saveWorkspaceSearchReference(
+  workspaceId: string,
+  reference: LibrarySearchReference,
+  folderId?: string,
+  newFolderName?: string,
+  options: WorkspaceLibraryRequestOptions = {},
+): Promise<WorkspaceLibraryAsset> {
+  let targetFolderId = folderId
+  const trimmedName = newFolderName?.trim()
+  if (trimmedName) {
+    const folder = await workspaceLibraryApi.createFolder(workspaceId, trimmedName, options)
+    targetFolderId = folder.id
+  }
+  return workspaceLibraryApi.saveAsset(
+    workspaceId,
+    toWorkspaceLibraryAssetInput(reference, targetFolderId),
+    options,
+  )
+}
+
+/** Removes a saved Search reference (resolve, then delete the owned asset). */
+export async function removeWorkspaceSearchReference(
+  workspaceId: string,
+  provider: 'unsplash' | 'pexels',
+  sourceId: string,
+  options: WorkspaceLibraryRequestOptions = {},
+): Promise<void> {
+  const results = await workspaceLibraryApi.resolveAssets(
+    workspaceId,
+    [{ provider, sourceId }],
+    options,
+  )
+  const asset = results.find((result) => result.status === 'resolved' && result.asset)?.asset
+  if (!asset) return
+  await workspaceLibraryApi.deleteAsset(workspaceId, asset.id, options)
+}
+
+export type LibraryMaterializedMedia = {
+  mediaAssetId: string
+  url: string
+  width: number
+  height: number
+}
+
+export type LibraryAssetMaterializer = (assetId: string) => Promise<LibraryMaterializedMedia>
+
+export type LibraryMaterializeOptions = WorkspaceLibraryRequestOptions & {
+  pollAttempts?: number | undefined
+  pollDelayMs?: number | undefined
+}
+
+function materializeDelay(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('The request was aborted.', 'AbortError'))
+      return
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    function onAbort() {
+      clearTimeout(timer)
+      reject(new DOMException('The request was aborted.', 'AbortError'))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * Turns an owned workspace Library asset into a managed Media asset for
+ * Canvas: creates the materialization job, polls it to a terminal state,
+ * then resolves display media through the shared delivery boundary.
+ */
+export async function materializeLibraryAssetForCanvas(
+  workspaceId: string,
+  assetId: string,
+  options: LibraryMaterializeOptions = {},
+): Promise<LibraryMaterializedMedia> {
+  const fallback = i18n.global.t('library.errors.importAssetFailed')
+  const job = await workspaceLibraryApi.createMaterialization(workspaceId, assetId, options)
+  const snapshot = await pollLibraryMaterialization(workspaceId, job.id, options)
+  if (snapshot.status === 'failed') {
+    throw new Error(snapshot.errorMessage?.trim() || fallback)
+  }
+  if (snapshot.status !== 'completed') throw new Error(fallback)
+  return resolveMaterializedMedia(snapshot.mediaAssetId, options)
+}
+
+async function pollLibraryMaterialization(
+  workspaceId: string,
+  materializationId: string,
+  options: LibraryMaterializeOptions,
+): Promise<WorkspaceLibraryMaterialization> {
+  const fallback = i18n.global.t('library.errors.importAssetFailed')
+  const attempts = options.pollAttempts ?? 20
+  const delayMs = options.pollDelayMs ?? 1000
+  let snapshot = await workspaceLibraryApi.getMaterialization(
+    workspaceId,
+    materializationId,
+    options,
+  )
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (snapshot.status === 'completed' || snapshot.status === 'failed') return snapshot
+    await materializeDelay(delayMs, options.signal)
+    snapshot = await workspaceLibraryApi.getMaterialization(workspaceId, materializationId, options)
+  }
+  if (snapshot.status === 'completed' || snapshot.status === 'failed') return snapshot
+  throw new Error(fallback)
+}
+
+async function resolveMaterializedMedia(
+  mediaAssetId: string | undefined,
+  options: LibraryMaterializeOptions,
+): Promise<LibraryMaterializedMedia> {
+  const fallback = i18n.global.t('library.errors.importAssetFailed')
+  if (!mediaAssetId) throw new Error(fallback)
+  const metadata = await getMediaAssetMetadata(mediaAssetId, {
+    ...(options.signal == null ? {} : { signal: options.signal }),
+  })
+  const originalUrl = metadata.original?.url?.trim() ? metadata.original.url.trim() : ''
+  const previewUrl = metadata.derivatives['large-preview']?.url?.trim()
+    ? metadata.derivatives['large-preview'].url.trim()
+    : ''
+  const deliveryUrl = originalUrl || previewUrl
+  if (!deliveryUrl) throw new Error(fallback)
+  if (!Number.isFinite(metadata.width) || !Number.isFinite(metadata.height)) {
+    throw new Error(fallback)
+  }
+  return {
+    mediaAssetId,
+    url: resolveAssetUrl(deliveryUrl),
+    width: metadata.width,
+    height: metadata.height,
+  }
 }

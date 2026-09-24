@@ -1,14 +1,12 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import { uploadAdminAsset } from '../../../shared/api/generated-query/admin-assets/admin-assets'
+import { api } from '../../../shared/api/client'
 import {
-  getGetAdminBrandingSettingQueryKey,
-  updateAdminBrandingSetting,
-  useGetAdminBrandingSetting,
-} from '../../../shared/api/generated-query/admin-settings/admin-settings'
-import type { BrandingSetting } from '../../../shared/api/generated-query/model'
-import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
+  createApiDataSelector,
+  resolveApiData,
+  type ApiResponseWithData,
+} from '../../../shared/api/apiResponse'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import type { AdminBrandingSettingsFeedback } from './useSettingsFeedback'
 import {
@@ -19,20 +17,43 @@ import {
   resolveSiteBrandingLogoURL,
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
+  type BrandingSetting,
 } from '../../../shared/composables/useSiteBranding'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
+
+// Admin branding boundary (issue #809). The generated `admin-settings` and
+// `admin-assets` clients are gone but the backend admin plane still serves
+// `/api/admin/settings/branding` and `/api/admin/upload` with the shared
+// envelope, so this composable transports through the central `api.request`.
+const ADMIN_BRANDING_QUERY_KEY = ['admin', 'settings', 'branding'] as const
 const selectAdminBrandingSetting = createApiDataSelector<BrandingSetting>('加载项目品牌失败')
 
 export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
   const queryClient = useQueryClient()
-  const brandingQuery = useGetAdminBrandingSetting<BrandingSetting>({
-    query: { select: selectAdminBrandingSetting },
+  const brandingQuery = useQuery<
+    ApiResponseWithData<BrandingSetting>,
+    Error,
+    BrandingSetting
+  >({
+    queryKey: ADMIN_BRANDING_QUERY_KEY,
+    queryFn: ({ signal }) =>
+      api.request<ApiResponseWithData<BrandingSetting>>('/admin/settings/branding', {
+        method: 'GET',
+        ...(signal == null ? {} : { signal }),
+      }),
+    select: selectAdminBrandingSetting,
   })
   const setting = computed(() => brandingQuery.data.value)
   const loading = computed(() => brandingQuery.isLoading.value || brandingQuery.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (draft: BrandingSetting) =>
-      resolveApiData(updateAdminBrandingSetting(draft), '保存项目品牌失败'),
+      resolveApiData(
+        api.request<ApiResponseWithData<BrandingSetting>>('/admin/settings/branding', {
+          method: 'PUT',
+          body: draft as unknown as Record<string, unknown>,
+        }),
+        '保存项目品牌失败',
+      ),
   })
   const saving = computed(() => saveMutation.isPending.value)
   const lifecycle = useSettingsLifecycle({
@@ -49,7 +70,7 @@ export function useBrandingSettings(options: { feedback: AdminBrandingSettingsFe
       writeBrandingQueryCache(queryClient, savedSetting)
       writeSiteBrandingQueryCache(queryClient, savedSetting)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: getGetAdminBrandingSettingQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: ADMIN_BRANDING_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: SITE_BRANDING_QUERY_KEY }),
       ])
     },
@@ -107,8 +128,13 @@ function isSameBrandingSetting(current: BrandingSetting, synced: BrandingSetting
 
 async function uploadBrandingLogoFile(file: File): Promise<string> {
   const prepared = await prepareImageAssetForUpload(file, { compressionPolicy: 'none' })
+  const formData = new FormData()
+  formData.append('file', prepared.uploadFile)
   const data = await resolveApiData(
-    uploadAdminAsset({ file: prepared.uploadFile }),
+    api.request<ApiResponseWithData<{ url: string }>>('/admin/upload', {
+      method: 'POST',
+      body: formData,
+    }),
     '上传 Logo 失败',
   )
   if (!data.url) throw new Error('上传 Logo 失败')
@@ -116,7 +142,7 @@ async function uploadBrandingLogoFile(file: File): Promise<string> {
 }
 
 function writeBrandingQueryCache(queryClient: QueryClient, setting: BrandingSetting) {
-  queryClient.setQueryData(getGetAdminBrandingSettingQueryKey(), {
+  queryClient.setQueryData(ADMIN_BRANDING_QUERY_KEY, {
     code: 0,
     msg: 'ok',
     data: setting,

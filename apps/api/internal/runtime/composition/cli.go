@@ -1,11 +1,7 @@
 package composition
 
 import (
-	"errors"
-
 	"github.com/spf13/cobra"
-
-	"ideaboard/api/internal/media/reclamation"
 )
 
 // newRootCommand builds the process CLI. Subcommand names match the legacy
@@ -27,7 +23,6 @@ func newRootCommand() *cobra.Command {
 		newInitAdminCommand(),
 		newFinalizeMigrateCommand(),
 		newInitCreditWalletsCommand(),
-		newMediaReclamationCommand(),
 	)
 	return root
 }
@@ -78,27 +73,4 @@ func newInitCreditWalletsCommand() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func newMediaReclamationCommand() *cobra.Command {
-	reclamationCmd := &cobra.Command{
-		Use:   "media-reclamation",
-		Short: "Media storage consistency inspection",
-	}
-	scan := &cobra.Command{
-		Use:   "scan",
-		Short: "Report stale and orphaned media objects",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			staleAfter, _ := cmd.Flags().GetDuration("stale-after")
-			if staleAfter <= 0 {
-				return errors.New("stale-after must be greater than 0 (e.g. --stale-after=30m)")
-			}
-			runMediaReclamation(staleAfter)
-			return nil
-		},
-	}
-	scan.Flags().Duration("stale-after", reclamation.StaleUploadingAfter, "age after which uploading assets are reported as stale")
-	reclamationCmd.AddCommand(scan)
-	return reclamationCmd
 }

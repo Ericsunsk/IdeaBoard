@@ -1,7 +1,13 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LibraryMutationPublisher } from '../folderFacts'
-import { libraryAssetKey, saveSearchReference, type LibraryAssetView } from '../resource'
+import {
+  libraryAssetKey,
+  requireWorkspaceId,
+  saveWorkspaceSearchReference,
+  type LibrarySearchReference,
+} from '../workspace'
+import type { LibraryAssetView } from '../transfer'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
@@ -12,7 +18,11 @@ import {
 } from '../transfer'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
-import type { LibraryFolderTab, useLibraryWorkspace } from '../useLibraryWorkspace'
+import {
+  LIBRARY_ALL_FOLDER_KEY,
+  type LibraryFolderTab,
+  type useLibraryWorkspace,
+} from '../useLibraryWorkspace'
 
 export interface LibraryIslandDnDOptions {
   workspace: ReturnType<typeof useLibraryWorkspace>
@@ -45,7 +55,7 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
     ghost.style.zIndex = '9999'
 
     const img = document.createElement('img')
-    img.src = asset.preview_url
+    img.src = asset.previewUrl
     img.style.width = '100%'
     img.style.height = '100%'
     img.style.objectFit = 'cover'
@@ -70,7 +80,7 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
   async function handleDropIntoFolder(e: DragEvent, folderKey: string) {
     const libraryAssetID = readLibraryFolderMoveTransfer(e.dataTransfer)
     if (libraryAssetID) {
-      if (folderKey !== 'all') {
+      if (folderKey !== LIBRARY_ALL_FOLDER_KEY) {
         await workspace.moveSelectedAsset(libraryAssetID, folderKey)
       }
       return
@@ -95,23 +105,19 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
     await handleDropIntoFolder(e, folder.queryKey)
   }
 
-  async function saveReferenceToFolder(
-    reference: Parameters<typeof saveSearchReference>[0],
-    folderKey: string,
-  ) {
-    const targetFolder = workspace.folders.value.find((folder) => folder.query_key === folderKey)
+  async function saveReferenceToFolder(reference: LibrarySearchReference, folderKey: string) {
+    const targetFolder = workspace.folders.value.find((folder) => folder.id === folderKey)
     const targetFolderId =
-      targetFolder && !targetFolder.is_virtual && !targetFolder.is_system
-        ? targetFolder.id
-        : undefined
+      targetFolder && folderKey !== LIBRARY_ALL_FOLDER_KEY ? targetFolder.id : undefined
 
     try {
-      const asset = await saveSearchReference(reference, targetFolderId)
+      const workspaceId = requireWorkspaceId(workspace.workspaceId.value)
+      const asset = await saveWorkspaceSearchReference(workspaceId, reference, targetFolderId)
       await mutationPublisher.publishMutation({
         kind: 'asset-saved',
         provider: asset.provider,
-        sourceID: asset.source_id,
-        assetKey: libraryAssetKey(asset.provider, asset.source_id),
+        sourceID: asset.sourceId,
+        assetKey: libraryAssetKey(asset.provider, asset.sourceId),
         affectedFolderKeys: ['all', folderKey],
         galleryEffect: 'selection-will-reload',
       })

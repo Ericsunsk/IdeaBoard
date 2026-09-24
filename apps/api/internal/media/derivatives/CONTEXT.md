@@ -1,8 +1,8 @@
 # Media Derivatives Context
 
-`internal/media/derivatives` owns the asynchronous lifecycle, image rendering,
-consistency verification, and bounded repair of image derivative assets
-(thumbnails, previews, processing inputs).
+`internal/media/derivatives` owns the tier catalogue, provider-neutral input
+profiles, consistency verification, and bounded repair of image derivative
+assets (thumbnails, previews, processing inputs).
 It covers only transformed derivatives of original media assets,
 never the originals themselves.
 No production implementation lives at the package root;
@@ -15,14 +15,11 @@ application startup composes the canonical subpackages directly.
 - `ports`: contracts for storage access (`Storage`), integrity checking
   (`Verifier`), image rendering (`Renderer`), and event publishing
   (`EventPublisher`).
-- `application`: `processing` (claim, render, persist, complete, retry
-  scheduling); `reconciliation` (storage audit, orphan detection,
+- `application`: `reconciliation` (storage audit, orphan detection,
   invalidation notification); `repair` (transactional recovery
   under attempt caps).
-- `infrastructure`: `rendering` (`GoRenderer` native Catmull-Rom scaling,
-  optional `VipsRenderer` libvips CLI); `events` (`UserEventPublisher`
-  adapting domain events to NATS JetStream via `UserEventHub`);
-  `worker` (River `Worker`, `OutboxDispatcher`, Prometheus metrics).
+- `infrastructure`: `imgproxy` (signed on-demand pull URLs for display
+  tiers); `worker` (River `Worker`, `OutboxDispatcher`, Prometheus metrics).
 - `tests`: integration, edge-case, and scenario suite
   in an isolated test package.
 
@@ -39,15 +36,8 @@ application startup composes the canonical subpackages directly.
 
 ## Public Seams
 
-- `Renderer`: renders a derivative for a tier/format.
-  `GoRenderer` is the native implementation;
-  `VipsRenderer` is the optional libvips CLI.
 - `Storage`: derivative object persistence access.
 - `Verifier`: integrity checking of stored derivatives.
-- `EventPublisher` / `UserEventPublisher`: publishes domain events
-  to NATS JetStream via `UserEventHub`.
-- `processing`: coordinates claim, render, persist, complete,
-  and retry scheduling.
 - `reconciliation`: background audit of storage against records,
   orphan object detection, and invalidation notification.
 - `repair`: transactional recovery of missing/invalid records

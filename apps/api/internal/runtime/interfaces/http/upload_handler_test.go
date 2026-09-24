@@ -12,9 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/testsupport"
@@ -26,17 +24,6 @@ var (
 	errDedupeRetireBoom     = errors.New("retire boom")
 	errDedupeProbeTransient = errors.New("probe transient")
 )
-
-func dbsqlcMediaAssetStub() dbsqlc.MediaAsset {
-	return dbsqlc.MediaAsset{
-		ID:               7,
-		AssetID:          "asset_dedupe_stub",
-		OwnerUserID:      42,
-		StorageProfileID: "builtin-local",
-		StorageKey:       "uploads/canvas/owner/board/content/image.png",
-		Status:           "ready",
-	}
-}
 
 type fakeMediaUploadSettingsProvider struct {
 	setting settings.MediaUploadSetting
@@ -221,101 +208,4 @@ func TestUploadImageResponseUsesAvatarFieldForStoredReference(t *testing.T) {
 	if payload.Avatar != profileAvatarDeliveryURL || payload.URL != "" || payload.Ext != "webp" {
 		t.Fatalf("payload = %+v, want avatar response", payload)
 	}
-}
-
-type fakeDedupeProber struct {
-	object *ports.StoredUploadObject
-	err    error
-}
-
-func (f *fakeDedupeProber) ReadObjectAtProfile(context.Context, string, string, int64) (*ports.StoredUploadObject, error) {
-	return f.object, f.err
-}
-
-type fakeDedupeRetirer struct {
-	err   error
-	calls [][2]int64
-}
-
-func (f *fakeDedupeRetirer) RetireMissingOwnedMediaAsset(_ context.Context, ownerUserID, assetID int64) error {
-	f.calls = append(f.calls, [2]int64{ownerUserID, assetID})
-	return f.err
-}
-
-func TestConfirmDedupedBoardAssetGatesMissingObjects(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	newContext := func() (*gin.Context, *httptest.ResponseRecorder) {
-		recorder := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(recorder)
-		c.Request = httptest.NewRequest(http.MethodPost, "/uploads", nil)
-		return c, recorder
-	}
-	existing := dbsqlcMediaAssetStub()
-
-	t.Run("live object is served", func(t *testing.T) {
-		c, _ := newContext()
-		retirer := &fakeDedupeRetirer{}
-		got, found, ok := confirmDedupedBoardAsset(c,
-			&fakeDedupeProber{object: &ports.StoredUploadObject{Data: []byte{1}}},
-			retirer, 42, existing)
-		if !ok || !found || got.ID != existing.ID {
-			t.Fatalf("got id=%d found=%v ok=%v, want hit", got.ID, found, ok)
-		}
-		if len(retirer.calls) != 0 {
-			t.Fatal("retirer must not run for live objects")
-		}
-	})
-
-	t.Run("missing object retires and misses", func(t *testing.T) {
-		c, _ := newContext()
-		retirer := &fakeDedupeRetirer{}
-		_, found, ok := confirmDedupedBoardAsset(c,
-			&fakeDedupeProber{err: domain.ErrStoredObjectNotFound},
-			retirer, 42, existing)
-		if !ok || found {
-			t.Fatalf("found=%v ok=%v, want miss with ok", found, ok)
-		}
-		if len(retirer.calls) != 1 || retirer.calls[0] != [2]int64{42, existing.ID} {
-			t.Fatalf("retirer calls = %v", retirer.calls)
-		}
-	})
-
-	t.Run("empty object counts as missing", func(t *testing.T) {
-		c, _ := newContext()
-		retirer := &fakeDedupeRetirer{}
-		_, found, ok := confirmDedupedBoardAsset(c,
-			&fakeDedupeProber{object: &ports.StoredUploadObject{}},
-			retirer, 42, existing)
-		if !ok || found || len(retirer.calls) != 1 {
-			t.Fatalf("found=%v ok=%v calls=%v, want retired miss", found, ok, retirer.calls)
-		}
-	})
-
-	t.Run("retire failure is a 500", func(t *testing.T) {
-		c, recorder := newContext()
-		retirer := &fakeDedupeRetirer{err: errDedupeRetireBoom}
-		_, _, ok := confirmDedupedBoardAsset(c,
-			&fakeDedupeProber{err: domain.ErrStoredObjectNotFound},
-			retirer, 42, existing)
-		if ok {
-			t.Fatal("ok should be false when retirement fails")
-		}
-		if recorder.Code != http.StatusInternalServerError {
-			t.Fatalf("status = %d, want 500", recorder.Code)
-		}
-	})
-
-	t.Run("transient probe errors fail open", func(t *testing.T) {
-		c, _ := newContext()
-		retirer := &fakeDedupeRetirer{}
-		got, found, ok := confirmDedupedBoardAsset(c,
-			&fakeDedupeProber{err: errDedupeProbeTransient},
-			retirer, 42, existing)
-		if !ok || !found || got.ID != existing.ID {
-			t.Fatalf("got id=%d found=%v ok=%v, want fail-open hit", got.ID, found, ok)
-		}
-		if len(retirer.calls) != 0 {
-			t.Fatal("retirer must not run on transient errors")
-		}
-	})
 }

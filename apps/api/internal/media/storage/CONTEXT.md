@@ -21,7 +21,6 @@ task scheduling, or billing ledger facts.
 - `application`: `runtime` (upload, fetch, presign, object lifecycle);
   `profiles` (management, activation, credential testing);
   `authorization` (path and resource read/write authorization);
-  `taskmedia` (task-oriented media materialization and reading);
   `integrity` (SHA-256 post-write checksum verification).
 - `interfaces/http`: Gin controllers for admin storage profile management.
 - Root (`service.go`): composition surface for the runtime storage service;
@@ -41,7 +40,6 @@ task scheduling, or billing ledger facts.
 - `runtime`: upload, fetch, presign, and object lifecycle orchestration.
 - `profiles`: profile management, activation, and credential testing.
 - `authorization`: path and resource read/write authorization.
-- `taskmedia`: task-oriented media materialization and reading.
 - `integrity`: SHA-256 post-write checksum verification.
 - HTTP `interfaces`: Gin controllers for admin storage profile management.
 - `service.go`: root composition surface for the runtime storage service.

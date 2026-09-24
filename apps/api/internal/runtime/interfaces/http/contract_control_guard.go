@@ -117,6 +117,10 @@ type ContractControlDeps struct {
 	Idempotency       *contract.IdempotencyStore
 	RateLimiter       *ControlRateLimiter
 	AuditSink         ControlAuditSink
+	// Mail is the Auth-owned transactional mail seam behind the control
+	// mail-setting handlers (same instance serving legacy admin mail
+	// settings); nil keeps the mail routes fail-closed with 503.
+	Mail ControlMailService
 }
 
 func (d *ContractControlDeps) idempotencyStore() *contract.IdempotencyStore {
