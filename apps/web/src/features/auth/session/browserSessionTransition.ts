@@ -1,4 +1,5 @@
-import { fetchCurrentUserInfo, type User } from '../../../shared/api/userSession'
+import { fetchCurrentUserInfo } from '../../../shared/api/userSession'
+import type { User } from '../../../shared/api/sessionUser'
 import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
 import { USER_BOARDS_PATH, USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { normalizeSafeInternalRedirectPath } from '../../../shared/auth/sessionPolicy'

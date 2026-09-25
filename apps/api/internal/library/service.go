@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -36,9 +37,18 @@ import (
 //
 // Title/author have no durable columns (workspace assets keep provider
 // URL + source metadata only); inputs are validated by the seam and
-// reads return empty strings. Materialization methods fail closed with
-// ErrV1MaterializationUnavailable: completing a job needs a managed
-// Media Asset link, which lands in #820.
+// reads return empty strings.
+//
+// Materializations are durable jobs (pending -> running -> completed|
+// failed; terminal states immutable). The durable status word for
+// running is 'processing' (chk_library_materializations_status); the
+// store maps it at the boundary and enforces the machine in SQL
+// guards. Completion links a workspace-scoped Media Asset (the
+// caller's asset_... id resolves to media_assets.internal_id; unknown
+// links fail closed with the job left non-terminal). Failures persist
+// error_message only (no durable error_code column exists; reads
+// report an empty code) and rows carry no updated_at (reads report
+// completed_at, else created_at, as updated_at).
 type Service struct {
 	db *pgxpool.Pool
 	q  *dbsqlc.Queries
@@ -59,8 +69,19 @@ var errNotConfigured = errors.New("library service is not configured")
 // an unbounded scan. Keyset pagination is a follow-up; the handler
 // slices pages in memory like the in-memory store.
 const (
-	maxLibraryFolders = int32(500)
-	maxLibraryAssets  = int32(2000)
+	maxLibraryFolders          = int32(500)
+	maxLibraryAssets           = int32(2000)
+	maxLibraryMaterializations = int32(2000)
+)
+
+// Durable materialization status words (chk_library_materializations_
+// status). The public API exposes running; the table stores
+// processing. The store maps at the boundary in both directions.
+const (
+	libraryMaterializationDBPending    = "pending"
+	libraryMaterializationDBProcessing = "processing"
+	libraryMaterializationDBCompleted  = "completed"
+	libraryMaterializationDBFailed     = "failed"
 )
 
 // mintAttempts bounds public_id regeneration after a random collision.
@@ -239,6 +260,59 @@ func nullText(value string) pgtype.Text {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: value, Valid: true}
+}
+
+func isMaterializationPublicIDConflict(err error) bool {
+	if !database.IsDuplicateConstraintError(err) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "uq_library_materializations_public_id")
+}
+
+// v1MaterializationStatusFromDB maps the durable status word to the
+// public API word (processing -> running).
+func v1MaterializationStatusFromDB(status string) (V1MaterializationStatus, error) {
+	switch status {
+	case libraryMaterializationDBPending:
+		return V1MaterializationPending, nil
+	case libraryMaterializationDBProcessing:
+		return V1MaterializationRunning, nil
+	case libraryMaterializationDBCompleted:
+		return V1MaterializationCompleted, nil
+	case libraryMaterializationDBFailed:
+		return V1MaterializationFailed, nil
+	default:
+		return "", fmt.Errorf("library: unknown materialization status %q", status)
+	}
+}
+
+// materializationFromDetail builds the API snapshot from one joined
+// materialization row. Rows carry no updated_at: terminal records
+// report completed_at, non-terminal records created_at. error_code
+// has no durable column: reads always report an empty code.
+func materializationFromDetail(workspacePublicID, publicID, assetPublicID, dbStatus string, mediaAssetPublicID pgtype.Text, errorMessage string, createdAt, completedAt pgtype.Timestamptz) (*V1Materialization, error) {
+	status, err := v1MaterializationStatusFromDB(dbStatus)
+	if err != nil {
+		return nil, err
+	}
+	mediaAssetID := ""
+	if mediaAssetPublicID.Valid {
+		mediaAssetID = mediaAssetPublicID.String
+	}
+	updatedAt := dbutil.TimeValue(createdAt)
+	if completedAt.Valid {
+		updatedAt = completedAt.Time
+	}
+	return &V1Materialization{
+		WorkspacePublicID: workspacePublicID,
+		PublicID:          publicID,
+		AssetPublicID:     assetPublicID,
+		Status:            status,
+		MediaAssetID:      mediaAssetID,
+		ErrorMessage:      errorMessage,
+		CreatedAt:         dbutil.TimeValue(createdAt),
+		UpdatedAt:         updatedAt,
+	}, nil
 }
 
 // CreateFolder validates the display name (1..100 runes) and enforces
@@ -527,6 +601,73 @@ func (s *Service) SaveAsset(ctx context.Context, workspacePublicID string, input
 	return nil, false, errors.New("library: asset public id mint collision, retry the request")
 }
 
+// SaveManagedMediaAsset creates the workspace library reference for a task
+// output. The reference is keyed by (workspace, ProviderWorkspaceMedia,
+// sourceID), lives in Quick Saves, and points to an existing ready media asset.
+// Replays return the existing row with created=false.
+func (s *Service) SaveManagedMediaAsset(ctx context.Context, workspacePublicID, sourceID, mediaAssetID, publicID string) (*V1Asset, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
+		return nil, false, err
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	mediaAssetID = strings.TrimSpace(mediaAssetID)
+	publicID = strings.TrimSpace(publicID)
+	if sourceID == "" || len(sourceID) > 255 || !contract.IsAssetID(mediaAssetID) || !IsV1AssetID(publicID) {
+		return nil, false, ErrV1AssetNotFound
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, false, ErrV1AssetNotFound
+		}
+		return nil, false, err
+	}
+	if existing, err := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
+		WorkspaceID: workspaceInternalID, Provider: ProviderWorkspaceMedia, SourceID: sourceID,
+	}); err == nil {
+		return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
+	} else if !database.IsNotFound(err) {
+		return nil, false, err
+	}
+	media, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{
+		WorkspacePublicID: strings.TrimSpace(workspacePublicID), PublicID: mediaAssetID,
+	})
+	if database.IsNotFound(err) {
+		return nil, false, ErrV1AssetNotFound
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	folder, err := ensureQuickSavesFolderRow(ctx, q, workspaceInternalID)
+	if err != nil {
+		return nil, false, err
+	}
+	row, err := q.CreateManagedLibraryAsset(ctx, dbsqlc.CreateManagedLibraryAssetParams{
+		PublicID: publicID, WorkspaceID: workspaceInternalID, FolderID: folder.InternalID,
+		SourceID: sourceID, MediaAssetID: pgtype.Int8{Int64: media.InternalID, Valid: true},
+	})
+	if err == nil {
+		return assetFromLibraryAsset(strings.TrimSpace(workspacePublicID), folder.PublicID, row), true, nil
+	}
+	if isAssetPublicIDConflict(err) {
+		return nil, false, fmt.Errorf("save managed library asset: public id collision: %w", err)
+	}
+	if database.IsDuplicateConstraintError(err) {
+		existing, getErr := q.GetLibraryAssetByWorkspaceSource(ctx, dbsqlc.GetLibraryAssetByWorkspaceSourceParams{
+			WorkspaceID: workspaceInternalID, Provider: ProviderWorkspaceMedia, SourceID: sourceID,
+		})
+		if getErr == nil {
+			return assetFromWorkspaceSourceRow(strings.TrimSpace(workspacePublicID), existing), false, nil
+		}
+	}
+	return nil, false, fmt.Errorf("save managed library asset: %w", err)
+}
+
 // ListAssets returns every workspace asset in creation order; the
 // handler slices the stable page. Unknown workspaces list empty.
 func (s *Service) ListAssets(ctx context.Context, workspacePublicID string) ([]*V1Asset, error) {
@@ -751,37 +892,265 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 	return results, nil
 }
 
-// CreateMaterialization fails closed: durable materialization jobs need
-// a managed Media Asset link (media resolution + settlement land in
-// #820). See ErrV1MaterializationUnavailable.
+// CreateMaterialization opens a pending job for an owned workspace
+// asset. Unknown workspaces and unknown/malformed assets converge to
+// ErrV1AssetNotFound (parity with the in-memory store, where both
+// miss the same map); malformed job ids report
+// ErrV1MaterializationNotFound. No dedup key exists: one asset may
+// back many jobs and request idempotency stays handler-side
+// (library:materialize scope).
 func (s *Service) CreateMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*V1Materialization, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if _, err := s.dbWithContext(ctx).queries(); err != nil {
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
 		return nil, err
 	}
-	return nil, ErrV1MaterializationUnavailable
+	if !IsV1MaterializationID(strings.TrimSpace(publicID)) {
+		return nil, ErrV1MaterializationNotFound
+	}
+	if !IsV1AssetID(strings.TrimSpace(assetPublicID)) {
+		return nil, ErrV1AssetNotFound
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, ErrV1AssetNotFound
+		}
+		return nil, err
+	}
+	asset, err := q.GetLibraryAssetByPublicID(ctx, dbsqlc.GetLibraryAssetByPublicIDParams{
+		WorkspaceID: workspaceInternalID, PublicID: strings.TrimSpace(assetPublicID),
+	})
+	if database.IsNotFound(err) {
+		return nil, ErrV1AssetNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	trimmedWorkspace := strings.TrimSpace(workspacePublicID)
+	minted := strings.TrimSpace(publicID)
+	for attempt := 0; attempt < mintAttempts; attempt++ {
+		row, err := q.CreateLibraryMaterialization(ctx, dbsqlc.CreateLibraryMaterializationParams{
+			PublicID: minted, WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+		})
+		if isMaterializationPublicIDConflict(err) {
+			minted, err = NewV1MaterializationPublicID()
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("create library materialization: %w", err)
+		}
+		return materializationFromDetail(trimmedWorkspace, row.PublicID, asset.PublicID,
+			row.Status, pgtype.Text{}, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+	}
+	return nil, errors.New("library: materialization public id mint collision, retry the request")
 }
 
-// GetMaterialization fails closed (see CreateMaterialization).
+// GetMaterialization returns the status-addressable job snapshot.
+// Malformed, unknown, and cross-workspace ids converge to
+// ErrV1MaterializationNotFound.
 func (s *Service) GetMaterialization(ctx context.Context, workspacePublicID, materializationPublicID string) (*V1Materialization, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if _, err := s.dbWithContext(ctx).queries(); err != nil {
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
 		return nil, err
 	}
-	return nil, ErrV1MaterializationUnavailable
+	if !IsV1MaterializationID(strings.TrimSpace(materializationPublicID)) {
+		return nil, ErrV1MaterializationNotFound
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, ErrV1MaterializationNotFound
+		}
+		return nil, err
+	}
+	row, err := q.GetLibraryMaterializationByPublicID(ctx, dbsqlc.GetLibraryMaterializationByPublicIDParams{
+		WorkspaceID: workspaceInternalID, PublicID: strings.TrimSpace(materializationPublicID),
+	})
+	if database.IsNotFound(err) {
+		return nil, ErrV1MaterializationNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, row.AssetPublicID,
+		row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
 }
 
-// SetMaterializationResult fails closed (see CreateMaterialization).
+// ListMaterializations returns every workspace job in creation order
+// (concrete Service method only: the WorkspaceLibraryStore seam has no
+// list; the handler exposes status-addressable GETs). Unknown
+// workspaces list empty, matching the asset posture.
+func (s *Service) ListMaterializations(ctx context.Context, workspacePublicID string) ([]*V1Materialization, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
+		return nil, err
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return []*V1Materialization{}, nil
+		}
+		return nil, err
+	}
+	rows, err := q.ListLibraryMaterializations(ctx, dbsqlc.ListLibraryMaterializationsParams{
+		WorkspaceID: workspaceInternalID, RowLimit: maxLibraryMaterializations,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list library materializations: %w", err)
+	}
+	trimmedWorkspace := strings.TrimSpace(workspacePublicID)
+	out := make([]*V1Materialization, 0, len(rows))
+	for _, row := range rows {
+		record, err := materializationFromDetail(trimmedWorkspace, row.PublicID, row.AssetPublicID,
+			row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, record)
+	}
+	return out, nil
+}
+
+// materializationSnapshot reads back the stored record, mapping a
+// miss to ErrV1MaterializationNotFound. Transition misses land here:
+// terminal records report their snapshot so idempotent replays
+// converge instead of resurrecting jobs.
+func materializationSnapshot(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, workspaceInternalID int64, materializationPublicID string) (*V1Materialization, error) {
+	row, err := q.GetLibraryMaterializationByPublicID(ctx, dbsqlc.GetLibraryMaterializationByPublicIDParams{
+		WorkspaceID: workspaceInternalID, PublicID: materializationPublicID,
+	})
+	if database.IsNotFound(err) {
+		return nil, ErrV1MaterializationNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, row.AssetPublicID,
+		row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+}
+
+// resolveMaterializationMediaInternal maps the caller's asset_...
+// result link to its workspace-scoped media_assets.internal_id.
+// Unknown or cross-workspace links fail closed with the job left
+// non-terminal (safe to retry once Media settles).
+func resolveMaterializationMediaInternal(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, mediaAssetID string) (int64, error) {
+	trimmed := strings.TrimSpace(mediaAssetID)
+	if !contract.IsAssetID(trimmed) {
+		return 0, fmt.Errorf("library: invalid media asset id %q", trimmed)
+	}
+	row, err := q.GetMediaAssetByPublicID(ctx, dbsqlc.GetMediaAssetByPublicIDParams{
+		PublicID: trimmed, WorkspacePublicID: strings.TrimSpace(workspacePublicID),
+	})
+	if database.IsNotFound(err) {
+		return 0, fmt.Errorf("library: media asset %q not found in workspace", trimmed)
+	}
+	if err != nil {
+		return 0, err
+	}
+	return row.InternalID, nil
+}
+
+// SetMaterializationResult advances pending jobs through running to a
+// terminal completed|failed state. The machine is enforced in SQL
+// guards (pending -> processing -> completed|failed, with direct
+// pending -> completed|failed allowed): guarded misses read back the
+// stored snapshot, so terminal records are immutable and concurrent
+// settlers converge on the winner. Unknown statuses report
+// ErrV1MaterializationNotFound, except against terminal records,
+// which still report their snapshot (in-memory parity). errorCode is
+// accepted for seam stability but not persisted (no durable column);
+// completion requires a resolvable workspace-scoped asset_... link.
 func (s *Service) SetMaterializationResult(ctx context.Context, workspacePublicID, materializationPublicID string, status V1MaterializationStatus, mediaAssetID, errorCode, errorMessage string) (*V1Materialization, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if _, err := s.dbWithContext(ctx).queries(); err != nil {
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
 		return nil, err
 	}
-	return nil, ErrV1MaterializationUnavailable
+	if !IsV1MaterializationID(strings.TrimSpace(materializationPublicID)) {
+		return nil, ErrV1MaterializationNotFound
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, ErrV1MaterializationNotFound
+		}
+		return nil, err
+	}
+	jobID := strings.TrimSpace(materializationPublicID)
+	switch status {
+	case V1MaterializationRunning, V1MaterializationCompleted, V1MaterializationFailed:
+		// Proceed below.
+	default:
+		// Unknown words never advance a job: terminal records still
+		// report their snapshot (in-memory parity) while anything
+		// else reports not found.
+		snapshot, err := materializationSnapshot(ctx, q, workspacePublicID, workspaceInternalID, jobID)
+		if err != nil {
+			return nil, err
+		}
+		if snapshot.Status == V1MaterializationCompleted || snapshot.Status == V1MaterializationFailed {
+			return snapshot, nil
+		}
+		return nil, ErrV1MaterializationNotFound
+	}
+	switch status {
+	case V1MaterializationRunning:
+		row, err := q.StartLibraryMaterialization(ctx, dbsqlc.StartLibraryMaterializationParams{
+			WorkspaceID: workspaceInternalID, PublicID: jobID,
+		})
+		if err == nil {
+			return materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, row.AssetPublicID,
+				row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+		}
+		if !database.IsNotFound(err) {
+			return nil, fmt.Errorf("start library materialization: %w", err)
+		}
+		return materializationSnapshot(ctx, q, workspacePublicID, workspaceInternalID, jobID)
+	case V1MaterializationCompleted:
+		mediaInternalID, err := resolveMaterializationMediaInternal(ctx, q, workspacePublicID, mediaAssetID)
+		if err != nil {
+			return nil, err
+		}
+		row, err := q.CompleteLibraryMaterialization(ctx, dbsqlc.CompleteLibraryMaterializationParams{
+			WorkspaceID: workspaceInternalID, PublicID: jobID, MediaAssetID: pgtype.Int8{Int64: mediaInternalID, Valid: true},
+		})
+		if err == nil {
+			return materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, row.AssetPublicID,
+				row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+		}
+		if !database.IsNotFound(err) {
+			return nil, fmt.Errorf("complete library materialization: %w", err)
+		}
+		return materializationSnapshot(ctx, q, workspacePublicID, workspaceInternalID, jobID)
+	default: // V1MaterializationFailed
+		row, err := q.FailLibraryMaterialization(ctx, dbsqlc.FailLibraryMaterializationParams{
+			WorkspaceID: workspaceInternalID, PublicID: jobID, ErrorMessage: strings.TrimSpace(errorMessage),
+		})
+		if err == nil {
+			return materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, row.AssetPublicID,
+				row.Status, row.MediaAssetPublicID, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+		}
+		if !database.IsNotFound(err) {
+			return nil, fmt.Errorf("fail library materialization: %w", err)
+		}
+		return materializationSnapshot(ctx, q, workspacePublicID, workspaceInternalID, jobID)
+	}
 }

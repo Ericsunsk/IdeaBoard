@@ -47,9 +47,9 @@ package httpapi
 // failures reuse the #804 codes (billing_quote_unavailable 503,
 // billing_wallet_restricted 403).
 //
-// Production wiring leaves ContractV1LibraryDeps zero-valued until the
-// postgres mapping + credits/billing adapters land (#809); nil store
-// fails closed with 501, nil auxiliary seams with 503. Tests inject the
+// Production wiring supplies the postgres mapping and credits/billing
+// adapters. The remote media Materializer remains optional and fails closed
+// with 503 until its fetch/storage adapter is available. Tests inject the
 // in-memory store plus fakes.
 
 import (
@@ -98,9 +98,8 @@ type V1BillingQuoter interface {
 	Quote(ctx context.Context, workspacePublicID, sku string) (int64, error)
 }
 
-// ContractV1LibraryDeps wires the workspace library handlers. Zero
-// values fail closed; production fills every field when the postgres
-// mapping + adapters land (#809).
+// ContractV1LibraryDeps wires the workspace library handlers. Zero values
+// fail closed; production supplies the store and billing seams.
 type ContractV1LibraryDeps struct {
 	Store        library.WorkspaceLibraryStore
 	Materializer V1LibraryMaterializer
@@ -129,6 +128,18 @@ var (
 	// errV1BillingRestricted maps hold rejections (frozen/restricted/
 	// insufficient wallets) to 403 billing_wallet_restricted.
 	errV1BillingRestricted = errors.New("v1 billing wallet restricted")
+)
+
+// ErrV1BillingQuoteUnavailable and ErrV1BillingRestricted expose the
+// #804 billing failure identities to production adapters outside this
+// package (composition wires credits.Commands-backed settlers that must
+// report these identities without leaking provider errors). They alias
+// the unexported sentinels above, so errors.Is matches the branches in
+// runLibraryMaterialization/renderLibraryBillingError. Additive only:
+// no handler behavior changes.
+var (
+	ErrV1BillingQuoteUnavailable = errV1BillingQuoteUnavailable
+	ErrV1BillingRestricted       = errV1BillingRestricted
 )
 
 func (h *contractV1Handler) registerLibraryRoutes(group *gin.RouterGroup) {

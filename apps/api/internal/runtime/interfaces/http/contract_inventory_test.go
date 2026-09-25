@@ -1,15 +1,25 @@
 package httpapi
 
-// Contract inventory gate for issue #800 (API Contract Kernel).
+// Contract inventory gate for issue #800 (API Contract Kernel), flipped to
+// legacy-ZERO by the #809 hard cut.
 //
 // Scope: assert that every route registered by RegisterRoutes lands in
-// exactly one documentation bucket {public, control, auth, infra}, while
-// legacy /api/user and /api/admin routes are still present but only flagged
-// x-legacy. Hard failure on legacy routes is deferred to #809, so this file
-// logs warnings (undocumented endpoints, error codes, event types,
-// generated-client drift) instead of failing CI while #801-808 fill in the
-// skeleton contracts (openapi.public.yaml, openapi.control.yaml,
-// openapi.events.yaml).
+// exactly one documentation bucket {public, control, auth, infra}, and that
+// NO legacy /api/user or /api/admin route is registered anymore. There are
+// no compatibility aliases, no dual-read/dual-write, and no x-legacy
+// bucket: any legacy path is a hard CI failure.
+//
+// Notes on deliberate non-bans (verified live, not legacy):
+//   - platform/response + message_safe: the shared error envelope used by
+//     every live handler (v1, control, health, static, webhook).
+//   - principal.RequireAdmin + auth.AdminMiddleware: still referenced by
+//     domain admin handlers (mail/social providers, billing, credits,
+//     payments, search catalog) whose methods the Control Plane proxies
+//     under its capability guard, plus their in-package unit tests.
+//   - "/api/user..." string literals inside domain unit tests (auth,
+//     credits, storage, tasking, metrics, cors): opaque test URLs for
+//     middleware/handler units, not registered routes. This gate asserts
+//     on the registered router, never on source text.
 
 import (
 	"context"
@@ -19,24 +29,8 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/aigateway"
-	billinghttp "ideaboard/api/internal/billing/interfaces/http"
-	"ideaboard/api/internal/billingrecords"
-	"ideaboard/api/internal/boards"
-	credithttp "ideaboard/api/internal/credits/interfaces/http"
-	"ideaboard/api/internal/identity/auth"
-	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/media/storage"
-	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
-	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
-	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/rewards"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
-	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
-	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
-	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,9 +39,8 @@ import (
 type contractInventoryBucket string
 
 const (
-	bucketLegacy  contractInventoryBucket = "legacy"  // /api/user + /api/admin, x-legacy until #809
-	bucketPublic  contractInventoryBucket = "public"  // legacy public paths + new /api/v1 stubs
-	bucketControl contractInventoryBucket = "control" // new /api/control/v1 stubs
+	bucketPublic  contractInventoryBucket = "public"  // new /api/v1 + legacy public paths
+	bucketControl contractInventoryBucket = "control" // new /api/control/v1
 	bucketAuth    contractInventoryBucket = "auth"    // Better Auth transport, owned by apps/auth
 	bucketInfra   contractInventoryBucket = "infra"   // health/readiness, webhooks, internal, static bytes
 )
@@ -65,56 +58,21 @@ func newContractInventoryRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	RegisterRoutes(router, Dependencies{
-		UserRoutes: UserRouteDeps{
-			AuthHandler:            &auth.AuthHandler{},
-			TaskHandler:            &taskhttp.Handler{},
-			BoardHandler:           &boards.Handler{},
-			BillingHandler:         &billinghttp.Handler{},
-			BillingRecords:         &billingrecords.Handler{},
-			CreditUserHandler:      &credithttp.UserHandler{},
-			UsageHandler:           &usage.Handler{},
-			RewardUserHandler:      &rewards.UserHandler{},
-			PaymentUserHandler:     &paymenthttp.UserCheckoutHandler{},
-			UserEventStreamHandler: &UserEventStreamHandler{},
-			VisionHandler:          &searchhttp.VisionHandler{},
-		},
 		PublicSearchHandler: &searchhttp.SearchHandler{},
-		AdminRoutes: AdminRouteDeps{
-			AdminHandler:                &identityhttp.AdminHandler{},
-			MailConfigHandler:           &auth.MailConfigAdminHandler{},
-			SocialProviderHandler:       &auth.SocialProviderAdminHandler{},
-			AIGatewayHandler:            &aigateway.Handler{},
-			BillingHandler:              &billinghttp.Handler{},
-			CreditAdminCommandHandler:   &credithttp.AdminCommandHandler{},
-			CreditAdminReadHandler:      &credithttp.AdminReadHandler{},
-			CreditReconciliationHandler: &credithttp.ReconciliationHandler{},
-			TaskHandler:                 &taskhttp.Handler{},
-			TaskStatsHandler:            &statisticshttp.Handler{},
-			StorageHandler:              &storagehttp.Handler{},
-			FeaturePromptHandler:        &prompts.FeaturePromptHandler{},
-			StorageService:              &storage.Service{},
-			RewardAdminCommandHandler:   &rewards.AdminCommandHandler{},
-			RewardAdminReadHandler:      &rewards.AdminReadHandler{},
-			PaymentAdminHandler:         &paymenthttp.AdminHandler{},
-			SearchCatalogHandler:        &searchhttp.Handler{},
-			AdminBrandLogoHandler:       &adminbranding.Handler{},
-		},
-		PaymentWebhook: &paymenthttp.WebhookHandler{},
-		Internal:       InternalRouteDeps{UserHandler: &identityhttp.InternalHandler{}},
-		CORSMiddleware: func(c *gin.Context) { c.Next() },
-		RateLimit:      inventoryRateLimitStub{},
+		PaymentWebhook:      nil,
+		Internal:            InternalRouteDeps{},
+		CORSMiddleware:      func(c *gin.Context) { c.Next() },
+		RateLimit:           inventoryRateLimitStub{},
 	}, nil, FrontendRouteOptions{})
 	return router
 }
 
 // classifyContractRoute maps a registered path to exactly one bucket.
+// Legacy /api/user and /api/admin paths are unclassified on purpose:
+// they must not be registered anymore (see the legacy-zero test below).
 // Frontend SPA routes are not registered when frontendFS is nil.
 func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	switch {
-	case path == "/api/user" || strings.HasPrefix(path, "/api/user/"):
-		return bucketLegacy, true
-	case path == "/api/admin" || strings.HasPrefix(path, "/api/admin/"):
-		return bucketLegacy, true
 	case path == ContractControlGroupPath || strings.HasPrefix(path, ContractControlGroupPath+"/"):
 		return bucketControl, true
 	case path == ContractV1GroupPath || strings.HasPrefix(path, ContractV1GroupPath+"/"):
@@ -135,34 +93,41 @@ func classifyContractRoute(path string) (contractInventoryBucket, bool) {
 	}
 }
 
+// isLegacyCutPath reports the deleted legacy groups. Any registered route
+// under them is a hard-cut violation, not an undocumented endpoint.
+func isLegacyCutPath(path string) bool {
+	return path == "/api/user" || strings.HasPrefix(path, "/api/user/") ||
+		path == "/api/admin" || strings.HasPrefix(path, "/api/admin/")
+}
+
 func TestContractInventoryEveryRouteHasExactlyOneBucket(t *testing.T) {
 	router := newContractInventoryRouter()
 	counts := map[contractInventoryBucket]int{}
 	var legacy, unclassified []string
 	for _, route := range router.Routes() {
+		if isLegacyCutPath(route.Path) {
+			legacy = append(legacy, route.Method+" "+route.Path)
+			continue
+		}
 		bucket, ok := classifyContractRoute(route.Path)
 		if !ok {
 			unclassified = append(unclassified, route.Method+" "+route.Path)
 			continue
 		}
 		counts[bucket]++
-		if bucket == bucketLegacy {
-			legacy = append(legacy, route.Method+" "+route.Path)
-		}
+	}
+	if len(legacy) > 0 {
+		sort.Strings(legacy)
+		t.Fatalf("legacy /api/user and /api/admin routes must stay deleted post-#809 hard cut:\n%s",
+			strings.Join(legacy, "\n"))
 	}
 	if len(unclassified) > 0 {
 		sort.Strings(unclassified)
 		t.Fatalf("routes without a documentation bucket (CI must fail on undocumented endpoints):\n%s",
 			strings.Join(unclassified, "\n"))
 	}
-	if counts[bucketLegacy] == 0 {
-		t.Fatal("expected legacy /api/user and /api/admin routes to still be registered until #809")
-	}
-	sort.Strings(legacy)
-	t.Logf("route inventory buckets: public=%d control=%d legacy=%d auth=%d infra=%d",
-		counts[bucketPublic], counts[bucketControl], counts[bucketLegacy], counts[bucketAuth], counts[bucketInfra])
-	t.Logf("legacy routes still present (x-legacy: true, hard fail deferred to #809): %d routes, e.g.\n%s",
-		len(legacy), strings.Join(legacy[:min(5, len(legacy))], "\n"))
+	t.Logf("route inventory buckets: public=%d control=%d auth=%d infra=%d (legacy=0)",
+		counts[bucketPublic], counts[bucketControl], counts[bucketAuth], counts[bucketInfra])
 }
 
 func TestContractInventorySkeletonContractsExist(t *testing.T) {
@@ -238,8 +203,7 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"X-Webhook-Signature",
 		},
 		// Legacy openapi.yaml was deleted by the #809 hard cut; its absence
-		// is asserted by TestContractInventoryLegacyMarkersStayDeleted and
-		// TestContractInventoryLegacyGrepWarning below, not by markers here.
+		// is asserted by TestContractInventoryLegacySurfacesStayDeleted.
 	}
 	files := make([]string, 0, len(want))
 	for name := range want {
@@ -259,11 +223,11 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 	}
 }
 
-// TestContractInventoryLegacyGrepWarning lists legacy references, undocumented
-// endpoints/error codes/event types and generated-client drift as warnings.
-// Post-#809 the legacy openapi.yaml file itself must be gone (hard failure);
-// the remaining route-catalog warnings stay advisory.
-func TestContractInventoryLegacyGrepWarning(t *testing.T) {
+// TestContractInventoryLegacySurfacesStayDeleted pins the #809 hard cut:
+// the legacy route files, the fail-closed task-store stub, and the legacy
+// spec must stay deleted. (Error-code / event-type catalogs and
+// generated-client drift stay advisory warnings below, not hard gates.)
+func TestContractInventoryLegacySurfacesStayDeleted(t *testing.T) {
 	// The legacy spec was deleted by the #809 hard cut: fail if it returns.
 	legacySpec := filepath.Join("..", "..", "..", "..", "openapi.yaml")
 	if _, err := os.Stat(legacySpec); err == nil {
@@ -272,19 +236,38 @@ func TestContractInventoryLegacyGrepWarning(t *testing.T) {
 		t.Fatalf("stat legacy openapi.yaml: %v", err)
 	}
 
-	router := newContractInventoryRouter()
-	var undocumented []string
-	for _, route := range router.Routes() {
-		bucket, ok := classifyContractRoute(route.Path)
-		if !ok || bucket == bucketLegacy {
-			undocumented = append(undocumented, route.Method+" "+route.Path)
+	deleted := []string{
+		// Legacy route groups + handlers that existed only to serve them.
+		"routes_user.go",
+		"routes_admin.go",
+		"user_events.go",
+		"upload_handler.go",
+		"download_handler.go",
+		"media_asset_handler.go",
+		// Fail-closed legacy task-store stub (+ its pin test): the
+		// workspace-scoped store replaced every seam it covered.
+		filepath.Join("..", "composition", "legacy_task_store_stub.go"),
+		filepath.Join("..", "composition", "legacy_task_store_stub_test.go"),
+	}
+	for _, name := range deleted {
+		if _, err := os.Stat(name); err == nil {
+			t.Fatalf("legacy file %s must stay deleted post-#809 hard cut", name)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat %s: %v", name, err)
 		}
 	}
-	sort.Strings(undocumented)
-	t.Logf("WARNING (filled in by #801-808): %d registered routes not yet in the new Public/Control/Event "+
-		"skeleton contracts", len(undocumented))
 
-	t.Log("WARNING (placeholder): error-code and event-type catalog checks land with #801-808; " +
+	router := newContractInventoryRouter()
+	counts := map[contractInventoryBucket]int{}
+	for _, route := range router.Routes() {
+		if isLegacyCutPath(route.Path) {
+			t.Fatalf("registered legacy route %s %s must stay deleted post-#809 hard cut", route.Method, route.Path)
+		}
+		if bucket, ok := classifyContractRoute(route.Path); ok {
+			counts[bucket]++
+		}
+	}
+	t.Logf("WARNING (placeholder): error-code and event-type catalog checks land with #801-808; " +
 		"current known codes include task_idempotency_conflict, search_unavailable; " +
 		"current known event types include task.completed, task.failed, board.member_invited")
 

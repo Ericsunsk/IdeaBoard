@@ -1,14 +1,23 @@
 import { api } from '../../../shared/api/client'
+import { CONTROL_API_PREFIX } from '../../../shared/api/controlMutator'
 import {
   resolveApiData,
   type ApiResponseWithData,
 } from '../../../shared/api/apiResponse'
+import {
+  getGetControlStorageBucketInfoUrl,
+  getListControlStorageProfilesUrl,
+  getListControlStorageProvidersUrl,
+} from '../../../shared/api/generated-query/control/control-platform/control-platform'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 
-// Admin storage boundary (issue #809). The generated `admin-storage`
-// client is gone but the backend admin plane still serves
-// `/api/admin/storage/*` with the shared envelope, so this boundary
-// transports through the central `api.request` with local wire types.
+// Admin storage boundary (final cut, partial). Reads moved to the Control
+// Plane (`GET /api/control/v1/platform/storage/*`, guarded proxies keeping
+// the legacy `{code, msg, data}` envelope), so the fetch functions below
+// repoint at the generated Control paths with wire types untouched. The
+// save/apply/test/delete mutations stay on the legacy routes until the
+// admin UI collects the operator reason the Control mutation guard
+// requires — see the blocked list.
 export type GeneratedStorageProviderMeta = {
   provider: string
   label: string
@@ -88,7 +97,7 @@ export function createAdminStorageResource(): AdminStorageResource {
 async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<{ providers: GeneratedStorageProviderMeta[] }>>(
-      '/admin/storage/providers',
+      `${CONTROL_API_PREFIX}${getListControlStorageProvidersUrl()}`,
       { method: 'GET' },
     ),
     '加载存储供应商失败',
@@ -99,7 +108,7 @@ async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
 async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<{ profiles: GeneratedStorageProfile[] }>>(
-      '/admin/storage/profiles',
+      `${CONTROL_API_PREFIX}${getListControlStorageProfilesUrl()}`,
       { method: 'GET' },
     ),
     '加载存储配置失败',
@@ -167,7 +176,7 @@ async function deleteAdminStorageProfileRecord(id: string): Promise<{ message: s
 async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<{ info: { domains?: string[] } }>>(
-      `/admin/storage/profiles/${encodeURIComponent(id)}/bucket-info`,
+      `${CONTROL_API_PREFIX}${getGetControlStorageBucketInfoUrl(id)}`,
       { method: 'GET' },
     ),
     '获取 Bucket 信息失败',

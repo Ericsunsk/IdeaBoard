@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	tenancypg "ideaboard/api/internal/tenancy/postgres"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -44,6 +47,24 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 	return repositoryQueryer{ctx: ctx, db: s.db, q: s.q}
 }
 
+// BeginSettlementTx opens the caller-owned settlement transaction for the
+// workspacetasks single-transaction boundary (task flip + Credits
+// Capture/Release + River enqueue commit atomically). It satisfies
+// workspacetasks.SettlementTransactor; the Service owns commit/rollback.
+func (s *Store) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("tasking postgres: database pool not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("tasking postgres: begin settlement tx: %w", err)
+	}
+	return tx, nil
+}
+
+// Compile-time convergence with the settlement tx seam.
+var _ workspacetasks.TxTaskStore = (*Store)(nil)
+
 // workflowInputEnvelope is the tasks.workflow_input JSONB shape. Billing
 // snapshots are quote-time facts (the credits ledger owns settlement
 // truth); execution_token is the durable retry-fencing token; cancel
@@ -51,6 +72,7 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 type workflowInputEnvelope struct {
 	MediaAssetIDs   []string                        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any                  `json:"params,omitempty"`
+	CanonicalParams string                          `json:"canonical_params,omitempty"`
 	BillingSnapshot *workspacetasks.BillingSnapshot `json:"billing_snapshot,omitempty"`
 	ExecutionToken  string                          `json:"execution_token,omitempty"`
 	CancelReason    string                          `json:"cancel_reason,omitempty"`
@@ -77,10 +99,11 @@ func validTaskRef(workspaceID, taskID string) bool {
 
 func marshalEnvelope(task *workspacetasks.WorkspaceTask) ([]byte, error) {
 	envelope := workflowInputEnvelope{
-		MediaAssetIDs:  append([]string(nil), task.MediaAssetIDs...),
-		Params:         task.Params,
-		ExecutionToken: task.ExecutionToken,
-		CancelReason:   task.CancelReason,
+		MediaAssetIDs:   append([]string(nil), task.MediaAssetIDs...),
+		Params:          task.Params,
+		CanonicalParams: task.CanonicalParams,
+		ExecutionToken:  task.ExecutionToken,
+		CancelReason:    task.CancelReason,
 	}
 	if task.BillingSnapshot.SKU != "" || task.BillingSnapshot.TotalCredits != 0 || task.BillingSnapshot.HoldTransactionID != "" {
 		snapshot := task.BillingSnapshot
@@ -142,21 +165,22 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		completed = dbutil.TimePtr(row.CancelledAt)
 	}
 	task := &workspacetasks.WorkspaceTask{
-		ID:             row.PublicID,
-		WorkspaceID:    strings.TrimSpace(workspacePublicID),
-		OwnerUserID:    row.SubmitterUserID,
-		WorkflowKind:   row.WorkflowType,
-		MediaAssetIDs:  append([]string(nil), envelope.MediaAssetIDs...),
-		Params:         envelope.Params,
-		Status:         row.Status,
-		RetryCount:     int(row.RetryCount),
-		ExecutionToken: envelope.ExecutionToken,
-		OutputRefs:     append([]workspacetasks.OutputRef(nil), outputs...),
-		ErrorMsg:       row.ErrorMessage,
-		CancelReason:   envelope.CancelReason,
-		CreatedAt:      dbutil.TimeValue(row.CreatedAt),
-		UpdatedAt:      dbutil.TimeValue(row.UpdatedAt),
-		CompletedAt:    completed,
+		ID:              row.PublicID,
+		WorkspaceID:     strings.TrimSpace(workspacePublicID),
+		OwnerUserID:     row.SubmitterUserID,
+		WorkflowKind:    row.WorkflowType,
+		MediaAssetIDs:   append([]string(nil), envelope.MediaAssetIDs...),
+		Params:          envelope.Params,
+		CanonicalParams: envelope.CanonicalParams,
+		Status:          row.Status,
+		RetryCount:      int(row.RetryCount),
+		ExecutionToken:  envelope.ExecutionToken,
+		OutputRefs:      append([]workspacetasks.OutputRef(nil), outputs...),
+		ErrorMsg:        row.ErrorMessage,
+		CancelReason:    envelope.CancelReason,
+		CreatedAt:       dbutil.TimeValue(row.CreatedAt),
+		UpdatedAt:       dbutil.TimeValue(row.UpdatedAt),
+		CompletedAt:     completed,
 	}
 	if envelope.BillingSnapshot != nil {
 		task.BillingSnapshot = *envelope.BillingSnapshot
@@ -179,35 +203,13 @@ func resolveWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID 
 }
 
 // resolveBillingAccount returns the workspace billing account (1:1),
-// provisioning it on demand. Task inserts must never fail on a missing
-// billing account; full billing lifecycle stays in #804.
+// provisioning it on demand through the canonical tenancy helper. Task
+// inserts must never fail on a missing billing account; full billing
+// lifecycle stays in #804.
 func resolveBillingAccount(ctx context.Context, q *dbsqlc.Queries, workspaceInternalID int64) (int64, error) {
-	workspaceID := pgtype.Int8{Int64: workspaceInternalID, Valid: true}
-	row, err := q.GetBillingAccountByWorkspaceID(ctx, workspaceID)
-	if err == nil {
-		return row.InternalID, nil
-	}
-	if !database.IsNotFound(err) {
+	created, err := tenancypg.EnsureBillingAccountForWorkspaceWithQueries(ctx, q, workspaceInternalID)
+	if err != nil {
 		return 0, err
-	}
-	publicID, mintErr := contract.MintPublicID("ba_", 12)
-	if mintErr != nil {
-		return 0, mintErr
-	}
-	created, createErr := q.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID:       publicID,
-		WorkspaceID:    pgtype.Int8{Int64: workspaceInternalID, Valid: true},
-		OrganizationID: pgtype.Int8{},
-	})
-	if createErr != nil {
-		if database.IsDuplicateConstraintError(createErr) {
-			existing, getErr := q.GetBillingAccountByWorkspaceID(ctx, workspaceID)
-			if getErr != nil {
-				return 0, notFound(getErr)
-			}
-			return existing.InternalID, nil
-		}
-		return 0, createErr
 	}
 	return created.InternalID, nil
 }
@@ -233,17 +235,118 @@ func loadOutputs(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, task
 }
 
 func (s *Store) mapRowWithOutputs(ctx context.Context, workspacePublicID string, row dbsqlc.Task) (*workspacetasks.WorkspaceTask, error) {
-	outputs, err := loadOutputs(ctx, s.dbWithContext(ctx).q, workspacePublicID, row.PublicID)
+	return s.mapRowWithOutputsWithQueries(ctx, s.dbWithContext(ctx).q, workspacePublicID, row)
+}
+
+func (s *Store) mapRowWithOutputsWithQueries(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, row dbsqlc.Task) (*workspacetasks.WorkspaceTask, error) {
+	outputs, err := loadOutputs(ctx, q, workspacePublicID, row.PublicID)
 	if err != nil {
 		return nil, err
 	}
 	return mapTaskRow(workspacePublicID, row, outputs)
 }
 
+func (s *Store) getTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error) {
+	return getTaskWithQueries(ctx, q, workspaceID, taskID)
+}
+
+func getTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	taskID = strings.TrimSpace(taskID)
+	if !validTaskRef(workspaceID, taskID) {
+		return nil, workspacetasks.ErrNotFound
+	}
+	row, err := q.GetWorkspaceTaskByPublicID(ctx, dbsqlc.GetWorkspaceTaskByPublicIDParams{
+		PublicID:          taskID,
+		WorkspacePublicID: workspaceID,
+	})
+	if err != nil {
+		return nil, notFound(err)
+	}
+	outputs, err := loadOutputs(ctx, q, workspaceID, row.PublicID)
+	if err != nil {
+		return nil, err
+	}
+	return mapTaskRow(workspaceID, row, outputs)
+}
+
 // CreateTask inserts a pending task. The input carries Service-validated
 // facts; the repository re-validates the discriminated union (canonical
 // workflow kind, asset shapes, params) so direct callers fail closed too.
 func (s *Store) CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
+	return createTaskWithQueries(ctx, s.dbWithContext(ctx).q, task)
+}
+
+// CreateTaskInTx inserts a pending task inside the caller's settlement
+// transaction (single-transaction Quote -> Hold -> Insert -> Enqueue).
+func (s *Store) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	return createTaskWithQueries(ctx, s.q.WithTx(tx), task)
+}
+
+// CreateBillingFactsInTx records the immutable quote and initial settlement
+// state alongside the task insert transaction.
+func (s *Store) CreateBillingFactsInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
+	if tx == nil || task == nil {
+		return fmt.Errorf("tasking postgres: billing facts require transaction and task")
+	}
+	snapshot := task.BillingSnapshot
+	if _, err := tx.Exec(ctx, `
+INSERT INTO task_billing_snapshots (
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		task.ID, task.OwnerUserID, task.WorkflowKind, snapshot.SKU, snapshot.DisplayName,
+		snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution,
+		snapshot.UnitCredits, snapshot.Quantity, snapshot.TotalCredits, snapshot.QuotedAt,
+		nilIfEmpty(snapshot.HoldTransactionID)); err != nil {
+		return fmt.Errorf("insert task billing snapshot: %w", err)
+	}
+	if snapshot.SettlementState != "held" && snapshot.SettlementState != "free" {
+		return fmt.Errorf("insert task billing settlement: invalid initial state %q", snapshot.SettlementState)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO task_billing_settlements (task_id, state, settled_at) VALUES ($1,$2,CASE WHEN $2 = 'free' THEN clock_timestamp() ELSE NULL END)`, task.ID, snapshot.SettlementState); err != nil {
+		return fmt.Errorf("insert task billing settlement: %w", err)
+	}
+	return nil
+}
+
+func nilIfEmpty(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return value
+}
+
+// SetBillingSettlementInTx updates only the mutable settlement read model.
+// The snapshot itself remains immutable by database trigger contract.
+func (s *Store) SetBillingSettlementInTx(ctx context.Context, tx pgx.Tx, taskID, state string, outputCount, captured, released int64, captureTransactionID, releaseTransactionID string) error {
+	if tx == nil {
+		return fmt.Errorf("tasking postgres: billing settlement transaction is nil")
+	}
+	if state != "captured" && state != "released" {
+		return fmt.Errorf("update task billing settlement: invalid terminal state %q", state)
+	}
+	var settledAt *time.Time
+	now := time.Now().UTC()
+	settledAt = &now
+	tag, err := tx.Exec(ctx, `UPDATE task_billing_settlements
+SET state=$2, actual_output_count=$3, captured_credits=$4, released_credits=$5,
+    capture_transaction_id=$6, release_transaction_id=$7, settled_at=$8
+WHERE task_id=$1`, taskID, state, outputCount, captured, released,
+		nilIfEmpty(captureTransactionID), nilIfEmpty(releaseTransactionID), settledAt)
+	if err != nil {
+		return fmt.Errorf("update task billing settlement: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("update task billing settlement: task %q not found", taskID)
+	}
+	return nil
+}
+
+func createTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
 	if task == nil {
 		return nil, fmt.Errorf("tasking postgres: task is nil: %w", workspacetasks.ErrValidation)
 	}
@@ -272,16 +375,15 @@ func (s *Store) CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTa
 	if err != nil {
 		return nil, err
 	}
-	dbCtx := s.dbWithContext(ctx)
-	workspaceInternalID, err := resolveWorkspace(ctx, dbCtx.q, workspaceID)
+	workspaceInternalID, err := resolveWorkspace(ctx, q, workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	billingAccountID, err := resolveBillingAccount(ctx, dbCtx.q, workspaceInternalID)
+	billingAccountID, err := resolveBillingAccount(ctx, q, workspaceInternalID)
 	if err != nil {
 		return nil, err
 	}
-	row, err := dbCtx.q.CreateWorkspaceTask(ctx, dbsqlc.CreateWorkspaceTaskParams{
+	row, err := q.CreateWorkspaceTask(ctx, dbsqlc.CreateWorkspaceTaskParams{
 		PublicID:         taskID,
 		WorkspaceID:      workspaceInternalID,
 		SubmitterUserID:  stored.OwnerUserID,
@@ -301,19 +403,7 @@ func (s *Store) CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTa
 
 // GetTask resolves a workspace-scoped task with its outputs.
 func (s *Store) GetTask(ctx context.Context, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error) {
-	workspaceID = strings.TrimSpace(workspaceID)
-	taskID = strings.TrimSpace(taskID)
-	if !validTaskRef(workspaceID, taskID) {
-		return nil, workspacetasks.ErrNotFound
-	}
-	row, err := s.dbWithContext(ctx).q.GetWorkspaceTaskByPublicID(ctx, dbsqlc.GetWorkspaceTaskByPublicIDParams{
-		PublicID:          taskID,
-		WorkspacePublicID: workspaceID,
-	})
-	if err != nil {
-		return nil, notFound(err)
-	}
-	return s.mapRowWithOutputs(ctx, workspaceID, row)
+	return s.getTaskWithQueries(ctx, s.dbWithContext(ctx).q, workspaceID, taskID)
 }
 
 // ListTasks pages workspace tasks newest-first with limit/offset (the v1
@@ -404,7 +494,11 @@ func (s *Store) DeleteTask(ctx context.Context, workspaceID, taskID string) erro
 // cross-workspace id -> ErrNotFound) from a terminal-state guard
 // (-> ErrStateConflict) after a transition UPDATE matched zero rows.
 func (s *Store) convergeFailedUpdate(ctx context.Context, workspaceID, taskID string) error {
-	current, err := s.GetTask(ctx, workspaceID, taskID)
+	return convergeFailedUpdateWithQueries(ctx, s.dbWithContext(ctx).q, workspaceID, taskID)
+}
+
+func convergeFailedUpdateWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID, taskID string) error {
+	current, err := getTaskWithQueries(ctx, q, workspaceID, taskID)
 	if err != nil {
 		return err
 	}
@@ -445,6 +539,19 @@ func (s *Store) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken s
 // and releases the lease. Terminal tasks replay idempotently
 // (already=true).
 func (s *Store) CancelTask(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
+	return cancelTaskWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, actorUserID, reason)
+}
+
+// CancelTaskInTx flips to cancelled inside the caller's settlement
+// transaction (state flip + Credits Release commit atomically).
+func (s *Store) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
+	if tx == nil {
+		return nil, false, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	return cancelTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, actorUserID, reason)
+}
+
+func cancelTaskWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	taskID = strings.TrimSpace(taskID)
 	if !validTaskRef(workspaceID, taskID) {
@@ -458,7 +565,7 @@ func (s *Store) CancelTask(ctx context.Context, workspaceID, taskID string, acto
 	if actorUserID > 0 {
 		cancelledBy = pgtype.Int8{Int64: actorUserID, Valid: true}
 	}
-	row, err := s.dbWithContext(ctx).q.CancelWorkspaceTask(ctx, dbsqlc.CancelWorkspaceTaskParams{
+	row, err := q.CancelWorkspaceTask(ctx, dbsqlc.CancelWorkspaceTaskParams{
 		CancelledByUserID: cancelledBy,
 		CancelReason:      reason,
 		PublicID:          taskID,
@@ -468,7 +575,7 @@ func (s *Store) CancelTask(ctx context.Context, workspaceID, taskID string, acto
 		if !database.IsNotFound(err) {
 			return nil, false, err
 		}
-		current, getErr := s.GetTask(ctx, workspaceID, taskID)
+		current, getErr := getTaskWithQueries(ctx, q, workspaceID, taskID)
 		if getErr != nil {
 			return nil, false, getErr
 		}
@@ -477,7 +584,7 @@ func (s *Store) CancelTask(ctx context.Context, workspaceID, taskID string, acto
 		}
 		return nil, false, workspacetasks.ErrStateConflict
 	}
-	mapped, err := s.mapRowWithOutputs(ctx, workspaceID, row)
+	mapped, err := s.mapRowWithOutputsWithQueries(ctx, q, workspaceID, row)
 	if err != nil {
 		return nil, false, err
 	}
@@ -581,6 +688,19 @@ func (s *Store) AddOutputs(ctx context.Context, workspaceID, taskID string, outp
 // pending with retry_count incremented, the lease released, and the fresh
 // execution token recorded in the envelope.
 func (s *Store) TransitionForRetry(ctx context.Context, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
+	return transitionForRetryWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, newToken)
+}
+
+// TransitionForRetryInTx consumes one retry budget entry inside the
+// caller's settlement transaction (retry flip + River requeue atomic).
+func (s *Store) TransitionForRetryInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	return transitionForRetryWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, newToken)
+}
+
+func transitionForRetryWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	taskID = strings.TrimSpace(taskID)
 	newToken = strings.TrimSpace(newToken)
@@ -590,18 +710,18 @@ func (s *Store) TransitionForRetry(ctx context.Context, workspaceID, taskID, new
 	if newToken == "" {
 		return nil, fmt.Errorf("tasking postgres: execution token required: %w", workspacetasks.ErrValidation)
 	}
-	row, err := s.dbWithContext(ctx).q.RetryWorkspaceTask(ctx, dbsqlc.RetryWorkspaceTaskParams{
+	row, err := q.RetryWorkspaceTask(ctx, dbsqlc.RetryWorkspaceTaskParams{
 		ExecutionToken:    newToken,
 		PublicID:          taskID,
 		WorkspacePublicID: workspaceID,
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
-			return nil, s.convergeFailedUpdate(ctx, workspaceID, taskID)
+			return nil, convergeFailedUpdateWithQueries(ctx, q, workspaceID, taskID)
 		}
 		return nil, err
 	}
-	return s.mapRowWithOutputs(ctx, workspaceID, row)
+	return s.mapRowWithOutputsWithQueries(ctx, q, workspaceID, row)
 }
 
 // CompleteTask flips a live task to completed and persists outputs
@@ -619,22 +739,12 @@ func (s *Store) CompleteTask(ctx context.Context, workspaceID, taskID string, ou
 	}
 	var completed *workspacetasks.WorkspaceTask
 	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
-		row, err := q.CompleteWorkspaceTask(ctx, dbsqlc.CompleteWorkspaceTaskParams{
-			PublicID:          taskID,
-			WorkspacePublicID: workspaceID,
-		})
+		done, err := completeTaskWithQueries(ctx, q, workspaceID, taskID, outputs)
 		if err != nil {
 			return err
 		}
-		if err := insertOutputRefs(ctx, q, workspaceID, taskID, 0, outputs); err != nil {
-			return err
-		}
-		loaded, err := loadOutputs(ctx, q, workspaceID, taskID)
-		if err != nil {
-			return err
-		}
-		completed, err = mapTaskRow(workspaceID, row, loaded)
-		return err
+		completed = done
+		return nil
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -645,9 +755,68 @@ func (s *Store) CompleteTask(ctx context.Context, workspaceID, taskID string, ou
 	return completed, nil
 }
 
+// CompleteTaskInTx flips to completed (persisting outputs) inside the
+// caller's settlement transaction (state flip + outputs + Credits
+// Capture commit atomically).
+func (s *Store) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	taskID = strings.TrimSpace(taskID)
+	if !validTaskRef(workspaceID, taskID) {
+		return nil, workspacetasks.ErrNotFound
+	}
+	for _, ref := range outputs {
+		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
+			return nil, err
+		}
+	}
+	if tx == nil {
+		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	q := s.q.WithTx(tx)
+	completed, err := completeTaskWithQueries(ctx, q, workspaceID, taskID, outputs)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, convergeFailedUpdateWithQueries(ctx, q, workspaceID, taskID)
+		}
+		return nil, err
+	}
+	return completed, nil
+}
+
+func completeTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID, taskID string, outputs []workspacetasks.OutputRef) (*workspacetasks.WorkspaceTask, error) {
+	row, err := q.CompleteWorkspaceTask(ctx, dbsqlc.CompleteWorkspaceTaskParams{
+		PublicID:          taskID,
+		WorkspacePublicID: workspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := insertOutputRefs(ctx, q, workspaceID, taskID, 0, outputs); err != nil {
+		return nil, err
+	}
+	loaded, err := loadOutputs(ctx, q, workspaceID, taskID)
+	if err != nil {
+		return nil, err
+	}
+	return mapTaskRow(workspaceID, row, loaded)
+}
+
 // FailTask flips a live task to failed with the terminal error and
 // releases the lease.
 func (s *Store) FailTask(ctx context.Context, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+	return failTaskWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, errorMsg)
+}
+
+// FailTaskInTx flips to failed inside the caller's settlement transaction
+// (state flip + Credits Release commit atomically).
+func (s *Store) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	return failTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, errorMsg)
+}
+
+func failTaskWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	taskID = strings.TrimSpace(taskID)
 	if !validTaskRef(workspaceID, taskID) {
@@ -657,16 +826,16 @@ func (s *Store) FailTask(ctx context.Context, workspaceID, taskID, errorMsg stri
 	if errorMsg == "" {
 		errorMsg = "task failed"
 	}
-	row, err := s.dbWithContext(ctx).q.FailWorkspaceTask(ctx, dbsqlc.FailWorkspaceTaskParams{
+	row, err := q.FailWorkspaceTask(ctx, dbsqlc.FailWorkspaceTaskParams{
 		ErrorMessage:      errorMsg,
 		PublicID:          taskID,
 		WorkspacePublicID: workspaceID,
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
-			return nil, s.convergeFailedUpdate(ctx, workspaceID, taskID)
+			return nil, convergeFailedUpdateWithQueries(ctx, q, workspaceID, taskID)
 		}
 		return nil, err
 	}
-	return s.mapRowWithOutputs(ctx, workspaceID, row)
+	return s.mapRowWithOutputsWithQueries(ctx, q, workspaceID, row)
 }

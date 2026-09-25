@@ -1,5 +1,10 @@
 package httpapi
 
+// The legacy /api/user + /api/admin upload bypasses were deleted with the
+// #809 hard cut: no POST path bypasses the global JSON body limit anymore
+// (the v1 workspace upload/media surface is JSON session-based). These
+// tests pin the always-false classifier, including its nil-safety.
+
 import (
 	"net/http"
 	"net/url"
@@ -12,13 +17,14 @@ func TestIsUploadRequestClassifiesURLPathsWithoutFilesystemCleaning(t *testing.T
 		path string
 		want bool
 	}{
-		{name: "profile avatar", path: "/api/user/profile/avatar", want: true},
-		{name: "admin upload", path: "/api/admin/upload", want: true},
-		{name: "vision extract", path: "/api/user/search/vision-extract", want: true},
-		{name: "board upload", path: "/api/user/boards/board-1/uploads", want: true},
+		{name: "legacy profile avatar bypass is gone", path: "/api/user/profile/avatar", want: false},
+		{name: "legacy admin upload bypass is gone", path: "/api/admin/upload", want: false},
+		{name: "legacy vision extract bypass is gone", path: "/api/user/search/vision-extract", want: false},
+		{name: "legacy board upload bypass is gone", path: "/api/user/boards/board-1/uploads", want: false},
 		{name: "board traversal is not reclassified", path: "/api/user/boards/board-1/../uploads", want: false},
 		{name: "board missing id", path: "/api/user/boards//uploads", want: false},
 		{name: "board extra segment", path: "/api/user/boards/board-1/uploads/", want: false},
+		{name: "v1 workspace upload honors the global limit", path: "/api/v1/workspaces/ws_123/uploads", want: false},
 	}
 
 	for _, tt := range tests {

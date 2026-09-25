@@ -1,14 +1,18 @@
 import { api } from '../../../shared/api/client'
+import { CONTROL_API_PREFIX } from '../../../shared/api/controlMutator'
 import {
   resolveApiData,
   type ApiResponseWithData,
 } from '../../../shared/api/apiResponse'
+import { getListControlFeaturePromptsUrl } from '../../../shared/api/generated-query/control/control-platform/control-platform'
 
-// Admin feature prompt boundary (issue #809). The generated
-// `admin-feature-prompts` client is gone but the backend admin plane still
-// serves `/api/admin/feature-prompts*` with the shared envelope, so this
-// boundary transports through the central `api.request` with local wire
-// types.
+// Admin feature prompt boundary (final cut, partial). The list read moved
+// to the Control Plane (`GET /api/control/v1/platform/feature-prompts`, a
+// guarded proxy keeping the legacy `{code, msg, data}` envelope), so
+// `fetchAdminFeaturePrompts` repoints at the generated Control path with
+// wire types untouched. `saveAdminFeaturePrompt` stays on the legacy route
+// until the admin UI collects the operator reason the Control mutation
+// guard requires — see the blocked list.
 export type FeaturePrompt = {
   feature_slug: string
   prompt: string
@@ -25,9 +29,12 @@ export type SaveFeaturePromptInput = {
 
 export async function fetchAdminFeaturePrompts(): Promise<FeaturePrompt[]> {
   const data = await resolveApiData(
-    api.request<ApiResponseWithData<{ prompts: FeaturePrompt[] }>>('/admin/feature-prompts', {
-      method: 'GET',
-    }),
+    api.request<ApiResponseWithData<{ prompts: FeaturePrompt[] }>>(
+      `${CONTROL_API_PREFIX}${getListControlFeaturePromptsUrl()}`,
+      {
+        method: 'GET',
+      },
+    ),
     '加载提示词失败',
   )
   return data.prompts ?? []

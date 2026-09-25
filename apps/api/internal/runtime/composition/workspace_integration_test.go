@@ -25,10 +25,13 @@ package composition
 //  5. Settlement: workspacetasks.Service Create over the REAL postgres
 //     store with stub quoter/holder/queue proves Quote->Hold->Insert->
 //     Enqueue plus enqueue-failure rollback (row deleted, hold released).
+//     These stubs lack the Tx seams, so this scenario exercises the
+//     compensating fallback; the single-transaction boundary itself is
+//     proven in workspacetasks/settle_atomic_test.go (fixture DB, real
+//     Credits ledger + Billing catalog).
 //
 // What this does NOT prove (documented residuals): actual image generation
-// (worker consumes workspace_task_execute in Phase-4b), single shared PG
-// transaction across settlement (compensating today), derivative rendering
+// (worker consumes workspace_task_execute in Phase-4b), derivative rendering
 // (renderer nil), library materialization (503), single-tx billing.
 
 import (
@@ -259,6 +262,7 @@ CREATE TABLE library_assets (
   source_url TEXT NOT NULL,
   preview_url TEXT NOT NULL,
   original_url TEXT NOT NULL,
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   width INT NOT NULL DEFAULT 0,
   height INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -266,9 +270,13 @@ CREATE TABLE library_assets (
   CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
   CONSTRAINT uq_library_assets_workspace_source UNIQUE (workspace_id, provider, source_id),
   CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
-  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels')),
+  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels','workspace_media')),
   CONSTRAINT chk_library_assets_source_id CHECK (length(btrim(source_id)) > 0),
-  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0)
+  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
+  CONSTRAINT chk_library_assets_reference_shape CHECK (
+    (provider = 'workspace_media' AND media_asset_id IS NOT NULL AND source_url = '' AND preview_url = '' AND original_url = '')
+    OR (provider IN ('unsplash','pexels') AND media_asset_id IS NULL AND source_url <> '' AND preview_url <> '' AND original_url <> '')
+  )
 );
 `
 
@@ -455,8 +463,8 @@ func TestWorkspaceIntegrationUploadLibrary(t *testing.T) {
 		FolderPublicID: folder.PublicID,
 		Asset: library.AssetInput{
 			Provider: library.ProviderUnsplash, SourceID: "inttest-1",
-			SourceURL: "https://images.unsplash.com/inttest-1",
-			PreviewURL: "https://images.unsplash.com/inttest-1",
+			SourceURL:   "https://images.unsplash.com/inttest-1",
+			PreviewURL:  "https://images.unsplash.com/inttest-1",
 			OriginalURL: "https://images.unsplash.com/inttest-1",
 		},
 	}, assetPublicID)

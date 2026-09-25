@@ -81,7 +81,7 @@ describe('ImageNodeStage Library import recovery', () => {
         stageWidth: 280,
         stageHeight: 280,
         displayImage: { url: 'https://provider.example/preview.png' },
-        libraryImport: { state: 'pending', libraryAssetId: 7 },
+        libraryImport: { state: 'pending', libraryAssetId: 'lasset_asset0007' },
         active: false,
         dragging: false,
       },
@@ -103,7 +103,7 @@ describe('ImageNodeStage Library import recovery', () => {
         displayImage: null,
         libraryImport: {
           state: 'failed',
-          libraryAssetId: 7,
+          libraryAssetId: 'lasset_asset0007',
           failureMessage: '素材导入失败',
         },
         active: false,

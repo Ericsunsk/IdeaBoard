@@ -60,12 +60,10 @@ const imageNodeOutputItemSchema = v.strictObject({
 
 const libraryAssetOpaqueIdSchema = v.pipe(
   v.string(),
-  v.regex(/^liba_[A-Za-z0-9_-]+$/),
+  v.regex(/^lasset_[A-Za-z0-9_-]+$/),
 )
 
-// Numeric ids stay valid only so legacy persisted snapshots keep loading;
-// new facts always carry the opaque workspace id.
-const libraryAssetIdSchema = v.union([positiveIntegerSchema, libraryAssetOpaqueIdSchema])
+const libraryAssetIdSchema = libraryAssetOpaqueIdSchema
 
 const libraryImportFactSchema = v.union([
   v.strictObject({

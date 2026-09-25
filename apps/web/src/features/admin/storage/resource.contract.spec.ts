@@ -81,7 +81,7 @@ describe('createAdminStorageResource', () => {
       },
       {
         method: 'GET',
-        path: '/api/admin/storage/profiles/profile-1/bucket-info',
+        path: '/api/control/v1/platform/storage/profiles/profile-1/bucket-info',
         search: '',
       },
       {
@@ -108,7 +108,7 @@ describe('createAdminStorageResource', () => {
 
   it('uses the resource fallback when a successful response omits required data', async () => {
     useMswHandlers(
-      http.get('/api/admin/storage/providers', () => {
+      http.get('/api/control/v1/platform/storage/providers', () => {
         return HttpResponse.json({ code: 0, msg: 'success' })
       }),
     )
@@ -119,7 +119,7 @@ describe('createAdminStorageResource', () => {
 
   it('normalizes provider field lists when the API returns null for providers without fields', async () => {
     useMswHandlers(
-      http.get('/api/admin/storage/providers', () => {
+      http.get('/api/control/v1/platform/storage/providers', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -153,7 +153,7 @@ describe('createAdminStorageResource', () => {
 
 function storageQueryHandlers() {
   return [
-    http.get('/api/admin/storage/providers', () => {
+    http.get('/api/control/v1/platform/storage/providers', () => {
       return HttpResponse.json({
         code: 0,
         msg: 'ok',
@@ -162,7 +162,7 @@ function storageQueryHandlers() {
         },
       })
     }),
-    http.get('/api/admin/storage/profiles', () => {
+    http.get('/api/control/v1/platform/storage/profiles', () => {
       return HttpResponse.json({
         code: 0,
         msg: 'ok',
@@ -223,7 +223,7 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
         },
       })
     }),
-    http.get('/api/admin/storage/profiles/:id/bucket-info', ({ request }) => {
+    http.get('/api/control/v1/platform/storage/profiles/:id/bucket-info', ({ request }) => {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({

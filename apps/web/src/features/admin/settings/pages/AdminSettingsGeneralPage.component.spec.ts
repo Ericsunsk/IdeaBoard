@@ -18,7 +18,7 @@ describe('AdminSettingsGeneralPage', () => {
           data: { project_name: 'IdeaBoard Test', logo_url: '' },
         }),
       ),
-      http.get('/api/admin/search/providers', () =>
+      http.get('/api/control/v1/platform/search/providers', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',

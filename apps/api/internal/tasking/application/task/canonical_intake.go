@@ -45,6 +45,44 @@ type compiledTaskExecution struct {
 	typedParams *tasks.WorkflowTaskParams
 }
 
+// CompilerWorkspaceMediaAssetIDsParam carries workspace public asset ids into
+// canonical compilation without persisting the HTTP envelope field in Extra.
+const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
+
+// CompileWorkspaceParams applies canonical submit ordering to a workspace v1
+// task envelope and returns the durable typed parameter JSON.
+func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
+	feature = strings.TrimSpace(feature)
+	if feature == "" {
+		return "", validation.New("feature 不能为空")
+	}
+	working := make(map[string]interface{}, len(params)+1)
+	for key, value := range params {
+		working[key] = value
+	}
+	if err := normalizeSubmitExecutionMap(working, feature); err != nil {
+		return "", err
+	}
+	plan, err := compileSubmitExecutionPlan(working, feature)
+	if err != nil {
+		return "", err
+	}
+	typed, err := finalizeSubmitTypedParams(working, feature, plan)
+	if err != nil {
+		return "", err
+	}
+	prompt := strings.TrimSpace(userPrompt)
+	snapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
+		Plan: plan, UserPrompt: prompt, CompiledPrompt: prompt,
+		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt), Params: typed,
+	})
+	if err != nil {
+		return "", err
+	}
+	typed.Generation = &snapshot
+	return marshalWorkflowTaskParams(typed, working)
+}
+
 // normalizeSubmitExecutionMap runs stage 1 of the canonical submit ordering.
 // Contract normalization must precede media-fact derivation so fusion weights
 // and structured prompt fields are canonical before anything reads them.
@@ -255,7 +293,7 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 func workflowExtraParamsFromMap(params map[string]interface{}) map[string]interface{} {
 	var extra map[string]interface{}
 	for key, value := range params {
-		if key == "model" || paramkeys.IsKnownSubmitTaskParamKey(key) {
+		if key == "model" || key == CompilerWorkspaceMediaAssetIDsParam || paramkeys.IsKnownSubmitTaskParamKey(key) {
 			continue
 		}
 		if extra == nil {
@@ -393,6 +431,11 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 		media.Inputs = append(media.Inputs, mediaRefsFromAssetIDs(assetIDs, tasks.MediaRoleInput)...)
 		hasMedia = true
 	}
+	publicAssetIDs := collectPublicAssetIDs(params[CompilerWorkspaceMediaAssetIDsParam])
+	if len(publicAssetIDs) > 0 {
+		media.Inputs = append(media.Inputs, mediaRefsFromPublicAssetIDs(publicAssetIDs, tasks.MediaRoleInput)...)
+		hasMedia = true
+	}
 	referenceAssetIDs := collectInt64List(params[paramkeys.ReferenceImageAssetIDs])
 	if len(referenceAssetIDs) > 0 {
 		media.References = append(media.References, mediaRefsFromAssetIDs(referenceAssetIDs, tasks.MediaRoleReference)...)
@@ -447,6 +490,37 @@ func mediaRefsFromAssetIDs(assetIDs []int64, role string) []tasks.MediaRef {
 	refs := make([]tasks.MediaRef, 0, len(assetIDs))
 	for _, id := range assetIDs {
 		refs = append(refs, tasks.MediaRef{AssetID: id, Role: role})
+	}
+	return refs
+}
+
+func collectPublicAssetIDs(raw interface{}) []string {
+	var values []string
+	switch typed := raw.(type) {
+	case []string:
+		values = append(values, typed...)
+	case []interface{}:
+		for _, value := range typed {
+			if id, ok := value.(string); ok {
+				values = append(values, id)
+			}
+		}
+	case string:
+		values = append(values, typed)
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func mediaRefsFromPublicAssetIDs(assetIDs []string, role string) []tasks.MediaRef {
+	refs := make([]tasks.MediaRef, 0, len(assetIDs))
+	for _, id := range assetIDs {
+		refs = append(refs, tasks.MediaRef{PublicAssetID: strings.TrimSpace(id), Role: role})
 	}
 	return refs
 }

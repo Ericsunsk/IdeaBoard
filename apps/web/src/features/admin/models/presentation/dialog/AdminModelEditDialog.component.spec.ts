@@ -24,7 +24,7 @@ describe('AdminModelEditDialog', () => {
           },
         })
       }),
-      http.get('/api/admin/settings/ai-gateway/providers', () => {
+      http.get('/api/control/v1/platform/ai-gateway/providers', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',

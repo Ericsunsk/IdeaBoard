@@ -14,8 +14,10 @@ import (
 
 // libraryTestDDL is the minimal fixture for the postgres Service,
 // copied verbatim from the canonical schema snapshot (users,
-// workspaces, library_folders, library_assets with their CHECKs and
-// FKs). It intentionally excludes the legacy library_asset_media_assets
+// workspaces, library_folders, library_assets, library_materializations
+// with their CHECKs and FKs, plus the minimal upload_sessions +
+// media_assets rows the materialization result link resolves through).
+// It intentionally excludes the legacy library_asset_media_assets
 // association, whose references to the dropped user-scoped tables no
 // longer apply; the canonical snapshot itself is being repaired
 // separately (see the #818 report).
@@ -87,6 +89,7 @@ CREATE TABLE library_assets (
   source_url TEXT NOT NULL,
   preview_url TEXT NOT NULL,
   original_url TEXT NOT NULL,
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   width INT NOT NULL DEFAULT 0,
   height INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -94,17 +97,95 @@ CREATE TABLE library_assets (
   CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
   CONSTRAINT uq_library_assets_workspace_source UNIQUE (workspace_id, provider, source_id),
   CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
-  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels')),
+  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels','workspace_media')),
   CONSTRAINT chk_library_assets_source_id CHECK (length(btrim(source_id)) > 0),
-  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0)
+  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
+  CONSTRAINT chk_library_assets_reference_shape CHECK (
+    (provider = 'workspace_media' AND media_asset_id IS NOT NULL AND source_url = '' AND preview_url = '' AND original_url = '')
+    OR (provider IN ('unsplash','pexels') AND media_asset_id IS NULL AND source_url <> '' AND preview_url <> '' AND original_url <> '')
+  )
+);
+
+CREATE TABLE upload_sessions (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  uploader_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  declared_mime_type TEXT NOT NULL,
+  declared_size_bytes BIGINT NOT NULL,
+  declared_checksum TEXT NULL,
+  storage_key TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  completed_at TIMESTAMPTZ NULL,
+  expired_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_upload_sessions_public_id UNIQUE (public_id),
+  CONSTRAINT chk_upload_sessions_public_id CHECK (public_id LIKE 'upload\_%'),
+  CONSTRAINT chk_upload_sessions_size_positive CHECK (declared_size_bytes > 0),
+  CONSTRAINT chk_upload_sessions_status CHECK (status IN ('pending','transferring','completed','expired','failed')),
+  CONSTRAINT chk_upload_sessions_completion CHECK (
+    (status = 'completed' AND completed_at IS NOT NULL AND storage_key IS NOT NULL)
+    OR (status = 'expired' AND expired_at IS NOT NULL)
+    OR (status IN ('pending','transferring','failed'))
+  )
+);
+
+CREATE TABLE media_assets (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  upload_session_id BIGINT NOT NULL REFERENCES upload_sessions(internal_id) ON DELETE RESTRICT,
+  owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  storage_key TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  checksum TEXT NOT NULL,
+  media_kind TEXT NOT NULL,
+  width INT NULL,
+  height INT NULL,
+  duration_ms INT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  archived_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_media_assets_public_id UNIQUE (public_id),
+  CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_key),
+  CONSTRAINT chk_media_assets_public_id CHECK (public_id LIKE 'asset\_%'),
+  CONSTRAINT chk_media_assets_size_positive CHECK (size_bytes > 0),
+  CONSTRAINT chk_media_assets_media_kind CHECK (media_kind IN ('image','video','audio','document','other')),
+  CONSTRAINT chk_media_assets_dimensions CHECK (
+    (media_kind = 'image' AND width > 0 AND height > 0)
+    OR (media_kind != 'image')
+  ),
+  CONSTRAINT chk_media_assets_metadata CHECK (jsonb_typeof(metadata) = 'object')
+);
+
+CREATE TABLE library_materializations (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_id TEXT NOT NULL,
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  library_asset_id BIGINT NOT NULL REFERENCES library_assets(internal_id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
+  error_message TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ NULL,
+  CONSTRAINT uq_library_materializations_public_id UNIQUE (public_id),
+  CONSTRAINT chk_library_materializations_public_id CHECK (public_id LIKE 'lmat\_%'),
+  CONSTRAINT chk_library_materializations_status CHECK (status IN ('pending','processing','completed','failed')),
+  CONSTRAINT chk_library_materializations_completion CHECK (
+    (status = 'completed' AND media_asset_id IS NOT NULL AND completed_at IS NOT NULL)
+    OR (status = 'failed' AND completed_at IS NOT NULL)
+    OR (status IN ('pending','processing'))
+  )
 );
 `
 
 type libraryTestEnv struct {
-	pool *pgxpool.Pool
-	svc  *Service
-	wsA  string
-	wsB  string
+	pool   *pgxpool.Pool
+	svc    *Service
+	userID int64
+	wsA    string
+	wsB    string
 }
 
 const libraryTestAssetURL = "https://images.unsplash.com/photo-test"
@@ -179,7 +260,7 @@ func openLibraryTestEnv(t *testing.T) *libraryTestEnv {
 	wsB := fmt.Sprintf("ws_libtest_b_%d", time.Now().UnixNano()%1000000)
 	seedWorkspace(wsA, "lib-a")
 	seedWorkspace(wsB, "lib-b")
-	return &libraryTestEnv{pool: pool, svc: NewService(pool), wsA: wsA, wsB: wsB}
+	return &libraryTestEnv{pool: pool, svc: NewService(pool), userID: userID, wsA: wsA, wsB: wsB}
 }
 
 func mustFolderID(t *testing.T, ctx context.Context, svc *Service, ws, name string) string {
@@ -215,6 +296,66 @@ func mustSaveAsset(t *testing.T, ctx context.Context, svc *Service, ws, sourceID
 		t.Fatalf("asset id = %q, want lasset_ shape", asset.PublicID)
 	}
 	return asset
+}
+
+// libraryWorkspaceInternalID resolves the fixture workspace row for
+// direct seed inserts (media link fixtures bypass the store).
+func libraryWorkspaceInternalID(t *testing.T, ctx context.Context, env *libraryTestEnv, ws string) int64 {
+	t.Helper()
+	var internalID int64
+	if err := env.pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = $1`, ws).Scan(&internalID); err != nil {
+		t.Fatalf("resolve workspace %s: %v", ws, err)
+	}
+	return internalID
+}
+
+// mustSeedMediaAsset inserts a completed upload session + image media
+// asset for the workspace and returns its asset_... public id. Tags
+// must be unique per call (storage_key uniqueness).
+func mustSeedMediaAsset(t *testing.T, ctx context.Context, env *libraryTestEnv, ws, tag string) string {
+	t.Helper()
+	wsInternalID := libraryWorkspaceInternalID(t, ctx, env, ws)
+	mediaPublicID := fmt.Sprintf("asset_libtest_%s", tag)
+	var uploadID int64
+	if err := env.pool.QueryRow(ctx,
+		`INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status, completed_at)
+		 VALUES ($1, $2, $3, 'image/png', 10, 'chk', $4, 'completed', now()) RETURNING internal_id`,
+		fmt.Sprintf("upload_libtest_%s", tag), wsInternalID, env.userID, fmt.Sprintf("test-storage-key-%s", tag),
+	).Scan(&uploadID); err != nil {
+		t.Fatalf("seed upload session: %v", err)
+	}
+	if _, err := env.pool.Exec(ctx,
+		`INSERT INTO media_assets (public_id, workspace_id, upload_session_id, owner_user_id, storage_key, mime_type, size_bytes, checksum, media_kind, width, height, metadata)
+		 VALUES ($1, $2, $3, $4, $5, 'image/png', 10, 'chk', 'image', 100, 80, '{}')`,
+		mediaPublicID, wsInternalID, uploadID, env.userID, fmt.Sprintf("test-media-key-%s", tag),
+	); err != nil {
+		t.Fatalf("seed media asset: %v", err)
+	}
+	return mediaPublicID
+}
+
+// mustCreateMaterialization opens a pending job and asserts the open
+// shape (pending, no link, no error).
+func mustCreateMaterialization(t *testing.T, ctx context.Context, svc *Service, ws, assetPublicID string) *V1Materialization {
+	t.Helper()
+	publicID, err := NewV1MaterializationPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := svc.CreateMaterialization(ctx, ws, assetPublicID, publicID)
+	if err != nil {
+		t.Fatalf("create materialization: %v", err)
+	}
+	if !IsV1MaterializationID(record.PublicID) {
+		t.Fatalf("materialization id = %q, want lmat_ shape", record.PublicID)
+	}
+	if record.Status != V1MaterializationPending || record.AssetPublicID != assetPublicID {
+		t.Fatalf("materialization = %+v, want pending job for %s", record, assetPublicID)
+	}
+	if record.MediaAssetID != "" || record.ErrorMessage != "" {
+		t.Fatalf("materialization = %+v, want no link and no error", record)
+	}
+	return record
 }
 
 func TestLibraryServicePublicIDShapes(t *testing.T) {
@@ -526,17 +667,250 @@ func TestLibraryServiceResolve(t *testing.T) {
 	}
 }
 
-func TestLibraryServiceMaterializationUnavailable(t *testing.T) {
+func TestLibraryServiceMaterializationLifecycle(t *testing.T) {
 	env := openLibraryTestEnv(t)
 	ctx := context.Background()
 
-	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "lasset_missing", "lmat_abc"); !errors.Is(err, ErrV1MaterializationUnavailable) {
-		t.Fatalf("create materialization = %v, want unavailable", err)
+	asset := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-life", "")
+	record := mustCreateMaterialization(t, ctx, env.svc, env.wsA, asset.PublicID)
+	if record.WorkspacePublicID != env.wsA {
+		t.Fatalf("workspace = %q, want %q", record.WorkspacePublicID, env.wsA)
 	}
-	if _, err := env.svc.GetMaterialization(ctx, env.wsA, "lmat_abc"); !errors.Is(err, ErrV1MaterializationUnavailable) {
-		t.Fatalf("get materialization = %v, want unavailable", err)
+
+	got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, "lmat_abc", V1MaterializationRunning, "", "", ""); !errors.Is(err, ErrV1MaterializationUnavailable) {
-		t.Fatalf("set materialization = %v, want unavailable", err)
+	if got.Status != V1MaterializationPending || got.AssetPublicID != asset.PublicID {
+		t.Fatalf("get = %+v, want pending job", got)
 	}
+
+	running, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if running.Status != V1MaterializationRunning {
+		t.Fatalf("start = %+v, want running", running)
+	}
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationRunning {
+		t.Fatalf("get running = %+v, %v; want running", got, err)
+	}
+
+	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "life")
+	completed, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != V1MaterializationCompleted || completed.MediaAssetID != mediaPublicID {
+		t.Fatalf("complete = %+v, want completed with link %s", completed, mediaPublicID)
+	}
+	if !completed.UpdatedAt.After(completed.CreatedAt) && !completed.UpdatedAt.Equal(completed.CreatedAt) {
+		t.Fatalf("complete updated_at = %v, want >= created_at %v", completed.UpdatedAt, completed.CreatedAt)
+	}
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationCompleted || got.MediaAssetID != mediaPublicID {
+		t.Fatalf("get completed = %+v, %v; want completed with link", got, err)
+	}
+}
+
+func TestLibraryServiceMaterializationGuards(t *testing.T) {
+	env := openLibraryTestEnv(t)
+	ctx := context.Background()
+
+	asset := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-guard", "")
+	other := mustSaveAsset(t, ctx, env.svc, env.wsB, "mat-guard-b", "")
+
+	// Create gates: malformed job ids, unknown/malformed assets, and
+	// unknown workspaces converge to their operation's not-found error.
+	matID, err := NewV1MaterializationPublicID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, asset.PublicID, "42"); !errors.Is(err, ErrV1MaterializationNotFound) {
+		t.Fatalf("create malformed job id = %v, want not found", err)
+	}
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "lasset_doesnotexist0000", matID); !errors.Is(err, ErrV1AssetNotFound) {
+		t.Fatalf("create unknown asset = %v, want asset not found", err)
+	}
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "42", matID); !errors.Is(err, ErrV1AssetNotFound) {
+		t.Fatalf("create malformed asset = %v, want asset not found", err)
+	}
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, other.PublicID, matID); !errors.Is(err, ErrV1AssetNotFound) {
+		t.Fatalf("create cross-workspace asset = %v, want asset not found", err)
+	}
+	if _, err := env.svc.CreateMaterialization(ctx, "ws_missing00000001", asset.PublicID, matID); !errors.Is(err, ErrV1AssetNotFound) {
+		t.Fatalf("create unknown workspace = %v, want asset not found", err)
+	}
+
+	// Get gates: malformed, unknown, cross-workspace, and unknown
+	// workspace ids converge to materialization not found.
+	record := mustCreateMaterialization(t, ctx, env.svc, env.wsA, asset.PublicID)
+	for name, pair := range map[string][2]string{
+		"malformed":       {env.wsA, "42"},
+		"unknown":         {env.wsA, "lmat_doesnotexist0000"},
+		"cross-workspace": {env.wsB, record.PublicID},
+		"unknown ws":      {"ws_missing00000001", record.PublicID},
+	} {
+		ws, id := pair[0], pair[1]
+		if _, err := env.svc.GetMaterialization(ctx, ws, id); !errors.Is(err, ErrV1MaterializationNotFound) {
+			t.Fatalf("get %s = %v, want not found", name, err)
+		}
+		if _, err := env.svc.SetMaterializationResult(ctx, ws, id, V1MaterializationRunning, "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+			t.Fatalf("set %s = %v, want not found", name, err)
+		}
+	}
+
+	// Unknown transition words never advance a non-terminal job.
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationPending, "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+		t.Fatalf("set pending word = %v, want not found", err)
+	}
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, "bogus", "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+		t.Fatalf("set bogus word = %v, want not found", err)
+	}
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationPending {
+		t.Fatalf("job after bad words = %+v, %v; want still pending", got, err)
+	}
+
+	// Completion needs a resolvable workspace-scoped asset_... link:
+	// the job stays non-terminal so the trigger can retry once Media
+	// settles.
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, "asset_missing00000001", "", ""); err == nil {
+		t.Fatal("complete unknown media link = nil, want link error")
+	}
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, "nope", "", ""); err == nil {
+		t.Fatal("complete malformed media link = nil, want link error")
+	}
+	foreignMedia := mustSeedMediaAsset(t, ctx, env, env.wsB, "guard-foreign")
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, foreignMedia, "", ""); err == nil {
+		t.Fatal("complete cross-workspace media link = nil, want link error")
+	}
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationPending {
+		t.Fatalf("job after bad links = %+v, %v; want still pending", got, err)
+	}
+
+	// Terminal records are immutable: attempts to move them report the
+	// stored snapshot with state, link, and error untouched.
+	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "guard")
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	replay, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Status != V1MaterializationCompleted || replay.MediaAssetID != mediaPublicID {
+		t.Fatalf("completed replay = %+v, want stored snapshot", replay)
+	}
+	for _, status := range []V1MaterializationStatus{V1MaterializationRunning, V1MaterializationFailed} {
+		snapshot, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, status, "", "x", "y")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if snapshot.Status != V1MaterializationCompleted || snapshot.MediaAssetID != mediaPublicID || snapshot.ErrorMessage != "" {
+			t.Fatalf("terminal %s = %+v, want immutable completed snapshot", status, snapshot)
+		}
+	}
+	// Unknown words against terminal records still report the stored
+	// snapshot (in-memory parity).
+	snapshot, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, "bogus", "", "", "")
+	if err != nil || snapshot.Status != V1MaterializationCompleted {
+		t.Fatalf("terminal bogus word = %+v, %v; want stored snapshot", snapshot, err)
+	}
+}
+
+func TestLibraryServiceMaterializationFailedAndReplay(t *testing.T) {
+	env := openLibraryTestEnv(t)
+	ctx := context.Background()
+
+	asset := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-fail", "")
+	record := mustCreateMaterialization(t, ctx, env.svc, env.wsA, asset.PublicID)
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	failed, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
+		V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failed.Status != V1MaterializationFailed {
+		t.Fatalf("fail = %+v, want failed", failed)
+	}
+	if failed.ErrorMessage != "素材转存失败，请稍后重试" {
+		t.Fatalf("fail error = %q, want persisted message", failed.ErrorMessage)
+	}
+	// error_code has no durable column: reads report it empty (see the
+	// #828 slice A report for the follow-up migration).
+	if failed.ErrorCode != "" {
+		t.Fatalf("fail code = %q, want empty (not persisted)", failed.ErrorCode)
+	}
+	if failed.UpdatedAt.IsZero() {
+		t.Fatal("fail updated_at is zero, want completed_at")
+	}
+
+	// Failed replays converge on the first failure; resurrection to
+	// completed is rejected with the stored snapshot.
+	replay, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
+		V1MaterializationFailed, "", "other", "changed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Status != V1MaterializationFailed || replay.ErrorMessage != "素材转存失败，请稍后重试" {
+		t.Fatalf("failed replay = %+v, want first failure", replay)
+	}
+	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "fail-resurrect")
+	resurrect, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
+		V1MaterializationCompleted, mediaPublicID, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resurrect.Status != V1MaterializationFailed || resurrect.MediaAssetID != "" {
+		t.Fatalf("failed->completed = %+v, want immutable failed snapshot", resurrect)
+	}
+}
+
+func TestLibraryServiceListMaterializations(t *testing.T) {
+	env := openLibraryTestEnv(t)
+	ctx := context.Background()
+
+	first := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-list-1", "")
+	second := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-list-2", "")
+	job1 := mustCreateMaterialization(t, ctx, env.svc, env.wsA, first.PublicID)
+	job2 := mustCreateMaterialization(t, ctx, env.svc, env.wsA, second.PublicID)
+	foreignAsset := mustSaveAsset(t, ctx, env.svc, env.wsB, "mat-list-b", "")
+	mustCreateMaterialization(t, ctx, env.svc, env.wsB, foreignAsset.PublicID)
+
+	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "list")
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	all, err := env.svc.ListMaterializations(ctx, env.wsA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].PublicID != job1.PublicID || all[1].PublicID != job2.PublicID {
+		t.Fatalf("list = %v, want creation-ordered [job1 job2]", publicIDs(all))
+	}
+	if all[0].Status != V1MaterializationCompleted || all[0].MediaAssetID != mediaPublicID {
+		t.Fatalf("list[0] = %+v, want completed with link", all[0])
+	}
+	if all[1].Status != V1MaterializationPending {
+		t.Fatalf("list[1] = %+v, want pending", all[1])
+	}
+	if empty, err := env.svc.ListMaterializations(ctx, "ws_missing00000001"); err != nil || len(empty) != 0 {
+		t.Fatalf("list unknown workspace = %v, %v; want empty", empty, err)
+	}
+}
+
+func publicIDs(records []*V1Materialization) []string {
+	out := make([]string, 0, len(records))
+	for _, record := range records {
+		out = append(out, record.PublicID)
+	}
+	return out
 }

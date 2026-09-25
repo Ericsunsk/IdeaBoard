@@ -56,6 +56,17 @@ describe('resolveAuthFailureAction', () => {
     ).toEqual({ kind: 'redirect-home', targetPath: '/' })
   })
 
+  it('redirects admin users home after a control API 403 on an admin page', () => {
+    expect(
+      resolveAuthFailureAction({
+        status: 403,
+        requestUrl: '/api/control/v1/platform/statistics?range=7d',
+        currentPathname: '/admin/statistics',
+        currentFullPath: '/admin/statistics',
+      }),
+    ).toEqual({ kind: 'redirect-home', targetPath: '/' })
+  })
+
   it('clears auth without redirecting for session probe 401', () => {
     expect(
       resolveAuthFailureAction({

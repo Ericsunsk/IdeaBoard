@@ -1,24 +1,15 @@
 import { getMe } from './generated-query/public/me/me'
 import { i18n } from '../i18n'
+import type { User } from './sessionUser'
 
 // Session principal owned by the shared API boundary (issue #809).
 //
 // The legacy `generated-query/user` + `apiResponse` transport is gone; the
 // Public Data Plane serves the principal at `GET /api/v1/me` (`MeEnvelope`).
-// Feature code keeps importing this `User` view type (never generated code
-// directly); unknown envelope fields fail closed to `undefined`.
-export type User = {
-  public_id: string
-  display_name?: string
-  avatar?: string
-  role?: string | null
-  email?: string
-  personal_workspace_id?: string
-  storage_namespace?: string
-  status?: number
-  created_at?: string
-  updated_at?: string
-}
+// The `User` view type lives in `./sessionUser` (import it from there, never
+// from here: this module's runtime transport sits downstream of the shared
+// API client and a type edge back would close an import cycle); unknown
+// envelope fields fail closed to `undefined`.
 
 function asTrimmedString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined

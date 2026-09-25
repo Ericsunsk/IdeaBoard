@@ -1,44 +1,30 @@
 package composition
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
 	"ideaboard/api/internal/aigateway"
-	billinghttp "ideaboard/api/internal/billing/interfaces/http"
-	"ideaboard/api/internal/billingrecords"
-	"ideaboard/api/internal/boards"
-	credithttp "ideaboard/api/internal/credits/interfaces/http"
-	"ideaboard/api/internal/identity/auth"
-	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/library"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
-	"ideaboard/api/internal/media/workspacemedia"
-	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
-	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/adapters/webdist"
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	httpapi "ideaboard/api/internal/runtime/interfaces/http"
-	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	"ideaboard/api/internal/runtime/ports"
 	searchapplication "ideaboard/api/internal/searchcatalog/application"
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
-	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
-	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
+	taskservice "ideaboard/api/internal/tasking/application/task"
 	tenancypg "ideaboard/api/internal/tenancy/postgres"
-	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -51,36 +37,18 @@ func newAppRouter(
 	readyChecker ports.HealthChecker,
 	redMetrics *redmetrics.Set,
 ) (*gin.Engine, error) {
-	taskHandler := taskhttp.NewHandler(taskhttp.HandlerDeps{
-		Commands: taskServices.taskService, AdminQueries: taskServices.taskService, UserQueries: taskServices.taskService,
-	})
-	taskStatsHandler := statisticshttp.NewHandler(taskServices.taskStatsService, taskServices.monitor)
-	billingHandler := billinghttp.NewHandler(services.billingCatalog, services.billingCatalog)
-	paymentUserHandler := paymenthttp.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
-	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.userEvents)
-	paymentAdminHandler := paymenthttp.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
+	// #809 hard cut: the /api/user + /api/admin handler trees are
+	// deleted, so only the contract/static/webhook/internal handlers are
+	// built here. The Stripe webhook stays live; the Control Plane
+	// reuses the platform-config handlers (ai-gateway, storage, search
+	// providers, feature prompts) under its capability guard.
 	paymentWebhookHandler := paymenthttp.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
-	creditUserHandler := credithttp.NewUserHandler(services.creditService, creditUserResolver)
-	creditAdminCommandHandler := credithttp.NewAdminCommandHandler(services.creditService, creditUserResolver)
-	creditAdminReadHandler := credithttp.NewAdminReadHandler(services.creditService, creditUserResolver)
-	creditReconciliationHandler := credithttp.NewReconciliationHandler(services.creditService, creditUserResolver)
-	rewardIdentityProjection := rewardIdentityProjector{repo: repos.userRepo}
-	rewardUserHandler := rewards.NewUserHandler(services.rewardService)
-	rewardAdminCommandHandler := rewards.NewAdminCommandHandler(services.rewardService)
-	rewardAdminReadHandler := rewards.NewAdminReadHandler(services.rewardService, rewardIdentityProjection)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
 		UserRepo:          repos.userRepo,
 		UserLifecycle:     services.userLifecycle,
-	}
-	uploadDeps := httpapi.UploadDeps{
-		StorageService: services.storageService,
-		MediaAssets:    repos.mediaAssetRegistry,
-		UserRepo:       repos.userRepo,
-		BoardService:   services.boardService,
-		UploadSettings: services.runtimeSettings,
 	}
 	uploadReadAccess := storageauth.NewReadableUploadAccess(
 		uploadBoardAccessResolver{service: services.boardService},
@@ -94,14 +62,6 @@ func newAppRouter(
 		aiGatewayRepo,
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
-	visionService := searchapplication.NewVisionSearchService(visionModelAdapter{repo: aiGatewayRepo}, visionGatewayAdapter{repo: aiGatewayRepo, metrics: redMetrics})
-	// #809 legacy removal: the user-scoped library service is deleted, so
-	// the vision reader runs without a library asset source. Library
-	// references fail closed (ErrVisionInput) until a workspace-scoped
-	// reader lands; the v1 vision flow resolves refs via the workspace store.
-	visionHandler := searchhttp.NewVisionHandler(visionService, searchhttp.NewVisionInputReader(nil))
-	visionHandler.SetBillingService(searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, visionService))
-	mediaService := workspacemedia.NewService(repos.db)
 
 	router := gin.New()
 	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
@@ -117,43 +77,51 @@ func newAppRouter(
 		ContractV1: httpapi.ContractV1Deps{
 			Store: tenancypg.NewStore(repos.db),
 			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
-			// #818 (#809 Phase 4-01): workspace-scoped library postgres
-			// store. Folder/asset routes are live; materialization
-			// stays fail-closed (503) until its Media/billing adapters
-			// land in #820.
-			// #820 (#809 Phase 4-03): workspace-scoped media postgres
-			// store. Upload/media routes are live; binary reads ride
-			// the storage service, derivative generation runs
-			// best-effort without a renderer (tiers stay pending).
-			Library: httpapi.ContractV1LibraryDeps{Store: library.NewService(repos.db)},
-			Media:   mediaService,
-			// Binary reads ride the storage service (missing bytes
-			// fail closed per endpoint); the derivative renderer
-			// stays nil until the rendering seam lands, so
-			// generation is skipped while metadata keeps working.
+			// Workspace library and media stores are live. Library
+			// materialization has server-side billing adapters, but the
+			// HTTP path intentionally leaves remote media Materializer nil
+			// until that fetch/storage adapter is available; the endpoint
+			// then fails closed before creating a billable job.
+			Library: httpapi.ContractV1LibraryDeps{
+				Store:   library.NewService(repos.db),
+				Quoter:  newLibraryMaterializeQuoter(services.billingCatalog),
+				Billing: newLibraryMaterializeSettler(services.creditService),
+			},
+			Media: taskServices.workspaceTaskMedia,
+			// Binary reads ride the storage service. Derivative rendering
+			// is wired in the workspace task worker; this HTTP contract
+			// keeps its optional renderer nil, so metadata remains usable
+			// while ungenerated tiers stay pending.
 			MediaObjects: services.storageService,
 			// #821 (#809 Phase 4-04): workspace-scoped task postgres
 			// store + production settlement adapters. Task routes
 			// are live: Quote via the billing catalog, Hold/Capture/
 			// Release via credits.Commands, enqueue via the River
-			// client (workspace_task_execute kind; worker consumption
-			// is Phase-4b), input/output asset gates via the media
-			// TaskAssetAdapter. Settlement is compensating
-			// (Quote->Hold->Insert->Enqueue with Release/Delete
-			// rollback), not yet a single shared PG transaction;
-			// see workspace_task_adapters.go.
-			Tasks:      taskpostgres.NewStore(repos.db),
-			TaskQuoter: &workspaceTaskQuoter{catalog: services.billingCatalog},
-			TaskHolder: newWorkspaceTaskHolder(services.creditService),
-			TaskQueue:  taskServices.workspaceTaskQueue,
-			TaskAssets: &workspacemedia.TaskAssetAdapter{Store: mediaService},
+			// client (workspace_task_execute kind; #825 registers the
+			// real worker consumer on the same client), input/output
+			// asset gates via the media TaskAssetAdapter. The store,
+			// holder, quoter, queue, and assets below are the single
+			// shared instances built in task_wiring.go (the worker
+			// settles through the same holder/Service); settlement is
+			// transaction-first (Quote->Hold->Insert->Enqueue and
+			// terminal Capture/Release each commit in ONE shared PG
+			// transaction via the Tx seams, compensating only for
+			// backends without them; see workspace_task_adapters.go).
+			Tasks:                 taskServices.workspaceTaskStore,
+			TaskQuoter:            taskServices.workspaceTaskQuoter,
+			TaskHolder:            taskServices.workspaceTaskHolder,
+			TaskQueue:             taskServices.workspaceTaskQueue,
+			TaskAssets:            taskServices.workspaceTaskAssets,
+			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning
 		// services (no handler ledger writes); checkout reuses the
 		// Payments seam with a workspace-namespaced idempotency key, and
 		// webhook settlement stays inside Payments -> credits.Commands.
-		// Task submission settlement is #805 (hook left unimplemented).
+		// Workspace task submission uses the shared transaction-first
+		// settlement seams wired above; billing reads below remain owned
+		// by the billing services.
 		ContractV1Billing: httpapi.ContractV1BillingDeps{
 			Tenancy:         tenancypg.NewStore(repos.db),
 			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
@@ -166,11 +134,16 @@ func newAppRouter(
 				cfg.PublicOrigins.WebURL("/user/boards")),
 		},
 		// Control Plane administration (issue #808). Every seam below is
-		// shared with the legacy admin handlers (no second ledger, queue,
-		// or settings store); the control guard adds capability auth,
-		// the separate rate-limit bucket, header-only idempotency, the
-		// operator reason, and the mandatory audit record. Legacy
-		// /api/admin routes above are untouched; removal is #809.
+		// shared with the platform-config handlers (no second ledger,
+		// queue, or settings store); the control guard adds capability
+		// auth, the separate rate-limit bucket, header-only idempotency,
+		// the operator reason, and the mandatory audit record.
+		// #809 hard cut: Tasks and Monitor stay nil (the legacy task
+		// services are deleted with the stub), so the control task
+		// read/ops routes fail closed with 503 and the monitor/
+		// statistics proxies with 501 until the workspace task read
+		// model lands. Routes stay registered (openapi operationIds
+		// intact).
 		ContractControl: httpapi.ContractControlDeps{
 			Users:             services.userService,
 			Identity:          administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
@@ -179,7 +152,6 @@ func newAppRouter(
 			CreditUsers:       creditUserResolver,
 			CreditReads:       services.creditService,
 			Reconciliation:    services.creditService,
-			Tasks:             taskServices.taskService,
 			Tenancy:           tenancypg.NewStore(repos.db),
 			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
@@ -191,62 +163,11 @@ func newAppRouter(
 			Storage:           storagehttp.NewHandler(services.storageService),
 			SearchProviders:   searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
 			FeaturePrompts:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			Monitor:           taskStatsHandler,
 			Mail:              services.authServiceClient,
 		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
-		UserRoutes: httpapi.UserRouteDeps{
-			AuthHandler:            auth.NewAuthHandler(services.userService),
-			TaskHandler:            taskHandler,
-			BoardHandler:           boards.NewHandler(services.boardService, cfg.PublicOrigins),
-			BillingHandler:         billingHandler,
-			BillingRecords:         billingrecords.NewHandler(services.billingRecords),
-			CreditUserHandler:      creditUserHandler,
-			UsageHandler:           usage.NewHandler(services.usageService),
-			RewardUserHandler:      rewardUserHandler,
-			PaymentUserHandler:     paymentUserHandler,
-			UserEventStreamHandler: userEventStreamHandler,
-			MediaAssetRegistry:     repos.mediaAssetRegistry,
-			MediaStorageService:    services.storageService,
-			Imgproxy:               imgproxyTierConfig(cfg),
-			Uploads:                uploadDeps,
-			UploadDownloads: httpapi.UploadDownloadDeps{
-				Reader:     services.storageService,
-				ReadAccess: uploadReadAccess,
-			},
-			VisionHandler: visionHandler,
-		},
-		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler: identityhttp.NewAdminHandler(
-				services.userService,
-				services.runtimeSettings,
-				administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
-				services.authServiceClient,
-			),
-			MailConfigHandler:           auth.NewMailConfigAdminHandler(services.authServiceClient),
-			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(services.authServiceClient),
-			BillingHandler:              billingHandler,
-			CreditAdminCommandHandler:   creditAdminCommandHandler,
-			CreditAdminReadHandler:      creditAdminReadHandler,
-			CreditReconciliationHandler: creditReconciliationHandler,
-			TaskHandler:                 taskHandler,
-			TaskStatsHandler:            taskStatsHandler,
-			StorageHandler:              storagehttp.NewHandler(services.storageService),
-			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			StorageService:              services.storageService,
-			UploadSettings:              services.runtimeSettings,
-			RewardAdminCommandHandler:   rewardAdminCommandHandler,
-			RewardAdminReadHandler:      rewardAdminReadHandler,
-			PaymentAdminHandler:         paymentAdminHandler,
-			SearchCatalogHandler:        searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
-			AIGatewayHandler:            aiGatewayHandler,
-			AdminBrandLogoHandler: adminbranding.NewHandler(repos.adminBrandLogoRepo, func(c *gin.Context) bool {
-				_, ok := principal.RequireAdmin(c)
-				return ok
-			}),
-		},
-		PaymentWebhook: paymentWebhookHandler,
-		Internal:       httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
+		PaymentWebhook:      paymentWebhookHandler,
+		Internal:            httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
 		StaticUploads: httpapi.StaticUploadDeps{Auth: authDeps,
 			BoardService: services.boardService,
 			ReadAccess:   uploadReadAccess,
@@ -270,72 +191,4 @@ func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOption
 	}
 
 	httpapi.RegisterRoutes(r, deps, frontendFS, frontendOptions)
-}
-
-// visionGatewayAdapter routes vision search through the central AI gateway
-// connection (openrouter route). Composition owns this glue so the
-// searchcatalog context never imports the runtime transport.
-type visionGatewayAdapter struct {
-	repo    *aigateway.ConfigRepository
-	metrics *redmetrics.Set
-}
-
-func (a visionGatewayAdapter) Do(ctx context.Context, req searchports.VisionGatewayRequest) (searchports.VisionGatewayResponse, error) {
-	if a.repo == nil {
-		return searchports.VisionGatewayResponse{}, fmt.Errorf("ai gateway config repository is unavailable")
-	}
-	resolved, err := a.repo.Resolve(ctx)
-	if err != nil {
-		return searchports.VisionGatewayResponse{}, err
-	}
-	client, err := infrastructure.NewGatewayClient(infrastructure.GatewayClientConfig{
-		BaseURL: resolved.BaseURL,
-		Token:   resolved.Token,
-		// Vision rides the standard outbound client through the gateway
-		// seam; its own target keeps vision timeout/retry behavior
-		// separately observable from image calls in logs/metrics.
-		Target:  "vision-search",
-		Metrics: a.metrics,
-	})
-	if err != nil {
-		return searchports.VisionGatewayResponse{}, err
-	}
-	resp, err := client.Do(ctx, ports.GatewayRequest{
-		Endpoint: ports.GatewayEndpoint{
-			Kind:     ports.GatewayEndpointProviderNative,
-			Provider: "openrouter",
-			Path:     "api/v1/chat/completions",
-		},
-		Model:   req.Model,
-		Feature: "vision-search",
-		Body:    req.Body,
-		Cache:   ports.GatewayCachePolicy{Mode: ports.GatewayCacheSkip},
-		Timeout: req.Timeout,
-	})
-	if err != nil {
-		return searchports.VisionGatewayResponse{}, err
-	}
-	return searchports.VisionGatewayResponse{
-		StatusCode: resp.StatusCode,
-		Header:     resp.Header,
-		Body:       resp.Body,
-	}, nil
-}
-
-// visionModelAdapter resolves the vision search model from the central
-// AI gateway mappings (fixed "vision" key). Composition owns this glue so
-// the searchcatalog context never imports the gateway config package.
-type visionModelAdapter struct {
-	repo *aigateway.ConfigRepository
-}
-
-func (a visionModelAdapter) VisionConfig(ctx context.Context) (searchports.VisionProviderConfig, error) {
-	if a.repo == nil {
-		return searchports.VisionProviderConfig{}, fmt.Errorf("ai gateway config repository is unavailable")
-	}
-	model, err := a.repo.ResolveVisionModel(ctx)
-	if err != nil {
-		return searchports.VisionProviderConfig{}, err
-	}
-	return searchports.VisionProviderConfig{Model: model}, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/media/storage/application/authorization"
 	"ideaboard/api/internal/media/storage/domain"
@@ -101,6 +102,17 @@ func jailUploadStaticPath(objectKey string) (string, error) {
 		return "", fmt.Errorf("upload object key escapes uploads root")
 	}
 	return fullAbs, nil
+}
+
+// requireAuthenticatedUserID resolves the session principal to an
+// internal user id. It lived in the deleted legacy upload handler;
+// the static upload surface is its remaining caller.
+func requireAuthenticatedUserID(c *gin.Context) (int64, bool) {
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return 0, false
+	}
+	return identityPrincipal.UserID(), true
 }
 
 func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {

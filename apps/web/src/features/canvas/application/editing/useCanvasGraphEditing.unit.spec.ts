@@ -254,7 +254,7 @@ describe('useCanvasGraphEditing', () => {
       files: [new File(['ignored'], 'should-not-upload.png', { type: 'image/png' })],
     } as unknown as DataTransfer
     const asset: CanvasLibraryImportDescriptor = {
-      assetId: 'liba_asset0042',
+      assetId: 'lasset_asset0042',
       previewUrl: 'https://images.unsplash.com/dragged-asset-preview',
       title: 'Dragged asset',
       width: 1200,
@@ -269,7 +269,7 @@ describe('useCanvasGraphEditing', () => {
     } as unknown as DragEvent)
     await Promise.resolve()
 
-    expect(harness.materializeLibraryAsset).toHaveBeenCalledWith('liba_asset0042')
+    expect(harness.materializeLibraryAsset).toHaveBeenCalledWith('lasset_asset0042')
     expect(harness.upload).not.toHaveBeenCalled()
     expect(harness.nodes.value).toContainEqual(
       expect.objectContaining({

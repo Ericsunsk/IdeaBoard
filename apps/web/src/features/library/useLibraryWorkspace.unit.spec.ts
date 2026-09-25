@@ -61,9 +61,9 @@ function folder(id: string, name: string): WorkspaceLibraryFolder {
 
 function asset(overrides: Partial<WorkspaceLibraryAsset> = {}): WorkspaceLibraryAsset {
   return {
-    id: 'liba_asset0009',
+    id: 'lasset_asset0009',
     workspaceId: WORKSPACE_ID,
-    folderId: 'libf_folder0003',
+    folderId: 'lfolder_folder0003',
     provider: 'pexels',
     sourceId: 'deleted-image',
     sourceUrl: 'https://example.com/source',
@@ -111,22 +111,22 @@ describe('useLibraryWorkspace', () => {
 
     const workspace = useLibraryWorkspace({ workspaceId: WORKSPACE_ID })
     await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledOnce())
-    workspace.selectFolder('libf_folder0002')
+    workspace.selectFolder('lfolder_folder0002')
     await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledTimes(2))
 
-    folderPage.resolve({ items: [{ id: 'liba_asset0002' }], nextCursor: '', hasMore: false })
+    folderPage.resolve({ items: [{ id: 'lasset_asset0002' }], nextCursor: '', hasMore: false })
     await vi.waitFor(() =>
-      expect(workspace.assets.value).toEqual([{ id: 'liba_asset0002' }]),
+      expect(workspace.assets.value).toEqual([{ id: 'lasset_asset0002' }]),
     )
-    allPage.resolve({ items: [{ id: 'liba_asset0001' }], nextCursor: '', hasMore: false })
+    allPage.resolve({ items: [{ id: 'lasset_asset0001' }], nextCursor: '', hasMore: false })
     await allPage.promise
 
-    expect(workspace.selectedFolder.value).toBe('libf_folder0002')
-    expect(workspace.assets.value).toEqual([{ id: 'liba_asset0002' }])
+    expect(workspace.selectedFolder.value).toBe('lfolder_folder0002')
+    expect(workspace.assets.value).toEqual([{ id: 'lasset_asset0002' }])
   })
 
   it('publishes Folder create, rename, and delete through one shared snapshot', async () => {
-    const original = folder('libf_folder0001', 'Original')
+    const original = folder('lfolder_folder0001', 'Original')
     const renamed = { ...original, name: 'Renamed' }
     const fetchFolders = vi
       .fn<() => Promise<WorkspaceLibraryFolder[]>>()
@@ -152,11 +152,11 @@ describe('useLibraryWorkspace', () => {
     expect(facts.folders.value).toEqual([original])
     expect(mocks.listAssets).toHaveBeenCalledOnce()
 
-    await workspace.renameFolder('libf_folder0001', 'Renamed')
+    await workspace.renameFolder('lfolder_folder0001', 'Renamed')
     expect(facts.folders.value).toEqual([renamed])
     expect(mocks.listAssets).toHaveBeenCalledOnce()
 
-    await workspace.deleteFolder('libf_folder0001')
+    await workspace.deleteFolder('lfolder_folder0001')
     expect(facts.folders.value).toEqual([])
     expect(mocks.listAssets).toHaveBeenCalledTimes(2)
   })
@@ -185,7 +185,7 @@ describe('useLibraryWorkspace', () => {
         provider: 'pexels',
         sourceID: 'deleted-image',
         assetKey: 'pexels:deleted-image',
-        affectedFolderKeys: ['all', 'libf_folder0003'],
+        affectedFolderKeys: ['all', 'lfolder_folder0003'],
         galleryEffect: 'none',
       },
     ])

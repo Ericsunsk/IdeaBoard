@@ -231,6 +231,18 @@ function checkAllowanceReasons<T extends string>(
   })
 }
 
+function stripCommentsForStyle(content: string, extension: string): string {
+  // Count rules must match code, not prose: issue references like `#809`
+  // in comments read as hex colors, and prose about selectors reads as
+  // selector usage. Line comments are stripped only outside CSS, where
+  // `//` can appear inside `url(...)`.
+  const withoutBlocks = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+  if (extension === '.css') return withoutBlocks
+  return withoutBlocks.replace(/(^|\s)\/\/.*$/gm, '$1')
+}
+
 function checkCountRules<T extends string>(
   file: SourceFile,
   content: string,
@@ -239,9 +251,10 @@ function checkCountRules<T extends string>(
 ): Violation[] {
   const allowance = allowances[file.sourcePath]
   const violations: Violation[] = []
+  const code = stripCommentsForStyle(content, path.extname(file.absolutePath))
 
   for (const rule of rules) {
-    const count = countMatches(content, rule.pattern)
+    const count = countMatches(code, rule.pattern)
     const allowed = allowance?.counts[rule.id] ?? 0
     if (count <= allowed) continue
 
@@ -249,7 +262,7 @@ function checkCountRules<T extends string>(
       file: file.sourcePath,
       rule: rule.id,
       message: `${rule.message} Found ${count}, allowed ${allowed}.`,
-      details: matchDetails(content, rule.pattern),
+      details: matchDetails(code, rule.pattern),
     })
   }
 
@@ -263,7 +276,10 @@ function checkStaleAllowances<T extends string>(
   staleRuleName: string,
 ): Violation[] {
   return Object.entries(allowances).flatMap(([sourcePath, allowance]) => {
-    const content = filesByPath.get(sourcePath) ?? ''
+    const content = stripCommentsForStyle(
+      filesByPath.get(sourcePath) ?? '',
+      path.extname(sourcePath),
+    )
 
     return Object.entries(allowance.counts).flatMap(([ruleId, allowed]) => {
       const rule = rules.find((item) => item.id === ruleId)

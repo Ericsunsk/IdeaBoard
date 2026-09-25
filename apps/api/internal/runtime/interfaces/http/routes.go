@@ -7,41 +7,24 @@ import (
 	"net/http"
 	"time"
 
-	credithttp "ideaboard/api/internal/credits/interfaces/http"
-
-	"ideaboard/api/internal/aigateway"
-	billinghttp "ideaboard/api/internal/billing/interfaces/http"
-	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	identityports "ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/media/derivatives/infrastructure/imgproxy"
-	"ideaboard/api/internal/media/storage"
-	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	storageports "ideaboard/api/internal/media/storage/ports"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
-	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/rewards"
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	"ideaboard/api/internal/runtime/ports"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
-	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
-	taskhttp "ideaboard/api/internal/tasking/interfaces/http/task"
-	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Dependencies struct {
 	Auth                AuthDeps
-	UserRoutes          UserRouteDeps
 	PublicSearchHandler *searchhttp.SearchHandler
-	AdminRoutes         AdminRouteDeps
 	StaticUploads       StaticUploadDeps
 	CORSMiddleware      gin.HandlerFunc
 	RateLimit           settings.RateLimitSettingProvider
@@ -58,7 +41,7 @@ type Dependencies struct {
 	ContractV1Billing ContractV1BillingDeps
 	// ContractControl wires the Control Plane administration surface
 	// (issue #808). Zero value keeps every control route fail-closed
-	// with 501/503; legacy /api/admin routes are untouched.
+	// with 501/503.
 	ContractControl ContractControlDeps
 	// REDMetrics feeds the per-route latency/error middleware. Nil keeps the
 	// middleware a pass-through; production wires the Prometheus set.
@@ -80,113 +63,20 @@ type AuthDeps struct {
 	UserLifecycle     auth.IdentityProvisioner
 }
 
-type UploadDeps struct {
-	StorageService *storage.Service
-	MediaAssets    assets.UploadRegistry
-	UserRepo       identityports.UserRepository
-	BoardService   *boards.Service
-	UploadSettings settings.MediaUploadSettingProvider
-}
-
-type UploadResourceReader interface {
-	ReadUploadResourceByURL(context.Context, string, int64) (*storageports.StoredUploadObject, error)
-}
-
-type UploadDownloadDeps struct {
-	Reader     UploadResourceReader
-	ReadAccess storageports.ReadableUploadAccess
-}
-
 type StaticUploadDeps struct {
 	Auth         AuthDeps
 	BoardService *boards.Service
 	ReadAccess   storageports.ReadableUploadAccess
 }
 
-type UserRouteDeps struct {
-	AuthHandler            *auth.AuthHandler
-	TaskHandler            *taskhttp.Handler
-	BoardHandler           *boards.Handler
-	BillingHandler         *billinghttp.Handler
-	BillingRecords         *billingrecords.Handler
-	CreditUserHandler      *credithttp.UserHandler
-	UsageHandler           *usage.Handler
-	RewardUserHandler      *rewards.UserHandler
-	PaymentUserHandler     *paymenthttp.UserCheckoutHandler
-	UserEventStreamHandler *UserEventStreamHandler
-	MediaAssetRegistry     assets.ReadRegistry
-	MediaStorageService    *storage.Service
-	Imgproxy               imgproxy.Config
-	Uploads                UploadDeps
-	UploadDownloads        UploadDownloadDeps
-	VisionHandler          *searchhttp.VisionHandler
-}
-
-type AdminRouteDeps struct {
-	AdminHandler                *identityhttp.AdminHandler
-	MailConfigHandler           *auth.MailConfigAdminHandler
-	SocialProviderHandler       *auth.SocialProviderAdminHandler
-	AIGatewayHandler            *aigateway.Handler
-	BillingHandler              *billinghttp.Handler
-	CreditAdminCommandHandler   *credithttp.AdminCommandHandler
-	CreditAdminReadHandler      *credithttp.AdminReadHandler
-	CreditReconciliationHandler *credithttp.ReconciliationHandler
-	TaskHandler                 *taskhttp.Handler
-	TaskStatsHandler            *statisticshttp.Handler
-	StorageHandler              *storagehttp.Handler
-	FeaturePromptHandler        *prompts.FeaturePromptHandler
-	StorageService              *storage.Service
-	UploadSettings              settings.MediaUploadSettingProvider
-	RewardAdminCommandHandler   *rewards.AdminCommandHandler
-	RewardAdminReadHandler      *rewards.AdminReadHandler
-	PaymentAdminHandler         *paymenthttp.AdminHandler
-	SearchCatalogHandler        *searchhttp.Handler
-	AdminBrandLogoHandler       *adminbranding.Handler
-}
-
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
-const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
-const visionRequestBodyLimitBytes int64 = 11 * 1024 * 1024
-
-// API group prefixes. RouteUser*/RouteAdmin* constants below are
-// group-relative; full paths are group + relative (e.g. UserAPIGroupPath +
-// RouteUserProfileAvatar). The body-limit upload bypass must build from these
-// constants instead of hardcoding full paths a second time.
-const (
-	UserAPIGroupPath  = "/api/user"
-	AdminAPIGroupPath = "/api/admin"
-)
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                                = "/api/health"
-	RoutePublicSettingsBranding                = "/api/settings/branding"
-	RoutePublicSearch                          = "/api/search"
-	RouteUserProfileAvatar                     = "/profile/avatar"
-	RouteUserBoardUploads                      = "/boards/:board_id/uploads"
-	RouteUserDownload                          = "/download"
-	RouteUserEvents                            = "/events"
-	RouteUserVisionExtract                     = "/search/vision-extract"
-	RouteAdminUpload                           = "/upload"
-	RouteAdminSettingsBranding                 = "/settings/branding"
-	RouteAdminSettingsAIGateway                = "/settings/ai-gateway"
-	RouteAdminSettingsAIGatewayModels          = "/settings/ai-gateway/models"
-	RouteAdminSettingsAIGatewayCatalog         = "/settings/ai-gateway/catalog"
-	RouteAdminSettingsAIGatewayProviders       = "/settings/ai-gateway/providers"
-	RouteAdminSettingsAIGatewayDetectModels    = "/settings/ai-gateway/detect-models"
-	RouteAdminSettingsAIGatewayModelsReference = "/settings/ai-gateway/models-reference"
-	RouteAdminSettingsAIGatewayBrandLogo       = "/settings/ai-gateway/brand-logo"
-	RouteAdminSettingsAIGatewayModelsObserved  = "/settings/ai-gateway/models-observed"
-	RouteAdminSettingsAIGatewayRoutePreview    = "/settings/ai-gateway/route-preview"
-	RouteAdminSettingsAIGatewayTestConnection  = "/settings/ai-gateway/test-connection"
-	RouteAdminSettingsMediaUpload              = "/settings/media-upload"
-	RouteAdminSettingsRateLimit                = "/settings/rate-limit"
-	RouteAdminSettingsOutbound                 = "/settings/outbound-policy"
-	RouteAdminSettingsMail                     = "/settings/mail"
-	RouteAdminUsersOAuthProvider               = "/users/oauth-providers/:provider"
-	RouteAdminStripeConfiguration              = "/payments/stripe-config"
-	RouteAdminBrandLogoOverrides               = "/brand-logo-overrides"
-	RoutePaymentStripeWebhook                  = "/api/webhooks/stripe"
+	RouteHealth                 = "/api/health"
+	RoutePublicSettingsBranding = "/api/settings/branding"
+	RoutePublicSearch           = "/api/search"
+	RoutePaymentStripeWebhook   = "/api/webhooks/stripe"
 )
 
 // UploadsStaticRoutePrefix is the public prefix for locally served upload
@@ -200,22 +90,20 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerInternalRoutes(r, deps.Internal)
 	registerStaticUploadRoutes(r, deps.StaticUploads)
-	registerAuthenticatedUserRoutes(r, deps.Auth, deps.UserRoutes)
-	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)
 	// Contract kernel v1 routes (issue #800 kernel, #801 handlers):
-	// additive /api/v1 real handlers plus the /api/control/v1 Control
+	// the /api/v1 Public Data Plane plus the /api/control/v1 Control
 	// Plane (issue #808: capability auth, separate rate limits, audit).
-	// Legacy /api/user, /api/admin, and /api/health routes above are
-	// untouched; removal is #809. Registered before the SPA fallback so
-	// explicit contract routes win over NoRoute.
+	// Legacy /api/user and /api/admin routes were deleted by the #809
+	// hard cut (no compatibility aliases, no dual-read/dual-write).
+	// Registered before the SPA fallback so explicit contract routes
+	// win over NoRoute.
 	registerContractV1RoutesOnEngine(r, deps.Auth, deps.ContractV1)
 	// Workspace billing surface (issue #804): implicit per-workspace
 	// billing account + credits/billing/payments read and checkout
-	// contracts. Legacy /api/user billing routes above are untouched.
+	// contracts.
 	RegisterContractV1BillingRoutesOnEngine(r, deps.Auth, deps.ContractV1Billing)
 	// Control Plane administration (issue #808): separate capability
-	// chain, rate-limit bucket, and mandatory audit. Legacy /api/admin
-	// routes above are untouched; removal is #809.
+	// chain, rate-limit bucket, and mandatory audit.
 	RegisterContractControlRoutesOnEngine(r, deps.Auth, deps.ContractControl)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)

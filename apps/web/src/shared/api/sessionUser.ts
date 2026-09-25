@@ -1,11 +1,21 @@
-// Session user identity (leaf module, zero imports).
+// Session user view type (issue #809).
 //
-// Split from `userSession.ts` so `shared/utils/auth` (imported by the API
-// client) can reference the type without forming a type-only import cycle
-// back through the generated Public client.
+// This type lives in its own leaf module (zero imports) on purpose: the
+// dependency-cruiser `no-circular` rule counts even type-only edges, and
+// `shared/api/userSession` (runtime: generated `getMe` transport) sits
+// downstream of `shared/api/client`. Importing this type from `userSession`
+// would close a client → utils/auth → userSession → orvalMutator → client
+// cycle. Feature code keeps importing this `User` view type (never generated
+// code directly).
 export type User = {
   public_id: string
-  display_name: string
-  avatar: string
-  role: string
+  display_name?: string
+  avatar?: string
+  role?: string | null
+  email?: string
+  personal_workspace_id?: string
+  storage_namespace?: string
+  status?: number
+  created_at?: string
+  updated_at?: string
 }

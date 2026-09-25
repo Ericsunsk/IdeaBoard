@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"ideaboard/api/internal/workflow/paramkeys"
 )
@@ -72,10 +73,11 @@ type GenerationRequestSnapshot struct {
 
 // GenerationMediaIntent is an ordered, role-aware durable media intent.
 type GenerationMediaIntent struct {
-	InputIndex int     `json:"input_index"`
-	Role       string  `json:"role"`
-	AssetID    int64   `json:"asset_id"`
-	Weight     float64 `json:"weight,omitempty"`
+	InputIndex    int     `json:"input_index"`
+	Role          string  `json:"role"`
+	AssetID       int64   `json:"asset_id"`
+	PublicAssetID string  `json:"public_asset_id,omitempty"`
+	Weight        float64 `json:"weight,omitempty"`
 
 	// Source exists only before task persistence to materialize an Asset.
 	Source string `json:"-"`
@@ -106,9 +108,10 @@ type MediaInputs struct {
 }
 
 type MediaRef struct {
-	AssetID int64   `json:"asset_id"`
-	Role    string  `json:"role,omitempty"`
-	Weight  float64 `json:"weight,omitempty"`
+	AssetID       int64   `json:"asset_id"`
+	PublicAssetID string  `json:"public_asset_id,omitempty"`
+	Role          string  `json:"role,omitempty"`
+	Weight        float64 `json:"weight,omitempty"`
 
 	// Source exists only before task persistence to materialize an Asset.
 	Source string `json:"-"`
@@ -199,10 +202,11 @@ func applyMediaRef(ref *MediaRef, intents []GenerationMediaIntent, intentIndex *
 		return fmt.Errorf("canonical media facts do not match typed inputs")
 	}
 	intent := intents[*intentIndex]
-	if intent.InputIndex != *intentIndex || intent.AssetID <= 0 || !IsGenerationMediaRole(intent.Role) || intent.Role != ref.Role {
+	if intent.InputIndex != *intentIndex || (intent.AssetID <= 0 && strings.TrimSpace(intent.PublicAssetID) == "") || !IsGenerationMediaRole(intent.Role) || intent.Role != ref.Role {
 		return fmt.Errorf("canonical media fact %d is invalid", *intentIndex)
 	}
 	ref.AssetID = intent.AssetID
+	ref.PublicAssetID = strings.TrimSpace(intent.PublicAssetID)
 	ref.Source = ""
 	*intentIndex++
 	return nil

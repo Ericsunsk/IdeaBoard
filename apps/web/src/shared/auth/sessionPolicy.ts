@@ -119,7 +119,10 @@ function isSessionProbeRequest(requestUrl: string) {
 }
 
 function isAdminApiRequest(requestUrl: string) {
-  return requestUrl.includes('/admin/')
+  // Legacy `/api/admin/*` group plus its Control Plane successor
+  // (`/api/control/v1/*`): both carry operator traffic from admin pages, so
+  // capability denials keep the redirect-home behavior across the cut.
+  return requestUrl.includes('/admin/') || requestUrl.includes('/control/')
 }
 
 export function buildLoginRedirectPath(currentPathname: string, currentFullPath: string) {

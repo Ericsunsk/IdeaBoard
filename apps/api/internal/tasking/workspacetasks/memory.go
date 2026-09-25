@@ -29,16 +29,19 @@ type WorkspaceTaskStore interface {
 
 // InMemoryStore is a mutex-guarded WorkspaceTaskStore for tests. Tasks are
 // keyed by (workspace_id, task_id); cross-workspace ids stay invisible
-// (ErrNotFound), never 403.
+// (ErrNotFound), never 403. Leases mirror the postgres lease_token column:
+// held separately from the envelope execution token, set on claim, cleared
+// on every terminal/retry flip.
 type InMemoryStore struct {
-	mu    sync.Mutex
-	tasks map[string]*WorkspaceTask
-	now   func() time.Time
+	mu     sync.Mutex
+	tasks  map[string]*WorkspaceTask
+	leases map[string]string
+	now    func() time.Time
 }
 
 // NewInMemoryStoreForTests builds an empty store.
 func NewInMemoryStoreForTests() *InMemoryStore {
-	return &InMemoryStore{tasks: make(map[string]*WorkspaceTask), now: time.Now}
+	return &InMemoryStore{tasks: make(map[string]*WorkspaceTask), leases: make(map[string]string), now: time.Now}
 }
 
 // SetClockForTests injects a deterministic clock.
@@ -159,7 +162,42 @@ func (s *InMemoryStore) DeleteTask(ctx context.Context, workspaceID, taskID stri
 		return ErrNotFound
 	}
 	delete(s.tasks, key)
+	delete(s.leases, key)
 	return nil
+}
+
+// ClaimTask fences one pending task for the worker: pending -> running
+// with the lease token. The lease is tracked separately from the envelope
+// execution token (mirroring the postgres lease_token column, which claim
+// sets and terminal/retry flips clear without touching the envelope). It
+// mirrors the postgres sibling's transition guards: unknown ids stay
+// ErrNotFound, claimed/terminal rows converge to ErrStateConflict.
+func (s *InMemoryStore) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken string) (*WorkspaceTask, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := taskKey(workspaceID, taskID)
+	stored, ok := s.tasks[key]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if strings.TrimSpace(leaseToken) == "" {
+		return nil, fmt.Errorf("workspacetasks: lease token required: %w", ErrValidation)
+	}
+	if stored.Status != StatusPending {
+		return nil, ErrStateConflict
+	}
+	if _, held := s.leases[key]; held {
+		return nil, ErrStateConflict
+	}
+	now := s.clock()
+	stored.Status = StatusRunning
+	s.leases[key] = strings.TrimSpace(leaseToken)
+	stored.UpdatedAt = now
+	return copyTask(stored), nil
+}
+
+func (s *InMemoryStore) releaseLeaseLocked(workspaceID, taskID string) {
+	delete(s.leases, taskKey(workspaceID, taskID))
 }
 
 func (s *InMemoryStore) CancelTask(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error) {
@@ -181,6 +219,7 @@ func (s *InMemoryStore) CancelTask(ctx context.Context, workspaceID, taskID stri
 	completed := now
 	stored.CompletedAt = &completed
 	stored.UpdatedAt = now
+	s.releaseLeaseLocked(workspaceID, taskID)
 	return copyTask(stored), false, nil
 }
 
@@ -216,6 +255,7 @@ func (s *InMemoryStore) TransitionForRetry(ctx context.Context, workspaceID, tas
 	stored.ExecutionToken = newToken
 	stored.Status = StatusPending
 	stored.UpdatedAt = s.clock()
+	s.releaseLeaseLocked(workspaceID, taskID)
 	return copyTask(stored), nil
 }
 
@@ -235,6 +275,7 @@ func (s *InMemoryStore) CompleteTask(ctx context.Context, workspaceID, taskID st
 	completed := now
 	stored.CompletedAt = &completed
 	stored.UpdatedAt = now
+	s.releaseLeaseLocked(workspaceID, taskID)
 	return copyTask(stored), nil
 }
 
@@ -257,5 +298,6 @@ func (s *InMemoryStore) FailTask(ctx context.Context, workspaceID, taskID, error
 	completed := now
 	stored.CompletedAt = &completed
 	stored.UpdatedAt = now
+	s.releaseLeaseLocked(workspaceID, taskID)
 	return copyTask(stored), nil
 }

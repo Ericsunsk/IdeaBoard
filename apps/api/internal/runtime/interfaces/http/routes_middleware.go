@@ -38,36 +38,13 @@ func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
-func isUploadRequest(req *http.Request) bool {
-	if req == nil || req.URL == nil || strings.ToUpper(strings.TrimSpace(req.Method)) != http.MethodPost {
-		return false
-	}
-	// URL.Path is used only for route classification here; it is never joined
-	// with a filesystem root. Avoid filesystem-style path normalization so
-	// traversal-like input cannot be reclassified as an upload route.
-	requestPath := req.URL.Path
-	// Full paths are derived from the group + route constants so the bypass
-	// cannot drift from route registration.
-	if requestPath == UserAPIGroupPath+RouteUserProfileAvatar || requestPath == AdminAPIGroupPath+RouteAdminUpload {
-		return true
-	}
-	if requestPath == UserAPIGroupPath+RouteUserVisionExtract {
-		return true
-	}
-	return isBoardUploadPath(requestPath)
-}
-
-func isBoardUploadPath(requestPath string) bool {
-	// Match the route shape exactly: /api/user/boards/:board_id/uploads.
-	// Splitting URL path segments keeps this classifier independent from
-	// filesystem path semantics and rejects traversal-like or empty segments.
-	segments := strings.Split(requestPath, "/")
-	return len(segments) == 6 &&
-		segments[1] == "api" &&
-		segments[2] == "user" &&
-		segments[3] == "boards" &&
-		segments[4] != "" && segments[4] != "." && segments[4] != ".." &&
-		segments[5] == "uploads"
+// isUploadRequest reports whether a request carries upload bytes that must
+// bypass the global JSON body limit. The legacy /api/user + /api/admin
+// upload bypasses were deleted with the #809 hard cut; the v1 workspace
+// upload/media surface is JSON session-based and honors the global limit
+// like every other JSON route. No POST path bypasses today.
+func isUploadRequest(*http.Request) bool {
+	return false
 }
 
 func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {

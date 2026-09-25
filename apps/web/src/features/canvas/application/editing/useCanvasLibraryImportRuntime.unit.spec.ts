@@ -25,7 +25,7 @@ function attachment(): BoardAttachment {
   return {} as BoardAttachment
 }
 
-function pendingNode(id = 'image-1', libraryAssetId = 'liba_asset0007'): Node<FlowNodeData> {
+function pendingNode(id = 'image-1', libraryAssetId = 'lasset_asset0007'): Node<FlowNodeData> {
   const snapshot: ImageNodeItem = {
     id: 1,
     type: 'image-node',
@@ -119,7 +119,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     harness.materialize.mockReturnValue(new Promise(() => {}))
     const start = harness.imports.start(
       {
-        assetId: 'liba_asset0007',
+        assetId: 'lasset_asset0007',
         title: 'Reference',
         previewUrl: 'https://provider.example/preview.png',
         width: 200,
@@ -143,7 +143,7 @@ describe('useCanvasLibraryImportRuntime', () => {
 
     const nodeId = await harness.imports.start(
       {
-        assetId: 'liba_asset0007',
+        assetId: 'lasset_asset0007',
         title: 'Reference',
         previewUrl: 'https://provider.example/preview.png',
         width: 200,
@@ -156,7 +156,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     expect(nodeId).toBe('image-1')
     expect(pending).toMatchObject({
       sourceImageUrl: '',
-      libraryImport: { state: 'pending', libraryAssetId: 'liba_asset0007' },
+      libraryImport: { state: 'pending', libraryAssetId: 'lasset_asset0007' },
     })
     expect(pending.sourceMediaAssetId).toBeUndefined()
     expect(pending).not.toHaveProperty('previewUrl')
@@ -208,7 +208,7 @@ describe('useCanvasLibraryImportRuntime', () => {
       ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
     ).toEqual({
       state: 'pending',
-      libraryAssetId: 'liba_asset0007',
+      libraryAssetId: 'lasset_asset0007',
     })
 
     second.resolve({ mediaAssetId: 'asset_media0043', url: 'https://app.example/new', width: 100, height: 100 })
@@ -229,7 +229,7 @@ describe('useCanvasLibraryImportRuntime', () => {
       .libraryImport
     expect(failed).toEqual({
       state: 'failed',
-      libraryAssetId: 'liba_asset0007',
+      libraryAssetId: 'lasset_asset0007',
       failureMessage: 'Library import failed. Please try again later.',
     })
     expect(harness.imports.resumePending()).toBe(0)
@@ -244,7 +244,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     expect(harness.imports.retry('image-1')).toBe(true)
     await flushPromises()
     expect(harness.materialize).toHaveBeenCalledTimes(2)
-    expect(harness.materialize).toHaveBeenNthCalledWith(2, 'liba_asset0007')
+    expect(harness.materialize).toHaveBeenNthCalledWith(2, 'lasset_asset0007')
     expect(
       ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
     ).toBeUndefined()
@@ -272,7 +272,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     const failedSnapshot = (failedNode.data as FlowNodeData).snapshotNode as ImageNodeItem
     failedSnapshot.libraryImport = {
       state: 'failed',
-      libraryAssetId: 'liba_asset0007',
+      libraryAssetId: 'lasset_asset0007',
       failureMessage: '源图不可访问',
     }
     const harness = createHarness([failedNode])
@@ -289,7 +289,7 @@ describe('useCanvasLibraryImportRuntime', () => {
     })
 
     await flushPromises()
-    expect(harness.materialize).toHaveBeenCalledWith('liba_asset0007')
+    expect(harness.materialize).toHaveBeenCalledWith('lasset_asset0007')
     expect(harness.nodes.value).toEqual([])
   })
 })

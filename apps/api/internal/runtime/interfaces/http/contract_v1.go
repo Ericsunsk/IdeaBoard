@@ -44,18 +44,17 @@ type ContractV1Deps struct {
 	// tests inject fakes.
 	Search ContractV1SearchDeps
 	// Tasks is the workspace-scoped async job surface (issue #805).
-	// Nil keeps the tasks surface fail-closed with 501 until the
-	// postgres workspace-task mapping lands (#809); tests inject the
-	// in-memory implementation plus quoter/holder/queue/asset fakes.
-	Tasks      WorkspaceTaskStore
-	TaskQuoter WorkspaceTaskQuoter
-	TaskHolder WorkspaceTaskHolder
-	TaskQueue  WorkspaceTaskEnqueuer
-	TaskAssets WorkspaceTaskAssetReader
+	// Production wires the postgres store and settlement adapters; tests
+	// inject the in-memory implementation plus quoter/holder/queue/asset fakes.
+	Tasks                 WorkspaceTaskStore
+	TaskQuoter            WorkspaceTaskQuoter
+	TaskHolder            WorkspaceTaskHolder
+	TaskQueue             WorkspaceTaskEnqueuer
+	TaskAssets            WorkspaceTaskAssetReader
+	TaskCanonicalCompiler func(feature, userPrompt string, params map[string]interface{}) (string, error)
 	// Media is the workspace-scoped upload-session + media-asset
-	// surface (issue #803, restored in #820). Nil keeps the
-	// upload/media surface fail-closed with 501 until the postgres
-	// store lands; tests inject the in-memory implementation.
+	// surface (issue #803, restored in #820). Production wires the
+	// workspace postgres store; tests inject the in-memory implementation.
 	// MediaObjects reads stored bytes for the content/derivative
 	// endpoints (nil fails binary reads closed with 503 while
 	// metadata keeps working); MediaRenderer is the optional

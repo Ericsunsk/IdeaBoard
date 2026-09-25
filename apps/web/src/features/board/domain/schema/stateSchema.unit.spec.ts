@@ -100,7 +100,7 @@ describe('boardStateSchema', () => {
       imageNodes: [
         {
           ...makePendingImageNodeSnapshot(),
-          libraryImport: { state: 'failed', libraryAssetId: 7, failureMessage: '素材导入失败' },
+          libraryImport: { state: 'failed', libraryAssetId: 'lasset_asset0007', failureMessage: '素材导入失败' },
         },
       ],
     })
@@ -110,7 +110,7 @@ describe('boardStateSchema', () => {
     if (parsed.success) {
       expect(parsed.output.imageNodes[0]?.libraryImport).toEqual({
         state: 'failed',
-        libraryAssetId: 7,
+        libraryAssetId: 'lasset_asset0007',
         failureMessage: '素材导入失败',
       })
     }
@@ -123,7 +123,7 @@ describe('boardStateSchema', () => {
           ...makePendingImageNodeSnapshot(),
           libraryImport: {
             state: 'pending',
-            libraryAssetId: 'liba_asset0007',
+            libraryAssetId: 'lasset_asset0007',
           },
         },
       ],
@@ -134,9 +134,22 @@ describe('boardStateSchema', () => {
     if (parsed.success) {
       expect(parsed.output.imageNodes[0]?.libraryImport).toEqual({
         state: 'pending',
-        libraryAssetId: 'liba_asset0007',
+        libraryAssetId: 'lasset_asset0007',
       })
     }
+
+    const canonical = makeBoardState({
+      imageNodes: [
+        {
+          ...makePendingImageNodeSnapshot(),
+          libraryImport: {
+            state: 'pending',
+            libraryAssetId: 'lasset_asset0007',
+          },
+        },
+      ],
+    })
+    expect(v.safeParse(boardStateSchema, canonical).success).toBe(true)
 
     const malformed = {
       ...state,
@@ -156,7 +169,7 @@ describe('boardStateSchema', () => {
         ...node,
         libraryImport: {
           state: 'pending',
-          libraryAssetId: 7,
+          libraryAssetId: 'lasset_asset0007',
           previewUrl: 'https://provider.example/preview.png',
         },
       })),

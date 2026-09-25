@@ -10,20 +10,23 @@ package composition
 // Tasks surface live (replacing the 501 fail-closed).
 //
 // Transactional note: DESIGN.md requires Quote snapshot + Credit Hold +
-// Task insert + River enqueue in ONE PostgreSQL transaction. The Service
-// orchestrates compensating actions (Release on insert failure, Delete +
-// Release on enqueue failure) rather than a single shared tx: the billing
-// catalog quoter, credits Commands, postgres task store, and River client
-// each own their connection/transaction today, and threading one pgx.Tx
-// through all four is Phase-4b work. The compensation order guarantees no
-// stranded Hold and no orphan River job; events still stage and flush only
-// after commit. See the residual note in the #821 report.
+// Task insert + River enqueue in ONE PostgreSQL transaction, and terminal
+// Complete/Cancel/Fail to settle Capture/Release atomically with the state
+// flip. The seams below expose both halves: the plain Quoter/Holder/
+// Enqueuer methods (compensating fallback for test backends) and the
+// TxQuoter/TxHolder/TxEnqueuer variants that join the Service-owned
+// settlement transaction (opened on the task store pool via
+// workspacetasks.SettlementTransactor). Credits converge through
+// credits.Service.InTx(tx) — the sole ledger writer — the billing catalog
+// quotes through QuoteAtResolutionInTx, and River enqueues through
+// InsertTx, so the river_job row commits atomically with the business tx.
+// Events still stage and flush only after commit.
 //
-// legacy_task_store_stub.go is UNTOUCHED: it covers the legacy
-// taskstore.Repository seams (submission/execution/statistics/retention,
-// all keyed by the pre-workspace task model) which the workspace store
-// does not implement. The v1 workspace seams below are additive and live
-// beside it.
+// #809 hard cut: legacy_task_store_stub.go is DELETED (it covered the
+// legacy taskstore.Repository seams — submission/execution/statistics/
+// retention, all keyed by the pre-workspace task model — which the
+// workspace store does not implement). The v1 workspace seams below are
+// the only task path.
 
 import (
 	"context"
@@ -42,6 +45,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // workspaceTaskQuoter adapts the billing catalog to workspacetasks.Quoter.
@@ -53,6 +57,7 @@ type workspaceTaskQuoter struct {
 }
 
 var _ workspacetasks.Quoter = (*workspaceTaskQuoter)(nil)
+var _ workspacetasks.TxQuoter = (*workspaceTaskQuoter)(nil)
 
 func (q *workspaceTaskQuoter) Quote(ctx context.Context, workflowKind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if q == nil || q.catalog == nil {
@@ -75,16 +80,56 @@ func (q *workspaceTaskQuoter) Quote(ctx context.Context, workflowKind, resolutio
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w", workspacetasks.ErrQuoteUnavailable)
 	}
 	return workspacetasks.BillingSnapshot{
-		SKU:               string(quote.SKU),
-		DisplayName:       quote.DisplayName,
-		PriceVersionID:    quote.PriceVersionID,
-		PriceVersion:      quote.PriceVersion,
-		OutputResolution:  string(quote.OutputResolution),
-		UnitCredits:       quote.UnitCredits,
-		Quantity:          quote.Quantity,
-		TotalCredits:      quote.TotalCredits,
-		QuotedAt:          quote.QuotedAt,
-		SettlementState:   "quoted",
+		SKU:              string(quote.SKU),
+		DisplayName:      quote.DisplayName,
+		PriceVersionID:   quote.PriceVersionID,
+		PriceVersion:     quote.PriceVersion,
+		OutputResolution: string(quote.OutputResolution),
+		UnitCredits:      quote.UnitCredits,
+		Quantity:         quote.Quantity,
+		TotalCredits:     quote.TotalCredits,
+		QuotedAt:         quote.QuotedAt,
+		SettlementState:  "quoted",
+	}, nil
+}
+
+// QuoteInTx mints the same snapshot through the settlement transaction so
+// the price read shares the repeatable-read snapshot with the Hold that
+// follows. It satisfies workspacetasks.TxQuoter.
+func (q *workspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, workflowKind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+	if q == nil || q.catalog == nil {
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if tx == nil {
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(workflowKind))
+	if !ok {
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported kind %q: %w", workflowKind, workspacetasks.ErrQuoteUnavailable)
+	}
+	if quantity <= 0 {
+		quantity = 1
+	}
+	outputResolution, err := billing.NormalizeOutputResolution(resolution)
+	if err != nil {
+		outputResolution = billing.OutputResolutionDefault
+	}
+	sku := "ai-image:" + canonical
+	quote, err := q.catalog.QuoteAtResolutionInTx(ctx, tx, sku, outputResolution, quantity)
+	if err != nil {
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	return workspacetasks.BillingSnapshot{
+		SKU:              string(quote.SKU),
+		DisplayName:      quote.DisplayName,
+		PriceVersionID:   quote.PriceVersionID,
+		PriceVersion:     quote.PriceVersion,
+		OutputResolution: string(quote.OutputResolution),
+		UnitCredits:      quote.UnitCredits,
+		Quantity:         quote.Quantity,
+		TotalCredits:     quote.TotalCredits,
+		QuotedAt:         quote.QuotedAt,
+		SettlementState:  "quoted",
 	}, nil
 }
 
@@ -98,6 +143,11 @@ func (q *workspaceTaskQuoter) Quote(ctx context.Context, workflowKind, resolutio
 // interface change. A process restart between Hold and terminal settle
 // leaves the hold to the 24h stale-hold reconciler (credits ownership),
 // never to a second Hold.
+//
+// The TxHolder variants (HoldInTx/CaptureInTx/ReleaseInTx) take the userID
+// explicitly from the settled task row and run through
+// credits.Service.InTx(tx), so terminal settlement never depends on the
+// process-local map.
 type workspaceTaskHolder struct {
 	credits *credits.Service
 
@@ -106,6 +156,7 @@ type workspaceTaskHolder struct {
 }
 
 var _ workspacetasks.Holder = (*workspaceTaskHolder)(nil)
+var _ workspacetasks.TxHolder = (*workspaceTaskHolder)(nil)
 
 func newWorkspaceTaskHolder(creditService *credits.Service) *workspaceTaskHolder {
 	return &workspaceTaskHolder{credits: creditService, users: make(map[string]int64)}
@@ -113,10 +164,10 @@ func newWorkspaceTaskHolder(creditService *credits.Service) *workspaceTaskHolder
 
 func taskCommandMetadata(idempotencyKey, taskID string, userID int64) domain.CommandMetadata {
 	return domain.CommandMetadata{
-		IdempotencyKey: idempotencyKey,
-		Actor:          domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(userID)},
-		Source:         "task_submission",
-		Reason:         "AI 生图任务 Idea 预授权",
+		IdempotencyKey:    idempotencyKey,
+		Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(userID)},
+		Source:            "task_submission",
+		Reason:            "AI 生图任务 Idea 预授权",
 		BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
 	}
 }
@@ -230,11 +281,106 @@ func (h *workspaceTaskHolder) Release(ctx context.Context, holdTransactionID str
 	return nil
 }
 
+// HoldInTx reserves Ideas inside the settlement transaction through the
+// transaction-scoped Commands (credits.Service.InTx): the hold row commits
+// atomically with the task insert. It satisfies workspacetasks.TxHolder.
+func (h *workspaceTaskHolder) HoldInTx(ctx context.Context, tx pgx.Tx, userID int64, amount int64, idempotencyKey, taskID string) (string, error) {
+	if h == nil || h.credits == nil {
+		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if tx == nil {
+		return "", fmt.Errorf("workspace task holder: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if userID <= 0 {
+		return "", fmt.Errorf("workspace task holder: user required: %w", workspacetasks.ErrWalletRestricted)
+	}
+	creditAmount, err := domain.NewCreditAmount(amount)
+	if err != nil {
+		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	result, err := h.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
+		UserID:   userID,
+		Amount:   creditAmount,
+		Metadata: taskCommandMetadata(idempotencyKey, taskID, userID),
+	})
+	if err != nil {
+		return "", mapHolderError(err)
+	}
+	h.mu.Lock()
+	h.users[result.TransactionID] = userID
+	h.mu.Unlock()
+	return result.TransactionID, nil
+}
+
+// CaptureInTx converges a hold to revenue inside the settlement
+// transaction. The userID comes from the settled task row, never the
+// process-local map. It satisfies workspacetasks.TxHolder.
+func (h *workspaceTaskHolder) CaptureInTx(ctx context.Context, tx pgx.Tx, userID int64, holdTransactionID string, amount int64, taskID string) (string, error) {
+	if h == nil || h.credits == nil {
+		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if tx == nil {
+		return "", fmt.Errorf("workspace task holder: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if userID <= 0 {
+		return "", fmt.Errorf("workspace task holder: user required: %w", workspacetasks.ErrWalletRestricted)
+	}
+	if amount <= 0 {
+		return "", nil
+	}
+	creditAmount, err := domain.NewCreditAmount(amount)
+	if err != nil {
+		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	result, err := h.credits.InTx(tx).Capture(ctx, ports.CaptureCommand{
+		UserID:            userID,
+		HoldTransactionID: holdTransactionID,
+		Amount:            creditAmount,
+		Metadata:          taskCommandMetadata("task-capture:"+taskID, taskID, userID),
+	})
+	if err != nil {
+		return "", mapHolderError(err)
+	}
+	h.forgetHold(holdTransactionID)
+	return result.TransactionID, nil
+}
+
+// ReleaseInTx returns reserved Ideas inside the settlement transaction. It
+// satisfies workspacetasks.TxHolder.
+func (h *workspaceTaskHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID int64, holdTransactionID string, amount int64, taskID string) (string, error) {
+	if h == nil || h.credits == nil {
+		return "", fmt.Errorf("workspace task holder is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if tx == nil {
+		return "", fmt.Errorf("workspace task holder: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if userID <= 0 {
+		return "", fmt.Errorf("workspace task holder: user required: %w", workspacetasks.ErrWalletRestricted)
+	}
+	if amount <= 0 {
+		return "", nil
+	}
+	creditAmount, err := domain.NewCreditAmount(amount)
+	if err != nil {
+		return "", fmt.Errorf("workspace task holder: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	result, err := h.credits.InTx(tx).Release(ctx, ports.ReleaseCommand{
+		UserID:            userID,
+		HoldTransactionID: holdTransactionID,
+		Amount:            creditAmount,
+		Metadata:          taskCommandMetadata("task-release:"+taskID, taskID, userID),
+	})
+	if err != nil {
+		return "", mapHolderError(err)
+	}
+	h.forgetHold(holdTransactionID)
+	return result.TransactionID, nil
+}
+
 // WorkspaceTaskArgs is the River job payload for workspace-scoped task
-// execution. The worker that consumes it lands in Phase-4b (alongside the
-// vision/materialization billing adapters and the derivative renderer):
-// until then jobs wait as available and never dispatch to a provider.
-// The payload carries only opaque identifiers (no bytes, no secrets).
+// execution. The workspace worker (#825, workspace_task_worker.go) consumes
+// this kind on the shared drawing queue. The payload carries only opaque
+// identifiers (no bytes, no secrets).
 type WorkspaceTaskArgs struct {
 	TaskID         string `json:"task_id"`
 	WorkspaceID    string `json:"workspace_id"`
@@ -247,16 +393,28 @@ func (WorkspaceTaskArgs) Kind() string { return "workspace_task_execute" }
 
 // workspaceTaskEnqueuer adapts the River client to workspacetasks.Enqueuer.
 // Production enqueues into the default drawing queue; the workspace worker
-// (Phase-4b) picks up the workspace_task_execute kind.
+// (#825 Phase-4b) consumes the workspace_task_execute kind on the same
+// workspaceRiverClient is the narrow River seam the workspace enqueuer
+// needs: plain inserts plus transaction-joined inserts. The production
+// *river.Client[pgx.Tx] satisfies it; tests inject a stub to prove the
+// ambient settlement tx is forwarded untouched.
+type workspaceRiverClient interface {
+	Insert(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
+	InsertTx(ctx context.Context, tx pgx.Tx, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
+}
+
+// queue via the shared River client.
 type workspaceTaskEnqueuer struct {
-	client      *river.Client[pgx.Tx]
+	mu          sync.Mutex
+	client      workspaceRiverClient
 	queue       string
 	maxAttempts int
 }
 
 var _ workspacetasks.Enqueuer = (*workspaceTaskEnqueuer)(nil)
+var _ workspacetasks.TxEnqueuer = (*workspaceTaskEnqueuer)(nil)
 
-func newWorkspaceTaskEnqueuer(client *river.Client[pgx.Tx], queue string, maxAttempts int) *workspaceTaskEnqueuer {
+func newWorkspaceTaskEnqueuer(client workspaceRiverClient, queue string, maxAttempts int) *workspaceTaskEnqueuer {
 	if strings.TrimSpace(queue) == "" {
 		queue = "drawing_default"
 	}
@@ -266,14 +424,69 @@ func newWorkspaceTaskEnqueuer(client *river.Client[pgx.Tx], queue string, maxAtt
 	return &workspaceTaskEnqueuer{client: client, queue: queue, maxAttempts: maxAttempts}
 }
 
+// SetClient attaches the River client once it exists. The enqueuer is built
+// before the client (the settlement Service needs it at construction, the
+// client needs the worker at registration); jobs only flow after Start, by
+// which time the client is set. Enqueue before then fails closed.
+func (e *workspaceTaskEnqueuer) SetClient(client workspaceRiverClient) {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.client = client
+}
+
 func (e *workspaceTaskEnqueuer) Enqueue(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
-	if e == nil || e.client == nil {
+	if e == nil {
+		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	e.mu.Lock()
+	client := e.client
+	e.mu.Unlock()
+	if client == nil {
 		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" {
 		return fmt.Errorf("workspace task enqueuer: task identity required: %w", workspacetasks.ErrNotFound)
 	}
-	_, err := e.client.Insert(ctx, WorkspaceTaskArgs{
+	_, err := client.Insert(ctx, WorkspaceTaskArgs{
+		TaskID:         strings.TrimSpace(task.ID),
+		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
+		WorkflowKind:   strings.TrimSpace(task.WorkflowKind),
+		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
+	}, &river.InsertOpts{
+		Queue:       e.queue,
+		MaxAttempts: e.maxAttempts,
+		Tags:        []string{strings.TrimSpace(task.ID)},
+	})
+	if err != nil {
+		return fmt.Errorf("workspace task enqueue: %w", err)
+	}
+	return nil
+}
+
+// EnqueueInTx inserts the River job through the settlement transaction
+// (client.InsertTx joins the ambient pgx.Tx): the river_job row commits
+// atomically with the task insert, retry flip, or not at all. It satisfies
+// workspacetasks.TxEnqueuer.
+func (e *workspaceTaskEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask) error {
+	if e == nil {
+		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if tx == nil {
+		return fmt.Errorf("workspace task enqueuer: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	e.mu.Lock()
+	client := e.client
+	e.mu.Unlock()
+	if client == nil {
+		return fmt.Errorf("workspace task enqueuer is not configured: %w", workspacetasks.ErrQuoteUnavailable)
+	}
+	if task == nil || strings.TrimSpace(task.ID) == "" {
+		return fmt.Errorf("workspace task enqueuer: task identity required: %w", workspacetasks.ErrNotFound)
+	}
+	_, err := client.InsertTx(ctx, tx, WorkspaceTaskArgs{
 		TaskID:         strings.TrimSpace(task.ID),
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
 		WorkflowKind:   strings.TrimSpace(task.WorkflowKind),

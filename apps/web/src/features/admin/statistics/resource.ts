@@ -1,16 +1,20 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { api } from '../../../shared/api/client'
+import { CONTROL_API_PREFIX } from '../../../shared/api/controlMutator'
 import {
   createApiDataSelector,
   type ApiResponseWithData,
 } from '../../../shared/api/apiResponse'
+import { getGetControlStatisticsUrl } from '../../../shared/api/generated-query/control/control-platform/control-platform'
 
-// Admin statistics boundary (issue #809). The generated `admin-statistics`
-// client is gone but the backend admin plane still serves
-// `GET /api/admin/statistics` with the shared envelope, so this boundary
-// transports through the central `api.request` with local view types. Charts
-// and presentations keep importing these names, never generated code.
+// Admin statistics boundary (final cut: Control Plane read). The legacy
+// `GET /api/admin/statistics` route group is deleted; the same handler now
+// serves `GET /api/control/v1/platform/statistics` as a guarded proxy with
+// the legacy `{code, msg, data}` envelope untouched, so this boundary keeps
+// its local view types and only repoints transport at the generated Control
+// path. Charts and presentations keep importing these names, never generated
+// code.
 export const GetAdminStatisticsRange = {
   '1d': '1d',
   '7d': '7d',
@@ -124,10 +128,10 @@ const ADMIN_STATISTICS_STALE_TIME_MS = 60_000
 const selectAdminStatistics = createApiDataSelector<AdminStatistics>('加载统计数据失败')
 
 function statisticsUrl(params?: GetAdminStatisticsParams): string {
-  const search = new URLSearchParams()
-  if (params?.range) search.append('range', params.range)
-  const query = search.toString()
-  return query ? `/admin/statistics?${query}` : '/admin/statistics'
+  // Generated Control path (`/platform/statistics[?range=]`); the shared
+  // `api.request` mounts only `/api`, so the `/control/v1` prefix is added
+  // here exactly like `controlMutator` does for generated callers.
+  return `${CONTROL_API_PREFIX}${getGetControlStatisticsUrl(params?.range ? { range: params.range } : undefined)}`
 }
 
 export function useAdminStatisticsResource(

@@ -23,9 +23,8 @@ package httpapi
 //   - ONLY internal/credits writes the ledger, via credits.Commands
 //     (Grant/Hold/Capture/Release/Refund/Purchase...). This file performs
 //     NO ledger writes; checkout settlement flows through the existing
-//     Payments -> Credits transactional seam. Task submission settlement
-//     itself is #805: this file leaves the hook (see TaskSettlementHook)
-//     and does not implement it.
+//     Payments -> Credits transactional seam. Task submission uses the
+//     workspace task settlement service instead of this billing read surface.
 //   - Billing ONLY mints immutable PriceSnapshots/Quotes (server-side, no
 //     client price input). Recharge checkout uses the server-side Payments
 //     PurchaseQuote (IdeasPerUSD); no client amount/price is accepted.
@@ -144,14 +143,6 @@ type workspaceCheckoutStatus struct {
 	ExpiresAt    time.Time
 }
 
-// TaskSettlementHook is the #805 seam: task submission settlement
-// (server-side Quote snapshot + Credit Hold + task insert + River enqueue
-// in one PG transaction). #804 leaves this hook unimplemented on purpose;
-// the zero value reports unavailable so no partial settlement can run.
-type TaskSettlementHook interface {
-	SettleTaskSubmission(ctx context.Context, workspacePublicID string) error
-}
-
 // ContractV1BillingDeps wires the workspace billing handlers. Zero values
 // fail closed (501/503); production fills every field in http_wiring.go.
 type ContractV1BillingDeps struct {
@@ -164,7 +155,6 @@ type ContractV1BillingDeps struct {
 	Usage           billingUsageReader
 	Quoter          billingQuoter
 	Checkout        workspaceCheckoutService
-	TaskSettlement  TaskSettlementHook
 }
 
 func (d *ContractV1BillingDeps) normalize() {

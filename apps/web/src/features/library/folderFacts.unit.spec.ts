@@ -34,12 +34,12 @@ describe('Library Folder facts', () => {
     const island = facts.load()
 
     expect(fetchFolders).toHaveBeenCalledOnce()
-    request.resolve([folder('libf_folder0001', 'References')])
+    request.resolve([folder('lfolder_folder0001', 'References')])
     await expect(Promise.all([popover, island])).resolves.toEqual([
-      { status: 'current', folders: [folder('libf_folder0001', 'References')] },
-      { status: 'current', folders: [folder('libf_folder0001', 'References')] },
+      { status: 'current', folders: [folder('lfolder_folder0001', 'References')] },
+      { status: 'current', folders: [folder('lfolder_folder0001', 'References')] },
     ])
-    expect(facts.folders.value).toEqual([folder('libf_folder0001', 'References')])
+    expect(facts.folders.value).toEqual([folder('lfolder_folder0001', 'References')])
   })
 
   it('does not allow a pre-mutation response to overwrite refreshed facts', async () => {
@@ -50,14 +50,14 @@ describe('Library Folder facts', () => {
 
     const stale = facts.load()
     const current = facts.refresh()
-    staleRequest.resolve([folder('libf_folder0001', 'Before save')])
+    staleRequest.resolve([folder('lfolder_folder0001', 'Before save')])
     await stale
 
     expect(facts.folders.value).toEqual([])
-    currentRequest.resolve([folder('libf_folder0002', 'After save')])
+    currentRequest.resolve([folder('lfolder_folder0002', 'After save')])
     await current
 
-    expect(facts.folders.value).toEqual([folder('libf_folder0002', 'After save')])
+    expect(facts.folders.value).toEqual([folder('lfolder_folder0002', 'After save')])
   })
 
   it('drops identity-scoped facts and in-flight work on reset and dispose', async () => {
@@ -71,14 +71,14 @@ describe('Library Folder facts', () => {
     const previous = facts.load()
     facts.reset()
     const current = facts.load()
-    previousRequest.resolve([folder('libf_folder0001', 'Previous user')])
+    previousRequest.resolve([folder('lfolder_folder0001', 'Previous user')])
     await expect(previous).resolves.toEqual({ status: 'stale' })
     expect(facts.folders.value).toEqual([])
 
-    currentRequest.resolve([folder('libf_folder0002', 'Current user')])
+    currentRequest.resolve([folder('lfolder_folder0002', 'Current user')])
     await expect(current).resolves.toEqual({
       status: 'current',
-      folders: [folder('libf_folder0002', 'Current user')],
+      folders: [folder('lfolder_folder0002', 'Current user')],
     })
     facts.dispose()
 
@@ -95,13 +95,13 @@ describe('Library Folder facts', () => {
     publisher.subscribe((outcome) => outcomes.push(outcome))
 
     const publication = publisher.publishMutations([
-      { kind: 'folder-renamed', affectedFolderKeys: ['libf_folder0007'], galleryEffect: 'none' },
-      { kind: 'folder-deleted', affectedFolderKeys: ['libf_folder0008'], galleryEffect: 'none' },
+      { kind: 'folder-renamed', affectedFolderKeys: ['lfolder_folder0007'], galleryEffect: 'none' },
+      { kind: 'folder-deleted', affectedFolderKeys: ['lfolder_folder0008'], galleryEffect: 'none' },
     ])
 
     expect(outcomes).toEqual([
-      { kind: 'folder-renamed', affectedFolderKeys: ['libf_folder0007'], galleryEffect: 'none' },
-      { kind: 'folder-deleted', affectedFolderKeys: ['libf_folder0008'], galleryEffect: 'none' },
+      { kind: 'folder-renamed', affectedFolderKeys: ['lfolder_folder0007'], galleryEffect: 'none' },
+      { kind: 'folder-deleted', affectedFolderKeys: ['lfolder_folder0008'], galleryEffect: 'none' },
     ])
     expect(fetchFolders).toHaveBeenCalledOnce()
 
@@ -119,12 +119,12 @@ describe('Library Folder facts', () => {
 
     await publisher.publishMutation({
       kind: 'folder-renamed',
-      affectedFolderKeys: ['libf_folder0007'],
+      affectedFolderKeys: ['lfolder_folder0007'],
       galleryEffect: 'none',
     })
 
     expect(outcomes).toEqual([
-      { kind: 'folder-renamed', affectedFolderKeys: ['libf_folder0007'], galleryEffect: 'none' },
+      { kind: 'folder-renamed', affectedFolderKeys: ['lfolder_folder0007'], galleryEffect: 'none' },
     ])
   })
 })

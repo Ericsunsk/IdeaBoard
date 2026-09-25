@@ -23,7 +23,7 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // (never a silent empty page).
 
 const WORKSPACE_ID_RE = /^ws_[A-Za-z0-9_-]+$/
-const LIBRARY_ASSET_ID_RE = /^liba_[A-Za-z0-9_-]+$/
+const LIBRARY_ASSET_ID_RE = /^lasset_[A-Za-z0-9_-]+$/
 
 function assertWorkspaceId(value: string): string {
   const trimmed = value.trim()
@@ -34,7 +34,7 @@ function assertWorkspaceId(value: string): string {
 export function assertWorkspaceLibraryAssetId(value: string): string {
   const trimmed = value.trim()
   if (!LIBRARY_ASSET_ID_RE.test(trimmed)) {
-    throw new Error('Invalid library asset id: expected liba_...')
+    throw new Error('Invalid library asset id: expected lasset_...')
   }
   return trimmed
 }

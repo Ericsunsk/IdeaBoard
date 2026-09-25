@@ -45,7 +45,7 @@ const reference: LibrarySearchReference = {
 }
 
 const asset: LibraryAssetView = {
-  id: 'liba_asset0042',
+  id: 'lasset_asset0042',
   workspaceId: 'ws_test123',
   provider: 'pexels',
   sourceId: 'photo-42',
@@ -56,7 +56,7 @@ const asset: LibraryAssetView = {
   author: 'B. Creator',
   width: 800,
   height: 800,
-  folderId: 'libf_folder0001',
+  folderId: 'lfolder_folder0001',
   createdAt: '2026-08-22T00:00:00Z',
   updatedAt: '2026-08-22T00:00:00Z',
 }

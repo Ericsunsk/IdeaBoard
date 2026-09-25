@@ -47,9 +47,9 @@ vi.mock('../../shared/api/mediaAssetDelivery', async (importOriginal) => {
 })
 
 const WORKSPACE_ID = 'ws_abc123'
-const FOLDER_ID = 'libf_folder0001'
-const ASSET_ID = 'liba_asset0001'
-const MATERIALIZATION_ID = 'libm_job0001'
+const FOLDER_ID = 'lfolder_folder0001'
+const ASSET_ID = 'lasset_asset0001'
+const MATERIALIZATION_ID = 'lmat_job0001'
 const PREVIEW_URL = 'https://images.unsplash.com/photo-test'
 
 function folderFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -104,13 +104,13 @@ describe('workspace library paths', () => {
       '/v1/workspaces/ws_abc123/library/folders',
     )
     expect(workspaceLibraryFolderSuffix(WORKSPACE_ID, FOLDER_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/folders/libf_folder0001',
+      '/v1/workspaces/ws_abc123/library/folders/lfolder_folder0001',
     )
     expect(workspaceLibraryAssetsSuffix(WORKSPACE_ID)).toBe(
       '/v1/workspaces/ws_abc123/library/assets',
     )
     expect(workspaceLibraryAssetSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/assets/liba_asset0001',
+      '/v1/workspaces/ws_abc123/library/assets/lasset_asset0001',
     )
     expect(workspaceLibraryResolveSuffix(WORKSPACE_ID)).toBe(
       '/v1/workspaces/ws_abc123/library/asset-resolutions',
@@ -119,14 +119,14 @@ describe('workspace library paths', () => {
       '/v1/workspaces/ws_abc123/library/materializations',
     )
     expect(workspaceLibraryMaterializationSuffix(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/materializations/libm_job0001',
+      '/v1/workspaces/ws_abc123/library/materializations/lmat_job0001',
     )
   })
 
   it('rejects malformed ids before any network call (integer ids included)', () => {
     expect(() => assertWorkspaceId('nope')).toThrow()
     expect(() => assertLibraryFolderId('42')).toThrow()
-    expect(() => assertLibraryFolderId('liba_asset0001')).toThrow()
+    expect(() => assertLibraryFolderId('lasset_asset0001')).toThrow()
     expect(() => assertLibraryAssetId('42')).toThrow()
     expect(() => assertLibraryMaterializationId('nope')).toThrow()
     expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()
@@ -511,5 +511,214 @@ describe('workspace library use cases', () => {
         pollAttempts: 3,
       }),
     ).rejects.toThrow('quote broke')
+  })
+})
+
+describe('workspace library canonical ids (lfolder_/lasset_/lmat_)', () => {
+  const FOLDER_ID = 'lfolder_folder0001'
+  const ASSET_ID = 'lasset_asset0001'
+  const MATERIALIZATION_ID = 'lmat_job0001'
+
+  it('accepts canonical ids in suffixes, asserts, and mapping', () => {
+    expect(workspaceLibraryFolderSuffix(WORKSPACE_ID, FOLDER_ID)).toBe(
+      '/v1/workspaces/ws_abc123/library/folders/lfolder_folder0001',
+    )
+    expect(workspaceLibraryAssetSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
+      '/v1/workspaces/ws_abc123/library/assets/lasset_asset0001',
+    )
+    expect(workspaceLibraryMaterializationSuffix(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
+      '/v1/workspaces/ws_abc123/library/materializations/lmat_job0001',
+    )
+    expect(() => assertLibraryFolderId(FOLDER_ID)).not.toThrow()
+    expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()
+    expect(() => assertLibraryMaterializationId(MATERIALIZATION_ID)).not.toThrow()
+    expect(toWorkspaceLibraryFolder(folderFixture({ id: FOLDER_ID })).id).toBe(FOLDER_ID)
+    expect(toWorkspaceLibraryAsset(assetFixture({ id: ASSET_ID, folder_id: FOLDER_ID })).id).toBe(
+      ASSET_ID,
+    )
+    expect(
+      toWorkspaceLibraryMaterialization(
+        materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID }),
+      ).id,
+    ).toBe(MATERIALIZATION_ID)
+    // Cross-kind and legacy-integer shapes still fail closed before any network call.
+    expect(() => assertLibraryFolderId(ASSET_ID)).toThrow()
+    expect(() => assertLibraryAssetId(FOLDER_ID)).toThrow()
+    expect(() => assertLibraryMaterializationId(ASSET_ID)).toThrow()
+    expect(() => assertLibraryAssetId('42')).toThrow()
+  })
+
+  it('materializes canonical ids end to end: create, poll, then resolve display media', async () => {
+    let polls = 0
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
+          { status: 202 },
+        )
+      }),
+      http.get(
+        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
+        async () => {
+          polls += 1
+          return HttpResponse.json({
+            data: materializationFixture({
+              id: MATERIALIZATION_ID,
+              library_asset_id: ASSET_ID,
+              status: polls > 1 ? 'completed' : 'running',
+            }),
+          })
+        },
+      ),
+    )
+    const media = await materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+      pollDelayMs: 1,
+      pollAttempts: 5,
+    })
+    expect(polls).toBeGreaterThan(1)
+    expect(media).toMatchObject({
+      mediaAssetId: 'asset_abc123',
+      width: 400,
+      height: 200,
+    })
+  })
+
+  it('degrades gracefully when creation renders 503 billing_quote_unavailable', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          {
+            error: {
+              code: 'billing_quote_unavailable',
+              message: '价格服务暂不可用',
+              request_id: 'req-503',
+            },
+          },
+          { status: 503 },
+        )
+      }),
+    )
+    await expect(
+      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+        pollDelayMs: 1,
+        pollAttempts: 3,
+      }),
+    ).rejects.toMatchObject({ code: 'billing_quote_unavailable' })
+  })
+
+  it('degrades gracefully when the materializer seam is down (503 service_unavailable)', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          {
+            error: {
+              code: 'service_unavailable',
+              message: '转存服务暂不可用',
+              request_id: 'req-503',
+            },
+          },
+          { status: 503 },
+        )
+      }),
+    )
+    await expect(
+      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+        pollDelayMs: 1,
+        pollAttempts: 3,
+      }),
+    ).rejects.toMatchObject({ code: 'service_unavailable' })
+  })
+
+  it('degrades gracefully when polling renders 503 instead of a snapshot', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
+          { status: 202 },
+        )
+      }),
+      http.get(
+        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
+        async () => {
+          return HttpResponse.json(
+            {
+              error: {
+                code: 'service_unavailable',
+                message: '素材库服务暂不可用',
+                request_id: 'req-503',
+              },
+            },
+            { status: 503 },
+          )
+        },
+      ),
+    )
+    await expect(
+      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+        pollDelayMs: 1,
+        pollAttempts: 3,
+      }),
+    ).rejects.toMatchObject({ code: 'service_unavailable' })
+  })
+
+  it('degrades gracefully when the polled job is unknown (404 library_materialization_not_found)', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
+          { status: 202 },
+        )
+      }),
+      http.get(
+        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
+        async () => {
+          return HttpResponse.json(
+            {
+              error: {
+                code: 'library_materialization_not_found',
+                message: '转存任务不存在',
+                request_id: 'req-404',
+              },
+            },
+            { status: 404 },
+          )
+        },
+      ),
+    )
+    await expect(
+      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+        pollDelayMs: 1,
+        pollAttempts: 3,
+      }),
+    ).rejects.toMatchObject({ code: 'library_materialization_not_found' })
+  })
+
+  it('fails closed instead of hanging when the job never reaches a terminal state', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
+        return HttpResponse.json(
+          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
+          { status: 202 },
+        )
+      }),
+      http.get(
+        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
+        async () => {
+          return HttpResponse.json({
+            data: materializationFixture({
+              id: MATERIALIZATION_ID,
+              library_asset_id: ASSET_ID,
+              status: 'running',
+            }),
+          })
+        },
+      ),
+    )
+    await expect(
+      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
+        pollDelayMs: 1,
+        pollAttempts: 2,
+      }),
+    ).rejects.toThrow()
   })
 })

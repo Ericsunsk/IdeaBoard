@@ -106,11 +106,11 @@ func compileGenerationMedia(snapshot *tasks.GenerationRequestSnapshot, media *ta
 		return
 	}
 	appendMedia := func(ref tasks.MediaRef) {
-		if strings.TrimSpace(ref.Source) == "" && ref.AssetID <= 0 {
+		if strings.TrimSpace(ref.Source) == "" && ref.AssetID <= 0 && strings.TrimSpace(ref.PublicAssetID) == "" {
 			return
 		}
 		snapshot.Media = append(snapshot.Media, tasks.GenerationMediaIntent{
-			InputIndex: len(snapshot.Media), Role: ref.Role, AssetID: ref.AssetID, Weight: ref.Weight, Source: strings.TrimSpace(ref.Source),
+			InputIndex: len(snapshot.Media), Role: ref.Role, AssetID: ref.AssetID, PublicAssetID: strings.TrimSpace(ref.PublicAssetID), Weight: ref.Weight, Source: strings.TrimSpace(ref.Source),
 		})
 	}
 	for _, ref := range media.Inputs {

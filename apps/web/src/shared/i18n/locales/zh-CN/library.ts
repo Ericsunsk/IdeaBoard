@@ -41,7 +41,7 @@ export default {
     folderNameLabel: '文件夹名称',
     folderNamePlaceholder: '例如 极简空间',
     deleteFolderTitle: '删除文件夹',
-    deleteFolderMessage: '确定删除 "{name}" 吗？其中的参考图将移至快速收藏。',
+    deleteFolderMessage: '确定删除 "{name}" 吗？其中的参考图将变为未归档（可在全部素材下查看）。',
     removeAssetTitle: '移除收藏',
     removeAssetMessage: '确定要从素材库中移除此参考图吗？',
     cancel: '取消',

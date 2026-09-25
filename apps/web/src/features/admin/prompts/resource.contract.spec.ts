@@ -9,7 +9,7 @@ describe('feature prompt resource', () => {
   it('maps the canonical feature-prompts API behind the Admin resource seam', async () => {
     const requests: Array<{ method: string; path: string; body?: unknown }> = []
     useMswHandlers(
-      http.get('/api/admin/feature-prompts', () =>
+      http.get('/api/control/v1/platform/feature-prompts', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',

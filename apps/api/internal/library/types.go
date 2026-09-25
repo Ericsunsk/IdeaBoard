@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	ProviderUnsplash = "unsplash"
-	ProviderPexels   = "pexels"
-	AllAssetsFolder  = "all"
-	QuickSavesFolder = "quick-saves"
+	ProviderUnsplash       = "unsplash"
+	ProviderPexels         = "pexels"
+	ProviderWorkspaceMedia = "workspace_media"
+	AllAssetsFolder        = "all"
+	QuickSavesFolder       = "quick-saves"
 	// DefaultPageSize tracks the shared pagination standard.
 	DefaultPageSize = pagination.DefaultLimit
 	// MaxPageSize tracks the shared pagination standard.

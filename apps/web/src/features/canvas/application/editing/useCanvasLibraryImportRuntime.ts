@@ -259,9 +259,6 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
       if (!current) return
       const fact = current.snapshot.libraryImport
       if (fact?.state !== 'pending') return
-      // Legacy numeric facts cannot resume on the workspace API (integer
-      // ids converge to 404); only opaque ids materialize.
-      if (typeof fact.libraryAssetId !== 'string') return
       if (
         materializePending(
           node.id,

@@ -365,19 +365,20 @@ type FeaturePrompt struct {
 }
 
 type LibraryAsset struct {
-	InternalID  int64              `json:"internal_id"`
-	PublicID    string             `json:"public_id"`
-	WorkspaceID int64              `json:"workspace_id"`
-	FolderID    int64              `json:"folder_id"`
-	Provider    string             `json:"provider"`
-	SourceID    string             `json:"source_id"`
-	SourceUrl   string             `json:"source_url"`
-	PreviewUrl  string             `json:"preview_url"`
-	OriginalUrl string             `json:"original_url"`
-	Width       int32              `json:"width"`
-	Height      int32              `json:"height"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	InternalID   int64              `json:"internal_id"`
+	PublicID     string             `json:"public_id"`
+	WorkspaceID  int64              `json:"workspace_id"`
+	FolderID     int64              `json:"folder_id"`
+	Provider     string             `json:"provider"`
+	SourceID     string             `json:"source_id"`
+	SourceUrl    string             `json:"source_url"`
+	PreviewUrl   string             `json:"preview_url"`
+	OriginalUrl  string             `json:"original_url"`
+	MediaAssetID pgtype.Int8        `json:"media_asset_id"`
+	Width        int32              `json:"width"`
+	Height       int32              `json:"height"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LibraryAssetMediaAsset struct {

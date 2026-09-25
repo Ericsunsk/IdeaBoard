@@ -359,7 +359,13 @@ func normalizeRiverServerOptions(opts RiverServerOptions) (string, int, int, tim
 
 func buildRiverWorkersAndErrorHandler(worker *RiverTaskWorker, opts RiverServerOptions) (*riverqueue.Workers, riverqueue.ErrorHandler) {
 	workers := riverqueue.NewWorkers()
-	riverqueue.AddWorker(workers, worker)
+	// #809 hard cut: the legacy drawing-task worker is unregistered
+	// (composition passes nil). Skipping registration fails stray
+	// old-kind jobs loudly as unknown kinds instead of panicking on a
+	// nil worker or silently dropping them.
+	if worker != nil {
+		riverqueue.AddWorker(workers, worker)
+	}
 	if opts.RegisterWorkers != nil {
 		opts.RegisterWorkers(workers)
 	}

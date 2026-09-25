@@ -128,7 +128,7 @@ func validateGenerationMedia(media []tasks.GenerationMediaIntent, runtimeInputs 
 	generationImageCount := 0
 	generationHasMask := false
 	for index, item := range media {
-		if item.InputIndex != index || item.AssetID <= 0 || !tasks.IsGenerationMediaRole(item.Role) {
+		if item.InputIndex != index || (item.AssetID <= 0 && strings.TrimSpace(item.PublicAssetID) == "") || !tasks.IsGenerationMediaRole(item.Role) {
 			return fmt.Errorf("task generation media is invalid")
 		}
 		if item.Role == tasks.MediaRoleMask {
@@ -235,19 +235,19 @@ func providerMediaFacts(media *tasks.MediaInputs) (int, bool) {
 	}
 	count := 0
 	for _, ref := range media.Inputs {
-		if ref.AssetID > 0 {
+		if ref.AssetID > 0 || strings.TrimSpace(ref.PublicAssetID) != "" {
 			count++
 		}
 	}
 	for _, ref := range media.References {
-		if ref.AssetID > 0 {
+		if ref.AssetID > 0 || strings.TrimSpace(ref.PublicAssetID) != "" {
 			count++
 		}
 	}
-	if media.Original != nil && media.Original.AssetID > 0 {
+	if media.Original != nil && (media.Original.AssetID > 0 || strings.TrimSpace(media.Original.PublicAssetID) != "") {
 		count++
 	}
-	hasMask := media.Mask != nil && media.Mask.AssetID > 0
+	hasMask := media.Mask != nil && (media.Mask.AssetID > 0 || strings.TrimSpace(media.Mask.PublicAssetID) != "")
 	return count, hasMask
 }
 
@@ -268,7 +268,7 @@ func validateProviderMediaMatchesGeneration(media *tasks.MediaInputs, generation
 	}
 	for index, ref := range refs {
 		intent := generation[index]
-		if ref.AssetID <= 0 || ref.AssetID != intent.AssetID || ref.Role != intent.Role {
+		if ref.AssetID != intent.AssetID || strings.TrimSpace(ref.PublicAssetID) != strings.TrimSpace(intent.PublicAssetID) || (ref.AssetID <= 0 && strings.TrimSpace(ref.PublicAssetID) == "") || ref.Role != intent.Role {
 			return fmt.Errorf("task provider media fact %d does not match generation snapshot", index)
 		}
 	}

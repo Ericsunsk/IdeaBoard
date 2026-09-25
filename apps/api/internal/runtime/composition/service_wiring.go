@@ -98,6 +98,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	billingItems := billingregistry.WorkflowItems()
 	billingItems = append(billingItems, billingregistry.VisionSearchItem())
+	billingItems = append(billingItems, billingregistry.LibraryMaterializeItem())
 	billableItemRegistry, err := billing.NewBillableItemRegistry(billingItems)
 	if err != nil {
 		return appDomainServices{}, fmt.Errorf("build billable item registry: %w", err)

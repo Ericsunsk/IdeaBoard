@@ -24,9 +24,6 @@ export function hasPendingLibraryImport(
 export function retryLibraryImport(snapshot: ImageNodeItem): ImageNodeItem | null {
   const fact = snapshot.libraryImport
   if (fact?.state !== 'failed') return null
-  // Legacy numeric facts cannot resume: the workspace API never accepts
-  // integer ids (they converge to 404), so only opaque ids retry.
-  if (typeof fact.libraryAssetId !== 'string') return null
   return {
     ...snapshot,
     libraryImport: createPendingLibraryImportFact(fact.libraryAssetId),

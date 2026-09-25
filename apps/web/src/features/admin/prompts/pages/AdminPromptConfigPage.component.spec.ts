@@ -41,7 +41,7 @@ describe('AdminPromptConfigPage', () => {
     ]
 
     useMswHandlers(
-      http.get('/api/admin/feature-prompts', () => {
+      http.get('/api/control/v1/platform/feature-prompts', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',

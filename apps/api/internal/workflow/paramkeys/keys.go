@@ -12,6 +12,7 @@ const (
 	Extra         = "extra"
 	Generation    = "generation"
 	ExecutionPlan = "execution_plan"
+	WorkspaceID   = "__workspace_id"
 
 	ImageURL               = "image_url"
 	ImageURLs              = "image_urls"
@@ -71,6 +72,7 @@ var canonicalTaskParamKeys = keySet(
 	Extra,
 	Generation,
 	ExecutionPlan,
+	WorkspaceID,
 )
 
 var providerReservedKeys = keySet(
@@ -85,6 +87,7 @@ var providerReservedKeys = keySet(
 	Extra,
 	Generation,
 	ExecutionPlan,
+	WorkspaceID,
 	ImageURL,
 	ImageURLs,
 	ReferenceImageURLs,

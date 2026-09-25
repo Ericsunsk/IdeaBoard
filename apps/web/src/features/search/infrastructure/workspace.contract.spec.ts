@@ -11,7 +11,7 @@ import {
 } from './workspace'
 
 const WORKSPACE_ID = 'ws_abc123'
-const ASSET_ID = 'liba_asset0001'
+const ASSET_ID = 'lasset_asset0001'
 const PREVIEW_URL = 'https://images.unsplash.com/photo-test'
 
 function resultFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -39,8 +39,10 @@ describe('workspace search paths', () => {
 
   it('rejects malformed ids before any network call', () => {
     expect(() => assertWorkspaceLibraryAssetId('42')).toThrow()
-    expect(() => assertWorkspaceLibraryAssetId('libf_x')).toThrow()
+    expect(() => assertWorkspaceLibraryAssetId('lfolder_x')).toThrow()
+    expect(() => assertWorkspaceLibraryAssetId('lfolder_x')).toThrow()
     expect(() => assertWorkspaceLibraryAssetId(ASSET_ID)).not.toThrow()
+    expect(() => assertWorkspaceLibraryAssetId('lasset_asset0001')).not.toThrow()
     expect(() => workspaceSearchSuffix('nope')).toThrow()
   })
 })
@@ -181,5 +183,31 @@ describe('workspace vision query replay headers', () => {
         { idempotencyKey: 'search:vision:2' },
       ),
     ).rejects.toMatchObject({ code: 'billing_wallet_restricted' })
+  })
+
+  it('sends canonical lasset_ refs in the vision query body', async () => {
+    let seenBody: unknown = null
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/search/vision-queries', async ({ request }) => {
+        seenBody = await request.json()
+        return HttpResponse.json(
+          {
+            data: {
+              operation_id: 'visq_op0002',
+              status: 'succeeded',
+              query: 'warm cafe',
+              created_at: '2026-09-23T00:00:00Z',
+            },
+          },
+          { status: 201 },
+        )
+      }),
+    )
+    const query = await workspaceSearchApi.createVisionQuery(
+      { workspaceId: WORKSPACE_ID, userText: 'warm cafe', libraryAssetIds: ['lasset_asset0001'] },
+      { idempotencyKey: 'search:vision:3' },
+    )
+    expect(query.operationId).toBe('visq_op0002')
+    expect(seenBody).toMatchObject({ data: { library_asset_ids: ['lasset_asset0001'] } })
   })
 })

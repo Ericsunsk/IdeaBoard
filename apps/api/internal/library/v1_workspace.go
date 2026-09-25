@@ -119,8 +119,9 @@ type V1Folder struct {
 	UpdatedAt         time.Time
 }
 
-// V1Asset is one saved external reference: provider URL + source
-// metadata only. It never carries bytes.
+// V1Asset is one saved library reference. External rows carry provider URLs;
+// task output rows use ProviderWorkspaceMedia and point at media_assets through
+// the database-managed media_asset_id column, without storing bytes in Library.
 type V1Asset struct {
 	WorkspacePublicID string
 	PublicID          string

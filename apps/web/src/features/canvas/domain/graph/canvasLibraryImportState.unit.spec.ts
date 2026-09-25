@@ -7,7 +7,7 @@ import {
   retryLibraryImport,
 } from './canvasLibraryImportState'
 
-const LIBRARY_ASSET_ID = 'liba_asset0007'
+const LIBRARY_ASSET_ID = 'lasset_asset0007'
 
 function pendingImage(): ImageNodeItem {
   return {
@@ -51,19 +51,14 @@ describe('CanvasLibraryImportState', () => {
     expect(materialized.libraryImport).toBeUndefined()
   })
 
-  it('leaves legacy numeric facts inert: they cannot resume on the workspace API', () => {
-    const legacy = { ...pendingImage(), libraryImport: { state: 'failed' as const, libraryAssetId: 7, failureMessage: 'x' } }
-    expect(retryLibraryImport(legacy)).toBeNull()
-  })
-
   it('rejects transitions from a mismatched durable fact', () => {
     const pending = pendingImage()
 
-    expect(failLibraryImport(pending, 'liba_asset0008', 'Source unavailable')).toBeNull()
+    expect(failLibraryImport(pending, 'lasset_asset0008', 'Source unavailable')).toBeNull()
     expect(
       materializeLibraryImport(
         pending,
-        'liba_asset0008',
+        'lasset_asset0008',
         {
           mediaAssetId: 'asset_media0042',
           url: 'https://app.example/media/42',

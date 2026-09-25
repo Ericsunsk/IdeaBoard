@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
+	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
@@ -280,6 +281,22 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 	// Canonical request hash for idempotent replay (same key+hash ->
 	// same task_id; conflict hash -> 409).
 	paramsJSON, _ := json.Marshal(body.Data.Params)
+	canonicalParams := ""
+	if h.deps.TaskCanonicalCompiler != nil {
+		var compileErr error
+		canonicalInput := make(map[string]interface{}, len(body.Data.Params)+1)
+		for key, value := range body.Data.Params {
+			canonicalInput[key] = value
+		}
+		if len(assetIDs) > 0 {
+			canonicalInput[taskservice.CompilerWorkspaceMediaAssetIDsParam] = append([]string(nil), assetIDs...)
+		}
+		canonicalParams, compileErr = h.deps.TaskCanonicalCompiler(kind, "", canonicalInput)
+		if compileErr != nil {
+			renderTaskError(c, compileErr)
+			return
+		}
+	}
 	hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
 		strings.Join(assetIDs, ","), string(paramsJSON),
 		strconv.FormatInt(quantity, 10), resolution)
@@ -290,7 +307,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
 			WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
 			WorkflowKind: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
-			Quantity: quantity, Resolution: resolution,
+			Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
 		}, key)
 		if err != nil {
 			return nil, err

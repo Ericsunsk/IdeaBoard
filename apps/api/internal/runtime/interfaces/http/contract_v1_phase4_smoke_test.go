@@ -91,9 +91,9 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		Store: store, Users: dir,
 		Library: ContractV1LibraryDeps{Store: lib},
 		Media:   media,
-		// MediaObjects stays nil: binary reads fail closed with 503
-		// while metadata keeps working (production wires the storage
-		// service; the renderer stays nil in both).
+		// MediaObjects stays nil in this fixture: binary reads fail closed
+		// with 503 while metadata keeps working. The production task worker
+		// has its own renderer; this HTTP fixture does not exercise it.
 		Tasks:      tasks,
 		TaskQuoter: quoter,
 		TaskHolder: holder,

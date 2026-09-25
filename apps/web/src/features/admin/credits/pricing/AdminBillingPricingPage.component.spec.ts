@@ -26,10 +26,10 @@ describe('AdminBillingPricingPage', () => {
     toast.warning.mockReset()
     toast.error.mockReset()
     useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
       ),
-      http.get('/api/admin/settings/ai-gateway/catalog', () =>
+      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
       ),
     )
@@ -362,14 +362,14 @@ describe('AdminBillingPricingPage', () => {
       http.get('/api/admin/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.get('/api/admin/settings/ai-gateway/models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: [{ feature: 'inpaint', model: 'openai/gpt-image-1' }],
         }),
       ),
-      http.get('/api/admin/settings/ai-gateway/catalog', () =>
+      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -406,10 +406,10 @@ describe('AdminBillingPricingPage', () => {
       http.get('/api/admin/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.get('/api/admin/settings/ai-gateway/models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
       ),
-      http.get('/api/admin/settings/ai-gateway/catalog', () =>
+      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -453,10 +453,10 @@ describe('AdminBillingPricingPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/settings/ai-gateway/models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
       ),
-      http.get('/api/admin/settings/ai-gateway/catalog', () =>
+      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',

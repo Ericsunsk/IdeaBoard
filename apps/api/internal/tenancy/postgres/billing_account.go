@@ -47,8 +47,8 @@ func NewBillingAccountStore(db *pgxpool.Pool) *BillingAccountStore {
 	return &BillingAccountStore{db: db, q: dbsqlc.New(db)}
 }
 
-func (s *BillingAccountStore) dbWithContext(ctx context.Context) *dbsqlc.Queries {
-	return s.q
+func (s *BillingAccountStore) dbWithContext(ctx context.Context) repositoryQueryer {
+	return repositoryQueryer{ctx: ctx, db: s.db, q: s.q}
 }
 
 // EnsureBillingAccountForWorkspace provisions the workspace billing account
@@ -63,38 +63,47 @@ func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Conte
 	if s == nil || s.q == nil {
 		return BillingAccount{}, errors.New("tenancy: billing account store not configured")
 	}
-	key := pgtype.Int8{Int64: workspaceInternalID, Valid: workspaceInternalID > 0}
-	queries := s.dbWithContext(ctx)
-	if row, err := queries.GetBillingAccountByWorkspaceID(ctx, key); err == nil {
-		return mapBillingAccount(row, workspacePublicID), nil
-	} else if !database.IsNotFound(err) {
-		return BillingAccount{}, err
-	}
-	// Every billing_accounts row carries a ba_-prefixed public_id per the
-	// contract kernel (chk_billing_accounts_public_id); mint one through
-	// the tenancy seam like the workspace lifecycle does.
-	publicID, err := tenancy.NewBillingAccountPublicID()
+	created, err := ensureBillingAccountForWorkspace(ctx, s.dbWithContext(ctx).q, workspaceInternalID)
 	if err != nil {
-		return BillingAccount{}, err
-	}
-	created, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
-		PublicID:       publicID,
-		WorkspaceID:    key,
-		OrganizationID: pgtype.Int8{},
-	})
-	if err != nil {
-		// Best-effort convergence on concurrent first read: the
-		// ux_billing_accounts_workspace loser reads back the winner.
-		// Non-duplicate errors (including a ba_ public_id collision,
-		// which re-reads as not-found) surface unchanged.
-		if database.IsDuplicateConstraintError(err) {
-			if row, readErr := queries.GetBillingAccountByWorkspaceID(ctx, key); readErr == nil {
-				return mapBillingAccount(row, workspacePublicID), nil
-			}
-		}
 		return BillingAccount{}, err
 	}
 	return mapBillingAccount(created, workspacePublicID), nil
+}
+
+// EnsureBillingAccountForWorkspaceWithQueries applies the same provisioning
+// rules to an existing query set, including a caller-owned transaction.
+// Task settlement uses this form so billing-account creation remains in the
+// task insert transaction without duplicating the get-or-create logic.
+func EnsureBillingAccountForWorkspaceWithQueries(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, error) {
+	return ensureBillingAccountForWorkspace(ctx, queries, workspaceInternalID)
+}
+
+func ensureBillingAccountForWorkspace(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, error) {
+	if queries == nil || workspaceInternalID <= 0 {
+		return dbsqlc.BillingAccount{}, errors.New("tenancy: billing account workspace is invalid")
+	}
+	key := pgtype.Int8{Int64: workspaceInternalID, Valid: true}
+	if row, err := queries.GetBillingAccountByWorkspaceID(ctx, key); err == nil {
+		return row, nil
+	} else if !database.IsNotFound(err) {
+		return dbsqlc.BillingAccount{}, err
+	}
+	publicID, err := tenancy.NewBillingAccountPublicID()
+	if err != nil {
+		return dbsqlc.BillingAccount{}, err
+	}
+	created, err := queries.CreateBillingAccountStub(ctx, dbsqlc.CreateBillingAccountStubParams{
+		PublicID: publicID, WorkspaceID: key, OrganizationID: pgtype.Int8{},
+	})
+	if err != nil {
+		if database.IsDuplicateConstraintError(err) {
+			if row, readErr := queries.GetBillingAccountByWorkspaceID(ctx, key); readErr == nil {
+				return row, nil
+			}
+		}
+		return dbsqlc.BillingAccount{}, err
+	}
+	return created, nil
 }
 
 func mapBillingAccount(row dbsqlc.BillingAccount, workspacePublicID string) BillingAccount {

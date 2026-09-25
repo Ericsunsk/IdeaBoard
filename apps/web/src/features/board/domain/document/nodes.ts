@@ -135,12 +135,11 @@ export interface BoardStateMediaRef {
  * The source remains owned by Library until materialization succeeds, so this
  * fact never carries provider URLs or a temporary media reference.
  *
- * `libraryAssetId` accepts the workspace opaque id (`liba_...`); the numeric
- * form stays valid only so legacy persisted snapshots keep loading.
+ * `libraryAssetId` accepts the canonical workspace opaque id (`lasset_...`).
  */
 export type LibraryImportFact =
-  | { state: 'pending'; libraryAssetId: number | string }
-  | { state: 'failed'; libraryAssetId: number | string; failureMessage: string }
+  | { state: 'pending'; libraryAssetId: string }
+  | { state: 'failed'; libraryAssetId: string; failureMessage: string }
 
 export interface ImageNodeItem {
   id: number

@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '../../../../test/render'
 import { useUserStore } from '../../../auth/session/userSession'
-import type { User } from '../../../../shared/api/userSession'
+import type { User } from '../../../../shared/api/sessionUser'
 import {
   createAccountOverlay,
   provideAccountOverlay,

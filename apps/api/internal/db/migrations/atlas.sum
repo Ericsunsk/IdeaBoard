@@ -1,4 +1,5 @@
-h1:CrzgrJFWJA1jQ+2g2Z2yM1Hnj+5lTHh5sGa2wekh924=
+h1:HpivxYs7KcgUTNo4g5DIuW0OghYuhhV12hDJNw+xGNs=
 20260924000001_baseline.sql h1:GybISD0x6RAoxNvufRMGxI0ccXE47THODLbLalut5Jg=
 20260924000002_drop_task_submission_claims.sql h1:hhkoO9VibQf0H+Hjne37MX8QQsFzLWddBqqaDj+gWNs=
 20260924000003_fix_reconciliation_tasks_public_id.sql h1:MZNfkEOs/ZV29+lIe6sTgFRXo21AHrLp2TPxIX+pDzo=
+20260925000001_workspace_library_managed_media.sql h1:fOaotCn7fthZCnKwdqKgOWpMAcOPyUnywgy5tEon2+o=

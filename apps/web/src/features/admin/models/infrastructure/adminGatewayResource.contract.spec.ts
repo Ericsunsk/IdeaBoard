@@ -5,7 +5,7 @@ import { createAdminGatewayResource } from './adminGatewayResource'
 describe('Admin gateway resource', () => {
   it('lists per-feature model mappings', async () => {
     useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/models', () =>
+      http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',

@@ -17,11 +17,20 @@ async function listAdminSourceFiles(directory: string): Promise<string[]> {
   return files.flat()
 }
 
+function stripComments(source: string): string {
+  // Linters must match code, not prose: a comment mentioning "cursor" (e.g.
+  // documenting a blocked native-dialect migration) is not a hand-rolled
+  // pagination lifecycle.
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s)\/\/.*$/gm, '$1')
+}
+
 async function main() {
   const duplicateLifecycles: string[] = []
 
   for (const filePath of await listAdminSourceFiles(adminRoot)) {
-    const source = await readFile(filePath, 'utf8')
+    const source = stripComments(await readFile(filePath, 'utf8'))
     const ownsManualCollectionLifecycle =
       source.includes('initialError') &&
       source.includes('backgroundError') &&

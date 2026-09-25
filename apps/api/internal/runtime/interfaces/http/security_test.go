@@ -37,21 +37,12 @@ func TestSecurityHeadersMiddlewareSetsHardeningHeaders(t *testing.T) {
 	}
 }
 
-func TestUploadBypassPathsDeriveFromRouteConstants(t *testing.T) {
-	if UserAPIGroupPath+RouteUserProfileAvatar != "/api/user/profile/avatar" {
-		t.Fatalf("avatar bypass path drifted: %q", UserAPIGroupPath+RouteUserProfileAvatar)
-	}
-	if AdminAPIGroupPath+RouteAdminUpload != "/api/admin/upload" {
-		t.Fatalf("admin upload bypass path drifted: %q", AdminAPIGroupPath+RouteAdminUpload)
-	}
-	if UserAPIGroupPath+RouteUserBoardUploads != "/api/user/boards/:board_id/uploads" {
-		t.Fatalf("board upload route drifted: %q", UserAPIGroupPath+RouteUserBoardUploads)
-	}
-	if UserAPIGroupPath+RouteUserEvents != "/api/user/events" {
-		t.Fatalf("user events route drifted: %q", UserAPIGroupPath+RouteUserEvents)
-	}
+func TestUploadBypassPathsStayLive(t *testing.T) {
 	if UploadsStaticRoutePrefix != "/uploads/" {
 		t.Fatalf("uploads prefix drifted: %q", UploadsStaticRoutePrefix)
+	}
+	if RoutePaymentStripeWebhook != "/api/webhooks/stripe" {
+		t.Fatalf("stripe webhook path drifted: %q", RoutePaymentStripeWebhook)
 	}
 }
 
@@ -81,14 +72,8 @@ func TestRequestTimeoutMiddlewareEnforcesDeadline(t *testing.T) {
 
 func TestRequestTimeoutMiddlewareExemptsStreamsAndUploads(t *testing.T) {
 	for path, method := range map[string]string{
-		UserAPIGroupPath + RouteUserEvents:        http.MethodGet,
 		RoutePaymentStripeWebhook:                 http.MethodPost,
 		UploadsStaticRoutePrefix + "canvas/a.png": http.MethodGet,
-		UserAPIGroupPath + RouteUserProfileAvatar: http.MethodPost,
-		AdminAPIGroupPath + RouteAdminUpload:      http.MethodPost,
-		UserAPIGroupPath + RouteUserVisionExtract: http.MethodPost,
-		UserAPIGroupPath + "/boards/b1/uploads":   http.MethodPost,
-		UserAPIGroupPath + RouteUserDownload:      http.MethodGet,
 	} {
 		req := httptest.NewRequest(method, path, nil)
 		if method == http.MethodPost {
@@ -99,9 +84,9 @@ func TestRequestTimeoutMiddlewareExemptsStreamsAndUploads(t *testing.T) {
 		}
 	}
 
-	jsonReq := httptest.NewRequest(http.MethodPost, "/api/user/tasks/submit", nil)
+	jsonReq := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/ws_123/tasks", nil)
 	if isTimeoutExemptRequest(jsonReq) {
-		t.Fatal("task submit should not be timeout-exempt")
+		t.Fatal("workspace task create should not be timeout-exempt")
 	}
 }
 

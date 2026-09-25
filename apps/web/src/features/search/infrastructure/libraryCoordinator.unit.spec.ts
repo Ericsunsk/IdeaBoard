@@ -45,7 +45,7 @@ describe('Search Library coordinator', () => {
 
   it('refreshes the shared Folder facts after save and remove mutations', async () => {
     mocks.saveAsset.mockResolvedValue({
-      id: 'liba_asset0001',
+      id: 'lasset_asset0001',
       provider: 'unsplash',
       sourceId: 'image-1',
     })
@@ -82,7 +82,7 @@ describe('Search Library coordinator', () => {
   it('publishes successful save and remove outcomes when the Folder refresh fails', async () => {
     mocks.listFolders.mockRejectedValue(new Error('Folder refresh unavailable'))
     mocks.saveAsset.mockResolvedValue({
-      id: 'liba_asset0001',
+      id: 'lasset_asset0001',
       provider: 'unsplash',
       sourceId: 'image-1',
     })

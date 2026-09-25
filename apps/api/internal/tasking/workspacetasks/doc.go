@@ -13,7 +13,10 @@
 // production postgres mapping (workspace_tasks_v2 link + billing snapshot
 // join) is a documented #809 follow-up; until it lands, HTTP handlers fail
 // closed with 501 when the store is nil and tests inject the in-memory
-// sibling. The settlement Service still proves the same all-or-nothing
-// contract the PG transaction will enforce: Quote -> Hold -> Task insert
-// -> River enqueue; any failure compensates all prior steps.
+// sibling. The settlement Service settles transaction-first: when the
+// store, quoter, holder, and queue expose their Tx seams (see settle_tx.go)
+// the whole boundary commits in ONE shared PostgreSQL transaction;
+// backends without those seams (the in-memory sibling, stub adapters)
+// keep the compensating contract: Quote -> Hold -> Task insert -> River
+// enqueue with Release/Delete rollback on failure.
 package workspacetasks

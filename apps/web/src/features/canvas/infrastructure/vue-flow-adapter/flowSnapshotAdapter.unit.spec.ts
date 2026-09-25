@@ -279,7 +279,7 @@ describe('flowSnapshotAdapter', () => {
     })
     ;((pending.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport = {
       state: 'pending',
-      libraryAssetId: 7,
+      libraryAssetId: 'lasset_asset0007',
     }
 
     const snapshot = flowToBoardSnapshot({ nodes: [pending], edges: [] })
@@ -288,13 +288,13 @@ describe('flowSnapshotAdapter', () => {
       expect.objectContaining({
         id: 1,
         sourceImageUrl: '',
-        libraryImport: { state: 'pending', libraryAssetId: 7 },
+        libraryImport: { state: 'pending', libraryAssetId: 'lasset_asset0007' },
       }),
     ])
     expect(snapshot.imageNodes[0]?.sourceMediaAssetId).toBeUndefined()
     expect(snapshot.mediaRefs).toBeUndefined()
     expect(boardSnapshotToFlow(snapshot).nodes[0]?.data).toMatchObject({
-      snapshotNode: { libraryImport: { state: 'pending', libraryAssetId: 7 } },
+      snapshotNode: { libraryImport: { state: 'pending', libraryAssetId: 'lasset_asset0007' } },
     })
   })
 

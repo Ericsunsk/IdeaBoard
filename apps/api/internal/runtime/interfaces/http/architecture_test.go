@@ -7,19 +7,20 @@ import (
 	"testing"
 )
 
-// Admin routes must flow through registerAuthenticatedAdminRoutes, the single
-// group that pins auth.AdminMiddleware. A second group creation site would
-// silently bypass admin enforcement.
-func TestAdminRoutesGoThroughAdminMiddleware(t *testing.T) {
-	content, err := os.ReadFile("routes_admin.go")
-	if err != nil {
-		t.Fatalf("read routes_admin.go: %v", err)
-	}
-	if !strings.Contains(string(content), "auth.AdminMiddleware()") {
-		t.Fatal("routes_admin.go must wire auth.AdminMiddleware on the admin group")
+// Legacy route groups must stay deleted: no file may recreate the
+// /api/user or /api/admin groups, and the deleted route files must not
+// return. Admin enforcement now lives in the Control Plane capability
+// guard (contract_control_guard.go), not in a legacy admin group.
+func TestLegacyRouteGroupsStayDeleted(t *testing.T) {
+	for _, name := range []string{"routes_user.go", "routes_admin.go"} {
+		if _, err := os.Stat(name); err == nil {
+			t.Fatalf("legacy route file %s must stay deleted post-#809 hard cut", name)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat %s: %v", name, err)
+		}
 	}
 
-	err = filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
+	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -30,8 +31,8 @@ func TestAdminRoutesGoThroughAdminMiddleware(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}
-		if (strings.Contains(string(raw), "Group(AdminAPIGroupPath") || strings.Contains(string(raw), `Group("/api/admin")`)) && entry.Name() != "routes_admin.go" {
-			t.Errorf("admin group must only be created in routes_admin.go, found in %s", path)
+		if strings.Contains(string(raw), `Group("/api/user")`) || strings.Contains(string(raw), `Group("/api/admin")`) {
+			t.Errorf("legacy route group must not be recreated, found in %s", path)
 		}
 		return nil
 	})

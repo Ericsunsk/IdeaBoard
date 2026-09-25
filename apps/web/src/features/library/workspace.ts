@@ -17,10 +17,11 @@ import { i18n } from '../../shared/i18n'
 // components must consume this module, never generated code directly.
 //
 // This module is the SOLE library transport: the legacy user-scoped
-// `resource.ts` (integer ids, `/user/library/*`) is deleted. All ids are
-// opaque (`ws_` / `libf_` / `liba_` / `libm_`); malformed ids throw before
-// any network call, matching the backend 404 posture. Payloads map
-// snake_case to camelCase at this boundary; callers only see camelCase.
+// `resource.ts` (integer ids, `/user/library/*`) is deleted. Ids are
+// opaque (`ws_` + canonical `lfolder_` / `lasset_` / `lmat_`);
+// malformed ids throw before any network call, matching the backend 404
+// posture. Payloads map snake_case to camelCase at this boundary;
+// callers only see camelCase.
 //
 // Backend notes callers must respect:
 // - Folders are plain workspace folders: no system/virtual taxonomy, no
@@ -32,7 +33,7 @@ import { i18n } from '../../shared/i18n'
 //   completed|failed`); `materializeLibraryAssetForCanvas` polls the job
 //   and resolves display media through the shared delivery boundary.
 
-const LIBRARY_ID_RE = /^(?:libf|liba|libm)_[A-Za-z0-9_-]+$/
+const LIBRARY_ID_RE = /^(?:lfolder|lasset|lmat)_[A-Za-z0-9_-]+$/
 
 function isLibraryId(value: unknown): value is string {
   return typeof value === 'string' && LIBRARY_ID_RE.test(value)
@@ -42,10 +43,19 @@ function libraryIdPrefix(value: string): string {
   return value.slice(0, value.indexOf('_'))
 }
 
-function assertLibraryId(value: string, prefix: 'libf' | 'liba' | 'libm', label: string): string {
+const LIBRARY_FOLDER_PREFIXES = ['lfolder'] as const
+const LIBRARY_ASSET_PREFIXES = ['lasset'] as const
+const LIBRARY_MATERIALIZATION_PREFIXES = ['lmat'] as const
+
+function assertLibraryId(
+  value: string,
+  prefixes: readonly string[],
+  label: string,
+  canonical: string,
+): string {
   const trimmed = value.trim()
-  if (!isLibraryId(trimmed) || libraryIdPrefix(trimmed) !== prefix) {
-    throw new Error(`Invalid ${label}: expected ${prefix}_...`)
+  if (!isLibraryId(trimmed) || !prefixes.includes(libraryIdPrefix(trimmed))) {
+    throw new Error(`Invalid ${label}: expected ${canonical}_...`)
   }
   return trimmed
 }
@@ -57,15 +67,15 @@ export function assertWorkspaceId(value: string): string {
 }
 
 export function assertLibraryFolderId(value: string): string {
-  return assertLibraryId(value, 'libf', 'library folder id')
+  return assertLibraryId(value, LIBRARY_FOLDER_PREFIXES, 'library folder id', 'lfolder')
 }
 
 export function assertLibraryAssetId(value: string): string {
-  return assertLibraryId(value, 'liba', 'library asset id')
+  return assertLibraryId(value, LIBRARY_ASSET_PREFIXES, 'library asset id', 'lasset')
 }
 
 export function assertLibraryMaterializationId(value: string): string {
-  return assertLibraryId(value, 'libm', 'library materialization id')
+  return assertLibraryId(value, LIBRARY_MATERIALIZATION_PREFIXES, 'library materialization id', 'lmat')
 }
 
 function encodeId(value: string): string {

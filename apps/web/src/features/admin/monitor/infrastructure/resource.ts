@@ -1,20 +1,23 @@
 import { useQuery } from '@tanstack/vue-query'
 import { toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { api } from '../../../../shared/api/client'
+import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
 import {
   createApiDataSelector,
   resolveApiData,
   type ApiResponseWithData,
 } from '../../../../shared/api/apiResponse'
+import { getGetControlMonitorUrl } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { taskCancellationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 import type { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
 
-// Admin monitor/task boundary (issue #809). The generated `admin-monitor`
-// and `admin-tasks` clients are gone but the backend admin plane still
-// serves `/api/admin/tasks*` and `/api/admin/monitor` with the shared
-// envelope, so this boundary transports through the central `api.request`
-// with local view types. Application hooks and pages keep importing these
-// names, never generated code directly.
+// Admin monitor/task boundary (final cut, partial). The runtime snapshot
+// moved to the Control Plane (`GET /api/control/v1/platform/monitor`, a
+// guarded proxy keeping the legacy envelope), so `useAdminMonitorResource`
+// repoints at the generated Control path with view types untouched. The
+// `/api/admin/tasks*` list/detail/cancel transports below stay until the
+// native Control task dialect (cursor pagination, operator-reason cancel)
+// is adopted by the admin UI — see the blocked list.
 export type ListAdminTasksParams = {
   status?: ListAdminTasksStatus
   user_public_id?: string
@@ -298,10 +301,13 @@ export function useAdminMonitorResource(
     ...(options?.query ?? {}),
     queryKey: ADMIN_MONITOR_QUERY_KEY,
     queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<MonitorResponse>>('/admin/monitor', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
+      api.request<ApiResponseWithData<MonitorResponse>>(
+        `${CONTROL_API_PREFIX}${getGetControlMonitorUrl()}`,
+        {
+          method: 'GET',
+          ...(signal == null ? {} : { signal }),
+        },
+      ),
     select: selectAdminMonitor,
   })
 }

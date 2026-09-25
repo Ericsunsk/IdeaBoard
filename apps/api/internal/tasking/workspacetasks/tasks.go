@@ -146,6 +146,7 @@ type WorkspaceTask struct {
 	WorkflowKind    string          `json:"workflow_kind"`
 	MediaAssetIDs   []string        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any  `json:"params,omitempty"`
+	CanonicalParams string          `json:"canonical_params,omitempty"`
 	Status          string          `json:"status"`
 	RetryCount      int             `json:"retry_count"`
 	ExecutionToken  string          `json:"execution_token"`

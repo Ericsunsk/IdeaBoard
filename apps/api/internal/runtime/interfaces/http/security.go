@@ -27,8 +27,8 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 
 // DefaultRequestTimeout bounds JSON API handlers via request context. Slow
 // downstream calls (DB, Auth service) observe ctx cancellation instead of
-// holding workers until the server WriteTimeout. Streams, uploads, downloads
-// and webhooks are exempt: they own their own limits.
+// holding workers until the server WriteTimeout. Static upload bytes and
+// webhooks are exempt: they own their own limits.
 const DefaultRequestTimeout = 60 * time.Second
 
 // RequestTimeoutMiddleware applies a context deadline to non-exempt routes.
@@ -60,13 +60,14 @@ func isTimeoutExemptRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
-	if path == UserAPIGroupPath+RouteUserEvents || path == RoutePaymentStripeWebhook {
+	// The legacy /api/user/events SSE stream and /api/user/download
+	// exemptions were deleted with the #809 hard cut. The v1 workspace
+	// event stream honors the standard request timeout like every other
+	// JSON route (clients resume with Last-Event-ID).
+	if path == RoutePaymentStripeWebhook {
 		return true
 	}
 	if strings.HasPrefix(path, UploadsStaticRoutePrefix) {
-		return true
-	}
-	if path == UserAPIGroupPath+RouteUserDownload {
 		return true
 	}
 	return isUploadRequest(req)

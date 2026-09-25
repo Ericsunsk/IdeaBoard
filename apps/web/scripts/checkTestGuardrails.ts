@@ -196,20 +196,7 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
   ],
 }
 
-const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {
-  'src/features/admin/monitor/application/useAdminMonitor.contract.spec.ts': [
-    {
-      module: '../../../../shared/api/generated-query/admin-tasks/admin-tasks',
-      reason:
-        'Hard boundary for task-list polling state; the generated query hook is mocked to drive composable states directly.',
-    },
-    {
-      module: '../../../../shared/api/generated-query/admin-monitor/admin-monitor',
-      reason:
-        'Hard boundary for monitor polling state; the generated query hook is mocked to drive composable states directly.',
-    },
-  ],
-}
+const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {}
 
 const componentHarnessPatterns: readonly ComponentHarnessPattern[] = [
   {

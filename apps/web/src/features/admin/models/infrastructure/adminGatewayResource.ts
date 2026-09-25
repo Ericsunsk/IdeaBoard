@@ -1,4 +1,11 @@
 import { api } from '../../../../shared/api/client'
+import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
+import {
+  getGetControlAIGatewayUrl,
+  getListControlAIGatewayCatalogUrl,
+  getListControlAIGatewayModelsUrl,
+  getListControlAIGatewayProvidersUrl,
+} from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import {
   resolveApiData,
   resolveApiOk,
@@ -11,11 +18,16 @@ import type {
 } from '../domain/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/catalogData'
 
-// Admin AI gateway boundary (issue #809). The generated `admin-settings`
-// client is gone but the backend admin plane still serves
-// `/api/admin/settings/ai-gateway/*` with the shared envelope, so this
-// boundary transports through the central `api.request` with local wire
-// types. Callers keep importing these names, never generated code directly.
+// Admin AI gateway boundary (final cut, partial). Reads with a Control
+// equivalent moved to the Control Plane (`GET
+// /api/control/v1/platform/ai-gateway*`, guarded proxies keeping the legacy
+// envelope): catalog list, providers list, connection get, model mappings
+// list. Everything else stays on the legacy routes until follow-up: writes
+// need the operator reason the Control mutation guard requires, and the
+// read-only extras (`route-preview`, `detect-models`, `models-reference`,
+// `models-observed`, `test-connection`) have no Control operation — see the
+// blocked list. Callers keep importing these names, never generated code
+// directly.
 export type GatewayConfigSummary = {
   base_url?: string
   account_id?: string
@@ -277,7 +289,7 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
 async function listModelCatalog(): Promise<AdminModelItem[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<GatewayModelCatalogItem[]>>(
-      '/admin/settings/ai-gateway/catalog',
+      `${CONTROL_API_PREFIX}${getListControlAIGatewayCatalogUrl()}`,
       { method: 'GET' },
     ),
     '加载模型库失败',
@@ -335,7 +347,7 @@ async function detectGatewayModels(provider?: string): Promise<GatewayModelDetec
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<GatewayProviderOption[]>>(
-      '/admin/settings/ai-gateway/providers',
+      `${CONTROL_API_PREFIX}${getListControlAIGatewayProvidersUrl()}`,
       { method: 'GET' },
     ),
     '加载供应商列表失败',
@@ -448,7 +460,7 @@ async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
 
 async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
   const response = await api.request<ApiResponseWithData<GatewayConfigSummary>>(
-    '/admin/settings/ai-gateway',
+    `${CONTROL_API_PREFIX}${getGetControlAIGatewayUrl()}`,
     { method: 'GET' },
   )
   if (!response.data) throw new Error('AI 网关配置不存在')
@@ -495,7 +507,7 @@ async function testGatewayConnection(input: {
 async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
   const data = await resolveApiData(
     api.request<ApiResponseWithData<GatewayModelMapping[]>>(
-      '/admin/settings/ai-gateway/models',
+      `${CONTROL_API_PREFIX}${getListControlAIGatewayModelsUrl()}`,
       { method: 'GET' },
     ),
     '加载模型映射失败',

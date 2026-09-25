@@ -29,6 +29,7 @@ type Querier interface {
 	// the caller distinguishes via GetWorkspaceTaskByPublicID.
 	ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTaskParams) (Task, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
+	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
 	// CompleteUploadSession flips a live session to completed with its
@@ -46,6 +47,27 @@ type Querier interface {
 	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
 	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
 	CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error)
+	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
+	// Materialization durable jobs (#828 slice A, Phase 4 of #809).
+	//
+	// Status words: the public API exposes pending/running/completed/failed
+	// while the durable CHECK stores pending/processing/completed/failed
+	// (chk_library_materializations_status). The store maps running <->
+	// processing at the boundary; SQL below uses the durable words.
+	// Terminal states (completed/failed) are immutable: transition
+	// statements guard on status IN ('pending','processing') so concurrent
+	// settlers converge on the winner; a guarded miss reads back the stored
+	// snapshot so idempotent replays converge instead of resurrecting jobs.
+	// Completion CHECK: completed needs media_asset_id + completed_at,
+	// failed needs completed_at. The result link resolves the caller's
+	// asset_... public id to media_assets.internal_id workspace-scoped
+	// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
+	// durable column: failures persist error_message only and reads report
+	// an empty code (follow-up migration if the taxonomy must persist).
+	// Rows carry no updated_at: reads report COALESCE(completed_at,
+	// created_at) as updated_at. No dedup key: one asset may back many
+	// jobs; request idempotency stays handler-side (library:materialize).
+	CreateLibraryMaterialization(ctx context.Context, arg CreateLibraryMaterializationParams) (LibraryMaterialization, error)
 	// Workspace-scoped library queries (#818, Phase 4-01 of #809).
 	//
 	// All lookups are keyed by workspace first: every folder/asset row is
@@ -70,7 +92,7 @@ type Querier interface {
 	// Title/author have no durable columns (the workspace tables keep
 	// provider URL + source metadata only); they are validated by the seam
 	// and intentionally not persisted here.
-	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
+	CreateManagedLibraryAsset(ctx context.Context, arg CreateManagedLibraryAssetParams) (LibraryAsset, error)
 	// CreateMediaAsset inserts the durable asset row. Width/height ride
 	// NULL when unknown (0 maps to NULL; the image CHECK passes on NULL
 	// and read-back maps NULL to 0).
@@ -145,6 +167,7 @@ type Querier interface {
 	EnsureQuickSavesFolder(ctx context.Context, arg EnsureQuickSavesFolderParams) error
 	// ExpireUploadSession lazily expires a live session past its TTL.
 	ExpireUploadSession(ctx context.Context, arg ExpireUploadSessionParams) (UploadSession, error)
+	FailLibraryMaterialization(ctx context.Context, arg FailLibraryMaterializationParams) (FailLibraryMaterializationRow, error)
 	// FailUploadSession flips a live session to failed (chk gate carries
 	// no extra columns for failed rows; the reason stays server-side).
 	FailUploadSession(ctx context.Context, arg FailUploadSessionParams) (UploadSession, error)
@@ -160,6 +183,7 @@ type Querier interface {
 	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
 	GetLibraryFolderByPublicID(ctx context.Context, arg GetLibraryFolderByPublicIDParams) (LibraryFolder, error)
 	GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg GetLibraryFolderByWorkspaceAndNameCIParams) (LibraryFolder, error)
+	GetLibraryMaterializationByPublicID(ctx context.Context, arg GetLibraryMaterializationByPublicIDParams) (GetLibraryMaterializationByPublicIDRow, error)
 	// GetMediaAssetByPublicID returns the asset row including archived
 	// ones (archived assets stay metadata-readable; bytes go 410).
 	GetMediaAssetByPublicID(ctx context.Context, arg GetMediaAssetByPublicIDParams) (MediaAsset, error)
@@ -229,6 +253,7 @@ type Querier interface {
 	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
 	ListLibraryAssetsByWorkspaceProvider(ctx context.Context, arg ListLibraryAssetsByWorkspaceProviderParams) ([]ListLibraryAssetsByWorkspaceProviderRow, error)
 	ListLibraryFolders(ctx context.Context, arg ListLibraryFoldersParams) ([]LibraryFolder, error)
+	ListLibraryMaterializations(ctx context.Context, arg ListLibraryMaterializationsParams) ([]ListLibraryMaterializationsRow, error)
 	// ListMediaAssetDerivatives returns stored variants for one asset
 	// (internal id already resolved in the workspace scope).
 	ListMediaAssetDerivatives(ctx context.Context, assetID int64) ([]MediaAssetDerivative, error)
@@ -290,6 +315,11 @@ type Querier interface {
 	// in the workflow_input envelope.
 	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
+	// Transitions read their result back through the data-modifying
+	// CTE's RETURNING list (joined to the untouched asset/media tables):
+	// the outer statement shares the CTE snapshot, so re-scanning the
+	// target table would return the pre-update row version.
+	StartLibraryMaterialization(ctx context.Context, arg StartLibraryMaterializationParams) (StartLibraryMaterializationRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).

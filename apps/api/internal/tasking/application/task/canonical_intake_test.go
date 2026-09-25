@@ -10,6 +10,61 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
+func TestCompileWorkspaceParamsPersistsDurableExecutionFacts(t *testing.T) {
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "", map[string]interface{}{
+		"output_count": 2,
+	})
+	if err != nil {
+		t.Fatalf("compile workspace params: %v", err)
+	}
+	params, err := tasks.UnmarshalParams(raw)
+	if err != nil {
+		t.Fatalf("decode workspace params: %v", err)
+	}
+	if params.Generation == nil {
+		t.Fatal("workspace params missing generation snapshot")
+	}
+	plan, err := workflow.DecodeFeatureExecutionPlan(params.ExecutionPlan)
+	if err != nil {
+		t.Fatalf("decode execution plan: %v", err)
+	}
+	if plan.Feature() != workflow.FeatureSlugGeneration || plan.RequestedOutputCount().Int() != 2 {
+		t.Fatalf("plan=%+v", plan)
+	}
+	if params.Controls == nil || params.Controls.OutputCount != 2 || params.Generation.RequestedOutputCount != 2 {
+		t.Fatalf("controls=%+v generation=%+v", params.Controls, params.Generation)
+	}
+}
+
+func TestCompileWorkspaceParamsCarriesCanonicalWorkspaceMedia(t *testing.T) {
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "", map[string]interface{}{
+		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input123"},
+	})
+	if err != nil {
+		t.Fatalf("compile workspace params: %v", err)
+	}
+	params, err := tasks.UnmarshalParams(raw)
+	if err != nil {
+		t.Fatalf("decode workspace params: %v", err)
+	}
+	if params.Media == nil || len(params.Media.Inputs) != 1 || params.Media.Inputs[0].PublicAssetID != "asset_input123" {
+		t.Fatalf("media=%+v, want one public workspace input", params.Media)
+	}
+	if params.Generation == nil || len(params.Generation.Media) != 1 || params.Generation.Media[0].PublicAssetID != "asset_input123" {
+		t.Fatalf("generation=%+v, want one public workspace input", params.Generation)
+	}
+	plan, err := workflow.DecodeFeatureExecutionPlan(params.ExecutionPlan)
+	if err != nil {
+		t.Fatalf("decode execution plan: %v", err)
+	}
+	if plan.RuntimeInputs().ImageInputCount() != 1 || plan.RuntimeInputs().GenerationPrimitive() != workflow.GenerationPrimitiveImageToImage {
+		t.Fatalf("runtime inputs=%+v, want one image-to-image input", plan.RuntimeInputs())
+	}
+	if _, exists := params.Extra[CompilerWorkspaceMediaAssetIDsParam]; exists {
+		t.Fatalf("compiler-only key leaked into Extra: %+v", params.Extra)
+	}
+}
+
 // The canonical intake ordering is map → typed → plan → persisted JSON with
 // plan-derived facts stamped before the typed conversion. These tests lock
 // that sequence at the stage level so future edits cannot silently reorder it.

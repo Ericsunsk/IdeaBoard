@@ -19,16 +19,16 @@ const providersPayload = {
   ],
 }
 
-// Search provider boundary contract (issue #809 follow-up): reads stay on
-// the legacy admin route, while writes go through the Control Plane with a
-// header-only Idempotency-Key and an operator reason. Control marks these
-// routes `x-control-envelope: legacy`, so success bodies keep the legacy
-// `{ code, msg, data? }` shape. This spec pins the adapter half: control
-// URLs, headers, bodies, and control error-code branches.
+// Search provider boundary contract (final cut): reads moved to the Control
+// Plane alongside the writes (header-only Idempotency-Key and an operator
+// reason). Control marks these routes `x-control-envelope: legacy`, so
+// success bodies keep the legacy `{ code, msg, data? }` shape. This spec
+// pins the adapter half: control URLs, headers, bodies, and control
+// error-code branches.
 describe('searchProviderResource', () => {
-  it('lists providers through the legacy admin route', async () => {
+  it('lists providers through the control plane route', async () => {
     useMswHandlers(
-      http.get('/api/admin/search/providers', () =>
+      http.get('/api/control/v1/platform/search/providers', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: providersPayload }),
       ),
     )

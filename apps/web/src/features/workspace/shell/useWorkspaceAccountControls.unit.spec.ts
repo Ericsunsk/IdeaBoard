@@ -1,7 +1,7 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '../../../test/render'
-import type { User } from '../../../shared/api/userSession'
+import type { User } from '../../../shared/api/sessionUser'
 import { ADMIN_ROOT_PATH, HOME_PATH } from '../../../shared/constants/routePaths'
 import {
   createAccountOverlay,

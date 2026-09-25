@@ -111,7 +111,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
       webRoot,
       'src/features/admin/pages/.boundary-page-to-query.fixture.ts',
     ),
-    content: `import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'; console.log(useGetAdminMonitor);`,
+    content: `import { getGetControlMonitorUrl } from '../../../shared/api/generated-query/control/control-platform/control-platform'; console.log(getGetControlMonitorUrl);`,
   },
   {
     name: 'prohibits cross-feature deep imports into internal directories',

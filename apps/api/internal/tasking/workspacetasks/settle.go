@@ -13,11 +13,16 @@ import (
 //	writes) -> Task insert (pending, retry_count, execution_token,
 //	output_refs, billing_snapshot) -> River enqueue (via Enqueuer).
 //
-// Any failure rolls back all prior steps (compensating Release + Delete),
-// so a River job is never enqueued without its durable task facts and a
-// Hold is never stranded without its task. Terminal settle (Capture on
-// success / Release on fail/cancel/timeout) is atomic with the state flip:
-// a settle failure reverts the flip. Events stage during settlement and
+// When the store, quoter, holder, and queue all expose their Tx seams
+// (see settle_tx.go) plus a SettlementTransactor, settlement commits in
+// ONE shared PostgreSQL transaction: a billing failure rolls the state
+// flip back and a state-guard failure rolls the billing writes back.
+// Without those seams (in-memory test backend, stub adapters) the Service
+// falls back to compensating rollback (Release + Delete), so a River job
+// is never enqueued without its durable task facts and a Hold is never
+// stranded without its task. Terminal settle (Capture on success /
+// Release on fail/cancel/timeout) follows the same tx-first rule: a
+// settle failure reverts the flip. Events stage during settlement and
 // flush ONLY after commit; staging never publishes inside the txn (NATS
 // fanout itself is #807).
 type Service struct {
@@ -103,13 +108,14 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 
 // CreateInput is the validated creation intent for settlement.
 type CreateInput struct {
-	WorkspaceID   string
-	OwnerUserID   int64
-	WorkflowKind  string
-	MediaAssetIDs []string
-	Params        map[string]any
-	Quantity      int64
-	Resolution    string
+	WorkspaceID     string
+	OwnerUserID     int64
+	WorkflowKind    string
+	MediaAssetIDs   []string
+	Params          map[string]any
+	Quantity        int64
+	Resolution      string
+	CanonicalParams string
 }
 
 // Create settles one task atomically: Quote -> Hold -> Insert -> Enqueue.
@@ -149,6 +155,9 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
+	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token); handled {
+		return created, err
+	}
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
 		holdTxID, err = s.holder.Hold(ctx, input.OwnerUserID, snapshot.TotalCredits, "task-hold:"+taskID, taskID)
@@ -163,7 +172,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	task := &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
 		WorkflowKind: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), Status: StatusPending,
+		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, Status: StatusPending,
 		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
 	}
 	created, err := s.tasks.CreateTask(ctx, task)
@@ -221,6 +230,9 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 	if s.tasks == nil {
 		return nil, false, ErrNotFound
 	}
+	if flipped, already, handled, err := s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason); handled {
+		return flipped, already, err
+	}
 	before, err := s.tasks.GetTask(ctx, workspaceID, taskID)
 	if err != nil {
 		return nil, false, err
@@ -259,6 +271,9 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 	if err := s.verifyOutputAssets(ctx, workspaceID, outputs); err != nil {
 		return nil, err
 	}
+	if completed, handled, err := s.completeInTx(ctx, workspaceID, taskID, outputs); handled {
+		return completed, err
+	}
 	completed, err := s.tasks.CompleteTask(ctx, workspaceID, taskID, outputs)
 	if err != nil {
 		return nil, err
@@ -289,6 +304,9 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error) {
 	if s.tasks == nil {
 		return nil, ErrNotFound
+	}
+	if failed, handled, err := s.failInTx(ctx, workspaceID, taskID, errorMsg); handled {
+		return failed, err
 	}
 	failed, err := s.tasks.FailTask(ctx, workspaceID, taskID, errorMsg)
 	if err != nil {
@@ -325,6 +343,9 @@ func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryab
 	if err != nil {
 		return nil, err
 	}
+	if retried, handled, err := s.retryInTx(ctx, workspaceID, taskID, token); handled {
+		return retried, err
+	}
 	retried, err := s.tasks.TransitionForRetry(ctx, workspaceID, taskID, token)
 	if err != nil {
 		return nil, err
@@ -355,33 +376,6 @@ func (s *Service) verifyOutputAssets(ctx context.Context, workspaceID string, ou
 		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
 			return fmt.Errorf("workspacetasks: output asset not ready: %w", ErrMediaNotReady)
 		}
-	}
-	return nil
-}
-
-// TaskSettlementHook seam (#804): the zero-value hook reports unavailable
-// so no partial settlement can run. The Service above is the real
-// implementation; this adapter satisfies the legacy hook signature for
-// wiring that still references it.
-type legacyHookAdapter struct {
-	service *Service
-}
-
-// AsLegacyHook exposes the Service as a TaskSettlementHook-compatible
-// value. The hook itself carries no task facts (workspace scope only);
-// callers needing per-task settlement must use Service.Create directly.
-func (s *Service) AsLegacyHook() interface {
-	SettleTaskSubmission(ctx context.Context, workspacePublicID string) error
-} {
-	return &legacyHookAdapter{service: s}
-}
-
-func (h *legacyHookAdapter) SettleTaskSubmission(ctx context.Context, workspacePublicID string) error {
-	if h == nil || h.service == nil || h.service.tasks == nil {
-		return fmt.Errorf("workspacetasks: settlement unavailable: %w", ErrQuoteUnavailable)
-	}
-	if strings.TrimSpace(workspacePublicID) == "" {
-		return fmt.Errorf("workspacetasks: workspace required: %w", ErrValidation)
 	}
 	return nil
 }

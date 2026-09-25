@@ -25,7 +25,7 @@ function transfer(): DataTransfer {
 }
 
 const asset: CanvasLibraryImportDescriptor = {
-  assetId: 'liba_asset0017',
+  assetId: 'lasset_asset0017',
   title: 'Drop asset',
   previewUrl: 'https://images.unsplash.com/drop-17-preview',
   width: 1200,

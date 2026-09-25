@@ -11,16 +11,76 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeLibraryMaterialization = `-- name: CompleteLibraryMaterialization :one
+WITH updated AS (
+  UPDATE library_materializations AS m
+  SET status = 'completed', media_asset_id = $1, error_message = '', completed_at = now()
+  WHERE m.workspace_id = $2
+    AND m.public_id = $3
+    AND m.status IN ('pending', 'processing')
+  RETURNING m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+    m.status, m.media_asset_id, m.error_message, m.created_at, m.completed_at
+)
+SELECT u.internal_id, u.public_id, u.workspace_id, u.library_asset_id,
+  a.public_id AS asset_public_id,
+  u.status, u.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  u.error_message, u.created_at, u.completed_at
+FROM updated AS u
+INNER JOIN library_assets AS a ON a.internal_id = u.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = u.media_asset_id
+LIMIT 1
+`
+
+type CompleteLibraryMaterializationParams struct {
+	MediaAssetID pgtype.Int8 `json:"media_asset_id"`
+	WorkspaceID  int64       `json:"workspace_id"`
+	PublicID     string      `json:"public_id"`
+}
+
+type CompleteLibraryMaterializationRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error) {
+	row := q.db.QueryRow(ctx, completeLibraryMaterialization, arg.MediaAssetID, arg.WorkspaceID, arg.PublicID)
+	var i CompleteLibraryMaterializationRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.AssetPublicID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.MediaAssetPublicID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const createLibraryAsset = `-- name: CreateLibraryAsset :one
 INSERT INTO library_assets (
   public_id, workspace_id, folder_id, provider, source_id,
-  source_url, preview_url, original_url, width, height
+  source_url, preview_url, original_url, media_asset_id, width, height
 )
 VALUES (
   $1, $2, $3, $4, $5,
-  $6, $7, $8, $9, $10
+  $6, $7, $8, NULL, $9, $10
 )
-RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, width, height, created_at, updated_at
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at
 `
 
 type CreateLibraryAssetParams struct {
@@ -60,6 +120,7 @@ func (q *Queries) CreateLibraryAsset(ctx context.Context, arg CreateLibraryAsset
 		&i.SourceUrl,
 		&i.PreviewUrl,
 		&i.OriginalUrl,
+		&i.MediaAssetID,
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
@@ -69,7 +130,6 @@ func (q *Queries) CreateLibraryAsset(ctx context.Context, arg CreateLibraryAsset
 }
 
 const createLibraryFolder = `-- name: CreateLibraryFolder :one
-
 INSERT INTO library_folders (public_id, workspace_id, name, is_system, is_default)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING internal_id, public_id, workspace_id, name, is_system, is_default, created_at, updated_at
@@ -81,6 +141,101 @@ type CreateLibraryFolderParams struct {
 	Name        string `json:"name"`
 	IsSystem    bool   `json:"is_system"`
 	IsDefault   bool   `json:"is_default"`
+}
+
+func (q *Queries) CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error) {
+	row := q.db.QueryRow(ctx, createLibraryFolder,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.Name,
+		arg.IsSystem,
+		arg.IsDefault,
+	)
+	var i LibraryFolder
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.IsSystem,
+		&i.IsDefault,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createLibraryMaterialization = `-- name: CreateLibraryMaterialization :one
+
+INSERT INTO library_materializations (public_id, workspace_id, library_asset_id, status)
+VALUES ($1, $2, $3, 'pending')
+RETURNING internal_id, public_id, workspace_id, library_asset_id, status, media_asset_id, error_message, created_at, completed_at
+`
+
+type CreateLibraryMaterializationParams struct {
+	PublicID       string `json:"public_id"`
+	WorkspaceID    int64  `json:"workspace_id"`
+	LibraryAssetID int64  `json:"library_asset_id"`
+}
+
+// Materialization durable jobs (#828 slice A, Phase 4 of #809).
+//
+// Status words: the public API exposes pending/running/completed/failed
+// while the durable CHECK stores pending/processing/completed/failed
+// (chk_library_materializations_status). The store maps running <->
+// processing at the boundary; SQL below uses the durable words.
+// Terminal states (completed/failed) are immutable: transition
+// statements guard on status IN ('pending','processing') so concurrent
+// settlers converge on the winner; a guarded miss reads back the stored
+// snapshot so idempotent replays converge instead of resurrecting jobs.
+// Completion CHECK: completed needs media_asset_id + completed_at,
+// failed needs completed_at. The result link resolves the caller's
+// asset_... public id to media_assets.internal_id workspace-scoped
+// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
+// durable column: failures persist error_message only and reads report
+// an empty code (follow-up migration if the taxonomy must persist).
+// Rows carry no updated_at: reads report COALESCE(completed_at,
+// created_at) as updated_at. No dedup key: one asset may back many
+// jobs; request idempotency stays handler-side (library:materialize).
+func (q *Queries) CreateLibraryMaterialization(ctx context.Context, arg CreateLibraryMaterializationParams) (LibraryMaterialization, error) {
+	row := q.db.QueryRow(ctx, createLibraryMaterialization, arg.PublicID, arg.WorkspaceID, arg.LibraryAssetID)
+	var i LibraryMaterialization
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const createManagedLibraryAsset = `-- name: CreateManagedLibraryAsset :one
+
+INSERT INTO library_assets (
+  public_id, workspace_id, folder_id, provider, source_id,
+  source_url, preview_url, original_url, media_asset_id, width, height
+)
+SELECT
+  $1, $2, $3, 'workspace_media', $4,
+  '', '', '', $5, ma.width, ma.height
+FROM media_assets AS ma
+WHERE ma.internal_id = $5
+  AND ma.workspace_id = $2
+  AND ma.archived_at IS NULL
+RETURNING internal_id, public_id, workspace_id, folder_id, provider, source_id, source_url, preview_url, original_url, media_asset_id, width, height, created_at, updated_at
+`
+
+type CreateManagedLibraryAssetParams struct {
+	PublicID     string      `json:"public_id"`
+	WorkspaceID  int64       `json:"workspace_id"`
+	FolderID     int64       `json:"folder_id"`
+	SourceID     string      `json:"source_id"`
+	MediaAssetID pgtype.Int8 `json:"media_asset_id"`
 }
 
 // Workspace-scoped library queries (#818, Phase 4-01 of #809).
@@ -107,22 +262,28 @@ type CreateLibraryFolderParams struct {
 // Title/author have no durable columns (the workspace tables keep
 // provider URL + source metadata only); they are validated by the seam
 // and intentionally not persisted here.
-func (q *Queries) CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error) {
-	row := q.db.QueryRow(ctx, createLibraryFolder,
+func (q *Queries) CreateManagedLibraryAsset(ctx context.Context, arg CreateManagedLibraryAssetParams) (LibraryAsset, error) {
+	row := q.db.QueryRow(ctx, createManagedLibraryAsset,
 		arg.PublicID,
 		arg.WorkspaceID,
-		arg.Name,
-		arg.IsSystem,
-		arg.IsDefault,
+		arg.FolderID,
+		arg.SourceID,
+		arg.MediaAssetID,
 	)
-	var i LibraryFolder
+	var i LibraryAsset
 	err := row.Scan(
 		&i.InternalID,
 		&i.PublicID,
 		&i.WorkspaceID,
-		&i.Name,
-		&i.IsSystem,
-		&i.IsDefault,
+		&i.FolderID,
+		&i.Provider,
+		&i.SourceID,
+		&i.SourceUrl,
+		&i.PreviewUrl,
+		&i.OriginalUrl,
+		&i.MediaAssetID,
+		&i.Width,
+		&i.Height,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -184,11 +345,71 @@ func (q *Queries) EnsureQuickSavesFolder(ctx context.Context, arg EnsureQuickSav
 	return err
 }
 
+const failLibraryMaterialization = `-- name: FailLibraryMaterialization :one
+WITH updated AS (
+  UPDATE library_materializations AS m
+  SET status = 'failed', media_asset_id = NULL, error_message = $1, completed_at = now()
+  WHERE m.workspace_id = $2
+    AND m.public_id = $3
+    AND m.status IN ('pending', 'processing')
+  RETURNING m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+    m.status, m.media_asset_id, m.error_message, m.created_at, m.completed_at
+)
+SELECT u.internal_id, u.public_id, u.workspace_id, u.library_asset_id,
+  a.public_id AS asset_public_id,
+  u.status, u.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  u.error_message, u.created_at, u.completed_at
+FROM updated AS u
+INNER JOIN library_assets AS a ON a.internal_id = u.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = u.media_asset_id
+LIMIT 1
+`
+
+type FailLibraryMaterializationParams struct {
+	ErrorMessage string `json:"error_message"`
+	WorkspaceID  int64  `json:"workspace_id"`
+	PublicID     string `json:"public_id"`
+}
+
+type FailLibraryMaterializationRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) FailLibraryMaterialization(ctx context.Context, arg FailLibraryMaterializationParams) (FailLibraryMaterializationRow, error) {
+	row := q.db.QueryRow(ctx, failLibraryMaterialization, arg.ErrorMessage, arg.WorkspaceID, arg.PublicID)
+	var i FailLibraryMaterializationRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.AssetPublicID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.MediaAssetPublicID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const getLibraryAssetByPublicID = `-- name: GetLibraryAssetByPublicID :one
 SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
   f.public_id AS folder_public_id,
   a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
 WHERE a.workspace_id = $1
@@ -212,6 +433,7 @@ type GetLibraryAssetByPublicIDRow struct {
 	SourceUrl      string             `json:"source_url"`
 	PreviewUrl     string             `json:"preview_url"`
 	OriginalUrl    string             `json:"original_url"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
 	Width          int32              `json:"width"`
 	Height         int32              `json:"height"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -232,6 +454,7 @@ func (q *Queries) GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryA
 		&i.SourceUrl,
 		&i.PreviewUrl,
 		&i.OriginalUrl,
+		&i.MediaAssetID,
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
@@ -244,7 +467,7 @@ const getLibraryAssetByWorkspaceSource = `-- name: GetLibraryAssetByWorkspaceSou
 SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
   f.public_id AS folder_public_id,
   a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
 WHERE a.workspace_id = $1
@@ -270,6 +493,7 @@ type GetLibraryAssetByWorkspaceSourceRow struct {
 	SourceUrl      string             `json:"source_url"`
 	PreviewUrl     string             `json:"preview_url"`
 	OriginalUrl    string             `json:"original_url"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
 	Width          int32              `json:"width"`
 	Height         int32              `json:"height"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -290,6 +514,7 @@ func (q *Queries) GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetL
 		&i.SourceUrl,
 		&i.PreviewUrl,
 		&i.OriginalUrl,
+		&i.MediaAssetID,
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
@@ -358,6 +583,58 @@ func (q *Queries) GetLibraryFolderByWorkspaceAndNameCI(ctx context.Context, arg 
 	return i, err
 }
 
+const getLibraryMaterializationByPublicID = `-- name: GetLibraryMaterializationByPublicID :one
+SELECT m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+  a.public_id AS asset_public_id,
+  m.status, m.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  m.error_message, m.created_at, m.completed_at
+FROM library_materializations AS m
+INNER JOIN library_assets AS a ON a.internal_id = m.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
+WHERE m.workspace_id = $1
+  AND m.public_id = $2
+LIMIT 1
+`
+
+type GetLibraryMaterializationByPublicIDParams struct {
+	WorkspaceID int64  `json:"workspace_id"`
+	PublicID    string `json:"public_id"`
+}
+
+type GetLibraryMaterializationByPublicIDRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) GetLibraryMaterializationByPublicID(ctx context.Context, arg GetLibraryMaterializationByPublicIDParams) (GetLibraryMaterializationByPublicIDRow, error) {
+	row := q.db.QueryRow(ctx, getLibraryMaterializationByPublicID, arg.WorkspaceID, arg.PublicID)
+	var i GetLibraryMaterializationByPublicIDRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.AssetPublicID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.MediaAssetPublicID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const getQuickSavesFolder = `-- name: GetQuickSavesFolder :one
 SELECT internal_id, public_id, workspace_id, name, is_system, is_default, created_at, updated_at
 FROM library_folders AS f
@@ -388,7 +665,7 @@ const listLibraryAssets = `-- name: ListLibraryAssets :many
 SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
   f.public_id AS folder_public_id,
   a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
 WHERE a.workspace_id = $1
@@ -412,6 +689,7 @@ type ListLibraryAssetsRow struct {
 	SourceUrl      string             `json:"source_url"`
 	PreviewUrl     string             `json:"preview_url"`
 	OriginalUrl    string             `json:"original_url"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
 	Width          int32              `json:"width"`
 	Height         int32              `json:"height"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -438,6 +716,7 @@ func (q *Queries) ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsPa
 			&i.SourceUrl,
 			&i.PreviewUrl,
 			&i.OriginalUrl,
+			&i.MediaAssetID,
 			&i.Width,
 			&i.Height,
 			&i.CreatedAt,
@@ -457,7 +736,7 @@ const listLibraryAssetsByFolder = `-- name: ListLibraryAssetsByFolder :many
 SELECT a.internal_id, a.public_id, a.workspace_id, a.folder_id,
   f.public_id AS folder_public_id,
   a.provider, a.source_id, a.source_url, a.preview_url, a.original_url,
-  a.width, a.height, a.created_at, a.updated_at
+  a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
 FROM library_assets AS a
 INNER JOIN library_folders AS f ON f.internal_id = a.folder_id
 WHERE a.workspace_id = $1
@@ -483,6 +762,7 @@ type ListLibraryAssetsByFolderRow struct {
 	SourceUrl      string             `json:"source_url"`
 	PreviewUrl     string             `json:"preview_url"`
 	OriginalUrl    string             `json:"original_url"`
+	MediaAssetID   pgtype.Int8        `json:"media_asset_id"`
 	Width          int32              `json:"width"`
 	Height         int32              `json:"height"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -509,6 +789,7 @@ func (q *Queries) ListLibraryAssetsByFolder(ctx context.Context, arg ListLibrary
 			&i.SourceUrl,
 			&i.PreviewUrl,
 			&i.OriginalUrl,
+			&i.MediaAssetID,
 			&i.Width,
 			&i.Height,
 			&i.CreatedAt,
@@ -637,12 +918,77 @@ func (q *Queries) ListLibraryFolders(ctx context.Context, arg ListLibraryFolders
 	return items, nil
 }
 
+const listLibraryMaterializations = `-- name: ListLibraryMaterializations :many
+SELECT m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+  a.public_id AS asset_public_id,
+  m.status, m.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  m.error_message, m.created_at, m.completed_at
+FROM library_materializations AS m
+INNER JOIN library_assets AS a ON a.internal_id = m.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
+WHERE m.workspace_id = $1
+ORDER BY m.created_at ASC, m.internal_id ASC
+LIMIT $2
+`
+
+type ListLibraryMaterializationsParams struct {
+	WorkspaceID int64 `json:"workspace_id"`
+	RowLimit    int32 `json:"row_limit"`
+}
+
+type ListLibraryMaterializationsRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) ListLibraryMaterializations(ctx context.Context, arg ListLibraryMaterializationsParams) ([]ListLibraryMaterializationsRow, error) {
+	rows, err := q.db.Query(ctx, listLibraryMaterializations, arg.WorkspaceID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLibraryMaterializationsRow
+	for rows.Next() {
+		var i ListLibraryMaterializationsRow
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.LibraryAssetID,
+			&i.AssetPublicID,
+			&i.Status,
+			&i.MediaAssetID,
+			&i.MediaAssetPublicID,
+			&i.ErrorMessage,
+			&i.CreatedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveLibraryAsset = `-- name: MoveLibraryAsset :one
 UPDATE library_assets AS a
 SET folder_id = $1, updated_at = now()
 WHERE a.workspace_id = $2
   AND a.public_id = $3
-RETURNING a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.width, a.height, a.created_at, a.updated_at
+RETURNING a.internal_id, a.public_id, a.workspace_id, a.folder_id, a.provider, a.source_id, a.source_url, a.preview_url, a.original_url, a.media_asset_id, a.width, a.height, a.created_at, a.updated_at
 `
 
 type MoveLibraryAssetParams struct {
@@ -664,6 +1010,7 @@ func (q *Queries) MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetPara
 		&i.SourceUrl,
 		&i.PreviewUrl,
 		&i.OriginalUrl,
+		&i.MediaAssetID,
 		&i.Width,
 		&i.Height,
 		&i.CreatedAt,
@@ -720,6 +1067,70 @@ func (q *Queries) RenameLibraryFolder(ctx context.Context, arg RenameLibraryFold
 		&i.IsDefault,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const startLibraryMaterialization = `-- name: StartLibraryMaterialization :one
+
+WITH updated AS (
+  UPDATE library_materializations AS m
+  SET status = 'processing', error_message = ''
+  WHERE m.workspace_id = $1
+    AND m.public_id = $2
+    AND m.status = 'pending'
+  RETURNING m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+    m.status, m.media_asset_id, m.error_message, m.created_at, m.completed_at
+)
+SELECT u.internal_id, u.public_id, u.workspace_id, u.library_asset_id,
+  a.public_id AS asset_public_id,
+  u.status, u.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  u.error_message, u.created_at, u.completed_at
+FROM updated AS u
+INNER JOIN library_assets AS a ON a.internal_id = u.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = u.media_asset_id
+LIMIT 1
+`
+
+type StartLibraryMaterializationParams struct {
+	WorkspaceID int64  `json:"workspace_id"`
+	PublicID    string `json:"public_id"`
+}
+
+type StartLibraryMaterializationRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+// Transitions read their result back through the data-modifying
+// CTE's RETURNING list (joined to the untouched asset/media tables):
+// the outer statement shares the CTE snapshot, so re-scanning the
+// target table would return the pre-update row version.
+func (q *Queries) StartLibraryMaterialization(ctx context.Context, arg StartLibraryMaterializationParams) (StartLibraryMaterializationRow, error) {
+	row := q.db.QueryRow(ctx, startLibraryMaterialization, arg.WorkspaceID, arg.PublicID)
+	var i StartLibraryMaterializationRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.AssetPublicID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.MediaAssetPublicID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }

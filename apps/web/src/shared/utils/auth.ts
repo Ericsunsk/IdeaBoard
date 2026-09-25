@@ -1,4 +1,4 @@
-import type { User } from '../api/userSession'
+import type { User } from '../api/sessionUser'
 import { clearAuthScopedQueryCache } from '../query/queryClient'
 import { resolveAuthFailureAction } from '../auth/sessionPolicy'
 import type { AuthFailureAction, AuthFailureContext } from '../auth/sessionPolicy'

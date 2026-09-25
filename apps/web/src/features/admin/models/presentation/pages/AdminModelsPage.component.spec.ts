@@ -30,7 +30,7 @@ describe('AdminModelsPage', () => {
     storedCatalog = wireCatalogModels()
 
     useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/catalog', () => {
+      http.get('/api/control/v1/platform/ai-gateway/catalog', () => {
         // MSW 模拟的是线路格式（snake_case），与真实后端一致。
         return HttpResponse.json({ code: 0, msg: 'ok', data: storedCatalog })
       }),
@@ -51,7 +51,7 @@ describe('AdminModelsPage', () => {
           },
         })
       }),
-      http.get('/api/admin/settings/ai-gateway', () => {
+      http.get('/api/control/v1/platform/ai-gateway', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -77,7 +77,7 @@ describe('AdminModelsPage', () => {
           },
         })
       }),
-      http.get('/api/admin/settings/ai-gateway/providers', () =>
+      http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
