@@ -19,6 +19,7 @@ const (
 	RiverMaxAttemptsTaskRetention           = 3
 	RiverMaxAttemptsVisionBilling           = 5
 	RiverMaxAttemptsMediaReclamation        = 10
+	RiverMaxAttemptsWebhookDeliver          = 8
 )
 
 // QueueRetryPolicy pins the retry budget of one River queue.
@@ -88,6 +89,12 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			MaxAttempts: RiverMaxAttemptsMediaReclamation,
 			Worker:      "ReclaimWorker / ScheduleWorker",
 			Notes:       "storage consistency scan; storage blips are transient so the budget exceeds other maintenance queues",
+		},
+		{
+			Queue:       RiverQueueWebhookDeliver,
+			MaxAttempts: RiverMaxAttemptsWebhookDeliver,
+			Worker:      "WebhookDeliverWorker (webhook_deliver)",
+			Notes:       "one job per delivery preserves the 8-attempt budget; discarded rows are the durable DLQ fact",
 		},
 	}
 }

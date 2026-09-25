@@ -5,9 +5,16 @@
 // transport types only: snake_case -> camelCase mapping lives in canvas
 // task-runner adapters (keep this resource thin).
 //
-// TODO(#805-regen): move these calls onto `generated-query/public` once the
-// merger stream regenerates it from the task operations documented in the
-// #805 report. Never import `generated-query/admin|control` here, and route
+// TODO(#805-regen, 2026-09-25): move these calls onto `generated-query/public`
+// once the merger stream regenerates it from the task operations documented
+// in the #805 report. BLOCKED 2026-09-25: generated public fns use
+// The task adapter owns the versioned route and response contract.
+// while this module ships `/v1/...` suffixes (-> `/api/v1/...`); the correct
+// `publicMutator` exists but `orval.config.ts publicQuery` still points at
+// Generated wrappers remain behind the adapter boundary.
+// this transport until regen lands; do not force-fit (status convergence,
+// output storage-leak guards, and opaque-id asserts have no generated
+// equivalent). Never import `generated-query/admin|control` here, and route
 // pages must consume the canvas runner, never this module directly.
 //
 // Legacy `/api/user` task behavior (submit/readiness/matrix/cancel) is owned

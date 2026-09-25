@@ -11,11 +11,12 @@
         "
       >
         <img
-          v-if="brandLogo"
+          v-if="brandLogo && !logoLoadFailed"
           :src="brandLogo"
           :alt="model.provider"
           class="size-4.5 object-contain"
           loading="lazy"
+          @error="onLogoError"
         />
         <Cube v-else class="size-4" />
       </div>
@@ -90,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Cube } from '@iconoir/vue'
 import { resolveModelBrandLogo } from '../../../shared/logos/brandLogos'
 import { MODEL_HOSTING_CLOUDFLARE } from '../../domain/catalogData'
@@ -113,4 +114,15 @@ const props = withDefaults(
 
 // 模板多处使用：一次解析，多处复用。
 const brandLogo = computed(() => resolveModelBrandLogo(props.model))
+
+// Provider 品牌图经后端透传 models.dev SVG：加载失败（404/断网）时回落 Cube
+// 占位，避免破图；模型切换后重置失败态。
+const logoLoadFailed = ref(false)
+watch(brandLogo, () => {
+  logoLoadFailed.value = false
+})
+
+function onLogoError(): void {
+  logoLoadFailed.value = true
+}
 </script>

@@ -42,8 +42,7 @@ import type {
   WorkspaceMemberList,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -56,9 +55,9 @@ export const getListWorkspaceMembersUrl = (workspaceId: string) => {
  */
 export const listWorkspaceMembers = async (
   workspaceId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceMemberList> => {
-  return orvalMutator<WorkspaceMemberList>(getListWorkspaceMembersUrl(workspaceId), {
+  return publicMutator<WorkspaceMemberList>(getListWorkspaceMembersUrl(workspaceId), {
     ...options,
     method: 'GET',
   })
@@ -70,14 +69,14 @@ export const getListWorkspaceMembersQueryKey = (workspaceId: MaybeRefOrGetter<st
 
 export const getListWorkspaceMembersQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceMembers>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMembers>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -98,7 +97,7 @@ export const getListWorkspaceMembersQueryOptions = <
 export type ListWorkspaceMembersQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceMembers>>
 >
-export type ListWorkspaceMembersQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type ListWorkspaceMembersQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary List workspace members (members only)
@@ -106,14 +105,14 @@ export type ListWorkspaceMembersQueryError = ErrorType<UnauthorizedResponse | No
 
 export function useListWorkspaceMembers<
   TData = Awaited<ReturnType<typeof listWorkspaceMembers>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMembers>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -138,7 +137,7 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 export const addWorkspaceMember = async (
   workspaceId: string,
   addWorkspaceMemberRequest: AddWorkspaceMemberRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceMemberEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -159,7 +158,7 @@ export const addWorkspaceMember = async (
     }
     return headers
   }
-  return orvalMutator<WorkspaceMemberEnvelope>(getAddWorkspaceMemberUrl(workspaceId), {
+  return publicMutator<WorkspaceMemberEnvelope>(getAddWorkspaceMemberUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -170,13 +169,12 @@ export const addWorkspaceMember = async (
 export const getAddWorkspaceMemberMutationKey = () => ['addWorkspaceMember'] as const
 
 export const getAddWorkspaceMemberMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -185,7 +183,7 @@ export const getAddWorkspaceMemberMutationOptions = <
     AddWorkspaceMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof addWorkspaceMember>>,
   TError,
@@ -214,30 +212,28 @@ export const getAddWorkspaceMemberMutationOptions = <
 export type AddWorkspaceMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof addWorkspaceMember>>
 >
-export type AddWorkspaceMemberMutationBody = BodyType<AddWorkspaceMemberRequest>
-export type AddWorkspaceMemberMutationError = ErrorType<
+export type AddWorkspaceMemberMutationBody = AddWorkspaceMemberRequest
+export type AddWorkspaceMemberMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type AddWorkspaceMemberMutationVariables = {
   workspaceId: string
-  data: BodyType<AddWorkspaceMemberRequest>
+  data: AddWorkspaceMemberRequest
 }
 
 /**
  * @summary Add a workspace member (owner/admin only; owner-only promotion)
  */
 export const useAddWorkspaceMember = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -247,7 +243,7 @@ export const useAddWorkspaceMember = <
       AddWorkspaceMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -269,7 +265,7 @@ export const updateWorkspaceMember = async (
   workspaceId: string,
   memberId: string,
   updateWorkspaceMemberRequest: UpdateWorkspaceMemberRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceMemberEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -290,24 +286,26 @@ export const updateWorkspaceMember = async (
     }
     return headers
   }
-  return orvalMutator<WorkspaceMemberEnvelope>(getUpdateWorkspaceMemberUrl(workspaceId, memberId), {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(updateWorkspaceMemberRequest),
-  })
+  return publicMutator<WorkspaceMemberEnvelope>(
+    getUpdateWorkspaceMemberUrl(workspaceId, memberId),
+    {
+      ...options,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(updateWorkspaceMemberRequest),
+    },
+  )
 }
 
 export const getUpdateWorkspaceMemberMutationKey = () => ['updateWorkspaceMember'] as const
 
 export const getUpdateWorkspaceMemberMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -316,7 +314,7 @@ export const getUpdateWorkspaceMemberMutationOptions = <
     UpdateWorkspaceMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateWorkspaceMember>>,
   TError,
@@ -345,31 +343,29 @@ export const getUpdateWorkspaceMemberMutationOptions = <
 export type UpdateWorkspaceMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateWorkspaceMember>>
 >
-export type UpdateWorkspaceMemberMutationBody = BodyType<UpdateWorkspaceMemberRequest>
-export type UpdateWorkspaceMemberMutationError = ErrorType<
+export type UpdateWorkspaceMemberMutationBody = UpdateWorkspaceMemberRequest
+export type UpdateWorkspaceMemberMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type UpdateWorkspaceMemberMutationVariables = {
   workspaceId: string
   memberId: string
-  data: BodyType<UpdateWorkspaceMemberRequest>
+  data: UpdateWorkspaceMemberRequest
 }
 
 /**
  * @summary Change a member role (last owner cannot be demoted)
  */
 export const useUpdateWorkspaceMember = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -379,7 +375,7 @@ export const useUpdateWorkspaceMember = <
       UpdateWorkspaceMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -400,9 +396,9 @@ export const getRemoveWorkspaceMemberUrl = (workspaceId: string, memberId: strin
 export const removeWorkspaceMember = async (
   workspaceId: string,
   memberId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<DeletedEnvelope> => {
-  return orvalMutator<DeletedEnvelope>(getRemoveWorkspaceMemberUrl(workspaceId, memberId), {
+  return publicMutator<DeletedEnvelope>(getRemoveWorkspaceMemberUrl(workspaceId, memberId), {
     ...options,
     method: 'DELETE',
   })
@@ -411,7 +407,7 @@ export const removeWorkspaceMember = async (
 export const getRemoveWorkspaceMemberMutationKey = () => ['removeWorkspaceMember'] as const
 
 export const getRemoveWorkspaceMemberMutationOptions = <
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -420,7 +416,7 @@ export const getRemoveWorkspaceMemberMutationOptions = <
     RemoveWorkspaceMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof removeWorkspaceMember>>,
   TError,
@@ -450,16 +446,15 @@ export type RemoveWorkspaceMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeWorkspaceMember>>
 >
 
-export type RemoveWorkspaceMemberMutationError = ErrorType<
+export type RemoveWorkspaceMemberMutationError =
   UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
->
 export type RemoveWorkspaceMemberMutationVariables = { workspaceId: string; memberId: string }
 
 /**
  * @summary Remove a workspace member (last owner cannot be removed)
  */
 export const useRemoveWorkspaceMember = <
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
   TContext = unknown,
 >(
   options?: {
@@ -469,7 +464,7 @@ export const useRemoveWorkspaceMember = <
       RemoveWorkspaceMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

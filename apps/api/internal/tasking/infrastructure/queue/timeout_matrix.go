@@ -50,6 +50,9 @@ const (
 	// RiverJobTimeoutMediaReclamationSchedule covers one due-asset scan
 	// (capped batch) plus the enqueue fan-out.
 	RiverJobTimeoutMediaReclamationSchedule = 2 * time.Minute
+	// RiverJobTimeoutWebhookDeliver covers one signed delivery attempt
+	// (one outbound POST under a 5s send budget plus store bookkeeping).
+	RiverJobTimeoutWebhookDeliver = time.Minute
 )
 
 // QueueTimeoutPolicy pins the River Timeout of one worker.
@@ -136,6 +139,12 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 			Timeout: RiverJobTimeoutMediaReclamationSchedule,
 			Worker:  "ScheduleWorker",
 			Notes:   "due-asset scan (capped batch) plus enqueue fan-out",
+		},
+		{
+			Queue:   RiverQueueWebhookDeliver,
+			Timeout: RiverJobTimeoutWebhookDeliver,
+			Worker:  "WebhookDeliverWorker (webhook_deliver)",
+			Notes:   "single signed POST attempt; short budget keeps slow endpoints from head-blocking the delivery queue",
 		},
 	}
 }

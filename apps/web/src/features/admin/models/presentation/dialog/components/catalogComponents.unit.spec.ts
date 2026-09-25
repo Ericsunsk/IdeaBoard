@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { http, HttpResponse, useMswHandlers } from '../../../../../../test/msw'
 import CatalogIdentityPanel from './CatalogIdentityPanel.vue'
@@ -344,6 +344,39 @@ describe('AdminModelEditDialog subcomponents', () => {
       // 只读面板：无任何 update:* 回写事件，表单 description 永不被参照回写
       //（emitted 含 user-event 派发的原生 DOM 事件，只断言无 update: 前缀）。
       expect(Object.keys(emitted()).filter((key) => key.startsWith('update:'))).toEqual([])
+    })
+
+    it('falls back to the placeholder when the provider logo fails to load', async () => {
+      useMswHandlers(
+        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
+          HttpResponse.json({
+            code: 0,
+            msg: 'ok',
+            data: {
+              model_id: 'openai/gpt-4o',
+              provider: 'OpenAI',
+              name: 'GPT-4o',
+              input_usd_per_mtok: 2.5,
+              output_usd_per_mtok: 10,
+              context_limit: 128000,
+              last_updated: '2026-01-01',
+              source: 'models.dev',
+              note: '参照价，非结算依据',
+              found: true,
+            },
+          }),
+        ),
+      )
+
+      render(CatalogReferencePanel, {
+        props: { modelId: 'openai/gpt-4o', provider: 'OpenAI', modelName: 'GPT-4o' },
+      })
+
+      const logo = await screen.findByRole('img', { name: 'OpenAI' })
+      expect(logo).toBeInTheDocument()
+      await fireEvent.error(logo)
+      // 破图隐藏，回落 Cube 占位，不再有可访问的品牌图。
+      expect(screen.queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
     })
 
     it('does not let an older reference response overwrite a newer model', async () => {

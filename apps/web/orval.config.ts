@@ -20,9 +20,14 @@ export default defineConfig({
       formatter: 'prettier',
       urlEncodeParameters: true,
       override: {
+        // Public Data Plane transport prefix (issue #809): the Public spec
+        // is canonical with `servers: /api/v1` plus relative paths, so the
+        // shared mutator would hit `/api/...` (no such route). publicMutator
+        // prefixes every generated Public path with `/v1`; see controlQuery
+        // below for the Control analogue.
         mutator: {
-          path: './src/shared/api/orvalMutator.ts',
-          name: 'orvalMutator',
+          path: './src/shared/api/publicMutator.ts',
+          name: 'publicMutator',
         },
         fetch: {
           includeHttpResponseReturnType: false,

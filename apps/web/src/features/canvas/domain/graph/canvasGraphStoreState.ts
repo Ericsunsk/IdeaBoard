@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
@@ -19,7 +20,7 @@ import type {
 } from './canvasGraphStoreTypes'
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
+  return structuredClone(toRaw(value) as T)
 }
 
 export function getNodeKind(node: CanvasNodeItem): CanvasGraphNodeKind {

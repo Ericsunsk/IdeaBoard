@@ -46,8 +46,7 @@ import type {
   WorkspaceList,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -70,9 +69,9 @@ export const getListOrganizationsUrl = (params?: ListOrganizationsParams) => {
  */
 export const listOrganizations = async (
   params?: ListOrganizationsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedOrganizations> => {
-  return orvalMutator<PaginatedOrganizations>(getListOrganizationsUrl(params), {
+  return publicMutator<PaginatedOrganizations>(getListOrganizationsUrl(params), {
     ...options,
     method: 'GET',
   })
@@ -86,12 +85,12 @@ export const getListOrganizationsQueryKey = (
 
 export const getListOrganizationsQueryOptions = <
   TData = Awaited<ReturnType<typeof listOrganizations>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse,
 >(
   params?: MaybeRefOrGetter<ListOrganizationsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrganizations>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -111,7 +110,7 @@ export const getListOrganizationsQueryOptions = <
 export type ListOrganizationsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listOrganizations>>
 >
-export type ListOrganizationsQueryError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+export type ListOrganizationsQueryError = BadRequestResponse | UnauthorizedResponse
 
 /**
  * @summary List visible organizations with cursor pagination
@@ -119,12 +118,12 @@ export type ListOrganizationsQueryError = ErrorType<BadRequestResponse | Unautho
 
 export function useListOrganizations<
   TData = Awaited<ReturnType<typeof listOrganizations>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse,
 >(
   params?: MaybeRefOrGetter<ListOrganizationsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listOrganizations>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -148,7 +147,7 @@ export const getCreateOrganizationUrl = () => {
  */
 export const createOrganization = async (
   createOrganizationRequest: CreateOrganizationRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<OrganizationEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -169,7 +168,7 @@ export const createOrganization = async (
     }
     return headers
   }
-  return orvalMutator<OrganizationEnvelope>(getCreateOrganizationUrl(), {
+  return publicMutator<OrganizationEnvelope>(getCreateOrganizationUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -180,9 +179,8 @@ export const createOrganization = async (
 export const getCreateOrganizationMutationKey = () => ['createOrganization'] as const
 
 export const getCreateOrganizationMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ConflictResponse | UnprocessableEntityResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ConflictResponse | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -191,7 +189,7 @@ export const getCreateOrganizationMutationOptions = <
     CreateOrganizationMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createOrganization>>,
   TError,
@@ -220,19 +218,17 @@ export const getCreateOrganizationMutationOptions = <
 export type CreateOrganizationMutationResult = NonNullable<
   Awaited<ReturnType<typeof createOrganization>>
 >
-export type CreateOrganizationMutationBody = BodyType<CreateOrganizationRequest>
-export type CreateOrganizationMutationError = ErrorType<
+export type CreateOrganizationMutationBody = CreateOrganizationRequest
+export type CreateOrganizationMutationError =
   BadRequestResponse | UnauthorizedResponse | ConflictResponse | UnprocessableEntityResponse
->
-export type CreateOrganizationMutationVariables = { data: BodyType<CreateOrganizationRequest> }
+export type CreateOrganizationMutationVariables = { data: CreateOrganizationRequest }
 
 /**
  * @summary Create an organization
  */
 export const useCreateOrganization = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ConflictResponse | UnprocessableEntityResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ConflictResponse | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -242,7 +238,7 @@ export const useCreateOrganization = <
       CreateOrganizationMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -262,9 +258,9 @@ export const getGetOrganizationUrl = (organizationId: string) => {
  */
 export const getOrganization = async (
   organizationId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<OrganizationEnvelope> => {
-  return orvalMutator<OrganizationEnvelope>(getGetOrganizationUrl(organizationId), {
+  return publicMutator<OrganizationEnvelope>(getGetOrganizationUrl(organizationId), {
     ...options,
     method: 'GET',
   })
@@ -276,12 +272,12 @@ export const getGetOrganizationQueryKey = (organizationId: MaybeRefOrGetter<stri
 
 export const getGetOrganizationQueryOptions = <
   TData = Awaited<ReturnType<typeof getOrganization>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrganization>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -302,7 +298,7 @@ export const getGetOrganizationQueryOptions = <
 }
 
 export type GetOrganizationQueryResult = NonNullable<Awaited<ReturnType<typeof getOrganization>>>
-export type GetOrganizationQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetOrganizationQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get an organization by explicit organization context
@@ -310,12 +306,12 @@ export type GetOrganizationQueryError = ErrorType<UnauthorizedResponse | NotFoun
 
 export function useGetOrganization<
   TData = Awaited<ReturnType<typeof getOrganization>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getOrganization>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -340,7 +336,7 @@ export const getUpdateOrganizationUrl = (organizationId: string) => {
 export const updateOrganization = async (
   organizationId: string,
   updateOrganizationRequest: UpdateOrganizationRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<OrganizationEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -361,7 +357,7 @@ export const updateOrganization = async (
     }
     return headers
   }
-  return orvalMutator<OrganizationEnvelope>(getUpdateOrganizationUrl(organizationId), {
+  return publicMutator<OrganizationEnvelope>(getUpdateOrganizationUrl(organizationId), {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -372,13 +368,12 @@ export const updateOrganization = async (
 export const getUpdateOrganizationMutationKey = () => ['updateOrganization'] as const
 
 export const getUpdateOrganizationMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -387,7 +382,7 @@ export const getUpdateOrganizationMutationOptions = <
     UpdateOrganizationMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateOrganization>>,
   TError,
@@ -416,30 +411,28 @@ export const getUpdateOrganizationMutationOptions = <
 export type UpdateOrganizationMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateOrganization>>
 >
-export type UpdateOrganizationMutationBody = BodyType<UpdateOrganizationRequest>
-export type UpdateOrganizationMutationError = ErrorType<
+export type UpdateOrganizationMutationBody = UpdateOrganizationRequest
+export type UpdateOrganizationMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type UpdateOrganizationMutationVariables = {
   organizationId: string
-  data: BodyType<UpdateOrganizationRequest>
+  data: UpdateOrganizationRequest
 }
 
 /**
  * @summary Rename an organization (owner/admin only)
  */
 export const useUpdateOrganization = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -449,7 +442,7 @@ export const useUpdateOrganization = <
       UpdateOrganizationMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -469,9 +462,9 @@ export const getListOrganizationWorkspacesUrl = (organizationId: string) => {
  */
 export const listOrganizationWorkspaces = async (
   organizationId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceList> => {
-  return orvalMutator<WorkspaceList>(getListOrganizationWorkspacesUrl(organizationId), {
+  return publicMutator<WorkspaceList>(getListOrganizationWorkspacesUrl(organizationId), {
     ...options,
     method: 'GET',
   })
@@ -483,14 +476,14 @@ export const getListOrganizationWorkspacesQueryKey = (organizationId: MaybeRefOr
 
 export const getListOrganizationWorkspacesQueryOptions = <
   TData = Awaited<ReturnType<typeof listOrganizationWorkspaces>>,
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listOrganizationWorkspaces>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -514,9 +507,8 @@ export const getListOrganizationWorkspacesQueryOptions = <
 export type ListOrganizationWorkspacesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listOrganizationWorkspaces>>
 >
-export type ListOrganizationWorkspacesQueryError = ErrorType<
+export type ListOrganizationWorkspacesQueryError =
   UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
->
 
 /**
  * @summary List workspaces of an organization (org members only)
@@ -524,14 +516,14 @@ export type ListOrganizationWorkspacesQueryError = ErrorType<
 
 export function useListOrganizationWorkspaces<
   TData = Awaited<ReturnType<typeof listOrganizationWorkspaces>>,
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   organizationId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listOrganizationWorkspaces>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -556,7 +548,7 @@ export const getCreateOrganizationWorkspaceUrl = (organizationId: string) => {
 export const createOrganizationWorkspace = async (
   organizationId: string,
   createOrganizationWorkspaceRequest: CreateOrganizationWorkspaceRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -577,7 +569,7 @@ export const createOrganizationWorkspace = async (
     }
     return headers
   }
-  return orvalMutator<WorkspaceEnvelope>(getCreateOrganizationWorkspaceUrl(organizationId), {
+  return publicMutator<WorkspaceEnvelope>(getCreateOrganizationWorkspaceUrl(organizationId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -589,14 +581,13 @@ export const getCreateOrganizationWorkspaceMutationKey = () =>
   ['createOrganizationWorkspace'] as const
 
 export const getCreateOrganizationWorkspaceMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -605,7 +596,7 @@ export const getCreateOrganizationWorkspaceMutationOptions = <
     CreateOrganizationWorkspaceMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createOrganizationWorkspace>>,
   TError,
@@ -634,32 +625,30 @@ export const getCreateOrganizationWorkspaceMutationOptions = <
 export type CreateOrganizationWorkspaceMutationResult = NonNullable<
   Awaited<ReturnType<typeof createOrganizationWorkspace>>
 >
-export type CreateOrganizationWorkspaceMutationBody = BodyType<CreateOrganizationWorkspaceRequest>
-export type CreateOrganizationWorkspaceMutationError = ErrorType<
+export type CreateOrganizationWorkspaceMutationBody = CreateOrganizationWorkspaceRequest
+export type CreateOrganizationWorkspaceMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type CreateOrganizationWorkspaceMutationVariables = {
   organizationId: string
-  data: BodyType<CreateOrganizationWorkspaceRequest>
+  data: CreateOrganizationWorkspaceRequest
 }
 
 /**
  * @summary Create an organization workspace (org owner/admin only)
  */
 export const useCreateOrganizationWorkspace = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -669,7 +658,7 @@ export const useCreateOrganizationWorkspace = <
       CreateOrganizationWorkspaceMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

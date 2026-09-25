@@ -27,8 +27,7 @@ import { unref } from 'vue'
 
 import type { MeEnvelope, UnauthorizedResponse } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -40,8 +39,8 @@ export const getGetMeUrl = () => {
  * Returns the session principal with the external usr_ identifier. Provisions the personal workspace idempotently on first call.
  * @summary Get the current principal profile
  */
-export const getMe = async (options?: Parameters<typeof orvalMutator>[1]): Promise<MeEnvelope> => {
-  return orvalMutator<MeEnvelope>(getGetMeUrl(), {
+export const getMe = async (options?: Parameters<typeof publicMutator>[1]): Promise<MeEnvelope> => {
+  return publicMutator<MeEnvelope>(getGetMeUrl(), {
     ...options,
     method: 'GET',
   })
@@ -53,10 +52,10 @@ export const getGetMeQueryKey = () => {
 
 export const getGetMeQueryOptions = <
   TData = Awaited<ReturnType<typeof getMe>>,
-  TError = ErrorType<UnauthorizedResponse>,
+  TError = UnauthorizedResponse,
 >(options?: {
   query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>>
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
@@ -73,19 +72,16 @@ export const getGetMeQueryOptions = <
 }
 
 export type GetMeQueryResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
-export type GetMeQueryError = ErrorType<UnauthorizedResponse>
+export type GetMeQueryError = UnauthorizedResponse
 
 /**
  * @summary Get the current principal profile
  */
 
-export function useGetMe<
-  TData = Awaited<ReturnType<typeof getMe>>,
-  TError = ErrorType<UnauthorizedResponse>,
->(
+export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = UnauthorizedResponse>(
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

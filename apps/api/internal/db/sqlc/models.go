@@ -121,6 +121,7 @@ type Board struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt  pgtype.Timestamptz `json:"archived_at"`
+	OwnerUserID pgtype.Int8        `json:"owner_user_id"`
 }
 
 type BoardDocument struct {
@@ -136,6 +137,7 @@ type BoardMembership struct {
 	UserID    int64              `json:"user_id"`
 	Role      string             `json:"role"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type BoardRevision struct {
@@ -157,8 +159,12 @@ type BoardShareToken struct {
 	GrantedRole     string             `json:"granted_role"`
 	CreatedByUserID int64              `json:"created_by_user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	RevokedAt       pgtype.Timestamptz `json:"revoked_at"`
 	RevokedByUserID pgtype.Int8        `json:"revoked_by_user_id"`
+	TokenID         pgtype.Text        `json:"token_id"`
+	TokenPrefix     string             `json:"token_prefix"`
+	UsageCount      int64              `json:"usage_count"`
 }
 
 type ControlAuditRecord struct {
@@ -342,6 +348,16 @@ type EventDelivery struct {
 	ResponseStatus  pgtype.Int4        `json:"response_status"`
 	ResponseBody    string             `json:"response_body"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type EventDeliveryAttempt struct {
+	InternalID    int64              `json:"internal_id"`
+	DeliveryID    int64              `json:"delivery_id"`
+	AttemptNumber int32              `json:"attempt_number"`
+	StatusCode    int32              `json:"status_code"`
+	Outcome       string             `json:"outcome"`
+	ErrorMessage  string             `json:"error_message"`
+	AttemptedAt   pgtype.Timestamptz `json:"attempted_at"`
 }
 
 type EventSubscription struct {

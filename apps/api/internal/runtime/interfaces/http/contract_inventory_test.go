@@ -200,7 +200,7 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"pattern: '^evt_",
 			"task.completed",
 			"Last-Event-ID",
-			"X-Webhook-Signature",
+			"svix-signature",
 		},
 		// Legacy openapi.yaml was deleted by the #809 hard cut; its absence
 		// is asserted by TestContractInventoryLegacySurfacesStayDeleted.

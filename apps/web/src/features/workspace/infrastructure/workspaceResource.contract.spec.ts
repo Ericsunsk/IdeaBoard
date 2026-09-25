@@ -32,7 +32,7 @@ const AGREED_PAGE = {
 
 describe('workspace list envelope', () => {
   it('maps the agreed snake_case page to camelCase domain items', async () => {
-    useMswHandlers(http.get('/api/workspaces', () => HttpResponse.json(AGREED_PAGE)))
+    useMswHandlers(http.get('/api/v1/workspaces', () => HttpResponse.json(AGREED_PAGE)))
 
     const page = await fetchWorkspacePage()
 
@@ -66,7 +66,7 @@ describe('workspace list envelope', () => {
   it('walks cursor pagination and clamps page size to the agreed bounds', async () => {
     const seenUrls: string[] = []
     useMswHandlers(
-      http.get('/api/workspaces', ({ request }) => {
+      http.get('/api/v1/workspaces', ({ request }) => {
         seenUrls.push(request.url)
         const cursor = new URL(request.url).searchParams.get('cursor')
         if (cursor === 'cursor2') {
@@ -107,7 +107,7 @@ describe('workspace list envelope', () => {
   it('propagates Request-Id on reads', async () => {
     let requestId: string | null = null
     useMswHandlers(
-      http.get('/api/workspaces', ({ request }) => {
+      http.get('/api/v1/workspaces', ({ request }) => {
         requestId = request.headers.get('request-id')
         return HttpResponse.json(AGREED_PAGE)
       }),
@@ -120,7 +120,7 @@ describe('workspace list envelope', () => {
 
   it('keeps hidden (404) distinct from forbidden (403)', async () => {
     useMswHandlers(
-      http.get('/api/workspaces', () =>
+      http.get('/api/v1/workspaces', () =>
         HttpResponse.json(
           {
             error: {
@@ -148,7 +148,7 @@ describe('workspace creation', () => {
     const seen: Array<{ idempotencyKey: string | null; requestId: string | null; body: unknown }> =
       []
     useMswHandlers(
-      http.post('/api/workspaces', async ({ request }) => {
+      http.post('/api/v1/workspaces', async ({ request }) => {
         seen.push({
           idempotencyKey: request.headers.get('idempotency-key'),
           requestId: request.headers.get('request-id'),
@@ -194,7 +194,7 @@ describe('workspace creation', () => {
 describe('principal envelope', () => {
   it('maps the agreed principal shape to camelCase', async () => {
     useMswHandlers(
-      http.get('/api/me', () =>
+      http.get('/api/v1/me', () =>
         HttpResponse.json({
           data: { public_id: 'usr_u1', display_name: 'Ada', avatar: 'https://cdn.example/a.png' },
         }),

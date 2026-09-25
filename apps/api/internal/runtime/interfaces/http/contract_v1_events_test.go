@@ -12,7 +12,6 @@ package httpapi
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,6 +31,8 @@ import (
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 type fakeEventSender struct {
@@ -67,31 +68,27 @@ func (f *fakeEventSender) snapshot() (int, [][]byte, []map[string]string) {
 	return f.calls, append([][]byte(nil), f.bodies...), append([]map[string]string(nil), f.headers...)
 }
 
-type manualEventScheduler struct {
-	mu      sync.Mutex
-	pending []func()
+// inlineEventEnqueuer executes webhook deliveries synchronously through
+// the River worker, so contract tests keep asserting sends immediately
+// after the emitting call without running a River client.
+type inlineEventEnqueuer struct {
+	mu    sync.Mutex
+	store *events.WebhookStore
 }
 
-func (m *manualEventScheduler) schedule(_ time.Duration, fn func()) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.pending = append(m.pending, fn)
-}
-
-func (m *manualEventScheduler) runAll() {
-	for {
-		m.mu.Lock()
-		if len(m.pending) == 0 {
-			m.mu.Unlock()
-			return
-		}
-		next := m.pending
-		m.pending = nil
-		m.mu.Unlock()
-		for _, fn := range next {
-			fn()
-		}
+func (m *inlineEventEnqueuer) Insert(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
+	delivery, ok := args.(events.WebhookDeliveryArgs)
+	if !ok {
+		return nil, fmt.Errorf("inline enqueuer: unexpected args %T", args)
 	}
+	worker := events.NewWebhookDeliverWorker(m.store)
+	// Attempt 1 of the 8-budget runs inline; worker errors stand in for
+	// River retries (no failing-sender contract paths exist today).
+	_ = worker.Work(ctx, &river.Job[events.WebhookDeliveryArgs]{
+		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 8},
+		Args:   delivery,
+	})
+	return &rivertype.JobInsertResult{}, nil
 }
 
 type v1EventsFixture struct {
@@ -106,7 +103,7 @@ type v1EventsFixture struct {
 	eventLog     *events.WorkspaceEventLog
 	webhooks     *events.WebhookStore
 	sender       *fakeEventSender
-	scheduler    *manualEventScheduler
+	enqueuer     *inlineEventEnqueuer
 	holder       *fakeTaskHolder
 	materializer *fakeLibraryMaterializer
 }
@@ -127,8 +124,9 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	materializer := &fakeLibraryMaterializer{mediaID: "asset_abc123def456"}
 	eventLog := events.NewWorkspaceEventLog()
 	sender := &fakeEventSender{status: 200}
-	scheduler := &manualEventScheduler{}
-	webhooks := events.NewWebhookStore(sender, scheduler.schedule)
+	webhooks := events.NewWebhookStore(sender, nil)
+	enqueuer := &inlineEventEnqueuer{store: webhooks}
+	webhooks.SetEnqueuer(enqueuer)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(ContractRequestIDMiddleware())
@@ -186,7 +184,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 		engine: router, store: store, dir: dir, ws: ws, tasks: tasks,
 		boards: boardsStore, boardID: boardID,
 		lib: lib, eventLog: eventLog, webhooks: webhooks, sender: sender,
-		scheduler: scheduler, holder: holder, materializer: materializer,
+		enqueuer: enqueuer, holder: holder, materializer: materializer,
 	}
 }
 
@@ -499,9 +497,9 @@ func TestV1EventSubscriptionCRUD(t *testing.T) {
 		t.Fatalf("subscription id = %q, want sub_...", subID)
 	}
 	secretHex, _ := data["secret"].(string)
-	secretBytes, err := hex.DecodeString(secretHex)
-	if err != nil || len(secretBytes) == 0 {
-		t.Fatalf("minted secret must be hex-encoded once, got %q", secretHex)
+	secretBytes, ok := events.ParseWhsecSecret([]byte(secretHex))
+	if !ok || len(secretBytes) == 0 {
+		t.Fatalf("minted secret must be whsec_-form once, got %q", secretHex)
 	}
 	if subscription["has_secret"] != true {
 		t.Fatalf("view must report has_secret: %v", subscription)
@@ -526,7 +524,7 @@ func TestV1EventSubscriptionCRUD(t *testing.T) {
 	}
 	// Provided secrets never appear in any view.
 	status, _ = eventIDEM(t, fx.engine, http.MethodPost, fx.subscriptionsPath(), 2, "evt-sub-2",
-		`{"data":{"url":"https://hooks.example.com/y","secret":"provided-secret-123456"}}`, nil)
+		`{"data":{"url":"https://hooks.example.com/y","secret":"whsec_cHJvdmlkZWQtc2VjcmV0LTEyMzQ1Ng=="}}`, nil)
 	if status != http.StatusCreated {
 		t.Fatalf("provided-secret create = %d, want 201", status)
 	}
@@ -593,11 +591,17 @@ func TestV1WebhookDispatchVerifiesSignature(t *testing.T) {
 		if err := events.ValidateV1Envelope(envelope); err != nil {
 			t.Fatalf("delivery %d envelope invalid: %v", i, err)
 		}
-		if err := events.VerifyWebhookSignature(stored.Secret, body, headers[i], now); err != nil {
+		if err := events.VerifyWebhookSignature([]byte(events.FormatWhsecSecret(stored.Secret)), body, headers[i], now); err != nil {
 			t.Fatalf("delivery %d signature rejected: %v", i, err)
 		}
-		if headers[i]["X-Webhook-Delivery-Id"] != envelope.ID {
-			t.Fatalf("delivery id header = %q, want %q", headers[i]["X-Webhook-Delivery-Id"], envelope.ID)
+		if headers[i]["svix-id"] != envelope.ID {
+			t.Fatalf("delivery id header = %q, want %q", headers[i]["svix-id"], envelope.ID)
+		}
+		if !strings.HasPrefix(headers[i]["svix-signature"], "v1,") {
+			t.Fatalf("delivery %d svix-signature = %q, want v1,<base64>", i, headers[i]["svix-signature"])
+		}
+		if _, ok := headers[i]["svix-timestamp"]; !ok {
+			t.Fatalf("delivery %d missing svix-timestamp", i)
 		}
 	}
 }

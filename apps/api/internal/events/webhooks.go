@@ -3,25 +3,25 @@ package events
 // Signed webhook subscriptions (issue #807).
 //
 // Model: a workspace-scoped subscription carries a destination URL, an
-// event-type filter (empty = all frozen types), a signing secret, and
+// event-type filter (omitted = all frozen types), a signing secret, and
 // delivery state. Reads never expose the secret plaintext: views carry
 // has_secret only; the plaintext is returned exactly once at creation
 // and only when server-minted.
 //
-// Delivery: POST the v1 envelope JSON with X-Webhook-Signature
-// (hex HMAC-SHA256 over "<timestamp>.<raw-body>"), X-Webhook-Timestamp
-// (unix seconds), X-Webhook-Delivery-Id (evt_ id), and
-// X-Webhook-Attempt (1-based). Receivers accept timestamps within
-// webhookTimestampTolerance (5 minutes).
+// Delivery: POST the v1 envelope JSON with Svix-compatible signature
+// headers: svix-id (the evt_ delivery id, stable across retries),
+// svix-timestamp (unix seconds), and svix-signature ("v1,<base64>"
+// HMAC-SHA256 over "<id>.<timestamp>.<raw-body>", space-delimited to
+// allow rotation entries). Secrets travel in whsec_ form
+// ("whsec_" + base64 of the raw key); the store keeps raw key bytes.
+// Receivers accept timestamps within webhookTimestampTolerance
+// (5 minutes).
 //
-// Retry/backoff: maxAttempts (8) with base 30s doubling capped at 1h.
-// Attempt history is an in-memory ring (20 per subscription); after the
-// budget is exhausted the subscription moves to dead_letter and the
-// envelope lands in the dead-letter list (cap 100, oldest evicted).
-// Retry scheduling is driven by the injected scheduler (production:
-// time.AfterFunc; tests: manual) so retry-then-DLQ is deterministic.
-// Durable subscription + outbox rows land with #809; until then this
-// store is process-local (documented in the OpenAPI events delta).
+// Retry/backoff: one webhook_deliver River job per delivery with
+// MaxAttempts (8). The worker-level NextRetry keeps the 30s-base
+// doubling curve capped at 1h and adds +/-10% jitter. Attempt history and
+// dead-letter state are persisted by the injected WebhookPersistence
+// adapter; the in-memory projection is only a cache for the HTTP surface.
 //
 // Provider inbound webhooks (Stripe) stay distinct integrations that
 // emit internal events; they never flow through this dispatcher.
@@ -33,10 +33,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -56,10 +57,11 @@ const (
 	webhookDeadLetterCap      = 100
 	webhookMaxSubscriptions   = 50
 	webhookMinSecretLength    = 16
-	webhookSignatureHeader    = "X-Webhook-Signature"
-	webhookTimestampHeader    = "X-Webhook-Timestamp"
-	webhookDeliveryIDHeader   = "X-Webhook-Delivery-Id"
-	webhookAttemptHeader      = "X-Webhook-Attempt"
+	webhookSecretPrefix       = "whsec_"
+	svixIDHeader              = "svix-id"
+	svixTimestampHeader       = "svix-timestamp"
+	svixSignatureHeader       = "svix-signature"
+	webhookSignatureVersion   = "v1"
 	webhookSubscriptionPrefix = "sub_"
 )
 
@@ -126,35 +128,123 @@ type WebhookSender interface {
 	Send(ctx context.Context, destination string, headers map[string]string, body []byte) (int, error)
 }
 
-// WebhookScheduler defers retries. Production uses time.AfterFunc;
-// tests drive retries manually.
-type WebhookScheduler func(delay time.Duration, fn func())
-
-// AfterFuncScheduler is the production scheduler.
-func AfterFuncScheduler(delay time.Duration, fn func()) {
-	timer := time.AfterFunc(delay, fn)
-	_ = timer
+// WebhookPersistence is the durable subscription and delivery boundary.
+type WebhookPersistence interface {
+	CreateSubscription(context.Context, *WebhookSubscription) error
+	DeleteSubscription(context.Context, string, string) error
+	LoadSubscriptions(context.Context) ([]*WebhookSubscription, error)
+	LoadSubscription(context.Context, string) (*WebhookSubscription, error)
+	EnsureDelivery(context.Context, V1Envelope, string) error
+	PendingDeliveries(context.Context) ([]WebhookDeliveryArgs, error)
+	RecordAttempt(context.Context, string, V1Envelope, WebhookAttempt, bool) error
+	MarkDelivered(context.Context, string, V1Envelope) error
 }
 
 // WebhookStore owns subscriptions + dispatch for one process.
+// Deliveries are scheduled through the injected enqueuer (production:
+// the shared River client; tests: fakes). A nil enqueuer drops
+// dispatches with a warning, mirroring the nil-EventBus seam.
 type WebhookStore struct {
 	mu          sync.Mutex
 	subs        map[string]*WebhookSubscription
 	byWorkspace map[string][]string
 	sender      WebhookSender
-	scheduler   WebhookScheduler
+	enqueuer    WebhookEnqueuer
+	persistence WebhookPersistence
 	now         func() time.Time
 }
 
-// NewWebhookStore builds a store dispatching via sender.
-func NewWebhookStore(sender WebhookSender, scheduler WebhookScheduler) *WebhookStore {
-	if scheduler == nil {
-		scheduler = AfterFuncScheduler
-	}
+// NewWebhookStore builds a store dispatching via sender and enqueuer.
+func NewWebhookStore(sender WebhookSender, enqueuer WebhookEnqueuer) *WebhookStore {
 	return &WebhookStore{
 		subs: map[string]*WebhookSubscription{}, byWorkspace: map[string][]string{},
-		sender: sender, scheduler: scheduler, now: time.Now,
+		sender: sender, enqueuer: enqueuer, now: time.Now,
 	}
+}
+
+// SetPersistence attaches the durable adapter at the composition root.
+func (s *WebhookStore) SetPersistence(persistence WebhookPersistence) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.persistence = persistence
+}
+
+// LoadFromPersistence refreshes the process-local projection after startup.
+func (s *WebhookStore) LoadFromPersistence(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	persistence := s.persistence
+	s.mu.Unlock()
+	if persistence == nil {
+		return nil
+	}
+	subs, err := persistence.LoadSubscriptions(ctx)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, sub := range subs {
+		if sub == nil {
+			continue
+		}
+		if sub.Delivered == nil {
+			sub.Delivered = map[string]struct{}{}
+		}
+		s.subs[sub.ID] = sub
+		found := false
+		for _, id := range s.byWorkspace[sub.WorkspaceID] {
+			if id == sub.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.byWorkspace[sub.WorkspaceID] = append(s.byWorkspace[sub.WorkspaceID], sub.ID)
+		}
+	}
+	return nil
+}
+
+// ReconcilePending re-enqueues durable deliveries left behind by an enqueue
+// failure or a process crash between commit and River insertion.
+func (s *WebhookStore) ReconcilePending(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	persistence, enqueuer := s.persistence, s.enqueuer
+	s.mu.Unlock()
+	if persistence == nil || enqueuer == nil {
+		return nil
+	}
+	deliveries, err := persistence.PendingDeliveries(ctx)
+	if err != nil {
+		return err
+	}
+	for _, args := range deliveries {
+		if _, err := enqueuer.Insert(ctx, args, WebhookDeliveryInsertOpts(args)); err != nil {
+			slog.Warn("webhook pending reconciliation enqueue failed", "subscription", args.SubscriptionID, "delivery_id", args.DeliveryID, "err", err)
+		}
+	}
+	return nil
+}
+
+// SetEnqueuer attaches the River-backed enqueuer after construction.
+// The composition root uses it because the River client needs the
+// worker at registration while the worker needs this store first.
+func (s *WebhookStore) SetEnqueuer(enqueuer WebhookEnqueuer) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.enqueuer = enqueuer
 }
 
 // SetClockForTests injects a deterministic clock.
@@ -213,6 +303,55 @@ func mintWebhookSecret() ([]byte, error) {
 	return buf, nil
 }
 
+// FormatWhsecSecret renders raw key bytes for exactly-once transport:
+// "whsec_" + base64. Minted secrets are stored raw and only rendered
+// in this form at creation; reads never carry them.
+func FormatWhsecSecret(raw []byte) string {
+	return webhookSecretPrefix + base64.StdEncoding.EncodeToString(raw)
+}
+
+// ParseWhsecSecret decodes a whsec_-form secret to raw key bytes.
+// ok=false when the input is not whsec_-formed or is mis-encoded.
+func ParseWhsecSecret(input []byte) ([]byte, bool) {
+	trimmed := strings.TrimSpace(string(input))
+	if !strings.HasPrefix(trimmed, webhookSecretPrefix) {
+		return nil, false
+	}
+	payload := strings.TrimSpace(strings.TrimPrefix(trimmed, webhookSecretPrefix))
+	if payload == "" {
+		return nil, false
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(payload); err == nil {
+		return decoded, true
+	}
+	decoded, err := base64.RawStdEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, false
+	}
+	return decoded, true
+}
+
+// validateWebhookSecret accepts only the Svix whsec_ transport form.
+func validateWebhookSecret(secret []byte) error {
+	if decoded, ok := ParseWhsecSecret(secret); ok {
+		if len(decoded) < webhookMinSecretLength {
+			return fmt.Errorf("events: webhook secret must decode to at least %d bytes", webhookMinSecretLength)
+		}
+		return nil
+	}
+	return fmt.Errorf("events: webhook secret must use whsec_ form")
+}
+
+// webhookSigningKey resolves the HMAC key from a whsec_ secret.
+func webhookSigningKey(secret []byte) []byte {
+	if decoded, ok := ParseWhsecSecret(secret); ok {
+		return decoded
+	}
+	// The store keeps decoded key bytes in memory; only public inputs are
+	// required to use the whsec_ representation.
+	return secret
+}
+
 // Create registers a subscription. Empty secret mints one (returned once
 // via minted=true); provided secrets must be >= 16 chars. Empty
 // eventTypes means all frozen types.
@@ -238,6 +377,9 @@ func (s *WebhookStore) Create(ctx context.Context, workspaceID, destination stri
 		}
 		normalized = append(normalized, trimmed)
 	}
+	if len(normalized) == 0 {
+		normalized = V1EventTypes()
+	}
 	minted := false
 	if len(secret) == 0 {
 		generated, err := mintWebhookSecret()
@@ -246,17 +388,16 @@ func (s *WebhookStore) Create(ctx context.Context, workspaceID, destination stri
 		}
 		secret = generated
 		minted = true
-	} else if len(secret) < webhookMinSecretLength {
-		return nil, nil, false, fmt.Errorf("events: webhook secret must be at least %d bytes", webhookMinSecretLength)
+	} else if err := validateWebhookSecret(secret); err != nil {
+		return nil, nil, false, err
+	}
+	if !minted {
+		decoded, _ := ParseWhsecSecret(secret)
+		secret = decoded
 	}
 	id, err := contract.MintPublicID(webhookSubscriptionPrefix, 12)
 	if err != nil {
 		return nil, nil, false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.byWorkspace[workspaceID]) >= webhookMaxSubscriptions {
-		return nil, nil, false, fmt.Errorf("events: too many webhook subscriptions for workspace")
 	}
 	now := s.clock()
 	storedSecret := append([]byte(nil), secret...)
@@ -265,6 +406,17 @@ func (s *WebhookStore) Create(ctx context.Context, workspaceID, destination stri
 		EventTypes: append([]string(nil), normalized...), Secret: storedSecret,
 		Status: WebhookStatusActive, CreatedAt: now, UpdatedAt: now,
 		Delivered: map[string]struct{}{},
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.byWorkspace[workspaceID]) >= webhookMaxSubscriptions {
+		return nil, nil, false, fmt.Errorf("events: too many webhook subscriptions for workspace")
+	}
+	persistence := s.persistence
+	if persistence != nil {
+		if err := persistence.CreateSubscription(ctx, sub); err != nil {
+			return nil, nil, false, err
+		}
 	}
 	s.subs[id] = sub
 	s.byWorkspace[workspaceID] = append(s.byWorkspace[workspaceID], id)
@@ -305,16 +457,22 @@ func (s *WebhookStore) List(workspaceID string) []WebhookView {
 }
 
 // Delete removes the subscription when it belongs to the workspace.
-func (s *WebhookStore) Delete(workspaceID, id string) bool {
+func (s *WebhookStore) Delete(ctx context.Context, workspaceID, id string) (bool, error) {
 	if s == nil {
-		return false
+		return false, nil
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	workspaceID = strings.TrimSpace(workspaceID)
 	sub, ok := s.subs[strings.TrimSpace(id)]
 	if !ok || sub.WorkspaceID != workspaceID {
-		return false
+		return false, nil
+	}
+	persistence := s.persistence
+	if persistence != nil {
+		if err := persistence.DeleteSubscription(ctx, workspaceID, sub.ID); err != nil {
+			return false, err
+		}
 	}
 	delete(s.subs, sub.ID)
 	kept := s.byWorkspace[workspaceID][:0]
@@ -324,7 +482,7 @@ func (s *WebhookStore) Delete(workspaceID, id string) bool {
 		}
 	}
 	s.byWorkspace[workspaceID] = kept
-	return true
+	return true, nil
 }
 
 func maskSubscription(sub *WebhookSubscription) WebhookView {
@@ -361,33 +519,39 @@ func (sub *WebhookSubscription) Matches(typ string) bool {
 	return false
 }
 
-// SignWebhook builds the signature + timestamp headers for a body.
-func SignWebhook(secret, body []byte, at time.Time) map[string]string {
+// SignWebhook builds the Svix-compatible signature headers for a body:
+// svix-id carries the delivery id (evt_, stable across retries),
+// svix-timestamp the unix-second signing time, and svix-signature
+// "v1,<base64>" HMAC-SHA256 over "<id>.<timestamp>.<raw-body>" keyed
+// by the whsec_-decoded secret.
+func SignWebhook(secret, body []byte, deliveryID string, at time.Time) map[string]string {
 	stamp := strconv.FormatInt(at.UTC().Unix(), 10)
-	mac := hmac.New(sha256.New, secret)
+	mac := hmac.New(sha256.New, webhookSigningKey(secret))
+	_, _ = mac.Write([]byte(deliveryID + "."))
 	_, _ = mac.Write([]byte(stamp + "."))
 	_, _ = mac.Write(body)
 	return map[string]string{
-		webhookSignatureHeader: hex.EncodeToString(mac.Sum(nil)),
-		webhookTimestampHeader: stamp,
+		svixIDHeader:        deliveryID,
+		svixTimestampHeader: stamp,
+		svixSignatureHeader: webhookSignatureVersion + "," + base64.StdEncoding.EncodeToString(mac.Sum(nil)),
 	}
 }
 
-// VerifyWebhookSignature verifies hex HMAC-SHA256 over
-// "<timestamp>.<raw-body>" with timestamp tolerance. It compares in
-// constant time and rejects empty secrets.
+// VerifyWebhookSignature verifies the Svix-compatible headers (svix-id,
+// svix-timestamp, svix-signature) with timestamp tolerance. At least
+// one space-delimited v1,<base64> entry must match HMAC-SHA256 over
+// "<id>.<timestamp>.<raw-body>". Comparison is constant time and empty
+// secrets are rejected.
 func VerifyWebhookSignature(secret, body []byte, headers map[string]string, now time.Time) error {
-	if len(secret) == 0 {
-		return fmt.Errorf("events: webhook secret is required")
+	decoded, ok := ParseWhsecSecret(secret)
+	if !ok || len(decoded) < webhookMinSecretLength {
+		return fmt.Errorf("events: webhook secret must use whsec_ form")
 	}
-	signature := strings.TrimSpace(headerLookup(headers, webhookSignatureHeader))
-	stamp := strings.TrimSpace(headerLookup(headers, webhookTimestampHeader))
-	if signature == "" || stamp == "" {
+	deliveryID := strings.TrimSpace(headerLookup(headers, svixIDHeader))
+	stamp := strings.TrimSpace(headerLookup(headers, svixTimestampHeader))
+	signature := strings.TrimSpace(headerLookup(headers, svixSignatureHeader))
+	if deliveryID == "" || stamp == "" || signature == "" {
 		return fmt.Errorf("events: webhook signature headers are required")
-	}
-	decoded, err := hex.DecodeString(signature)
-	if err != nil || len(decoded) != sha256.Size {
-		return fmt.Errorf("events: webhook signature is malformed")
 	}
 	unix, err := strconv.ParseInt(stamp, 10, 64)
 	if err != nil {
@@ -401,13 +565,25 @@ func VerifyWebhookSignature(secret, body []byte, headers map[string]string, now 
 	if drift > webhookTimestampTolerance {
 		return fmt.Errorf("events: webhook timestamp outside tolerance")
 	}
-	mac := hmac.New(sha256.New, secret)
+	mac := hmac.New(sha256.New, decoded)
+	_, _ = mac.Write([]byte(deliveryID + "."))
 	_, _ = mac.Write([]byte(stamp + "."))
 	_, _ = mac.Write(body)
-	if subtle.ConstantTimeCompare(decoded, mac.Sum(nil)) != 1 {
-		return fmt.Errorf("events: webhook signature mismatch")
+	expected := mac.Sum(nil)
+	for _, candidate := range strings.Fields(signature) {
+		tag, payload, found := strings.Cut(candidate, ",")
+		if !found || strings.TrimSpace(tag) != webhookSignatureVersion {
+			continue
+		}
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(payload))
+		if err != nil {
+			continue
+		}
+		if subtle.ConstantTimeCompare(decoded, expected) == 1 {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("events: webhook signature mismatch")
 }
 
 func headerLookup(headers map[string]string, name string) string {
@@ -438,10 +614,12 @@ func WebhookRetryDelay(attempt int) time.Duration {
 	return delay
 }
 
-// Dispatch delivers the envelope to every matching subscription of the
-// workspace: attempt #1 runs inline (best-effort, sender timeout owns
-// latency); failures schedule retries via the injected scheduler.
-// Duplicate envelope ids per subscription collapse (dedup).
+// Dispatch enqueues one webhook_deliver job per matching subscription
+// of the workspace. Per-subscription type filtering and duplicate
+// envelope collapse (dedup) happen here; River owns every attempt
+// (including the first) and its retries. Enqueue never fails the
+// caller: failures are logged and dropped, mirroring the NATS publish
+// seam (emission follows the domain commit).
 func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
 	if s == nil {
 		return
@@ -450,7 +628,7 @@ func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
 		return
 	}
 	s.mu.Lock()
-	targets := []*WebhookSubscription{}
+	targets := []string{}
 	for _, id := range s.byWorkspace[envelope.WorkspaceID] {
 		sub, ok := s.subs[id]
 		if !ok || sub.Status == WebhookStatusDeadLetter {
@@ -462,49 +640,97 @@ func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
 		if _, dup := sub.Delivered[envelope.ID]; dup {
 			continue
 		}
-		targets = append(targets, sub)
+		targets = append(targets, sub.ID)
 	}
+	enqueuer := s.enqueuer
+	persistence := s.persistence
 	s.mu.Unlock()
-	for _, sub := range targets {
-		s.attempt(ctx, sub.ID, envelope, 1)
+	for _, subscriptionID := range targets {
+		if persistence != nil {
+			if err := persistence.EnsureDelivery(ctx, envelope, subscriptionID); err != nil {
+				slog.Warn("webhook durable delivery creation failed", "subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+				continue
+			}
+		}
+		if enqueuer == nil {
+			slog.Warn("webhook dispatch has no enqueuer; durable delivery remains pending", "delivery_id", envelope.ID, "subscription", subscriptionID)
+			continue
+		}
+		args := WebhookDeliveryArgs{
+			SubscriptionID: subscriptionID, DeliveryID: envelope.ID, Envelope: envelope,
+		}
+		if _, err := enqueuer.Insert(ctx, args, WebhookDeliveryInsertOpts(args)); err != nil {
+			slog.Warn("webhook enqueue failed",
+				"subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+		}
 	}
 }
 
-func (s *WebhookStore) attempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt int) {
+// executeDeliveryAttempt performs ONE signed delivery attempt for the
+// River worker. Nil means delivered or dropped without retry
+// (unknown/deleted subscription, dead-lettered subscription, or a
+// delivery already marked Delivered). A returned error asks River to
+// retry; on budget exhaustion the live DLQ entry is parked first so
+// the discarded job row and the read surface agree.
+func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts int) error {
+	if maxAttempts <= 0 {
+		maxAttempts = webhookMaxAttempts
+	}
+	if attempt < 1 {
+		attempt = 1
+	}
 	s.mu.Lock()
 	sub, ok := s.subs[subscriptionID]
-	if !ok || sub.Status == WebhookStatusDeadLetter {
+	persistence := s.persistence
+	s.mu.Unlock()
+	if !ok && persistence != nil {
+		loaded, loadErr := persistence.LoadSubscription(ctx, subscriptionID)
+		if loadErr != nil {
+			return fmt.Errorf("events: load webhook subscription %s: %w", subscriptionID, loadErr)
+		}
+		if loaded != nil {
+			s.mu.Lock()
+			s.subs[subscriptionID] = loaded
+			s.byWorkspace[loaded.WorkspaceID] = appendIfMissing(s.byWorkspace[loaded.WorkspaceID], subscriptionID)
+			sub, ok = loaded, true
+			s.mu.Unlock()
+		}
+	}
+	s.mu.Lock()
+	if !ok || sub.Status == WebhookStatusDeadLetter || sub.WorkspaceID != envelope.WorkspaceID {
 		s.mu.Unlock()
-		return
+		return nil
 	}
 	if _, dup := sub.Delivered[envelope.ID]; dup {
 		s.mu.Unlock()
-		return
+		return nil
 	}
 	body, err := json.Marshal(envelope)
 	s.mu.Unlock()
 	if err != nil {
-		s.recordAttempt(subscriptionID, envelope, attempt, 0, "failed", err.Error())
-		s.afterAttempt(subscriptionID, envelope, attempt, err.Error())
-		return
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, "failed", err.Error())
+		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, err.Error())
 	}
 	s.mu.Lock()
 	secret := append([]byte(nil), sub.Secret...)
 	destination := sub.URL
 	s.mu.Unlock()
-	headers := SignWebhook(secret, body, s.clock())
-	headers[webhookDeliveryIDHeader] = envelope.ID
-	headers[webhookAttemptHeader] = strconv.Itoa(attempt)
+	headers := SignWebhook(secret, body, envelope.ID, s.clock())
 	sender := s.sender
 	if sender == nil {
-		s.recordAttempt(subscriptionID, envelope, attempt, 0, "failed", "no sender configured")
-		s.afterAttempt(subscriptionID, envelope, attempt, "no sender configured")
-		return
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, "failed", "no sender configured")
+		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, "no sender configured")
 	}
 	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	status, sendErr := sender.Send(sendCtx, destination, headers, body)
 	cancel()
 	if sendErr == nil && status >= 200 && status < 300 {
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, "delivered", "")
+		if persistence != nil {
+			if err := persistence.MarkDelivered(ctx, subscriptionID, envelope); err != nil {
+				return fmt.Errorf("events: persist delivered webhook: %w", err)
+			}
+		}
 		s.mu.Lock()
 		if current, ok := s.subs[subscriptionID]; ok {
 			current.Delivered[envelope.ID] = struct{}{}
@@ -514,8 +740,7 @@ func (s *WebhookStore) attempt(ctx context.Context, subscriptionID string, envel
 			current.UpdatedAt = s.clock()
 		}
 		s.mu.Unlock()
-		s.recordAttempt(subscriptionID, envelope, attempt, status, "delivered", "")
-		return
+		return nil
 	}
 	detail := ""
 	if sendErr != nil {
@@ -523,11 +748,50 @@ func (s *WebhookStore) attempt(ctx context.Context, subscriptionID string, envel
 	} else {
 		detail = fmt.Sprintf("unexpected status %d", status)
 	}
-	s.recordAttempt(subscriptionID, envelope, attempt, status, "failed", detail)
-	s.afterAttempt(subscriptionID, envelope, attempt, detail)
+	s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, "failed", detail)
+	return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, detail)
 }
 
-func (s *WebhookStore) recordAttempt(subscriptionID string, envelope V1Envelope, attempt, status int, outcome, detail string) {
+// deliveryFailure parks the live DLQ entry once the budget is
+// exhausted and always returns the failure for River (retry, then
+// discard on the final attempt).
+func (s *WebhookStore) deliveryFailure(subscriptionID string, envelope V1Envelope, attempt, maxAttempts int, detail string) error {
+	if attempt >= maxAttempts {
+		s.parkDeadLetterOnce(subscriptionID, envelope, attempt, detail)
+	}
+	return fmt.Errorf("events: webhook delivery %s attempt %d/%d failed: %s",
+		envelope.ID, attempt, maxAttempts, detail)
+}
+
+// parkDeadLetterOnce moves the subscription to dead_letter and parks
+// the envelope exactly once per delivery id, so worker redelivery
+// after a restart never double-parks.
+func (s *WebhookStore) parkDeadLetterOnce(subscriptionID string, envelope V1Envelope, attempts int, lastError string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sub, ok := s.subs[subscriptionID]
+	if !ok {
+		return
+	}
+	for _, parked := range sub.DeadLetter {
+		if parked.DeliveryID == envelope.ID {
+			sub.Status = WebhookStatusDeadLetter
+			sub.UpdatedAt = s.clock()
+			return
+		}
+	}
+	sub.Status = WebhookStatusDeadLetter
+	sub.DeadLetter = append(sub.DeadLetter, WebhookDeadLetter{
+		DeliveryID: envelope.ID, EventType: envelope.Type,
+		Attempts: attempts, LastError: lastError, At: s.clock(),
+	})
+	for len(sub.DeadLetter) > webhookDeadLetterCap {
+		sub.DeadLetter = append([]WebhookDeadLetter(nil), sub.DeadLetter[1:]...)
+	}
+	sub.UpdatedAt = s.clock()
+}
+
+func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts, status int, outcome, detail string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sub, ok := s.subs[subscriptionID]
@@ -545,39 +809,21 @@ func (s *WebhookStore) recordAttempt(subscriptionID string, envelope V1Envelope,
 		sub.Status = WebhookStatusDegraded
 	}
 	sub.UpdatedAt = s.clock()
+	if s.persistence != nil {
+		fact := WebhookAttempt{DeliveryID: envelope.ID, Attempt: attempt, StatusCode: status, Outcome: outcome, Error: detail, At: s.clock()}
+		if err := s.persistence.RecordAttempt(ctx, subscriptionID, envelope, fact, attempt >= maxAttempts); err != nil {
+			slog.Warn("webhook durable attempt record failed", "subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+		}
+	}
 }
 
-func (s *WebhookStore) afterAttempt(subscriptionID string, envelope V1Envelope, attempt int, lastError string) {
-	s.mu.Lock()
-	sub, ok := s.subs[subscriptionID]
-	if !ok {
-		s.mu.Unlock()
-		return
-	}
-	if attempt >= webhookMaxAttempts {
-		sub.Status = WebhookStatusDeadLetter
-		sub.DeadLetter = append(sub.DeadLetter, WebhookDeadLetter{
-			DeliveryID: envelope.ID, EventType: envelope.Type,
-			Attempts: attempt, LastError: lastError, At: s.clock(),
-		})
-		for len(sub.DeadLetter) > webhookDeadLetterCap {
-			sub.DeadLetter = append([]WebhookDeadLetter(nil), sub.DeadLetter[1:]...)
+func appendIfMissing(ids []string, id string) []string {
+	for _, candidate := range ids {
+		if candidate == id {
+			return ids
 		}
-		sub.UpdatedAt = s.clock()
-		s.mu.Unlock()
-		return
 	}
-	next := attempt + 1
-	delay := WebhookRetryDelay(next)
-	scheduler := s.scheduler
-	s.mu.Unlock()
-	if scheduler == nil {
-		return
-	}
-	nextEnvelope := envelope
-	scheduler(delay, func() {
-		s.attempt(context.Background(), subscriptionID, nextEnvelope, next)
-	})
+	return append(ids, id)
 }
 
 func failureCount(sub *WebhookSubscription) int {

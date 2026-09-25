@@ -47,8 +47,7 @@ import type {
   WorkspaceUsageEnvelope,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -62,9 +61,9 @@ export const getGetWorkspaceBillingAccountUrl = (workspaceId: string) => {
  */
 export const getWorkspaceBillingAccount = async (
   workspaceId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceBillingAccountEnvelope> => {
-  return orvalMutator<WorkspaceBillingAccountEnvelope>(
+  return publicMutator<WorkspaceBillingAccountEnvelope>(
     getGetWorkspaceBillingAccountUrl(workspaceId),
     {
       ...options,
@@ -79,14 +78,14 @@ export const getGetWorkspaceBillingAccountQueryKey = (workspaceId: MaybeRefOrGet
 
 export const getGetWorkspaceBillingAccountQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceBillingAccount>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBillingAccount>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -108,9 +107,8 @@ export const getGetWorkspaceBillingAccountQueryOptions = <
 export type GetWorkspaceBillingAccountQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceBillingAccount>>
 >
-export type GetWorkspaceBillingAccountQueryError = ErrorType<
+export type GetWorkspaceBillingAccountQueryError =
   UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
->
 
 /**
  * @summary Get the implicit per-workspace billing account (members only)
@@ -118,14 +116,14 @@ export type GetWorkspaceBillingAccountQueryError = ErrorType<
 
 export function useGetWorkspaceBillingAccount<
   TData = Awaited<ReturnType<typeof getWorkspaceBillingAccount>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceBillingAccount>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -150,9 +148,9 @@ export const getGetWorkspaceCreditsBalanceUrl = (workspaceId: string) => {
  */
 export const getWorkspaceCreditsBalance = async (
   workspaceId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceCreditsBalanceEnvelope> => {
-  return orvalMutator<WorkspaceCreditsBalanceEnvelope>(
+  return publicMutator<WorkspaceCreditsBalanceEnvelope>(
     getGetWorkspaceCreditsBalanceUrl(workspaceId),
     {
       ...options,
@@ -167,14 +165,14 @@ export const getGetWorkspaceCreditsBalanceQueryKey = (workspaceId: MaybeRefOrGet
 
 export const getGetWorkspaceCreditsBalanceQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceCreditsBalance>>,
-  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TError = UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceCreditsBalance>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -196,9 +194,8 @@ export const getGetWorkspaceCreditsBalanceQueryOptions = <
 export type GetWorkspaceCreditsBalanceQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceCreditsBalance>>
 >
-export type GetWorkspaceCreditsBalanceQueryError = ErrorType<
+export type GetWorkspaceCreditsBalanceQueryError =
   UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
->
 
 /**
  * @summary Get workspace credits balance (members only)
@@ -206,14 +203,14 @@ export type GetWorkspaceCreditsBalanceQueryError = ErrorType<
 
 export function useGetWorkspaceCreditsBalance<
   TData = Awaited<ReturnType<typeof getWorkspaceCreditsBalance>>,
-  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TError = UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceCreditsBalance>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -254,9 +251,9 @@ export const getListWorkspaceCreditsLedgerUrl = (
 export const listWorkspaceCreditsLedger = async (
   workspaceId: string,
   params?: ListWorkspaceCreditsLedgerParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedCreditsLedger> => {
-  return orvalMutator<PaginatedCreditsLedger>(
+  return publicMutator<PaginatedCreditsLedger>(
     getListWorkspaceCreditsLedgerUrl(workspaceId, params),
     {
       ...options,
@@ -274,7 +271,7 @@ export const getListWorkspaceCreditsLedgerQueryKey = (
 
 export const getListWorkspaceCreditsLedgerQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceCreditsLedger>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceCreditsLedgerParams>,
@@ -282,7 +279,7 @@ export const getListWorkspaceCreditsLedgerQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceCreditsLedger>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -305,9 +302,8 @@ export const getListWorkspaceCreditsLedgerQueryOptions = <
 export type ListWorkspaceCreditsLedgerQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceCreditsLedger>>
 >
-export type ListWorkspaceCreditsLedgerQueryError = ErrorType<
+export type ListWorkspaceCreditsLedgerQueryError =
   BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse
->
 
 /**
  * @summary List immutable credits ledger entries (members only)
@@ -315,7 +311,7 @@ export type ListWorkspaceCreditsLedgerQueryError = ErrorType<
 
 export function useListWorkspaceCreditsLedger<
   TData = Awaited<ReturnType<typeof listWorkspaceCreditsLedger>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceCreditsLedgerParams>,
@@ -323,7 +319,7 @@ export function useListWorkspaceCreditsLedger<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceCreditsLedger>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -364,9 +360,9 @@ export const getListWorkspaceBillingRecordsUrl = (
 export const listWorkspaceBillingRecords = async (
   workspaceId: string,
   params?: ListWorkspaceBillingRecordsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedBillingRecords> => {
-  return orvalMutator<PaginatedBillingRecords>(
+  return publicMutator<PaginatedBillingRecords>(
     getListWorkspaceBillingRecordsUrl(workspaceId, params),
     {
       ...options,
@@ -384,7 +380,7 @@ export const getListWorkspaceBillingRecordsQueryKey = (
 
 export const getListWorkspaceBillingRecordsQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceBillingRecords>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceBillingRecordsParams>,
@@ -392,7 +388,7 @@ export const getListWorkspaceBillingRecordsQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceBillingRecords>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -418,9 +414,8 @@ export const getListWorkspaceBillingRecordsQueryOptions = <
 export type ListWorkspaceBillingRecordsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceBillingRecords>>
 >
-export type ListWorkspaceBillingRecordsQueryError = ErrorType<
+export type ListWorkspaceBillingRecordsQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
->
 
 /**
  * @summary List caller-owned billing records (members only)
@@ -428,7 +423,7 @@ export type ListWorkspaceBillingRecordsQueryError = ErrorType<
 
 export function useListWorkspaceBillingRecords<
   TData = Awaited<ReturnType<typeof listWorkspaceBillingRecords>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceBillingRecordsParams>,
@@ -436,7 +431,7 @@ export function useListWorkspaceBillingRecords<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceBillingRecords>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -474,9 +469,9 @@ export const getGetWorkspaceUsageUrl = (workspaceId: string, params?: GetWorkspa
 export const getWorkspaceUsage = async (
   workspaceId: string,
   params?: GetWorkspaceUsageParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceUsageEnvelope> => {
-  return orvalMutator<WorkspaceUsageEnvelope>(getGetWorkspaceUsageUrl(workspaceId, params), {
+  return publicMutator<WorkspaceUsageEnvelope>(getGetWorkspaceUsageUrl(workspaceId, params), {
     ...options,
     method: 'GET',
   })
@@ -491,15 +486,13 @@ export const getGetWorkspaceUsageQueryKey = (
 
 export const getGetWorkspaceUsageQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceUsage>>,
-  TError = ErrorType<
-    UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope
-  >,
+  TError = UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<GetWorkspaceUsageParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUsage>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -520,9 +513,8 @@ export const getGetWorkspaceUsageQueryOptions = <
 export type GetWorkspaceUsageQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceUsage>>
 >
-export type GetWorkspaceUsageQueryError = ErrorType<
+export type GetWorkspaceUsageQueryError =
   UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope
->
 
 /**
  * @summary Get current workspace usage snapshot (members only)
@@ -530,15 +522,13 @@ export type GetWorkspaceUsageQueryError = ErrorType<
 
 export function useGetWorkspaceUsage<
   TData = Awaited<ReturnType<typeof getWorkspaceUsage>>,
-  TError = ErrorType<
-    UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope
-  >,
+  TError = UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<GetWorkspaceUsageParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUsage>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -564,7 +554,7 @@ export const getCreateWorkspaceCheckoutSessionUrl = (workspaceId: string) => {
 export const createWorkspaceCheckoutSession = async (
   workspaceId: string,
   createWorkspaceCheckoutRequest: CreateWorkspaceCheckoutRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceCheckoutSessionEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -585,7 +575,7 @@ export const createWorkspaceCheckoutSession = async (
     }
     return headers
   }
-  return orvalMutator<WorkspaceCheckoutSessionEnvelope>(
+  return publicMutator<WorkspaceCheckoutSessionEnvelope>(
     getCreateWorkspaceCheckoutSessionUrl(workspaceId),
     {
       ...options,
@@ -600,13 +590,12 @@ export const getCreateWorkspaceCheckoutSessionMutationKey = () =>
   ['createWorkspaceCheckoutSession'] as const
 
 export const getCreateWorkspaceCheckoutSessionMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -615,7 +604,7 @@ export const getCreateWorkspaceCheckoutSessionMutationOptions = <
     CreateWorkspaceCheckoutSessionMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceCheckoutSession>>,
   TError,
@@ -644,30 +633,28 @@ export const getCreateWorkspaceCheckoutSessionMutationOptions = <
 export type CreateWorkspaceCheckoutSessionMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceCheckoutSession>>
 >
-export type CreateWorkspaceCheckoutSessionMutationBody = BodyType<CreateWorkspaceCheckoutRequest>
-export type CreateWorkspaceCheckoutSessionMutationError = ErrorType<
+export type CreateWorkspaceCheckoutSessionMutationBody = CreateWorkspaceCheckoutRequest
+export type CreateWorkspaceCheckoutSessionMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ErrorEnvelope
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type CreateWorkspaceCheckoutSessionMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateWorkspaceCheckoutRequest>
+  data: CreateWorkspaceCheckoutRequest
 }
 
 /**
  * @summary Create a recharge checkout session (members only)
  */
 export const useCreateWorkspaceCheckoutSession = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -677,7 +664,7 @@ export const useCreateWorkspaceCheckoutSession = <
       CreateWorkspaceCheckoutSessionMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -699,9 +686,9 @@ export const getGetWorkspaceCheckoutSessionUrl = (workspaceId: string, sessionId
 export const getWorkspaceCheckoutSession = async (
   workspaceId: string,
   sessionId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceCheckoutSessionEnvelope> => {
-  return orvalMutator<WorkspaceCheckoutSessionEnvelope>(
+  return publicMutator<WorkspaceCheckoutSessionEnvelope>(
     getGetWorkspaceCheckoutSessionUrl(workspaceId, sessionId),
     {
       ...options,
@@ -719,7 +706,7 @@ export const getGetWorkspaceCheckoutSessionQueryKey = (
 
 export const getGetWorkspaceCheckoutSessionQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceCheckoutSession>>,
-  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   sessionId: MaybeRefOrGetter<string>,
@@ -727,7 +714,7 @@ export const getGetWorkspaceCheckoutSessionQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceCheckoutSession>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -759,7 +746,7 @@ export const getGetWorkspaceCheckoutSessionQueryOptions = <
 export type GetWorkspaceCheckoutSessionQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceCheckoutSession>>
 >
-export type GetWorkspaceCheckoutSessionQueryError = ErrorType<UnauthorizedResponse | ErrorEnvelope>
+export type GetWorkspaceCheckoutSessionQueryError = UnauthorizedResponse | ErrorEnvelope
 
 /**
  * @summary Get a checkout session status (members only)
@@ -767,7 +754,7 @@ export type GetWorkspaceCheckoutSessionQueryError = ErrorType<UnauthorizedRespon
 
 export function useGetWorkspaceCheckoutSession<
   TData = Awaited<ReturnType<typeof getWorkspaceCheckoutSession>>,
-  TError = ErrorType<UnauthorizedResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   sessionId: MaybeRefOrGetter<string>,
@@ -775,7 +762,7 @@ export function useGetWorkspaceCheckoutSession<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceCheckoutSession>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

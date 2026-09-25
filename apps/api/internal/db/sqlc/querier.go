@@ -17,6 +17,7 @@ type Querier interface {
 	ArchiveMediaAsset(ctx context.Context, arg ArchiveMediaAssetParams) (MediaAsset, error)
 	ArchiveOrganization(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
+	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	// CancelWorkspaceTask flips a live task to cancelled (chk constraint
 	// requires cancelled_at) and releases the lease. The tasks table carries
@@ -42,6 +43,7 @@ type Querier interface {
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
+	CountWorkspaceBoardOwners(ctx context.Context, arg CountWorkspaceBoardOwnersParams) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
 	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
@@ -131,6 +133,12 @@ type Querier interface {
 	// Workspace tenancy queries (#801). Public references use public_id;
 	// internal_id stays database-internal.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
+	// Workspace-rooted boards postgres store (#802 interface, #809 follow-up
+	// to #817). boards.workspace_id is the workspace link (no separate link
+	// table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
+	// revision query exists here by design. Every board-scoped query joins
+	// workspaces on public_id so foreign-workspace rows stay invisible.
+	CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error)
 	// Workspace-scoped task queries (#819, Phase 4-02). The tasks table is the
 	// workspace-scoped async job resource (public_id LIKE 'task_%'):
 	// lease_token is required when status='running' and empty otherwise
@@ -160,6 +168,7 @@ type Querier interface {
 	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
+	DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error)
 	DeleteWorkspaceMembership(ctx context.Context, arg DeleteWorkspaceMembershipParams) (int64, error)
 	// DeleteWorkspaceTask removes a task row (settlement compensation rollback
 	// on enqueue failure). Outputs cascade.
@@ -178,6 +187,9 @@ type Querier interface {
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
+	GetBoardRevisionByID(ctx context.Context, arg GetBoardRevisionByIDParams) (GetBoardRevisionByIDRow, error)
+	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
+	GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardShareTokenBySecretParams) (GetBoardShareTokenBySecretRow, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
 	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
@@ -214,6 +226,8 @@ type Querier interface {
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
+	GetWorkspaceBoard(ctx context.Context, arg GetWorkspaceBoardParams) (GetWorkspaceBoardRow, error)
+	GetWorkspaceBoardMembershipRole(ctx context.Context, arg GetWorkspaceBoardMembershipRoleParams) (string, error)
 	GetWorkspaceByInternalID(ctx context.Context, internalID int64) (Workspace, error)
 	GetWorkspaceByPublicID(ctx context.Context, publicID string) (Workspace, error)
 	// GetWorkspaceMediaAssetID resolves a workspace-scoped media asset public
@@ -223,6 +237,10 @@ type Querier interface {
 	GetWorkspaceMembership(ctx context.Context, arg GetWorkspaceMembershipParams) (WorkspaceMembership, error)
 	GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspaceTaskByPublicIDParams) (Task, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
+	IncrementBoardShareTokenUsage(ctx context.Context, internalID int64) error
+	InsertBoardDocument(ctx context.Context, arg InsertBoardDocumentParams) error
+	InsertBoardRevision(ctx context.Context, arg InsertBoardRevisionParams) (InsertBoardRevisionRow, error)
+	InsertBoardShareToken(ctx context.Context, arg InsertBoardShareTokenParams) (InsertBoardShareTokenRow, error)
 	// Control Plane audit record writes (#809). Best-effort durable sink
 	// behind the control guard's structured slog record; audit failures
 	// never fail the guarded request.
@@ -238,6 +256,7 @@ type Querier interface {
 	InsertPersonalWorkspaceIgnore(ctx context.Context, arg InsertPersonalWorkspaceIgnoreParams) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
+	InsertWorkspaceBoardMembershipIgnore(ctx context.Context, arg InsertWorkspaceBoardMembershipIgnoreParams) (int64, error)
 	InsertWorkspaceMembershipIgnore(ctx context.Context, arg InsertWorkspaceMembershipIgnoreParams) (int64, error)
 	// InsertWorkspaceTaskOutput appends one output ref to a workspace-scoped
 	// task. Scoping resolves atomically in the SELECT so outputs can never
@@ -248,6 +267,8 @@ type Querier interface {
 	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
+	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
+	ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
 	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
@@ -282,6 +303,8 @@ type Querier interface {
 	ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListWorkspaceBoardMemberships(ctx context.Context, arg ListWorkspaceBoardMembershipsParams) ([]ListWorkspaceBoardMembershipsRow, error)
+	ListWorkspaceBoards(ctx context.Context, arg ListWorkspaceBoardsParams) ([]ListWorkspaceBoardsRow, error)
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]WorkspaceMembership, error)
 	ListWorkspaceTaskOutputs(ctx context.Context, arg ListWorkspaceTaskOutputsParams) ([]TaskOutput, error)
 	// ListWorkspaceTaskOutputsByTaskIDs batches output reads for list pages
@@ -292,6 +315,7 @@ type Querier interface {
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
 	LockAIGatewayModelMappingWrite(ctx context.Context) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
+	LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoardParams) (LockWorkspaceBoardRow, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
 	MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error)
 	MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error)
@@ -307,13 +331,16 @@ type Querier interface {
 	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error)
 	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
+	RenameWorkspaceBoard(ctx context.Context, arg RenameWorkspaceBoardParams) (int64, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
+	RestoreWorkspaceBoard(ctx context.Context, arg RestoreWorkspaceBoardParams) (int64, error)
 	RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error)
 	// RetryWorkspaceTask consumes one retry budget entry: a live task returns
 	// to pending with retry_count incremented, the lease released (pending rows
 	// must carry an empty lease_token), and the fresh execution token recorded
 	// in the workflow_input envelope.
 	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
+	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) (int64, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	// Transitions read their result back through the data-modifying
 	// CTE's RETURNING list (joined to the untouched asset/media tables):
@@ -321,6 +348,8 @@ type Querier interface {
 	// target table would return the pre-update row version.
 	StartLibraryMaterialization(ctx context.Context, arg StartLibraryMaterializationParams) (StartLibraryMaterializationRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
+	TouchWorkspaceBoard(ctx context.Context, internalID int64) error
+	UpdateBoardDocument(ctx context.Context, arg UpdateBoardDocumentParams) (int64, error)
 	// UpdateMediaAssetMetadata refreshes dimensions and merges metadata
 	// (read-modify-write merge: unknown keys from other writers survive).
 	UpdateMediaAssetMetadata(ctx context.Context, arg UpdateMediaAssetMetadataParams) (MediaAsset, error)
@@ -332,10 +361,12 @@ type Querier interface {
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
+	UpdateWorkspaceBoardMembershipRole(ctx context.Context, arg UpdateWorkspaceBoardMembershipRoleParams) (int64, error)
 	UpdateWorkspaceMemberRole(ctx context.Context, arg UpdateWorkspaceMemberRoleParams) (int64, error)
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) (int64, error)
 	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
+	UpsertJoinBoardMembership(ctx context.Context, arg UpsertJoinBoardMembershipParams) error
 	// UpsertMediaAssetDerivative records one materialized derivative
 	// variant. Regeneration converges on (asset_id, variant_name).
 	UpsertMediaAssetDerivative(ctx context.Context, arg UpsertMediaAssetDerivativeParams) (MediaAssetDerivative, error)

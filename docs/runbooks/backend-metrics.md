@@ -97,12 +97,13 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `task_retention` | 3 | 串行 purge：失败立即暴露，检查保留窗口与锁竞争 |
 | `vision_billing` | 5 | 快照对账失败看 searchcatalog 计费链路 |
 | `media_reclamation` | 10 | 存储抖动自愈空间最大；持续失败看 storage profile 与对象可达性 |
+| `webhook_deliver` | 8 | 单 delivery 8 次耗尽即进 River `discarded`（即 durable DLQ），`discarded` 行即投递终态；attempt 间隔为 30s 起 doubling + jitter（1h cap） |
 
 `ideaboard_gateway_retries_total` 只统计 `drawing_default` 的 worker 层重投（网关 5 次内部重试耗尽后的整任务重投），维护队列不计入该指标。
 
 ## River 超时矩阵（#783）
 
-超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：11 个生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
+超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：12 个生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
 
 | Queue | Worker | Timeout | 排障含义 |
 |-------|--------|---------|----------|
@@ -116,6 +117,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `vision_billing` | VisionBillingReconciliationWorker | 4min | 低于 5min 调度周期；超时看 searchcatalog 计费链路（超时不会堆积到下个周期） |
 | `media_reclamation` | ReclaimWorker | 2min | 低于 5min claim lease；超时看 storage profile 与对象可达性 |
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |
+| `webhook_deliver` | WebhookDeliverWorker | 1min | 单次签名 POST 投递；超时看目标端点可达性 |
 
 ## 告警建议阈值（初始值，按线上观察调优）
 

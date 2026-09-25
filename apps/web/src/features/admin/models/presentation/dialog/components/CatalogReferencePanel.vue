@@ -48,11 +48,12 @@
           "
         >
           <img
-            v-if="brandLogo"
+            v-if="brandLogo && !logoLoadFailed"
             :src="brandLogo"
             :alt="snapshot.provider || 'provider'"
             class="size-4.5 object-contain"
             loading="lazy"
+            @error="onLogoError"
           />
           <Cube v-else class="size-4" />
         </div>
@@ -218,10 +219,12 @@ const props = withDefaults(
     modelId: string
     provider?: string
     modelName?: string
+    enabled?: boolean
   }>(),
   {
     provider: '',
     modelName: '',
+    enabled: true,
   },
 )
 
@@ -249,6 +252,13 @@ function identityOf(): { modelId: string } | { provider: string; model: string }
 }
 
 async function fetchReference(refresh: boolean) {
+  if (!props.enabled) {
+    requestVersion += 1
+    snapshot.value = null
+    loading.value = false
+    loadError.value = ''
+    return
+  }
   const version = ++requestVersion
   if (isFal.value) {
     if (version !== requestVersion) return
@@ -284,7 +294,7 @@ function refreshReference() {
 
 // 表单输入抖动时才查后端，避免每个 keystroke 打一次参照接口。
 watchDebounced(
-  [() => props.modelId, () => props.provider, () => props.modelName],
+  [() => props.enabled, () => props.modelId, () => props.provider, () => props.modelName],
   () => {
     void fetchReference(false)
   },
@@ -292,7 +302,7 @@ watchDebounced(
 )
 
 watch(
-  () => props.modelId,
+  () => [props.enabled, props.modelId] as const,
   () => {
     // 标识清空即丢弃旧快照，避免把上一个模型的价挂在空表单下。
     if (!identityOf()) {
@@ -309,6 +319,16 @@ const brandLogo = computed(() =>
     provider: props.provider,
   }),
 )
+
+// provider logo 经后端透传 models.dev SVG：加载失败时回落 Cube 占位，避免破图。
+const logoLoadFailed = ref(false)
+watch(brandLogo, () => {
+  logoLoadFailed.value = false
+})
+
+function onLogoError(): void {
+  logoLoadFailed.value = true
+}
 
 const pricingText = computed(() => (snapshot.value ? formatReferencePricing(snapshot.value) : ''))
 

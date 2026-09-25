@@ -10,14 +10,16 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	"ideaboard/api/internal/media/storage/application/authorization"
+	storagedomain "ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/tenancy"
+	tenancypg "ideaboard/api/internal/tenancy/postgres"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/gin-gonic/gin"
@@ -27,12 +29,17 @@ type uploadStaticTestEnv struct {
 	router        *gin.Engine
 	auth          *httptest.Server
 	taskOutputURL string
+	boardID       string
+}
+
+func canvasStaticURL(boardID, rest string) string {
+	return "/uploads/canvas/OWNR1A/" + boardID + "/" + strings.TrimPrefix(rest, "/")
 }
 
 func TestUploadStaticHandlerCanvasRequiresLogin(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, canvasStaticURL(env.boardID, "content/demo.txt"), "")
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusUnauthorized, rec.Body.String())
@@ -42,7 +49,7 @@ func TestUploadStaticHandlerCanvasRequiresLogin(t *testing.T) {
 func TestUploadStaticHandlerCanvasRejectsNonMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "session=outsider")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, canvasStaticURL(env.boardID, "content/demo.txt"), "session=outsider")
 
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d or %d; body=%s", rec.Code, http.StatusForbidden, http.StatusNotFound, rec.Body.String())
@@ -52,7 +59,7 @@ func TestUploadStaticHandlerCanvasRejectsNonMember(t *testing.T) {
 func TestUploadStaticHandlerCanvasAllowsMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, canvasStaticURL(env.boardID, "content/demo.txt"), "session=member")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
@@ -68,7 +75,7 @@ func TestUploadStaticHandlerCanvasAllowsMember(t *testing.T) {
 func TestUploadStaticHandlerCanvasRejectsOwnerSegmentMismatch(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/WRONG1/board-1/content/demo.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/WRONG1/"+env.boardID+"/content/demo.txt", "session=member")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
@@ -78,7 +85,7 @@ func TestUploadStaticHandlerCanvasRejectsOwnerSegmentMismatch(t *testing.T) {
 func TestUploadStaticHandlerCanvasNonContentRejectsNonMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/thumb/demo.txt", "session=outsider")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, canvasStaticURL(env.boardID, "thumb/demo.txt"), "session=outsider")
 
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d or %d; body=%s", rec.Code, http.StatusForbidden, http.StatusNotFound, rec.Body.String())
@@ -88,7 +95,7 @@ func TestUploadStaticHandlerCanvasNonContentRejectsNonMember(t *testing.T) {
 func TestUploadStaticHandlerDoesNotListDirectories(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, canvasStaticURL(env.boardID, "content/"), "session=member")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
@@ -193,7 +200,7 @@ func TestUploadStaticHandlerCanvasTraversalStillRequiresAuth(t *testing.T) {
 	rec := performUploadStaticRequest(
 		env.router,
 		http.MethodGet,
-		"/uploads/canvas/OWNR1A/board-1/content/public/../../content/demo.txt",
+		"/uploads/canvas/OWNR1A/"+env.boardID+"/content/public/../../content/demo.txt",
 		"session=outsider",
 	)
 
@@ -209,8 +216,15 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	tmpDir := t.TempDir()
 	t.Chdir(tmpDir)
 
-	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "demo.txt"), "canvas content")
-	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "thumb", "demo.txt"), "canvas thumb")
+	// Board-gated canvas paths are seeded through the workspace-scoped
+	// postgres store (#802 seam, #809 follow-up): the legacy user-scoped
+	// repository was removed in #817 and fails closed by design.
+	boardID, err := boards.NewV1BoardPublicID()
+	if err != nil {
+		t.Fatalf("mint board id failed: %v", err)
+	}
+	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", boardID, "content", "demo.txt"), "canvas content")
+	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", boardID, "thumb", "demo.txt"), "canvas thumb")
 	mustWriteTestFile(t, filepath.Join("uploads", "site", "assets", "logo.txt"), "site logo")
 	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
@@ -224,12 +238,20 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	taskOutputURL := "/uploads/tasks/" + ownerIDPath + "/task-demo/output.png"
 	mustWriteTestFile(t, filepath.Join("uploads", "tasks", ownerIDPath, "task-demo", "output.png"), "task output")
 
-	boardRepo := boards.NewRepository(db)
-	now := time.Now()
-	if err := boardRepo.Upsert(context.Background(), &boards.Board{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+	boardStore := boards.NewPostgresWorkspaceBoardStore(db)
+	ctx := context.Background()
+	tenancyStore := tenancypg.NewStore(db)
+	workspace, err := tenancyStore.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{
+		Name:        "upload-static",
+		OwnerUserID: owner.ID,
+	})
+	if err != nil {
+		t.Fatalf("create workspace failed: %v", err)
+	}
+	if _, err := boardStore.CreateBoard(ctx, workspace.PublicID, owner.ID, "Demo", boardID); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := boardRepo.UpsertMember(context.Background(), owner.ID, "board-1", member.ID, boards.RoleViewer); err != nil {
+	if _, err := boardStore.AddBoardMember(ctx, workspace.PublicID, boardID, owner.ID, member.ID, boards.RoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
@@ -245,17 +267,47 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 			}),
 			UserRepo: userRepo,
 		},
-		BoardService: boards.NewService(boardRepo, userRepo),
 	}
 	deps.ReadAccess = authorization.NewReadableUploadAccess(
-		staticUploadBoardAccessResolver{service: deps.BoardService},
+		staticUploadWorkspaceBoardAccessResolver{store: boardStore, workspacePublicID: workspace.PublicID},
 		staticUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
 	handler := uploadStaticHandler(deps)
 	router.GET("/uploads/*filepath", handler)
 	router.HEAD("/uploads/*filepath", handler)
 
-	return uploadStaticTestEnv{router: router, auth: authServer, taskOutputURL: taskOutputURL}
+	return uploadStaticTestEnv{router: router, auth: authServer, taskOutputURL: taskOutputURL, boardID: boardID}
+}
+
+// staticUploadWorkspaceBoardAccessResolver resolves canvas board access
+// through the workspace-scoped boards store. The fixture closes over the
+// workspace it created; callers without a board grant converge to
+// boards.ErrNotFound (404 board_not_found semantics at the handler edge).
+// Production static uploads keep the legacy BoardService fallback in
+// resolveStaticUploadReadAccess: legacy board ids carry no workspace
+// context, so that path stays fail-closed until a workspace-aware canvas
+// URL exists.
+type staticUploadWorkspaceBoardAccessResolver struct {
+	store             boards.WorkspaceBoardStore
+	workspacePublicID string
+}
+
+func (r staticUploadWorkspaceBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
+	if r.store == nil || strings.TrimSpace(r.workspacePublicID) == "" {
+		return 0, storagedomain.ErrUploadAccessDependencyMissing
+	}
+	_, ok, err := r.store.GetBoardRole(ctx, r.workspacePublicID, boardID, userID)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, boards.ErrNotFound
+	}
+	board, err := r.store.GetBoard(ctx, r.workspacePublicID, boardID)
+	if err != nil {
+		return 0, err
+	}
+	return board.OwnerUserID, nil
 }
 
 func newUploadStaticAuthServer(t *testing.T) *httptest.Server {

@@ -13,6 +13,12 @@ import type { BoardState } from '../../domain'
 // shared envelope, so this boundary transports through the central
 // `api.request`. The board document shape is owned by the board domain
 // (`BoardState`); this module only moves it across the wire.
+//
+// TODO(2026-09-25): KEEP hand-rolled — generated `boards` is workspace-scoped
+// (`/workspaces/{ws}/boards`, contract envelope) and covers none of these
+// legacy `/user/boards/*` flows 1:1 (list/save/remove/join-by-share-token,
+// `{code,msg,data}` envelope). Do not force-fit; migration (if any) belongs
+// to the backend boards-store owner (sibling A).
 export type { ApiResponseBase }
 export type BoardStateEnvelope = BoardState
 

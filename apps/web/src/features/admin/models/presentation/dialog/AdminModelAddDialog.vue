@@ -137,17 +137,18 @@
                     <div
                       class="flex size-6 shrink-0 items-center justify-center rounded-md overflow-hidden"
                       :class="
-                        resolveModelBrandLogo(model)
+                        rowBrandLogo(model)
                           ? 'bg-admin-surface-muted/60 border border-admin-border-soft/60'
                           : 'bg-admin-accent/10 text-admin-accent'
                       "
                     >
                       <img
-                        v-if="resolveModelBrandLogo(model)"
-                        :src="resolveModelBrandLogo(model)"
+                        v-if="rowBrandLogo(model)"
+                        :src="rowBrandLogo(model)"
                         :alt="model.provider"
                         class="size-3.5 object-contain"
                         loading="lazy"
+                        @error="markBrandLogoFailed(model.id)"
                       />
                       <Cube v-else class="size-3.5" />
                     </div>
@@ -285,6 +286,19 @@ const existingIdSet = computed(() => {
 
 function isModelExisting(modelId: string): boolean {
   return existingIdSet.value.has(modelId)
+}
+
+// 品牌 logo 经后端透传 models.dev SVG：单行加载失败（404/断网）时回落 Cube
+// 占位，避免破图；失败态按模型标识记忆，不影响其他行。
+const failedBrandLogoIds = ref<Set<string>>(new Set())
+
+function rowBrandLogo(model: DetectedGatewayModel): string | undefined {
+  if (failedBrandLogoIds.value.has(model.id)) return undefined
+  return resolveModelBrandLogo(model)
+}
+
+function markBrandLogoFailed(modelId: string): void {
+  failedBrandLogoIds.value.add(modelId)
 }
 
 // 供应商下拉项

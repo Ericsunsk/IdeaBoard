@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -17,8 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Workspace event streams + webhook delivery (issue #807). Additive
-// only: legacy /api/user/events is untouched (removal is #809).
+// Workspace event streams + webhook delivery (issue #807).
 //
 // Surface:
 //
@@ -68,7 +66,6 @@ import (
 // workspace (+ principal membership + types filter): cross-workspace
 // cursors cannot resume (workspace isolation), unknown/evicted cursors
 // resume from the oldest retained envelope with a `gap` notice frame.
-// Durable outbox persistence + async webhook worker land with #809.
 
 const eventStreamHeartbeatInterval = 15 * time.Second
 
@@ -310,9 +307,9 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 				if len(minted) == 0 {
 					return map[string]any{"subscription": candidate}, nil
 				}
-				// Minted secrets are hex-encoded for transport and
+				// Minted secrets are whsec_-encoded for transport and
 				// returned exactly once; reads never carry them.
-				return map[string]any{"subscription": candidate, "secret": hex.EncodeToString(minted)}, nil
+				return map[string]any{"subscription": candidate, "secret": events.FormatWhsecSecret(minted)}, nil
 			}
 		}
 		return map[string]any{"subscription": sub.ID}, nil
@@ -347,8 +344,18 @@ func (h *contractV1Handler) deleteEventSubscription(c *gin.Context) {
 		return
 	}
 	subscriptionID := strings.TrimSpace(c.Param("subscription_id"))
-	if !events.IsWebhookSubscriptionID(subscriptionID) ||
-		!h.deps.Webhooks.Delete(workspace.PublicID, subscriptionID) {
+	if !events.IsWebhookSubscriptionID(subscriptionID) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
+		c.Abort()
+		return
+	}
+	deleted, err := h.deps.Webhooks.Delete(c.Request.Context(), workspace.PublicID, subscriptionID)
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "事件服务暂不可用")
+		c.Abort()
+		return
+	}
+	if !deleted {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
 		c.Abort()
 		return

@@ -19,6 +19,11 @@ const (
 	RiverJobKindDrawingFinalFailure = "drawing_final_failure"
 	RiverQueueDefault               = "drawing_default"
 	RiverMaxAttemptsDefault         = 25
+	// RiverQueueWebhookDeliver carries signed webhook deliveries
+	// (issue #833). The events package owns the worker; this package
+	// owns the budget constants so RiverRetryMatrix stays the single
+	// source of truth for per-queue MaxAttempts.
+	RiverQueueWebhookDeliver = "webhook_deliver"
 )
 
 type DrawingTaskArgs struct {

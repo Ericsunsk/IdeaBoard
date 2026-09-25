@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
+import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import {
   createAdminGatewayResource,
   type AdminGatewayCatalog,
@@ -27,6 +28,7 @@ export function useAdminModelCatalogWorkspace(
 ) {
   const adminConfirm = useAdminConfirm()
   const feedback = useAdminModelCatalogFeedback()
+  const { copyText } = useAppClipboard()
   const queryClient = useQueryClient()
   const queryKey = getAdminModelCatalogQueryKey()
 
@@ -262,23 +264,18 @@ export function useAdminModelCatalogWorkspace(
   function copyModelId(id: string) {
     if (copyTimer) clearTimeout(copyTimer)
     copyTimer = null
-    if (!navigator?.clipboard?.writeText) {
-      feedback.clipboardUnsupported()
-      return
-    }
-    void navigator.clipboard.writeText(id).then(
-      () => {
+    void copyText(id).then((ok) => {
+      if (ok) {
         copiedModelId.value = id
         copyTimer = setTimeout(() => {
           if (copiedModelId.value === id) {
             copiedModelId.value = null
           }
         }, 2000)
-      },
-      () => {
+      } else {
         feedback.copyFailed()
-      },
-    )
+      }
+    })
   }
 
   onUnmounted(() => {

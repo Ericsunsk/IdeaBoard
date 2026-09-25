@@ -1,3 +1,5 @@
+import { clamp } from '../../../../../shared/utils/number.ts'
+
 export const MASK_PAINTING_RGB = {
   r: 122,
   g: 107,
@@ -20,7 +22,7 @@ export const INPAINT_MAX_LAYER_OPACITY = 100
 export function clampMaskBrushSize(value: number, fallback = INPAINT_DEFAULT_BRUSH_SIZE): number {
   const next = Number(value)
   const resolved = Number.isFinite(next) && next > 0 ? next : fallback
-  return Math.max(INPAINT_MIN_BRUSH_SIZE, Math.min(INPAINT_MAX_BRUSH_SIZE, resolved))
+  return clamp(resolved, INPAINT_MIN_BRUSH_SIZE, INPAINT_MAX_BRUSH_SIZE)
 }
 
 export function clampMaskLayerOpacity(
@@ -29,8 +31,5 @@ export function clampMaskLayerOpacity(
 ): number {
   const next = Number(value)
   const resolved = Number.isFinite(next) ? next : fallback
-  return Math.max(
-    INPAINT_MIN_LAYER_OPACITY,
-    Math.min(INPAINT_MAX_LAYER_OPACITY, Math.round(resolved)),
-  )
+  return clamp(Math.round(resolved), INPAINT_MIN_LAYER_OPACITY, INPAINT_MAX_LAYER_OPACITY)
 }

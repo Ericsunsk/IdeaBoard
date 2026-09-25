@@ -1,0 +1,8 @@
+# Compose / Grype YAML policy. GitHub workflows are covered by actionlint.
+# document-start is omitted by compose-file convention; line-length is
+# unenforced because compose interpolations (${VAR:?message}) cannot wrap safely.
+extends: default
+
+rules:
+  document-start: disable
+  line-length: disable

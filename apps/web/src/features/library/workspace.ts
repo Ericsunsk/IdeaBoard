@@ -19,6 +19,14 @@ import { i18n } from '../../shared/i18n'
 // This module is the SOLE library transport: the legacy user-scoped
 // `resource.ts` (integer ids, `/user/library/*`) is deleted. Ids are
 // opaque (`ws_` + canonical `lfolder_` / `lasset_` / `lmat_`);
+//
+// TODO(#806-regen, 2026-09-25): BLOCKED on generated-query/public regen —
+// Library requests use the feature adapter so route and response validation
+// stay owned by this context.
+// while this module ships `/v1/...` suffixes; `orval.config.ts publicQuery`
+// must point at `publicMutator` and regen (`api:generate`) is out of scope
+// here. Keep this transport until then; do not force-fit (auto idempotency
+// minting, resolve batch bound, snake_case -> camelCase validators stay).
 // malformed ids throw before any network call, matching the backend 404
 // posture. Payloads map snake_case to camelCase at this boundary;
 // callers only see camelCase.

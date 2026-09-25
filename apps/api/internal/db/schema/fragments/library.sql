@@ -45,6 +45,8 @@ CREATE TABLE library_assets (
 
 CREATE INDEX idx_library_assets_workspace ON library_assets (workspace_id, created_at DESC);
 CREATE INDEX idx_library_assets_folder ON library_assets (folder_id, created_at DESC);
+CREATE INDEX idx_library_assets_media_asset ON library_assets (media_asset_id)
+  WHERE media_asset_id IS NOT NULL;
 
 -- Materialization creates a durable job that eventually produces a Media Asset.
 CREATE TABLE library_materializations (

@@ -213,6 +213,7 @@ import {
   getPaymentOrderStatusPresentation,
   getStripeStatusLabel,
 } from './paymentOrderPresentation'
+import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import type {
   AdminPaymentDisputeSummary,
   AdminPaymentOrderDetail,
@@ -275,7 +276,7 @@ const overviewRows = computed(() => {
   const detail = props.detail
   if (!detail) return []
   return [
-    { label: 'Idea 数量', value: new Intl.NumberFormat('zh-CN').format(detail.ideaQuantity) },
+    { label: 'Idea 数量', value: formatLocaleNumber(detail.ideaQuantity) },
     {
       label: '原始实付',
       value: formatPaymentMoney(detail.paidTotalMinor, detail.paidCurrency),
@@ -323,7 +324,7 @@ function formatRefund(refund: AdminPaymentRefundSummary): string {
   const ideas =
     refund.ideaQuantity === undefined
       ? 'Idea 数量未知'
-      : `${new Intl.NumberFormat('zh-CN').format(refund.ideaQuantity)} Ideas`
+      : `${formatLocaleNumber(refund.ideaQuantity)} Ideas`
   return `${ideas} / ${formatPaymentMoney(refund.amountMinor, refund.currency)}`
 }
 
@@ -340,7 +341,7 @@ function refundStatusLabel(status: string): string {
 }
 
 function formatIdeas(value: number): string {
-  return new Intl.NumberFormat('zh-CN').format(value)
+  return formatLocaleNumber(value)
 }
 
 function submitRefund() {
@@ -352,7 +353,7 @@ function formatDispute(dispute: AdminPaymentDisputeSummary): string {
   const amount = formatPaymentMoney(dispute.amountMinor, dispute.currency)
   const ratio =
     dispute.ratioBasisPoints !== undefined
-      ? ` / 比例 ${(dispute.ratioBasisPoints / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`
+      ? ` / 比例 ${formatLocaleNumber(dispute.ratioBasisPoints / 100, { maximumFractionDigits: 2 })}%`
       : ''
   const target = formatIdeas(dispute.targetIdeaQuantity ?? 0)
   const debited = formatIdeas(dispute.debitedIdeaQuantity ?? 0)

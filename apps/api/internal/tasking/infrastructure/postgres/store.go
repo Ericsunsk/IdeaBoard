@@ -307,8 +307,20 @@ INSERT INTO task_billing_snapshots (
 	if snapshot.SettlementState != "held" && snapshot.SettlementState != "free" {
 		return fmt.Errorf("insert task billing settlement: invalid initial state %q", snapshot.SettlementState)
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO task_billing_settlements (task_id, state, settled_at) VALUES ($1,$2,CASE WHEN $2 = 'free' THEN clock_timestamp() ELSE NULL END)`, task.ID, snapshot.SettlementState); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO task_billing_settlements (task_id, state, settled_at) VALUES ($1,$2,$3)`, task.ID, snapshot.SettlementState, settledAtForInitialState(snapshot.SettlementState)); err != nil {
 		return fmt.Errorf("insert task billing settlement: %w", err)
+	}
+	return nil
+}
+
+// settledAtForInitialState resolves the settled_at value client-side. The
+// state is already known in Go, so no SQL CASE over the state parameter is
+// needed — and such a CASE would pin $2 to text (unknown literals default
+// to text in operator resolution), conflicting with the varchar(16)
+// column (SQLSTATE 42P08).
+func settledAtForInitialState(state string) any {
+	if state == "free" {
+		return time.Now().UTC()
 	}
 	return nil
 }

@@ -49,6 +49,7 @@
 import { useI18n } from 'vue-i18n'
 import { nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
 import { usePointerDragSession } from '../../../infrastructure/browser/interaction/usePointerDragSession.ts'
+import { clamp } from '../../../../../shared/utils/number.ts'
 import type { RetouchCurveChannel } from '../model.ts'
 import type { NormalizedCurveChannelPoint } from '../processing/curves.ts'
 
@@ -253,11 +254,11 @@ function resolveKeyboardDelta(key: string, step: number) {
 
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0
-  return Math.min(100, Math.max(0, Math.round(value)))
+  return clamp(Math.round(value), 0, 100)
 }
 
 function clampUserPointInput(value: number) {
-  return Math.min(USER_POINT_MAX_INPUT, Math.max(USER_POINT_MIN_INPUT, value))
+  return clamp(value, USER_POINT_MIN_INPUT, USER_POINT_MAX_INPUT)
 }
 
 function setPointButtonRef(pointId: string, element: Element | ComponentPublicInstance | null) {

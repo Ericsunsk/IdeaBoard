@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import {
   CANVAS_NODE_REGISTRY_LIST,
   createEmptyBoardSnapshot,
@@ -46,7 +47,7 @@ export type FlowToBoardSnapshotOptions = {
 }
 
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
+  return structuredClone(toRaw(value) as T)
 }
 
 function createSnapshotShell(base?: BoardSnapshot): BoardSnapshot {

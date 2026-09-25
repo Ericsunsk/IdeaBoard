@@ -68,3 +68,24 @@ CREATE TABLE event_deliveries (
 CREATE INDEX idx_event_deliveries_subscription ON event_deliveries (subscription_id, created_at DESC);
 CREATE INDEX idx_event_deliveries_retry ON event_deliveries (next_retry_at) WHERE status = 'retrying' AND next_retry_at IS NOT NULL;
 CREATE INDEX idx_event_deliveries_status ON event_deliveries (status, created_at);
+
+-- A single event/subscription pair has one durable delivery aggregate.
+CREATE UNIQUE INDEX ux_event_deliveries_event_subscription
+  ON event_deliveries (event_id, subscription_id);
+
+-- Per-attempt history remains readable after River retries, restart, or discard.
+CREATE TABLE event_delivery_attempts (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  delivery_id BIGINT NOT NULL REFERENCES event_deliveries(internal_id) ON DELETE CASCADE,
+  attempt_number INT NOT NULL,
+  status_code INT NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL,
+  error_message TEXT NOT NULL DEFAULT '',
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_event_delivery_attempts_delivery_attempt UNIQUE (delivery_id, attempt_number),
+  CONSTRAINT chk_event_delivery_attempts_number CHECK (attempt_number > 0),
+  CONSTRAINT chk_event_delivery_attempts_outcome CHECK (outcome IN ('delivered', 'failed'))
+);
+
+CREATE INDEX idx_event_delivery_attempts_delivery
+  ON event_delivery_attempts (delivery_id, attempt_number DESC);

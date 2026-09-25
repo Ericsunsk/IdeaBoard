@@ -13,6 +13,11 @@ import (
 )
 
 func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
+	// Legacy user-scoped boards were removed in #817 (Phase 3b-08): the
+	// repository under test fails closed by design, so this pin cannot
+	// run. Workspace-scoped tenant isolation is covered by
+	// TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible.
+	t.Skip("legacy boards store removed (#817): workspace-scoped coverage lives in postgres_workspace_test.go")
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
 	repo := NewRepository(db)
@@ -102,6 +107,11 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 }
 
 func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
+	// Legacy user-scoped boards were removed in #817 (Phase 3b-08): the
+	// repository under test fails closed by design, so this pin cannot
+	// run. Workspace-scoped document concurrency is covered by
+	// TestPostgresWorkspaceBoardStoreDocumentRevisions.
+	t.Skip("legacy boards store removed (#817): workspace-scoped coverage lives in postgres_workspace_test.go")
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
 	repo := NewRepository(db)
@@ -164,6 +174,11 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 }
 
 func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
+	// Legacy user-scoped boards were removed in #817 (Phase 3b-08): the
+	// repository under test fails closed by design, so this pin cannot
+	// run. Workspace-scoped share tokens are covered by
+	// TestPostgresWorkspaceBoardStoreShareTokens.
+	t.Skip("legacy boards store removed (#817): workspace-scoped coverage lives in postgres_workspace_test.go")
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
 	repo := NewRepository(db)

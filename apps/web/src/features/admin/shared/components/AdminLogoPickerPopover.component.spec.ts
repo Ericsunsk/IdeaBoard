@@ -1,5 +1,6 @@
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../test/render'
 import AdminLogoPickerPopover from './AdminLogoPickerPopover.vue'
 import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from '../logos/brandLogos'
@@ -94,6 +95,22 @@ describe('AdminLogoPickerPopover', () => {
 
     expect(getAdminBrandLogoOverride('provider-endpoint', 101)).toBeUndefined()
     expect(logoResource.remove).toHaveBeenCalledWith('provider-endpoint', 101)
+  })
+
+  it('falls back to a placeholder when a brand thumbnail fails to load', async () => {
+    const { user } = renderWithUser(Harness, {})
+
+    await user.click(screen.getByRole('button', { name: '打开 Logo 选择器' }))
+    const fluxThumb = await screen.findByRole('img', { name: 'Flux (Black Forest Labs)' })
+    await fireEvent.error(fluxThumb)
+
+    // 破图缩略图隐藏回落占位，选择按钮仍在可继续点选。
+    expect(
+      screen.queryByRole('img', { name: 'Flux (Black Forest Labs)' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Flux (Black Forest Labs)' }),
+    ).toBeInTheDocument()
   })
 
   it('keeps the current logo when the server mutation fails', async () => {

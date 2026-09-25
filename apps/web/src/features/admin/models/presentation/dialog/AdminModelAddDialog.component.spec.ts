@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { within } from '@testing-library/vue'
+import { fireEvent, within } from '@testing-library/vue'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminModelAddDialog from './AdminModelAddDialog.vue'
@@ -160,6 +160,18 @@ describe('AdminModelAddDialog', () => {
     expect(imported[0]?.id).toBe('gpt-4o')
     expect(imported[0]?.provider).toBe('OpenAI')
     expect(imported[0]?.mode).toBe('chat')
+  })
+
+  it('falls back to the placeholder icon when a row brand logo fails to load', async () => {
+    renderDialog()
+
+    const dialog = await screen.findByRole('dialog')
+    const openaiLogo = await within(dialog).findByRole('img', { name: 'OpenAI' })
+    await fireEvent.error(openaiLogo)
+
+    // 破图行回落占位，不再有可访问的品牌图；其他行不受影响。
+    expect(within(dialog).queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('img', { name: 'Workers AI' })).toBeInTheDocument()
   })
 
   it('filters models by search keyword', async () => {

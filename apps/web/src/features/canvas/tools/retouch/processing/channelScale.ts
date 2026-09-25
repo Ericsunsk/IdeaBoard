@@ -1,3 +1,5 @@
+import { clamp } from '../../../../../shared/utils/number.ts'
+
 export const RETOUCH_CHANNEL_MIN = 0
 export const RETOUCH_CHANNEL_MAX = 255
 const RETOUCH_PLOT_PERCENT_MIN = 0
@@ -60,7 +62,7 @@ export function retouchPlotPercentToChannel(value: unknown, fallbackChannel = RE
  */
 export function clampFiniteNumber(value: unknown, min: number, max: number, fallback: number) {
   if (!isFiniteNumber(value)) return fallback
-  return Math.min(max, Math.max(min, value))
+  return clamp(value, min, max)
 }
 
 function isFiniteNumber(value: unknown): value is number {

@@ -159,6 +159,18 @@ describe('AdminModelsPage', () => {
     expect(screen.getAllByText('image_generation')).toHaveLength(2)
   })
 
+  it('hides a broken brand logo instead of showing a broken image', async () => {
+    renderModelsPage()
+    await screen.findByText('我们找到了 2 个模型')
+
+    const openaiImg = screen.getByRole('img', { name: 'OpenAI' })
+    expect(openaiImg).toBeInTheDocument()
+    await fireEvent.error(openaiImg)
+
+    // 卡片品牌图加载失败即隐藏，回落 Cube 占位。
+    expect(screen.queryByRole('img', { name: 'OpenAI' })).not.toBeInTheDocument()
+  })
+
   it('filters models dynamically based on keyword and can clear filters', async () => {
     renderModelsPage()
 

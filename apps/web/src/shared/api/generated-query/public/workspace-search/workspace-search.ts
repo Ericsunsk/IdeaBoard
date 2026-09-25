@@ -42,8 +42,7 @@ import type {
   WorkspaceVisionQueryEnvelope,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -79,12 +78,15 @@ export const getSearchWorkspaceUrl = (workspaceId: string, params: SearchWorkspa
 export const searchWorkspace = async (
   workspaceId: string,
   params: SearchWorkspaceParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedWorkspaceSearchResults> => {
-  return orvalMutator<PaginatedWorkspaceSearchResults>(getSearchWorkspaceUrl(workspaceId, params), {
-    ...options,
-    method: 'GET',
-  })
+  return publicMutator<PaginatedWorkspaceSearchResults>(
+    getSearchWorkspaceUrl(workspaceId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
 }
 
 export const getSearchWorkspaceQueryKey = (
@@ -96,19 +98,18 @@ export const getSearchWorkspaceQueryKey = (
 
 export const getSearchWorkspaceQueryOptions = <
   TData = Awaited<ReturnType<typeof searchWorkspace>>,
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | UnprocessableEntityResponse
-    | ErrorEnvelope
-  >,
+    | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params: MaybeRefOrGetter<SearchWorkspaceParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof searchWorkspace>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -127,13 +128,12 @@ export const getSearchWorkspaceQueryOptions = <
 }
 
 export type SearchWorkspaceQueryResult = NonNullable<Awaited<ReturnType<typeof searchWorkspace>>>
-export type SearchWorkspaceQueryError = ErrorType<
+export type SearchWorkspaceQueryError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
   | ErrorEnvelope
->
 
 /**
  * @summary Search provider catalogs in a workspace context (members only)
@@ -141,19 +141,18 @@ export type SearchWorkspaceQueryError = ErrorType<
 
 export function useSearchWorkspace<
   TData = Awaited<ReturnType<typeof searchWorkspace>>,
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | UnprocessableEntityResponse
-    | ErrorEnvelope
-  >,
+    | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params: MaybeRefOrGetter<SearchWorkspaceParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof searchWorkspace>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -179,7 +178,7 @@ export const getCreateWorkspaceVisionQueryUrl = (workspaceId: string) => {
 export const createWorkspaceVisionQuery = async (
   workspaceId: string,
   createWorkspaceVisionQueryRequest: CreateWorkspaceVisionQueryRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceVisionQueryEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -200,26 +199,28 @@ export const createWorkspaceVisionQuery = async (
     }
     return headers
   }
-  return orvalMutator<WorkspaceVisionQueryEnvelope>(getCreateWorkspaceVisionQueryUrl(workspaceId), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(createWorkspaceVisionQueryRequest),
-  })
+  return publicMutator<WorkspaceVisionQueryEnvelope>(
+    getCreateWorkspaceVisionQueryUrl(workspaceId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(createWorkspaceVisionQueryRequest),
+    },
+  )
 }
 
 export const getCreateWorkspaceVisionQueryMutationKey = () =>
   ['createWorkspaceVisionQuery'] as const
 
 export const getCreateWorkspaceVisionQueryMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -228,7 +229,7 @@ export const getCreateWorkspaceVisionQueryMutationOptions = <
     CreateWorkspaceVisionQueryMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceVisionQuery>>,
   TError,
@@ -257,32 +258,30 @@ export const getCreateWorkspaceVisionQueryMutationOptions = <
 export type CreateWorkspaceVisionQueryMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceVisionQuery>>
 >
-export type CreateWorkspaceVisionQueryMutationBody = BodyType<CreateWorkspaceVisionQueryRequest>
-export type CreateWorkspaceVisionQueryMutationError = ErrorType<
+export type CreateWorkspaceVisionQueryMutationBody = CreateWorkspaceVisionQueryRequest
+export type CreateWorkspaceVisionQueryMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ErrorEnvelope
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type CreateWorkspaceVisionQueryMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateWorkspaceVisionQueryRequest>
+  data: CreateWorkspaceVisionQueryRequest
 }
 
 /**
  * @summary File a vision query from text plus owned library refs (members only)
  */
 export const useCreateWorkspaceVisionQuery = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -292,7 +291,7 @@ export const useCreateWorkspaceVisionQuery = <
       CreateWorkspaceVisionQueryMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

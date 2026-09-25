@@ -2498,6 +2498,8 @@ CREATE TABLE library_assets (
 
 CREATE INDEX idx_library_assets_workspace ON library_assets (workspace_id, created_at DESC);
 CREATE INDEX idx_library_assets_folder ON library_assets (folder_id, created_at DESC);
+CREATE INDEX idx_library_assets_media_asset ON library_assets (media_asset_id)
+  WHERE media_asset_id IS NOT NULL;
 
 -- Materialization creates a durable job that eventually produces a Media Asset.
 CREATE TABLE library_materializations (
@@ -2608,6 +2610,27 @@ CREATE TABLE event_deliveries (
 CREATE INDEX idx_event_deliveries_subscription ON event_deliveries (subscription_id, created_at DESC);
 CREATE INDEX idx_event_deliveries_retry ON event_deliveries (next_retry_at) WHERE status = 'retrying' AND next_retry_at IS NOT NULL;
 CREATE INDEX idx_event_deliveries_status ON event_deliveries (status, created_at);
+
+-- A single event/subscription pair has one durable delivery aggregate.
+CREATE UNIQUE INDEX ux_event_deliveries_event_subscription
+  ON event_deliveries (event_id, subscription_id);
+
+-- Per-attempt history remains readable after River retries, restart, or discard.
+CREATE TABLE event_delivery_attempts (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  delivery_id BIGINT NOT NULL REFERENCES event_deliveries(internal_id) ON DELETE CASCADE,
+  attempt_number INT NOT NULL,
+  status_code INT NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL,
+  error_message TEXT NOT NULL DEFAULT '',
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_event_delivery_attempts_delivery_attempt UNIQUE (delivery_id, attempt_number),
+  CONSTRAINT chk_event_delivery_attempts_number CHECK (attempt_number > 0),
+  CONSTRAINT chk_event_delivery_attempts_outcome CHECK (outcome IN ('delivered', 'failed'))
+);
+
+CREATE INDEX idx_event_delivery_attempts_delivery
+  ON event_delivery_attempts (delivery_id, attempt_number DESC);
 CREATE TABLE ai_search_operations (
   operation_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2736,6 +2759,12 @@ CREATE TABLE boards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
+  -- Implicit board owner (creator). Nullable so the additive migration
+  -- applies where boards rows already exist; the WorkspaceBoardStore
+  -- postgres implementation always sets it on insert and reads owner-less
+  -- rows as not found (fail-closed). The creator never needs a
+  -- board_memberships row (see v1_workspace.go).
+  owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
   CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
@@ -2784,6 +2813,7 @@ CREATE TABLE board_memberships (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
 );
 
@@ -2799,12 +2829,25 @@ CREATE TABLE board_share_tokens (
   granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
   created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   revoked_at TIMESTAMPTZ NULL,
   revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Opaque sht_ bearer id exposed in {token_id} URL segments. Nullable so
+  -- the additive migration applies where token rows already exist; the
+  -- store always sets it on insert. Only the bearer hash is kept in
+  -- token_secret (never the bearer), so share secrets need no reversible
+  -- encryption at rest.
+  token_id TEXT NULL,
+  token_prefix TEXT NOT NULL DEFAULT '',
+  -- Join counter. The durable audit trail itself is a #808 follow-up.
+  usage_count BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
   CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
+  CONSTRAINT uq_board_share_tokens_token_id UNIQUE (token_id),
   CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
   CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
+  CONSTRAINT chk_board_share_tokens_token_id CHECK (token_id IS NULL OR token_id LIKE 'sht\_%'),
+  CONSTRAINT chk_board_share_tokens_usage_count CHECK (usage_count >= 0),
   CONSTRAINT chk_board_share_tokens_revocation CHECK (
     (revoked_at IS NULL AND revoked_by_user_id IS NULL)
     OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)

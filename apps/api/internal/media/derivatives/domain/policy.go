@@ -1,9 +1,7 @@
 package domain
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
+	"ideaboard/api/internal/platform/contract"
 )
 
 type TierPolicy struct {
@@ -23,11 +21,7 @@ var OnDemandTierPolicies = map[string]TierPolicy{
 }
 
 func NewDerivativeID() (string, error) {
-	var value [12]byte
-	if _, err := rand.Read(value[:]); err != nil {
-		return "", fmt.Errorf("generate media derivative id: %w", err)
-	}
-	return "derivative_" + hex.EncodeToString(value[:]), nil
+	return contract.MintPublicID("derivative_", 12)
 }
 
 func DerivativeMimeType(format string) string {

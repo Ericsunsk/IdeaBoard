@@ -50,6 +50,7 @@
           :model-id="form.values.id"
           :provider="form.values.provider"
           :model-name="form.values.name"
+          :enabled="visible"
         />
       </div>
     </div>

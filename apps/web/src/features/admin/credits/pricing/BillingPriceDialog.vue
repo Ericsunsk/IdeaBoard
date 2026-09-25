@@ -89,6 +89,7 @@ import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
 import ModelMappingRow from './ModelMappingRow.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { pricingMappingFeature } from './groups'
+import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import type { AdminModelItem } from '../../models/domain/catalogData'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
@@ -145,7 +146,7 @@ const validationErrors = computed<Record<PricingVariant, string>>(() => {
       value != null &&
       (!Number.isSafeInteger(value) || value < 0 || value > maxPriceCredits)
     ) {
-      errors[variant] = `价格必须是 0 到 ${maxPriceCredits.toLocaleString('zh-CN')} 之间的整数`
+      errors[variant] = `价格必须是 0 到 ${formatLocaleNumber(maxPriceCredits)} 之间的整数`
     } else errors[variant] = ''
   }
   return errors

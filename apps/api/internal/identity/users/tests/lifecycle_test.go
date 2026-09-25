@@ -506,8 +506,20 @@ func TestUserDeletionFailuresRemainFrozenAndRetryConverges(t *testing.T) {
 		t.Fatalf("provision deletion user: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
-INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result)
-VALUES ('delete-convergence-task', $1, '', '', '', 'pending', '', '')`, provisioned.User.ID); err != nil {
+INSERT INTO workspaces (public_id, owner_user_id, name) VALUES ('ws_deleteconverge', $1, 'delete-converge')`, provisioned.User.ID); err != nil {
+		t.Fatalf("seed retained workspace: %v", err)
+	}
+	var workspaceID, billingAccountID int64
+	if err := pool.QueryRow(ctx, `SELECT internal_id FROM workspaces WHERE public_id = 'ws_deleteconverge'`).Scan(&workspaceID); err != nil {
+		t.Fatalf("read retained workspace: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `
+INSERT INTO billing_accounts (public_id, workspace_id) VALUES ('ba_deleteconverge', $1) RETURNING internal_id`, workspaceID).Scan(&billingAccountID); err != nil {
+		t.Fatalf("seed retained billing account: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status)
+VALUES ('task_deleteconvergence', $1, $2, $3, 'render', '{}', 'pending')`, workspaceID, provisioned.User.ID, billingAccountID); err != nil {
 		t.Fatalf("seed retained task: %v", err)
 	}
 
@@ -583,7 +595,7 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 	if err := pool.QueryRow(ctx, `SELECT auth_user_id, storage_uid FROM user_deletion_requests WHERE user_id = $1`, provisioned.User.ID).Scan(&retainedAuthUserID, &retainedStorageUID); err != nil {
 		t.Fatalf("read completed deletion request PII: %v", err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM tasks WHERE user_id = $1`, provisioned.User.ID).Scan(&taskCount); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM tasks WHERE submitter_user_id = $1`, provisioned.User.ID).Scan(&taskCount); err != nil {
 		t.Fatalf("count retained tasks: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_welcome_claims WHERE claimed_user_id = $1`, provisioned.User.ID).Scan(&claimCount); err != nil {

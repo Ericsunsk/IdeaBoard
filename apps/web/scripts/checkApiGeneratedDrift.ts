@@ -87,6 +87,12 @@ async function prepareGenerationWorkspace(tempRoot: string): Promise<string> {
       path.join(webRoot, 'src/shared/api/controlMutator.ts'),
       path.join(tempApiSourceRoot, 'controlMutator.ts'),
     ),
+    // The Public client resolves through its own transport mutator
+    // (v1 prefix); the drift workspace needs it too.
+    copyFile(
+      path.join(webRoot, 'src/shared/api/publicMutator.ts'),
+      path.join(tempApiSourceRoot, 'publicMutator.ts'),
+    ),
     symlink(path.join(webRoot, 'node_modules'), path.join(tempWebRoot, 'node_modules'), 'dir'),
   ])
 

@@ -9,6 +9,12 @@ CREATE TABLE boards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
+  -- Implicit board owner (creator). Nullable so the additive migration
+  -- applies where boards rows already exist; the WorkspaceBoardStore
+  -- postgres implementation always sets it on insert and reads owner-less
+  -- rows as not found (fail-closed). The creator never needs a
+  -- board_memberships row (see v1_workspace.go).
+  owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
   CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
@@ -57,6 +63,7 @@ CREATE TABLE board_memberships (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
 );
 
@@ -72,12 +79,25 @@ CREATE TABLE board_share_tokens (
   granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
   created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   revoked_at TIMESTAMPTZ NULL,
   revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Opaque sht_ bearer id exposed in {token_id} URL segments. Nullable so
+  -- the additive migration applies where token rows already exist; the
+  -- store always sets it on insert. Only the bearer hash is kept in
+  -- token_secret (never the bearer), so share secrets need no reversible
+  -- encryption at rest.
+  token_id TEXT NULL,
+  token_prefix TEXT NOT NULL DEFAULT '',
+  -- Join counter. The durable audit trail itself is a #808 follow-up.
+  usage_count BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
   CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
+  CONSTRAINT uq_board_share_tokens_token_id UNIQUE (token_id),
   CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
   CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
+  CONSTRAINT chk_board_share_tokens_token_id CHECK (token_id IS NULL OR token_id LIKE 'sht\_%'),
+  CONSTRAINT chk_board_share_tokens_usage_count CHECK (usage_count >= 0),
   CONSTRAINT chk_board_share_tokens_revocation CHECK (
     (revoked_at IS NULL AND revoked_by_user_id IS NULL)
     OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)

@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import type { CanvasConnection, CanvasNodeItem } from '../../../board'
 import {
   addEdgeToIndexes,
@@ -18,7 +19,7 @@ import {
 let transactionSequence = 0
 
 function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
+  return structuredClone(toRaw(value) as T)
 }
 import {
   toCanvasGraphEdgeId,

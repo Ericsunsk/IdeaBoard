@@ -1,6 +1,7 @@
 import { computed, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import type { ChartDataset } from 'chart.js'
 import { adminChartPlugins, adminChartTheme, defineAdminChartTooltip } from '../../shared/lib/chart'
+import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import {
   formatCompactNumber,
   resolveChartScaleMax,
@@ -22,35 +23,60 @@ type MonitorTimelineOptions = {
   filterStatus: Ref<ListAdminTasksStatusValue | null>
 }
 
+// GMT+8 wall-clock single source: every part comes from Intl with a fixed
+// Asia/Shanghai time zone, so axis labels never drift with the browser's local
+// time zone. Month names stay fixed en-US short ('Jan'..'Dec') to keep the
+// historical `Mon D` axis rendering byte-identical.
+const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
+
+const shanghaiWallPartsFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: SHANGHAI_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+const shanghaiMonthShortFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: SHANGHAI_TIME_ZONE,
+  month: 'short',
+})
+
 export function toGmt8Date(value: Date | number) {
   const date = value instanceof Date ? value : new Date(value)
-  const utc = date.getTime() + date.getTimezoneOffset() * 60000
-  return new Date(utc + 8 * 3600000)
+  const entries = shanghaiWallPartsFormat
+    .formatToParts(date)
+    .reduce<Record<string, string>>((result, part) => {
+      if (part.type !== 'literal') result[part.type] = part.value
+      return result
+    }, {})
+  return new Date(
+    Number(entries.year),
+    Number(entries.month) - 1,
+    Number(entries.day),
+    Number(entries.hour),
+    Number(entries.minute),
+    Number(entries.second),
+  )
 }
 
-function formatXAxisTime(date: Date, durationMs: number) {
-  const gmt8 = toGmt8Date(date)
-  const hh = String(gmt8.getHours()).padStart(2, '0')
-  const mm = String(gmt8.getMinutes()).padStart(2, '0')
+export function formatXAxisTime(date: Date, durationMs: number) {
+  const entries = shanghaiWallPartsFormat
+    .formatToParts(date)
+    .reduce<Record<string, string>>((result, part) => {
+      if (part.type !== 'literal') result[part.type] = part.value
+      return result
+    }, {})
+  const hh = entries.hour ?? '00'
+  const mm = entries.minute ?? '00'
   if (durationMs <= 12 * 3600 * 1000) {
     return `${hh}:${mm}`
   }
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ]
-  const mon = months[gmt8.getMonth()]
-  const day = gmt8.getDate()
+  const mon = shanghaiMonthShortFormat.format(date)
+  const day = Number(entries.day)
   if (durationMs <= 24 * 3600 * 1000) {
     return `${mon} ${day}, ${hh}:${mm}`
   }
@@ -247,7 +273,7 @@ export function useMonitorTimeline(options: MonitorTimelineOptions) {
             label(context: { dataset: { label?: string }; raw: unknown }) {
               const label = context.dataset.label || ''
               const val = context.raw
-              const formatted = typeof val === 'number' ? val.toLocaleString() : String(val ?? 0)
+              const formatted = typeof val === 'number' ? formatLocaleNumber(val) : String(val ?? 0)
               return ` ${label}: ${formatted}`
             },
           },

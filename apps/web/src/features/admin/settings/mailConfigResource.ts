@@ -116,7 +116,9 @@ function controlError(code: string, message: string): Error & { code?: string | 
 }
 
 // withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
+// Branch on code, never on message text. Reads never carry an operator
+// reason, so `control_reason_required` only fires on writes; 403/404/503
+// converge here for both reads and the write side.
 function withControlCopy(error: unknown, fallback: string): Error {
   const code = readErrorCode(error)
   if (code === 'idempotency_conflict' || code === 409) {
@@ -124,6 +126,15 @@ function withControlCopy(error: unknown, fallback: string): Error {
   }
   if (code === 'control_reason_required') {
     return controlError(code, '需要填写操作原因')
+  }
+  if (code === 'forbidden' || code === 403) {
+    return controlError('forbidden', '权限不足，无法操作邮件配置')
+  }
+  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
+    return controlError('control_not_found', '邮件配置不存在')
+  }
+  if (code === 'service_unavailable' || code === 503) {
+    return controlError('service_unavailable', '邮件服务暂不可用，请稍后重试')
   }
   if (error instanceof Error) return error
   return controlError('control_failed', fallback)
@@ -136,7 +147,7 @@ function readErrorCode(error: unknown): string | number | undefined {
   }
   if (error && typeof error === 'object' && 'status' in error) {
     const status = (error as { status?: unknown }).status
-    if (status === 409) return 409
+    if (status === 403 || status === 404 || status === 503 || status === 409) return status
   }
   return undefined
 }

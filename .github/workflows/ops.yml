@@ -87,6 +87,33 @@ jobs:
             scripts/ci-legacy-media-zero-scan-test.sh \
             scripts/ci-workflow-contract-test.sh
 
+      - name: Lint Dockerfiles
+        run: |
+          docker run --rm \
+            -v "${PWD}:/work:ro" \
+            -w /work \
+            --entrypoint hadolint \
+            hadolint/hadolint@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
+            apps/api/Dockerfile apps/auth/Dockerfile
+
+      - name: Install yamllint
+        shell: bash
+        run: |
+          if ! command -v yamllint >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y yamllint
+          fi
+          yamllint --version
+
+      - name: Lint compose and Grype YAML
+        shell: bash
+        run: |
+          yamllint \
+            docker/compose.yml \
+            docker/compose.npm.yml \
+            docker/compose.local.yml \
+            .grype.yaml
+
       - name: Verify manifest-only deployment contract
         shell: bash
         run: bash scripts/deploy-stack-test.sh

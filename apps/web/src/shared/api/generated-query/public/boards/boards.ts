@@ -57,8 +57,7 @@ import type {
   UpdateBoardRequest,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -85,9 +84,9 @@ export const getListBoardsUrl = (workspaceId: string, params?: ListBoardsParams)
 export const listBoards = async (
   workspaceId: string,
   params?: ListBoardsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedBoards> => {
-  return orvalMutator<PaginatedBoards>(getListBoardsUrl(workspaceId, params), {
+  return publicMutator<PaginatedBoards>(getListBoardsUrl(workspaceId, params), {
     ...options,
     method: 'GET',
   })
@@ -102,13 +101,13 @@ export const getListBoardsQueryKey = (
 
 export const getListBoardsQueryOptions = <
   TData = Awaited<ReturnType<typeof listBoards>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListBoardsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoards>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -127,9 +126,7 @@ export const getListBoardsQueryOptions = <
 }
 
 export type ListBoardsQueryResult = NonNullable<Awaited<ReturnType<typeof listBoards>>>
-export type ListBoardsQueryError = ErrorType<
-  BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
+export type ListBoardsQueryError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary List accessible boards of a workspace with cursor pagination
@@ -137,13 +134,13 @@ export type ListBoardsQueryError = ErrorType<
 
 export function useListBoards<
   TData = Awaited<ReturnType<typeof listBoards>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListBoardsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoards>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -169,7 +166,7 @@ export const getCreateBoardUrl = (workspaceId: string) => {
 export const createBoard = async (
   workspaceId: string,
   createBoardRequest: CreateBoardRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -190,7 +187,7 @@ export const createBoard = async (
     }
     return headers
   }
-  return orvalMutator<BoardEnvelope>(getCreateBoardUrl(workspaceId), {
+  return publicMutator<BoardEnvelope>(getCreateBoardUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -201,13 +198,12 @@ export const createBoard = async (
 export const getCreateBoardMutationKey = () => ['createBoard'] as const
 
 export const getCreateBoardMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -216,7 +212,7 @@ export const getCreateBoardMutationOptions = <
     CreateBoardMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createBoard>>,
   TError,
@@ -243,30 +239,25 @@ export const getCreateBoardMutationOptions = <
 }
 
 export type CreateBoardMutationResult = NonNullable<Awaited<ReturnType<typeof createBoard>>>
-export type CreateBoardMutationBody = BodyType<CreateBoardRequest>
-export type CreateBoardMutationError = ErrorType<
+export type CreateBoardMutationBody = CreateBoardRequest
+export type CreateBoardMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
-export type CreateBoardMutationVariables = {
-  workspaceId: string
-  data: BodyType<CreateBoardRequest>
-}
+export type CreateBoardMutationVariables = { workspaceId: string; data: CreateBoardRequest }
 
 /**
  * @summary Create a board (workspace members only)
  */
 export const useCreateBoard = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -276,7 +267,7 @@ export const useCreateBoard = <
       CreateBoardMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -298,7 +289,7 @@ export const getJoinBoardByTokenUrl = (workspaceId: string) => {
 export const joinBoardByToken = async (
   workspaceId: string,
   joinBoardRequest: JoinBoardRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -319,7 +310,7 @@ export const joinBoardByToken = async (
     }
     return headers
   }
-  return orvalMutator<BoardEnvelope>(getJoinBoardByTokenUrl(workspaceId), {
+  return publicMutator<BoardEnvelope>(getJoinBoardByTokenUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -330,9 +321,7 @@ export const joinBoardByToken = async (
 export const getJoinBoardByTokenMutationKey = () => ['joinBoardByToken'] as const
 
 export const getJoinBoardByTokenMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -341,7 +330,7 @@ export const getJoinBoardByTokenMutationOptions = <
     JoinBoardByTokenMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof joinBoardByToken>>,
   TError,
@@ -370,22 +359,16 @@ export const getJoinBoardByTokenMutationOptions = <
 export type JoinBoardByTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof joinBoardByToken>>
 >
-export type JoinBoardByTokenMutationBody = BodyType<JoinBoardRequest>
-export type JoinBoardByTokenMutationError = ErrorType<
+export type JoinBoardByTokenMutationBody = JoinBoardRequest
+export type JoinBoardByTokenMutationError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
->
-export type JoinBoardByTokenMutationVariables = {
-  workspaceId: string
-  data: BodyType<JoinBoardRequest>
-}
+export type JoinBoardByTokenMutationVariables = { workspaceId: string; data: JoinBoardRequest }
 
 /**
  * @summary Join a board with a share bearer
  */
 export const useJoinBoardByToken = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -395,7 +378,7 @@ export const useJoinBoardByToken = <
       JoinBoardByTokenMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -417,9 +400,9 @@ export const getGetBoardUrl = (workspaceId: string, boardId: string) => {
 export const getBoard = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
-  return orvalMutator<BoardEnvelope>(getGetBoardUrl(workspaceId, boardId), {
+  return publicMutator<BoardEnvelope>(getGetBoardUrl(workspaceId, boardId), {
     ...options,
     method: 'GET',
   })
@@ -434,13 +417,13 @@ export const getGetBoardQueryKey = (
 
 export const getGetBoardQueryOptions = <
   TData = Awaited<ReturnType<typeof getBoard>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoard>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -465,7 +448,7 @@ export const getGetBoardQueryOptions = <
 }
 
 export type GetBoardQueryResult = NonNullable<Awaited<ReturnType<typeof getBoard>>>
-export type GetBoardQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetBoardQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get a board (any board role)
@@ -473,13 +456,13 @@ export type GetBoardQueryError = ErrorType<UnauthorizedResponse | NotFoundRespon
 
 export function useGetBoard<
   TData = Awaited<ReturnType<typeof getBoard>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoard>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -506,7 +489,7 @@ export const updateBoard = async (
   workspaceId: string,
   boardId: string,
   updateBoardRequest: UpdateBoardRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -527,7 +510,7 @@ export const updateBoard = async (
     }
     return headers
   }
-  return orvalMutator<BoardEnvelope>(getUpdateBoardUrl(workspaceId, boardId), {
+  return publicMutator<BoardEnvelope>(getUpdateBoardUrl(workspaceId, boardId), {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -538,13 +521,12 @@ export const updateBoard = async (
 export const getUpdateBoardMutationKey = () => ['updateBoard'] as const
 
 export const getUpdateBoardMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -553,7 +535,7 @@ export const getUpdateBoardMutationOptions = <
     UpdateBoardMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateBoard>>,
   TError,
@@ -580,31 +562,29 @@ export const getUpdateBoardMutationOptions = <
 }
 
 export type UpdateBoardMutationResult = NonNullable<Awaited<ReturnType<typeof updateBoard>>>
-export type UpdateBoardMutationBody = BodyType<UpdateBoardRequest>
-export type UpdateBoardMutationError = ErrorType<
+export type UpdateBoardMutationBody = UpdateBoardRequest
+export type UpdateBoardMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type UpdateBoardMutationVariables = {
   workspaceId: string
   boardId: string
-  data: BodyType<UpdateBoardRequest>
+  data: UpdateBoardRequest
 }
 
 /**
  * @summary Rename a board (owner/editor only)
  */
 export const useUpdateBoard = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -614,7 +594,7 @@ export const useUpdateBoard = <
       UpdateBoardMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -636,9 +616,9 @@ export const getArchiveBoardUrl = (workspaceId: string, boardId: string) => {
 export const archiveBoard = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
-  return orvalMutator<BoardEnvelope>(getArchiveBoardUrl(workspaceId, boardId), {
+  return publicMutator<BoardEnvelope>(getArchiveBoardUrl(workspaceId, boardId), {
     ...options,
     method: 'POST',
   })
@@ -647,13 +627,12 @@ export const archiveBoard = async (
 export const getArchiveBoardMutationKey = () => ['archiveBoard'] as const
 
 export const getArchiveBoardMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -662,7 +641,7 @@ export const getArchiveBoardMutationOptions = <
     ArchiveBoardMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof archiveBoard>>,
   TError,
@@ -690,26 +669,24 @@ export const getArchiveBoardMutationOptions = <
 
 export type ArchiveBoardMutationResult = NonNullable<Awaited<ReturnType<typeof archiveBoard>>>
 
-export type ArchiveBoardMutationError = ErrorType<
+export type ArchiveBoardMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type ArchiveBoardMutationVariables = { workspaceId: string; boardId: string }
 
 /**
  * @summary Archive a board (owner/editor only)
  */
 export const useArchiveBoard = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -719,7 +696,7 @@ export const useArchiveBoard = <
       ArchiveBoardMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -741,9 +718,9 @@ export const getRestoreBoardUrl = (workspaceId: string, boardId: string) => {
 export const restoreBoard = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardEnvelope> => {
-  return orvalMutator<BoardEnvelope>(getRestoreBoardUrl(workspaceId, boardId), {
+  return publicMutator<BoardEnvelope>(getRestoreBoardUrl(workspaceId, boardId), {
     ...options,
     method: 'POST',
   })
@@ -752,13 +729,12 @@ export const restoreBoard = async (
 export const getRestoreBoardMutationKey = () => ['restoreBoard'] as const
 
 export const getRestoreBoardMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -767,7 +743,7 @@ export const getRestoreBoardMutationOptions = <
     RestoreBoardMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof restoreBoard>>,
   TError,
@@ -795,26 +771,24 @@ export const getRestoreBoardMutationOptions = <
 
 export type RestoreBoardMutationResult = NonNullable<Awaited<ReturnType<typeof restoreBoard>>>
 
-export type RestoreBoardMutationError = ErrorType<
+export type RestoreBoardMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type RestoreBoardMutationVariables = { workspaceId: string; boardId: string }
 
 /**
  * @summary Restore an archived board (owner/editor only)
  */
 export const useRestoreBoard = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -824,7 +798,7 @@ export const useRestoreBoard = <
       RestoreBoardMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -846,9 +820,9 @@ export const getGetBoardDocumentUrl = (workspaceId: string, boardId: string) => 
 export const getBoardDocument = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardDocumentEnvelope> => {
-  return orvalMutator<BoardDocumentEnvelope>(getGetBoardDocumentUrl(workspaceId, boardId), {
+  return publicMutator<BoardDocumentEnvelope>(getGetBoardDocumentUrl(workspaceId, boardId), {
     ...options,
     method: 'GET',
   })
@@ -863,13 +837,13 @@ export const getGetBoardDocumentQueryKey = (
 
 export const getGetBoardDocumentQueryOptions = <
   TData = Awaited<ReturnType<typeof getBoardDocument>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardDocument>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -894,7 +868,7 @@ export const getGetBoardDocumentQueryOptions = <
 }
 
 export type GetBoardDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof getBoardDocument>>>
-export type GetBoardDocumentQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetBoardDocumentQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get the board document snapshot (any board role)
@@ -902,13 +876,13 @@ export type GetBoardDocumentQueryError = ErrorType<UnauthorizedResponse | NotFou
 
 export function useGetBoardDocument<
   TData = Awaited<ReturnType<typeof getBoardDocument>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardDocument>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -935,7 +909,7 @@ export const replaceBoardDocument = async (
   workspaceId: string,
   boardId: string,
   replaceBoardDocumentRequest: ReplaceBoardDocumentRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardDocumentEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -956,7 +930,7 @@ export const replaceBoardDocument = async (
     }
     return headers
   }
-  return orvalMutator<BoardDocumentEnvelope>(getReplaceBoardDocumentUrl(workspaceId, boardId), {
+  return publicMutator<BoardDocumentEnvelope>(getReplaceBoardDocumentUrl(workspaceId, boardId), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -967,13 +941,12 @@ export const replaceBoardDocument = async (
 export const getReplaceBoardDocumentMutationKey = () => ['replaceBoardDocument'] as const
 
 export const getReplaceBoardDocumentMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -982,7 +955,7 @@ export const getReplaceBoardDocumentMutationOptions = <
     ReplaceBoardDocumentMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof replaceBoardDocument>>,
   TError,
@@ -1011,31 +984,29 @@ export const getReplaceBoardDocumentMutationOptions = <
 export type ReplaceBoardDocumentMutationResult = NonNullable<
   Awaited<ReturnType<typeof replaceBoardDocument>>
 >
-export type ReplaceBoardDocumentMutationBody = BodyType<ReplaceBoardDocumentRequest>
-export type ReplaceBoardDocumentMutationError = ErrorType<
+export type ReplaceBoardDocumentMutationBody = ReplaceBoardDocumentRequest
+export type ReplaceBoardDocumentMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type ReplaceBoardDocumentMutationVariables = {
   workspaceId: string
   boardId: string
-  data: BodyType<ReplaceBoardDocumentRequest>
+  data: ReplaceBoardDocumentRequest
 }
 
 /**
  * @summary Replace the board document (owner/editor only, optimistic concurrency)
  */
 export const useReplaceBoardDocument = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1045,7 +1016,7 @@ export const useReplaceBoardDocument = <
       ReplaceBoardDocumentMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1084,9 +1055,9 @@ export const listBoardRevisions = async (
   workspaceId: string,
   boardId: string,
   params?: ListBoardRevisionsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedBoardRevisions> => {
-  return orvalMutator<PaginatedBoardRevisions>(
+  return publicMutator<PaginatedBoardRevisions>(
     getListBoardRevisionsUrl(workspaceId, boardId, params),
     {
       ...options,
@@ -1112,14 +1083,14 @@ export const getListBoardRevisionsQueryKey = (
 
 export const getListBoardRevisionsQueryOptions = <
   TData = Awaited<ReturnType<typeof listBoardRevisions>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListBoardRevisionsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardRevisions>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -1149,9 +1120,8 @@ export const getListBoardRevisionsQueryOptions = <
 export type ListBoardRevisionsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listBoardRevisions>>
 >
-export type ListBoardRevisionsQueryError = ErrorType<
+export type ListBoardRevisionsQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 
 /**
  * @summary List immutable document revisions (any board role)
@@ -1159,14 +1129,14 @@ export type ListBoardRevisionsQueryError = ErrorType<
 
 export function useListBoardRevisions<
   TData = Awaited<ReturnType<typeof listBoardRevisions>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListBoardRevisionsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardRevisions>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1197,9 +1167,9 @@ export const getBoardRevision = async (
   workspaceId: string,
   boardId: string,
   revisionId: number,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardRevisionDetailEnvelope> => {
-  return orvalMutator<BoardRevisionDetailEnvelope>(
+  return publicMutator<BoardRevisionDetailEnvelope>(
     getGetBoardRevisionUrl(workspaceId, boardId, revisionId),
     {
       ...options,
@@ -1218,14 +1188,14 @@ export const getGetBoardRevisionQueryKey = (
 
 export const getGetBoardRevisionQueryOptions = <
   TData = Awaited<ReturnType<typeof getBoardRevision>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   revisionId: MaybeRefOrGetter<number>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardRevision>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -1255,7 +1225,7 @@ export const getGetBoardRevisionQueryOptions = <
 }
 
 export type GetBoardRevisionQueryResult = NonNullable<Awaited<ReturnType<typeof getBoardRevision>>>
-export type GetBoardRevisionQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetBoardRevisionQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get one immutable revision with its snapshot (any board role)
@@ -1263,14 +1233,14 @@ export type GetBoardRevisionQueryError = ErrorType<UnauthorizedResponse | NotFou
 
 export function useGetBoardRevision<
   TData = Awaited<ReturnType<typeof getBoardRevision>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   revisionId: MaybeRefOrGetter<number>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBoardRevision>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1296,9 +1266,9 @@ export const getListBoardMembersUrl = (workspaceId: string, boardId: string) => 
 export const listBoardMembers = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardMemberList> => {
-  return orvalMutator<BoardMemberList>(getListBoardMembersUrl(workspaceId, boardId), {
+  return publicMutator<BoardMemberList>(getListBoardMembersUrl(workspaceId, boardId), {
     ...options,
     method: 'GET',
   })
@@ -1313,13 +1283,13 @@ export const getListBoardMembersQueryKey = (
 
 export const getListBoardMembersQueryOptions = <
   TData = Awaited<ReturnType<typeof listBoardMembers>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -1344,7 +1314,7 @@ export const getListBoardMembersQueryOptions = <
 }
 
 export type ListBoardMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listBoardMembers>>>
-export type ListBoardMembersQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type ListBoardMembersQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary List board members (any board role)
@@ -1352,13 +1322,13 @@ export type ListBoardMembersQueryError = ErrorType<UnauthorizedResponse | NotFou
 
 export function useListBoardMembers<
   TData = Awaited<ReturnType<typeof listBoardMembers>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1385,7 +1355,7 @@ export const addBoardMember = async (
   workspaceId: string,
   boardId: string,
   addBoardMemberRequest: AddBoardMemberRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardMemberEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -1406,7 +1376,7 @@ export const addBoardMember = async (
     }
     return headers
   }
-  return orvalMutator<BoardMemberEnvelope>(getAddBoardMemberUrl(workspaceId, boardId), {
+  return publicMutator<BoardMemberEnvelope>(getAddBoardMemberUrl(workspaceId, boardId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1417,14 +1387,13 @@ export const addBoardMember = async (
 export const getAddBoardMemberMutationKey = () => ['addBoardMember'] as const
 
 export const getAddBoardMemberMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1433,7 +1402,7 @@ export const getAddBoardMemberMutationOptions = <
     AddBoardMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof addBoardMember>>,
   TError,
@@ -1460,33 +1429,31 @@ export const getAddBoardMemberMutationOptions = <
 }
 
 export type AddBoardMemberMutationResult = NonNullable<Awaited<ReturnType<typeof addBoardMember>>>
-export type AddBoardMemberMutationBody = BodyType<AddBoardMemberRequest>
-export type AddBoardMemberMutationError = ErrorType<
+export type AddBoardMemberMutationBody = AddBoardMemberRequest
+export type AddBoardMemberMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type AddBoardMemberMutationVariables = {
   workspaceId: string
   boardId: string
-  data: BodyType<AddBoardMemberRequest>
+  data: AddBoardMemberRequest
 }
 
 /**
  * @summary Grant a board role (owner only)
  */
 export const useAddBoardMember = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1496,7 +1463,7 @@ export const useAddBoardMember = <
       AddBoardMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1520,7 +1487,7 @@ export const updateBoardMember = async (
   boardId: string,
   memberId: string,
   updateBoardMemberRequest: UpdateBoardMemberRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardMemberEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -1541,7 +1508,7 @@ export const updateBoardMember = async (
     }
     return headers
   }
-  return orvalMutator<BoardMemberEnvelope>(
+  return publicMutator<BoardMemberEnvelope>(
     getUpdateBoardMemberUrl(workspaceId, boardId, memberId),
     {
       ...options,
@@ -1555,13 +1522,12 @@ export const updateBoardMember = async (
 export const getUpdateBoardMemberMutationKey = () => ['updateBoardMember'] as const
 
 export const getUpdateBoardMemberMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1570,7 +1536,7 @@ export const getUpdateBoardMemberMutationOptions = <
     UpdateBoardMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateBoardMember>>,
   TError,
@@ -1599,32 +1565,30 @@ export const getUpdateBoardMemberMutationOptions = <
 export type UpdateBoardMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateBoardMember>>
 >
-export type UpdateBoardMemberMutationBody = BodyType<UpdateBoardMemberRequest>
-export type UpdateBoardMemberMutationError = ErrorType<
+export type UpdateBoardMemberMutationBody = UpdateBoardMemberRequest
+export type UpdateBoardMemberMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
->
 export type UpdateBoardMemberMutationVariables = {
   workspaceId: string
   boardId: string
   memberId: string
-  data: BodyType<UpdateBoardMemberRequest>
+  data: UpdateBoardMemberRequest
 }
 
 /**
  * @summary Change a board member role (owner only)
  */
 export const useUpdateBoardMember = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1634,7 +1598,7 @@ export const useUpdateBoardMember = <
       UpdateBoardMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1657,9 +1621,9 @@ export const removeBoardMember = async (
   workspaceId: string,
   boardId: string,
   memberId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<DeletedEnvelope> => {
-  return orvalMutator<DeletedEnvelope>(getRemoveBoardMemberUrl(workspaceId, boardId, memberId), {
+  return publicMutator<DeletedEnvelope>(getRemoveBoardMemberUrl(workspaceId, boardId, memberId), {
     ...options,
     method: 'DELETE',
   })
@@ -1668,13 +1632,12 @@ export const removeBoardMember = async (
 export const getRemoveBoardMemberMutationKey = () => ['removeBoardMember'] as const
 
 export const getRemoveBoardMemberMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1683,7 +1646,7 @@ export const getRemoveBoardMemberMutationOptions = <
     RemoveBoardMemberMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof removeBoardMember>>,
   TError,
@@ -1713,13 +1676,12 @@ export type RemoveBoardMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeBoardMember>>
 >
 
-export type RemoveBoardMemberMutationError = ErrorType<
+export type RemoveBoardMemberMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type RemoveBoardMemberMutationVariables = {
   workspaceId: string
   boardId: string
@@ -1730,13 +1692,12 @@ export type RemoveBoardMemberMutationVariables = {
  * @summary Remove a board member (owner manages the roster; anyone may leave)
  */
 export const useRemoveBoardMember = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1746,7 +1707,7 @@ export const useRemoveBoardMember = <
       RemoveBoardMemberMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1768,9 +1729,9 @@ export const getListShareTokensUrl = (workspaceId: string, boardId: string) => {
 export const listShareTokens = async (
   workspaceId: string,
   boardId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardShareTokenList> => {
-  return orvalMutator<BoardShareTokenList>(getListShareTokensUrl(workspaceId, boardId), {
+  return publicMutator<BoardShareTokenList>(getListShareTokensUrl(workspaceId, boardId), {
     ...options,
     method: 'GET',
   })
@@ -1785,13 +1746,13 @@ export const getListShareTokensQueryKey = (
 
 export const getListShareTokensQueryOptions = <
   TData = Awaited<ReturnType<typeof listShareTokens>>,
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShareTokens>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -1816,9 +1777,7 @@ export const getListShareTokensQueryOptions = <
 }
 
 export type ListShareTokensQueryResult = NonNullable<Awaited<ReturnType<typeof listShareTokens>>>
-export type ListShareTokensQueryError = ErrorType<
-  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
->
+export type ListShareTokensQueryError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
 
 /**
  * @summary List share tokens without bearers (owner only)
@@ -1826,13 +1785,13 @@ export type ListShareTokensQueryError = ErrorType<
 
 export function useListShareTokens<
   TData = Awaited<ReturnType<typeof listShareTokens>>,
-  TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   boardId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShareTokens>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -1859,7 +1818,7 @@ export const createShareToken = async (
   workspaceId: string,
   boardId: string,
   createShareTokenRequest: CreateShareTokenRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<BoardShareTokenEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -1880,7 +1839,7 @@ export const createShareToken = async (
     }
     return headers
   }
-  return orvalMutator<BoardShareTokenEnvelope>(getCreateShareTokenUrl(workspaceId, boardId), {
+  return publicMutator<BoardShareTokenEnvelope>(getCreateShareTokenUrl(workspaceId, boardId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1891,14 +1850,13 @@ export const createShareToken = async (
 export const getCreateShareTokenMutationKey = () => ['createShareToken'] as const
 
 export const getCreateShareTokenMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1907,7 +1865,7 @@ export const getCreateShareTokenMutationOptions = <
     CreateShareTokenMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createShareToken>>,
   TError,
@@ -1936,33 +1894,31 @@ export const getCreateShareTokenMutationOptions = <
 export type CreateShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof createShareToken>>
 >
-export type CreateShareTokenMutationBody = BodyType<CreateShareTokenRequest>
-export type CreateShareTokenMutationError = ErrorType<
+export type CreateShareTokenMutationBody = CreateShareTokenRequest
+export type CreateShareTokenMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type CreateShareTokenMutationVariables = {
   workspaceId: string
   boardId: string
-  data: BodyType<CreateShareTokenRequest>
+  data: CreateShareTokenRequest
 }
 
 /**
  * @summary Create a share bearer (owner only)
  */
 export const useCreateShareToken = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1972,7 +1928,7 @@ export const useCreateShareToken = <
       CreateShareTokenMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1995,9 +1951,9 @@ export const revokeShareToken = async (
   workspaceId: string,
   boardId: string,
   tokenId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<DeletedEnvelope> => {
-  return orvalMutator<DeletedEnvelope>(getRevokeShareTokenUrl(workspaceId, boardId, tokenId), {
+  return publicMutator<DeletedEnvelope>(getRevokeShareTokenUrl(workspaceId, boardId, tokenId), {
     ...options,
     method: 'DELETE',
   })
@@ -2006,13 +1962,12 @@ export const revokeShareToken = async (
 export const getRevokeShareTokenMutationKey = () => ['revokeShareToken'] as const
 
 export const getRevokeShareTokenMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2021,7 +1976,7 @@ export const getRevokeShareTokenMutationOptions = <
     RevokeShareTokenMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof revokeShareToken>>,
   TError,
@@ -2051,13 +2006,12 @@ export type RevokeShareTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof revokeShareToken>>
 >
 
-export type RevokeShareTokenMutationError = ErrorType<
+export type RevokeShareTokenMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type RevokeShareTokenMutationVariables = {
   workspaceId: string
   boardId: string
@@ -2068,13 +2022,12 @@ export type RevokeShareTokenMutationVariables = {
  * @summary Revoke a share token (owner only)
  */
 export const useRevokeShareToken = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -2084,7 +2037,7 @@ export const useRevokeShareToken = <
       RevokeShareTokenMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

@@ -1,4 +1,5 @@
 import { Canvas, FabricImage, PencilBrush, Point } from 'fabric'
+import { clamp } from '../../../../../shared/utils/number.ts'
 import { buildMaskCommitResult } from '../lib/maskPaintingCanvas.ts'
 import {
   clampMaskBrushSize,
@@ -89,7 +90,7 @@ function toCssSize(value: number): number {
 }
 
 function clampToPlane(value: number, max: number): number {
-  return Math.max(0, Math.min(max, value))
+  return clamp(value, 0, max)
 }
 
 export class FabricMaskPainter implements MaskPainter {

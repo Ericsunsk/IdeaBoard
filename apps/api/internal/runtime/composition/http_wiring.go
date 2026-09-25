@@ -113,6 +113,10 @@ func newAppRouter(
 			TaskQueue:             taskServices.workspaceTaskQueue,
 			TaskAssets:            taskServices.workspaceTaskAssets,
 			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+			// #833: the webhook store is shared with the River delivery
+			// worker (built in task_wiring.go where the client exists),
+			// so HTTP views and the worker observe one registry.
+			Webhooks: taskServices.webhooks,
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning

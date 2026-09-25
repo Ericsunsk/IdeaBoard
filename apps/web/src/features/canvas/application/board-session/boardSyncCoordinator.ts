@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import {
   createEmptyBoardSnapshot,
   InvalidBoardStateError,
@@ -60,9 +61,9 @@ export type BoardSaveResult = {
 }
 
 function cloneBoardSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
-  // Canvas snapshots are JSON domain data. JSON serialization also unwraps any Vue
+  // Canvas snapshots are JSON domain data. structuredClone also unwraps any Vue
   // proxies that reached this boundary without retaining references to live state.
-  return JSON.parse(JSON.stringify(snapshot)) as BoardSnapshot
+  return structuredClone(toRaw(snapshot) as BoardSnapshot)
 }
 
 function isRecoverableSaveStatus(status: SaveStatus): boolean {

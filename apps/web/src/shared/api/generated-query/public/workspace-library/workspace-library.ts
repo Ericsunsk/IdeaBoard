@@ -53,8 +53,7 @@ import type {
   UnprocessableEntityResponse,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -84,9 +83,9 @@ export const getListWorkspaceLibraryFoldersUrl = (
 export const listWorkspaceLibraryFolders = async (
   workspaceId: string,
   params?: ListWorkspaceLibraryFoldersParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedLibraryFolders> => {
-  return orvalMutator<PaginatedLibraryFolders>(
+  return publicMutator<PaginatedLibraryFolders>(
     getListWorkspaceLibraryFoldersUrl(workspaceId, params),
     {
       ...options,
@@ -104,7 +103,7 @@ export const getListWorkspaceLibraryFoldersQueryKey = (
 
 export const getListWorkspaceLibraryFoldersQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceLibraryFolders>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceLibraryFoldersParams>,
@@ -112,7 +111,7 @@ export const getListWorkspaceLibraryFoldersQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceLibraryFolders>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -138,9 +137,8 @@ export const getListWorkspaceLibraryFoldersQueryOptions = <
 export type ListWorkspaceLibraryFoldersQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceLibraryFolders>>
 >
-export type ListWorkspaceLibraryFoldersQueryError = ErrorType<
+export type ListWorkspaceLibraryFoldersQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 
 /**
  * @summary List workspace library folders with cursor pagination (members only)
@@ -148,7 +146,7 @@ export type ListWorkspaceLibraryFoldersQueryError = ErrorType<
 
 export function useListWorkspaceLibraryFolders<
   TData = Awaited<ReturnType<typeof listWorkspaceLibraryFolders>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceLibraryFoldersParams>,
@@ -156,7 +154,7 @@ export function useListWorkspaceLibraryFolders<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceLibraryFolders>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -182,7 +180,7 @@ export const getCreateWorkspaceLibraryFolderUrl = (workspaceId: string) => {
 export const createWorkspaceLibraryFolder = async (
   workspaceId: string,
   createLibraryFolderRequest: CreateLibraryFolderRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryFolderEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -203,7 +201,7 @@ export const createWorkspaceLibraryFolder = async (
     }
     return headers
   }
-  return orvalMutator<LibraryFolderEnvelope>(getCreateWorkspaceLibraryFolderUrl(workspaceId), {
+  return publicMutator<LibraryFolderEnvelope>(getCreateWorkspaceLibraryFolderUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -215,13 +213,12 @@ export const getCreateWorkspaceLibraryFolderMutationKey = () =>
   ['createWorkspaceLibraryFolder'] as const
 
 export const getCreateWorkspaceLibraryFolderMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -230,7 +227,7 @@ export const getCreateWorkspaceLibraryFolderMutationOptions = <
     CreateWorkspaceLibraryFolderMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceLibraryFolder>>,
   TError,
@@ -259,30 +256,28 @@ export const getCreateWorkspaceLibraryFolderMutationOptions = <
 export type CreateWorkspaceLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceLibraryFolder>>
 >
-export type CreateWorkspaceLibraryFolderMutationBody = BodyType<CreateLibraryFolderRequest>
-export type CreateWorkspaceLibraryFolderMutationError = ErrorType<
+export type CreateWorkspaceLibraryFolderMutationBody = CreateLibraryFolderRequest
+export type CreateWorkspaceLibraryFolderMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type CreateWorkspaceLibraryFolderMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateLibraryFolderRequest>
+  data: CreateLibraryFolderRequest
 }
 
 /**
  * @summary Create a workspace library folder (members only)
  */
 export const useCreateWorkspaceLibraryFolder = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -292,7 +287,7 @@ export const useCreateWorkspaceLibraryFolder = <
       CreateWorkspaceLibraryFolderMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -315,7 +310,7 @@ export const renameWorkspaceLibraryFolder = async (
   workspaceId: string,
   folderId: string,
   renameLibraryFolderRequest: RenameLibraryFolderRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryFolderEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -336,7 +331,7 @@ export const renameWorkspaceLibraryFolder = async (
     }
     return headers
   }
-  return orvalMutator<LibraryFolderEnvelope>(
+  return publicMutator<LibraryFolderEnvelope>(
     getRenameWorkspaceLibraryFolderUrl(workspaceId, folderId),
     {
       ...options,
@@ -351,13 +346,12 @@ export const getRenameWorkspaceLibraryFolderMutationKey = () =>
   ['renameWorkspaceLibraryFolder'] as const
 
 export const getRenameWorkspaceLibraryFolderMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -366,7 +360,7 @@ export const getRenameWorkspaceLibraryFolderMutationOptions = <
     RenameWorkspaceLibraryFolderMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof renameWorkspaceLibraryFolder>>,
   TError,
@@ -395,31 +389,29 @@ export const getRenameWorkspaceLibraryFolderMutationOptions = <
 export type RenameWorkspaceLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof renameWorkspaceLibraryFolder>>
 >
-export type RenameWorkspaceLibraryFolderMutationBody = BodyType<RenameLibraryFolderRequest>
-export type RenameWorkspaceLibraryFolderMutationError = ErrorType<
+export type RenameWorkspaceLibraryFolderMutationBody = RenameLibraryFolderRequest
+export type RenameWorkspaceLibraryFolderMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type RenameWorkspaceLibraryFolderMutationVariables = {
   workspaceId: string
   folderId: string
-  data: BodyType<RenameLibraryFolderRequest>
+  data: RenameLibraryFolderRequest
 }
 
 /**
  * @summary Rename a workspace library folder (members only)
  */
 export const useRenameWorkspaceLibraryFolder = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -429,7 +421,7 @@ export const useRenameWorkspaceLibraryFolder = <
       RenameWorkspaceLibraryFolderMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -451,9 +443,9 @@ export const getDeleteWorkspaceLibraryFolderUrl = (workspaceId: string, folderId
 export const deleteWorkspaceLibraryFolder = async (
   workspaceId: string,
   folderId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<DeletedEnvelope> => {
-  return orvalMutator<DeletedEnvelope>(getDeleteWorkspaceLibraryFolderUrl(workspaceId, folderId), {
+  return publicMutator<DeletedEnvelope>(getDeleteWorkspaceLibraryFolderUrl(workspaceId, folderId), {
     ...options,
     method: 'DELETE',
   })
@@ -463,9 +455,7 @@ export const getDeleteWorkspaceLibraryFolderMutationKey = () =>
   ['deleteWorkspaceLibraryFolder'] as const
 
 export const getDeleteWorkspaceLibraryFolderMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -474,7 +464,7 @@ export const getDeleteWorkspaceLibraryFolderMutationOptions = <
     DeleteWorkspaceLibraryFolderMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteWorkspaceLibraryFolder>>,
   TError,
@@ -504,9 +494,8 @@ export type DeleteWorkspaceLibraryFolderMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteWorkspaceLibraryFolder>>
 >
 
-export type DeleteWorkspaceLibraryFolderMutationError = ErrorType<
+export type DeleteWorkspaceLibraryFolderMutationError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
->
 export type DeleteWorkspaceLibraryFolderMutationVariables = {
   workspaceId: string
   folderId: string
@@ -516,9 +505,7 @@ export type DeleteWorkspaceLibraryFolderMutationVariables = {
  * @summary Delete a workspace library folder (members only)
  */
 export const useDeleteWorkspaceLibraryFolder = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -528,7 +515,7 @@ export const useDeleteWorkspaceLibraryFolder = <
       DeleteWorkspaceLibraryFolderMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -565,9 +552,9 @@ export const getListWorkspaceLibraryAssetsUrl = (
 export const listWorkspaceLibraryAssets = async (
   workspaceId: string,
   params?: ListWorkspaceLibraryAssetsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedLibraryAssets> => {
-  return orvalMutator<PaginatedLibraryAssets>(
+  return publicMutator<PaginatedLibraryAssets>(
     getListWorkspaceLibraryAssetsUrl(workspaceId, params),
     {
       ...options,
@@ -585,7 +572,7 @@ export const getListWorkspaceLibraryAssetsQueryKey = (
 
 export const getListWorkspaceLibraryAssetsQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceLibraryAssets>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceLibraryAssetsParams>,
@@ -593,7 +580,7 @@ export const getListWorkspaceLibraryAssetsQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceLibraryAssets>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -616,9 +603,8 @@ export const getListWorkspaceLibraryAssetsQueryOptions = <
 export type ListWorkspaceLibraryAssetsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceLibraryAssets>>
 >
-export type ListWorkspaceLibraryAssetsQueryError = ErrorType<
+export type ListWorkspaceLibraryAssetsQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 
 /**
  * @summary List workspace library assets with cursor pagination (members only)
@@ -626,7 +612,7 @@ export type ListWorkspaceLibraryAssetsQueryError = ErrorType<
 
 export function useListWorkspaceLibraryAssets<
   TData = Awaited<ReturnType<typeof listWorkspaceLibraryAssets>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceLibraryAssetsParams>,
@@ -634,7 +620,7 @@ export function useListWorkspaceLibraryAssets<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceLibraryAssets>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -660,7 +646,7 @@ export const getSaveWorkspaceLibraryAssetUrl = (workspaceId: string) => {
 export const saveWorkspaceLibraryAsset = async (
   workspaceId: string,
   saveLibraryAssetRequest: SaveLibraryAssetRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryAssetEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -681,7 +667,7 @@ export const saveWorkspaceLibraryAsset = async (
     }
     return headers
   }
-  return orvalMutator<LibraryAssetEnvelope>(getSaveWorkspaceLibraryAssetUrl(workspaceId), {
+  return publicMutator<LibraryAssetEnvelope>(getSaveWorkspaceLibraryAssetUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -692,13 +678,12 @@ export const saveWorkspaceLibraryAsset = async (
 export const getSaveWorkspaceLibraryAssetMutationKey = () => ['saveWorkspaceLibraryAsset'] as const
 
 export const getSaveWorkspaceLibraryAssetMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -707,7 +692,7 @@ export const getSaveWorkspaceLibraryAssetMutationOptions = <
     SaveWorkspaceLibraryAssetMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof saveWorkspaceLibraryAsset>>,
   TError,
@@ -736,30 +721,28 @@ export const getSaveWorkspaceLibraryAssetMutationOptions = <
 export type SaveWorkspaceLibraryAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveWorkspaceLibraryAsset>>
 >
-export type SaveWorkspaceLibraryAssetMutationBody = BodyType<SaveLibraryAssetRequest>
-export type SaveWorkspaceLibraryAssetMutationError = ErrorType<
+export type SaveWorkspaceLibraryAssetMutationBody = SaveLibraryAssetRequest
+export type SaveWorkspaceLibraryAssetMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type SaveWorkspaceLibraryAssetMutationVariables = {
   workspaceId: string
-  data: BodyType<SaveLibraryAssetRequest>
+  data: SaveLibraryAssetRequest
 }
 
 /**
  * @summary Save a provider reference as a workspace library asset (members only)
  */
 export const useSaveWorkspaceLibraryAsset = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -769,7 +752,7 @@ export const useSaveWorkspaceLibraryAsset = <
       SaveWorkspaceLibraryAssetMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -792,7 +775,7 @@ export const moveWorkspaceLibraryAsset = async (
   workspaceId: string,
   assetId: string,
   moveLibraryAssetRequest: MoveLibraryAssetRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryAssetEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -813,20 +796,22 @@ export const moveWorkspaceLibraryAsset = async (
     }
     return headers
   }
-  return orvalMutator<LibraryAssetEnvelope>(getMoveWorkspaceLibraryAssetUrl(workspaceId, assetId), {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(moveLibraryAssetRequest),
-  })
+  return publicMutator<LibraryAssetEnvelope>(
+    getMoveWorkspaceLibraryAssetUrl(workspaceId, assetId),
+    {
+      ...options,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(moveLibraryAssetRequest),
+    },
+  )
 }
 
 export const getMoveWorkspaceLibraryAssetMutationKey = () => ['moveWorkspaceLibraryAsset'] as const
 
 export const getMoveWorkspaceLibraryAssetMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -835,7 +820,7 @@ export const getMoveWorkspaceLibraryAssetMutationOptions = <
     MoveWorkspaceLibraryAssetMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof moveWorkspaceLibraryAsset>>,
   TError,
@@ -864,23 +849,21 @@ export const getMoveWorkspaceLibraryAssetMutationOptions = <
 export type MoveWorkspaceLibraryAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof moveWorkspaceLibraryAsset>>
 >
-export type MoveWorkspaceLibraryAssetMutationBody = BodyType<MoveLibraryAssetRequest>
-export type MoveWorkspaceLibraryAssetMutationError = ErrorType<
+export type MoveWorkspaceLibraryAssetMutationBody = MoveLibraryAssetRequest
+export type MoveWorkspaceLibraryAssetMutationError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse
->
 export type MoveWorkspaceLibraryAssetMutationVariables = {
   workspaceId: string
   assetId: string
-  data: BodyType<MoveLibraryAssetRequest>
+  data: MoveLibraryAssetRequest
 }
 
 /**
  * @summary Move a workspace library asset to another folder (members only)
  */
 export const useMoveWorkspaceLibraryAsset = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -890,7 +873,7 @@ export const useMoveWorkspaceLibraryAsset = <
       MoveWorkspaceLibraryAssetMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -912,9 +895,9 @@ export const getDeleteWorkspaceLibraryAssetUrl = (workspaceId: string, assetId: 
 export const deleteWorkspaceLibraryAsset = async (
   workspaceId: string,
   assetId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<DeletedEnvelope> => {
-  return orvalMutator<DeletedEnvelope>(getDeleteWorkspaceLibraryAssetUrl(workspaceId, assetId), {
+  return publicMutator<DeletedEnvelope>(getDeleteWorkspaceLibraryAssetUrl(workspaceId, assetId), {
     ...options,
     method: 'DELETE',
   })
@@ -924,9 +907,7 @@ export const getDeleteWorkspaceLibraryAssetMutationKey = () =>
   ['deleteWorkspaceLibraryAsset'] as const
 
 export const getDeleteWorkspaceLibraryAssetMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -935,7 +916,7 @@ export const getDeleteWorkspaceLibraryAssetMutationOptions = <
     DeleteWorkspaceLibraryAssetMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteWorkspaceLibraryAsset>>,
   TError,
@@ -965,18 +946,15 @@ export type DeleteWorkspaceLibraryAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteWorkspaceLibraryAsset>>
 >
 
-export type DeleteWorkspaceLibraryAssetMutationError = ErrorType<
+export type DeleteWorkspaceLibraryAssetMutationError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
->
 export type DeleteWorkspaceLibraryAssetMutationVariables = { workspaceId: string; assetId: string }
 
 /**
  * @summary Delete a workspace library asset (members only)
  */
 export const useDeleteWorkspaceLibraryAsset = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse
-  >,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -986,7 +964,7 @@ export const useDeleteWorkspaceLibraryAsset = <
       DeleteWorkspaceLibraryAssetMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1008,7 +986,7 @@ export const getResolveWorkspaceLibraryAssetsUrl = (workspaceId: string) => {
 export const resolveWorkspaceLibraryAssets = async (
   workspaceId: string,
   resolveLibraryAssetsRequest: ResolveLibraryAssetsRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<ResolveLibraryAssetsEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -1029,7 +1007,7 @@ export const resolveWorkspaceLibraryAssets = async (
     }
     return headers
   }
-  return orvalMutator<ResolveLibraryAssetsEnvelope>(
+  return publicMutator<ResolveLibraryAssetsEnvelope>(
     getResolveWorkspaceLibraryAssetsUrl(workspaceId),
     {
       ...options,
@@ -1044,7 +1022,7 @@ export const getResolveWorkspaceLibraryAssetsMutationKey = () =>
   ['resolveWorkspaceLibraryAssets'] as const
 
 export const getResolveWorkspaceLibraryAssetsMutationOptions = <
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1053,7 +1031,7 @@ export const getResolveWorkspaceLibraryAssetsMutationOptions = <
     ResolveWorkspaceLibraryAssetsMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof resolveWorkspaceLibraryAssets>>,
   TError,
@@ -1082,20 +1060,19 @@ export const getResolveWorkspaceLibraryAssetsMutationOptions = <
 export type ResolveWorkspaceLibraryAssetsMutationResult = NonNullable<
   Awaited<ReturnType<typeof resolveWorkspaceLibraryAssets>>
 >
-export type ResolveWorkspaceLibraryAssetsMutationBody = BodyType<ResolveLibraryAssetsRequest>
-export type ResolveWorkspaceLibraryAssetsMutationError = ErrorType<
+export type ResolveWorkspaceLibraryAssetsMutationBody = ResolveLibraryAssetsRequest
+export type ResolveWorkspaceLibraryAssetsMutationError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 export type ResolveWorkspaceLibraryAssetsMutationVariables = {
   workspaceId: string
-  data: BodyType<ResolveLibraryAssetsRequest>
+  data: ResolveLibraryAssetsRequest
 }
 
 /**
  * @summary Batch-resolve saved workspace assets by reference (members only, max 20)
  */
 export const useResolveWorkspaceLibraryAssets = <
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1105,7 +1082,7 @@ export const useResolveWorkspaceLibraryAssets = <
       ResolveWorkspaceLibraryAssetsMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1127,7 +1104,7 @@ export const getCreateWorkspaceLibraryMaterializationUrl = (workspaceId: string)
 export const createWorkspaceLibraryMaterialization = async (
   workspaceId: string,
   createLibraryMaterializationRequest: CreateLibraryMaterializationRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryMaterializationEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -1148,7 +1125,7 @@ export const createWorkspaceLibraryMaterialization = async (
     }
     return headers
   }
-  return orvalMutator<LibraryMaterializationEnvelope>(
+  return publicMutator<LibraryMaterializationEnvelope>(
     getCreateWorkspaceLibraryMaterializationUrl(workspaceId),
     {
       ...options,
@@ -1163,9 +1140,8 @@ export const getCreateWorkspaceLibraryMaterializationMutationKey = () =>
   ['createWorkspaceLibraryMaterialization'] as const
 
 export const getCreateWorkspaceLibraryMaterializationMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1174,7 +1150,7 @@ export const getCreateWorkspaceLibraryMaterializationMutationOptions = <
     CreateWorkspaceLibraryMaterializationMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceLibraryMaterialization>>,
   TError,
@@ -1203,23 +1179,20 @@ export const getCreateWorkspaceLibraryMaterializationMutationOptions = <
 export type CreateWorkspaceLibraryMaterializationMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceLibraryMaterialization>>
 >
-export type CreateWorkspaceLibraryMaterializationMutationBody =
-  BodyType<CreateLibraryMaterializationRequest>
-export type CreateWorkspaceLibraryMaterializationMutationError = ErrorType<
+export type CreateWorkspaceLibraryMaterializationMutationBody = CreateLibraryMaterializationRequest
+export type CreateWorkspaceLibraryMaterializationMutationError =
   BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse
->
 export type CreateWorkspaceLibraryMaterializationMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateLibraryMaterializationRequest>
+  data: CreateLibraryMaterializationRequest
 }
 
 /**
  * @summary Materialize an owned library reference into a managed media asset (members only, 202)
  */
 export const useCreateWorkspaceLibraryMaterialization = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse
-  >,
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -1229,7 +1202,7 @@ export const useCreateWorkspaceLibraryMaterialization = <
       CreateWorkspaceLibraryMaterializationMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -1254,9 +1227,9 @@ export const getGetWorkspaceLibraryMaterializationUrl = (
 export const getWorkspaceLibraryMaterialization = async (
   workspaceId: string,
   materializationId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<LibraryMaterializationEnvelope> => {
-  return orvalMutator<LibraryMaterializationEnvelope>(
+  return publicMutator<LibraryMaterializationEnvelope>(
     getGetWorkspaceLibraryMaterializationUrl(workspaceId, materializationId),
     {
       ...options,
@@ -1274,7 +1247,7 @@ export const getGetWorkspaceLibraryMaterializationQueryKey = (
 
 export const getGetWorkspaceLibraryMaterializationQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceLibraryMaterialization>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   materializationId: MaybeRefOrGetter<string>,
@@ -1282,7 +1255,7 @@ export const getGetWorkspaceLibraryMaterializationQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceLibraryMaterialization>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -1318,9 +1291,7 @@ export const getGetWorkspaceLibraryMaterializationQueryOptions = <
 export type GetWorkspaceLibraryMaterializationQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceLibraryMaterialization>>
 >
-export type GetWorkspaceLibraryMaterializationQueryError = ErrorType<
-  UnauthorizedResponse | NotFoundResponse
->
+export type GetWorkspaceLibraryMaterializationQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get a library materialization job snapshot (members only)
@@ -1328,7 +1299,7 @@ export type GetWorkspaceLibraryMaterializationQueryError = ErrorType<
 
 export function useGetWorkspaceLibraryMaterialization<
   TData = Awaited<ReturnType<typeof getWorkspaceLibraryMaterialization>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   materializationId: MaybeRefOrGetter<string>,
@@ -1336,7 +1307,7 @@ export function useGetWorkspaceLibraryMaterialization<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceLibraryMaterialization>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

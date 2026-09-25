@@ -46,8 +46,7 @@ import type {
   UploadSessionEnvelope,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -62,7 +61,7 @@ export const getCreateWorkspaceUploadUrl = (workspaceId: string) => {
 export const createWorkspaceUpload = async (
   workspaceId: string,
   createUploadRequest: CreateUploadRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<UploadSessionEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -83,7 +82,7 @@ export const createWorkspaceUpload = async (
     }
     return headers
   }
-  return orvalMutator<UploadSessionEnvelope>(getCreateWorkspaceUploadUrl(workspaceId), {
+  return publicMutator<UploadSessionEnvelope>(getCreateWorkspaceUploadUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -94,13 +93,12 @@ export const createWorkspaceUpload = async (
 export const getCreateWorkspaceUploadMutationKey = () => ['createWorkspaceUpload'] as const
 
 export const getCreateWorkspaceUploadMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ErrorEnvelope
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -109,7 +107,7 @@ export const getCreateWorkspaceUploadMutationOptions = <
     CreateWorkspaceUploadMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceUpload>>,
   TError,
@@ -138,30 +136,28 @@ export const getCreateWorkspaceUploadMutationOptions = <
 export type CreateWorkspaceUploadMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceUpload>>
 >
-export type CreateWorkspaceUploadMutationBody = BodyType<CreateUploadRequest>
-export type CreateWorkspaceUploadMutationError = ErrorType<
+export type CreateWorkspaceUploadMutationBody = CreateUploadRequest
+export type CreateWorkspaceUploadMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ErrorEnvelope
   | UnprocessableEntityResponse
->
 export type CreateWorkspaceUploadMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateUploadRequest>
+  data: CreateUploadRequest
 }
 
 /**
  * @summary Declare a workspace upload session (members only, 201)
  */
 export const useCreateWorkspaceUpload = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ErrorEnvelope
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -171,7 +167,7 @@ export const useCreateWorkspaceUpload = <
       CreateWorkspaceUploadMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -193,9 +189,9 @@ export const getGetWorkspaceUploadUrl = (workspaceId: string, uploadId: string) 
 export const getWorkspaceUpload = async (
   workspaceId: string,
   uploadId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<UploadSessionEnvelope> => {
-  return orvalMutator<UploadSessionEnvelope>(getGetWorkspaceUploadUrl(workspaceId, uploadId), {
+  return publicMutator<UploadSessionEnvelope>(getGetWorkspaceUploadUrl(workspaceId, uploadId), {
     ...options,
     method: 'GET',
   })
@@ -210,13 +206,13 @@ export const getGetWorkspaceUploadQueryKey = (
 
 export const getGetWorkspaceUploadQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceUpload>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   uploadId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUpload>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -243,9 +239,7 @@ export const getGetWorkspaceUploadQueryOptions = <
 export type GetWorkspaceUploadQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceUpload>>
 >
-export type GetWorkspaceUploadQueryError = ErrorType<
-  UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
->
+export type GetWorkspaceUploadQueryError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
 
 /**
  * @summary Get a workspace upload session (members only)
@@ -253,13 +247,13 @@ export type GetWorkspaceUploadQueryError = ErrorType<
 
 export function useGetWorkspaceUpload<
   TData = Awaited<ReturnType<typeof getWorkspaceUpload>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ErrorEnvelope>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   uploadId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceUpload>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -286,7 +280,7 @@ export const completeWorkspaceUpload = async (
   workspaceId: string,
   uploadId: string,
   completeUploadRequest: CompleteUploadRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<CompleteUploadEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -307,7 +301,7 @@ export const completeWorkspaceUpload = async (
     }
     return headers
   }
-  return orvalMutator<CompleteUploadEnvelope>(
+  return publicMutator<CompleteUploadEnvelope>(
     getCompleteWorkspaceUploadUrl(workspaceId, uploadId),
     {
       ...options,
@@ -321,13 +315,12 @@ export const completeWorkspaceUpload = async (
 export const getCompleteWorkspaceUploadMutationKey = () => ['completeWorkspaceUpload'] as const
 
 export const getCompleteWorkspaceUploadMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ErrorEnvelope
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -336,7 +329,7 @@ export const getCompleteWorkspaceUploadMutationOptions = <
     CompleteWorkspaceUploadMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof completeWorkspaceUpload>>,
   TError,
@@ -365,31 +358,29 @@ export const getCompleteWorkspaceUploadMutationOptions = <
 export type CompleteWorkspaceUploadMutationResult = NonNullable<
   Awaited<ReturnType<typeof completeWorkspaceUpload>>
 >
-export type CompleteWorkspaceUploadMutationBody = BodyType<CompleteUploadRequest>
-export type CompleteWorkspaceUploadMutationError = ErrorType<
+export type CompleteWorkspaceUploadMutationBody = CompleteUploadRequest
+export type CompleteWorkspaceUploadMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | ErrorEnvelope
   | UnprocessableEntityResponse
->
 export type CompleteWorkspaceUploadMutationVariables = {
   workspaceId: string
   uploadId: string
-  data: BodyType<CompleteUploadRequest>
+  data: CompleteUploadRequest
 }
 
 /**
  * @summary Complete a workspace upload session (members only, 200 + asset)
  */
 export const useCompleteWorkspaceUpload = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | ErrorEnvelope
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -399,7 +390,7 @@ export const useCompleteWorkspaceUpload = <
       CompleteWorkspaceUploadMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -436,9 +427,9 @@ export const getListWorkspaceMediaAssetsUrl = (
 export const listWorkspaceMediaAssets = async (
   workspaceId: string,
   params?: ListWorkspaceMediaAssetsParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedMediaAssets> => {
-  return orvalMutator<PaginatedMediaAssets>(getListWorkspaceMediaAssetsUrl(workspaceId, params), {
+  return publicMutator<PaginatedMediaAssets>(getListWorkspaceMediaAssetsUrl(workspaceId, params), {
     ...options,
     method: 'GET',
   })
@@ -453,7 +444,7 @@ export const getListWorkspaceMediaAssetsQueryKey = (
 
 export const getListWorkspaceMediaAssetsQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceMediaAssets>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceMediaAssetsParams>,
@@ -461,7 +452,7 @@ export const getListWorkspaceMediaAssetsQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMediaAssets>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -484,9 +475,8 @@ export const getListWorkspaceMediaAssetsQueryOptions = <
 export type ListWorkspaceMediaAssetsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceMediaAssets>>
 >
-export type ListWorkspaceMediaAssetsQueryError = ErrorType<
+export type ListWorkspaceMediaAssetsQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 
 /**
  * @summary List workspace media assets with cursor pagination (members only)
@@ -494,7 +484,7 @@ export type ListWorkspaceMediaAssetsQueryError = ErrorType<
 
 export function useListWorkspaceMediaAssets<
   TData = Awaited<ReturnType<typeof listWorkspaceMediaAssets>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceMediaAssetsParams>,
@@ -502,7 +492,7 @@ export function useListWorkspaceMediaAssets<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceMediaAssets>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -528,9 +518,9 @@ export const getGetWorkspaceMediaAssetUrl = (workspaceId: string, assetId: strin
 export const getWorkspaceMediaAsset = async (
   workspaceId: string,
   assetId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<MediaAssetEnvelope> => {
-  return orvalMutator<MediaAssetEnvelope>(getGetWorkspaceMediaAssetUrl(workspaceId, assetId), {
+  return publicMutator<MediaAssetEnvelope>(getGetWorkspaceMediaAssetUrl(workspaceId, assetId), {
     ...options,
     method: 'GET',
   })
@@ -545,7 +535,7 @@ export const getGetWorkspaceMediaAssetQueryKey = (
 
 export const getGetWorkspaceMediaAssetQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceMediaAsset>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -553,7 +543,7 @@ export const getGetWorkspaceMediaAssetQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -580,7 +570,7 @@ export const getGetWorkspaceMediaAssetQueryOptions = <
 export type GetWorkspaceMediaAssetQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceMediaAsset>>
 >
-export type GetWorkspaceMediaAssetQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetWorkspaceMediaAssetQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get a workspace media asset (members only)
@@ -588,7 +578,7 @@ export type GetWorkspaceMediaAssetQueryError = ErrorType<UnauthorizedResponse | 
 
 export function useGetWorkspaceMediaAsset<
   TData = Awaited<ReturnType<typeof getWorkspaceMediaAsset>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -596,7 +586,7 @@ export function useGetWorkspaceMediaAsset<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -622,9 +612,9 @@ export const getContentWorkspaceMediaAssetUrl = (workspaceId: string, assetId: s
 export const contentWorkspaceMediaAsset = async (
   workspaceId: string,
   assetId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<Blob> => {
-  return orvalMutator<Blob>(getContentWorkspaceMediaAssetUrl(workspaceId, assetId), {
+  return publicMutator<Blob>(getContentWorkspaceMediaAssetUrl(workspaceId, assetId), {
     ...options,
     method: 'GET',
   })
@@ -639,7 +629,7 @@ export const getContentWorkspaceMediaAssetQueryKey = (
 
 export const getContentWorkspaceMediaAssetQueryOptions = <
   TData = Awaited<ReturnType<typeof contentWorkspaceMediaAsset>>,
-  TError = ErrorType<NotFoundResponse | ConflictResponse | ErrorEnvelope>,
+  TError = NotFoundResponse | ConflictResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -647,7 +637,7 @@ export const getContentWorkspaceMediaAssetQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof contentWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -679,9 +669,8 @@ export const getContentWorkspaceMediaAssetQueryOptions = <
 export type ContentWorkspaceMediaAssetQueryResult = NonNullable<
   Awaited<ReturnType<typeof contentWorkspaceMediaAsset>>
 >
-export type ContentWorkspaceMediaAssetQueryError = ErrorType<
+export type ContentWorkspaceMediaAssetQueryError =
   NotFoundResponse | ConflictResponse | ErrorEnvelope
->
 
 /**
  * @summary Read workspace media asset bytes (members only)
@@ -689,7 +678,7 @@ export type ContentWorkspaceMediaAssetQueryError = ErrorType<
 
 export function useContentWorkspaceMediaAsset<
   TData = Awaited<ReturnType<typeof contentWorkspaceMediaAsset>>,
-  TError = ErrorType<NotFoundResponse | ConflictResponse | ErrorEnvelope>,
+  TError = NotFoundResponse | ConflictResponse | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -697,7 +686,7 @@ export function useContentWorkspaceMediaAsset<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof contentWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -728,9 +717,9 @@ export const derivativeWorkspaceMediaAsset = async (
   workspaceId: string,
   assetId: string,
   variant: 'thumb' | 'preview' | 'large-preview',
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<Blob> => {
-  return orvalMutator<Blob>(getDerivativeWorkspaceMediaAssetUrl(workspaceId, assetId, variant), {
+  return publicMutator<Blob>(getDerivativeWorkspaceMediaAssetUrl(workspaceId, assetId, variant), {
     ...options,
     method: 'GET',
   })
@@ -746,7 +735,7 @@ export const getDerivativeWorkspaceMediaAssetQueryKey = (
 
 export const getDerivativeWorkspaceMediaAssetQueryOptions = <
   TData = Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>,
-  TError = ErrorType<BadRequestResponse | NotFoundResponse | ConflictResponse>,
+  TError = BadRequestResponse | NotFoundResponse | ConflictResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -755,7 +744,7 @@ export const getDerivativeWorkspaceMediaAssetQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -789,9 +778,8 @@ export const getDerivativeWorkspaceMediaAssetQueryOptions = <
 export type DerivativeWorkspaceMediaAssetQueryResult = NonNullable<
   Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>
 >
-export type DerivativeWorkspaceMediaAssetQueryError = ErrorType<
+export type DerivativeWorkspaceMediaAssetQueryError =
   BadRequestResponse | NotFoundResponse | ConflictResponse
->
 
 /**
  * @summary Read a workspace media asset derivative (members only)
@@ -799,7 +787,7 @@ export type DerivativeWorkspaceMediaAssetQueryError = ErrorType<
 
 export function useDerivativeWorkspaceMediaAsset<
   TData = Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>,
-  TError = ErrorType<BadRequestResponse | NotFoundResponse | ConflictResponse>,
+  TError = BadRequestResponse | NotFoundResponse | ConflictResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   assetId: MaybeRefOrGetter<string>,
@@ -808,7 +796,7 @@ export function useDerivativeWorkspaceMediaAsset<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof derivativeWorkspaceMediaAsset>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -839,9 +827,9 @@ export const getArchiveWorkspaceMediaAssetUrl = (workspaceId: string, assetId: s
 export const archiveWorkspaceMediaAsset = async (
   workspaceId: string,
   assetId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<MediaAssetEnvelope> => {
-  return orvalMutator<MediaAssetEnvelope>(getArchiveWorkspaceMediaAssetUrl(workspaceId, assetId), {
+  return publicMutator<MediaAssetEnvelope>(getArchiveWorkspaceMediaAssetUrl(workspaceId, assetId), {
     ...options,
     method: 'POST',
   })
@@ -851,9 +839,12 @@ export const getArchiveWorkspaceMediaAssetMutationKey = () =>
   ['archiveWorkspaceMediaAsset'] as const
 
 export const getArchiveWorkspaceMediaAssetMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ErrorEnvelope
-  >,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ErrorEnvelope,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -862,7 +853,7 @@ export const getArchiveWorkspaceMediaAssetMutationOptions = <
     ArchiveWorkspaceMediaAssetMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof archiveWorkspaceMediaAsset>>,
   TError,
@@ -892,18 +883,20 @@ export type ArchiveWorkspaceMediaAssetMutationResult = NonNullable<
   Awaited<ReturnType<typeof archiveWorkspaceMediaAsset>>
 >
 
-export type ArchiveWorkspaceMediaAssetMutationError = ErrorType<
+export type ArchiveWorkspaceMediaAssetMutationError =
   BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ErrorEnvelope
->
 export type ArchiveWorkspaceMediaAssetMutationVariables = { workspaceId: string; assetId: string }
 
 /**
  * @summary Archive a workspace media asset (owner/admin only, 200)
  */
 export const useArchiveWorkspaceMediaAsset = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ErrorEnvelope
-  >,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ErrorEnvelope,
   TContext = unknown,
 >(
   options?: {
@@ -913,7 +906,7 @@ export const useArchiveWorkspaceMediaAsset = <
       ArchiveWorkspaceMediaAssetMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
-import { calculateTimelineYScale, toGmt8Date, useMonitorTimeline } from './useMonitorTimeline'
+import {
+  calculateTimelineYScale,
+  formatXAxisTime,
+  toGmt8Date,
+  useMonitorTimeline,
+} from './useMonitorTimeline'
 import type { AdminTaskRow } from './useAdminTaskList'
 
 describe('useMonitorTimeline', () => {
@@ -45,6 +50,37 @@ describe('useMonitorTimeline', () => {
       const utcDate = new Date('2026-09-19T00:00:00Z')
       const gmt8 = toGmt8Date(utcDate)
       expect(gmt8.getHours()).toBe(8)
+    })
+
+    it('preserves the Shanghai wall-clock date parts', () => {
+      const gmt8 = toGmt8Date(new Date('2026-09-19T00:00:00Z'))
+      expect(gmt8.getFullYear()).toBe(2026)
+      expect(gmt8.getMonth()).toBe(8)
+      expect(gmt8.getDate()).toBe(19)
+      expect(gmt8.getMinutes()).toBe(0)
+    })
+  })
+
+  describe('formatXAxisTime', () => {
+    // 2026-09-19T00:00:00Z is 08:00 on Sep 19 in Asia/Shanghai.
+    const instant = new Date('2026-09-19T00:00:00Z')
+
+    it('pins HH:mm for short ranges (<=12h)', () => {
+      expect(formatXAxisTime(instant, 60 * 60 * 1000)).toBe('08:00')
+      expect(formatXAxisTime(instant, 12 * 3600 * 1000)).toBe('08:00')
+    })
+
+    it('pins Mon D, HH:mm for day ranges (<=24h)', () => {
+      expect(formatXAxisTime(instant, 20 * 3600 * 1000)).toBe('Sep 19, 08:00')
+    })
+
+    it('pins Mon D HH:00 for long ranges (>24h)', () => {
+      expect(formatXAxisTime(instant, 48 * 3600 * 1000)).toBe('Sep 19 08:00')
+    })
+
+    it('pins midnight correctly (hourCycle h23, never 24:xx)', () => {
+      // 2026-09-18T16:00:00Z is exactly 00:00 Shanghai wall time.
+      expect(formatXAxisTime(new Date('2026-09-18T16:00:00Z'), 60 * 60 * 1000)).toBe('00:00')
     })
   })
 

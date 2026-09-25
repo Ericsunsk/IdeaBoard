@@ -146,7 +146,7 @@
       <AdminColumn field="ideaQuantity" header="Idea 数量" :style="{ width: '120px' }">
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
-            {{ ideaFormatter.format(data.ideaQuantity) }}
+            {{ formatLocaleNumber(data.ideaQuantity) }}
           </span>
         </template>
       </AdminColumn>
@@ -249,6 +249,7 @@ import {
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
 import { createUniqueId } from '../../../../shared/utils/ids'
+import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
   formatPaymentDateTime,
@@ -277,7 +278,6 @@ const detailLoading = ref(false)
 const detailError = ref(false)
 const refundLoading = ref(false)
 const refundError = ref('')
-const ideaFormatter = new Intl.NumberFormat('zh-CN')
 const adminConfirm = useAdminConfirm()
 const feedback = usePaymentOrdersFeedback()
 const refundIdempotencyKeys = new Map<string, string>()
@@ -322,7 +322,7 @@ const {
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 
-const totalLabel = computed(() => `${ideaFormatter.format(total.value)} 笔`)
+const totalLabel = computed(() => `${formatLocaleNumber(total.value)} 笔`)
 const hasFilters = computed(
   () => statusFilter.value !== ORDER_STATUS_FILTER_ALL || anomalyOnly.value,
 )
@@ -405,7 +405,7 @@ async function requestRefund(ideaQuantity: number) {
   if (!publicOrderNumber || refundLoading.value) return
   const confirmed = await adminConfirm.confirm({
     title: '确认退款',
-    message: `将为订单 ${publicOrderNumber} 发起 ${ideaFormatter.format(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？`,
+    message: `将为订单 ${publicOrderNumber} 发起 ${formatLocaleNumber(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？`,
     confirmLabel: '发起退款',
     intent: 'danger',
   })

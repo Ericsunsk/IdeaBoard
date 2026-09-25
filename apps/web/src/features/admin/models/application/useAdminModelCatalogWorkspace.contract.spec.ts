@@ -17,6 +17,12 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   useAdminToast: () => toast,
 }))
 
+const clipboardCopyText = vi.hoisted(() => ({ current: vi.fn() }))
+
+vi.mock('../../../../shared/composables/useAppClipboard', () => ({
+  useAppClipboard: () => ({ copyText: clipboardCopyText.current }),
+}))
+
 function model(overrides: Partial<AdminModelItem> & { id: string }): AdminModelItem {
   return {
     name: overrides.id,
@@ -158,5 +164,53 @@ describe('useAdminModelCatalogWorkspace refresh enrichment', () => {
     await workspace.handleRefresh()
 
     expect(saved.items).toHaveLength(0)
+  })
+})
+
+describe('useAdminModelCatalogWorkspace copy feedback contract', () => {
+  beforeEach(() => {
+    toast.success.mockReset()
+    toast.error.mockReset()
+    clipboardCopyText.current = vi.fn().mockResolvedValue(true)
+  })
+
+  function mountForCopy() {
+    const stored = [model({ id: 'openai/gpt-4o' })]
+    const catalog: AdminGatewayCatalog = {
+      list: async () => stored.map((m) => ({ ...m })),
+      save: async () => {},
+      previewRoute: async () => {
+        throw new Error('not needed')
+      },
+      listProviders: async () => [],
+      getReference: async () => {
+        throw new Error('not needed')
+      },
+      listObserved: async () => [],
+      detect: async () => ({ models: [], configured_providers: 0 }),
+    }
+    return mountWorkspace(catalog)
+  }
+
+  it('marks the id copied on clipboard success without error feedback', async () => {
+    const { workspace } = mountForCopy()
+
+    workspace.copyModelId('openai/gpt-4o')
+
+    await waitFor(() => expect(workspace.copiedModelId.value).toBe('openai/gpt-4o'))
+    expect(clipboardCopyText.current).toHaveBeenCalledWith('openai/gpt-4o')
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('routes clipboard failure to copyFailed feedback and keeps copied state empty', async () => {
+    clipboardCopyText.current = vi.fn().mockResolvedValue(false)
+    const { workspace } = mountForCopy()
+
+    workspace.copyModelId('openai/gpt-4o')
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('复制失败，请手动复制模型标识'),
+    )
+    expect(workspace.copiedModelId.value).toBeNull()
   })
 })

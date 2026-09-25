@@ -146,6 +146,40 @@ describe('mailConfigResource', () => {
     )
   })
 
+  it('maps read 403/404/503 to operator copy', async () => {
+    const resource = createAdminMailConfigResource()
+
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/mail', () =>
+        HttpResponse.json(
+          { error: { code: 'forbidden', message: 'denied', request_id: 'r' } },
+          { status: 403 },
+        ),
+      ),
+    )
+    await expect(resource.get()).rejects.toThrow('权限不足，无法操作邮件配置')
+
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/mail', () =>
+        HttpResponse.json(
+          { error: { code: 'control_not_found', message: 'missing', request_id: 'r' } },
+          { status: 404 },
+        ),
+      ),
+    )
+    await expect(resource.get()).rejects.toThrow('邮件配置不存在')
+
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/mail', () =>
+        HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'down', request_id: 'r' } },
+          { status: 503 },
+        ),
+      ),
+    )
+    await expect(resource.get()).rejects.toThrow('邮件服务暂不可用，请稍后重试')
+  })
+
   it('maps control error codes to operator copy', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/settings/mail', () =>

@@ -47,8 +47,7 @@ import type {
   WorkspaceTaskOutputsEnvelope,
 } from '../model'
 
-import { orvalMutator } from '../../../orvalMutator'
-import type { ErrorType, BodyType } from '../../../orvalMutator'
+import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
@@ -78,9 +77,9 @@ export const getListWorkspaceTasksUrl = (
 export const listWorkspaceTasks = async (
   workspaceId: string,
   params?: ListWorkspaceTasksParams,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<PaginatedWorkspaceTasks> => {
-  return orvalMutator<PaginatedWorkspaceTasks>(getListWorkspaceTasksUrl(workspaceId, params), {
+  return publicMutator<PaginatedWorkspaceTasks>(getListWorkspaceTasksUrl(workspaceId, params), {
     ...options,
     method: 'GET',
   })
@@ -95,13 +94,13 @@ export const getListWorkspaceTasksQueryKey = (
 
 export const getListWorkspaceTasksQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceTasks>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceTasksParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceTasks>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -122,9 +121,8 @@ export const getListWorkspaceTasksQueryOptions = <
 export type ListWorkspaceTasksQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceTasks>>
 >
-export type ListWorkspaceTasksQueryError = ErrorType<
+export type ListWorkspaceTasksQueryError =
   BadRequestResponse | UnauthorizedResponse | NotFoundResponse
->
 
 /**
  * @summary List workspace tasks with cursor pagination (members only)
@@ -132,13 +130,13 @@ export type ListWorkspaceTasksQueryError = ErrorType<
 
 export function useListWorkspaceTasks<
   TData = Awaited<ReturnType<typeof listWorkspaceTasks>>,
-  TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListWorkspaceTasksParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceTasks>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -164,7 +162,7 @@ export const getCreateWorkspaceTaskUrl = (workspaceId: string) => {
 export const createWorkspaceTask = async (
   workspaceId: string,
   createWorkspaceTaskRequest: CreateWorkspaceTaskRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<TaskEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -185,7 +183,7 @@ export const createWorkspaceTask = async (
     }
     return headers
   }
-  return orvalMutator<TaskEnvelope>(getCreateWorkspaceTaskUrl(workspaceId), {
+  return publicMutator<TaskEnvelope>(getCreateWorkspaceTaskUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -196,14 +194,13 @@ export const createWorkspaceTask = async (
 export const getCreateWorkspaceTaskMutationKey = () => ['createWorkspaceTask'] as const
 
 export const getCreateWorkspaceTaskMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -212,7 +209,7 @@ export const getCreateWorkspaceTaskMutationOptions = <
     CreateWorkspaceTaskMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createWorkspaceTask>>,
   TError,
@@ -241,32 +238,30 @@ export const getCreateWorkspaceTaskMutationOptions = <
 export type CreateWorkspaceTaskMutationResult = NonNullable<
   Awaited<ReturnType<typeof createWorkspaceTask>>
 >
-export type CreateWorkspaceTaskMutationBody = BodyType<CreateWorkspaceTaskRequest>
-export type CreateWorkspaceTaskMutationError = ErrorType<
+export type CreateWorkspaceTaskMutationBody = CreateWorkspaceTaskRequest
+export type CreateWorkspaceTaskMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ErrorEnvelope
   | NotFoundResponse
   | ConflictResponse
   | UnprocessableEntityResponse
->
 export type CreateWorkspaceTaskMutationVariables = {
   workspaceId: string
-  data: BodyType<CreateWorkspaceTaskRequest>
+  data: CreateWorkspaceTaskRequest
 }
 
 /**
  * @summary Submit a workspace task (members only, 202 + Location)
  */
 export const useCreateWorkspaceTask = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ErrorEnvelope
     | NotFoundResponse
     | ConflictResponse
-    | UnprocessableEntityResponse
-  >,
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {
@@ -276,7 +271,7 @@ export const useCreateWorkspaceTask = <
       CreateWorkspaceTaskMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -298,9 +293,9 @@ export const getGetWorkspaceTaskUrl = (workspaceId: string, taskId: string) => {
 export const getWorkspaceTask = async (
   workspaceId: string,
   taskId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<TaskEnvelope> => {
-  return orvalMutator<TaskEnvelope>(getGetWorkspaceTaskUrl(workspaceId, taskId), {
+  return publicMutator<TaskEnvelope>(getGetWorkspaceTaskUrl(workspaceId, taskId), {
     ...options,
     method: 'GET',
   })
@@ -315,13 +310,13 @@ export const getGetWorkspaceTaskQueryKey = (
 
 export const getGetWorkspaceTaskQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceTask>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   taskId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -346,7 +341,7 @@ export const getGetWorkspaceTaskQueryOptions = <
 }
 
 export type GetWorkspaceTaskQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceTask>>>
-export type GetWorkspaceTaskQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type GetWorkspaceTaskQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary Get a workspace task (members only)
@@ -354,13 +349,13 @@ export type GetWorkspaceTaskQueryError = ErrorType<UnauthorizedResponse | NotFou
 
 export function useGetWorkspaceTask<
   TData = Awaited<ReturnType<typeof getWorkspaceTask>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   taskId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceTask>>, TError, TData>>
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -387,7 +382,7 @@ export const cancelWorkspaceTask = async (
   workspaceId: string,
   taskId: string,
   cancelWorkspaceTaskRequest?: CancelWorkspaceTaskRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<TaskEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -408,7 +403,7 @@ export const cancelWorkspaceTask = async (
     }
     return headers
   }
-  return orvalMutator<TaskEnvelope>(getCancelWorkspaceTaskUrl(workspaceId, taskId), {
+  return publicMutator<TaskEnvelope>(getCancelWorkspaceTaskUrl(workspaceId, taskId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -419,13 +414,12 @@ export const cancelWorkspaceTask = async (
 export const getCancelWorkspaceTaskMutationKey = () => ['cancelWorkspaceTask'] as const
 
 export const getCancelWorkspaceTaskMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -434,7 +428,7 @@ export const getCancelWorkspaceTaskMutationOptions = <
     CancelWorkspaceTaskMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof cancelWorkspaceTask>>,
   TError,
@@ -463,31 +457,29 @@ export const getCancelWorkspaceTaskMutationOptions = <
 export type CancelWorkspaceTaskMutationResult = NonNullable<
   Awaited<ReturnType<typeof cancelWorkspaceTask>>
 >
-export type CancelWorkspaceTaskMutationBody = BodyType<CancelWorkspaceTaskRequest> | undefined
-export type CancelWorkspaceTaskMutationError = ErrorType<
+export type CancelWorkspaceTaskMutationBody = CancelWorkspaceTaskRequest | undefined
+export type CancelWorkspaceTaskMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
   | ConflictResponse
->
 export type CancelWorkspaceTaskMutationVariables = {
   workspaceId: string
   taskId: string
-  data?: BodyType<CancelWorkspaceTaskRequest>
+  data?: CancelWorkspaceTaskRequest
 }
 
 /**
  * @summary Cancel a workspace task (members only)
  */
 export const useCancelWorkspaceTask = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
-    | ConflictResponse
-  >,
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -497,7 +489,7 @@ export const useCancelWorkspaceTask = <
       CancelWorkspaceTaskMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<
@@ -519,9 +511,9 @@ export const getListWorkspaceTaskOutputsUrl = (workspaceId: string, taskId: stri
 export const listWorkspaceTaskOutputs = async (
   workspaceId: string,
   taskId: string,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<WorkspaceTaskOutputsEnvelope> => {
-  return orvalMutator<WorkspaceTaskOutputsEnvelope>(
+  return publicMutator<WorkspaceTaskOutputsEnvelope>(
     getListWorkspaceTaskOutputsUrl(workspaceId, taskId),
     {
       ...options,
@@ -539,7 +531,7 @@ export const getListWorkspaceTaskOutputsQueryKey = (
 
 export const getListWorkspaceTaskOutputsQueryOptions = <
   TData = Awaited<ReturnType<typeof listWorkspaceTaskOutputs>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   taskId: MaybeRefOrGetter<string>,
@@ -547,7 +539,7 @@ export const getListWorkspaceTaskOutputsQueryOptions = <
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceTaskOutputs>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
@@ -576,7 +568,7 @@ export const getListWorkspaceTaskOutputsQueryOptions = <
 export type ListWorkspaceTaskOutputsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listWorkspaceTaskOutputs>>
 >
-export type ListWorkspaceTaskOutputsQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+export type ListWorkspaceTaskOutputsQueryError = UnauthorizedResponse | NotFoundResponse
 
 /**
  * @summary List task output references (members only)
@@ -584,7 +576,7 @@ export type ListWorkspaceTaskOutputsQueryError = ErrorType<UnauthorizedResponse 
 
 export function useListWorkspaceTaskOutputs<
   TData = Awaited<ReturnType<typeof listWorkspaceTaskOutputs>>,
-  TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+  TError = UnauthorizedResponse | NotFoundResponse,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   taskId: MaybeRefOrGetter<string>,
@@ -592,7 +584,7 @@ export function useListWorkspaceTaskOutputs<
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceTaskOutputs>>, TError, TData>
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -618,7 +610,7 @@ export const getQuoteWorkspaceTaskUrl = (workspaceId: string) => {
 export const quoteWorkspaceTask = async (
   workspaceId: string,
   quoteWorkspaceTaskRequest: QuoteWorkspaceTaskRequest,
-  options?: Parameters<typeof orvalMutator>[1],
+  options?: Parameters<typeof publicMutator>[1],
 ): Promise<TaskBillingSnapshotEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -639,7 +631,7 @@ export const quoteWorkspaceTask = async (
     }
     return headers
   }
-  return orvalMutator<TaskBillingSnapshotEnvelope>(getQuoteWorkspaceTaskUrl(workspaceId), {
+  return publicMutator<TaskBillingSnapshotEnvelope>(getQuoteWorkspaceTaskUrl(workspaceId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -650,13 +642,12 @@ export const quoteWorkspaceTask = async (
 export const getQuoteWorkspaceTaskMutationKey = () => ['quoteWorkspaceTask'] as const
 
 export const getQuoteWorkspaceTaskMutationOptions = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | UnprocessableEntityResponse
-    | ErrorEnvelope
-  >,
+    | ErrorEnvelope,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -665,7 +656,7 @@ export const getQuoteWorkspaceTaskMutationOptions = <
     QuoteWorkspaceTaskMutationVariables,
     TContext
   >
-  request?: SecondParameter<typeof orvalMutator>
+  request?: SecondParameter<typeof publicMutator>
 }): UseMutationOptions<
   Awaited<ReturnType<typeof quoteWorkspaceTask>>,
   TError,
@@ -694,30 +685,28 @@ export const getQuoteWorkspaceTaskMutationOptions = <
 export type QuoteWorkspaceTaskMutationResult = NonNullable<
   Awaited<ReturnType<typeof quoteWorkspaceTask>>
 >
-export type QuoteWorkspaceTaskMutationBody = BodyType<QuoteWorkspaceTaskRequest>
-export type QuoteWorkspaceTaskMutationError = ErrorType<
+export type QuoteWorkspaceTaskMutationBody = QuoteWorkspaceTaskRequest
+export type QuoteWorkspaceTaskMutationError =
   | BadRequestResponse
   | UnauthorizedResponse
   | NotFoundResponse
   | UnprocessableEntityResponse
   | ErrorEnvelope
->
 export type QuoteWorkspaceTaskMutationVariables = {
   workspaceId: string
-  data: BodyType<QuoteWorkspaceTaskRequest>
+  data: QuoteWorkspaceTaskRequest
 }
 
 /**
  * @summary Preflight price quote for a task (members only, no persistence)
  */
 export const useQuoteWorkspaceTask = <
-  TError = ErrorType<
+  TError =
     | BadRequestResponse
     | UnauthorizedResponse
     | NotFoundResponse
     | UnprocessableEntityResponse
-    | ErrorEnvelope
-  >,
+    | ErrorEnvelope,
   TContext = unknown,
 >(
   options?: {
@@ -727,7 +716,7 @@ export const useQuoteWorkspaceTask = <
       QuoteWorkspaceTaskMutationVariables,
       TContext
     >
-    request?: SecondParameter<typeof orvalMutator>
+    request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseMutationReturnType<

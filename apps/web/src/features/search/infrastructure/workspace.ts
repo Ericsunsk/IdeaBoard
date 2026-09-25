@@ -21,6 +21,13 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // routes are removed in #809. Query length validation stays
 // server-owned: over-limit queries surface as 422 validation_failed
 // (never a silent empty page).
+//
+// TODO(#806-regen, 2026-09-25): BLOCKED on the same regen — generated
+// Search requests use the feature adapter so route and response validation
+// stay owned by this context while this
+// module ships `/v1/...` suffixes; `orval.config.ts publicQuery` must point
+// at `publicMutator` and regen (`api:generate`) is out of scope here. Keep
+// this transport until then; do not force-fit.
 
 const WORKSPACE_ID_RE = /^ws_[A-Za-z0-9_-]+$/
 const LIBRARY_ASSET_ID_RE = /^lasset_[A-Za-z0-9_-]+$/

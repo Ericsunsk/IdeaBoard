@@ -56,7 +56,15 @@
               :disabled="isSaving"
               @click="selectLogo(item.key)"
             >
-              <img :src="item.logoSrc" :alt="item.label" class="size-full object-contain" />
+              <img
+                v-if="!failedLogoKeys.has(item.key)"
+                :src="item.logoSrc"
+                :alt="item.label"
+                class="size-full object-contain"
+                loading="lazy"
+                @error="markLogoFailed(item.key)"
+              />
+              <Cube v-else class="size-5 text-admin-text-3" />
             </button>
           </div>
         </div>
@@ -68,6 +76,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'reka-ui'
+import { Cube } from '@iconoir/vue'
 import {
   ADMIN_BRAND_CATEGORIES,
   ALL_ADMIN_BRAND_LOGOS,
@@ -109,6 +118,13 @@ const anchorEl = ref<HTMLElement | null>(null)
 
 const currentCategory = ref<AdminBrandCategoryKey>(props.initialCategory)
 const isSaving = ref(false)
+
+// 品牌缩略图经后端透传 models.dev SVG：加载失败回落 Cube 占位，避免破图。
+const failedLogoKeys = ref<Set<AdminBrandLogoKey>>(new Set())
+
+function markLogoFailed(key: AdminBrandLogoKey): void {
+  failedLogoKeys.value.add(key)
+}
 
 watch(
   () => props.initialCategory,

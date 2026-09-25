@@ -213,6 +213,7 @@ import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
+import { formatLocaleDate } from '../../../../shared/i18n/formatters'
 import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopover.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
@@ -365,7 +366,7 @@ function handlePlaintextDialogVisible(visible: boolean) {
 
 function formatExpiresAt(value?: string): string {
   if (!value) return '永不过期'
-  return new Intl.DateTimeFormat('zh-CN', {
+  return formatLocaleDate(new Date(value), {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
@@ -373,7 +374,7 @@ function formatExpiresAt(value?: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(value))
+  })
 }
 
 function statusPresentation(status: RewardCode['status']) {

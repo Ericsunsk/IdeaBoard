@@ -34,14 +34,46 @@ info:
     refetch state. The initial `:connected` frame is not a domain event
     and carries no `evt_` ID.
 
-    Webhook delivery: POSTs share the envelope and add
-    `X-Webhook-Signature` (hex HMAC-SHA256 over "<timestamp>.<raw-body>"),
-    `X-Webhook-Timestamp` (unix seconds, ±5 minute tolerance),
-    `X-Webhook-Delivery-Id` (evt_ id) and `X-Webhook-Attempt` headers,
+    Webhook delivery: POSTs share the envelope and add Svix-compatible
+    signature headers: `svix-id` (the evt_ delivery id, stable across
+    retries), `svix-timestamp` (unix seconds, ±5 minute tolerance), and
+    `svix-signature` (`v1,<base64>` HMAC-SHA256 over
+    `<id>.<timestamp>.<raw-body>`, space-delimited to allow rotation
+    entries),
     per-subscription event-type filtering, exponential-backoff retry
-    (30s base, doubling, 1h cap, 8 attempts), delivery status and
-    dead-letter parking. Subscription secrets are returned exactly once
+    (30s base, doubling with jitter, 1h cap, 8 attempts scheduled on
+    River; discarded River rows are the durable dead-letter fact),
+    delivery status and dead-letter parking. Subscription secrets travel in `whsec_` form
+    (`whsec_` + base64 of the raw key) and are returned exactly once
     at creation (only when server-minted) and never appear in reads.
+    Go verification reference (imports: crypto/hmac, crypto/sha256,
+    encoding/base64, net/http, strconv, strings, time):
+
+    ```go
+    func verifyWebhook(secret string, body []byte, h http.Header, now time.Time) bool {
+      if !strings.HasPrefix(secret, "whsec_") { return false }
+      key, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, "whsec_"))
+      if err != nil { return false }
+      id, stamp, signatures := h.Get("svix-id"), h.Get("svix-timestamp"), h.Get("svix-signature")
+      if id == "" || stamp == "" { return false }
+      unix, err := strconv.ParseInt(stamp, 10, 64)
+      if err != nil { return false }
+      drift := now.Sub(time.Unix(unix, 0))
+      if drift < -5*time.Minute || drift > 5*time.Minute { return false }
+      mac := hmac.New(sha256.New, key)
+      mac.Write([]byte(id + "." + stamp + "."))
+      mac.Write(body)
+      expected := mac.Sum(nil)
+      for _, entry := range strings.Fields(signatures) {
+        version, encoded, ok := strings.Cut(entry, ",")
+        if !ok || version != "v1" { continue }
+        actual, err := base64.StdEncoding.DecodeString(encoded)
+        if err == nil && hmac.Equal(actual, expected) { return true }
+      }
+      return false
+    }
+    ```
+
     All mutating subscription calls require a header-only Idempotency-Key.
     Provider inbound webhooks (Stripe) stay distinct integrations that
     emit internal events; they never flow through this dispatcher.
@@ -592,7 +624,7 @@ components:
               format: uri
             secret:
               type: string
-              description: Optional (min 16 chars); when omitted the server mints one.
+              description: Optional whsec_-form secret (at least 16 decoded bytes); when omitted the server mints one.
             event_types:
               type: array
               items:
@@ -609,4 +641,4 @@ components:
               $ref: '#/components/schemas/EventSubscription'
             secret:
               type: string
-              description: Hex-encoded minted secret, returned exactly once (absent otherwise).
+              description: whsec_-form minted secret, returned exactly once (absent otherwise).

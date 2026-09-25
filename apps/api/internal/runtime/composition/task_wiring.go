@@ -46,11 +46,16 @@ type appTaskServices struct {
 	// hold_transaction_id -> userID process-locally at Hold time, so a
 	// second holder instance would fail every worker Capture/Release with
 	// "unknown hold".
-	workspaceTaskStore   *taskpostgres.Store
-	workspaceTaskHolder  *workspaceTaskHolder
-	workspaceTaskQuoter  *workspaceTaskQuoter
-	workspaceTaskMedia   *workspacemedia.Service
-	workspaceTaskAssets  *workspacemedia.TaskAssetAdapter
+	workspaceTaskStore  *taskpostgres.Store
+	workspaceTaskHolder *workspaceTaskHolder
+	workspaceTaskQuoter *workspaceTaskQuoter
+	workspaceTaskMedia  *workspacemedia.Service
+	workspaceTaskAssets *workspacemedia.TaskAssetAdapter
+	// webhooks owns signed webhook subscriptions + River-driven
+	// delivery (issue #833). Built here where the riverClient exists
+	// so the same store instance serves HTTP views and the worker;
+	// consumed by http_wiring.go.
+	webhooks *events.WebhookStore
 }
 
 type appWorkerRuntime struct {
@@ -218,6 +223,18 @@ func newAppTaskRuntime(
 	}
 	visionBillingService := searchapplication.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
 	visionBillingPeriodicJobs := visionbilling.VisionBillingPeriodicJobs()
+	// #833: the webhook store is built here (not in HTTP normalize) so
+	// the River worker and the HTTP views share one instance. The
+	// enqueuer attaches after NewRiverClient below (SetEnqueuer),
+	// mirroring the workspaceEnqueuer SetClient seam.
+	webhookStore := events.NewWebhookStore(events.NewHTTPSender(), nil)
+	webhookStore.SetPersistence(events.NewPostgresWebhookPersistence(dbs.db))
+	if err := webhookStore.LoadFromPersistence(ctx); err != nil {
+		if eventBus != nil {
+			_ = eventBus.Close()
+		}
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to load webhook subscriptions: %w", err)
+	}
 	// #809 hard cut: the legacy task-retention periodic jobs are dropped
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
@@ -238,6 +255,11 @@ func newAppTaskRuntime(
 			workerbilling.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			workerbilling.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
 			visionbilling.VisionBillingQueue:           {MaxWorkers: 1},
+			// #833: signed webhook deliveries ride their own queue with
+			// the shared concurrency config (no new infra); serial
+			// workers match the maintenance-queue precedent and the 1m
+			// per-attempt timeout bounds head-of-line blocking.
+			taskqueue.RiverQueueWebhookDeliver: {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
@@ -249,6 +271,8 @@ func newAppTaskRuntime(
 			// #825: the real workspace_task_execute consumer rides the
 			// shared client/queue/concurrency (no new infra).
 			river.AddWorker(workers, workspaceWorker)
+			// #833: the webhook delivery consumer rides the same client.
+			river.AddWorker(workers, events.NewWebhookDeliverWorker(webhookStore))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -263,17 +287,26 @@ func newAppTaskRuntime(
 	// is River redelivery + lease-guarded claim (#825).
 	riverQueue.SetClient(riverClient)
 	workspaceEnqueuer.SetClient(riverClient)
+	webhookStore.SetEnqueuer(riverClient)
+	if err := webhookStore.ReconcilePending(ctx); err != nil {
+		_ = riverClient.Stop(ctx)
+		if eventBus != nil {
+			_ = eventBus.Close()
+		}
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to reconcile pending webhooks: %w", err)
+	}
 
 	return appTaskServices{
 		// #821 (#809 Phase 4-04): v1 workspace task enqueue rides the
 		// production River client (workspace_task_execute kind); #825
 		// registers the real consumer on the same client above.
-		workspaceTaskQueue:   workspaceEnqueuer,
-		workspaceTaskStore:   workspaceStore,
-		workspaceTaskHolder:  workspaceHolder,
-		workspaceTaskQuoter:  workspaceQuoter,
-		workspaceTaskMedia:   workspaceMedia,
-		workspaceTaskAssets:  workspaceAssets,
+		workspaceTaskQueue:  workspaceEnqueuer,
+		workspaceTaskStore:  workspaceStore,
+		workspaceTaskHolder: workspaceHolder,
+		workspaceTaskQuoter: workspaceQuoter,
+		workspaceTaskMedia:  workspaceMedia,
+		workspaceTaskAssets: workspaceAssets,
+		webhooks:            webhookStore,
 	}, appWorkerRuntime{
 		riverClient:  riverClient,
 		eventBus:     eventBus,
@@ -295,6 +328,7 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 		workerbilling.PaymentReconciliationQueue,
 		workerbilling.PaymentCheckoutShutdownQueue,
 		visionbilling.VisionBillingQueue,
+		taskqueue.RiverQueueWebhookDeliver,
 	}
 	stats := make(map[string]redmetrics.RiverQueueStats, len(queues))
 	for _, name := range queues {
