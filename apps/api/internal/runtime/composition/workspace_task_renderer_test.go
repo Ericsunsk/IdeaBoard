@@ -194,7 +194,7 @@ func TestWorkspaceTaskRendererInvalidBytes(t *testing.T) {
 }
 
 // Nil fetcher fails remote ingest closed with an explicit message
-// (production wiring until the download seam lands).
+// (a renderer without a download seam ingests nothing).
 func TestWorkspaceTaskRendererNilFetcherFailsLoud(t *testing.T) {
 	env := newRendererTestEnv(t)
 	r := env.renderer(t, func(d *WorkspaceTaskRendererDeps) { d.Fetcher = nil })
