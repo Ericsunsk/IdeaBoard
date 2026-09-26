@@ -97,3 +97,16 @@ func TestProviderResultFinalizationRejectsMismatchedOutputURL(t *testing.T) {
 		t.Fatalf("err=%v, want mismatched URL failure", err)
 	}
 }
+
+func TestProviderResultFinalizationRejectsMixedAssetOutput(t *testing.T) {
+	result := newProviderDurableOutputs(
+		[]string{"asset_media_abc"},
+		[]tasks.TaskOutput{{AssetID: "asset_media_abc", URL: "https://provider.example/result.png", ResultIndex: 0}},
+	)
+	if result.state != providerResultTerminalFailure {
+		t.Fatalf("state=%d, want terminal failure", result.state)
+	}
+	if _, _, err := result.completedOutputs(); err == nil || !strings.Contains(err.Error(), "mixed URL fields") {
+		t.Fatalf("err=%v, want mixed asset output failure", err)
+	}
+}

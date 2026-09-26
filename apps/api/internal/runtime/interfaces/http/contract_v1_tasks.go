@@ -104,6 +104,7 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 	return workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: h.deps.Tasks, Quoter: h.deps.TaskQuoter,
 		Holder: h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
+		Models: h.deps.TaskModelResolver,
 	})
 }
 

@@ -28,8 +28,26 @@ type workspaceTaskResultBytesFetcher struct{}
 
 var _ WorkspaceResultBytesFetcher = workspaceTaskResultBytesFetcher{}
 
+type workspaceResultAllowHostsKey struct{}
+
+func withWorkspaceResultAllowHosts(ctx context.Context, hosts []string) context.Context {
+	return context.WithValue(ctx, workspaceResultAllowHostsKey{}, append([]string(nil), hosts...))
+}
+
+func workspaceResultAllowHostsFromCtx(ctx context.Context) []string {
+	if ctx == nil {
+		return nil
+	}
+	hosts, _ := ctx.Value(workspaceResultAllowHostsKey{}).([]string)
+	return append([]string(nil), hosts...)
+}
+
 func (workspaceTaskResultBytesFetcher) FetchResultBytes(ctx context.Context, _ *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) ([]byte, error) {
-	file, err := remote.DownloadImageWithLimit(ctx, strings.TrimSpace(ref.URL), outbound.AllowHosts(ctx), workspacemedia.MaxUploadSizeBytes)
+	allowHosts := workspaceResultAllowHostsFromCtx(ctx)
+	if len(allowHosts) == 0 {
+		allowHosts = outbound.AllowHosts(ctx)
+	}
+	file, err := remote.DownloadImageWithLimit(ctx, strings.TrimSpace(ref.URL), allowHosts, workspacemedia.MaxUploadSizeBytes)
 	if err != nil {
 		return nil, err
 	}

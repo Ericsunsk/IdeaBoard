@@ -146,6 +146,12 @@ const (
 // WorkspaceTask is one workspace-scoped async job. RetryCount,
 // ExecutionToken, OutputRefs, and BillingSnapshot persist as durable
 // facts; the store never exposes internal numeric keys.
+//
+// ResolvedModel is the durable execution-plan fact minted at submit: the
+// admin model mapping (provider/model) frozen for this task. The worker
+// prefers it over a live mapping lookup so retries and redeliveries reuse
+// the submit-time model even if the admin remaps the feature mid-flight.
+// Every newly created task must carry a non-empty provider/model target.
 type WorkspaceTask struct {
 	ID              string          `json:"id"`
 	WorkspaceID     string          `json:"workspace_id"`
@@ -154,6 +160,7 @@ type WorkspaceTask struct {
 	MediaAssetIDs   []string        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any  `json:"params,omitempty"`
 	CanonicalParams string          `json:"canonical_params,omitempty"`
+	ResolvedModel   string          `json:"resolved_model,omitempty"`
 	Status          string          `json:"status"`
 	RetryCount      int             `json:"retry_count"`
 	ExecutionToken  string          `json:"execution_token"`
@@ -235,6 +242,13 @@ type AssetInfo struct {
 // sibling; the replacement re-wires this seam); tests stub it.
 type AssetReader interface {
 	GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error)
+}
+
+// ModelResolver returns the admin-configured model for one workflow feature
+// at submit time. Production adapts the AI gateway model mapping; tests stub
+// it. A nil resolver makes task creation fail closed.
+type ModelResolver interface {
+	ResolveModel(ctx context.Context, feature string) (string, error)
 }
 
 // ValidateCreate enforces the discriminated input union:

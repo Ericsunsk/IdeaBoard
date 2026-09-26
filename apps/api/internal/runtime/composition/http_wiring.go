@@ -121,6 +121,12 @@ func newAppRouter(
 			TaskQueue:             taskServices.workspaceTaskQueue,
 			TaskAssets:            taskServices.workspaceTaskAssets,
 			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+			// The AI gateway repo doubles as the submit-time model
+			// resolver: it mints the durable plan model at submit.
+			// Unmapped features fail submission closed; gateway
+			// credentials stay request-scoped via Resolve (never
+			// persisted, never logged).
+			TaskModelResolver: aiGatewayRepo,
 			// #833: the webhook store is shared with the River delivery
 			// worker (built in task_wiring.go where the client exists),
 			// so HTTP views and the worker observe one registry.

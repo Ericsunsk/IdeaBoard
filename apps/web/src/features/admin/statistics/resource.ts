@@ -1,20 +1,19 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { api } from '../../../shared/api/client'
-import { CONTROL_API_PREFIX } from '../../../shared/api/controlMutator'
 import {
   createApiDataSelector,
   type ApiResponseWithData,
 } from '../../../shared/api/apiResponse'
-import { getGetControlStatisticsUrl } from '../../../shared/api/generated-query/control/control-platform/control-platform'
+import { getControlStatistics } from '../../../shared/api/generated-query/control/control-platform/control-platform'
+import type { GetControlStatisticsParams } from '../../../shared/api/generated-query/control/model'
 
 // Admin statistics boundary (final cut: Control Plane read). The legacy
 // `GET /api/admin/statistics` route group is deleted; the same handler now
 // serves `GET /api/control/v1/platform/statistics` as a guarded proxy with
 // the legacy `{code, msg, data}` envelope untouched, so this boundary keeps
-// its local view types and only repoints transport at the generated Control
-// path. Charts and presentations keep importing these names, never generated
-// code.
+// its local view types and rides the generated `getControlStatistics` hook
+// (wire-identical to the retired hand-rolled GET). Charts and presentations
+// keep importing these names, never generated code.
 export const GetAdminStatisticsRange = {
   '1d': '1d',
   '7d': '7d',
@@ -134,11 +133,9 @@ export type AdminStatisticsResourceOptions = {
 const ADMIN_STATISTICS_STALE_TIME_MS = 60_000
 const selectAdminStatistics = createApiDataSelector<AdminStatistics>('加载统计数据失败')
 
-function statisticsUrl(params?: GetAdminStatisticsParams): string {
-  // Generated Control path (`/platform/statistics[?range=]`); the shared
-  // `api.request` mounts only `/api`, so the `/control/v1` prefix is added
-  // here exactly like `controlMutator` does for generated callers.
-  return `${CONTROL_API_PREFIX}${getGetControlStatisticsUrl(params?.range ? { range: params.range } : undefined)}`
+function statisticsParams(params?: GetAdminStatisticsParams): GetControlStatisticsParams | undefined {
+  const range = params?.range
+  return range ? { range } : undefined
 }
 
 export function useAdminStatisticsResource(
@@ -148,10 +145,9 @@ export function useAdminStatisticsResource(
   const query = useQuery<ApiResponseWithData<AdminStatistics>, Error, AdminStatistics>({
     queryKey: ['admin', 'statistics', params] as const,
     queryFn: ({ signal }) =>
-      api.request<ApiResponseAdminStatistics>(statisticsUrl(toValue(params)), {
-        method: 'GET',
+      getControlStatistics(statisticsParams(toValue(params)), {
         ...(signal == null ? {} : { signal }),
-      }),
+      }) as Promise<ApiResponseAdminStatistics>,
     select: selectAdminStatistics,
     staleTime: options.staleTime ?? ADMIN_STATISTICS_STALE_TIME_MS,
     refetchIntervalInBackground: options.refetchIntervalInBackground ?? false,

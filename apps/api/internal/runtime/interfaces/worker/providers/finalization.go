@@ -112,6 +112,19 @@ func (r providerResultFinalization) validateDurableOutputs() error {
 }
 
 func validateDurableOutput(imageURL string, output tasks.TaskOutput) error {
+	if strings.TrimSpace(output.AssetID) != "" {
+		// Workspace-managed asset reference: the bytes already live in
+		// workspace media (ingested by the workspace result
+		// materializer), so no URL round-trip is required or allowed
+		// (the workspace output contract forbids mixed asset/URL refs).
+		if strings.TrimSpace(output.URL) != "" || strings.TrimSpace(output.ChecksumSHA256) != "" {
+			return fmt.Errorf("provider result asset output contains mixed URL fields")
+		}
+		if output.ResultIndex < 0 {
+			return fmt.Errorf("provider result durable output has a negative result index")
+		}
+		return nil
+	}
 	if strings.TrimSpace(imageURL) == "" || strings.TrimSpace(output.URL) == "" {
 		return fmt.Errorf("provider result durable output is missing an image URL")
 	}

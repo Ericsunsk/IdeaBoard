@@ -1,11 +1,9 @@
-import { api } from '../../../shared/api/client'
-import { CONTROL_API_PREFIX } from '../../../shared/api/controlMutator'
 import {
   resolveApiData,
   type ApiResponseWithData,
 } from '../../../shared/api/apiResponse'
 import {
-  getListControlSearchProvidersUrl,
+  listControlSearchProviders,
   testControlSearchProvider,
   updateControlSearchProvider,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
@@ -20,9 +18,9 @@ import type {
   SearchProviderUpdate,
 } from './searchProviderTypes'
 
-// Admin search provider boundary (final cut). Reads moved to the Control
-// Plane (`GET /api/control/v1/platform/search/providers`, a guarded proxy
-// keeping the legacy envelope); writes already go through the Control Plane
+// Admin search provider boundary (final cut). Reads ride the generated
+// Control hook (`listControlSearchProviders`, a guarded proxy keeping the
+// legacy envelope); writes already go through the Control Plane
 // (`updateControlSearchProvider` / `testControlSearchProvider`, operator
 // reason required). Control marks these routes `x-control-envelope: legacy`,
 // so success bodies keep the legacy `{ code, msg, data? }` shape while
@@ -55,13 +53,11 @@ export function createAdminSearchProviderResource(): AdminSearchProviderResource
 }
 
 function listSearchProviders() {
-  return resolveApiData<SearchProviderList>(
-    api.request<ApiResponseWithData<SearchProviderList>>(
-      `${CONTROL_API_PREFIX}${getListControlSearchProvidersUrl()}`,
-      {
-        method: 'GET',
-      },
-    ),
+  // Wire-identical to the retired hand-rolled GET (same guarded-legacy
+  // `{ code, msg, data }` body through `controlMutator`); the generated
+  // hook owns the route so the duplicate URL prefixing is deleted.
+  return resolveApiData(
+    listControlSearchProviders() as Promise<ApiResponseWithData<SearchProviderList>>,
     '加载图片搜索供应商配置失败',
   )
 }

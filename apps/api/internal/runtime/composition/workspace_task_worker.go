@@ -27,13 +27,16 @@ package composition
 // holder instance would fail every Capture/Release with "unknown hold".
 //
 // Provider-creds boundary (deliberate): the production Generate bridge
-// resolves the admin model mapping and calls providers.Executor.CallGatewayAPI
-// (transport/auth/retries stay inside the gateway). Workspace submit persists
-// a durable execution plan and canonical media facts before dispatch. Result
-// materialization into workspace
-// media assets is #827 (WorkspaceTaskRenderer below): once a provider
-// (real or fake) yields output refs, the renderer ingests remote results
-// into asset rows and settlement persists the refs atomically.
+// consumes the durable execution plan minted at submit (canonical params
+// plus the submit-time resolved model) and calls
+// providers.Executor.CallGatewayAPI (transport/auth/retries stay inside
+// the gateway). Missing gateway credentials or model mappings fail the
+// task deterministically with a clear message. Result materialization
+// into workspace media assets runs inside the executor finalize seam
+// (workspace result materializer) and through the WorkspaceTaskRenderer
+// below: once a provider (real or fake) yields output refs, the renderer
+// verifies asset refs (or ingests remote refs) and settlement persists
+// the refs atomically.
 // The worker never dials providers directly and never shapes provider bodies.
 
 import (
@@ -414,50 +417,47 @@ func redactToken(token string) string {
 }
 
 // workspaceGatewayProvider bridges the EXISTING provider gateway seam for
-// workspace tasks. It resolves the admin model mapping, synthesizes the
-// legacy TaskPayload the executor requires, and maps provider outputs back
-// to workspace OutputRefs. It never shapes provider bodies and never dials
-// providers: transport/auth/retries stay inside the gateway client.
+// workspace tasks. It consumes the durable execution plan minted at submit
+// (submit-time resolved model), synthesizes
+// the legacy TaskPayload the executor requires, and maps provider outputs
+// back to workspace OutputRefs. It never shapes provider bodies and never
+// dials providers: transport/auth/retries stay inside the gateway client.
 //
-// Boundary (see file header): v1 submit mints no durable execution plan, so
-// image features fail deterministically inside the executor today, and a
-// missing gateway configuration fails deterministically at Resolve/factory
-// time. Both converge tasks to failed with a clear message.
+// Boundary: gateway credentials resolve per execution through the AI
+// gateway config seam (system settings + env-held encryption key) and are
+// never persisted; a missing gateway configuration or model mapping fails
+// the task deterministically at Resolve/factory time. Provider image bytes
+// land in workspace media through the workspace result materializer
+// (executor finalize seam), so Generate yields workspace asset refs that
+// the renderer verifies before the atomic Complete.
 type workspaceGatewayProvider struct {
-	models   workspaceModelResolver
 	executor *providers.Executor
 }
 
-// workspaceModelResolver mirrors execution.ModelResolver without importing
-// the legacy execution package into the workspace path.
-type workspaceModelResolver interface {
-	ResolveModel(ctx context.Context, feature string) (string, error)
-}
-
-func newWorkspaceGatewayProvider(models workspaceModelResolver, executor *providers.Executor) *workspaceGatewayProvider {
-	return &workspaceGatewayProvider{models: models, executor: executor}
+func newWorkspaceGatewayProvider(executor *providers.Executor) *workspaceGatewayProvider {
+	return &workspaceGatewayProvider{executor: executor}
 }
 
 // Generate implements WorkspaceTaskProvider.
 func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
-	if p == nil || p.models == nil || p.executor == nil {
+	if p == nil || p.executor == nil {
 		return nil, errors.New("上游图像服务未配置，请联系管理员")
 	}
-	kind := strings.TrimSpace(task.WorkflowKind)
-	model, err := p.models.ResolveModel(ctx, kind)
-	if err != nil {
-		return nil, fmt.Errorf("上游模型解析失败: %w", err)
-	}
-	if strings.TrimSpace(model) == "" {
-		return nil, errors.New("功能模型未配置，请先在后台配置")
+	model := strings.TrimSpace(task.ResolvedModel)
+	if model == "" {
+		return nil, errors.New("任务执行计划缺少模型，请重新提交任务")
 	}
 	legacy, err := workspaceBridgeTaskPayload(task)
 	if err != nil {
 		return nil, err
 	}
+	// Scope the call for the workspace result materializer (executor
+	// passes ctx through to it): the materializer needs the workspace
+	// identity that the legacy materialize signature does not carry.
+	ctx = withWorkspaceTaskScope(ctx, strings.TrimSpace(task.WorkspaceID))
 	output, err := p.executor.CallGatewayAPI(ctx, runtimeports.GatewayCallInput{
 		Task:           legacy,
-		Model:          strings.TrimSpace(model),
+		Model:          model,
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
 	})
 	if err != nil {
@@ -466,39 +466,20 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspace
 	return mapWorkspaceProviderOutputs(output.Outputs)
 }
 
-// workspaceBridgeTaskPayload synthesizes the legacy payload the gateway
-// executor requires from workspace facts. Params carry the canonical submit
-// envelope plus the workflow feature so UnmarshalParams resolves; the
-// executor still owns validation, dialect shaping, and materialization.
+// workspaceBridgeTaskPayload synthesizes the gateway payload from the
+// durable canonical plan. The executor still owns dialect shaping and
+// materialization; an absent or invalid canonical plan fails closed.
 func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.TaskPayload, error) {
 	if task == nil || strings.TrimSpace(task.ID) == "" {
 		return nil, errors.New("任务标识缺失")
 	}
 	raw := strings.TrimSpace(task.CanonicalParams)
 	if raw == "" {
-		envelope := map[string]any{"feature": strings.TrimSpace(task.WorkflowKind)}
-		for key, value := range task.Params {
-			if _, exists := envelope[key]; !exists {
-				envelope[key] = value
-			}
-		}
-		encoded, err := json.Marshal(envelope)
-		if err != nil {
-			return nil, fmt.Errorf("任务参数编码失败: %w", err)
-		}
-		raw = string(encoded)
+		return nil, errors.New("任务执行计划缺少 canonical 参数，请重新提交任务")
 	}
-	type workflowTaskParamsAlias tasks.WorkflowTaskParams
-	var alias workflowTaskParamsAlias
-	if err := json.Unmarshal([]byte(raw), &alias); err != nil {
+	typed, err := tasks.UnmarshalParams(raw)
+	if err != nil {
 		return nil, fmt.Errorf("任务 canonical 参数解析失败: %w", err)
-	}
-	typed := tasks.WorkflowTaskParams(alias)
-	if typed.SchemaVersion == 0 {
-		typed.SchemaVersion = tasks.CurrentParamsSchemaVersion
-	}
-	if strings.TrimSpace(typed.Feature) == "" {
-		typed.Feature = strings.TrimSpace(task.WorkflowKind)
 	}
 	if typed.Extra == nil {
 		typed.Extra = make(map[string]interface{})
@@ -511,30 +492,21 @@ func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.Task
 	return &tasks.TaskPayload{
 		TaskID:    strings.TrimSpace(task.ID),
 		UserID:    task.OwnerUserID,
-		Prompt:    workspaceBridgePrompt(task, &typed),
+		Prompt:    workspaceBridgePrompt(typed),
 		Params:    string(encoded),
 		CreatedAt: task.CreatedAt.Unix(),
 	}, nil
 }
 
-// workspaceBridgePrompt resolves the provider prompt the worker actually
-// sends. The durable fact is the canonical Generation snapshot
-// (CompiledPrompt, fallback UserPrompt) stamped by CompileWorkspaceParams
-// from the v1 data.prompt input; the legacy params.prompt fallback keeps
-// compiler-less tasks (and existing tests) working. A task with no prompt
-// fact bridges "" and lets the executor enforce feature policy.
-func workspaceBridgePrompt(task *workspacetasks.WorkspaceTask, typed *tasks.WorkflowTaskParams) string {
+// workspaceBridgePrompt resolves the provider prompt from the canonical
+// Generation snapshot stamped at submit time.
+func workspaceBridgePrompt(typed *tasks.WorkflowTaskParams) string {
 	if typed != nil && typed.Generation != nil {
 		if prompt := strings.TrimSpace(typed.Generation.CompiledPrompt); prompt != "" {
 			return prompt
 		}
 		if prompt := strings.TrimSpace(typed.Generation.UserPrompt); prompt != "" {
 			return prompt
-		}
-	}
-	if task != nil && task.Params != nil {
-		if value, ok := task.Params["prompt"].(string); ok {
-			return value
 		}
 	}
 	return ""

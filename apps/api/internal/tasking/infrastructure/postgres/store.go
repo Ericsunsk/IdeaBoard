@@ -73,6 +73,7 @@ type workflowInputEnvelope struct {
 	MediaAssetIDs   []string                        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any                  `json:"params,omitempty"`
 	CanonicalParams string                          `json:"canonical_params,omitempty"`
+	ResolvedModel   string                          `json:"resolved_model,omitempty"`
 	BillingSnapshot *workspacetasks.BillingSnapshot `json:"billing_snapshot,omitempty"`
 	ExecutionToken  string                          `json:"execution_token,omitempty"`
 	CancelReason    string                          `json:"cancel_reason,omitempty"`
@@ -102,6 +103,7 @@ func marshalEnvelope(task *workspacetasks.WorkspaceTask) ([]byte, error) {
 		MediaAssetIDs:   append([]string(nil), task.MediaAssetIDs...),
 		Params:          task.Params,
 		CanonicalParams: task.CanonicalParams,
+		ResolvedModel:   task.ResolvedModel,
 		ExecutionToken:  task.ExecutionToken,
 		CancelReason:    task.CancelReason,
 	}
@@ -172,6 +174,7 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		MediaAssetIDs:   append([]string(nil), envelope.MediaAssetIDs...),
 		Params:          envelope.Params,
 		CanonicalParams: envelope.CanonicalParams,
+		ResolvedModel:   envelope.ResolvedModel,
 		Status:          row.Status,
 		RetryCount:      int(row.RetryCount),
 		ExecutionToken:  envelope.ExecutionToken,

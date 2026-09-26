@@ -13,6 +13,10 @@ import { i18n } from '../../../shared/i18n'
 // `ws_` required) is not a substitute. Domain shapes stay owned by
 // `../domain/models`.
 //
+// TODO(2026-09-26, public inspiration gap): GET `/search` has no operation
+// in `apps/api/openapi.public.yaml`, so no generated hook exists and this
+// hand-rolled GET stays. Adopt the hook once the spec gains the operation;
+// do not run `api:generate` from this task (out of scope).
 
 export function generateRandomInspirationCursor(): string {
   const page = Math.floor(Math.random() * 8) + 1

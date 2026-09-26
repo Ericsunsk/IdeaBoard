@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 import {
   MediaWorkspaceUnavailableError,
+  WORKSPACE_MEDIA_BATCH_MAX_ITEMS,
   getMediaAssetMetadata,
   getWorkspaceMediaAssetMetadata,
+  getWorkspaceMediaAssetMetadataBatch,
   invalidateMediaAssetMetadata,
   resetMediaWorkspaceIdResolver,
   resolveMediaAssetDerivativeURL,
@@ -51,6 +53,28 @@ function assetEnvelope(status: string, derivativeUrl = '/api/v1/preview.webp') {
       created_at: '2026-09-25T00:00:00.000Z',
       updated_at: '2026-09-25T00:00:00.000Z',
     },
+  }
+}
+
+function batchAssetPayload(assetId: string) {
+  return {
+    id: assetId,
+    workspace_id: WORKSPACE_ID,
+    status: 'ready',
+    media_kind: 'image',
+    mime_type: 'image/jpeg',
+    width: 2048,
+    height: 1024,
+    size_bytes: 100,
+    checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${assetId}/content`,
+    derivatives: {
+      thumb: { status: 'ready', url: '/api/v1/thumb.webp' },
+      preview: { status: 'ready', url: '/api/v1/preview.webp' },
+      'large-preview': { status: 'ready', url: '/api/v1/large.webp' },
+    },
+    created_at: '2026-09-25T00:00:00.000Z',
+    updated_at: '2026-09-25T00:00:00.000Z',
   }
 }
 
@@ -195,5 +219,72 @@ describe('workspace mediaAssetDelivery', () => {
     await expect(resolveMediaAssetProcessingURL(ASSET_ID)).rejects.toMatchObject({
       name: 'MediaAssetDerivativeNotReadyError',
     })
+  })
+
+  it('reads a batch through one generated batch transport in request order', async () => {
+    const secondId = 'asset_uid43'
+    mocks.request.mockResolvedValueOnce({
+      data: {
+        items: [batchAssetPayload(ASSET_ID), batchAssetPayload(secondId)],
+      },
+    })
+
+    const items = await getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [ASSET_ID, secondId])
+
+    expect(items.map((item) => item.asset_id)).toEqual([ASSET_ID, secondId])
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+    expect(mocks.request).toHaveBeenCalledWith(
+      `/v1/workspaces/${WORKSPACE_ID}/media-assets/batch`,
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const body = mocks.request.mock.calls[0]?.[1] as { body?: string }
+    expect(JSON.parse(body.body as string)).toEqual({
+      data: { asset_ids: [ASSET_ID, secondId] },
+    })
+  })
+
+  it('serves batch repeats from the shared cache without transport', async () => {
+    mocks.request.mockResolvedValueOnce({
+      data: { items: [batchAssetPayload(ASSET_ID)] },
+    })
+
+    const first = await getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [ASSET_ID])
+    const second = await getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [ASSET_ID])
+
+    expect(second[0]).toBe(first[0])
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('hydrates the single-read cache from batch results', async () => {
+    mocks.request.mockResolvedValueOnce({
+      data: { items: [batchAssetPayload(ASSET_ID)] },
+    })
+
+    await getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [ASSET_ID])
+    const single = await getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
+
+    expect(single.asset_id).toBe(ASSET_ID)
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails batch reads closed on empty or blank ids', async () => {
+    await expect(getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [])).rejects.toThrow()
+    await expect(
+      getWorkspaceMediaAssetMetadataBatch(WORKSPACE_ID, [ASSET_ID, '   ']),
+    ).rejects.toThrow()
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('fails batch reads closed without a workspace selection', async () => {
+    mocks.selectedWorkspaceId.current = null
+
+    await expect(getWorkspaceMediaAssetMetadataBatch(null, [ASSET_ID])).rejects.toBeInstanceOf(
+      MediaWorkspaceUnavailableError,
+    )
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('exposes the backend batch bound', () => {
+    expect(WORKSPACE_MEDIA_BATCH_MAX_ITEMS).toBe(50)
   })
 })

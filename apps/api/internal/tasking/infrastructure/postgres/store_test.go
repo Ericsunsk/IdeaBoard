@@ -353,10 +353,12 @@ func TestWorkspaceTaskValidation(t *testing.T) {
 
 func TestEnvelopeRoundTrip(t *testing.T) {
 	task := &workspacetasks.WorkspaceTask{
-		MediaAssetIDs:  []string{"asset_abc"},
-		Params:         map[string]any{"prompt": "x"},
-		ExecutionToken: "exec_abc",
-		CancelReason:   "done",
+		MediaAssetIDs:   []string{"asset_abc"},
+		Params:          map[string]any{"prompt": "x"},
+		CanonicalParams: `{"schema_version":5,"feature":"render"}`,
+		ResolvedModel:   "openrouter/fake-image-model",
+		ExecutionToken:  "exec_abc",
+		CancelReason:    "done",
 		BillingSnapshot: workspacetasks.BillingSnapshot{
 			SKU: "ai-image:render", TotalCredits: 10, HoldTransactionID: "hold_1",
 		},
@@ -374,5 +376,11 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	}
 	if envelope.BillingSnapshot == nil || envelope.BillingSnapshot.HoldTransactionID != "hold_1" {
 		t.Fatalf("snapshot = %+v", envelope.BillingSnapshot)
+	}
+	if envelope.CanonicalParams != `{"schema_version":5,"feature":"render"}` {
+		t.Fatalf("canonical_params = %q, want round-trip", envelope.CanonicalParams)
+	}
+	if envelope.ResolvedModel != "openrouter/fake-image-model" {
+		t.Fatalf("resolved_model = %q, want round-trip", envelope.ResolvedModel)
 	}
 }

@@ -32,8 +32,7 @@ func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 	}
 }
 
-// Snapshot precedence: CompiledPrompt wins; UserPrompt is the fallback;
-// legacy params.prompt survives only when no snapshot exists.
+// Snapshot precedence: CompiledPrompt wins; UserPrompt is the fallback.
 func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 	compiled := `{"schema_version":5,"feature":"generation","generation":{"user_prompt":"user text","compiled_prompt":"compiled text"}}`
 	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
@@ -58,14 +57,10 @@ func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 		t.Fatalf("prompt = %q, want user snapshot text", legacy.Prompt)
 	}
 
-	legacy, err = workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
+	if _, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
 		ID: "task_prec3", WorkflowKind: "render", Params: map[string]any{"prompt": "legacy"},
-	})
-	if err != nil {
-		t.Fatalf("bridge: %v", err)
-	}
-	if legacy.Prompt != "legacy" {
-		t.Fatalf("prompt = %q, want legacy params fallback", legacy.Prompt)
+	}); err == nil {
+		t.Fatal("missing canonical params = nil, want fail-closed error")
 	}
 }
 
@@ -79,7 +74,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 		assets := &workerTestAssets{ready: map[string]bool{"asset_mask1": true}, archived: map[string]bool{}}
 		env.service = workspacetasks.NewService(workspacetasks.ServiceDeps{
 			Tasks: env.store, Quoter: workerTestQuoter{}, Holder: env.holder, Queue: env.queue,
-			Assets: assets,
+			Assets: assets, Models: workspaceTestModelResolver{},
 		})
 		return env, assets
 	}

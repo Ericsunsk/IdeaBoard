@@ -31,26 +31,29 @@ type Service struct {
 	holder Holder
 	queue  Enqueuer
 	assets AssetReader
+	models ModelResolver
 	events []TaskEvent
 	now    func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. Tasks is required; Quoter,
-// Holder, Enqueuer, and Assets may be nil in narrow unit tests (creation
-// then fails closed), but production wires all four.
+// Holder, Enqueuer, Assets, and Models are required for production creates.
+// Models mints the submit-time resolved model into the durable plan; tasks
+// are never persisted without that fact.
 type ServiceDeps struct {
 	Tasks  WorkspaceTaskStore
 	Quoter Quoter
 	Holder Holder
 	Queue  Enqueuer
 	Assets AssetReader
+	Models ModelResolver
 }
 
 // NewService builds the settlement orchestrator.
 func NewService(deps ServiceDeps) *Service {
 	return &Service{
 		tasks: deps.Tasks, quoter: deps.Quoter, holder: deps.Holder,
-		queue: deps.Queue, assets: deps.Assets, now: time.Now,
+		queue: deps.Queue, assets: deps.Assets, models: deps.Models, now: time.Now,
 	}
 }
 
@@ -106,7 +109,9 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 	return snapshot, nil
 }
 
-// CreateInput is the validated creation intent for settlement.
+// CreateInput is the validated creation intent for settlement. The provider
+// model is deliberately absent: submit always resolves it from the admin
+// mapping seam so callers cannot inject or replay a different target.
 type CreateInput struct {
 	WorkspaceID     string
 	OwnerUserID     int64
@@ -143,6 +148,12 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if resolution == "" {
 		resolution = "default"
 	}
+	// Mint the durable plan model before settlement. A task without a frozen
+	// provider/model target cannot be retried deterministically.
+	resolvedModel, err := s.mintResolvedModel(ctx, kind)
+	if err != nil {
+		return nil, err
+	}
 	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
 	if err != nil {
 		return nil, err
@@ -155,7 +166,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
-	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token); handled {
+	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, resolvedModel, taskID, token); handled {
 		return created, err
 	}
 	var holdTxID string
@@ -172,7 +183,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	task := &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
 		WorkflowKind: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, Status: StatusPending,
+		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, ResolvedModel: resolvedModel,
+		Status:     StatusPending,
 		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
 	}
 	created, err := s.tasks.CreateTask(ctx, task)
@@ -191,6 +203,41 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	s.stage(created.ID, created.WorkspaceID, StatusPending)
 	return created, nil
+}
+
+// mintResolvedModel freezes the admin model mapping into the durable plan.
+// Invalid, missing, or unresolved targets fail submit.
+func (s *Service) mintResolvedModel(ctx context.Context, kind string) (string, error) {
+	if s == nil || s.models == nil {
+		return "", fmt.Errorf("workspacetasks: model resolver unavailable")
+	}
+	model, err := s.models.ResolveModel(ctx, kind)
+	if err != nil {
+		return "", fmt.Errorf("workspacetasks: resolve model: %w", err)
+	}
+	model = strings.TrimSpace(model)
+	if err := validateResolvedModel(model); err != nil {
+		return "", fmt.Errorf("workspacetasks: resolve model: %w", err)
+	}
+	return model, nil
+}
+
+func validateResolvedModel(model string) error {
+	if model == "" || strings.ContainsAny(model, " \t\r\n") {
+		return fmt.Errorf("model must be provider/model without whitespace")
+	}
+	base := model
+	if at := strings.IndexByte(base, '@'); at >= 0 {
+		if at == 0 || at == len(base)-1 || strings.ContainsAny(base[at+1:], " \t\r\n") {
+			return fmt.Errorf("model gateway path is invalid")
+		}
+		base = base[:at]
+	}
+	parts := strings.SplitN(base, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return fmt.Errorf("model must be provider/model")
+	}
+	return nil
 }
 
 func cloneParams(in map[string]any) map[string]any {

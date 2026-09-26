@@ -188,7 +188,7 @@ func (s *Service) holderSettles(holdID string, total int64) bool {
 // without its Hold, no Hold without its task, no River job without task
 // facts. It reports handled=false when the tx seams are absent so the
 // caller falls back to the compensating path.
-func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, taskID, token string) (*WorkspaceTask, bool, error) {
+func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, resolvedModel, taskID, token string) (*WorkspaceTask, bool, error) {
 	transactor, txQuoter, txHolder, txStore, txQueue, ok := s.settlementSeams()
 	if !ok {
 		return nil, false, nil
@@ -222,7 +222,8 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	task := &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
 		WorkflowKind: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, Status: StatusPending,
+		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, ResolvedModel: resolvedModel,
+		Status:     StatusPending,
 		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
 	}
 	created, err := txStore.CreateTaskInTx(ctx, tx, task)

@@ -28,10 +28,13 @@ package composition
 //   - Objects: workspacemedia.DerivativeObjects (Read + PUT). *storage.Service
 //     satisfies it in production; tests inject map-backed fakes.
 //   - Fetcher: WorkspaceResultBytesFetcher downloads remote output bytes.
-//     Production wires NIL today: remote ingestion stays fail-loud
-//     ("result ingestion unavailable") until the allowlisted download seam
-//     lands. No live provider credentials exist in this environment and none
-//     are added here; the deterministic-failure path keeps working.
+//     Production wires the allowlisted downloader
+//     (workspaceTaskResultBytesFetcher: SSRF protection, timeout and size
+//     caps); a nil fetcher fails every remote ingest closed
+//     ("result ingestion unavailable"). Gateway credentials themselves
+//     arrive only via the operator-managed AI gateway config seam and are
+//     never added here; without them the worker still fails
+//     deterministically before any download.
 //   - Derivatives: derivativeports.Renderer, run SEQUENTIALLY via #820
 //     EnsureDerivatives BEST-EFFORT (failures warn-logged, tiers stay
 //     pending, the task still completes). Nil skips generation with a
@@ -44,12 +47,13 @@ package composition
 // upload); no task_outputs row ever points at a missing asset because refs
 // are built only from completed assets.
 //
-// What still stays stubbed after #827 (for #828+): execution-plan minting
-// at submit (contract_v1_tasks.go mints none, so the production gateway
-// bridge still fails deterministically inside CallGatewayAPI), the
-// production bytes fetcher (nil), and the production derivatives renderer
-// (nil, tiers pending). The success path is proven with the fake/stub
-// gateway seam: request shaping + result mapping + this renderer.
+// Live dispatch note: v1 submit mints the durable execution plan
+// (canonical params via CompileWorkspaceParams plus the submit-time
+// resolved model), the gateway bridge consumes it through CallGatewayAPI,
+// and live provider bytes land here through the workspace provider-result
+// materializer (executor finalize seam) as asset-kind refs. The success
+// path below stays proven with the fake/stub gateway seam for remote
+// refs: request shaping + result mapping + this renderer.
 
 import (
 	"context"
@@ -93,7 +97,7 @@ func (f WorkspaceResultBytesFetchFunc) FetchResultBytes(ctx context.Context, tas
 // required (fail fast); Objects, Fetcher, and Derivatives are optional
 // with fail-loud/deferred semantics documented above.
 type WorkspaceTaskRendererDeps struct {
-	Media workspacemedia.WorkspaceMediaStore
+	Media  workspacemedia.WorkspaceMediaStore
 	Assets workspacetasks.AssetReader
 	// Objects carries result bytes (PUT) and serves derivative reads.
 	// Nil fails every remote ingest closed at render time.
@@ -196,8 +200,8 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 }
 
 // ingestRemote fetches one remote output's bytes and persists them as a
-// new workspace-scoped media asset via the #820 session flow, returning
-// the settlement-ready asset-kind ref.
+// new workspace-scoped media asset via the shared session-flow ingest,
+// returning the settlement-ready asset-kind ref.
 func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef, index int) (workspacetasks.OutputRef, error) {
 	if r.fetcher == nil {
 		return workspacetasks.OutputRef{}, errors.New("任务结果转存未配置: result ingestion unavailable")
@@ -209,44 +213,10 @@ func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspac
 	if err != nil {
 		return workspacetasks.OutputRef{}, fmt.Errorf("任务结果下载失败: %w", err)
 	}
-	if len(data) == 0 {
-		return workspacetasks.OutputRef{}, errors.New("上游结果为空，无法转存")
-	}
-	if int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
-		return workspacetasks.OutputRef{}, fmt.Errorf("上游结果过大: %d 字节", len(data))
-	}
-	facts, err := imageformat.InspectDetectedBytes(data)
+	asset, err := persistWorkspaceTaskResultAsset(ctx, r.media, r.objects, r.derivatives, task, data, index, strings.TrimSpace(ref.ChecksumSHA256))
 	if err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("上游结果不是受支持的图片: %w", err)
+		return workspacetasks.OutputRef{}, err
 	}
-	sum := sha256.Sum256(data)
-	checksum := hex.EncodeToString(sum[:])
-	if !strings.EqualFold(checksum, strings.TrimSpace(ref.ChecksumSHA256)) {
-		return workspacetasks.OutputRef{}, errors.New("上游结果校验失败: checksum mismatch")
-	}
-	workspaceID := strings.TrimSpace(task.WorkspaceID)
-	filename := fmt.Sprintf("task-result-%d%s", index, facts.Extension)
-	session, err := r.media.CreateSession(ctx, workspacemedia.CreateSessionParams{
-		WorkspaceID: workspaceID, OwnerUserID: task.OwnerUserID, Filename: filename,
-		MIMEType: facts.MIMEType, SizeBytes: int64(len(data)),
-		ChecksumSHA256: checksum, MediaKind: workspacemedia.MediaKindImage,
-	})
-	if err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务结果落盘失败: %w", err)
-	}
-	if err := r.objects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, facts.MIMEType); err != nil {
-		_, _ = r.media.FailSession(ctx, workspaceID, session.ID, "result byte ingest failed")
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务结果字节写入失败: %w", err)
-	}
-	_, asset, err := r.media.CompleteSession(ctx, workspaceID, session.ID, workspacemedia.CompleteFacts{
-		ChecksumSHA256: checksum, SizeBytes: int64(len(data)),
-		MIMEType: facts.MIMEType, MediaKind: workspacemedia.MediaKindImage,
-		Width: int32(facts.Width), Height: int32(facts.Height),
-	}, workspacemedia.CreateAssetParams{})
-	if err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务结果落盘失败: %w", err)
-	}
-	r.generateDerivativesBestEffort(ctx, workspaceID, asset)
 	rendered := workspacetasks.OutputRef{
 		Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID,
 		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
@@ -254,24 +224,84 @@ func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspac
 	if err := workspacetasks.ValidateOutputRef(rendered); err != nil {
 		return workspacetasks.OutputRef{}, fmt.Errorf("任务输出不符合输出契约: %w", err)
 	}
-	slog.Info("workspace task result ingested as media asset",
-		"task_id", task.ID, "asset_id", asset.ID, "mime", facts.MIMEType,
-		"width", facts.Width, "height", facts.Height, "bytes", len(data))
 	return rendered, nil
 }
 
-// generateDerivativesBestEffort runs sequential #820 derivative generation
-// after a successful ingest. Every failure mode (nil seams, missing bytes,
-// render errors) is absorbed: the asset is already ready and
-// unmaterialized tiers stay pending (409 at the derivative-bytes
+// persistWorkspaceTaskResultAsset ingests provider result bytes into a
+// new workspace-scoped media asset via the #820 session flow and triggers
+// best-effort derivative tiers. It is shared by the renderer (remote refs
+// with a declared checksum) and the workspace provider-result materializer
+// (live gateway outputs without one), so both ingest paths produce
+// identical asset facts. expectChecksum empty skips the comparison.
+//
+// Transactional note (unchanged): the asset row commits BEFORE the
+// settlement tx (byte PUT cannot join a PG tx). If the later Complete
+// fails, the asset row orphans harmlessly (listable, metadata-readable,
+// same as an unused upload); no task_outputs row ever points at a missing
+// asset because refs are built only from completed assets.
+func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.DerivativeObjects, derivatives ports.Renderer, task *workspacetasks.WorkspaceTask, data []byte, index int, expectChecksum string) (*workspacemedia.Asset, error) {
+	if media == nil || objects == nil {
+		return nil, errors.New("任务结果转存未配置: result ingestion unavailable")
+	}
+	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
+		return nil, errors.New("任务标识缺失，无法渲染结果")
+	}
+	if len(data) == 0 {
+		return nil, errors.New("上游结果为空，无法转存")
+	}
+	if int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
+		return nil, fmt.Errorf("上游结果过大: %d 字节", len(data))
+	}
+	facts, err := imageformat.InspectDetectedBytes(data)
+	if err != nil {
+		return nil, fmt.Errorf("上游结果不是受支持的图片: %w", err)
+	}
+	sum := sha256.Sum256(data)
+	checksum := hex.EncodeToString(sum[:])
+	if strings.TrimSpace(expectChecksum) != "" && !strings.EqualFold(checksum, strings.TrimSpace(expectChecksum)) {
+		return nil, errors.New("上游结果校验失败: checksum mismatch")
+	}
+	workspaceID := strings.TrimSpace(task.WorkspaceID)
+	filename := fmt.Sprintf("task-result-%d%s", index, facts.Extension)
+	session, err := media.CreateSession(ctx, workspacemedia.CreateSessionParams{
+		WorkspaceID: workspaceID, OwnerUserID: task.OwnerUserID, Filename: filename,
+		MIMEType: facts.MIMEType, SizeBytes: int64(len(data)),
+		ChecksumSHA256: checksum, MediaKind: workspacemedia.MediaKindImage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("任务结果落盘失败: %w", err)
+	}
+	if err := objects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, facts.MIMEType); err != nil {
+		_, _ = media.FailSession(ctx, workspaceID, session.ID, "result byte ingest failed")
+		return nil, fmt.Errorf("任务结果字节写入失败: %w", err)
+	}
+	_, asset, err := media.CompleteSession(ctx, workspaceID, session.ID, workspacemedia.CompleteFacts{
+		ChecksumSHA256: checksum, SizeBytes: int64(len(data)),
+		MIMEType: facts.MIMEType, MediaKind: workspacemedia.MediaKindImage,
+		Width: int32(facts.Width), Height: int32(facts.Height),
+	}, workspacemedia.CreateAssetParams{})
+	if err != nil {
+		return nil, fmt.Errorf("任务结果落盘失败: %w", err)
+	}
+	generateWorkspaceTaskDerivativesBestEffort(ctx, media, objects, derivatives, workspaceID, asset)
+	slog.Info("workspace task result ingested as media asset",
+		"task_id", task.ID, "asset_id", asset.ID, "mime", facts.MIMEType,
+		"width", facts.Width, "height", facts.Height, "bytes", len(data))
+	return asset, nil
+}
+
+// generateWorkspaceTaskDerivativesBestEffort runs sequential #820
+// derivative generation after a successful ingest. Every failure mode (nil
+// seams, missing bytes, render errors) is absorbed: the asset is already
+// ready and unmaterialized tiers stay pending (409 at the derivative-bytes
 // endpoint). A nil renderer defers generation with a logged reason.
-func (r *workspaceTaskRenderer) generateDerivativesBestEffort(ctx context.Context, workspaceID string, asset *workspacemedia.Asset) {
-	if r == nil || r.media == nil || r.objects == nil || r.derivatives == nil {
+func generateWorkspaceTaskDerivativesBestEffort(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.DerivativeObjects, derivatives ports.Renderer, workspaceID string, asset *workspacemedia.Asset) {
+	if media == nil || objects == nil || derivatives == nil {
 		slog.Info("workspace task derivatives deferred: renderer not configured; tiers stay pending",
 			"workspace_id", workspaceID, "asset_id", assetIDForLog(asset))
 		return
 	}
-	if _, err := workspacemedia.EnsureDerivatives(ctx, r.media, r.objects, r.derivatives, workspaceID, asset); err != nil {
+	if _, err := workspacemedia.EnsureDerivatives(ctx, media, objects, derivatives, workspaceID, asset); err != nil {
 		slog.Warn("workspace task derivatives best-effort failed; tiers stay pending",
 			"workspace_id", workspaceID, "asset_id", assetIDForLog(asset), "err", err)
 	}

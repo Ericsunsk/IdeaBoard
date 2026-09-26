@@ -8,7 +8,10 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
-import { getWorkspaceMediaAsset } from './generated-query/public/workspace-media/workspace-media'
+import {
+  batchGetWorkspaceMediaAssets as batchGetWorkspaceMediaAssetsTransport,
+  getWorkspaceMediaAsset,
+} from './generated-query/public/workspace-media/workspace-media'
 import type { MediaAsset } from './generated-query/public/model/mediaAsset'
 import {
   workspaceMediaAssetContentSuffix,
@@ -39,12 +42,17 @@ export { resetMediaWorkspaceIdResolver, setMediaWorkspaceIdResolver }
 // Notes on v1 semantics:
 // - v1 statuses are `pending | ready` only (no `processing`/`failed`
 //   vocabulary); binary reads on non-ready assets stay 409 upstream.
-// - v1 has no batch metadata endpoint: the legacy
-//   `/user/media-assets/delivery/batch` single-round-trip fetch is retired
-//   (zero importers); callers read through the shared cache instead.
-// - v1 has no `processing-input` derivative tier: that metadata lookup
-//   stays strict (throws `MediaAssetDerivativeNotReadyError`) so
-//   generation inputs never silently change. Backend hook gap, reported.
+// - Bounded batch metadata reads ride the generated
+//   `batchGetWorkspaceMediaAssets` hook (`POST
+//   /api/v1/workspaces/{id}/media-assets/batch`, up to 50 ids, request
+//   order, same asset DTOs as the single read) through
+//   `getWorkspaceMediaAssetMetadataBatch` below; results hydrate the same
+//   cache the delivery composable feeds.
+// - TODO(2026-09-26, processing-input tier gap): v1 has no
+//   `processing-input` derivative tier in the generated `MediaAsset` DTO,
+//   so that metadata lookup stays strict (throws
+//   `MediaAssetDerivativeNotReadyError`) so generation inputs never
+//   silently change.
 // - Invalidation rides the versioned workspace stream
 //   (`media.asset_ready` / `media.asset_archived`); the deleted
 //   `/api/user/events` legacy stream is gone (backend #809 hard cut).
@@ -345,6 +353,72 @@ export async function getMediaAssetMetadata(
   } = {},
 ): Promise<MediaAssetDeliveryMetadata> {
   return getWorkspaceMediaAssetMetadata(null, assetId, options)
+}
+
+/** Backend batch bound (`asset_ids` min 1, max 50 per call). */
+export const WORKSPACE_MEDIA_BATCH_MAX_ITEMS = 50
+
+/**
+ * Bounded batch metadata read over the generated
+ * `batchGetWorkspaceMediaAssets` hook (same asset DTOs as the single
+ * read, request order). Cache-first unless `force`: cached entries are
+ * served without transport and misses ride one transport per 50-id chunk,
+ * hydrating the same cache the workspace-stream invalidation feeds. A
+ * malformed, unknown, or cross-workspace id converges the whole batch to
+ * 404 `media_not_found` (backend contract); the error propagates untouched
+ * so 404-vs-403 stays caller-visible.
+ */
+export async function getWorkspaceMediaAssetMetadataBatch(
+  workspaceId: string | null | undefined,
+  assetIds: readonly MediaAssetId[],
+  options: {
+    signal?: AbortSignal | undefined
+    force?: boolean | undefined
+  } = {},
+): Promise<MediaAssetDeliveryMetadata[]> {
+  const workspace = requireMediaWorkspaceId(workspaceId)
+  const normalized = assetIds.map((id) => normalizeMediaAssetId(id))
+  if (normalized.length === 0 || normalized.some((id) => id === null)) {
+    throw new Error(i18n.global.t('common.errors.mediaInvalid'))
+  }
+  const ids = normalized.filter((id): id is string => id !== null)
+  const results = new Array<MediaAssetDeliveryMetadata | undefined>(ids.length)
+  const missingIndexes: number[] = []
+  ids.forEach((id, index) => {
+    if (!options.force) {
+      const cached = getCachedMetadata(workspace, id)
+      if (cached) {
+        results[index] = cached
+        return
+      }
+    }
+    missingIndexes.push(index)
+  })
+  for (let at = 0; at < missingIndexes.length; at += WORKSPACE_MEDIA_BATCH_MAX_ITEMS) {
+    const chunk = missingIndexes.slice(at, at + WORKSPACE_MEDIA_BATCH_MAX_ITEMS)
+    const chunkIds = chunk.map((index) => ids[index] as string)
+    const envelope = await batchGetWorkspaceMediaAssetsTransport(
+      workspace,
+      { data: { asset_ids: chunkIds } },
+      { ...(options.signal == null ? {} : { signal: options.signal }) },
+    )
+    const items = envelope?.data?.items
+    if (!Array.isArray(items) || items.length !== chunk.length) {
+      throw new Error(i18n.global.t('common.errors.mediaInvalid'))
+    }
+    chunk.forEach((resultIndex, position) => {
+      const item = items[position] as MediaAsset | undefined
+      if (!item) throw new Error(i18n.global.t('common.errors.mediaInvalid'))
+      const metadata = toDeliveryMetadata(item)
+      const cacheId = ids[resultIndex] as string
+      metadataCache.set(metadataCacheKey(workspace, cacheId), {
+        value: metadata,
+        expiresAt: resolveMetadataExpiry(metadata),
+      })
+      results[resultIndex] = metadata
+    })
+  }
+  return results.filter((item): item is MediaAssetDeliveryMetadata => item !== undefined)
 }
 
 export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {

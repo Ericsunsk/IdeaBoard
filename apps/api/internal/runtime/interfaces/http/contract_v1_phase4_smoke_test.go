@@ -94,10 +94,11 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		// MediaObjects stays nil in this fixture: binary reads fail closed
 		// with 503 while metadata keeps working. The production task worker
 		// has its own renderer; this HTTP fixture does not exercise it.
-		Tasks:      tasks,
-		TaskQuoter: quoter,
-		TaskHolder: holder,
-		TaskQueue:  queue,
+		Tasks:             tasks,
+		TaskQuoter:        quoter,
+		TaskHolder:        holder,
+		TaskQueue:         queue,
+		TaskModelResolver: &eventTaskModelResolver{},
 		// Production-shaped asset gate: the real adapter over the
 		// media store, so task input/output verification runs the
 		// same ready/archived/invisible mapping as production.

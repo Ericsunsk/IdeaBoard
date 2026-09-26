@@ -171,10 +171,24 @@ func newAppTaskRuntime(
 	workspaceEnqueuer := newWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: workspaceStore, Quoter: workspaceQuoter, Holder: workspaceHolder,
-		Queue: workspaceEnqueuer, Assets: workspaceAssets,
+		Queue: workspaceEnqueuer, Assets: workspaceAssets, Models: aiGatewayRepo,
 	})
 	workspaceMediaResolver := newWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
-	workspaceGateway := providers.NewExecutor(workspaceMediaResolver, nil, cfg.PublicOrigins, gatewayFactory, modelRoutes)
+	// Live dispatch finalize seam: provider image bytes land directly in
+	// workspace media assets (never legacy user storage), so Generate
+	// yields workspace asset refs for the renderer + atomic Complete.
+	// Credentials still resolve per execution inside gatewayFactory; a
+	// missing gateway configuration fails tasks deterministically before
+	// this materializer ever runs.
+	workspaceProviderMaterializer, err := NewWorkspaceProviderResultMaterializer(WorkspaceProviderResultMaterializerDeps{
+		Media: workspaceMedia, Objects: services.storageService,
+		Fetcher:     workspaceTaskResultBytesFetcher{},
+		Derivatives: workspaceTaskDerivativeRenderer{},
+	})
+	if err != nil {
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
+	}
+	workspaceGateway := providers.NewExecutor(workspaceMediaResolver, workspaceProviderMaterializer, cfg.PublicOrigins, gatewayFactory, modelRoutes)
 	// #827 (#809 Phase 4b-03): result renderer ingests provider outputs
 	// into workspace-scoped media assets before the atomic Complete. Both
 	// byte seams are production implementations: remote downloads retain
@@ -206,7 +220,7 @@ func newAppTaskRuntime(
 	}
 	workspaceWorker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: workspaceStore, Settler: workspaceSettler, Assets: workspaceAssets,
-		Provider: newWorkspaceGatewayProvider(aiGatewayRepo, workspaceGateway),
+		Provider: newWorkspaceGatewayProvider(workspaceGateway),
 		Renderer: workspaceRenderer, Materializer: workspaceAutoMaterializer,
 	})
 	if err != nil {

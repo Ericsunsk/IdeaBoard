@@ -63,7 +63,7 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 	v1 := router.Group(ContractV1GroupPath)
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets, TaskModelResolver: &eventTaskModelResolver{},
 		TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prompt-mask", OwnerUserID: 1})

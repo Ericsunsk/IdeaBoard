@@ -94,7 +94,7 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 		}}
 		service := NewService(ServiceDeps{
 			Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets,
+			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Models: testModelResolver{},
 		})
 		return store, service
 	}

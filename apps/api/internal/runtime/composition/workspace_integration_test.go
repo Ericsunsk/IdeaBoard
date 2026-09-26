@@ -649,7 +649,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		Tasks: env.tasks, Quoter: quoter, Holder: holder, Queue: queue,
+		Tasks: env.tasks, Quoter: quoter, Holder: holder, Queue: queue, Models: workspaceTestModelResolver{},
 	})
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{

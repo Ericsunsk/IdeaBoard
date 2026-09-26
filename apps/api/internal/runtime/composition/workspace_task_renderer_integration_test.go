@@ -73,8 +73,8 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 				t.Errorf("provider saw status %q, want running (claimed)", task.Status)
 			}
 			return []workspacetasks.OutputRef{{
-				Kind: workspacetasks.OutputKindRemote,
-				URL: "https://cdn.example.com/fake-gateway-result.png",
+				Kind:           workspacetasks.OutputKindRemote,
+				URL:            "https://cdn.example.com/fake-gateway-result.png",
 				ChecksumSHA256: sum, Role: "result", ResultIndex: 0,
 			}}, nil
 		}))
@@ -83,7 +83,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	// (generate -> render -> atomic Complete) through the same seams.
 	renderingWorker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.tasks, Settler: service,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
+		Assets:   &workspacemedia.TaskAssetAdapter{Store: env.media},
 		Provider: worker.provider,
 		Renderer: renderer,
 	})

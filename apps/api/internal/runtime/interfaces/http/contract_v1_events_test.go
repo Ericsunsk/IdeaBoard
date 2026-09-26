@@ -45,6 +45,12 @@ type fakeEventSender struct {
 	destinations []string
 }
 
+type eventTaskModelResolver struct{}
+
+func (*eventTaskModelResolver) ResolveModel(context.Context, string) (string, error) {
+	return "openrouter/test-image-model", nil
+}
+
 func (f *fakeEventSender) Send(_ context.Context, destination string, headers map[string]string, body []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -157,7 +163,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	v1 := router.Group(ContractV1GroupPath)
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets,
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets, TaskModelResolver: &eventTaskModelResolver{},
 		Boards:   boardsStore,
 		Library:  ContractV1LibraryDeps{Store: libStore, Materializer: materializer, Billing: &fakeLibraryBilling{}, Quoter: &fakeLibraryQuoter{amount: 5}},
 		Events:   eventLog,

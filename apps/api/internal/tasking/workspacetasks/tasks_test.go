@@ -84,6 +84,12 @@ type fakeAssets struct {
 	err    error
 }
 
+type testModelResolver struct{}
+
+func (testModelResolver) ResolveModel(context.Context, string) (string, error) {
+	return "openrouter/test-image-model", nil
+}
+
 func (f *fakeAssets) GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error) {
 	if f.err != nil {
 		return nil, f.err
@@ -138,7 +144,7 @@ func TestCreateAtomicityRollbackOnEnqueueFailure(t *testing.T) {
 	queue := &fakeEnqueuer{failNext: errors.New("river down")}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue,
+		Holder: holder, Queue: queue, Models: testModelResolver{},
 	})
 	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
 	if err == nil {
@@ -164,7 +170,7 @@ func TestCreateAtomicityRollbackOnHoldFailure(t *testing.T) {
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue,
+		Holder: holder, Queue: queue, Models: testModelResolver{},
 	})
 	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
 	if !errors.Is(err, ErrInsufficientCredits) {
@@ -186,7 +192,7 @@ func TestCancelTerminalSettleReleases(t *testing.T) {
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue,
+		Holder: holder, Queue: queue, Models: testModelResolver{},
 	})
 	created, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
 	if err != nil {
@@ -259,7 +265,7 @@ func TestInputAssetsRequireReady(t *testing.T) {
 	}}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets,
+		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Models: testModelResolver{},
 	})
 	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render", MediaAssetIDs: []string{"asset_ready"}}, "k1"); err != nil {
 		t.Fatalf("ready input err = %v", err)

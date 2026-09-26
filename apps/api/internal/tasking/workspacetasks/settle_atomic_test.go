@@ -48,6 +48,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type atomicModelResolver struct{}
+
+func (atomicModelResolver) ResolveModel(context.Context, string) (string, error) {
+	return "openrouter/test-image-model", nil
+}
+
 const atomicTestChecksum = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 
 func randomAtomicHex(t *testing.T, nbytes int) string {
@@ -334,6 +340,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	queue := &atomicQueue{pool: pool}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue,
+		Models: atomicModelResolver{},
 	})
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
 }

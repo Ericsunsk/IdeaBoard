@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	runtimeports "ideaboard/api/internal/runtime/ports"
+	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -21,6 +22,12 @@ import (
 
 // workerTestQuoter mints a fixed-price snapshot (10 credits).
 type workerTestQuoter struct{}
+
+type workspaceTestModelResolver struct{}
+
+func (workspaceTestModelResolver) ResolveModel(context.Context, string) (string, error) {
+	return "openrouter/test-image-model", nil
+}
 
 func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if quantity <= 0 {
@@ -118,7 +125,7 @@ func newWorkerTestEnv() *workerTestEnv {
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
+		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}}, Models: workspaceTestModelResolver{},
 	})
 	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service}
 }
@@ -602,9 +609,13 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	if _, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{}); err == nil {
 		t.Fatal("empty id = nil, want error")
 	}
+	canonical, err := taskservice.CompileWorkspaceParams("generation", "a sunset", nil)
+	if err != nil {
+		t.Fatalf("compile canonical params: %v", err)
+	}
 	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
-		ID: "task_x", WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "render",
-		Params: map[string]any{"prompt": "a sunset"},
+		ID: "task_x", WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "generation",
+		CanonicalParams: canonical,
 	})
 	if err != nil {
 		t.Fatalf("bridge: %v", err)
@@ -612,7 +623,7 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	if legacy.TaskID != "task_x" || legacy.UserID != 7 || legacy.Prompt != "a sunset" {
 		t.Fatalf("bridged payload = %+v, want workspace facts carried over", legacy)
 	}
-	if !strings.Contains(legacy.Params, `"feature":"render"`) {
+	if !strings.Contains(legacy.Params, `"feature":"generation"`) {
 		t.Fatalf("bridged params = %s, want the workflow feature", legacy.Params)
 	}
 	typed, err := tasks.UnmarshalParams(legacy.Params)

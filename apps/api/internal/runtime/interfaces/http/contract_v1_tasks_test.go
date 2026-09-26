@@ -159,7 +159,7 @@ func newV1TaskFixture(t *testing.T) *v1TaskFixture {
 	v1 := router.Group(ContractV1GroupPath)
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets, TaskModelResolver: &eventTaskModelResolver{},
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "tasks", OwnerUserID: 1})
 	if err != nil {

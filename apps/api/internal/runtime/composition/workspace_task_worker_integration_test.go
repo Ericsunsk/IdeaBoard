@@ -33,7 +33,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.
 	queue := &integrationQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: env.tasks, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media},
+		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Models: workspaceTestModelResolver{},
 	})
 	return service, holder, queue
 }

@@ -95,8 +95,8 @@ func newRendererTestEnv(t *testing.T) *rendererTestEnv {
 func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*WorkspaceTaskRendererDeps)) WorkspaceTaskRenderer {
 	t.Helper()
 	deps := WorkspaceTaskRendererDeps{
-		Media:  e.media,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: e.media},
+		Media:   e.media,
+		Assets:  &workspacemedia.TaskAssetAdapter{Store: e.media},
 		Objects: e.objects,
 		Fetcher: WorkspaceResultBytesFetchFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask, _ workspacetasks.OutputRef) ([]byte, error) {
 			return append([]byte(nil), e.pegged...), nil
@@ -300,7 +300,7 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media},
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Models: workspaceTestModelResolver{},
 	})
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
@@ -324,7 +324,7 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: store, Settler: service,
-		Assets:   &workspacemedia.TaskAssetAdapter{Store: media},
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media},
 		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 			return []workspacetasks.OutputRef{rendererRemoteRef(sum)}, nil
 		}),
@@ -369,7 +369,7 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
-		Assets:   &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
+		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
 		Provider: WorkspaceTaskGenerateFunc(func(_ context.Context, _ *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 			return workerTestRemoteOutput(), nil
 		}),
