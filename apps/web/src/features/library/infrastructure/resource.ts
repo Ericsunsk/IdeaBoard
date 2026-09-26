@@ -1,0 +1,319 @@
+// Workspace-scoped library transport (issue #844; split from `../workspace`).
+//
+// Talks to the v1 endpoints under `/api/v1/workspaces/{id}/library`
+// through the generated `public/workspace-library` hooks (`/api/v1/...`
+// via `publicMutator`). Pages and components must consume this module via
+// the `features/library` barrel, never generated code directly.
+//
+// Transport note: the generated hooks own routes/envelopes; this adapter
+// keeps the opaque-id asserts, auto idempotency minting, resolve batch
+// bound, cursor loops, and snake_case -> camelCase validators that have
+// no generated equivalent.
+//
+// Backend notes callers must respect:
+// - Folders are plain workspace folders: no system/virtual taxonomy, no
+//   `quick-saves`, no asset counts. The island synthesizes the virtual
+//   `all` aggregate client-side; saving without a folder leaves the asset
+//   unfiled (visible under `all`). Deleting a folder unfiles its assets.
+// - Asset save is idempotent on `(workspace, provider, source_id)`.
+// - Materialization is an async job (`pending -> running ->
+//   completed|failed`); use-case polling lives in
+//   `../application/libraryUseCases`.
+
+import {
+  createWorkspaceLibraryFolder as createWorkspaceLibraryFolderTransport,
+  createWorkspaceLibraryMaterialization as createWorkspaceLibraryMaterializationTransport,
+  deleteWorkspaceLibraryAsset as deleteWorkspaceLibraryAssetTransport,
+  deleteWorkspaceLibraryFolder as deleteWorkspaceLibraryFolderTransport,
+  getWorkspaceLibraryMaterialization as getWorkspaceLibraryMaterializationTransport,
+  listWorkspaceLibraryAssets as listWorkspaceLibraryAssetsTransport,
+  listWorkspaceLibraryFolders as listWorkspaceLibraryFoldersTransport,
+  moveWorkspaceLibraryAsset as moveWorkspaceLibraryAssetTransport,
+  renameWorkspaceLibraryFolder as renameWorkspaceLibraryFolderTransport,
+  resolveWorkspaceLibraryAssets as resolveWorkspaceLibraryAssetsTransport,
+  saveWorkspaceLibraryAsset as saveWorkspaceLibraryAssetTransport,
+} from '../../../shared/api/generated-query/public/workspace-library/workspace-library'
+import {
+  buildContractRequestHeaders,
+  requireContractData,
+} from '../../../shared/api/contractKernel'
+import { createUniqueId } from '../../../shared/utils/ids'
+import { i18n } from '../../../shared/i18n'
+import {
+  assertLibraryAssetId,
+  assertLibraryFolderId,
+  assertLibraryMaterializationId,
+  assertWorkspaceId,
+  toWorkspaceLibraryAsset,
+  toWorkspaceLibraryFolder,
+  toWorkspaceLibraryMaterialization,
+  toWorkspaceLibraryPage,
+  toWorkspaceLibraryResolveResult,
+  type WorkspaceLibraryAsset,
+  type WorkspaceLibraryAssetInput,
+  type WorkspaceLibraryFolder,
+  type WorkspaceLibraryMaterialization,
+  type WorkspaceLibraryPage,
+  type WorkspaceLibraryResolveResult,
+} from '../domain/validators'
+
+export type WorkspaceLibraryRequestOptions = {
+  requestId?: string | undefined
+  idempotencyKey?: string | undefined
+  signal?: AbortSignal | null | undefined
+}
+
+function workspaceLibraryHeaders(
+  options: WorkspaceLibraryRequestOptions,
+): Record<string, string> {
+  return buildContractRequestHeaders({
+    requestId: options.requestId,
+    idempotencyKey: options.idempotencyKey,
+  })
+}
+
+// Mutating endpoints require an `Idempotency-Key` (per-endpoint scope, see
+// openapi). Default to a scoped unique key so callers stay replay-safe
+// without threading keys through every island/popover call.
+function withLibraryIdempotency(
+  options: WorkspaceLibraryRequestOptions,
+  scope: string,
+): WorkspaceLibraryRequestOptions {
+  if (options.idempotencyKey) return options
+  return { ...options, idempotencyKey: `${scope}:${createUniqueId()}` }
+}
+
+function toGeneratedOptions(options: WorkspaceLibraryRequestOptions): {
+  headers: Record<string, string>
+  signal?: AbortSignal | undefined
+} {
+  return {
+    headers: workspaceLibraryHeaders(options),
+    ...(options.signal == null ? {} : { signal: options.signal }),
+  }
+}
+
+export const WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS = 20
+
+export const workspaceLibraryApi = {
+  listFolders: async (
+    workspaceId: string,
+    options: WorkspaceLibraryRequestOptions & { cursor?: string; pageSize?: number } = {},
+  ): Promise<WorkspaceLibraryPage<WorkspaceLibraryFolder>> => {
+    const query: { cursor?: string; page_size?: number } = {}
+    if (options.cursor) query.cursor = options.cursor
+    if (options.pageSize != null) query.page_size = options.pageSize
+    const page = await listWorkspaceLibraryFoldersTransport(
+      assertWorkspaceId(workspaceId),
+      query,
+      toGeneratedOptions(options),
+    )
+    return toWorkspaceLibraryPage(page, toWorkspaceLibraryFolder, i18n.global.t('library.errors.loadFoldersFailed'))
+  },
+
+  createFolder: async (
+    workspaceId: string,
+    name: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryFolder> => {
+    const effective = withLibraryIdempotency(options, 'library:folder-create')
+    const envelope = await createWorkspaceLibraryFolderTransport(
+      assertWorkspaceId(workspaceId),
+      { data: { name } },
+      toGeneratedOptions(effective),
+    )
+    return toWorkspaceLibraryFolder(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.createFolderFailed'),
+      ),
+    )
+  },
+
+  renameFolder: async (
+    workspaceId: string,
+    folderId: string,
+    name: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryFolder> => {
+    const envelope = await renameWorkspaceLibraryFolderTransport(
+      assertWorkspaceId(workspaceId),
+      assertLibraryFolderId(folderId),
+      { data: { name } },
+      toGeneratedOptions(options),
+    )
+    return toWorkspaceLibraryFolder(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.renameFolderFailed'),
+      ),
+    )
+  },
+
+  deleteFolder: async (
+    workspaceId: string,
+    folderId: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<void> => {
+    const effective = withLibraryIdempotency(options, 'library:folder-delete')
+    await deleteWorkspaceLibraryFolderTransport(
+      assertWorkspaceId(workspaceId),
+      assertLibraryFolderId(folderId),
+      toGeneratedOptions(effective),
+    )
+  },
+
+  listAssets: async (
+    workspaceId: string,
+    options: WorkspaceLibraryRequestOptions & {
+      cursor?: string
+      pageSize?: number
+      folderId?: string
+    } = {},
+  ): Promise<WorkspaceLibraryPage<WorkspaceLibraryAsset>> => {
+    const query: { cursor?: string; page_size?: number; folder_id?: string } = {}
+    if (options.cursor) query.cursor = options.cursor
+    if (options.pageSize != null) query.page_size = options.pageSize
+    if (options.folderId) query.folder_id = assertLibraryFolderId(options.folderId)
+    const page = await listWorkspaceLibraryAssetsTransport(
+      assertWorkspaceId(workspaceId),
+      query,
+      toGeneratedOptions(options),
+    )
+    return toWorkspaceLibraryPage(page, toWorkspaceLibraryAsset, i18n.global.t('library.errors.loadAssetsFailed'))
+  },
+
+  saveAsset: async (
+    workspaceId: string,
+    input: WorkspaceLibraryAssetInput,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryAsset> => {
+    const effective = withLibraryIdempotency(options, 'library:asset-save')
+    const data: { provider: 'unsplash' | 'pexels'; source_id: string } & Record<string, unknown> = {
+      provider: input.provider,
+      source_id: input.sourceId,
+    }
+    if (input.sourceUrl != null) data.source_url = input.sourceUrl
+    if (input.previewUrl != null) data.preview_url = input.previewUrl
+    if (input.originalUrl != null) data.original_url = input.originalUrl
+    if (input.title != null) data.title = input.title
+    if (input.author != null) data.author = input.author
+    if (input.width != null) data.width = input.width
+    if (input.height != null) data.height = input.height
+    if (input.folderId != null) data.folder_id = assertLibraryFolderId(input.folderId)
+    const envelope = await saveWorkspaceLibraryAssetTransport(
+      assertWorkspaceId(workspaceId),
+      { data },
+      toGeneratedOptions(effective),
+    )
+    return toWorkspaceLibraryAsset(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.saveAssetFailed'),
+      ),
+    )
+  },
+
+  moveAsset: async (
+    workspaceId: string,
+    assetId: string,
+    folderId: string | null,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryAsset> => {
+    const envelope = await moveWorkspaceLibraryAssetTransport(
+      assertWorkspaceId(workspaceId),
+      assertLibraryAssetId(assetId),
+      // Wire-identical to the retired transport: null rides as '' (unfiled).
+      { data: { folder_id: folderId ?? '' } },
+      toGeneratedOptions(options),
+    )
+    return toWorkspaceLibraryAsset(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.moveAssetFailed'),
+      ),
+    )
+  },
+
+  deleteAsset: async (
+    workspaceId: string,
+    assetId: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<void> => {
+    const effective = withLibraryIdempotency(options, 'library:asset-delete')
+    await deleteWorkspaceLibraryAssetTransport(
+      assertWorkspaceId(workspaceId),
+      assertLibraryAssetId(assetId),
+      toGeneratedOptions(effective),
+    )
+  },
+
+  resolveAssets: async (
+    workspaceId: string,
+    items: Array<{ provider: string; sourceId?: string; sourceUrl?: string }>,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryResolveResult[]> => {
+    if (items.length > WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS) {
+      throw new Error(i18n.global.t('library.errors.lookupStatusFailed'))
+    }
+    const envelope = await resolveWorkspaceLibraryAssetsTransport(
+      assertWorkspaceId(workspaceId),
+      {
+        data: {
+          items: items.map((item) => {
+            const entry: { provider: string } & Record<string, unknown> = {
+              provider: item.provider,
+            }
+            if (item.sourceId != null) entry.source_id = item.sourceId
+            if (item.sourceUrl != null) entry.source_url = item.sourceUrl
+            return entry as { provider: 'unsplash' | 'pexels'; source_id?: string; source_url?: string }
+          }),
+        },
+      },
+      toGeneratedOptions(options),
+    )
+    const result = requireContractData<{ items: unknown }>(
+      envelope,
+      i18n.global.t('library.errors.lookupStatusFailed'),
+    )
+    if (!Array.isArray(result.items)) throw new Error(i18n.global.t('library.errors.lookupStatusFailed'))
+    return result.items.map(toWorkspaceLibraryResolveResult)
+  },
+
+  createMaterialization: async (
+    workspaceId: string,
+    libraryAssetId: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryMaterialization> => {
+    const effective = withLibraryIdempotency(options, 'library:materialize')
+    const envelope = await createWorkspaceLibraryMaterializationTransport(
+      assertWorkspaceId(workspaceId),
+      { data: { library_asset_id: assertLibraryAssetId(libraryAssetId) } },
+      toGeneratedOptions(effective),
+    )
+    return toWorkspaceLibraryMaterialization(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.importAssetFailed'),
+      ),
+    )
+  },
+
+  getMaterialization: async (
+    workspaceId: string,
+    materializationId: string,
+    options: WorkspaceLibraryRequestOptions = {},
+  ): Promise<WorkspaceLibraryMaterialization> => {
+    const envelope = await getWorkspaceLibraryMaterializationTransport(
+      assertWorkspaceId(workspaceId),
+      assertLibraryMaterializationId(materializationId),
+      toGeneratedOptions(options),
+    )
+    return toWorkspaceLibraryMaterialization(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('library.errors.importAssetFailed'),
+      ),
+    )
+  },
+}

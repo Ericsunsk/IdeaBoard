@@ -24,13 +24,15 @@ package httpapi
 //     routes (no body-key fallback), backed by the shared contract
 //     IdempotencyStore seam.
 //   - Envelope: dedicated handlers render the contract success/error
-//     envelope with Request-Id. A small set of platform-config families
-//     (ai-gateway, storage, search providers, feature prompts) reuses the
-//     legacy admin handler methods under the control guard so validation
-//     and provider side effects stay single-sourced; those proxied routes
-//     keep the legacy response shape until #809 unifies envelopes. Auth,
-//     audit, idempotency, and reason guarantees hold uniformly via the
-//     guard either way.
+//     envelope with Request-Id. The small set of platform-config
+//     families (ai-gateway, storage, search providers, feature prompts,
+//     monitor, brand-logo overrides, rewards) reuses the legacy admin
+//     handler methods under the control guard so validation and provider
+//     side effects stay single-sourced; the control-facing render layer
+//     translates every proxied response into the contract envelope at
+//     the boundary (parent #809; binary brand-logo and the SSE monitor
+//     stream stay raw protocol exceptions). Auth, audit, idempotency,
+//     and reason guarantees hold uniformly via the guard either way.
 //
 // Persistence decision (Baseline 7 audit): NO new table in #808. The
 // audit record is emitted as structured slog (shippable to the log

@@ -169,6 +169,7 @@ import {
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses } from '../../../shared/lib/brandMark'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { i18n } from '../../../shared/i18n'
 
 defineProps<{
   activeKey: string
@@ -219,7 +220,10 @@ function handleBottomMouseEnter() {
 
 const effectiveCollapsed = computed(() => isCollapsed.value && !isHovered.value)
 
-const { fallbackText, logoURL, projectName } = useSiteBranding({ enabled: ref(true) })
+const { fallbackText, logoURL, projectName } = useSiteBranding({
+  enabled: ref(true),
+  fallback: i18n.global.t('account.branding.loadFailed'),
+})
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
 function itemsOfGroup(group: AdminNavigationGroup): AdminNavigationItem[] {

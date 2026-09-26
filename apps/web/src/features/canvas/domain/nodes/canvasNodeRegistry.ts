@@ -4,7 +4,9 @@ import type {
   CanvasConnectionPort,
   CanvasExecutionOutputNodeType,
 } from '../../../board'
-import { i18n } from '../../../../shared/i18n'
+
+/** Copy resolver injected by the caller (application/presentation own i18n). */
+export type CanvasNodeCopyResolver = (labelKey: string) => string
 
 export type ExecutionActionLabels = { ready: string; running: string }
 
@@ -41,32 +43,41 @@ function getCanvasNodeUiRegistryItem(nodeType: CanvasConnectionNodeType): Canvas
   return CANVAS_NODE_UI_REGISTRY[nodeType]
 }
 
-export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
-  return i18n.global.t(getCanvasNodeUiRegistryItem(nodeType).defaultTitleKey)
+export function getDefaultCanvasNodeTitle(
+  nodeType: CanvasConnectionNodeType,
+  translate: CanvasNodeCopyResolver,
+): string {
+  return translate(getCanvasNodeUiRegistryItem(nodeType).defaultTitleKey)
 }
 
 export function getCanvasNodeExecutionActionLabels(
   nodeType: CanvasExecutionOutputNodeType,
+  translate: CanvasNodeCopyResolver,
 ): ExecutionActionLabels {
   const keys = getCanvasNodeUiRegistryItem(nodeType).primaryAction
   if (!keys) throw new Error(`Canvas node ${nodeType} has no execution action labels`)
   // Resolved read-time so locale copy stays live; the registry only owns keys.
-  return { ready: i18n.global.t(keys.readyKey), running: i18n.global.t(keys.runningKey) }
+  return { ready: translate(keys.readyKey), running: translate(keys.runningKey) }
 }
 
-export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
-  if (port === 'image') return i18n.global.t('canvas.node.image')
-  if (port === 'prompt') return i18n.global.t('canvas.node.prompt')
+export function formatCanvasNodePortLabel(
+  port: CanvasConnectionPort,
+  translate: CanvasNodeCopyResolver,
+): string {
+  if (port === 'image') return translate('canvas.node.image')
+  if (port === 'prompt') return translate('canvas.node.prompt')
   return port
 }
 
 /** Menu copy resolved read-time; callers render through their own t(). */
-export function getCanvasNodeKindMenuItems(): readonly {
+export function getCanvasNodeKindMenuItems(
+  translate: CanvasNodeCopyResolver,
+): readonly {
   key: CanvasCreatableNodeKind
   label: string
 }[] {
   return CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
     key: item.kind as CanvasCreatableNodeKind,
-    label: i18n.global.t(item.defaultTitleKey),
+    label: translate(item.defaultTitleKey),
   }))
 }

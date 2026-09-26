@@ -1,8 +1,7 @@
-import { resolveApiUrl } from '../config/runtimeUrls'
-
-export const ADMIN_UPLOAD_ENDPOINT = resolveApiUrl('/admin/upload')
-export const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
-export const MEDIA_ASSET_ENDPOINT = resolveApiUrl('/user/media-assets')
+// Shared image-upload vocabulary (no endpoint constants: the legacy
+// `/admin/upload`, `/user/download`, and `/user/media-assets` routes are
+// gone with the #809 hard cut; delivery URLs come from the v1 workspace
+// media boundary in `shared/api/mediaAssetDelivery`).
 
 export const SUPPORTED_IMAGE_UPLOAD_MIME_TYPES = [
   'image/jpeg',

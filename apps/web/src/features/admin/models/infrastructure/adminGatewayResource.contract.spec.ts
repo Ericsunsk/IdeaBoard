@@ -9,8 +9,6 @@ describe('Admin gateway resource', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [{ feature: 'generation', model: 'openai/gpt-image-1' }],
         }),
       ),
@@ -33,7 +31,7 @@ describe('Admin gateway resource', () => {
           idempotencyKey: request.headers.get('Idempotency-Key'),
           operatorReason: request.headers.get('X-Operator-Reason'),
         }
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -50,7 +48,7 @@ describe('Admin gateway resource', () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         requestBody = await request.json()
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -88,8 +86,6 @@ describe('Admin gateway resource', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/models-reference', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             model_id: 'openai/gpt-4o',
             provider: 'openai',
@@ -120,8 +116,6 @@ describe('Admin gateway resource', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/models-observed', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [
             {
               model: 'openai/gpt-4o',
@@ -164,8 +158,6 @@ describe('Admin gateway resource', () => {
           reason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             provider_slug: 'openai',
             is_first_party: false,
@@ -177,8 +169,6 @@ describe('Admin gateway resource', () => {
       }),
       http.get('/api/control/v1/platform/ai-gateway/detect-models', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             models: [
               {
@@ -201,8 +191,6 @@ describe('Admin gateway resource', () => {
           reason: request.headers.get('X-Operator-Reason'),
         })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { reachable: true, status_code: 200, latency_ms: 38, message: 'ok' },
         })
       }),
@@ -230,7 +218,10 @@ describe('Admin gateway resource', () => {
   it('surfaces mapping save validation errors', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway/models/:feature', () =>
-        HttpResponse.json({ code: 400, msg: '模型必须是 provider/model 格式且不含空白' }),
+        HttpResponse.json(
+          { error: { code: 'bad_request', message: '模型必须是 provider/model 格式且不含空白', request_id: 'req-gateway-400' } },
+          { status: 400 },
+        ),
       ),
     )
 
@@ -242,7 +233,10 @@ describe('Admin gateway resource', () => {
   it('rejects gateway config updates when the envelope reports an error', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway', () =>
-        HttpResponse.json({ code: 400, msg: '网关配置校验失败' }),
+        HttpResponse.json(
+          { error: { code: 'bad_request', message: '网关配置校验失败', request_id: 'req-gateway-400' } },
+          { status: 400 },
+        ),
       ),
     )
 
@@ -257,7 +251,7 @@ describe('Admin gateway resource', () => {
   it('resolves gateway config updates when the envelope reports success', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: null }),
+        HttpResponse.json({ data: {} }),
       ),
     )
 

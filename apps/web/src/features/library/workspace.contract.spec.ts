@@ -6,21 +6,25 @@ import {
   assertLibraryMaterializationId,
   assertWorkspaceId,
   libraryAssetKey,
-  lookupWorkspaceSavedAssetKeys,
   mapWorkspaceLibraryMaterializationStatus,
   mapWorkspaceLibraryProvider,
-  materializeLibraryAssetForCanvas,
-  removeWorkspaceSearchReference,
   resolveLibraryAssetCardURL,
-  saveWorkspaceSearchReference,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
   toWorkspaceLibraryMaterialization,
   toWorkspaceLibraryResolveResult,
+} from './domain/validators'
+import {
   WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
   workspaceLibraryApi,
-} from './workspace'
+} from './infrastructure/resource'
+import {
+  lookupWorkspaceSavedAssetKeys,
+  materializeLibraryAssetForCanvas,
+  removeWorkspaceSearchReference,
+  saveWorkspaceSearchReference,
+} from './application/libraryUseCases'
 import {
   getCreateWorkspaceLibraryMaterializationUrl,
   getDeleteWorkspaceLibraryAssetUrl,

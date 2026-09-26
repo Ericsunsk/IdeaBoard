@@ -4,7 +4,7 @@ import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../../boa
 import type {
   CanvasGroupRuntimeCommands,
   CanvasGroupRuntimeView,
-} from '../../domain/graph/application/useCanvasGroupRuntime.ts'
+} from '../group-runtime/useCanvasGroupRuntime.ts'
 import type { CanvasVueFlowConnectionAdapter } from '../../infrastructure/vue-flow-adapter'
 import type { CanvasGraphNodeIdForKind } from '../../domain/graph'
 import type { CanvasImageWorkflow } from '../image-workflow'

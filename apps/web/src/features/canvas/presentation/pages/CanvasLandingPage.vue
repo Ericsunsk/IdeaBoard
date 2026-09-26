@@ -115,7 +115,7 @@ import { PUBLIC_LEGAL_LINKS } from '../../../../shared/constants/legalLinks'
 
 const router = useRouter()
 const { t } = useI18n()
-const { projectName } = useSiteBranding()
+const { projectName } = useSiteBranding({ fallback: t('account.branding.loadFailed') })
 
 const homeHeroAssets = {
   boots: bootsAsset,

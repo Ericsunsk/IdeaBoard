@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { i18n } from '../../../../shared/i18n'
 import {
   getImageActionMenuItems,
   IMAGE_ACTION_MODE,
@@ -10,7 +11,7 @@ import {
   IMAGE_OUTPAINT_ACTION,
   IMAGE_UPSCALE_ACTION,
   isImageStrengthAction,
-} from '../../application/execution'
+} from '../execution-contracts/imageActionExecution'
 
 describe('imageActionRegistry', () => {
   it('defines each image action exactly once', () => {
@@ -29,7 +30,7 @@ describe('imageActionRegistry', () => {
   })
 
   it('derives menu items from the registry with copy resolved read-time', () => {
-    const items = getImageActionMenuItems()
+    const items = getImageActionMenuItems((key) => i18n.global.t(key))
     expect(items.map((item) => item.label)).toEqual([
       'Cutout',
       'Variations',

@@ -9,7 +9,7 @@ import {
   type AccountOverlay,
   type CreditWalletState,
 } from '../../account'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth/overlay'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth'
 import { useWorkspaceAccountControls } from './useWorkspaceAccountControls'
 
 const currentUser = ref<User | null>(null)

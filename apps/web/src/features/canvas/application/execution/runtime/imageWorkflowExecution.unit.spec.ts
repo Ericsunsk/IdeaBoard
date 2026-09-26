@@ -32,7 +32,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
 vi.mock('../../../../../shared/api/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
     async (assetId: number) =>
-      `/api/user/media-assets/${assetId}/derivatives/processing/jpeg/content`,
+      `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),
 }))
 

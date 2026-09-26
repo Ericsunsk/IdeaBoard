@@ -10,7 +10,6 @@ import {
 } from '../../domain'
 import {
   canonicalizeRuntimeUploadRef,
-  resolveApiUrl,
   resolveAssetUrl,
 } from '../../../../shared/config/runtimeUrls'
 import {
@@ -92,7 +91,6 @@ const PREVIEW_DOT_COLOR = 'rgba(226, 228, 232, 0.86)'
 const PREVIEW_NODE_BORDER = '#e2e8f0'
 const PREVIEW_NODE_TEXT = '#334155'
 const PREVIEW_EDGE_STROKE = '#9aa4b2'
-const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -127,18 +125,6 @@ function toAbsolutePreviewUrl(url: string): string {
     return `${window.location.origin}${normalized}`
   }
   return normalized
-}
-
-function shouldProxyPreviewUrl(resolvedUrl: string): boolean {
-  if (typeof window === 'undefined') return false
-  if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) return false
-  try {
-    const resolvedOrigin = new URL(resolvedUrl).origin
-    const apiOrigin = new URL(USER_DOWNLOAD_ENDPOINT, window.location.origin).origin
-    return resolvedOrigin !== window.location.origin && resolvedOrigin !== apiOrigin
-  } catch {
-    return false
-  }
 }
 
 function shouldReadCrossOriginPreviewAsBlob(resolvedUrl: string): boolean {
@@ -403,16 +389,11 @@ async function loadPreviewImage(
   let imageSrc = resolvedUrl
   let revokeUrl: string | undefined
 
-  if (shouldProxyPreviewUrl(resolvedUrl)) {
-    revokeUrl =
-      (await fetchPreviewObjectUrl(
-        `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(resolvedUrl)}`,
-      )) ?? undefined
-    if (!revokeUrl) return null
-    imageSrc = revokeUrl
-  } else if (shouldReadCrossOriginPreviewAsBlob(resolvedUrl)) {
-    // API media URLs can be cross-origin and authenticated. Loading them as an
-    // object URL keeps the preview canvas origin-clean before toDataURL().
+  if (shouldReadCrossOriginPreviewAsBlob(resolvedUrl)) {
+    // Cross-origin URLs (v1 workspace media on a remote API origin, or
+    // external images) load as an object URL so the preview canvas stays
+    // origin-clean before toDataURL(). Unreachable hosts resolve to null
+    // and the frame renders without that image.
     revokeUrl = (await fetchPreviewObjectUrl(resolvedUrl, true)) ?? undefined
     if (!revokeUrl) return null
     imageSrc = revokeUrl

@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -148,7 +148,9 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const paymentReturn = computed(() => props.paymentReturn)
 const userStore = useUserStore()
-const { fallbackText, logoURL, projectName } = useSiteBranding()
+const { fallbackText, logoURL, projectName } = useSiteBranding({
+  fallback: t('account.branding.loadFailed'),
+})
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const profileFeedback = useProfileFeedback()
 const { isPending: logoutLoading, runAsyncAction: runLogoutAction } = useAsyncAction()

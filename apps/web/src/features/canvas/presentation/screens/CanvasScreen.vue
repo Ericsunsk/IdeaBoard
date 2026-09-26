@@ -150,7 +150,11 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
-import { loadLibraryFloatingIsland, materializeLibraryAssetForCanvas } from '../../../library'
+import {
+  loadLibraryFloatingIsland,
+  materializeLibraryAssetForCanvas,
+  requireWorkspaceId,
+} from '../../../library'
 import type { CanvasLibraryImportDescriptor } from '../../../library'
 
 const props = defineProps<{
@@ -185,9 +189,7 @@ workspaceSelectionStore.getSelectedId()
 const canvasWorkspaceId = workspaceSelectionStore.selectedId
 
 function requireCanvasWorkspaceId(): string {
-  const workspaceId = canvasWorkspaceId.value
-  if (!workspaceId) throw new Error('Library workspace is unavailable.')
-  return workspaceId
+  return requireWorkspaceId(canvasWorkspaceId.value)
 }
 const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
 const { openNodeImagePreview, openImageUrlPreview } = useCanvasImageLightbox()

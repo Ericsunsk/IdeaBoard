@@ -7,7 +7,7 @@ import type {
   CanvasGroupFrame,
 } from '../../../domain/graph/canvasGroupGeometry.ts'
 import { useCanvasGroupPresentationInteraction } from './index'
-import type { CanvasSelectionGroupAction } from '../../../domain/graph/application/useCanvasGroupRuntime.ts'
+import type { CanvasSelectionGroupAction } from '../../../application/group-runtime/useCanvasGroupRuntime.ts'
 
 function createPromptNode(id: string, x: number, y: number, width = 280): Node {
   return {

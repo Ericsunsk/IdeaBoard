@@ -1,4 +1,3 @@
-import { USER_DOWNLOAD_ENDPOINT } from '../../../../shared/constants/media'
 import { resolveMediaAssetOriginalURL } from '../../../../shared/api/mediaAssetDelivery'
 
 export type CanvasGraphInteractionBrowserAdapter = {
@@ -27,7 +26,9 @@ function buildDownloadHref(
   } catch {
     return url
   }
-  return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(url)}`
+  // No legacy download proxy: v1 workspace media resolves through the
+  // delivery boundary above; every other URL downloads directly.
+  return url
 }
 
 function filenameWithBlobMime(fileName: string, mimeType: string): string {

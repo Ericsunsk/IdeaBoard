@@ -1,4 +1,3 @@
-import type { Node } from '@vue-flow/core'
 import type { CanvasGroup } from '../../../board'
 import {
   isCanvasGraphNodeId,
@@ -6,6 +5,23 @@ import {
   type CanvasGraphGroupGeometry,
   type CanvasGraphNodeId,
 } from '.'
+
+/**
+ * Minimal structural Flow node shape the pure group geometry needs.
+ *
+ * The domain must not import renderer DTOs (`@vue-flow/core`): real Flow
+ * nodes satisfy this shape structurally, and the application layer keeps
+ * owning the concrete `Node` type.
+ */
+export type CanvasFlowNodeLike = {
+  id: string
+  position: { x: number; y: number }
+  zIndex?: number | undefined
+  width?: unknown
+  height?: unknown
+  dimensions?: { width?: unknown; height?: unknown } | undefined
+  data?: unknown
+}
 
 export const CANVAS_GROUP_FRAME_PADDING_PX = 10
 const CANVAS_GROUP_FRAME_MIN_WIDTH_PX = 120
@@ -67,7 +83,7 @@ function readPositiveNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 }
 
-function readSnapshotNodeSize(node: Node): FlowNodeSize | null {
+function readSnapshotNodeSize(node: CanvasFlowNodeLike): FlowNodeSize | null {
   const data = isRecord(node.data) ? node.data : null
   const snapshotNode = data && isRecord(data.snapshotNode) ? data.snapshotNode : null
   const width = readPositiveNumber(snapshotNode?.width)
@@ -80,7 +96,7 @@ function readSnapshotNodeSize(node: Node): FlowNodeSize | null {
   }
 }
 
-function readFlowNodeSize(node: Node): FlowNodeSize {
+function readFlowNodeSize(node: CanvasFlowNodeLike): FlowNodeSize {
   const dimensions = (node as { dimensions?: { width?: unknown; height?: unknown } }).dimensions
   const dimensionsWidth = readPositiveNumber(dimensions?.width)
   const dimensionsHeight = readPositiveNumber(dimensions?.height)
@@ -100,7 +116,7 @@ function readFlowNodeSize(node: Node): FlowNodeSize {
   return { width: 1, height: 1 }
 }
 
-function readFlowNodeBounds(node: Node): CanvasRect {
+function readFlowNodeBounds(node: CanvasFlowNodeLike): CanvasRect {
   const size = readFlowNodeSize(node)
   return {
     left: node.position.x,
@@ -197,7 +213,7 @@ function canvasGroupToRect(group: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'heigh
 }
 
 function resolveCanvasGroupBoundsFromNodes(options: {
-  nodes: readonly Node[]
+  nodes: readonly CanvasFlowNodeLike[]
   nodeIds: readonly CanvasGraphNodeId[]
   padding?: number
 }): CanvasRect | null {
@@ -214,7 +230,7 @@ function resolveCanvasGroupBoundsFromNodes(options: {
 
 export function resolveCanvasSelectionGroupActionBounds(options: {
   action: CanvasSelectionGroupGeometryAction | null
-  nodes: readonly Node[]
+  nodes: readonly CanvasFlowNodeLike[]
   frames: readonly CanvasGroupFrame[]
   requireSelectedGroupFrame?: boolean
 }): CanvasRect | null {
@@ -249,7 +265,7 @@ function flowPointToViewportPoint(
 
 export function resolveCanvasSelectionGroupActionButtonPosition(options: {
   action: CanvasSelectionGroupGeometryAction | null
-  nodes: readonly Node[]
+  nodes: readonly CanvasFlowNodeLike[]
   frames: readonly CanvasGroupFrame[]
   viewport: CanvasFlowViewportTransform
   gapPx?: number
@@ -350,16 +366,16 @@ function resolveCanvasGroupNodeZIndexes(groups: readonly CanvasGroup[]): Map<str
 }
 
 export function projectCanvasGroupNodeLayers(
-  nodes: readonly Node[],
+  nodes: readonly CanvasFlowNodeLike[],
   groups: readonly CanvasGroup[],
 ) {
   const zIndexes = resolveCanvasGroupNodeZIndexes(groups)
-  let nextNodes: Node[] | null = null
+  let nextNodes: CanvasFlowNodeLike[] | null = null
 
   nodes.forEach((node, index) => {
     const nextZIndex = zIndexes.get(node.id) ?? CANVAS_GROUP_NODE_Z_INDEX_BASE
     if ((node.zIndex ?? 0) === nextZIndex) return
-    if (!nextNodes) nextNodes = nodes.slice() as Node[]
+    if (!nextNodes) nextNodes = nodes.slice() as CanvasFlowNodeLike[]
     nextNodes[index] = { ...node, zIndex: nextZIndex }
   })
 

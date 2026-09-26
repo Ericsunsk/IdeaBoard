@@ -2,6 +2,7 @@ import {
   getControlRewardRedemption,
   listControlRewardRedemptions,
 } from '../../../../shared/api/generated-query/control/control-credits/control-credits'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import type {
   ControlAdminRedemption,
   ControlAdminRedemptionDetail,
@@ -10,8 +11,9 @@ import type {
 
 // Admin reward redemption boundary (W2 transports). List/get ride the
 // Control Plane redemption operations
-// (`/api/control/v1/rewards/codes/:id/redemptions*`, guarded proxies
-// keeping the legacy `{code, msg, data}` envelope). The deleted
+// (`/api/control/v1/rewards/codes/:id/redemptions*`) with the unified
+// contract envelope (`{ data }` success / `{ error: { code, message,
+// request_id } }` errors). The deleted
 // `/api/admin/rewards/codes/:id/redemptions*` routes are gone; this
 // module is the single transport. View types and normalizers keep their
 // shapes so the UI and specs keep working.
@@ -90,7 +92,7 @@ async function listRewardCodeRedemptions(
   const body = await listControlRewardRedemptions(rewardCodeId, params, {
     ...(input.signal == null ? {} : { signal: input.signal }),
   })
-  const page = readLegacyData<ControlAdminRedemptionPage>(body, '加载兑换记录失败')
+  const page = requireContractData<ControlAdminRedemptionPage>(body, '加载兑换记录失败')
   if (!Array.isArray(page.redemptions)) throw controlError('control_failed', '加载兑换记录失败')
   const result: RewardCodeRedemptionPage = {
     redemptions: page.redemptions.map(normalizeRedemption),
@@ -107,7 +109,7 @@ async function getRewardCodeRedemption(
   const body = await getControlRewardRedemption(rewardCodeId, redemptionId, {
     ...(input.signal == null ? {} : { signal: input.signal }),
   })
-  const detail = readLegacyData<ControlAdminRedemptionDetail>(body, '加载兑换详情失败')
+  const detail = requireContractData<ControlAdminRedemptionDetail>(body, '加载兑换详情失败')
   return {
     ...normalizeRedemption(detail),
     creditTransactionId: detail.credit_transaction_id,
@@ -126,26 +128,16 @@ function normalizeRedemption(item: ControlAdminRedemption): RewardCodeRedemption
   }
 }
 
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-// Control reward routes keep the legacy `{ code, msg, data? }` shape: a
-// numeric `code` of 0 means success, anything else is a failure.
-function readLegacyData<T>(body: unknown, fallback: string): T {
-  if (isRecord(body) && 'code' in body) {
-    if (body.code !== 0) {
-      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
-      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
-    }
-    if (body.data == null) throw controlError('control_failed', fallback)
-    return body.data as T
+function controlError(
+  code: string,
+  message: string,
+  requestId?: string | undefined,
+): Error & { code?: string | undefined; requestId?: string | undefined } {
+  const error = new Error(message) as Error & {
+    code?: string | undefined
+    requestId?: string | undefined
   }
-  throw controlError('control_failed', fallback)
+  error.code = code
+  if (requestId) error.requestId = requestId
+  return error
 }

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { useUserStore } from '../../features/auth/session/userSession'
+import { useUserStore } from '../../features/auth'
 import { dismissAppToasts, useAppToast } from '../../shared/composables/useAppToast'
 import { i18n } from '../../shared/i18n'
 import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/navigationMeta'

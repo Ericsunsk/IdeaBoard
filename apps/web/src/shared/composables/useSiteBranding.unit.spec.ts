@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { api } from '../api/client'
 import {
+  fetchSiteBranding,
   getSiteBrandFallbackText,
   isValidSiteBrandingLogoURL,
   normalizeSiteBrandingSetting,
@@ -7,6 +9,31 @@ import {
   SITE_BRANDING_PROJECT_NAME_MAX_CHARS,
   validateSiteBrandingSetting,
 } from './useSiteBranding'
+
+vi.mock('../api/client', () => ({ api: { request: vi.fn() } }))
+
+describe('fetchSiteBranding fallback', () => {
+  afterEach(() => {
+    vi.mocked(api.request).mockReset()
+  })
+
+  it('resolves branding data without touching feature copy', async () => {
+    vi.mocked(api.request).mockResolvedValueOnce({
+      code: 0,
+      msg: 'ok',
+      data: { project_name: 'Acme', logo_url: '' },
+    })
+    await expect(fetchSiteBranding('Caller fallback')).resolves.toEqual({
+      project_name: 'Acme',
+      logo_url: '',
+    })
+  })
+
+  it('surfaces the caller-supplied fallback when the transport error is unsafe', async () => {
+    vi.mocked(api.request).mockRejectedValueOnce(new Error('dial tcp 127.0.0.1:5432'))
+    await expect(fetchSiteBranding('Caller fallback')).rejects.toThrow('Caller fallback')
+  })
+})
 
 describe('site branding helpers', () => {
   it('normalizes empty values to the default project name', () => {

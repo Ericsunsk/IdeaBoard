@@ -179,7 +179,15 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     if (cached) return cached
     const uploadTask = (async () => {
       try {
-        const prepared = await prepareImageAssetForUpload(file)
+        const prepared = await prepareImageAssetForUpload(file, {
+          messages: {
+            unknownError: i18n.global.t('canvas.session.unknownError'),
+            readImageSizeSkipCompression: i18n.global.t(
+              'canvas.session.readImageSizeSkipCompression',
+            ),
+            compressFallbackOriginal: i18n.global.t('canvas.session.compressFallbackOriginal'),
+          },
+        })
         prepared.warnings.forEach((message) => options.onWarning(message))
         const workspaceId = options.workspaceId?.().trim()
         if (!workspaceId) throw new Error(i18n.global.t('canvas.session.uploadFailed'))

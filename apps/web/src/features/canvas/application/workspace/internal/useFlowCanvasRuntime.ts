@@ -1,6 +1,6 @@
 import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import { useCanvasGraphHistory } from '../../../domain/graph/application/useCanvasGraphHistory.ts'
+import { useCanvasGraphHistory } from '../../group-runtime/useCanvasGraphHistory.ts'
 import { useBoardAutosave, createBoardSyncCoordinator, type SaveStatus } from '../../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
@@ -11,7 +11,7 @@ import {
   createCanvasGraphSessionRuntime,
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
-import { useCanvasGroupRuntime } from '../../../domain/graph/application/useCanvasGroupRuntime.ts'
+import { useCanvasGroupRuntime } from '../../group-runtime/useCanvasGroupRuntime.ts'
 import type { BoardSnapshot } from '../../../../board'
 import { boardSnapshotToFlow } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import type { BoardSession } from '../../board-session'

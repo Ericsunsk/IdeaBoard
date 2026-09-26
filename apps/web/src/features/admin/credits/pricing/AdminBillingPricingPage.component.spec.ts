@@ -31,10 +31,10 @@ describe('AdminBillingPricingPage', () => {
     toast.error.mockReset()
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+        HttpResponse.json({ data: [] }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+        HttpResponse.json({ data: [] }),
       ),
     )
   })
@@ -360,21 +360,17 @@ describe('AdminBillingPricingPage', () => {
       ),
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [{ feature: 'inpaint', model: 'openai/gpt-image-1' }],
         }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [makeCatalogModel()],
         }),
       ),
       http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ request }) => {
         savedBody = await request.json()
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -403,17 +399,18 @@ describe('AdminBillingPricingPage', () => {
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+        HttpResponse.json({ data: [] }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [makeCatalogModel({ id: 'bad/model', name: 'Bad Model' })],
         }),
       ),
       http.put('/api/control/v1/platform/ai-gateway/models/:feature', () =>
-        HttpResponse.json({ code: 400, msg: '网关写入失败', message_safe: true }, { status: 400 }),
+        HttpResponse.json(
+          { error: { code: 'bad_request', message: '网关写入失败', request_id: 'req-gateway-400' } },
+          { status: 400 },
+        ),
       ),
     )
 
@@ -450,19 +447,17 @@ describe('AdminBillingPricingPage', () => {
         }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: [] }),
+        HttpResponse.json({ data: [] }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [makeCatalogModel({ id: 'test-provider/test-model', name: 'Vision Model' })],
         }),
       ),
       http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ request, params }) => {
         putFeature = String(params.feature)
         putBody = await request.json()
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 

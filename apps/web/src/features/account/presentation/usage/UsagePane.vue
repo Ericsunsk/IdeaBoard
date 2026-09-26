@@ -141,6 +141,7 @@ import RangedLineChartCard from '../../../../shared/components/RangedLineChartCa
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { useUsage } from '../../application/usage/useUsage'
 import { DEFAULT_USAGE_RANGE, type UsageRange } from '../../infrastructure'
 import { buildUsageTrendChart, createUsageChartPlugins, resolveUsageChartTheme } from '../../domain'
@@ -232,6 +233,6 @@ function rangeDays(value: UsageRange) {
 }
 
 function errorMessage(value: unknown) {
-  return userFacingErrorCopy(value, t('account.usage.genericError'))
+  return userFacingErrorCopy(value, t('account.usage.genericError'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

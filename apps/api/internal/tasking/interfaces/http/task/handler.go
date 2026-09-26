@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/apperror"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/validation"
@@ -139,10 +140,11 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 		response.MachineError(c, http.StatusBadRequest, codeTaskRequestInvalid, "参数错误")
 		return
 	}
-	// Idempotency-Key is the canonical submit key; the legacy body
-	// client_action_id stays accepted as fallback. A mismatch replays
-	// nothing: the durable claim layer would see a different product.
-	key, err := idempotency.Resolve(c.GetHeader(idempotency.Header), req.ClientActionID)
+	// Idempotency-Key header is the only submit key (header-only; the
+	// body client_action_id carries no fallback semantics and is
+	// overwritten below). The durable claim layer still keys on the
+	// resolved value, so key reuse with a different product conflicts.
+	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
 		idempotency.DefaultMetrics.ObserveError(err)
 		response.MachineError(c, idempotency.RenderStatusOf(err), idempotency.RenderCodeOf(err), idempotencySafeMessage(err))

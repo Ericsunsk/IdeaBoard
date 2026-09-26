@@ -2,11 +2,12 @@ import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, type Ref } from 'vue'
 import type { BoardSnapshot } from '../../../../board'
 import type { BoardSession } from '../../board-session'
-import type { CanvasGraphHistory } from '../../../domain/graph/application/useCanvasGraphHistory.ts'
+import type { CanvasGraphHistory } from '../../group-runtime/useCanvasGraphHistory.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import { bindCanvasGraphSessionProjection } from '../../../infrastructure/vue-flow-adapter/bindCanvasGraphSessionProjection'
 import { boardSnapshotToFlow } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../../domain/graph'
+import { canvasGraphStoreTelemetryProbe } from '../../group-runtime/canvasGraphStoreTelemetryProbe'
 import {
   BoardGraphSession,
   type PendingImageExecutionCore,
@@ -137,7 +138,7 @@ export function createCanvasGraphSessionRuntime(
     }
 
     dispose()
-    const session = CanvasGraphSession.hydrate(boardId, snapshot)
+    const session = CanvasGraphSession.hydrate(boardId, snapshot, canvasGraphStoreTelemetryProbe)
     graphSession = session
     const unsubscribeHistory = session.subscribe((event) => {
       if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value)

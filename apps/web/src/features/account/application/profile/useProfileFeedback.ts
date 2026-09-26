@@ -1,6 +1,7 @@
 import type { AsyncActionFeedback } from '../../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../shared/i18n'
 
@@ -33,7 +34,13 @@ function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
       )
     },
     rewardRedemptionFailed(error) {
-      appToast.error(userFacingErrorCopy(error, i18n.global.t('account.errors.networkRetry')))
+      appToast.error(
+        userFacingErrorCopy(
+          error,
+          i18n.global.t('account.errors.networkRetry'),
+          ACCOUNT_GUIDANCE_COPY_KEYS,
+        ),
+      )
     },
     avatarUpload: {
       success() {
@@ -41,7 +48,11 @@ function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
       },
       error(error) {
         appToast.error(
-          userFacingErrorCopy(error, i18n.global.t('account.toast.avatarUpdateFailed')),
+          userFacingErrorCopy(
+            error,
+            i18n.global.t('account.toast.avatarUpdateFailed'),
+            ACCOUNT_GUIDANCE_COPY_KEYS,
+          ),
         )
       },
     },
@@ -51,7 +62,11 @@ function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
       },
       error(error) {
         appToast.error(
-          userFacingErrorCopy(error, i18n.global.t('account.toast.passwordUpdateFailed')),
+          userFacingErrorCopy(
+            error,
+            i18n.global.t('account.toast.passwordUpdateFailed'),
+            ACCOUNT_GUIDANCE_COPY_KEYS,
+          ),
         )
       },
     },

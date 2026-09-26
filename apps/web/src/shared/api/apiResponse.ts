@@ -1,13 +1,15 @@
 import { formatDisplayErrorMessage } from '../utils/errorMessages'
 
-// Legacy `/api/user/*` response boundary (issue #809).
+// Shared `{code, msg, data}` response boundary (issue #809).
 //
-// The backend user plane still serves the shared `{code, msg, data}`
-// envelope (`apps/api/internal/platform/response`), so this boundary is
-// restored decoupled from generated code: the envelope is declared locally
-// instead of importing the deleted `generated-query/model` types. New
-// Public/Control-plane code must use `contractKernel` instead; only the
-// surviving `/api/user/*` transports import this module.
+// Served by the surviving hand-rolled Public transports (`/api/settings/*`,
+// `/api/search`, ...). Control Plane routes use the unified contract
+// envelope (`{ data }` / `{ error: { code, message, request_id } }`;
+// only the binary brand-logo and SSE monitor stream stay raw), so no
+// Control caller imports this module. The envelope is declared locally
+// instead of importing generated types. New Public/Control-plane code must
+// use `contractKernel` instead; only the transports above import this
+// module.
 export type ApiResponseBase = {
   code: number
   msg: string

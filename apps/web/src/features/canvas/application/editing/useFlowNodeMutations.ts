@@ -161,7 +161,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       ).length
       if (imageInputCount >= inputLimit) {
         return i18n.global.t('canvas.session.inputLimitExceeded', {
-          label: getDefaultCanvasNodeTitle(targetKind),
+          label: getDefaultCanvasNodeTitle(targetKind, (key) => i18n.global.t(key)),
           count: inputLimit,
         })
       }

@@ -22,9 +22,11 @@ import (
 	visionbilling "ideaboard/api/internal/runtime/interfaces/worker/visionbilling"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	searchapplication "ideaboard/api/internal/searchcatalog/application"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	taskworker "ideaboard/api/internal/tasking/interfaces/worker"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/jackc/pgx/v5"
@@ -39,7 +41,7 @@ type appTaskServices struct {
 	// task surface (workspacetasks.Enqueuer). Built here where the
 	// riverClient exists; consumed by http_wiring.go. Nil only when the
 	// River client failed to build (startup already failed then).
-	workspaceTaskQueue *workspaceTaskEnqueuer
+	workspaceTaskQueue *taskruntime.WorkspaceTaskEnqueuer
 	// The workspace settlement pieces below are built ONCE here and shared
 	// with both the HTTP submit path (http_wiring.go) and the workspace
 	// worker (#825). Sharing is load-bearing for the holder: it maps
@@ -47,8 +49,8 @@ type appTaskServices struct {
 	// second holder instance would fail every worker Capture/Release with
 	// "unknown hold".
 	workspaceTaskStore  *taskpostgres.Store
-	workspaceTaskHolder *workspaceTaskHolder
-	workspaceTaskQuoter *workspaceTaskQuoter
+	workspaceTaskHolder *taskruntime.WorkspaceTaskHolder
+	workspaceTaskQuoter *taskruntime.WorkspaceTaskQuoter
 	workspaceTaskMedia  *workspacemedia.Service
 	workspaceTaskAssets *workspacemedia.TaskAssetAdapter
 	// webhooks owns signed webhook subscriptions + River-driven
@@ -164,26 +166,26 @@ func newAppTaskRuntime(
 	// construction, the River client needs the worker at registration, so
 	// the client attaches after NewRiverClient below (SetClient).
 	workspaceStore := taskpostgres.NewStore(dbs.db)
-	workspaceHolder := newWorkspaceTaskHolder(services.creditService)
-	workspaceQuoter := &workspaceTaskQuoter{catalog: services.billingCatalog}
+	workspaceHolder := taskruntime.NewWorkspaceTaskHolder(services.creditService)
+	workspaceQuoter := &taskruntime.WorkspaceTaskQuoter{Catalog: services.billingCatalog}
 	workspaceMedia := workspacemedia.NewService(dbs.db)
 	workspaceAssets := &workspacemedia.TaskAssetAdapter{Store: workspaceMedia}
-	workspaceEnqueuer := newWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
+	workspaceEnqueuer := taskruntime.NewWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: workspaceStore, Quoter: workspaceQuoter, Holder: workspaceHolder,
 		Queue: workspaceEnqueuer, Assets: workspaceAssets, Models: aiGatewayRepo,
 	})
-	workspaceMediaResolver := newWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
+	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
 	// Live dispatch finalize seam: provider image bytes land directly in
 	// workspace media assets (never legacy user storage), so Generate
 	// yields workspace asset refs for the renderer + atomic Complete.
 	// Credentials still resolve per execution inside gatewayFactory; a
 	// missing gateway configuration fails tasks deterministically before
 	// this materializer ever runs.
-	workspaceProviderMaterializer, err := NewWorkspaceProviderResultMaterializer(WorkspaceProviderResultMaterializerDeps{
+	workspaceProviderMaterializer, err := taskruntime.NewWorkspaceProviderResultMaterializer(taskruntime.WorkspaceProviderResultMaterializerDeps{
 		Media: workspaceMedia, Objects: services.storageService,
-		Fetcher:     workspaceTaskResultBytesFetcher{},
-		Derivatives: workspaceTaskDerivativeRenderer{},
+		Fetcher:     taskruntime.WorkspaceTaskResultBytesFetcher{},
+		Derivatives: taskruntime.WorkspaceTaskDerivativeRenderer{},
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace provider result materializer: %w", err)
@@ -194,12 +196,12 @@ func newAppTaskRuntime(
 	// byte seams are production implementations: remote downloads retain
 	// the outbound allowlist/timeout/size policy and derivatives are
 	// best-effort bounded PNG renders.
-	workspaceRenderer, err := NewWorkspaceTaskRenderer(WorkspaceTaskRendererDeps{
+	workspaceRenderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{
 		Media:       workspaceMedia,
 		Assets:      workspaceAssets,
 		Objects:     services.storageService,
-		Fetcher:     workspaceTaskResultBytesFetcher{},
-		Derivatives: workspaceTaskDerivativeRenderer{},
+		Fetcher:     taskruntime.WorkspaceTaskResultBytesFetcher{},
+		Derivatives: taskruntime.WorkspaceTaskDerivativeRenderer{},
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
@@ -209,18 +211,18 @@ func newAppTaskRuntime(
 	// library.Service (workspace_media + media_asset_id), so no provider URL
 	// is fabricated for internal media.
 	workspaceLibraryStore := library.NewService(repos.db)
-	workspaceAutoMaterializer, err := NewWorkspaceTaskAutoMaterializer(WorkspaceTaskAutoMaterializerDeps{
+	workspaceAutoMaterializer, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Store:   workspaceLibraryStore,
-		Quoter:  newLibraryMaterializeQuoter(services.billingCatalog),
-		Billing: newLibraryMaterializeSettler(services.creditService),
-		Saver:   newWorkspaceTaskLibrarySaver(workspaceLibraryStore),
+		Quoter:  taskruntime.NewLibraryMaterializeQuoter(services.billingCatalog),
+		Billing: taskruntime.NewLibraryMaterializeSettler(services.creditService),
+		Saver:   taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore),
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task auto-materializer: %w", err)
 	}
-	workspaceWorker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
+	workspaceWorker, err := taskworker.NewWorkspaceTaskWorker(taskworker.WorkspaceTaskWorkerDeps{
 		Store: workspaceStore, Settler: workspaceSettler, Assets: workspaceAssets,
-		Provider: newWorkspaceGatewayProvider(workspaceGateway),
+		Provider: taskworker.NewWorkspaceGatewayProvider(&workspaceGatewayCallerAdapter{executor: workspaceGateway}),
 		Renderer: workspaceRenderer, Materializer: workspaceAutoMaterializer,
 	})
 	if err != nil {

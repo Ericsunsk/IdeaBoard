@@ -108,7 +108,7 @@ import { useI18n } from 'vue-i18n'
 import { Camera } from '@iconoir/vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
 import AccountPane from '../common/AccountPane.vue'
 

@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { renderWithUser, waitFor } from '../../../../test/render'
 import type { User } from '../../../../shared/api/sessionUser'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../../auth/overlay'
+import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../../auth'
 import WorkspaceNavigation from './WorkspaceNavigation.vue'
 
 const session = vi.hoisted(() => ({

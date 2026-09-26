@@ -1,7 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import {
   type AsyncActionFeedback,
   useAsyncAction,

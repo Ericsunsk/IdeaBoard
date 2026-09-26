@@ -57,8 +57,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useUserStore } from '../../auth/session/userSession'
-import { authTransport } from '../../auth/session/transport'
+import { authTransport, useUserStore } from '../../auth'
 import AdminConfirmDialog from '../shared/components/AdminConfirmDialog.vue'
 import AdminSidebar from './AdminSidebar.vue'
 import AdminHeaderBar from './AdminHeaderBar.vue'

@@ -62,7 +62,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
       {
         path: USER_AUTH_CALLBACK_PATH.slice(USER_ROOT_PATH.length + 1),
         name: 'UserAuthCallback',
-        component: () => import('../../auth/pages/UserAuthCallbackPage.vue'),
+        component: () => import('../../auth').then((module) => module.loadUserAuthCallbackPage()),
         meta: { public: true },
       },
       {
@@ -94,7 +94,7 @@ export const workspaceRoutes: RouteRecordRaw[] = [
       {
         path: 'search',
         name: 'UserSearch',
-        component: () => import('../../search/presentation/pages/SearchPage.vue'),
+        component: () => import('../../search').then((module) => module.loadSearchPage()),
         meta: { public: true },
       },
       {

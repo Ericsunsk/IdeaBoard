@@ -11,9 +11,9 @@ import (
 // platform/idempotency:
 //
 //   - Header-only: the kernel reads ONLY the Idempotency-Key request
-//     header. The legacy body-key fallback (idempotency.Resolve) stays in
-//     the old package for existing routes; new v1 routes must not accept
-//     a second body-level idempotency field.
+//     header via IdempotencyKeyFromHeader. There is no body-key
+//     fallback on any route; new v1 routes must not accept a second
+//     body-level idempotency field.
 //   - Scope: the dedup tuple is principal + operation + key. Scope()
 //     binds principal + operation; the key travels in the header. The
 //     process-local Store additionally takes the internal numeric user id

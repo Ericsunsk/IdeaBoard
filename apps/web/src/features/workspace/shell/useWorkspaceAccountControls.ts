@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useUserStore } from '../../auth/session/userSession'
+import { useAuthOverlay, useUserStore } from '../../auth'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import type {
   UserAccountMenuItem,
@@ -16,7 +16,6 @@ import {
   useCreditWallet,
   type AccountTab,
 } from '../../account'
-import { useAuthOverlay } from '../../auth/overlay'
 
 export type WorkspaceNavigationAdapter = {
   navigate: (path: string) => Promise<unknown> | unknown

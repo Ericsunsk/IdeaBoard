@@ -3,10 +3,8 @@
 //
 // Contract:
 //   - POST writes in task, reward and board paths require an
-//     `Idempotency-Key` header. Domains that already carry a body key
-//     (task `client_action_id`, reward create `idempotency_key`) resolve
-//     header-first with conflict on mismatch, so existing callers keep
-//     working while new callers converge on the header.
+//     `Idempotency-Key` header (header-only: no body fallback —
+//     contract.IdempotencyKeyFromHeader is the single reader).
 //   - Missing/invalid/conflicting keys are classified through
 //     `platform/apperror` (wire codes `idempotency_key_required` and
 //     `idempotency_conflict`). Rewards maps the same outcomes onto its
@@ -80,24 +78,6 @@ func Parse(raw string) (string, error) {
 		return "", InvalidError()
 	}
 	return key, nil
-}
-
-// Resolve binds the header key to a legacy body key. The header wins when
-// both are present; a mismatch is a conflict; both empty is missing. This
-// keeps body-key callers working while the header becomes the canonical key.
-func Resolve(headerKey, bodyKey string) (string, error) {
-	header := strings.TrimSpace(headerKey)
-	body := strings.TrimSpace(bodyKey)
-	switch {
-	case header != "" && body != "" && header != body:
-		return "", ConflictError()
-	case header != "":
-		return Parse(header)
-	case body != "":
-		return Parse(body)
-	default:
-		return "", MissingError()
-	}
 }
 
 // RenderStatusOf returns the HTTP status a caller must render for err,

@@ -50,8 +50,6 @@ describe('AdminPromptConfigPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/feature-prompts', () => {
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { prompts: storedPrompts },
         })
       }),
@@ -69,8 +67,6 @@ describe('AdminPromptConfigPage', () => {
           })
         }
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { feature_slug: slug, prompt: body.prompt, updated_at: new Date().toISOString() },
         })
       }),

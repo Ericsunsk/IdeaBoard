@@ -275,6 +275,9 @@ func TestPublicIDValidators(t *testing.T) {
 		"upload_abc123": IsUploadID,
 		"evt_abc123":    IsEventID,
 		"ba_abc123":     IsBillingAccountID,
+		"rwd_abc123":    IsRewardCodeID,
+		"rdm_abc123":    IsRewardRedemptionID,
+		"rec_abc123":    IsReconciliationRunID,
 		"usr_a-1_B2":    IsUserID,
 		"task_550e8400": IsTaskID,
 	}

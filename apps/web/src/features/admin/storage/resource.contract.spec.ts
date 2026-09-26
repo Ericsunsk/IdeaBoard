@@ -104,7 +104,10 @@ describe('createAdminStorageResource', () => {
     useMswHandlers(
       ...storageQueryHandlers(),
       http.post('/api/control/v1/platform/storage/profiles', () => {
-        return HttpResponse.json({ code: 409, msg: '存储名称已存在', message_safe: true })
+        return HttpResponse.json(
+          { error: { code: 'conflict', message: '存储名称已存在', request_id: 'req-storage-409' } },
+          { status: 409 },
+        )
       }),
     )
     const resource = createAdminStorageResource()
@@ -126,8 +129,6 @@ describe('createAdminStorageResource', () => {
           operatorReason: request.headers.get('X-Operator-Reason'),
         }
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { message: 'created', profile: makeGeneratedProfile('profile-created') },
         })
       }),
@@ -145,7 +146,7 @@ describe('createAdminStorageResource', () => {
   it('uses the resource fallback when a successful response omits required data', async () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/storage/providers', () => {
-        return HttpResponse.json({ code: 0, msg: 'success' })
+        return HttpResponse.json({ data: null })
       }),
     )
     const resource = createAdminStorageResource()
@@ -157,8 +158,6 @@ describe('createAdminStorageResource', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/storage/providers', () => {
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             providers: [
               {
@@ -191,8 +190,6 @@ function storageQueryHandlers() {
   return [
     http.get('/api/control/v1/platform/storage/providers', () => {
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           providers: [makeS3Provider()],
         },
@@ -200,8 +197,6 @@ function storageQueryHandlers() {
     }),
     http.get('/api/control/v1/platform/storage/profiles', () => {
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           profiles: [makeGeneratedProfile('profile-listed')],
         },
@@ -216,8 +211,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request, await readRequestJson(request))
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           message: 'created',
           profile: makeGeneratedProfile('profile-created'),
@@ -228,8 +221,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request, await readRequestJson(request))
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           message: 'updated',
           profile: makeGeneratedProfile('profile-updated'),
@@ -240,8 +231,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           message: 'tested',
         },
@@ -251,8 +240,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           message: 'applied',
           profile: makeGeneratedProfile('profile-applied'),
@@ -263,8 +250,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           info: {
             domains: ['cdn.example.com', 'assets.example.com'],
@@ -276,8 +261,6 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
-        code: 0,
-        msg: 'ok',
         data: {
           message: 'deleted',
         },

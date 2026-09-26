@@ -34,11 +34,6 @@ const USER_ERROR_CODE_COPY_KEY_MAP: Readonly<Record<string, string>> = {
   checkout_request_rejected: 'errorCodes.checkout_request_rejected',
   checkout_session_expired: 'errorCodes.checkout_session_expired',
   payment_already_completed: 'errorCodes.payment_already_completed',
-  // Account workspace-billing guidance codes (W2 transports): frontend
-  // fail-closed errors when no workspace is selected or when the v1 plane
-  // has no equivalent surface. Copy lives in account.errors.
-  workspace_selection_required: 'account.errors.workspaceRequired',
-  workspace_billing_unavailable: 'account.errors.featureUnavailable',
   INVALID_EMAIL_OR_PASSWORD: 'auth.errors.invalidCredentials',
   USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'auth.errors.emailAlreadyRegistered',
   EMAIL_NOT_VERIFIED: 'auth.errors.emailNotVerified',
@@ -78,9 +73,15 @@ export function userErrorCode(error: unknown): string | null {
   return root.cause && root.cause !== error ? userErrorCode(root.cause) : null
 }
 
-export function userFacingErrorCopy(error: unknown, fallback: string): string {
+export type ErrorCodeCopyKeyMap = Readonly<Record<string, string>>
+
+export function userFacingErrorCopy(
+  error: unknown,
+  fallback: string,
+  codeCopyKeys?: ErrorCodeCopyKeyMap,
+): string {
   const code = userErrorCode(error)
-  const key = code ? USER_ERROR_CODE_COPY_KEY_MAP[code] : undefined
+  const key = code ? (codeCopyKeys?.[code] ?? USER_ERROR_CODE_COPY_KEY_MAP[code]) : undefined
   return key ? i18n.global.t(key) : fallback
 }
 

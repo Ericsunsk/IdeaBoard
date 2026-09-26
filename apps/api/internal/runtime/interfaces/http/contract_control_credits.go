@@ -451,6 +451,12 @@ func (d *ContractControlDeps) getControlReconciliationRun(c *gin.Context, _ cont
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
 		return
 	}
+	// FORMAL EXCEPTION to the opaque-id policy (parent #809 S4): :run_id
+	// is the internal credit_reconciliation_runs bigint (no public_id
+	// column; rec_ reserved in the kernel for the migration). Reconciliation
+	// runs are operator-only control reads with no public enumeration
+	// surface; cursor pagination (before_id) stays numeric by the same
+	// exception. Migrate both when the public_id column lands.
 	runID, err := strconv.ParseInt(strings.TrimSpace(c.Param("run_id")), 10, 64)
 	if err != nil || runID <= 0 {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "run_id 无效")

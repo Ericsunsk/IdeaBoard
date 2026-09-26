@@ -1,6 +1,6 @@
 /** Shared media URL/Blob/Canvas utilities used across canvas services. */
-import { USER_DOWNLOAD_ENDPOINT } from '../../../../shared/constants/media'
 import {
+  API_BASE_URL,
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,
 } from '../../../../shared/config/runtimeUrls'
@@ -31,15 +31,18 @@ function toAbsoluteUrl(raw: string): URL | null {
 /**
  * Resolves an image URL for fetch.
  * - Data URLs pass through.
- * - Same-origin /api/user/download URLs are normalized (no nested proxying).
  * - Same-origin /uploads paths can pass through for local mask/inpaint read.
- * - External http/https URLs are proxied through USER_DOWNLOAD_ENDPOINT.
+ * - v1 workspace media URLs stay on the API origin (authenticated direct
+ *   read through the same-origin gateway; no legacy download proxy).
+ * - External http/https URLs are fetched directly.
  * - options.blockExternal can prevent external URL resolution.
  */
-function resolveProxiedDownloadUrl(url: URL): string {
-  const target = (url.searchParams.get('url') || '').trim()
-  if (!target) return ''
-  return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
+function apiOrigin(): string {
+  try {
+    return new URL(API_BASE_URL, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
 }
 
 function resolveRemoteImageUrl(
@@ -49,7 +52,7 @@ function resolveRemoteImageUrl(
 ): string {
   if (url.protocol === 'http:' || url.protocol === 'https:') {
     if (options?.blockExternal) return ''
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(trimmed)}`
+    return trimmed
   }
   return trimmed
 }
@@ -63,12 +66,9 @@ export function resolveFetchUrl(
   if (/^data:/i.test(trimmed)) return trimmed
   const url = toAbsoluteUrl(trimmed)
   if (!url) return ''
-  const endpoint = new URL(USER_DOWNLOAD_ENDPOINT, window.location.origin)
+  const origin = apiOrigin()
   const isSameOrigin = url.origin === window.location.origin
-  const isApiOrigin = url.origin === endpoint.origin
-  if ((isSameOrigin || isApiOrigin) && url.pathname === endpoint.pathname) {
-    return resolveProxiedDownloadUrl(url)
-  }
+  const isApiOrigin = url.origin === origin
   if (
     (isSameOrigin || isApiOrigin) &&
     (options?.allowSameOriginUploads ?? true) &&

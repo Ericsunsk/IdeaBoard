@@ -158,7 +158,7 @@ describe('useCanvasExecutionWorkspace', () => {
       waitTaskImageResults: async () => [
         {
           assetId: 'asset_result',
-          url: '/api/user/media-assets/asset_result/derivatives/preview/webp/content',
+          url: '/api/v1/workspaces/ws_test123/media-assets/asset_result/derivatives/preview',
           width: 400,
           height: 200,
           resultIndex: 0,
@@ -201,7 +201,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const workspace = createReattachWorkspace(store, core, async () => [
       {
         assetId: 'asset_recovered',
-        url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_recovered/derivatives/preview',
         resultIndex: 0,
       },
     ])
@@ -220,7 +220,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const waitTaskImageResults = vi.fn(async () => [
       {
         assetId: 'asset_recovered',
-        url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_recovered/derivatives/preview',
         resultIndex: 0,
       },
     ])
@@ -246,7 +246,7 @@ describe('useCanvasExecutionWorkspace', () => {
     deferred.resolve([
       {
         assetId: 'asset_recovered',
-        url: '/api/user/media-assets/asset_recovered/derivatives/preview/webp/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_recovered/derivatives/preview',
         resultIndex: 0,
       },
     ])
@@ -296,7 +296,7 @@ describe('useCanvasExecutionWorkspace', () => {
     deferred.resolve([
       {
         assetId: 'asset_old_board',
-        url: '/api/user/media-assets/asset_old_board/derivatives/preview/webp/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_old_board/derivatives/preview',
         resultIndex: 0,
       },
     ])
@@ -323,7 +323,7 @@ describe('useCanvasExecutionWorkspace', () => {
     deferred.resolve([
       {
         assetId: 'asset_deleted',
-        url: '/api/user/media-assets/asset_deleted/derivatives/preview/webp/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_deleted/derivatives/preview',
         resultIndex: 0,
       },
     ])

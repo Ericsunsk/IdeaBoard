@@ -18,10 +18,12 @@
  * idempotency key, reason, outcome, timestamp); audit records never enter
  * the public event layer.
  *
- * Envelope: dedicated handlers render {data, meta?} success and
+ * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
- * header. Routes marked x-control-envelope: legacy proxy the legacy admin
- * handler shape under the same guard until #809 unifies envelopes.
+ * header. Proxied platform-config families translate the legacy admin
+ * DTO at the control boundary into {data} (parent #809 unified
+ * envelope); only the binary brand-logo (image/svg+xml) and the SSE
+ * monitor stream stay raw protocol exceptions, never JSON envelopes.
  *
  * Capability list (frozen): control:users, control:workspaces,
  * control:billing, control:credits, control:payments, control:platform,
@@ -41,8 +43,6 @@ export interface ControlRewardCodeCreateRequest {
   credit_amount?: number
   max_redemptions?: number
   expires_at?: string
-  /** Body fallback; the Idempotency-Key header is canonical. */
-  idempotency_key?: string
   /** Operator note (or X-Operator-Reason header). */
   reason?: string
   /** Operator note alias (or X-Operator-Reason header). */

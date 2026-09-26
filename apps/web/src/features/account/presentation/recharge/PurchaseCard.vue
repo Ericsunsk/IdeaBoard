@@ -144,6 +144,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../../shared/theme/formControls'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
@@ -227,6 +228,6 @@ function unavailableMessage(reason?: PaymentPurchaseOptions['unavailable_reason'
 }
 
 function errorMessage(error: unknown): string {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

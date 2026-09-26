@@ -9,8 +9,8 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
-function legacyOk(data: unknown): Record<string, unknown> {
-  return { code: 0, msg: 'ok', data }
+function contractOk(data: unknown): Record<string, unknown> {
+  return { data }
 }
 
 function redemptionFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -25,14 +25,14 @@ function redemptionFixture(overrides: Record<string, unknown> = {}): Record<stri
   }
 }
 
-// Reward redemptions ride the Control Plane with the legacy
-// `{code, msg, data}` envelope.
+// Reward redemptions ride the Control Plane with the unified contract
+// envelope (`{ data }` / `{ error: { code, message, request_id } }`).
 describe('RewardCodeRedemptionResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('lists redemptions through the control plane', async () => {
     transport.request.mockResolvedValue(
-      legacyOk({ redemptions: [redemptionFixture()], next_before_id: 51 }),
+      contractOk({ redemptions: [redemptionFixture()], next_before_id: 51 }),
     )
     const signal = new AbortController().signal
 
@@ -54,7 +54,7 @@ describe('RewardCodeRedemptionResource', () => {
 
   it('reads one redemption detail through the control plane', async () => {
     transport.request.mockResolvedValue(
-      legacyOk({
+      contractOk({
         ...redemptionFixture(),
         credit_transaction_id: 'txn_1',
         masked_code_hint: '•••• 2922',

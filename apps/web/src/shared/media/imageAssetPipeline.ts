@@ -5,8 +5,20 @@ import { i18n } from '../i18n'
 
 export type ImageAssetCompressionPolicy = 'default' | 'none'
 
+/**
+ * Caller-supplied pipeline copy (issue #835). The pipeline stays
+ * feature-free: resolution warnings embed these strings instead of
+ * resolving feature locale keys itself.
+ */
+export type ImageAssetPipelineMessages = {
+  unknownError: string
+  readImageSizeSkipCompression: string
+  compressFallbackOriginal: string
+}
+
 export interface PrepareImageAssetOptions {
   compressionPolicy?: ImageAssetCompressionPolicy
+  messages: ImageAssetPipelineMessages
 }
 
 export interface PreparedImageAsset {
@@ -304,7 +316,7 @@ function buildUncompressedAsset(
 
 export async function prepareImageAssetForUpload(
   file: File,
-  options: PrepareImageAssetOptions = {},
+  options: PrepareImageAssetOptions,
 ): Promise<PreparedImageAsset> {
   const uploadSourceFile = await normalizeImageUploadFile(file)
   if (!isSupportedUploadImageFile(uploadSourceFile)) {
@@ -315,8 +327,8 @@ export async function prepareImageAssetForUpload(
   try {
     dimensions = await readImageDimensions(uploadSourceFile)
   } catch (error) {
-    const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
-    warnings.push(`${i18n.global.t('canvas.session.readImageSizeSkipCompression')}: ${reason}`)
+    const reason = userFacingErrorCopy(error, options.messages.unknownError)
+    warnings.push(`${options.messages.readImageSizeSkipCompression}: ${reason}`)
     return buildUncompressedAsset(file, uploadSourceFile, warnings)
   }
   const compressionPolicy = options.compressionPolicy ?? 'default'
@@ -349,8 +361,8 @@ export async function prepareImageAssetForUpload(
       compressed: true,
     }
   } catch (error) {
-    const reason = userFacingErrorCopy(error, i18n.global.t('canvas.session.unknownError'))
-    warnings.push(`${i18n.global.t('canvas.session.compressFallbackOriginal')}: ${reason}`)
+    const reason = userFacingErrorCopy(error, options.messages.unknownError)
+    warnings.push(`${options.messages.compressFallbackOriginal}: ${reason}`)
     return buildUncompressedAsset(file, uploadSourceFile, warnings, dimensions)
   }
 }

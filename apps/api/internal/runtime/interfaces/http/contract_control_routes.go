@@ -5,11 +5,13 @@ package httpapi
 // RegisterContractControlRoutes mounts the full Control Plane surface on
 // the group: dedicated contract-envelope handlers for users, workspaces,
 // billing, credits, payments, tasks, and platform settings, plus guarded
-// proxies to the legacy admin handlers for ai-gateway, storage, search
-// providers, feature prompts, and monitor/statistics (single-sourced
-// validation and side effects; legacy envelope until #809). Unknown
-// control paths fail closed with 501. There is NO task creation route
-// here by design. Legacy /api/admin/* registration is untouched.
+// adapters over the legacy admin handlers for ai-gateway, storage, search
+// providers, feature prompts, monitor/statistics, brand-logo overrides,
+// and rewards (single-sourced validation and side effects; the
+// control-facing render layer translates every proxied response into the
+// contract envelope at the boundary, parent #809). Unknown control paths
+// fail closed with 501. There is NO task creation route here by design.
+// Legacy /api/admin/* registration is untouched.
 
 import (
 	"net/http"
@@ -21,15 +23,18 @@ import (
 )
 
 // controlProxy adapts a legacy admin handler method to a guarded control
-// route. available reports whether the handler is wired; nil stays
-// fail-closed with 501 instead of panicking.
+// route with the unified contract envelope: the legacy response is
+// captured and re-rendered as {data} / {error:{code,message,request_id}}
+// at the same HTTP status (see translateControlProxyResponse). available
+// reports whether the handler is wired; nil stays fail-closed with 501
+// instead of panicking.
 func (d *ContractControlDeps) controlProxy(route controlRoute, capability string, available bool, method func(*gin.Context)) gin.HandlerFunc {
 	return d.guard(capability, route, func(c *gin.Context, _ controlContext) {
 		if !available {
 			contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, "控制面服务未实现")
 			return
 		}
-		method(c)
+		translateControlProxyResponse(c, method)
 	})
 }
 
@@ -221,8 +226,9 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 // registerControlProxiedRoutes mounts the platform-config families that
 // reuse the legacy admin handler methods under the control guard
 // (capability control:platform, mandatory audit, header idempotency,
-// operator reason). Response envelopes on these routes keep the legacy
-// handler shape until #809 unifies the control envelope; every other
+// operator reason). Every proxied response is translated into the unified
+// contract envelope at the boundary (parent #809); the binary brand-logo
+// and the SSE monitor stream stay raw protocol exceptions. Every other
 // control guarantee holds uniformly.
 func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGroup) {
 	gatewayAvailable := d != nil && d.AIGateway != nil
@@ -251,7 +257,7 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.detect_ai_gateway_models", Route: "GET /platform/ai-gateway/detect-models"}, ControlCapabilityPlatform, gatewayAvailable, h.DetectModels))
 		control.GET("/platform/ai-gateway/models-reference", d.controlProxy(
 			controlRoute{Operation: "platform.get_ai_gateway_model_reference", Route: "GET /platform/ai-gateway/models-reference"}, ControlCapabilityPlatform, gatewayAvailable, h.GetModelReference))
-		control.GET("/platform/ai-gateway/brand-logo", d.controlProxy(
+		control.GET("/platform/ai-gateway/brand-logo", d.controlProxyRaw(
 			controlRoute{Operation: "platform.get_ai_gateway_brand_logo", Route: "GET /platform/ai-gateway/brand-logo"}, ControlCapabilityPlatform, gatewayAvailable, h.GetBrandLogo))
 		control.GET("/platform/ai-gateway/models-observed", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_models_observed", Route: "GET /platform/ai-gateway/models-observed"}, ControlCapabilityPlatform, gatewayAvailable, h.ListModelsObserved))
@@ -306,8 +312,9 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.get_monitor", Route: "GET /platform/monitor"}, ControlCapabilityPlatform, monitorAvailable, h.GetMonitor))
 		// Global monitor stream (SSE, snapshot every 10s): read-guard so
 		// the long-lived stream is never body-buffered; the audit record
-		// emits on disconnect with the terminal status.
-		control.GET("/platform/monitor/stream", d.controlProxy(
+		// emits on disconnect with the terminal status. The stream is a
+		// protocol exception and bypasses envelope translation.
+		control.GET("/platform/monitor/stream", d.controlProxyRaw(
 			controlRoute{Operation: "platform.stream_monitor", Route: "GET /platform/monitor/stream"}, ControlCapabilityPlatform, monitorAvailable, h.StreamMonitor))
 		control.GET("/platform/statistics", d.controlProxy(
 			controlRoute{Operation: "platform.get_statistics", Route: "GET /platform/statistics"}, ControlCapabilityPlatform, monitorAvailable, h.GetStatistics))

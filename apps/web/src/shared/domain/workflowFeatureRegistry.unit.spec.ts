@@ -33,4 +33,17 @@ describe('workflowFeatureRegistry projections', () => {
       title: 'Inpaint',
     })
   })
+
+  it('accepts a caller-supplied label resolver instead of reading i18n itself', () => {
+    const seenKeys: string[] = []
+    const text = getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.cutout, (key) => {
+      seenKeys.push(key)
+      return `resolved:${key}`
+    })
+    expect(seenKeys).toEqual(['canvas.features.cutout'])
+    expect(text).toEqual({
+      label: 'resolved:canvas.features.cutout',
+      title: 'resolved:canvas.features.cutout',
+    })
+  })
 })

@@ -7,7 +7,6 @@ import {
   resolveApiData,
   type ApiResponseWithData,
 } from '../api/apiResponse'
-import { i18n } from '../i18n'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
 // Public site branding (issue #809). The backend still serves
@@ -31,15 +30,17 @@ export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
 export const SITE_BRANDING_PROJECT_NAME_MAX_CHARS = 40
 export const SITE_BRANDING_LOGO_URL_MAX_LENGTH = 2048
 export const SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX = '/uploads/site/assets/'
-const selectSiteBranding = createApiDataSelector<BrandingSetting>(
-  i18n.global.t('account.branding.loadFailed'),
-)
+export type SiteBrandingOptions = {
+  enabled?: MaybeRef<boolean>
+  /** Caller-supplied load-failure copy; shared owns no feature locale keys. */
+  fallback: string
+}
 
-export async function fetchSiteBranding(): Promise<BrandingSetting> {
+export async function fetchSiteBranding(fallback: string): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
     await resolveApiData(
       api.request<ApiResponseBrandingSetting>('/settings/branding', { method: 'GET' }),
-      i18n.global.t('account.branding.loadFailed'),
+      fallback,
     ),
   )
 }
@@ -53,10 +54,11 @@ async function fetchSiteBrandingEnvelope(
   })
 }
 
-export function useSiteBranding(options?: { enabled?: MaybeRef<boolean> }) {
+export function useSiteBranding(options: SiteBrandingOptions) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
+  const selectSiteBranding = createApiDataSelector<BrandingSetting>(options.fallback)
   const brandingQuery = useQuery<
     ApiResponseBrandingSetting,
     Error,

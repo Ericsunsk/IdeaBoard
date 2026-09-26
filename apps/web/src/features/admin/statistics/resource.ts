@@ -1,19 +1,17 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import {
-  createApiDataSelector,
-  type ApiResponseWithData,
-} from '../../../shared/api/apiResponse'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { getControlStatistics } from '../../../shared/api/generated-query/control/control-platform/control-platform'
 import type { GetControlStatisticsParams } from '../../../shared/api/generated-query/control/model'
 
 // Admin statistics boundary (final cut: Control Plane read). The legacy
 // `GET /api/admin/statistics` route group is deleted; the same handler now
-// serves `GET /api/control/v1/platform/statistics` as a guarded proxy with
-// the legacy `{code, msg, data}` envelope untouched, so this boundary keeps
-// its local view types and rides the generated `getControlStatistics` hook
-// (wire-identical to the retired hand-rolled GET). Charts and presentations
-// keep importing these names, never generated code.
+// serves `GET /api/control/v1/platform/statistics` with the unified
+// contract envelope (`{ data }` success / `{ error: { code, message,
+// request_id } }` errors), so this boundary keeps its local view types and
+// rides the generated `getControlStatistics` hook (wire-identical to the
+// retired hand-rolled GET). Charts and presentations keep importing these
+// names, never generated code.
 export const GetAdminStatisticsRange = {
   '1d': '1d',
   '7d': '7d',
@@ -119,7 +117,7 @@ export type AdminStatistics = {
   backfill_status: AdminStatisticsBackfillStatus
 }
 
-export type ApiResponseAdminStatistics = ApiResponseWithData<AdminStatistics>
+export type ApiResponseAdminStatistics = { data: AdminStatistics }
 
 export type AdminStatisticsResourceOptions = {
   enabled?: MaybeRefOrGetter<boolean>
@@ -131,7 +129,9 @@ export type AdminStatisticsResourceOptions = {
 }
 
 const ADMIN_STATISTICS_STALE_TIME_MS = 60_000
-const selectAdminStatistics = createApiDataSelector<AdminStatistics>('加载统计数据失败')
+function selectAdminStatistics(response: ApiResponseAdminStatistics): AdminStatistics {
+  return requireContractData<AdminStatistics>(response, '加载统计数据失败')
+}
 
 function statisticsParams(params?: GetAdminStatisticsParams): GetControlStatisticsParams | undefined {
   const range = params?.range
@@ -142,7 +142,7 @@ export function useAdminStatisticsResource(
   params?: MaybeRef<GetAdminStatisticsParams>,
   options: AdminStatisticsResourceOptions = {},
 ) {
-  const query = useQuery<ApiResponseWithData<AdminStatistics>, Error, AdminStatistics>({
+  const query = useQuery<ApiResponseAdminStatistics, Error, AdminStatistics>({
     queryKey: ['admin', 'statistics', params] as const,
     queryFn: ({ signal }) =>
       getControlStatistics(statisticsParams(toValue(params)), {

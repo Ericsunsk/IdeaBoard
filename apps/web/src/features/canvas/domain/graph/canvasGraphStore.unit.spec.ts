@@ -15,6 +15,7 @@ import {
   toCanvasGraphNodeId,
 } from './canvasGraphStore'
 import { CanvasGraphSession } from './canvasGraphSession'
+import type { CanvasGraphStoreTelemetry } from './canvasGraphStoreTelemetry'
 import {
   commitCanvasGraphConnectIntent,
   commitCanvasGraphDeleteGroupIntent,
@@ -112,15 +113,30 @@ describe('CanvasGraphStore', () => {
     delete window.__canvasInteractionBenchmarkCounters
   })
 
-  it('measures both constructor and explicit hydrate paths during a benchmark', () => {
+  it('leaves benchmark counters untouched without injected telemetry', () => {
     window.__canvasInteractionBenchmarkCounters = {}
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
 
     store.hydrate(createEmptyBoardSnapshot())
 
-    expect(window.__canvasInteractionBenchmarkCounters.runtimeTimingMs).toMatchObject({
-      'graph-store.hydrate': { count: 2 },
-    })
+    expect(window.__canvasInteractionBenchmarkCounters.runtimeTimingMs).toBeUndefined()
+  })
+
+  it('routes constructor and explicit hydrate measurements through injected telemetry', () => {
+    const measured: string[] = []
+    const telemetry: CanvasGraphStoreTelemetry = {
+      measureHydrate: (counts, task) => {
+        measured.push(`hydrate:${counts.nodes}:${counts.edges}:${counts.groups}`)
+        return task()
+      },
+      measureDraft: (_counts, task) => task(),
+      recordCommit: () => {},
+    }
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot(), telemetry)
+
+    store.hydrate(createEmptyBoardSnapshot())
+
+    expect(measured).toEqual(['hydrate:3:1:0', 'hydrate:0:0:0'])
   })
 
   it('hydrates and exports a BoardSnapshot without changing the schema shape', () => {

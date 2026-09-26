@@ -49,7 +49,14 @@ import { Shield, Xmark } from '@iconoir/vue'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { useAuthSession, useUserStore } from '../../auth/session/userSession'
+import {
+  UserAuthModals,
+  createAuthOverlay,
+  provideAuthOverlay,
+  useAuthFeedback,
+  useAuthSession,
+  useUserStore,
+} from '../../auth'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import {
   ADMIN_USERS_PATH,
@@ -57,9 +64,6 @@ import {
   USER_REGISTER_PATH,
   USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
-import { useAuthFeedback } from '../../auth/useAuthFeedback'
-import UserAuthModals from '../../auth/components/UserAuthModals.vue'
-import { createAuthOverlay, provideAuthOverlay } from '../../auth/overlay'
 import { clearPendingSearchAuthAction } from '../../search'
 import { AccountDialogHost, createAccountOverlay, provideAccountOverlay } from '../../account'
 

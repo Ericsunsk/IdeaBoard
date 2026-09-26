@@ -5,7 +5,7 @@ import { queryClient } from '../shared/query/queryClient'
 import { i18n, initUserLocale } from '../shared/i18n'
 import router from './router'
 import App from './App.vue'
-import { useUserStore } from '../features/auth/session/userSession'
+import { useUserStore } from '../features/auth'
 import './style.css'
 import 'vue-sonner/style.css'
 

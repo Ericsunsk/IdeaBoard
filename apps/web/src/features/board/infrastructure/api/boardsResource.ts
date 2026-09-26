@@ -11,7 +11,8 @@ import {
 import type { Board } from '../../../../shared/api/generated-query/public/model/board'
 import type { BoardDocument } from '../../../../shared/api/generated-query/public/model/boardDocument'
 import { boardOperationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
-import { getWorkspaceSelectionStore } from '../../../workspace/infrastructure/workspaceContext'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../shared/utils/workspaceId'
+import { getWorkspaceSelectionStore } from '../../../workspace'
 import type { BoardState } from '../../domain'
 
 // Workspace board transport (Public Data Plane, `/api/v1`).
@@ -59,11 +60,10 @@ export class BoardPayloadError extends Error {
 
 /** Fail-closed workspace resolution: throws before any network call when unset. */
 export function requireBoardWorkspaceId(explicit?: string | null): string {
-  const trimmed = (explicit ?? '').trim()
-  if (trimmed) return trimmed
-  const selected = getWorkspaceSelectionStore().getSelectedId()
-  if (!selected) throw new BoardWorkspaceUnavailableError()
-  return selected
+  return requireSharedWorkspaceId(
+    explicit?.trim() ? explicit : getWorkspaceSelectionStore().getSelectedId(),
+    () => new BoardWorkspaceUnavailableError(),
+  )
 }
 
 export type WorkspaceBoardMeta = {

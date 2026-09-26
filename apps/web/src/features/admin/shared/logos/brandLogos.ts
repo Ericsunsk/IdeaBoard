@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
+import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
+import { getGetControlAIGatewayBrandLogoUrl } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 
 // Brand logo override vocabulary (issue #809). The legacy generated models
 // are gone; this module owns the scope/key sets its pickers and resources
@@ -65,7 +67,7 @@ const AdminBrandLogoOverrideUpdateLogoKey = {
 type AdminBrandLogoOverrideUpdateLogoKey =
   (typeof AdminBrandLogoOverrideUpdateLogoKey)[keyof typeof AdminBrandLogoOverrideUpdateLogoKey]
 
-// Provider 品牌图走后端 models.dev 透传（GET /admin/settings/ai-gateway/brand-logo），
+// Provider 品牌图走 Control 品牌图透传（GET /api/control/v1/platform/ai-gateway/brand-logo），
 // 前端不再 bundle 任何 provider SVG：上游缺失时后端回默认图，卡片不断图。
 // 存储与身份类目仍用站内现成资产（storage-vendors / oauth），不在本次迁移范围。
 import logoAmazonS3 from '../../../../shared/assets/storage-vendors/amazons3.svg'
@@ -96,8 +98,6 @@ export interface AdminBrandLogoItem {
 export type AdminBrandLogoScope = AdminBrandLogoOverrideScope
 export type AdminBrandLogoKey = AdminBrandLogoOverrideUpdateLogoKey
 
-const ADMIN_BRAND_LOGO_ENDPOINT = '/admin/settings/ai-gateway/brand-logo'
-
 // models.dev 上游 provider ID 与站内 logoKey 不一致时的别名（均经 /logos/{id}.svg 实测命中）。
 // 未列出的 key 按原样透传：上游命中即真图，未收录即回默认图（不断图），由 admin overrides 兜底。
 const MODELS_DEV_LOGO_ALIASES: Partial<Record<AdminBrandLogoKey, string>> = {
@@ -114,7 +114,10 @@ const MODELS_DEV_LOGO_ALIASES: Partial<Record<AdminBrandLogoKey, string>> = {
 
 export function adminBrandLogoProxyUrl(key: string): string {
   const provider = MODELS_DEV_LOGO_ALIASES[key as AdminBrandLogoKey] ?? key
-  return resolveApiUrl(`${ADMIN_BRAND_LOGO_ENDPOINT}?provider=${encodeURIComponent(provider)}`)
+  // Control brand-logo passthrough (binary SVG): the path comes from the
+  // generated Control hook URL builder (single source of truth, never
+  // hand-concatenated) mounted on the Control API prefix.
+  return resolveApiUrl(`${CONTROL_API_PREFIX}${getGetControlAIGatewayBrandLogoUrl({ provider })}`)
 }
 
 export const ADMIN_BRAND_CATEGORIES: AdminBrandCategory[] = [

@@ -57,12 +57,13 @@
 
 <script setup lang="ts">
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { i18n } from '../../../shared/i18n'
 import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
 
 defineProps<{ title: string; version: string }>()
 
-const { projectName } = useSiteBranding()
+const { projectName } = useSiteBranding({ fallback: i18n.global.t('account.branding.loadFailed') })
 
 const legalLinks = PUBLIC_LEGAL_LINKS
 </script>

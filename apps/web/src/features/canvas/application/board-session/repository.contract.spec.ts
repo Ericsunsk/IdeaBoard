@@ -13,36 +13,18 @@ import {
 import {
   makeBoardSnapshot,
   makeBoardState,
-  createMockBoardApiRequest,
 } from '../testing/boardFixtures'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
 import {
   getWorkspaceSelectionStore,
   resetWorkspaceSelectionStore,
-} from '../../../workspace/infrastructure/workspaceContext'
+} from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
-  const state: {
-    listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
-    upsertResponse: { code: number; msg?: string; data: unknown }
-  } = {
-    listResponse: { data: { list: [] as UserBoardItem[] } },
-    upsertResponse: { code: 0, data: { board: {}, new_revision: 1 } },
-  }
-  return { request, state }
+  return { request }
 })
-
-type UserBoardItem = {
-  board_id: string
-  name: string
-  state: unknown
-  revision: number
-  state_schema_version: number
-  created_at: number
-  updated_at: number
-}
 
 vi.mock('../../../../shared/api/client', () => ({
   api: {
@@ -164,7 +146,6 @@ function routeV1DocumentRequest(
 function routeV1BoardRequest(
   url: string,
   config: V1RequestConfig | undefined,
-  legacy: (url: string, config?: { method?: string }) => Promise<unknown>,
 ): Promise<unknown> {
   const method = config?.method ?? 'GET'
   const path = url.split('?')[0] ?? url
@@ -183,14 +164,12 @@ function routeV1BoardRequest(
   if (boardMatch && (method === 'GET' || method === 'PATCH')) {
     return readOrRenameV1Board(boardMatch[1] ?? '', config)
   }
-  return legacy(url, config)
+  return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
 }
 
-/** v1 workspace boards routes composed over the legacy mock (fallback for old URLs). */
-function createV1BoardApiRequest(
-  legacy: (url: string, config?: { method?: string }) => Promise<unknown>,
-) {
-  return (url: string, config?: V1RequestConfig) => routeV1BoardRequest(url, config, legacy)
+/** Pure v1 workspace boards mock: unknown (legacy) URLs fail closed. */
+function createV1BoardApiRequest() {
+  return (url: string, config?: V1RequestConfig) => routeV1BoardRequest(url, config)
 }
 
 function makeSnapshot(promptText: string): BoardSnapshot {
@@ -237,11 +216,7 @@ describe('createBoardSessionRepository', () => {
     })
     vi.clearAllMocks()
     resetV1BoardApi()
-    mocks.state.listResponse = { data: { list: [] } }
-    mocks.state.upsertResponse = { code: 0, data: { board: {}, new_revision: 1 } }
-    mocks.request.mockImplementation(
-      createV1BoardApiRequest(createMockBoardApiRequest(mocks.state)),
-    )
+    mocks.request.mockImplementation(createV1BoardApiRequest())
     resetWorkspaceSelectionStore()
     getWorkspaceSelectionStore().select(WORKSPACE_ID)
   })

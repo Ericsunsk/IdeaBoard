@@ -103,6 +103,99 @@ func NewNATSJetStreamEventBus(ctx context.Context, cfg NATSJetStreamConfig) (*NA
 	}, nil
 }
 
+// Generic NATS envelope bridge.
+//
+// The three event families (user events, task-status events, workspace v1
+// envelopes) share one transport shape: an origin_instance wrapper published
+// with a MsgID dedup key, fanned out through a per-instance durable consumer
+// (DeliverNew, AckExplicit, 30s AckWait, 5 MaxDeliver, 1024 MaxAckPending),
+// and drained by a consume loop with a uniform panic-recovery guard.
+// Per-family thin codecs supply the subject, MsgID, envelope marshal/decode,
+// and log labels; subject topology, retention, and ack policy stay exactly
+// as-is.
+type natsBridgeSubscribeConfig[T any] struct {
+	consumerName   string
+	subject        string
+	description    string
+	ensureOp       string
+	startOp        string
+	malformedLog   string
+	localAckLog    string
+	handlerFailLog string
+	ackFailLog     string
+	consumerErrLog string
+	decode         func(payload []byte, instanceID string) (T, bool, error)
+	handler        func(context.Context, T) error
+	logAttrs       func(T) []any
+}
+
+func (b *NATSJetStreamEventBus) publishBridgeMessage(ctx context.Context, subject, msgID string, payload []byte, op string) error {
+	if _, err := b.js.Publish(ctx, subject, payload, jetstream.WithMsgID(msgID)); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return nil
+}
+
+func subscribeNATSBridge[T any](b *NATSJetStreamEventBus, ctx context.Context, cfg natsBridgeSubscribeConfig[T]) error {
+	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
+		Name: cfg.consumerName, Durable: cfg.consumerName, Description: cfg.description,
+		DeliverPolicy: jetstream.DeliverNewPolicy, AckPolicy: jetstream.AckExplicitPolicy,
+		AckWait: 30 * time.Second, MaxDeliver: 5, MaxAckPending: 1024,
+		FilterSubject: cfg.subject, InactiveThreshold: natsConsumerInactivePeriod,
+	})
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", cfg.ensureOp, cfg.consumerName, err)
+	}
+	consume, err := consumer.Consume(func(msg jetstream.Msg) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("NATS consume callback panicked", "subject", msg.Subject(), "consumer", cfg.consumerName, "panic", r)
+				_ = msg.NakWithDelay(time.Second)
+			}
+		}()
+		event, shouldDeliver, err := cfg.decode(msg.Data(), b.instanceID)
+		if err != nil {
+			slog.Warn(cfg.malformedLog, "subject", msg.Subject(), "err", err)
+			_ = msg.Term()
+			return
+		}
+		if !shouldDeliver {
+			if err := msg.Ack(); err != nil {
+				slog.Warn(cfg.localAckLog, "subject", msg.Subject(), "err", err)
+			}
+			return
+		}
+		handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		handlerErr := cfg.handler(handlerCtx, event)
+		cancel()
+		if handlerErr != nil {
+			attrs := []any{"err", handlerErr}
+			if cfg.logAttrs != nil {
+				attrs = append(attrs, cfg.logAttrs(event)...)
+			}
+			slog.Warn(cfg.handlerFailLog, attrs...)
+			_ = msg.NakWithDelay(time.Second)
+			return
+		}
+		if err := msg.Ack(); err != nil {
+			attrs := []any{"subject", msg.Subject(), "err", err}
+			if cfg.logAttrs != nil {
+				attrs = append(attrs, cfg.logAttrs(event)...)
+			}
+			slog.Warn(cfg.ackFailLog, attrs...)
+		}
+	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
+		slog.Warn(cfg.consumerErrLog, "err", err)
+	}))
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", cfg.startOp, cfg.consumerName, err)
+	}
+	b.mu.Lock()
+	b.consumes = append(b.consumes, consume)
+	b.mu.Unlock()
+	return nil
+}
+
 type userEventEnvelope struct {
 	OriginInstance string    `json:"origin_instance"`
 	Event          UserEvent `json:"event"`
@@ -142,10 +235,7 @@ func (b *NATSJetStreamEventBus) PublishUserEvent(ctx context.Context, event User
 		return fmt.Errorf("marshal user event: %w", err)
 	}
 	msgID := fmt.Sprintf("%d:%s:%d", event.UserID, event.Type, event.OccurredAt.UnixNano())
-	if _, err := b.js.Publish(ctx, b.userEventSubject, payload, jetstream.WithMsgID(msgID)); err != nil {
-		return fmt.Errorf("publish user event: %w", err)
-	}
-	return nil
+	return b.publishBridgeMessage(ctx, b.userEventSubject, msgID, payload, "publish user event")
 }
 
 func (b *NATSJetStreamEventBus) SubscribeUserEvents(ctx context.Context, handler UserEventHandler) error {
@@ -155,45 +245,22 @@ func (b *NATSJetStreamEventBus) SubscribeUserEvents(ctx context.Context, handler
 	if handler == nil {
 		return fmt.Errorf("subscribe user events: handler is nil")
 	}
-	consumerName := b.instanceID + "-user-events"
-	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
-		Name: consumerName, Durable: consumerName, Description: "IdeaBoard API user event fanout bridge",
-		DeliverPolicy: jetstream.DeliverNewPolicy, AckPolicy: jetstream.AckExplicitPolicy,
-		AckWait: 30 * time.Second, MaxDeliver: 5, MaxAckPending: 1024,
-		FilterSubject: b.userEventSubject, InactiveThreshold: natsConsumerInactivePeriod,
+	return subscribeNATSBridge(b, ctx, natsBridgeSubscribeConfig[UserEvent]{
+		consumerName: b.instanceID + "-user-events", subject: b.userEventSubject,
+		description:    "IdeaBoard API user event fanout bridge",
+		ensureOp:       "ensure nats user event consumer",
+		startOp:        "start nats user event consumer",
+		malformedLog:   "discard malformed user event",
+		localAckLog:    "ack local-origin user event failed",
+		handlerFailLog: "user event handler failed",
+		ackFailLog:     "ack user event failed",
+		consumerErrLog: "user event consumer error",
+		decode:         decodeUserEventForInstance,
+		handler:        handler,
+		logAttrs: func(event UserEvent) []any {
+			return []any{"user_id", event.UserID, "type", event.Type}
+		},
 	})
-	if err != nil {
-		return fmt.Errorf("ensure nats user event consumer %s: %w", consumerName, err)
-	}
-	consume, err := consumer.Consume(func(msg jetstream.Msg) {
-		event, shouldDeliver, err := decodeUserEventForInstance(msg.Data(), b.instanceID)
-		if err != nil {
-			slog.Warn("discard malformed user event", "subject", msg.Subject(), "err", err)
-			_ = msg.Term()
-			return
-		}
-		if !shouldDeliver {
-			_ = msg.Ack()
-			return
-		}
-		handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err = handler(handlerCtx, event)
-		cancel()
-		if err != nil {
-			_ = msg.NakWithDelay(time.Second)
-			return
-		}
-		_ = msg.Ack()
-	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
-		slog.Warn("user event consumer error", "err", err)
-	}))
-	if err != nil {
-		return fmt.Errorf("start nats user event consumer %s: %w", consumerName, err)
-	}
-	b.mu.Lock()
-	b.consumes = append(b.consumes, consume)
-	b.mu.Unlock()
-	return nil
 }
 
 type taskStatusEnvelope struct {
@@ -236,10 +303,7 @@ func (b *NATSJetStreamEventBus) PublishTaskStatus(ctx context.Context, event Tas
 		return fmt.Errorf("marshal task status event: %w", err)
 	}
 	msgID := fmt.Sprintf("%s:%s:%d", event.TaskID, event.Status, event.OccurredAt.UnixNano())
-	if _, err := b.js.Publish(ctx, b.taskStatusSubject, payload, jetstream.WithMsgID(msgID)); err != nil {
-		return fmt.Errorf("publish task status event: %w", err)
-	}
-	return nil
+	return b.publishBridgeMessage(ctx, b.taskStatusSubject, msgID, payload, "publish task status event")
 }
 
 func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler TaskStatusHandler) error {
@@ -250,63 +314,22 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 		return fmt.Errorf("subscribe task status: handler is nil")
 	}
 
-	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
-		Name:              b.instanceID,
-		Durable:           b.instanceID,
-		Description:       "IdeaBoard API task status fanout bridge",
-		DeliverPolicy:     jetstream.DeliverNewPolicy,
-		AckPolicy:         jetstream.AckExplicitPolicy,
-		AckWait:           30 * time.Second,
-		MaxDeliver:        5,
-		MaxAckPending:     1024,
-		FilterSubject:     b.taskStatusSubject,
-		InactiveThreshold: natsConsumerInactivePeriod,
+	return subscribeNATSBridge(b, ctx, natsBridgeSubscribeConfig[TaskStatusEvent]{
+		consumerName: b.instanceID, subject: b.taskStatusSubject,
+		description:    "IdeaBoard API task status fanout bridge",
+		ensureOp:       "ensure nats task status consumer",
+		startOp:        "start nats task status consumer",
+		malformedLog:   "discard malformed task status event",
+		localAckLog:    "ack local-origin task status event failed",
+		handlerFailLog: "task status handler failed",
+		ackFailLog:     "ack task status event failed",
+		consumerErrLog: "task status consumer error",
+		decode:         decodeTaskStatusForInstance,
+		handler:        handler,
+		logAttrs: func(event TaskStatusEvent) []any {
+			return []any{"task_id", event.TaskID, "status", event.Status}
+		},
 	})
-	if err != nil {
-		return fmt.Errorf("ensure nats task status consumer %s: %w", b.instanceID, err)
-	}
-
-	consume, err := consumer.Consume(func(msg jetstream.Msg) {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("NATS consume callback panicked", "subject", msg.Subject(), "panic", r)
-				_ = msg.NakWithDelay(time.Second)
-			}
-		}()
-		event, shouldDeliver, err := decodeTaskStatusForInstance(msg.Data(), b.instanceID)
-		if err != nil {
-			slog.Warn("discard malformed task status event", "subject", msg.Subject(), "err", err)
-			_ = msg.Term()
-			return
-		}
-		if !shouldDeliver {
-			if err := msg.Ack(); err != nil {
-				slog.Warn("ack local-origin task status event failed", "subject", msg.Subject(), "err", err)
-			}
-			return
-		}
-		handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := handler(handlerCtx, event); err != nil {
-			slog.Warn("task status handler failed", "task_id", event.TaskID, "status", event.Status, "err", err)
-			handlerCancel()
-			_ = msg.NakWithDelay(time.Second)
-			return
-		}
-		handlerCancel()
-		if err := msg.Ack(); err != nil {
-			slog.Warn("ack task status event failed", "task_id", event.TaskID, "status", event.Status, "err", err)
-		}
-	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
-		slog.Warn("task status consumer error", "err", err)
-	}))
-	if err != nil {
-		return fmt.Errorf("start nats task status consumer %s: %w", b.instanceID, err)
-	}
-
-	b.mu.Lock()
-	b.consumes = append(b.consumes, consume)
-	b.mu.Unlock()
-	return nil
 }
 
 // Workspace v1 envelopes ride the same JetStream stream (7-day MaxAge)
@@ -338,10 +361,7 @@ func (b *NATSJetStreamEventBus) PublishWorkspaceEvent(ctx context.Context, envel
 	if err != nil {
 		return fmt.Errorf("marshal workspace event: %w", err)
 	}
-	if _, err := b.js.Publish(ctx, b.workspaceSubject, payload, jetstream.WithMsgID(envelope.ID)); err != nil {
-		return fmt.Errorf("publish workspace event: %w", err)
-	}
-	return nil
+	return b.publishBridgeMessage(ctx, b.workspaceSubject, envelope.ID, payload, "publish workspace event")
 }
 
 func decodeWorkspaceEventForInstance(payload []byte, instanceID string) (V1Envelope, bool, error) {
@@ -371,45 +391,22 @@ func (b *NATSJetStreamEventBus) SubscribeWorkspaceEvents(ctx context.Context, ha
 	if handler == nil {
 		return fmt.Errorf("subscribe workspace events: handler is nil")
 	}
-	consumerName := b.instanceID + "-workspace-events"
-	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
-		Name: consumerName, Durable: consumerName, Description: "IdeaBoard API workspace event bridge",
-		DeliverPolicy: jetstream.DeliverNewPolicy, AckPolicy: jetstream.AckExplicitPolicy,
-		AckWait: 30 * time.Second, MaxDeliver: 5, MaxAckPending: 1024,
-		FilterSubject: b.workspaceSubject, InactiveThreshold: natsConsumerInactivePeriod,
+	return subscribeNATSBridge(b, ctx, natsBridgeSubscribeConfig[V1Envelope]{
+		consumerName: b.instanceID + "-workspace-events", subject: b.workspaceSubject,
+		description:    "IdeaBoard API workspace event bridge",
+		ensureOp:       "ensure nats workspace event consumer",
+		startOp:        "start nats workspace event consumer",
+		malformedLog:   "discard malformed workspace event",
+		localAckLog:    "ack local-origin workspace event failed",
+		handlerFailLog: "workspace event handler failed",
+		ackFailLog:     "ack workspace event failed",
+		consumerErrLog: "workspace event consumer error",
+		decode:         decodeWorkspaceEventForInstance,
+		handler:        handler,
+		logAttrs: func(envelope V1Envelope) []any {
+			return []any{"id", envelope.ID, "type", envelope.Type}
+		},
 	})
-	if err != nil {
-		return fmt.Errorf("ensure nats workspace event consumer %s: %w", consumerName, err)
-	}
-	consume, err := consumer.Consume(func(msg jetstream.Msg) {
-		envelope, shouldDeliver, err := decodeWorkspaceEventForInstance(msg.Data(), b.instanceID)
-		if err != nil {
-			slog.Warn("discard malformed workspace event", "subject", msg.Subject(), "err", err)
-			_ = msg.Term()
-			return
-		}
-		if !shouldDeliver {
-			_ = msg.Ack()
-			return
-		}
-		handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err = handler(handlerCtx, envelope)
-		cancel()
-		if err != nil {
-			_ = msg.NakWithDelay(time.Second)
-			return
-		}
-		_ = msg.Ack()
-	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
-		slog.Warn("workspace event consumer error", "err", err)
-	}))
-	if err != nil {
-		return fmt.Errorf("start nats workspace event consumer %s: %w", consumerName, err)
-	}
-	b.mu.Lock()
-	b.consumes = append(b.consumes, consume)
-	b.mu.Unlock()
-	return nil
 }
 
 func (b *NATSJetStreamEventBus) Close() error {

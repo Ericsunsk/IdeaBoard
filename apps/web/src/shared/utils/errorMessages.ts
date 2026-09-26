@@ -1,5 +1,3 @@
-import { i18n } from '../i18n'
-
 const SENSITIVE_VALUE_PATTERN =
   /\b(?:sk|rk|pk)_(?:live|test)_[a-z0-9_-]+\b|\bwhsec_[a-z0-9_-]+\b|\bbearer\s+[a-z0-9._~+/=-]+|\b(?:token|secret|password|cookie|authorization|api[-_\s]?key|signature|credential)\s*[:=]\s*\S+/i
 const INTERNAL_ERROR_PATTERN =
@@ -36,7 +34,7 @@ export function extractSafeApiErrorMessage(error: unknown, fallback: string): st
 
 export function sanitizeTaskErrorMessage(
   message: string | null | undefined,
-  fallback: string = i18n.global.t('canvas.task.failedGeneric'),
+  fallback: string,
 ): string {
   return sanitizeApiErrorMessage(message, fallback)
 }

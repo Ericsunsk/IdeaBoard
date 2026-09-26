@@ -26,18 +26,19 @@ function codeFixture(overrides: Record<string, unknown> = {}): Record<string, un
   }
 }
 
-function legacyOk(data: unknown): Record<string, unknown> {
-  return { code: 0, msg: 'ok', data }
+function contractOk(data: unknown): Record<string, unknown> {
+  return { data }
 }
 
-// Reward codes ride the Control Plane with the legacy `{code, msg, data}`
-// envelope; mutations carry Idempotency-Key + operator reason headers.
+// Reward codes ride the Control Plane with the unified contract envelope
+// (`{ data }` / `{ error: { code, message, request_id } }`); mutations
+// carry Idempotency-Key + operator reason headers.
 describe('AdminRewardCodeResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('searches codes through the control plane', async () => {
     transport.request.mockResolvedValue(
-      legacyOk({ reward_codes: [codeFixture()], total: 1, next_before_id: 7 }),
+      contractOk({ reward_codes: [codeFixture()], total: 1, next_before_id: 7 }),
     )
     const resource = createAdminRewardCodeResource()
 
@@ -62,7 +63,7 @@ describe('AdminRewardCodeResource', () => {
 
   it('creates a code with idempotency key and operator reason', async () => {
     transport.request.mockResolvedValue(
-      legacyOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
+      contractOk({ reward_code: codeFixture(), plaintext: 'IDEA2026', replayed: false }),
     )
     const resource = createAdminRewardCodeResource()
 
@@ -103,7 +104,7 @@ describe('AdminRewardCodeResource', () => {
 
   it('updates a code and rotates plaintext only when a code is supplied', async () => {
     transport.request.mockResolvedValue(
-      legacyOk({ reward_code: codeFixture(), plaintext: 'NEWCODE1', replayed: false }),
+      contractOk({ reward_code: codeFixture(), plaintext: 'NEWCODE1', replayed: false }),
     )
     const resource = createAdminRewardCodeResource()
 
@@ -121,7 +122,7 @@ describe('AdminRewardCodeResource', () => {
   })
 
   it('toggles enabled through the control plane with an operator reason', async () => {
-    transport.request.mockResolvedValue(legacyOk(codeFixture({ enabled: false, status: 'disabled' })))
+    transport.request.mockResolvedValue(contractOk(codeFixture({ enabled: false, status: 'disabled' })))
     const resource = createAdminRewardCodeResource()
 
     const code = await resource.setEnabled(7, false, { operatorReason: '活动结束停用' })
@@ -137,7 +138,7 @@ describe('AdminRewardCodeResource', () => {
   })
 
   it('deletes a code through the control plane with an operator reason', async () => {
-    transport.request.mockResolvedValue(legacyOk({ reward_code_id: 7 }))
+    transport.request.mockResolvedValue(contractOk({ reward_code_id: 7 }))
     const resource = createAdminRewardCodeResource()
 
     await expect(resource.delete(7, { operatorReason: '误删创建' })).resolves.toBeUndefined()

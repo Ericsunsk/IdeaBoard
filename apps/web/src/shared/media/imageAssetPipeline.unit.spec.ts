@@ -20,6 +20,12 @@ class FailingImage {
   }
 }
 
+const PIPELINE_MESSAGES = {
+  unknownError: 'Unknown test error',
+  readImageSizeSkipCompression: 'Test skipped compression',
+  compressFallbackOriginal: 'Test fell back to original',
+}
+
 describe('prepareImageAssetForUpload', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -74,6 +80,7 @@ describe('prepareImageAssetForUpload', () => {
 
       const prepared = await prepareImageAssetForUpload(draggedFile, {
         compressionPolicy: 'none',
+        messages: PIPELINE_MESSAGES,
       })
 
       expect(prepared.originalFile).toBe(draggedFile)
@@ -81,7 +88,11 @@ describe('prepareImageAssetForUpload', () => {
       expect(prepared.uploadFile.type).toBe(mime)
       expect(prepared.uploadFile.lastModified).toBe(123)
       expect(new Uint8Array(await prepared.uploadFile.arrayBuffer())).toEqual(imageBytes)
-      expect(prepared.warnings).toHaveLength(1)
+      // Warning copy is caller-supplied: the pipeline embeds the injected
+      // messages instead of resolving feature locale keys itself.
+      expect(prepared.warnings).toEqual([
+        `${PIPELINE_MESSAGES.readImageSizeSkipCompression}: ${PIPELINE_MESSAGES.unknownError}`,
+      ])
     },
   )
 
@@ -101,7 +112,10 @@ describe('prepareImageAssetForUpload', () => {
       lastModified: 456,
     })
 
-    const prepared = await prepareImageAssetForUpload(heicFile, { compressionPolicy: 'none' })
+    const prepared = await prepareImageAssetForUpload(heicFile, {
+      compressionPolicy: 'none',
+      messages: PIPELINE_MESSAGES,
+    })
 
     expect(mocks.heic2any).toHaveBeenCalledWith({
       blob: heicFile,
@@ -126,7 +140,10 @@ describe('prepareImageAssetForUpload', () => {
       type: 'application/octet-stream',
     })
 
-    const prepared = await prepareImageAssetForUpload(avifFile, { compressionPolicy: 'none' })
+    const prepared = await prepareImageAssetForUpload(avifFile, {
+      compressionPolicy: 'none',
+      messages: PIPELINE_MESSAGES,
+    })
 
     expect(prepared.uploadFile.name).toBe('generated-image.avif')
     expect(prepared.uploadFile.type).toBe('image/avif')
@@ -149,7 +166,10 @@ describe('prepareImageAssetForUpload', () => {
       { type: 'image/heif' },
     )
 
-    const prepared = await prepareImageAssetForUpload(heifFile, { compressionPolicy: 'none' })
+    const prepared = await prepareImageAssetForUpload(heifFile, {
+      compressionPolicy: 'none',
+      messages: PIPELINE_MESSAGES,
+    })
 
     expect(prepared.uploadFile.name).toBe('burst.jpg')
     expect(new Uint8Array(await prepared.uploadFile.arrayBuffer())).toEqual(
@@ -161,8 +181,8 @@ describe('prepareImageAssetForUpload', () => {
     mocks.heic2any.mockRejectedValue(new Error('decoder failed'))
     const heicFile = new File([], 'broken.heic', { type: 'image/heic' })
 
-    await expect(prepareImageAssetForUpload(heicFile)).rejects.toThrow(
-      'HEIC/HEIF image could not be converted',
-    )
+    await expect(
+      prepareImageAssetForUpload(heicFile, { messages: PIPELINE_MESSAGES }),
+    ).rejects.toThrow('HEIC/HEIF image could not be converted')
   })
 })

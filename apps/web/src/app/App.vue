@@ -23,8 +23,9 @@ import { IconoirProvider } from '@iconoir/vue'
 import { watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
+import { i18n } from '../shared/i18n'
 
-const { logoURL } = useSiteBranding()
+const { logoURL } = useSiteBranding({ fallback: i18n.global.t('account.branding.loadFailed') })
 const iconoirProps = {
   color: 'currentColor',
   width: '1.5em',

@@ -59,6 +59,7 @@ import { resolveWorkspaceMediaAssetDerivativeURL } from '../../../../../shared/a
 import { notifyUserCreditsInvalidation } from '../../../../../shared/query/userCreditsInvalidation'
 import type { TaskImageResult } from '../../../../../shared/query/taskResult'
 import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessages'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../shared/utils/workspaceId'
 import { getWorkspaceSelectionStore } from '../../../../workspace'
 import type {
   SubmitTaskData,
@@ -115,9 +116,10 @@ export function isCanvasWorkspaceTaskUnmappableError(
 
 /** Single source of truth: the `features/workspace` selection store. */
 export function requireCanvasWorkspaceId(): string {
-  const workspaceId = getWorkspaceSelectionStore().getSelectedId()
-  if (!workspaceId) throw new CanvasWorkspaceUnavailableError()
-  return workspaceId
+  return requireSharedWorkspaceId(
+    getWorkspaceSelectionStore().getSelectedId(),
+    () => new CanvasWorkspaceUnavailableError(),
+  )
 }
 
 // Task -> workspace registry: cancel needs the workspace the task was

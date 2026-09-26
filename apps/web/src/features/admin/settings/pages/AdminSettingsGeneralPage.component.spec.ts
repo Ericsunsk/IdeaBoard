@@ -18,8 +18,6 @@ describe('AdminSettingsGeneralPage', () => {
       ),
       http.get('/api/control/v1/platform/search/providers', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             providers: [
               {

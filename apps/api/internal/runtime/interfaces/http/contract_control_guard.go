@@ -118,8 +118,9 @@ type ContractControlDeps struct {
 	Monitor           *statisticshttp.Handler
 	// RewardCommands and RewardReads reuse the Rewards admin handlers
 	// under the control guard (single-sourced validation, idempotency,
-	// and error mapping; legacy envelope until the control envelope is
-	// unified). Nil keeps the reward routes fail-closed with 501.
+	// and error mapping; the control-facing render layer translates
+	// every response into the unified contract envelope). Nil keeps the
+	// reward routes fail-closed with 501.
 	RewardCommands *rewardhttp.AdminCommandHandler
 	RewardReads    *rewardhttp.AdminReadHandler
 	// OAuth is the Auth-owned social-provider seam behind the dedicated
@@ -127,8 +128,8 @@ type ContractControlDeps struct {
 	// routes fail-closed with 503.
 	OAuth ControlOAuthService
 	// BrandLogos reuses the platform brand-logo override handler under
-	// the control guard (legacy envelope); nil keeps the override
-	// routes fail-closed with 501.
+	// the control guard (translated into the unified contract envelope);
+	// nil keeps the override routes fail-closed with 501.
 	BrandLogos *adminbranding.Handler
 	// BrandingUpload stores the site branding logo file (multipart)
 	// through the Storage service; nil keeps the upload route

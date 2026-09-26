@@ -1,5 +1,4 @@
 import { adminControlUnavailable } from '../lib/controlGuidance'
-import type { ApiResponseWithData } from '../../../../shared/api/apiResponse'
 import { useQueryClient, type QueryClient } from '@tanstack/vue-query'
 import {
   replaceAdminBrandLogoOverrides,
@@ -22,9 +21,11 @@ export type AdminBrandLogoOverrideDto = {
   updated_at?: string
 }
 
-export type ApiResponseAdminBrandLogoOverrideList = ApiResponseWithData<{
-  overrides: AdminBrandLogoOverrideDto[]
-}>
+export type ApiResponseAdminBrandLogoOverrideList = {
+  data: {
+    overrides: AdminBrandLogoOverrideDto[]
+  }
+}
 
 export const ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY = ['admin', 'brand-logo-overrides'] as const
 

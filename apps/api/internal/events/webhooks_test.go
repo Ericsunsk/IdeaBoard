@@ -5,12 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
+
+type blockingWebhookPersistence struct {
+	WebhookPersistence
+	started chan struct{}
+	release chan struct{}
+	mu      sync.Mutex
+	calls   int
+}
+
+func (p *blockingWebhookPersistence) CreateSubscription(context.Context, *WebhookSubscription) error {
+	p.mu.Lock()
+	p.calls++
+	call := p.calls
+	p.mu.Unlock()
+	if call == 1 {
+		close(p.started)
+		<-p.release
+	}
+	return nil
+}
 
 type fakeWebhookSender struct {
 	status int
@@ -100,6 +121,37 @@ func TestWebhookCreateMintsSecretOnce(t *testing.T) {
 		if strings.Contains(string(raw), "provided-secret-1234") {
 			t.Fatal("secret plaintext must never appear in reads")
 		}
+	}
+}
+
+func TestWebhookCreateReservesSubscriptionCapacityAcrossConcurrentPersistence(t *testing.T) {
+	store := NewWebhookStore(&fakeWebhookSender{status: 200}, nil)
+	for index := 0; index < webhookMaxSubscriptions-1; index++ {
+		if _, _, _, err := store.Create(context.Background(), "ws_1", fmt.Sprintf("https://hooks.example.com/%d", index), nil, nil); err != nil {
+			t.Fatalf("seed subscription %d: %v", index, err)
+		}
+	}
+	persistence := &blockingWebhookPersistence{started: make(chan struct{}), release: make(chan struct{})}
+	store.SetPersistence(persistence)
+	var firstErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, _, _, firstErr = store.Create(context.Background(), "ws_1", "https://hooks.example.com/first", nil, nil)
+	}()
+	select {
+	case <-persistence.started:
+	case <-time.After(time.Second):
+		t.Fatal("first persistence call did not start")
+	}
+	if _, _, _, err := store.Create(context.Background(), "ws_1", "https://hooks.example.com/second", nil, nil); err == nil {
+		t.Fatal("concurrent create must observe the reserved subscription slot")
+	}
+	close(persistence.release)
+	wg.Wait()
+	if firstErr != nil {
+		t.Fatalf("first create: %v", firstErr)
 	}
 }
 

@@ -2,8 +2,9 @@ package httpapi
 
 // Control monitor/statistics/backfill liveness tests (#809-close). The
 // workspace-backed statistics store wires ContractControlDeps.Monitor off
-// its honest 501, so these routes must answer 200 with the legacy admin
-// shape. The nil-Monitor fail-closed path stays covered by
+// its honest 501, so these routes must answer 200 with the unified
+// contract envelope ({data} unwrapped from the legacy admin DTO at the
+// control boundary). The nil-Monitor fail-closed path stays covered by
 // TestControlUnwiredDepsFailClosed in contract_control_auth_test.go.
 
 import (

@@ -10,7 +10,7 @@ import {
   resolveModelBrandLogo,
 } from './brandLogos'
 
-const LOGO_ENDPOINT = '/api/admin/settings/ai-gateway/brand-logo'
+const LOGO_ENDPOINT = '/api/control/v1/platform/ai-gateway/brand-logo'
 
 describe('adminBrandLogos', () => {
   it('defines all major brand categories', () => {

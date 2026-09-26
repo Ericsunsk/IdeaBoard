@@ -3,7 +3,7 @@ import { BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsR
 import {
   getWorkspaceSelectionStore,
   resetWorkspaceSelectionStore,
-} from '../../../workspace/infrastructure/workspaceContext'
+} from '../../../workspace'
 import { joinSharedBoardByToken } from './joinSharedBoardWorkflow'
 
 const WORKSPACE_ID = 'ws_test123'

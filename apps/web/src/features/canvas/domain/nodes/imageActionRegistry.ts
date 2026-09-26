@@ -1,12 +1,14 @@
 import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import { workflowFeatureLabelKey } from '../../../../shared/domain/workflowFeatureRegistry'
-import { i18n } from '../../../../shared/i18n'
 import type { WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
 import {
   IMAGE_EXECUTION_MODE,
   isImageStrengthAction,
   type ImageStrengthAction,
-} from '../../application/execution'
+} from '../execution-contracts/imageActionExecution.ts'
+
+/** Copy resolver injected by the caller (application/presentation own i18n). */
+export type ImageActionCopyResolver = (labelKey: string) => string
 
 export const IMAGE_NODE_ACTION = {
   ...WORKFLOW_IMAGE_NODE_ACTION,
@@ -108,9 +110,11 @@ export type ImageActionMenuItem = {
 }
 
 /** Menu copy resolved at call time; callers invoke inside render/computed. */
-export function getImageActionMenuItems(): readonly ImageActionMenuItem[] {
+export function getImageActionMenuItems(
+  translate: ImageActionCopyResolver,
+): readonly ImageActionMenuItem[] {
   return IMAGE_ACTION_REGISTRY_LIST.map((item) => {
-    const label = i18n.global.t(item.labelKey)
+    const label = translate(item.labelKey)
     return {
       action: item.action,
       label,

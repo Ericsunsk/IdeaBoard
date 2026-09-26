@@ -172,6 +172,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { ibFormInputClass } from '../../../../shared/theme/formControls'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { useProfileFeedback } from '../../application/profile/useProfileFeedback'
@@ -233,7 +234,7 @@ function formatShanghaiDateTime(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 
 async function submitCode() {

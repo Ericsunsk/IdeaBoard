@@ -77,5 +77,16 @@ func canonicalProfileAvatarURL(raw string) string {
 	if parsed.IsAbs() && !strings.EqualFold(parsed.Host, "ideaboard.art") {
 		return trimmed
 	}
-	return "/api/user/profile/avatar/content"
+	// v1 successor (PUT /api/v1/me/avatar): avatars are served by the
+	// existing static uploads handler, so emit the uploads-static path
+	// itself instead of the deleted legacy /api/user/profile/avatar/content
+	// endpoint. The path is already owner-scoped (profile/{uid}/avatar).
+	staticPath := parsed.Path
+	if staticPath == "" {
+		return trimmed
+	}
+	if parsed.RawQuery != "" {
+		staticPath += "?" + parsed.RawQuery
+	}
+	return staticPath
 }

@@ -18,10 +18,12 @@
  * idempotency key, reason, outcome, timestamp); audit records never enter
  * the public event layer.
  *
- * Envelope: dedicated handlers render {data, meta?} success and
+ * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
- * header. Routes marked x-control-envelope: legacy proxy the legacy admin
- * handler shape under the same guard until #809 unifies envelopes.
+ * header. Proxied platform-config families translate the legacy admin
+ * DTO at the control boundary into {data} (parent #809 unified
+ * envelope); only the binary brand-logo (image/svg+xml) and the SSE
+ * monitor stream stay raw protocol exceptions, never JSON envelopes.
  *
  * Capability list (frozen): control:users, control:workspaces,
  * control:billing, control:credits, control:payments, control:platform,
@@ -60,22 +62,15 @@ import type {
   ControlRewardCodeEnabledRequest,
   ControlRewardCodeSearchRequest,
   ControlRewardCodeUpdateRequest,
-  CreateControlRewardCode200,
-  DeleteControlRewardCode200,
   ForbiddenResponse,
-  GetControlRewardRedemption200,
   IdempotencyConflictResponse,
   ListControlCreditLedgerParams,
   ListControlReconciliationFindingsParams,
   ListControlReconciliationRunsParams,
-  ListControlRewardRedemptions200,
   ListControlRewardRedemptionsParams,
   PaginatedControlLedger,
-  SearchControlRewardCodes200,
-  SetControlRewardCodeEnabled200,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
-  UpdateControlRewardCode200,
 } from '../model'
 
 import { controlMutator } from '../../../controlMutator'
@@ -1247,13 +1242,13 @@ export const getSearchControlRewardCodesUrl = () => {
 }
 
 /**
- * Reward search is a POST-body read (fuzzy name / full-code HMAC lookup cannot ride a query string), so it registers as a POST read-guard without reason or idempotency requirements. Query strings are rejected (400). Data shape is ControlRewardCodePage inside the legacy admin envelope.
+ * Reward search is a POST-body read (fuzzy name / full-code HMAC lookup cannot ride a query string), so it registers as a POST read-guard without reason or idempotency requirements. Query strings are rejected (400). Data shape is ControlRewardCodePage inside the contract envelope.
  * @summary Search reward codes (fuzzy name / full-code lookup)
  */
 export const searchControlRewardCodes = async (
   controlRewardCodeSearchRequest?: ControlRewardCodeSearchRequest,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SearchControlRewardCodes200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1273,7 +1268,7 @@ export const searchControlRewardCodes = async (
     }
     return headers
   }
-  return controlMutator<SearchControlRewardCodes200>(getSearchControlRewardCodesUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getSearchControlRewardCodesUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1357,13 +1352,13 @@ export const getCreateControlRewardCodeUrl = () => {
 }
 
 /**
- * The Idempotency-Key header is canonical; the body idempotency_key stays accepted as fallback, and a mismatch conflicts (409 reward_code_idempotency_conflict) instead of forking codes. Data shape is ControlCreatedRewardCode (reward code plus one-time plaintext) inside the legacy admin envelope.
+ * The Idempotency-Key header is the only key (header-only; the body carries no idempotency field). Key reuse with a different payload conflicts (409 reward_code_idempotency_conflict) instead of forking codes. Data shape is ControlCreatedRewardCode (reward code plus one-time plaintext) inside the contract envelope.
  * @summary Create a reward code (operator reason required)
  */
 export const createControlRewardCode = async (
   controlRewardCodeCreateRequest: ControlRewardCodeCreateRequest,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<CreateControlRewardCode200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1383,7 +1378,7 @@ export const createControlRewardCode = async (
     }
     return headers
   }
-  return controlMutator<CreateControlRewardCode200>(getCreateControlRewardCodeUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getCreateControlRewardCodeUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1474,7 +1469,7 @@ export const updateControlRewardCode = async (
   id: number,
   controlRewardCodeUpdateRequest: ControlRewardCodeUpdateRequest,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<UpdateControlRewardCode200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1494,7 +1489,7 @@ export const updateControlRewardCode = async (
     }
     return headers
   }
-  return controlMutator<UpdateControlRewardCode200>(getUpdateControlRewardCodeUrl(id), {
+  return controlMutator<ControlObjectEnvelope>(getUpdateControlRewardCodeUrl(id), {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1595,14 +1590,14 @@ export const getDeleteControlRewardCodeUrl = (id: number) => {
 }
 
 /**
- * Codes with redemptions cannot be deleted (409 reward_code_redeemed: disable them instead). Data shape is ControlDeletedRewardCode inside the legacy admin envelope.
+ * Codes with redemptions cannot be deleted (409 reward_code_redeemed: disable them instead). Data shape is ControlDeletedRewardCode inside the contract envelope.
  * @summary Delete a reward code (operator reason required)
  */
 export const deleteControlRewardCode = async (
   id: number,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<DeleteControlRewardCode200> => {
-  return controlMutator<DeleteControlRewardCode200>(getDeleteControlRewardCodeUrl(id), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getDeleteControlRewardCodeUrl(id), {
     ...options,
     method: 'DELETE',
   })
@@ -1705,7 +1700,7 @@ export const setControlRewardCodeEnabled = async (
   id: number,
   controlRewardCodeEnabledRequest: ControlRewardCodeEnabledRequest,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SetControlRewardCodeEnabled200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1725,7 +1720,7 @@ export const setControlRewardCodeEnabled = async (
     }
     return headers
   }
-  return controlMutator<SetControlRewardCodeEnabled200>(getSetControlRewardCodeEnabledUrl(id), {
+  return controlMutator<ControlObjectEnvelope>(getSetControlRewardCodeEnabledUrl(id), {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1842,21 +1837,18 @@ export const getListControlRewardRedemptionsUrl = (
 }
 
 /**
- * Data shape is ControlAdminRedemptionPage (identity-enriched redemption summaries) inside the legacy admin envelope.
+ * Data shape is ControlAdminRedemptionPage (identity-enriched redemption summaries) inside the contract envelope.
  * @summary List admin redemption reads for one reward code
  */
 export const listControlRewardRedemptions = async (
   id: number,
   params?: ListControlRewardRedemptionsParams,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlRewardRedemptions200> => {
-  return controlMutator<ListControlRewardRedemptions200>(
-    getListControlRewardRedemptionsUrl(id, params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlRewardRedemptionsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  })
 }
 
 export const getListControlRewardRedemptionsQueryKey = (
@@ -1935,21 +1927,18 @@ export const getGetControlRewardRedemptionUrl = (id: number, redemptionId: numbe
 }
 
 /**
- * Data shape is ControlAdminRedemptionDetail (identity-enriched) inside the legacy admin envelope.
+ * Data shape is ControlAdminRedemptionDetail (identity-enriched) inside the contract envelope.
  * @summary Read one admin redemption for one reward code
  */
 export const getControlRewardRedemption = async (
   id: number,
   redemptionId: number,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlRewardRedemption200> => {
-  return controlMutator<GetControlRewardRedemption200>(
-    getGetControlRewardRedemptionUrl(id, redemptionId),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlRewardRedemptionUrl(id, redemptionId), {
+    ...options,
+    method: 'GET',
+  })
 }
 
 export const getGetControlRewardRedemptionQueryKey = (

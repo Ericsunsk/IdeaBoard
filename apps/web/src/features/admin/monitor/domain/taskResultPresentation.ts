@@ -3,6 +3,7 @@ import {
   sanitizeApiErrorMessage,
   sanitizeTaskErrorMessage,
 } from '../../../../shared/utils/errorMessages'
+import { i18n } from '../../../../shared/i18n'
 import { adminTaskStatuses } from './status'
 import { getSafeTaskResultImageUrl, getSafeTaskResultImageUrls } from './taskResultImages'
 import type { AdminMonitorDetailModel, AdminMonitorListItemModel } from '../infrastructure/resource'
@@ -59,25 +60,30 @@ export function formatTaskDuration(
 
 export function getTaskSanitizedError(row: Pick<MonitorResultRow, 'status' | 'error_msg'>): string {
   if (row.status !== adminTaskStatuses.failed || !row.error_msg) return ''
-  return sanitizeTaskErrorMessage(row.error_msg)
+  return sanitizeTaskErrorMessage(row.error_msg, taskErrorFallback())
 }
 
 export function getTaskErrorReason(
   row: Pick<MonitorResultRow, 'status' | 'error_msg' | 'result'>,
 ): string {
-  if (row.error_msg) return sanitizeTaskErrorMessage(row.error_msg)
+  if (row.error_msg) return sanitizeTaskErrorMessage(row.error_msg, taskErrorFallback())
   if (!row.result) return ''
 
   const parsed = parseResultSafely(row.result)
   if (isRecord(parsed)) {
     const error = parsed.error
-    if (error) return sanitizeTaskErrorMessage(String(error))
+    if (error) return sanitizeTaskErrorMessage(String(error), taskErrorFallback())
     return ''
   }
 
   if (parsed == null && row.status === adminTaskStatuses.failed)
-    return sanitizeTaskErrorMessage(row.result)
+    return sanitizeTaskErrorMessage(row.result, taskErrorFallback())
   return ''
+}
+
+/** Fallback copy is unchanged (same key, now resolved by the caller). */
+function taskErrorFallback(): string {
+  return i18n.global.t('canvas.task.failedGeneric')
 }
 
 export function formatTaskResultSummary(result: string | null | undefined): string {

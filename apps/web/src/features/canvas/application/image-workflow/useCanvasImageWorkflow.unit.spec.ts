@@ -8,7 +8,7 @@ import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 import {
   getWorkspaceSelectionStore,
   resetWorkspaceSelectionStore,
-} from '../../../workspace/infrastructure/workspaceContext'
+} from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {

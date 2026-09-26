@@ -46,8 +46,10 @@ export function workflowFeatureLabelKey(slug: WorkflowFeature): string {
 
 export function getWorkflowFeatureImageActionText(
   slug: WorkflowFeature,
+  resolveLabel: (key: string) => string = (key) => i18n.global.t(key),
 ): WorkflowFeatureImageActionText {
   // Resolve at read time so a future locale switch does not freeze this copy at module import.
-  const label = i18n.global.t(workflowFeatureLabelKey(slug))
+  // Callers may supply their own resolver; shared never hardcodes feature copy itself.
+  const label = resolveLabel(workflowFeatureLabelKey(slug))
   return { label, title: label }
 }

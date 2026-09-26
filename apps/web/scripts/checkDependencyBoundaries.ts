@@ -129,6 +129,33 @@ const fixtureCases: BoundaryFixtureCase[] = [
     content: `import { createEmptyBoardSnapshot } from '@/features/board/domain'; console.log(createEmptyBoardSnapshot);`,
     scannerOnly: true,
   },
+  {
+    name: 'prohibits cross-feature deep imports into auth session internals',
+    expectedRule: 'no-cross-feature-deep-imports',
+    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-auth-deep.fixture.ts'),
+    content: `import { useUserStore } from '../auth/session/userSession'; console.log(useUserStore);`,
+  },
+  {
+    name: 'prohibits cross-feature deep imports into workspace infrastructure',
+    expectedRule: 'no-cross-feature-deep-imports',
+    fixtureFilePath: path.join(
+      webRoot,
+      'src/features/admin/.boundary-workspace-deep.fixture.ts',
+    ),
+    content: `import { getWorkspaceSelectionStore } from '../workspace/infrastructure/workspaceContext'; console.log(getWorkspaceSelectionStore);`,
+  },
+  {
+    name: 'prohibits cross-feature deep imports into library components',
+    expectedRule: 'no-cross-feature-deep-imports',
+    fixtureFilePath: path.join(webRoot, 'src/features/search/.boundary-library-deep.fixture.ts'),
+    content: `import LibraryFloatingIsland from '../library/components/LibraryFloatingIsland.vue'; console.log(LibraryFloatingIsland);`,
+  },
+  {
+    name: 'prohibits cross-feature deep imports into search presentation',
+    expectedRule: 'no-cross-feature-deep-imports',
+    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-search-deep.fixture.ts'),
+    content: `import { useSearchScreenRuntime } from '../search/presentation/useSearchScreenRuntime'; console.log(useSearchScreenRuntime);`,
+  },
 ]
 
 function runDepcruise(args: string[]) {

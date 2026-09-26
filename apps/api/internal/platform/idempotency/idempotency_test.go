@@ -31,27 +31,6 @@ func TestParseRejectsOversizedKey(t *testing.T) {
 	}
 }
 
-func TestResolvePrefersHeader(t *testing.T) {
-	key, err := Resolve("header-key", "")
-	if err != nil || key != "header-key" {
-		t.Fatalf("Resolve header-only = %q, %v", key, err)
-	}
-	key, err = Resolve("", "body-key")
-	if err != nil || key != "body-key" {
-		t.Fatalf("Resolve body-only = %q, %v", key, err)
-	}
-	key, err = Resolve("same", "same")
-	if err != nil || key != "same" {
-		t.Fatalf("Resolve matching = %q, %v", key, err)
-	}
-	if _, err = Resolve("header-key", "other-key"); err == nil || !IsConflict(err) {
-		t.Fatalf("Resolve mismatch = %v, want conflict", err)
-	}
-	if _, err = Resolve("", ""); err == nil || IsConflict(err) {
-		t.Fatalf("Resolve empty = %v, want missing", err)
-	}
-}
-
 func TestStoreReplaysFirstResult(t *testing.T) {
 	store := NewStore(StoreOptions{TTL: time.Hour, MaxEntries: 8})
 	store.StoreResult("scope", 7, "key-1", HashRequest("a"), map[string]string{"v": "first"})

@@ -14,18 +14,19 @@ import type {
 import {
   buildContractRequestHeaders,
   newRequestId,
+  requireContractData,
 } from '../../../../shared/api/contractKernel'
 import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 
 // Admin reward code boundary (W2 transports). Search/create/update/
 // enable/delete ride the Control Plane reward-code operations
-// (`/api/control/v1/rewards/codes*`, guarded proxies keeping the legacy
-// `{code, msg, data}` envelope). Every mutation carries a header-only
-// Idempotency-Key plus an operator reason collected through the shared
-// confirm dialog, and emits a control audit record. The deleted
-// `/api/admin/rewards/codes/*` routes are gone; this module is the
-// single transport. View types and normalizers keep their shapes so the
-// UI and specs keep working.
+// (`/api/control/v1/rewards/codes*`) with the unified contract envelope
+// (`{ data }` success / `{ error: { code, message, request_id } }`
+// errors). Every mutation carries a header-only Idempotency-Key plus an
+// operator reason collected through the shared confirm dialog, and emits
+// a control audit record. The deleted `/api/admin/rewards/codes/*` routes
+// are gone; this module is the single transport. View types and
+// normalizers keep their shapes so the UI and specs keep working.
 const RewardCodeStatus = {
   disabled: 'disabled',
   expired: 'expired',
@@ -169,7 +170,7 @@ async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardC
   const body = await searchControlRewardCodes(criteria, {
     ...(input.signal == null ? {} : { signal: input.signal }),
   })
-  const page = readLegacyData<ControlRewardCodePage>(body, '加载兑换码失败')
+  const page = requireContractData<ControlRewardCodePage>(body, '加载兑换码失败')
   if (!Array.isArray(page.reward_codes) || typeof page.total !== 'number') {
     throw controlError('control_failed', '加载兑换码失败')
   }
@@ -203,7 +204,7 @@ async function createRewardCode(
   } catch (error) {
     throw withControlCopy(error, '创建兑换码失败')
   }
-  const created = readLegacyData<ControlCreatedRewardCode>(body, '创建兑换码失败')
+  const created = requireContractData<ControlCreatedRewardCode>(body, '创建兑换码失败')
   if (!created.reward_code || !created.plaintext) {
     throw controlError('control_failed', '创建兑换码失败')
   }
@@ -246,7 +247,7 @@ async function updateRewardCode(
   } catch (error) {
     throw withControlCopy(error, '更新兑换码失败')
   }
-  const updated = readLegacyData<ControlUpdatedRewardCode>(body, '更新兑换码失败')
+  const updated = requireContractData<ControlUpdatedRewardCode>(body, '更新兑换码失败')
   if (!updated.reward_code) throw controlError('control_failed', '更新兑换码失败')
   const result: UpdatedRewardCode = { rewardCode: normalizeRewardCode(updated.reward_code) }
   if (updated.plaintext != null) result.plaintext = updated.plaintext
@@ -276,7 +277,7 @@ async function setRewardCodeEnabled(
     throw withControlCopy(error, enabled ? '启用兑换码失败' : '停用兑换码失败')
   }
   return normalizeRewardCode(
-    readLegacyData<ControlRewardCode>(body, enabled ? '启用兑换码失败' : '停用兑换码失败'),
+    requireContractData<ControlRewardCode>(body, enabled ? '启用兑换码失败' : '停用兑换码失败'),
   )
 }
 
@@ -289,7 +290,9 @@ async function deleteRewardCode(id: number, options: RewardCodeMutationOptions):
         operatorReason,
       ),
     })
-    readLegacyOk(body, '删除兑换码失败')
+    // Delete resolves `{ data: <ControlDeletedRewardCode> }`; acknowledgement
+    // only, no view mapping.
+    requireContractData<Record<string, unknown>>(body, '删除兑换码失败')
   } catch (error) {
     throw withControlCopy(error, '删除兑换码失败')
   }
@@ -340,24 +343,34 @@ function requireOperatorReason(reason: string): string {
   return trimmed
 }
 
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
+function controlError(
+  code: string,
+  message: string,
+  requestId?: string | undefined,
+): Error & { code?: string | undefined; requestId?: string | undefined } {
+  const error = new Error(message) as Error & {
+    code?: string | undefined
+    requestId?: string | undefined
+  }
   error.code = code
+  if (requestId) error.requestId = requestId
   return error
 }
 
 // withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
+// Branch on code, never on message text. request_id flows through for
+// correlation wherever the app surfaces the error.
 function withControlCopy(error: unknown, fallback: string): Error {
   const code = readErrorCode(error)
+  const requestId = readRequestId(error)
   if (code === 'idempotency_conflict' || code === 409) {
-    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+    return controlError('idempotency_conflict', '操作已提交，请勿重复操作', requestId)
   }
   if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因')
+    return controlError(code, '需要填写操作原因', requestId)
   }
   if (error instanceof Error) return error
-  return controlError('control_failed', fallback)
+  return controlError('control_failed', fallback, requestId)
 }
 
 function readErrorCode(error: unknown): string | number | undefined {
@@ -367,29 +380,18 @@ function readErrorCode(error: unknown): string | number | undefined {
   }
   if (error && typeof error === 'object' && 'status' in error) {
     const status = (error as { status?: unknown }).status
-    if (status === 409) return 409
+    if (typeof status === 'number') return status
   }
   return undefined
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-// Control reward routes keep the legacy `{ code, msg, data? }` shape: a
-// numeric `code` of 0 means success, anything else is a failure.
-function readLegacyData<T>(body: unknown, fallback: string): T {
-  if (isRecord(body) && 'code' in body) {
-    if (body.code !== 0) {
-      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
-      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
+function readRequestId(error: unknown): string | undefined {
+  if (error && typeof error === 'object') {
+    const candidate = error as { requestId?: unknown; request_id?: unknown }
+    if (typeof candidate.requestId === 'string' && candidate.requestId) return candidate.requestId
+    if (typeof candidate.request_id === 'string' && candidate.request_id) {
+      return candidate.request_id
     }
-    if (body.data == null) throw controlError('control_failed', fallback)
-    return body.data as T
   }
-  throw controlError('control_failed', fallback)
-}
-
-function readLegacyOk(body: unknown, fallback: string): void {
-  readLegacyData<unknown>(body, fallback)
+  return undefined
 }

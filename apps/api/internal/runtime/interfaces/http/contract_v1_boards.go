@@ -750,6 +750,11 @@ func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// :revision_id is the board-scoped revision_number (1-based sequence
+	// within one board), NOT the board_revisions internal_id — so the
+	// numeric shape is a formal exception to the opaque-id policy, not a
+	// DB-id leak. Lookups stay scoped to (workspace, board) and unknown
+	// numbers converge to 404.
 	revisionNumber, parseErr := strconv.ParseInt(strings.TrimSpace(c.Param("revision_id")), 10, 64)
 	if parseErr != nil || revisionNumber <= 0 {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板版本不存在")

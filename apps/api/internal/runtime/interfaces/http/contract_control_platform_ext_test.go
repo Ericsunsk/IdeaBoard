@@ -26,7 +26,9 @@ import (
 	rewardports "ideaboard/api/internal/rewards/ports"
 )
 
-// --- reward fakes (single-sourced legacy handlers, control guard) ---
+// --- reward fakes (single-sourced legacy handlers under the control
+// guard; responses translated into the contract envelope at the
+// boundary) ---
 
 type fakeRewardAdminCommands struct {
 	creates int

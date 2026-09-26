@@ -151,7 +151,7 @@ const imageNodeFixtures: Record<
   },
   'image-5': {
     display: {
-      url: '/api/user/media-assets/asset-3/original/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
       ratio: 1,
       assetId: 'asset-3',
       mediaRef: { assetId: 'asset-3', derivativeTier: 'preview' },

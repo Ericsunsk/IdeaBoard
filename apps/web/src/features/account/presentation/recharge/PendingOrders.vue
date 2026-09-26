@@ -107,6 +107,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { formatLocaleDate } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { accountPrimaryActionButtonClass } from '../common/ui'
 import type { PendingPaymentOrder } from '../../infrastructure'
 
@@ -194,6 +195,6 @@ function expiryText(item: PendingPaymentOrder) {
 }
 
 function errorMessage(error: unknown) {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

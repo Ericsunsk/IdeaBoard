@@ -21,15 +21,15 @@ const providersPayload = {
 
 // Search provider boundary contract (final cut): reads moved to the Control
 // Plane alongside the writes (header-only Idempotency-Key and an operator
-// reason). Control marks these routes `x-control-envelope: legacy`, so
-// success bodies keep the legacy `{ code, msg, data? }` shape. This spec
-// pins the adapter half: control URLs, headers, bodies, and control
-// error-code branches.
+// reason) with the unified contract envelope (`{ data }` success /
+// `{ error: { code, message, request_id } }` errors). This spec pins the
+// adapter half: control URLs, headers, bodies, and control error-code
+// branches.
 describe('searchProviderResource', () => {
   it('lists providers through the control plane route', async () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/search/providers', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: providersPayload }),
+        HttpResponse.json({ data: providersPayload }),
       ),
     )
 
@@ -51,7 +51,7 @@ describe('searchProviderResource', () => {
             operatorReason: request.headers.get('X-Operator-Reason') ?? '',
           },
         }
-        return HttpResponse.json({ code: 0, msg: 'ok' })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -72,7 +72,7 @@ describe('searchProviderResource', () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/search/providers/unsplash', ({ request }) => {
         keys.push(request.headers.get('Idempotency-Key'))
-        return HttpResponse.json({ code: 0, msg: 'ok' })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -91,8 +91,6 @@ describe('searchProviderResource', () => {
       http.post('/api/control/v1/platform/search/providers/pexels/test', ({ request }) => {
         seen = { method: request.method, operatorReason: request.headers.get('X-Operator-Reason') ?? '' }
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { provider: 'pexels', test_state: 'passed', message: 'ok' },
         })
       }),

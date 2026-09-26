@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
-import { useSearchScreenRuntime } from './useSearchScreenRuntime'
+import { useSearchScreenRuntime } from '../application/useSearchScreenRuntime'
 
 const mocks = vi.hoisted(() => ({
   authOpen: vi.fn(),

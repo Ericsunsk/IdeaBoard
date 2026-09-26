@@ -201,7 +201,7 @@ import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogSty
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import StudioName from '../../../../shared/components/StudioName.vue'

@@ -7,6 +7,10 @@ import {
   type CanvasGraphTransactionOptions,
   type CanvasGraphTransactionSummary,
 } from './canvasGraphStore'
+import {
+  noopCanvasGraphStoreTelemetry,
+  type CanvasGraphStoreTelemetry,
+} from './canvasGraphStoreTelemetry'
 
 /**
  * Owns the canonical graph for exactly one attached Canvas Board.  Flow is a
@@ -19,15 +23,23 @@ export class CanvasGraphSession {
   readonly #unsubscribeCommitListeners = new Set<() => void>()
   #disposed = false
 
-  private constructor(boardId: string, snapshot: BoardSnapshot) {
+  private constructor(
+    boardId: string,
+    snapshot: BoardSnapshot,
+    telemetry: CanvasGraphStoreTelemetry = noopCanvasGraphStoreTelemetry,
+  ) {
     const normalizedBoardId = boardId.trim()
     if (!normalizedBoardId) throw new Error('Canvas Graph Session boardId is required')
     this.boardId = normalizedBoardId
-    this.#store = CanvasGraphStore.fromSnapshot(snapshot)
+    this.#store = CanvasGraphStore.fromSnapshot(snapshot, telemetry)
   }
 
-  static hydrate(boardId: string, snapshot: BoardSnapshot): CanvasGraphSession {
-    return new CanvasGraphSession(boardId, snapshot)
+  static hydrate(
+    boardId: string,
+    snapshot: BoardSnapshot,
+    telemetry: CanvasGraphStoreTelemetry = noopCanvasGraphStoreTelemetry,
+  ): CanvasGraphSession {
+    return new CanvasGraphSession(boardId, snapshot, telemetry)
   }
 
   get store(): CanvasGraphStore {

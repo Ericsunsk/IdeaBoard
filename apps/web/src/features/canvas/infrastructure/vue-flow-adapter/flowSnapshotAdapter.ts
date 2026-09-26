@@ -1,4 +1,5 @@
 import { toRaw } from 'vue'
+import { i18n } from '../../../../shared/i18n'
 import {
   CANVAS_NODE_REGISTRY_LIST,
   createEmptyBoardSnapshot,
@@ -125,7 +126,7 @@ export function resolveFlowNodeCanvasRef(
 
 function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { title?: unknown }): string {
   const title = typeof node.title === 'string' ? node.title.trim() : ''
-  return title || getDefaultCanvasNodeTitle(nodeType)
+  return title || getDefaultCanvasNodeTitle(nodeType, (key) => i18n.global.t(key))
 }
 
 function getSnapshotNodeCollection(

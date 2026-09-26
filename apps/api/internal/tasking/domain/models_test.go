@@ -116,7 +116,7 @@ func TestTaskOutputPublicJSONUsesAssetID(t *testing.T) {
 		AssetID:      "asset_public",
 		OutputKind:   "asset",
 		Role:         "image",
-		URL:          "/api/user/media-assets/asset_public/original/content",
+		URL:          "/api/v1/workspaces/ws_public/media-assets/asset_public/content",
 	}
 
 	payload, err := json.Marshal(output)

@@ -189,19 +189,32 @@ func TestRewardCreateRequiresIdempotencyKey(t *testing.T) {
 	assertRewardMachineCode(t, recorder, http.StatusBadRequest, "reward_invalid_input")
 }
 
-func TestRewardCreateRejectsHeaderBodyMismatch(t *testing.T) {
+func TestRewardCreateRejectsBodyIdempotencyKey(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	router := newIdempotencyAdminRouter(t, NewAdminCommandHandler(service))
 
+	// Header-only: a body idempotency_key is not a fallback — strict
+	// decoding rejects it as an unknown field even with a valid header.
 	_, recorder := performRewardWriteWithKey[CreatedRewardCode](
 		t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
-			"display_name": "Mismatch", "code": "MISMATCH-2026",
+			"display_name": "Body key", "code": "BODY-KEY-2026",
 			"credit_amount": 5, "max_redemptions": 0, "idempotency_key": "body-key",
-		}, "header-key", http.StatusConflict,
+		}, "header-key", http.StatusBadRequest,
 	)
-	assertRewardMachineCode(t, recorder, http.StatusConflict, "reward_code_idempotency_conflict")
+	assertRewardMachineCode(t, recorder, http.StatusBadRequest, "reward_invalid_input")
+
+	// The same payload without the body key succeeds on the header alone.
+	created, _ := performRewardWriteWithKey[CreatedRewardCode](
+		t, router, http.MethodPost, "/admin/rewards/codes", map[string]any{
+			"display_name": "Body key", "code": "BODY-KEY-2026",
+			"credit_amount": 5, "max_redemptions": 0,
+		}, "header-key", http.StatusOK,
+	)
+	if created.RewardCode.ID <= 0 {
+		t.Fatalf("header-only create id=%d, want positive", created.RewardCode.ID)
+	}
 }
 
 func TestRewardCreateReplaysWithHeaderKey(t *testing.T) {

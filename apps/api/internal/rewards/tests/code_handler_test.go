@@ -42,17 +42,16 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		"code":            "HTTP-REWARD-2026",
 		"credit_amount":   25,
 		"max_redemptions": 0,
-		"idempotency_key": "http-reward-code-create",
 	}
-	created, createRecorder := performRewardRequestWithRecorder[CreatedRewardCode](
-		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, http.StatusOK,
+	created, createRecorder := performRewardWriteWithKey[CreatedRewardCode](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, "http-reward-code-create", http.StatusOK,
 	)
 	if createRecorder.Header().Get("Cache-Control") != "no-store" ||
 		created.Plaintext != "HTTPREWARD2026" || created.Replayed {
 		t.Fatalf("create response = %+v Cache-Control=%q", created, createRecorder.Header().Get("Cache-Control"))
 	}
-	replay, replayRecorder := performRewardRequestWithRecorder[CreatedRewardCode](
-		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, http.StatusOK,
+	replay, replayRecorder := performRewardWriteWithKey[CreatedRewardCode](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", request, "http-reward-code-create", http.StatusOK,
 	)
 	if replayRecorder.Header().Get("Cache-Control") != "no-store" ||
 		!replay.Replayed || replay.Plaintext != "" || replay.RewardCode.ID != created.RewardCode.ID {
@@ -78,17 +77,17 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		strings.Contains(exactRecorder.Body.String(), "HTTPREWARD2026") {
 		t.Fatalf("exact Code search = %+v body=%s", exactPage, exactRecorder.Body.String())
 	}
-	enabledForPagination, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+	enabledForPagination, _ := performRewardWriteWithKey[CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "HTTP 分页奖励", "code": "HTTP-PAGE-ENABLED-2026", "credit_amount": 5,
-			"max_redemptions": 0, "idempotency_key": "http-page-enabled",
-		}, http.StatusOK,
+			"max_redemptions": 0,
+		}, "http-page-enabled", http.StatusOK,
 	)
-	disabledForFilter, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+	disabledForFilter, _ := performRewardWriteWithKey[CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "HTTP 停用奖励", "code": "HTTP-PAGE-DISABLED-2026", "credit_amount": 5,
-			"max_redemptions": 0, "idempotency_key": "http-page-disabled",
-		}, http.StatusOK,
+			"max_redemptions": 0,
+		}, "http-page-disabled", http.StatusOK,
 	)
 	disabledPath := fmt.Sprintf("/admin/rewards/codes/%d/enabled", disabledForFilter.RewardCode.ID)
 	performRewardRequestWithRecorder[RewardCode](
@@ -142,10 +141,9 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		"code":            "HTTP-REWARD-2026",
 		"credit_amount":   10,
 		"max_redemptions": 0,
-		"idempotency_key": "http-reward-code-conflict",
 	}
-	_, conflictRecorder := performRewardRequestWithRecorder[struct{}](
-		t, adminRouter, http.MethodPost, "/admin/rewards/codes", conflictRequest, http.StatusConflict,
+	_, conflictRecorder := performRewardWriteWithKey[struct{}](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", conflictRequest, "http-reward-code-conflict", http.StatusConflict,
 	)
 	if conflictRecorder.Header().Get("Cache-Control") != "no-store" ||
 		strings.Contains(conflictRecorder.Body.String(), "HTTPREWARD2026") ||
@@ -191,11 +189,11 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	if rotateReplay.Replayed == nil || !*rotateReplay.Replayed || rotateReplay.Plaintext != "" {
 		t.Fatalf("rotate replay = %+v", rotateReplay)
 	}
-	temporary, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+	temporary, _ := performRewardWriteWithKey[CreatedRewardCode](
 		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
 			"display_name": "待删除", "code": "HTTP-DELETE-2026", "credit_amount": 1,
-			"max_redemptions": 0, "idempotency_key": "http-delete",
-		}, http.StatusOK,
+			"max_redemptions": 0,
+		}, "http-delete", http.StatusOK,
 	)
 	deleted, _ := performRewardRequestWithRecorder[DeletedRewardCode](
 		t, adminRouter, http.MethodDelete,

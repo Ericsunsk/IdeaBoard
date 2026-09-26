@@ -11,8 +11,6 @@ describe('feature prompt resource', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/feature-prompts', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             prompts: [makeFeaturePrompt({ prompt: 'Initial prompt' })],
           },
@@ -24,8 +22,6 @@ describe('feature prompt resource', () => {
         requests.push({ method: request.method, path: url.pathname, body })
 
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: makeFeaturePrompt({ prompt: 'Saved prompt' }),
         })
       }),

@@ -137,6 +137,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { formatAccountLocalDateTime } from '../../domain'
 import type { BillingRecordItem } from '../../infrastructure'
 import { useBillingRecords } from '../../application/billing/useBillingRecords'
@@ -208,6 +209,6 @@ function formatLocalDateTime(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return userFacingErrorCopy(error, t('account.errors.networkRetry'))
+  return userFacingErrorCopy(error, t('account.errors.networkRetry'), ACCOUNT_GUIDANCE_COPY_KEYS)
 }
 </script>

@@ -278,7 +278,7 @@ describe('renderImageRetouchFile', () => {
     )
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/user/download?url=https%3A%2F%2Fexample.com%2Fsource.png',
+      'https://example.com/source.png',
       expect.objectContaining({ credentials: 'include' }),
     )
     expect(result.name).toBe('Sample-adjusted.webp')

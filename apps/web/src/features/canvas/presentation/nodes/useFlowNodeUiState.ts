@@ -213,7 +213,7 @@ function buildPrimaryAction(
   status: FlowNodeConnectionStatus,
   isRunning: boolean,
 ) {
-  const actionLabels = getCanvasNodeExecutionActionLabels(nodeType)
+  const actionLabels = getCanvasNodeExecutionActionLabels(nodeType, (key) => i18n.global.t(key))
   if (isRunning) {
     return {
       label: actionLabels.running,
@@ -226,7 +226,9 @@ function buildPrimaryAction(
   )
   const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
   if (disconnectedPorts.length > 0) {
-    const missingLabels = disconnectedPorts.map((port) => formatCanvasNodePortLabel(port))
+    const missingLabels = disconnectedPorts.map((port) =>
+      formatCanvasNodePortLabel(port, (key) => i18n.global.t(key)),
+    )
     return {
       label:
         disconnectedPorts.length === 1
@@ -244,7 +246,9 @@ function buildPrimaryAction(
     .map((port) => port.port)
     .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
   if (pendingPorts.length > 0) {
-    const pendingLabels = pendingPorts.map((port) => formatCanvasNodePortLabel(port))
+    const pendingLabels = pendingPorts.map((port) =>
+      formatCanvasNodePortLabel(port, (key) => i18n.global.t(key)),
+    )
     return {
       label:
         pendingPorts.length === 1

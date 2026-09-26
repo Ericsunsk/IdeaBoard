@@ -139,7 +139,13 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), {
       type: blob.type || 'image/jpeg',
     })
-    const prepared = await prepareImageAssetForUpload(file)
+    const prepared = await prepareImageAssetForUpload(file, {
+      messages: {
+        unknownError: t('canvas.session.unknownError'),
+        readImageSizeSkipCompression: t('canvas.session.readImageSizeSkipCompression'),
+        compressFallbackOriginal: t('canvas.session.compressFallbackOriginal'),
+      },
+    })
     prepared.warnings.forEach((message) => warning(message))
     if (!normalizedWorkspaceId) throw new Error(t('canvas.session.uploadFailed'))
     const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedWorkspaceId)

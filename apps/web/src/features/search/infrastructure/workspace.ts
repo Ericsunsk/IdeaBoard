@@ -7,6 +7,7 @@ import {
   requireContractData,
 } from '../../../shared/api/contractKernel'
 import { i18n } from '../../../shared/i18n'
+import { assertWorkspaceId as assertSharedWorkspaceId } from '../../../shared/utils/workspaceId'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
 
 // Workspace-scoped search resource (issue #806).
@@ -35,13 +36,10 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // params in the generated URL helper. Single/empty filters ride the hook
 // wire-identical to the retired transport.
 
-const WORKSPACE_ID_RE = /^ws_[A-Za-z0-9_-]+$/
 const LIBRARY_ASSET_ID_RE = /^lasset_[A-Za-z0-9_-]+$/
 
 function assertWorkspaceId(value: string): string {
-  const trimmed = value.trim()
-  if (!WORKSPACE_ID_RE.test(trimmed)) throw new Error('Invalid workspace id: expected ws_...')
-  return trimmed
+  return assertSharedWorkspaceId(value)
 }
 
 export function assertWorkspaceLibraryAssetId(value: string): string {

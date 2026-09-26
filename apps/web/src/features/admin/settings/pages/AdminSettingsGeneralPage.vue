@@ -170,6 +170,7 @@ import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses } from '../../../../shared/lib/brandMark'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
+import { i18n } from '../../../../shared/i18n'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import SettingEditorCard from '../SettingEditorCard.vue'
@@ -340,7 +341,14 @@ async function handleLogoInputChange(event: Event) {
     return
   }
 
-  const preparedFile = await prepareImageAssetForUpload(file)
+  // Warning copy is unchanged (same keys, now resolved by the caller).
+  const preparedFile = await prepareImageAssetForUpload(file, {
+    messages: {
+      unknownError: i18n.global.t('canvas.session.unknownError'),
+      readImageSizeSkipCompression: i18n.global.t('canvas.session.readImageSizeSkipCompression'),
+      compressFallbackOriginal: i18n.global.t('canvas.session.compressFallbackOriginal'),
+    },
+  })
   pendingLogoFile.value = preparedFile.uploadFile
   logoCropDialogVisible.value = true
 }

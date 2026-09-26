@@ -15,11 +15,8 @@ import {
 import {
   buildContractRequestHeaders,
   newRequestId,
+  requireContractData,
 } from '../../../../shared/api/contractKernel'
-import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
 import type {
   AdminModelItem,
   ModelObservedSkuMargin,
@@ -30,15 +27,16 @@ import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/c
 
 // Admin AI gateway boundary (W2 transports). Reads with a Control
 // equivalent ride the Control Plane (`GET
-// /api/control/v1/platform/ai-gateway*`, guarded proxies keeping the legacy
-// envelope) through the generated hooks: catalog list, providers list,
-// connection get, model mappings list. The read-only extras moved to the
-// Control Plane the same way: route preview, model detection,
-// pricing-reference lookup, and the 7-day observation window. Writes moved
-// to the Control Plane with the same envelope (operator reason required):
-// catalog save, connection update, model mapping save, and the
-// server-side connection probe. Callers keep importing these names, never
-// generated code directly.
+// /api/control/v1/platform/ai-gateway*`, unified contract envelope
+// `{ data }` / `{ error: { code, message, request_id } }`) through the
+// generated hooks: catalog list, providers list, connection get, model
+// mappings list. The read-only extras moved to the Control Plane the same
+// way: route preview, model detection, pricing-reference lookup, and the
+// 7-day observation window. Writes moved to the Control Plane with the
+// same envelope (operator reason required; nil-ack mutations resolve
+// `{ data: {} }`): catalog save, connection update, model mapping save,
+// and the server-side connection probe. Callers keep importing these
+// names, never generated code directly.
 export type GatewayMutationOptions = {
   operatorReason: string
   idempotencyKey?: string | undefined
@@ -456,12 +454,14 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
 }
 
 async function listModelCatalog(): Promise<AdminModelItem[]> {
-  const data = await resolveApiData(
-    listControlAIGatewayCatalog() as Promise<ApiResponseWithData<GatewayModelCatalogItem[]>>,
-    '加载模型库失败',
-  )
-  if (!Array.isArray(data)) throw new Error('加载模型库失败')
-  return data.map(toAdminModelItem)
+  try {
+    const body = await listControlAIGatewayCatalog()
+    const data = requireContractData<GatewayModelCatalogItem[]>(body, '加载模型库失败')
+    if (!Array.isArray(data)) throw new Error('加载模型库失败')
+    return data.map(toAdminModelItem)
+  } catch (error) {
+    throw withControlCopy(error, '加载模型库失败')
+  }
 }
 
 async function saveModelCatalog(
@@ -474,7 +474,8 @@ async function saveModelCatalog(
       { items: items.map(toGatewayCatalogItem) },
       { headers: mutationHeaders(options, operatorReason) },
     )
-    assertLegacyOk(body, '保存模型库失败')
+    // Nil-ack mutation: success is `{ data: {} }`.
+    requireContractData<Record<string, unknown>>(body, '保存模型库失败')
   } catch (error) {
     throw withControlCopy(error, '保存模型库失败')
   }
@@ -491,14 +492,14 @@ async function previewModelRoute(input: {
   if (input.customPath != null) payload.custom_path = input.customPath
   if (input.customParams != null) payload.custom_params = input.customParams
   const body = await previewControlAIGatewayRoute(payload)
-  return readLegacyData<GatewayRoutePreview>(body, '路由透视失败')
+  return requireContractData<GatewayRoutePreview>(body, '路由透视失败')
 }
 
 async function detectGatewayModels(provider?: string): Promise<GatewayModelDetection> {
   const body = await detectControlAIGatewayModels(
     provider?.trim() ? { provider: provider.trim() } : undefined,
   )
-  const result = readLegacyData<{ models: unknown; configured_providers: unknown }>(
+  const result = requireContractData<{ models: unknown; configured_providers: unknown }>(
     body,
     '模型探测失败',
   )
@@ -512,12 +513,14 @@ async function detectGatewayModels(provider?: string): Promise<GatewayModelDetec
 }
 
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
-  const data = await resolveApiData(
-    listControlAIGatewayProviders() as Promise<ApiResponseWithData<GatewayProviderOption[]>>,
-    '加载供应商列表失败',
-  )
-  if (!Array.isArray(data)) throw new Error('加载供应商列表失败')
-  return data
+  try {
+    const body = await listControlAIGatewayProviders()
+    const data = requireContractData<GatewayProviderOption[]>(body, '加载供应商列表失败')
+    if (!Array.isArray(data)) throw new Error('加载供应商列表失败')
+    return data
+  } catch (error) {
+    throw withControlCopy(error, '加载供应商列表失败')
+  }
 }
 
 async function getModelReference(input: {
@@ -532,20 +535,27 @@ async function getModelReference(input: {
   if (input.model?.trim()) params.model = input.model.trim()
   if (input.refresh != null) params.refresh = String(input.refresh)
   const body = await getControlAIGatewayModelReference(params)
-  return toModelReferenceSnapshot(readLegacyData<Record<string, unknown>>(body, '参照价查询失败'))
+  return toModelReferenceSnapshot(
+    requireContractData<Record<string, unknown>>(body, '参照价查询失败'),
+  )
 }
 
 async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
   const body = await listControlAIGatewayModelsObserved()
-  const rows = readLegacyData<unknown>(body, '观测数据加载失败')
+  const rows = requireContractData<unknown>(body, '观测数据加载失败')
   if (!Array.isArray(rows)) throw controlError('control_failed', '观测数据加载失败')
   return rows.map(toModelObservedSnapshot)
 }
 
 async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
-  const response = await getControlAIGateway() as ApiResponseWithData<GatewayConfigSummary>
-  if (!response.data) throw new Error('AI 网关配置不存在')
-  return response.data
+  try {
+    const body = await getControlAIGateway()
+    const data = requireContractData<GatewayConfigSummary>(body, 'AI 网关配置不存在')
+    if (!data) throw new Error('AI 网关配置不存在')
+    return data
+  } catch (error) {
+    throw withControlCopy(error, 'AI 网关配置不存在')
+  }
 }
 
 async function updateGatewayConnection(
@@ -558,7 +568,8 @@ async function updateGatewayConnection(
       { ...input },
       { headers: mutationHeaders(options, operatorReason) },
     )
-    assertLegacyOk(body, '保存 AI 网关配置失败')
+    // Nil-ack mutation: success is `{ data: {} }`.
+    requireContractData<Record<string, unknown>>(body, '保存 AI 网关配置失败')
   } catch (error) {
     throw withControlCopy(error, '保存 AI 网关配置失败')
   }
@@ -588,7 +599,7 @@ async function testGatewayConnection(
   } catch (error) {
     throw withControlCopy(error, '网关连接测试失败')
   }
-  const probe = readLegacyData<{
+  const probe = requireContractData<{
     reachable: boolean
     status_code: number
     latency_ms?: number
@@ -603,14 +614,16 @@ async function testGatewayConnection(
 }
 
 async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
-  const data = await resolveApiData(
-    listControlAIGatewayModels() as Promise<ApiResponseWithData<GatewayModelMapping[]>>,
-    '加载模型映射失败',
-  )
-  return (data ?? []).map((item) => ({
-    feature: item.feature,
-    model: item.model,
-  }))
+  try {
+    const body = await listControlAIGatewayModels()
+    const data = requireContractData<GatewayModelMapping[]>(body, '加载模型映射失败')
+    return (data ?? []).map((item) => ({
+      feature: item.feature,
+      model: item.model,
+    }))
+  } catch (error) {
+    throw withControlCopy(error, '加载模型映射失败')
+  }
 }
 
 async function saveGatewayModelMapping(
@@ -625,7 +638,8 @@ async function saveGatewayModelMapping(
       { model },
       { headers: mutationHeaders(options, operatorReason) },
     )
-    assertLegacyOk(body, '保存模型映射失败')
+    // Nil-ack mutation: success is `{ data: {} }`.
+    requireContractData<Record<string, unknown>>(body, '保存模型映射失败')
   } catch (error) {
     throw withControlCopy(error, '保存模型映射失败')
   }
@@ -645,24 +659,34 @@ function requireOperatorReason(reason: string): string {
   return trimmed
 }
 
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
+function controlError(
+  code: string,
+  message: string,
+  requestId?: string | undefined,
+): Error & { code?: string | undefined; requestId?: string | undefined } {
+  const error = new Error(message) as Error & {
+    code?: string | undefined
+    requestId?: string | undefined
+  }
   error.code = code
+  if (requestId) error.requestId = requestId
   return error
 }
 
 // withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
+// Branch on code, never on message text. request_id flows through for
+// correlation wherever the app surfaces the error.
 function withControlCopy(error: unknown, fallback: string): Error {
   const code = readErrorCode(error)
+  const requestId = readRequestId(error)
   if (code === 'idempotency_conflict' || code === 409) {
-    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+    return controlError('idempotency_conflict', '操作已提交，请勿重复操作', requestId)
   }
   if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因')
+    return controlError(code, '需要填写操作原因', requestId)
   }
   if (error instanceof Error) return error
-  return controlError('control_failed', fallback)
+  return controlError('control_failed', fallback, requestId)
 }
 
 function readErrorCode(error: unknown): string | number | undefined {
@@ -672,36 +696,22 @@ function readErrorCode(error: unknown): string | number | undefined {
   }
   if (error && typeof error === 'object' && 'status' in error) {
     const status = (error as { status?: unknown }).status
-    if (status === 409) return 409
+    if (typeof status === 'number') return status
+  }
+  return undefined
+}
+
+function readRequestId(error: unknown): string | undefined {
+  if (error && typeof error === 'object') {
+    const candidate = error as { requestId?: unknown; request_id?: unknown }
+    if (typeof candidate.requestId === 'string' && candidate.requestId) return candidate.requestId
+    if (typeof candidate.request_id === 'string' && candidate.request_id) {
+      return candidate.request_id
+    }
   }
   return undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-// Control AI gateway routes keep the legacy `{ code, msg, data? }` shape:
-// a numeric `code` of 0 means success, anything else is a failure.
-function assertLegacyOk(body: unknown, fallback: string): void {
-  if (isRecord(body) && 'code' in body) {
-    if (body.code !== 0) {
-      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
-      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
-    }
-    return
-  }
-  if (!isRecord(body)) throw controlError('control_failed', fallback)
-}
-
-function readLegacyData<T>(body: unknown, fallback: string): T {
-  if (isRecord(body) && 'code' in body) {
-    if (body.code !== 0) {
-      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
-      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
-    }
-    if (body.data == null) throw controlError('control_failed', fallback)
-    return body.data as T
-  }
-  throw controlError('control_failed', fallback)
 }

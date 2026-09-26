@@ -10,8 +10,11 @@ package httpapi
 // bucket: any legacy path is a hard CI failure.
 //
 // Notes on deliberate non-bans (verified live, not legacy):
-//   - platform/response + message_safe: the shared error envelope used by
-//     every live handler (v1, control, health, static, webhook).
+//   - platform/response: survives ONLY for documented protocol exceptions
+//     (health/readiness probes, provider webhooks, static bytes, SSE
+//     framing, binary bodies, cross-cutting middleware). v1 + control JSON
+//     handlers render via platform/contract; see
+//     TestContractV1EnvelopeUnification for the v1 pin.
 //   - principal.RequireAdmin + auth.AdminMiddleware: still referenced by
 //     domain admin handlers (mail/social providers, billing, credits,
 //     payments, search catalog) whose methods the Control Plane proxies
@@ -263,6 +266,122 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			if !strings.Contains(string(raw), marker) {
 				t.Errorf("%s must contain kernel marker %q (contract kernel regression)", name, marker)
 			}
+		}
+	}
+}
+
+// TestContractV1EnvelopeUnification pins USER-RULED envelope unification
+// (parent #809, Baseline §12: delete compatibility envelopes): every v1
+// handler file (contract_v1*.go, production code) renders through
+// platform/contract ({data,meta?} / {error:{code,message,details,
+// request_id}}) and must not import the legacy platform/response
+// ({code,msg,message_safe}) envelope.
+//
+// Documented protocol exceptions keep their non-contract shape, and all of
+// them live OUTSIDE contract_v1*.go, so the allowlist below is
+// intentionally empty:
+//   - health/readiness probes: routes.go (healthResponse/readyResponse).
+//   - provider webhooks: payments webhook handler (Stripe signature
+//     protocol, infra bucket).
+//   - SSE: contract_v1_events.go streamWorkspaceEvents via sse.WriteIDEvent
+//     (framing protocol, no JSON envelope at all).
+//   - binary: contract_v1_media.go content/derivative via c.Data and
+//     renderV1BinaryError via c.String (plain bytes/status, no JSON).
+//   - static bytes: upload_static_handler.go (/uploads/*).
+//   - cross-cutting middleware (body-limit, timeout, rate-limit, recovery):
+//     routes_middleware.go, security.go, rate_limit.go, observability.go.
+// There are currently no 204 / presigned-redirect sites in v1; v1 deletes
+// return 200 {data:{deleted:...}} by contract (status semantics frozen,
+// envelope shape only).
+func TestContractV1EnvelopeUnification(t *testing.T) {
+	// Allowlist of v1 handler files permitted to import
+	// platform/response. Empty: every documented exception lives outside
+	// contract_v1*.go (see above). Additions require a protocol-exception
+	// justification in this comment.
+	allowlisted := map[string]bool{}
+	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "contract_v1") ||
+			!strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			return nil
+		}
+		if allowlisted[entry.Name()] {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if strings.Contains(string(raw), "ideaboard/api/internal/platform/response") {
+			t.Errorf("v1 handler %s imports platform/response; migrate to platform/contract Render* "+
+				"(envelope unification; documented exceptions stay outside contract_v1*.go, see allowlist above)", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk error: %v", err)
+	}
+}
+
+// TestContractControlEnvelopeUnification pins USER-RULED envelope
+// unification (parent #809, Baseline §12) for the Control Plane: every
+// control route renders the platform/contract envelope, so
+// openapi.control.yaml must not carry x-control-envelope markers anymore
+// (any reintroduced marker is a hard CI failure). The only non-JSON
+// control responses are the two documented protocol exceptions, which
+// bypass translation via controlProxyRaw: the binary brand-logo
+// (image/svg+xml) and the SSE monitor stream (text/event-stream).
+func TestContractControlEnvelopeUnification(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "openapi.control.yaml"))
+	if err != nil {
+		t.Fatalf("read openapi.control.yaml: %v", err)
+	}
+	if strings.Contains(string(raw), "x-control-envelope") {
+		t.Errorf("openapi.control.yaml must not contain x-control-envelope markers " +
+			"(control envelope is unified onto platform/contract; exceptions stay raw via controlProxyRaw, never marked)")
+	}
+	routesRaw, err := os.ReadFile("contract_control_routes.go")
+	if err != nil {
+		t.Fatalf("read contract_control_routes.go: %v", err)
+	}
+	// Exactly the two documented exception call sites; every other
+	// proxied route translates via controlProxy (the controlProxyRaw
+	// definition itself lives in contract_control_proxy_envelope.go).
+	if got := strings.Count(string(routesRaw), "controlProxyRaw("); got != 2 {
+		t.Errorf("controlProxyRaw definition + call sites = %d, want 2 (brand-logo + monitor stream)", got)
+	}
+	allowed := map[string]bool{
+		"platform.get_ai_gateway_brand_logo": false,
+		"platform.stream_monitor":            false,
+	}
+	rest := string(routesRaw)
+	for {
+		idx := strings.Index(rest, "d.controlProxyRaw(")
+		if idx < 0 {
+			break
+		}
+		window := rest[idx:]
+		if len(window) > 400 {
+			window = window[:400]
+		}
+		matched := false
+		for op := range allowed {
+			if strings.Contains(window, op) {
+				allowed[op] = true
+				matched = true
+			}
+		}
+		if !matched {
+			t.Errorf("controlProxyRaw call site outside the documented protocol exceptions " +
+				"(brand-logo binary, monitor SSE stream)")
+		}
+		rest = rest[idx+len("d.controlProxyRaw("):]
+	}
+	for op, seen := range allowed {
+		if !seen {
+			t.Errorf("documented protocol exception %s must stay on controlProxyRaw", op)
 		}
 	}
 }

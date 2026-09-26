@@ -84,6 +84,63 @@ module.exports = {
         path: '^src/features/board/(?:domain|application|infrastructure|presentation|testing)(?:/|$)',
       },
     },
+    {
+      name: 'no-cross-feature-deep-imports',
+      severity: 'error',
+      comment:
+        'Features and app layers must consume auth through its public entrypoint; session, components, pages, and root auth modules are private. (Issue #834)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/auth(?:/|$)',
+      },
+      to: {
+        path: '^src/features/auth/',
+        pathNot: '^src/features/auth/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-feature-deep-imports',
+      severity: 'error',
+      comment:
+        'Features and app layers must consume workspace through its public entrypoint (routes stay public for router chunk splitting); shell, infrastructure, layout, and pages modules are private. The single accountWorkspace exception is deliberate: the workspace entrypoint re-exports the shell, which imports account, so routing that file through the entrypoint would close a module cycle (no-circular). (Issue #834)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot:
+          '^src/features/workspace(?:/|$)|^src/features/account/application/accountWorkspace\\.ts$',
+      },
+      to: {
+        path: '^src/features/workspace/',
+        pathNot: '^src/features/workspace/(?:index\\.ts$|routes/)',
+      },
+    },
+    {
+      name: 'no-cross-feature-deep-imports',
+      severity: 'error',
+      comment:
+        'Features and app layers must consume library through its public entrypoint; every module behind the barrel is private. (Issue #834)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/library(?:/|$)',
+      },
+      to: {
+        path: '^src/features/library/',
+        pathNot: '^src/features/library/index\\.ts$',
+      },
+    },
+    {
+      name: 'no-cross-feature-deep-imports',
+      severity: 'error',
+      comment:
+        'Features and app layers must consume search through its public entrypoint; every module behind the barrel is private. (Issue #834)',
+      from: {
+        path: '^src/(?:app|features/[^/]+)(?:/|$)',
+        pathNot: '^src/features/search(?:/|$)',
+      },
+      to: {
+        path: '^src/features/search/',
+        pathNot: '^src/features/search/index\\.ts$',
+      },
+    },
   ],
   options: {
     doNotFollow: {

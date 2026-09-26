@@ -21,6 +21,7 @@ import {
 import { subscribeWorkspaceMediaInvalidation } from './workspaceEventStream'
 import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../utils/workspaceId'
 import {
   readMediaWorkspaceId,
   resetMediaWorkspaceIdResolver,
@@ -66,11 +67,10 @@ export class MediaWorkspaceUnavailableError extends Error {
 
 /** Fail-closed workspace resolution: throws before any network call when unset. */
 export function requireMediaWorkspaceId(explicit?: string | null): string {
-  const trimmed = (explicit ?? '').trim()
-  if (trimmed) return trimmed
-  const selected = readMediaWorkspaceId()
-  if (!selected) throw new MediaWorkspaceUnavailableError()
-  return selected
+  return requireSharedWorkspaceId(
+    explicit?.trim() ? explicit : readMediaWorkspaceId(),
+    () => new MediaWorkspaceUnavailableError(),
+  )
 }
 
 export type MediaAssetDeliveryVariantStatus = 'pending' | 'processing' | 'ready' | 'failed'

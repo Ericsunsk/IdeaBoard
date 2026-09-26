@@ -85,27 +85,23 @@ describe('AdminModelsPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/catalog', () => {
         // MSW 模拟的是线路格式（snake_case），与真实后端一致。
-        return HttpResponse.json({ code: 0, msg: 'ok', data: storedCatalog })
+        return HttpResponse.json({ data: storedCatalog })
       }),
       http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         const body = (await request.json()) as { items?: typeof storedCatalog }
         storedCatalog = body.items ?? storedCatalog
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
       http.get('/api/control/v1/platform/ai-gateway', () => {
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { account_id: 'cf-acc-1', gateway_id: 'gw-1', token_configured: true },
         })
       }),
       http.put('/api/control/v1/platform/ai-gateway', () => {
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
       http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: [
             { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
             { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
@@ -207,7 +203,7 @@ describe('AdminModelsPage', () => {
       http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         savedList = await request.json()
         storedCatalog = (savedList as { items: typeof storedCatalog }).items ?? storedCatalog
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 
@@ -271,7 +267,7 @@ describe('AdminModelsPage', () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         savedList = await request.json()
-        return HttpResponse.json({ code: 0, msg: 'ok', data: null })
+        return HttpResponse.json({ data: {} })
       }),
     )
 

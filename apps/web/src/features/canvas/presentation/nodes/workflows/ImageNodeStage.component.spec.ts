@@ -208,7 +208,7 @@ describe('ImageNodeStage Library import recovery', () => {
         stageWidth: 280,
         stageHeight: 280,
         displayImage: {
-          url: '/api/user/media-assets/asset_5/original/content',
+          url: '/api/v1/workspaces/ws_test123/media-assets/asset_5/content',
           assetId: 'asset_5',
         },
         active: false,

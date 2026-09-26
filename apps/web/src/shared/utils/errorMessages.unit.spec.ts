@@ -3,6 +3,7 @@ import {
   extractSafeApiErrorMessage,
   formatDisplayErrorMessage,
   sanitizeApiErrorMessage,
+  sanitizeTaskErrorMessage,
 } from './errorMessages'
 
 describe('error message helpers', () => {
@@ -46,5 +47,13 @@ describe('error message helpers', () => {
     const error = Object.assign(new Error('请求失败'), { hasSafeDisplayMessage: false })
 
     expect(formatDisplayErrorMessage(error, '加载失败')).toBe('加载失败')
+  })
+
+  it('sanitizes task errors against the caller-supplied fallback', () => {
+    expect(
+      sanitizeTaskErrorMessage('Image generation failed. Please try again.', '调用方兜底'),
+    ).toBe('Image generation failed. Please try again.')
+    expect(sanitizeTaskErrorMessage('dial tcp 127.0.0.1:5432', '调用方兜底')).toBe('调用方兜底')
+    expect(sanitizeTaskErrorMessage('', '调用方兜底')).toBe('调用方兜底')
   })
 })

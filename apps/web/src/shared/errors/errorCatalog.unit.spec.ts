@@ -26,4 +26,30 @@ describe('User-facing error catalog', () => {
       'This service is unavailable right now. Please try again later.',
     )
   })
+
+  it('resolves feature guidance codes only through a caller-supplied overlay', () => {
+    const guidance = Object.assign(new Error('Select a workspace'), {
+      code: 'workspace_selection_required',
+    })
+    expect(userFacingErrorCopy(guidance, 'Fallback')).toBe('Fallback')
+    expect(
+      userFacingErrorCopy(guidance, 'Fallback', {
+        workspace_selection_required: 'account.errors.workspaceRequired',
+      }),
+    ).toBe('Select a workspace to view billing information.')
+  })
+
+  it('lets the caller overlay take precedence over built-in codes', () => {
+    const error = Object.assign(new Error('provider raw detail'), {
+      code: 'vision_search_timeout',
+    })
+    expect(userFacingErrorCopy(error, 'Fallback')).toBe(
+      'Visual Search took too long. Please try again.',
+    )
+    expect(
+      userFacingErrorCopy(error, 'Fallback', {
+        vision_search_timeout: 'account.errors.workspaceRequired',
+      }),
+    ).toBe('Select a workspace to view billing information.')
+  })
 })

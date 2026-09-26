@@ -18,10 +18,12 @@
  * idempotency key, reason, outcome, timestamp); audit records never enter
  * the public event layer.
  *
- * Envelope: dedicated handlers render {data, meta?} success and
+ * Envelope: every route renders {data, meta?} success and
  * {error: {code, message, request_id}} errors with a Request-Id response
- * header. Routes marked x-control-envelope: legacy proxy the legacy admin
- * handler shape under the same guard until #809 unifies envelopes.
+ * header. Proxied platform-config families translate the legacy admin
+ * DTO at the control boundary into {data} (parent #809 unified
+ * envelope); only the binary brand-logo (image/svg+xml) and the SSE
+ * monitor stream stay raw protocol exceptions, never JSON envelopes.
  *
  * Capability list (frozen): control:users, control:workspaces,
  * control:billing, control:credits, control:payments, control:platform,
@@ -46,8 +48,6 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
-  ApplyControlStorageProfile200,
-  BackfillControlStatistics200,
   BackfillControlStatisticsBody,
   BadRequestResponse,
   ControlAckEnvelope,
@@ -58,57 +58,27 @@ import type {
   ControlMailTestRequest,
   ControlObjectEnvelope,
   ControlOutboundPolicyRequest,
-  CreateControlStorageProfile200,
   CreateControlStorageProfileBody,
-  DeleteControlBrandLogoOverride200,
-  DeleteControlStorageProfile200,
-  DetectControlAIGatewayModels200,
   DetectControlAIGatewayModelsParams,
   ForbiddenResponse,
-  GetControlAIGateway200,
   GetControlAIGatewayBrandLogoParams,
-  GetControlAIGatewayModelReference200,
   GetControlAIGatewayModelReferenceParams,
-  GetControlFeaturePrompt200,
-  GetControlMonitor200,
-  GetControlStatistics200,
   GetControlStatisticsParams,
-  GetControlStorageBucketInfo200,
   IdempotencyConflictResponse,
-  ListControlAIGatewayCatalog200,
-  ListControlAIGatewayModels200,
-  ListControlAIGatewayModelsObserved200,
-  ListControlAIGatewayProviders200,
-  ListControlBrandLogoOverrides200,
-  ListControlFeaturePrompts200,
-  ListControlSearchProviders200,
-  ListControlStorageProfiles200,
-  ListControlStorageProviders200,
-  PreviewControlAIGatewayRoute200,
   PreviewControlAIGatewayRouteBody,
   RateLimitedResponse,
-  SaveControlAIGatewayCatalog200,
   SaveControlAIGatewayCatalogBody,
-  SaveControlAIGatewayModel200,
   SaveControlAIGatewayModelBody,
-  SaveControlBrandLogoOverride200,
   SaveControlBrandLogoOverrideBody,
-  SaveControlFeaturePrompt200,
   SaveControlFeaturePromptBody,
-  TestControlAIGatewayConnection200,
   TestControlAIGatewayConnectionBody,
-  TestControlSearchProvider200,
-  TestControlStorageProfile200,
   UnauthorizedResponse,
-  UpdateControlAIGateway200,
   UpdateControlAIGatewayBody,
   UpdateControlBrandingSettingBody,
   UpdateControlMediaUploadSettingBody,
   UpdateControlRateLimitSettingBody,
   UpdateControlRegistrationSettingBody,
-  UpdateControlSearchProvider200,
   UpdateControlSearchProviderBody,
-  UpdateControlStorageProfile200,
   UpdateControlStorageProfileBody,
   UploadControlBrandingLogoBody,
 } from '../model'
@@ -1568,8 +1538,8 @@ export const getGetControlAIGatewayUrl = () => {
  */
 export const getControlAIGateway = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlAIGateway200> => {
-  return controlMutator<GetControlAIGateway200>(getGetControlAIGatewayUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlAIGatewayUrl(), {
     ...options,
     method: 'GET',
   })
@@ -1640,7 +1610,7 @@ export const getUpdateControlAIGatewayUrl = () => {
 export const updateControlAIGateway = async (
   updateControlAIGatewayBody: UpdateControlAIGatewayBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<UpdateControlAIGateway200> => {
+): Promise<ControlAckEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1660,7 +1630,7 @@ export const updateControlAIGateway = async (
     }
     return headers
   }
-  return controlMutator<UpdateControlAIGateway200>(getUpdateControlAIGatewayUrl(), {
+  return controlMutator<ControlAckEnvelope>(getUpdateControlAIGatewayUrl(), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1750,8 +1720,8 @@ export const getListControlAIGatewayModelsUrl = () => {
  */
 export const listControlAIGatewayModels = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlAIGatewayModels200> => {
-  return controlMutator<ListControlAIGatewayModels200>(getListControlAIGatewayModelsUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlAIGatewayModelsUrl(), {
     ...options,
     method: 'GET',
   })
@@ -1828,7 +1798,7 @@ export const saveControlAIGatewayModel = async (
   feature: string,
   saveControlAIGatewayModelBody: SaveControlAIGatewayModelBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SaveControlAIGatewayModel200> => {
+): Promise<ControlAckEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -1848,7 +1818,7 @@ export const saveControlAIGatewayModel = async (
     }
     return headers
   }
-  return controlMutator<SaveControlAIGatewayModel200>(getSaveControlAIGatewayModelUrl(feature), {
+  return controlMutator<ControlAckEnvelope>(getSaveControlAIGatewayModelUrl(feature), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -1941,8 +1911,8 @@ export const getListControlAIGatewayCatalogUrl = () => {
  */
 export const listControlAIGatewayCatalog = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlAIGatewayCatalog200> => {
-  return controlMutator<ListControlAIGatewayCatalog200>(getListControlAIGatewayCatalogUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlAIGatewayCatalogUrl(), {
     ...options,
     method: 'GET',
   })
@@ -2018,7 +1988,7 @@ export const getSaveControlAIGatewayCatalogUrl = () => {
 export const saveControlAIGatewayCatalog = async (
   saveControlAIGatewayCatalogBody: SaveControlAIGatewayCatalogBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SaveControlAIGatewayCatalog200> => {
+): Promise<ControlAckEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -2038,7 +2008,7 @@ export const saveControlAIGatewayCatalog = async (
     }
     return headers
   }
-  return controlMutator<SaveControlAIGatewayCatalog200>(getSaveControlAIGatewayCatalogUrl(), {
+  return controlMutator<ControlAckEnvelope>(getSaveControlAIGatewayCatalogUrl(), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -2129,8 +2099,8 @@ export const getListControlAIGatewayProvidersUrl = () => {
  */
 export const listControlAIGatewayProviders = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlAIGatewayProviders200> => {
-  return controlMutator<ListControlAIGatewayProviders200>(getListControlAIGatewayProvidersUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlAIGatewayProvidersUrl(), {
     ...options,
     method: 'GET',
   })
@@ -2218,14 +2188,11 @@ export const getDetectControlAIGatewayModelsUrl = (params?: DetectControlAIGatew
 export const detectControlAIGatewayModels = async (
   params?: DetectControlAIGatewayModelsParams,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<DetectControlAIGatewayModels200> => {
-  return controlMutator<DetectControlAIGatewayModels200>(
-    getDetectControlAIGatewayModelsUrl(params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getDetectControlAIGatewayModelsUrl(params), {
+    ...options,
+    method: 'GET',
+  })
 }
 
 export const getDetectControlAIGatewayModelsQueryKey = (
@@ -2320,14 +2287,11 @@ export const getGetControlAIGatewayModelReferenceUrl = (
 export const getControlAIGatewayModelReference = async (
   params?: GetControlAIGatewayModelReferenceParams,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlAIGatewayModelReference200> => {
-  return controlMutator<GetControlAIGatewayModelReference200>(
-    getGetControlAIGatewayModelReferenceUrl(params),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlAIGatewayModelReferenceUrl(params), {
+    ...options,
+    method: 'GET',
+  })
 }
 
 export const getGetControlAIGatewayModelReferenceQueryKey = (
@@ -2504,14 +2468,11 @@ export const getListControlAIGatewayModelsObservedUrl = () => {
  */
 export const listControlAIGatewayModelsObserved = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlAIGatewayModelsObserved200> => {
-  return controlMutator<ListControlAIGatewayModelsObserved200>(
-    getListControlAIGatewayModelsObservedUrl(),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlAIGatewayModelsObservedUrl(), {
+    ...options,
+    method: 'GET',
+  })
 }
 
 export const getListControlAIGatewayModelsObservedQueryKey = () => {
@@ -2585,7 +2546,7 @@ export const getPreviewControlAIGatewayRouteUrl = () => {
 export const previewControlAIGatewayRoute = async (
   previewControlAIGatewayRouteBody: PreviewControlAIGatewayRouteBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<PreviewControlAIGatewayRoute200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -2605,7 +2566,7 @@ export const previewControlAIGatewayRoute = async (
     }
     return headers
   }
-  return controlMutator<PreviewControlAIGatewayRoute200>(getPreviewControlAIGatewayRouteUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getPreviewControlAIGatewayRouteUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -2698,7 +2659,7 @@ export const getTestControlAIGatewayConnectionUrl = () => {
 export const testControlAIGatewayConnection = async (
   testControlAIGatewayConnectionBody: TestControlAIGatewayConnectionBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<TestControlAIGatewayConnection200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -2718,7 +2679,7 @@ export const testControlAIGatewayConnection = async (
     }
     return headers
   }
-  return controlMutator<TestControlAIGatewayConnection200>(getTestControlAIGatewayConnectionUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getTestControlAIGatewayConnectionUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -2811,8 +2772,8 @@ export const getListControlStorageProvidersUrl = () => {
  */
 export const listControlStorageProviders = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlStorageProviders200> => {
-  return controlMutator<ListControlStorageProviders200>(getListControlStorageProvidersUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlStorageProvidersUrl(), {
     ...options,
     method: 'GET',
   })
@@ -2887,8 +2848,8 @@ export const getListControlStorageProfilesUrl = () => {
  */
 export const listControlStorageProfiles = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlStorageProfiles200> => {
-  return controlMutator<ListControlStorageProfiles200>(getListControlStorageProfilesUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlStorageProfilesUrl(), {
     ...options,
     method: 'GET',
   })
@@ -2964,7 +2925,7 @@ export const getCreateControlStorageProfileUrl = () => {
 export const createControlStorageProfile = async (
   createControlStorageProfileBody: CreateControlStorageProfileBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<CreateControlStorageProfile200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -2984,7 +2945,7 @@ export const createControlStorageProfile = async (
     }
     return headers
   }
-  return controlMutator<CreateControlStorageProfile200>(getCreateControlStorageProfileUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getCreateControlStorageProfileUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -3077,7 +3038,7 @@ export const updateControlStorageProfile = async (
   id: string,
   updateControlStorageProfileBody: UpdateControlStorageProfileBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<UpdateControlStorageProfile200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -3097,7 +3058,7 @@ export const updateControlStorageProfile = async (
     }
     return headers
   }
-  return controlMutator<UpdateControlStorageProfile200>(getUpdateControlStorageProfileUrl(id), {
+  return controlMutator<ControlObjectEnvelope>(getUpdateControlStorageProfileUrl(id), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -3192,8 +3153,8 @@ export const getDeleteControlStorageProfileUrl = (id: string) => {
 export const deleteControlStorageProfile = async (
   id: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<DeleteControlStorageProfile200> => {
-  return controlMutator<DeleteControlStorageProfile200>(getDeleteControlStorageProfileUrl(id), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getDeleteControlStorageProfileUrl(id), {
     ...options,
     method: 'DELETE',
   })
@@ -3283,8 +3244,8 @@ export const getApplyControlStorageProfileUrl = (id: string) => {
 export const applyControlStorageProfile = async (
   id: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ApplyControlStorageProfile200> => {
-  return controlMutator<ApplyControlStorageProfile200>(getApplyControlStorageProfileUrl(id), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getApplyControlStorageProfileUrl(id), {
     ...options,
     method: 'POST',
   })
@@ -3374,8 +3335,8 @@ export const getTestControlStorageProfileUrl = (id: string) => {
 export const testControlStorageProfile = async (
   id: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<TestControlStorageProfile200> => {
-  return controlMutator<TestControlStorageProfile200>(getTestControlStorageProfileUrl(id), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getTestControlStorageProfileUrl(id), {
     ...options,
     method: 'POST',
   })
@@ -3464,8 +3425,8 @@ export const getGetControlStorageBucketInfoUrl = (id: string) => {
 export const getControlStorageBucketInfo = async (
   id: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlStorageBucketInfo200> => {
-  return controlMutator<GetControlStorageBucketInfo200>(getGetControlStorageBucketInfoUrl(id), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlStorageBucketInfoUrl(id), {
     ...options,
     method: 'GET',
   })
@@ -3545,8 +3506,8 @@ export const getListControlSearchProvidersUrl = () => {
  */
 export const listControlSearchProviders = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlSearchProviders200> => {
-  return controlMutator<ListControlSearchProviders200>(getListControlSearchProvidersUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlSearchProvidersUrl(), {
     ...options,
     method: 'GET',
   })
@@ -3623,7 +3584,7 @@ export const updateControlSearchProvider = async (
   provider: string,
   updateControlSearchProviderBody: UpdateControlSearchProviderBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<UpdateControlSearchProvider200> => {
+): Promise<ControlAckEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -3643,15 +3604,12 @@ export const updateControlSearchProvider = async (
     }
     return headers
   }
-  return controlMutator<UpdateControlSearchProvider200>(
-    getUpdateControlSearchProviderUrl(provider),
-    {
-      ...options,
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-      body: JSON.stringify(updateControlSearchProviderBody),
-    },
-  )
+  return controlMutator<ControlAckEnvelope>(getUpdateControlSearchProviderUrl(provider), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateControlSearchProviderBody),
+  })
 }
 
 export const getUpdateControlSearchProviderMutationKey = () =>
@@ -3741,8 +3699,8 @@ export const getTestControlSearchProviderUrl = (provider: string) => {
 export const testControlSearchProvider = async (
   provider: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<TestControlSearchProvider200> => {
-  return controlMutator<TestControlSearchProvider200>(getTestControlSearchProviderUrl(provider), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getTestControlSearchProviderUrl(provider), {
     ...options,
     method: 'POST',
   })
@@ -3830,8 +3788,8 @@ export const getListControlFeaturePromptsUrl = () => {
  */
 export const listControlFeaturePrompts = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlFeaturePrompts200> => {
-  return controlMutator<ListControlFeaturePrompts200>(getListControlFeaturePromptsUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlFeaturePromptsUrl(), {
     ...options,
     method: 'GET',
   })
@@ -3907,8 +3865,8 @@ export const getGetControlFeaturePromptUrl = (slug: string) => {
 export const getControlFeaturePrompt = async (
   slug: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlFeaturePrompt200> => {
-  return controlMutator<GetControlFeaturePrompt200>(getGetControlFeaturePromptUrl(slug), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlFeaturePromptUrl(slug), {
     ...options,
     method: 'GET',
   })
@@ -3991,7 +3949,7 @@ export const saveControlFeaturePrompt = async (
   slug: string,
   saveControlFeaturePromptBody: SaveControlFeaturePromptBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SaveControlFeaturePrompt200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -4011,7 +3969,7 @@ export const saveControlFeaturePrompt = async (
     }
     return headers
   }
-  return controlMutator<SaveControlFeaturePrompt200>(getSaveControlFeaturePromptUrl(slug), {
+  return controlMutator<ControlObjectEnvelope>(getSaveControlFeaturePromptUrl(slug), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -4104,8 +4062,8 @@ export const getGetControlMonitorUrl = () => {
  */
 export const getControlMonitor = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlMonitor200> => {
-  return controlMutator<GetControlMonitor200>(getGetControlMonitorUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlMonitorUrl(), {
     ...options,
     method: 'GET',
   })
@@ -4171,7 +4129,7 @@ export const getStreamControlMonitorUrl = () => {
 }
 
 /**
- * Global monitor snapshot stream (snapshot every 10s, closes after the max connection period with a close event). Read-guard so the long-lived stream is never body-buffered; the audit record emits on disconnect with the terminal status. Setup failures render the legacy admin shape; the stream itself is text/event-stream, never a JSON envelope.
+ * Global monitor snapshot stream (snapshot every 10s, closes after the max connection period with a close event). Read-guard so the long-lived stream is never body-buffered; the audit record emits on disconnect with the terminal status. Setup failures render the contract error envelope; the stream itself is text/event-stream, never a JSON envelope.
  * @summary Stream the runtime monitor snapshot (SSE)
  */
 export const streamControlMonitor = async (
@@ -4263,8 +4221,8 @@ export const getGetControlStatisticsUrl = (params?: GetControlStatisticsParams) 
 export const getControlStatistics = async (
   params?: GetControlStatisticsParams,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<GetControlStatistics200> => {
-  return controlMutator<GetControlStatistics200>(getGetControlStatisticsUrl(params), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getGetControlStatisticsUrl(params), {
     ...options,
     method: 'GET',
   })
@@ -4345,7 +4303,7 @@ export const getBackfillControlStatisticsUrl = () => {
 export const backfillControlStatistics = async (
   backfillControlStatisticsBody?: BackfillControlStatisticsBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<BackfillControlStatistics200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -4365,7 +4323,7 @@ export const backfillControlStatistics = async (
     }
     return headers
   }
-  return controlMutator<BackfillControlStatistics200>(getBackfillControlStatisticsUrl(), {
+  return controlMutator<ControlObjectEnvelope>(getBackfillControlStatisticsUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -4451,13 +4409,13 @@ export const getListControlBrandLogoOverridesUrl = () => {
 }
 
 /**
- * Data shape is ControlBrandLogoOverrideList ({overrides: ControlBrandLogoOverride[]}) inside the legacy admin envelope.
+ * Data shape is ControlBrandLogoOverrideList ({overrides: ControlBrandLogoOverride[]}) inside the contract envelope.
  * @summary List brand logo overrides
  */
 export const listControlBrandLogoOverrides = async (
   options?: Parameters<typeof controlMutator>[1],
-): Promise<ListControlBrandLogoOverrides200> => {
-  return controlMutator<ListControlBrandLogoOverrides200>(getListControlBrandLogoOverridesUrl(), {
+): Promise<ControlObjectEnvelope> => {
+  return controlMutator<ControlObjectEnvelope>(getListControlBrandLogoOverridesUrl(), {
     ...options,
     method: 'GET',
   })
@@ -4531,7 +4489,7 @@ export const getSaveControlBrandLogoOverrideUrl = (
 }
 
 /**
- * Body carries {logo_key}; the scope-qualified key (scope plus target_key) is the audited target. Data shape is ControlBrandLogoOverride inside the legacy admin envelope.
+ * Body carries {logo_key}; the scope-qualified key (scope plus target_key) is the audited target. Data shape is ControlBrandLogoOverride inside the contract envelope.
  * @summary Upsert a brand logo override (operator reason required)
  */
 export const saveControlBrandLogoOverride = async (
@@ -4539,7 +4497,7 @@ export const saveControlBrandLogoOverride = async (
   targetKey: string,
   saveControlBrandLogoOverrideBody: SaveControlBrandLogoOverrideBody,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<SaveControlBrandLogoOverride200> => {
+): Promise<ControlObjectEnvelope> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -4559,7 +4517,7 @@ export const saveControlBrandLogoOverride = async (
     }
     return headers
   }
-  return controlMutator<SaveControlBrandLogoOverride200>(
+  return controlMutator<ControlObjectEnvelope>(
     getSaveControlBrandLogoOverrideUrl(scope, targetKey),
     {
       ...options,
@@ -4662,8 +4620,8 @@ export const deleteControlBrandLogoOverride = async (
   scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
   targetKey: string,
   options?: Parameters<typeof controlMutator>[1],
-): Promise<DeleteControlBrandLogoOverride200> => {
-  return controlMutator<DeleteControlBrandLogoOverride200>(
+): Promise<ControlAckEnvelope> => {
+  return controlMutator<ControlAckEnvelope>(
     getDeleteControlBrandLogoOverrideUrl(scope, targetKey),
     {
       ...options,

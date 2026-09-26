@@ -36,6 +36,15 @@ const (
 	PrefixLibraryFolder          = "lfolder_"
 	PrefixLibraryAsset           = "lasset_"
 	PrefixLibraryMaterialization = "lmat_"
+	// Rewards + reconciliation opaque prefixes (parent #809 residue).
+	// Reserved for the migration that moves reward codes, reward
+	// redemptions, and reconciliation runs off numeric DB ids (see the
+	// exception notes on the current numeric parse sites). Mint only
+	// after the public_id columns land; until then these prefixes MUST
+	// NOT appear on the wire.
+	PrefixRewardCode        = "rwd_"
+	PrefixRewardRedemption  = "rdm_"
+	PrefixReconciliationRun = "rec_"
 )
 
 // knownPrefixes lists every kernel prefix for PrefixOf.
@@ -52,6 +61,9 @@ var knownPrefixes = []string{
 	PrefixLibraryFolder,
 	PrefixLibraryAsset,
 	PrefixLibraryMaterialization,
+	PrefixRewardCode,
+	PrefixRewardRedemption,
+	PrefixReconciliationRun,
 }
 
 // IsValidPublicID reports whether id carries prefix with a non-empty
@@ -113,6 +125,22 @@ func IsLibraryAssetID(id string) bool { return IsValidPublicID(PrefixLibraryAsse
 func IsLibraryMaterializationID(id string) bool {
 	return IsValidPublicID(PrefixLibraryMaterialization, id)
 }
+
+// IsRewardCodeID reports whether id is a well-formed rwd_ identifier.
+// Reserved for the rewards opaque-id migration; the current numeric
+// :id parse sites still resolve bigint ids until the public_id
+// columns land (see requireAdminRewardCode).
+func IsRewardCodeID(id string) bool { return IsValidPublicID(PrefixRewardCode, id) }
+
+// IsRewardRedemptionID reports whether id is a well-formed rdm_ identifier.
+// Reserved for the rewards opaque-id migration (see GetAdminRedemption).
+func IsRewardRedemptionID(id string) bool { return IsValidPublicID(PrefixRewardRedemption, id) }
+
+// IsReconciliationRunID reports whether id is a well-formed rec_ identifier.
+// Reserved for the reconciliation opaque-id migration (see
+// getControlReconciliationRun); the current :run_id stays numeric by
+// formal exception until the public_id column lands.
+func IsReconciliationRunID(id string) bool { return IsValidPublicID(PrefixReconciliationRun, id) }
 
 // MintPublicID mints an opaque public identifier with the given prefix and
 // nbytes of crypto randomness (hex-encoded). It is the single mint behind

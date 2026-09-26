@@ -40,7 +40,9 @@ describe('runtime URL helpers', () => {
     const { API_BASE_URL, resolveApiUrl, resolveAssetUrl } = await import('./runtimeUrls')
 
     expect(API_BASE_URL).toBe('/api')
-    expect(resolveApiUrl('/user/tasks')).toBe('/api/user/tasks')
+    expect(resolveApiUrl('/v1/workspaces/ws_test123/tasks')).toBe(
+      '/api/v1/workspaces/ws_test123/tasks',
+    )
     expect(resolveAssetUrl('/uploads/image.png')).toBe('/uploads/image.png')
   })
 

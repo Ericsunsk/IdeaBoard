@@ -1,24 +1,22 @@
 import { useQuery } from '@tanstack/vue-query'
 import { type MaybeRef, type MaybeRefOrGetter } from 'vue'
-import {
-  createApiDataSelector,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { getControlMonitor } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
 import type { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
 
 // Admin monitor/task boundary (W2 transports, partial fail-closed). The
 // runtime snapshot rides the Control Plane (`GET
-// /api/control/v1/platform/monitor`, a guarded proxy keeping the legacy
-// envelope) through the generated `getControlMonitor` hook, with view
-// types untouched. The task list/detail/cancel transports have no
-// equivalent Control read model (the control task dialect is a thin
-// `task_id/status/feature` projection and its routes fail closed
-// server-side until the workspace task read model lands), so they fail
-// closed with guidance instead of calling the deleted
+// /api/control/v1/platform/monitor`, unified contract envelope `{ data }` /
+// `{ error: { code, message, request_id } }`) through the generated
+// `getControlMonitor` hook, with view types untouched. The task
+// list/detail/cancel transports have no equivalent Control read model (the
+// control task dialect is a thin `task_id/status/feature` projection and
+// its routes fail closed server-side until the workspace task read model
+// lands), so they fail closed with guidance instead of calling the deleted
 // `/api/admin/tasks*` routes. Backend gaps: control task read model +
-// global monitor stream (see the stream report).
+// global monitor stream (see the stream report). The SSE monitor stream
+// stays a raw protocol exception, never a JSON envelope.
 export type ListAdminTasksParams = {
   status?: ListAdminTasksStatus
   user_public_id?: string
@@ -216,7 +214,7 @@ export type MonitorResponse = {
   stats: MonitorStats
 }
 
-export type ApiResponseMonitor = ApiResponseWithData<MonitorResponse>
+export type ApiResponseMonitor = { data: MonitorResponse }
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
 export type AdminMonitorDetailModel = AdminMonitorDetail
@@ -236,16 +234,26 @@ type NestedQueryOptions<TQueryFnData> = {
   }
 }
 
-const selectAdminTaskList = createApiDataSelector<ApiResponseAdminTaskListData>('加载任务列表失败')
-const selectAdminTaskDetail = createApiDataSelector<ApiResponseAdminTaskData>('加载任务详情失败')
-const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控数据失败')
+function selectAdminTaskList(
+  response: { data: ApiResponseAdminTaskListData },
+): ApiResponseAdminTaskListData {
+  return requireContractData<ApiResponseAdminTaskListData>(response, '加载任务列表失败')
+}
+function selectAdminTaskDetail(
+  response: { data: ApiResponseAdminTaskData },
+): ApiResponseAdminTaskData {
+  return requireContractData<ApiResponseAdminTaskData>(response, '加载任务详情失败')
+}
+function selectAdminMonitor(response: ApiResponseMonitor): MonitorResponse {
+  return requireContractData<MonitorResponse>(response, '加载监控数据失败')
+}
 
 export function useAdminTaskListResource(
   params: MaybeRef<AdminTaskListQueryParams>,
-  options?: NestedQueryOptions<ApiResponseWithData<ApiResponseAdminTaskListData>>,
+  options?: NestedQueryOptions<{ data: ApiResponseAdminTaskListData }>,
 ) {
   return useQuery<
-    ApiResponseWithData<ApiResponseAdminTaskListData>,
+    { data: ApiResponseAdminTaskListData },
     Error,
     ApiResponseAdminTaskListData
   >({
@@ -279,15 +287,15 @@ export function getAdminMonitorQueryKey() {
 }
 
 export function useAdminMonitorResource(
-  options?: NestedQueryOptions<ApiResponseWithData<MonitorResponse>>,
+  options?: NestedQueryOptions<ApiResponseMonitor>,
 ) {
-  return useQuery<ApiResponseWithData<MonitorResponse>, Error, MonitorResponse>({
+  return useQuery<ApiResponseMonitor, Error, MonitorResponse>({
     ...(options?.query ?? {}),
     queryKey: ADMIN_MONITOR_QUERY_KEY,
     queryFn: ({ signal }) =>
       getControlMonitor({
         ...(signal == null ? {} : { signal }),
-      }) as Promise<ApiResponseWithData<MonitorResponse>>,
+      }) as Promise<ApiResponseMonitor>,
     select: selectAdminMonitor,
   })
 }
@@ -298,10 +306,10 @@ export async function cancelAdminTaskByID(_taskID: string): Promise<void> {
 
 export function useAdminTaskDetailResource(
   taskID: MaybeRef<string>,
-  options?: NestedQueryOptions<ApiResponseWithData<ApiResponseAdminTaskData>>,
+  options?: NestedQueryOptions<{ data: ApiResponseAdminTaskData }>,
 ) {
   return useQuery<
-    ApiResponseWithData<ApiResponseAdminTaskData>,
+    { data: ApiResponseAdminTaskData },
     Error,
     ApiResponseAdminTaskData
   >({

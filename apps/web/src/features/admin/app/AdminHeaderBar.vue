@@ -193,7 +193,7 @@ import {
   Xmark,
 } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
-import { useUserStore } from '../../auth/session/userSession'
+import { useUserStore } from '../../auth'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useAnomalyRadar } from '../shared/composables/useAnomalyRadar'
 import { useAdminToast } from '../shared/lib/toast'

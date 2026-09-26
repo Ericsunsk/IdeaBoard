@@ -11,7 +11,7 @@ import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import {
   getWorkspaceSelectionStore,
   resetWorkspaceSelectionStore,
-} from '../../../workspace/infrastructure/workspaceContext'
+} from '../../../workspace'
 import { BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
 import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persistence'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'

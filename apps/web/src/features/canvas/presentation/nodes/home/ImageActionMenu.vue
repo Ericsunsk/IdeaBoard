@@ -100,7 +100,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const actionMenuItems = computed(() => getImageActionMenuItems())
+const actionMenuItems = computed(() => getImageActionMenuItems((key) => t(key)))
 const showStrengthControl = computed(() => props.strengthControl.visible)
 const billingStore = useCanvasBillingReadinessStore()
 const actionMenuMotion = createPopoverMotionTransition()

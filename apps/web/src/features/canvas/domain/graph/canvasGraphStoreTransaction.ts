@@ -1,5 +1,5 @@
-import { toRaw } from 'vue'
 import type { CanvasConnection, CanvasNodeItem } from '../../../board'
+import { cloneJsonValue } from './canvasGraphClone'
 import {
   addEdgeToIndexes,
   addGroupToIndexes,
@@ -18,9 +18,6 @@ import {
 
 let transactionSequence = 0
 
-function cloneJson<T>(value: T): T {
-  return structuredClone(toRaw(value) as T)
-}
 import {
   toCanvasGraphEdgeId,
   toCanvasGraphGroupId,
@@ -238,9 +235,9 @@ export function normalizeTransactionChanges(
 }
 
 function applyNodeUpdate(current: CanvasNodeItem, update: CanvasGraphNodeUpdate): CanvasNodeItem {
-  if (typeof update === 'function') return cloneJson(update(cloneJson(current)))
+  if (typeof update === 'function') return cloneJsonValue(update(cloneJsonValue(current)))
   return {
-    ...cloneJson(current),
+    ...cloneJsonValue(current),
     ...update,
     id: current.id,
     type: current.type,
@@ -506,7 +503,7 @@ export class CanvasGraphTransaction {
     this.draft.nodeWrites.set(id, {
       id,
       kind,
-      snapshot: cloneJson(node),
+      snapshot: cloneJsonValue(node),
       selected: false,
     })
     const order = this.ensureNodeOrder()
@@ -622,7 +619,7 @@ export class CanvasGraphTransaction {
     this.assertConnectionEndpointsExist(connection)
     this.draft.edgeWrites.set(id, {
       id,
-      connection: cloneJson(connection),
+      connection: cloneJsonValue(connection),
       selected: false,
     })
     const order = this.ensureEdgeOrder()

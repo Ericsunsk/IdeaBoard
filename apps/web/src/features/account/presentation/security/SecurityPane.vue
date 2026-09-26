@@ -253,10 +253,11 @@ import {
   ibFormInputErrorClass,
 } from '../../../../shared/theme/formControls'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
+import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
 import { usePasswordChange } from '../../application/security/usePasswordChange'
 import AccountPane from '../common/AccountPane.vue'
 import { accountPrimaryActionButtonClass } from '../common/ui'
@@ -302,7 +303,13 @@ async function handleRequestEmailChange() {
       feedback: {
         success: () => appToast.success(t('account.security.toast.verificationCodeSent')),
         error: (error) =>
-          appToast.error(userFacingErrorCopy(error, t('account.security.toast.sendCodeFailed'))),
+          appToast.error(
+            userFacingErrorCopy(
+              error,
+              t('account.security.toast.sendCodeFailed'),
+              ACCOUNT_GUIDANCE_COPY_KEYS,
+            ),
+          ),
       },
     },
   )
@@ -321,7 +328,13 @@ async function handleConfirmEmailChange() {
       feedback: {
         success: () => appToast.success(t('account.security.toast.emailUpdated')),
         error: (error) =>
-          appToast.error(userFacingErrorCopy(error, t('account.security.toast.emailUpdateFailed'))),
+          appToast.error(
+            userFacingErrorCopy(
+              error,
+              t('account.security.toast.emailUpdateFailed'),
+              ACCOUNT_GUIDANCE_COPY_KEYS,
+            ),
+          ),
       },
     },
   )

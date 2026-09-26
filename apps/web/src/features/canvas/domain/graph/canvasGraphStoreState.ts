@@ -1,11 +1,10 @@
-import { toRaw } from 'vue'
 import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type CanvasGroup,
   type CanvasNodeItem,
 } from '../../../board'
-import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe'
+import { cloneJsonValue } from './canvasGraphClone'
 import { toCanvasGraphEdgeId, toCanvasGraphNodeId } from './canvasGraphStoreIds'
 import { rebuildIndexes } from './canvasGraphStoreIndexes'
 import type {
@@ -18,10 +17,6 @@ import type {
   CanvasGraphNodeRecord,
   CanvasGraphStoreState,
 } from './canvasGraphStoreTypes'
-
-function cloneJson<T>(value: T): T {
-  return structuredClone(toRaw(value) as T)
-}
 
 export function getNodeKind(node: CanvasNodeItem): CanvasGraphNodeKind {
   return node.type === 'image-node' ? 'image' : node.type
@@ -63,7 +58,7 @@ export function cloneNodeRecord(record: CanvasGraphNodeRecord): CanvasGraphNodeR
   return {
     id: record.id,
     kind: record.kind,
-    snapshot: cloneJson(record.snapshot),
+    snapshot: cloneJsonValue(record.snapshot),
     selected: record.selected,
   }
 }
@@ -71,7 +66,7 @@ export function cloneNodeRecord(record: CanvasGraphNodeRecord): CanvasGraphNodeR
 export function cloneEdgeRecord(record: CanvasGraphEdgeRecord): CanvasGraphEdgeRecord {
   return {
     id: record.id,
-    connection: cloneJson(record.connection),
+    connection: cloneJsonValue(record.connection),
     selected: record.selected,
   }
 }
@@ -87,7 +82,7 @@ export function cloneGroupRecord(record: CanvasGraphGroupRecord): CanvasGraphGro
   }
 }
 
-function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState {
+export function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState {
   const nodesById = new Map<CanvasGraphNodeId, CanvasGraphNodeRecord>()
   const edgesById = new Map<CanvasGraphEdgeId, CanvasGraphEdgeRecord>()
   const groupsById = new Map<CanvasGraphGroupId, CanvasGraphGroupRecord>()
@@ -102,7 +97,7 @@ function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState
     nodesById.set(id, {
       id,
       kind,
-      snapshot: cloneJson(node),
+      snapshot: cloneJsonValue(node),
       selected: false,
     })
     nodeOrder.push(id)
@@ -120,7 +115,7 @@ function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState
     if (edgesById.has(id)) continue
     edgesById.set(id, {
       id,
-      connection: cloneJson(connection),
+      connection: cloneJsonValue(connection),
       selected: false,
     })
     edgeOrder.push(id)
@@ -153,18 +148,6 @@ function createStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState
   return createState(nodesById, edgesById, groupsById, nodeOrder, edgeOrder, groupOrder)
 }
 
-export function createMeasuredStateFromSnapshot(snapshot: BoardSnapshot): CanvasGraphStoreState {
-  return measureCanvasPerf(
-    'graph-store.hydrate',
-    () => ({
-      nodes: snapshot.imageNodes.length + snapshot.promptNodes.length + snapshot.fusionNodes.length,
-      edges: snapshot.connections.length,
-      groups: snapshot.groups.length,
-    }),
-    () => createStateFromSnapshot(snapshot),
-  )
-}
-
 export function exportSnapshotFromState(
   state: CanvasGraphStoreState,
   base?: BoardSnapshot,
@@ -177,7 +160,7 @@ export function exportSnapshotFromState(
   for (const nodeId of state.nodeOrder) {
     const record = state.nodesById.get(nodeId)
     if (!record) continue
-    getNodeCollection(snapshot, record.kind).push(cloneJson(record.snapshot))
+    getNodeCollection(snapshot, record.kind).push(cloneJsonValue(record.snapshot))
   }
 
   for (const edgeId of state.edgeOrder) {
@@ -189,7 +172,7 @@ export function exportSnapshotFromState(
     )
     const targetId = toCanvasGraphNodeId(record.connection.toNodeType, record.connection.toNodeId)
     if (!state.nodesById.has(sourceId) || !state.nodesById.has(targetId)) continue
-    snapshot.connections.push(cloneJson(record.connection))
+    snapshot.connections.push(cloneJsonValue(record.connection))
   }
 
   for (const groupId of state.groupOrder) {

@@ -1,4 +1,5 @@
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../shared/utils/workspaceId'
 import { parseContractEnvelope, requireContractData } from '../../../shared/api/contractKernel'
 import { i18n } from '../../../shared/i18n'
 
@@ -25,14 +26,22 @@ function guidanceError(code: string, message: string): WorkspaceBillingGuidanceE
 export function requireAccountWorkspaceId(
   workspaceId: string | null | undefined,
 ): string {
-  const trimmed = workspaceId?.trim() ?? ''
-  if (!trimmed) {
-    throw guidanceError(
+  return requireSharedWorkspaceId(workspaceId, () =>
+    guidanceError(
       WORKSPACE_SELECTION_REQUIRED_CODE,
       i18n.global.t('account.errors.workspaceRequired'),
-    )
-  }
-  return trimmed
+    ),
+  )
+}
+
+/**
+ * Account-owned error-code copy keys (issue #835). The shared error catalog
+ * stays feature-free; account surfaces pass this overlay to
+ * `userFacingErrorCopy` so frontend guidance errors keep their copy.
+ */
+export const ACCOUNT_GUIDANCE_COPY_KEYS: Readonly<Record<string, string>> = {
+  workspace_selection_required: 'account.errors.workspaceRequired',
+  workspace_billing_unavailable: 'account.errors.featureUnavailable',
 }
 
 export async function resolveWorkspaceBillingData<T>(

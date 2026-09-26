@@ -26,6 +26,7 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -92,8 +93,8 @@ func newAppRouter(
 			// then fails closed before creating a billable job.
 			Library: httpapi.ContractV1LibraryDeps{
 				Store:   library.NewService(repos.db),
-				Quoter:  newLibraryMaterializeQuoter(services.billingCatalog),
-				Billing: newLibraryMaterializeSettler(services.creditService),
+				Quoter:  taskruntime.NewLibraryMaterializeQuoter(services.billingCatalog),
+				Billing: taskruntime.NewLibraryMaterializeSettler(services.creditService),
 			},
 			Media: taskServices.workspaceTaskMedia,
 			// Binary reads ride the storage service. Derivative rendering

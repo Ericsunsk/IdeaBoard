@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../auth/session/userSession'
+import { useUserStore } from '../../../auth'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -111,6 +111,7 @@ import AdminInput from '../../shared/components/AdminInput.vue'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
+import { i18n } from '../../../../shared/i18n'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
@@ -121,7 +122,9 @@ const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const feedback = useAdminLoginFeedback()
-const { fallbackText, logoURL, projectName } = useSiteBranding()
+const { fallbackText, logoURL, projectName } = useSiteBranding({
+  fallback: i18n.global.t('account.branding.loadFailed'),
+})
 const brandMarkClass = computed(() =>
   createBrandMarkClass(
     brandMarkClasses.sizes.login,

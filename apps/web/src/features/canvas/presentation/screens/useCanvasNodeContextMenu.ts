@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../../board'
+import { i18n } from '../../../../shared/i18n'
 import { getCanvasNodeKindMenuItems } from '../../domain/nodes/canvasNodeRegistry.ts'
 
 type CanvasNodeContextMenuSnapshot = {
@@ -19,7 +20,9 @@ export function useCanvasNodeContextMenu() {
     flowY: 0,
   })
 
-  const canvasNodeMenuItems = computed(() => getCanvasNodeKindMenuItems())
+  const canvasNodeMenuItems = computed(() =>
+    getCanvasNodeKindMenuItems((key) => i18n.global.t(key)),
+  )
 
   function close() {
     nodeContextMenu.value.visible = false

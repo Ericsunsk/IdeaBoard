@@ -425,9 +425,9 @@ type v1RenameLibraryFolderBody struct {
 	} `json:"data"`
 }
 
-func (h *contractV1Handler) libraryFolderOr404(c *gin.Context, workspace *tenancy.Workspace) (*library.V1Folder, bool) {
-	raw := strings.TrimSpace(c.Param("folder_id"))
-	if !library.IsV1FolderID(raw) {
+func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy.Workspace, folderID string) (*library.V1Folder, bool) {
+	folderID = strings.TrimSpace(folderID)
+	if !library.IsV1FolderID(folderID) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
 		c.Abort()
 		return nil, false
@@ -438,7 +438,7 @@ func (h *contractV1Handler) libraryFolderOr404(c *gin.Context, workspace *tenanc
 		return nil, false
 	}
 	for _, folder := range folders {
-		if folder.PublicID == raw {
+		if folder.PublicID == folderID {
 			return folder, true
 		}
 	}
@@ -456,7 +456,7 @@ func (h *contractV1Handler) renameLibraryFolder(c *gin.Context) {
 	if workspace == nil {
 		return
 	}
-	folder, ok := h.libraryFolderOr404(c, workspace)
+	folder, ok := h.libraryFolderByID(c, workspace, c.Param("folder_id"))
 	if !ok {
 		return
 	}
@@ -529,11 +529,6 @@ func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
 	}
 	var folderFilter *string
 	if raw := strings.TrimSpace(c.Query("folder_id")); raw != "" {
-		if !library.IsV1FolderID(raw) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
-			c.Abort()
-			return
-		}
 		if _, ok := h.libraryFolderByID(c, workspace, raw); !ok {
 			return
 		}
@@ -556,22 +551,6 @@ func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
 		return
 	}
 	contract.RenderPaginated(c, slice, meta)
-}
-
-func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy.Workspace, folderID string) (*library.V1Folder, bool) {
-	folders, err := h.deps.Library.Store.ListFolders(c.Request.Context(), workspace.PublicID)
-	if err != nil {
-		renderLibraryError(c, err)
-		return nil, false
-	}
-	for _, folder := range folders {
-		if folder.PublicID == folderID {
-			return folder, true
-		}
-	}
-	contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
-	c.Abort()
-	return nil, false
 }
 
 type v1SaveLibraryAssetBody struct {

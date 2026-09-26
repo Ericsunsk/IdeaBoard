@@ -1,11 +1,9 @@
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../board'
-import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics'
-import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe'
 import {
   cloneEdgeRecord,
   cloneGroupRecord,
   cloneNodeRecord,
-  createMeasuredStateFromSnapshot,
+  createStateFromSnapshot,
   exportSnapshotFromState,
 } from './canvasGraphStoreState'
 import {
@@ -44,6 +42,10 @@ import {
   type CanvasGraphTransactionReason,
   type CanvasGraphTransactionSummary,
 } from './canvasGraphStoreTypes'
+import {
+  noopCanvasGraphStoreTelemetry,
+  type CanvasGraphStoreTelemetry,
+} from './canvasGraphStoreTelemetry'
 
 // Public surface preserved from the pre-split module. Explicit re-exports (not
 // `export *`) keep the internal split modules — their helpers, state builders
@@ -84,18 +86,30 @@ export {
 export class CanvasGraphStore {
   private state: CanvasGraphStoreState
   private revision = 0
+  private readonly telemetry: CanvasGraphStoreTelemetry
   private readonly commitListeners = new Set<(event: CanvasGraphCommitEvent) => void>()
 
-  constructor(snapshot: BoardSnapshot = createEmptyBoardSnapshot()) {
-    this.state = createMeasuredStateFromSnapshot(snapshot)
+  constructor(
+    snapshot: BoardSnapshot = createEmptyBoardSnapshot(),
+    telemetry: CanvasGraphStoreTelemetry = noopCanvasGraphStoreTelemetry,
+  ) {
+    this.telemetry = telemetry
+    this.state = this.telemetry.measureHydrate(countBoardSnapshot(snapshot), () =>
+      createStateFromSnapshot(snapshot),
+    )
   }
 
-  static fromSnapshot(snapshot: BoardSnapshot): CanvasGraphStore {
-    return new CanvasGraphStore(snapshot)
+  static fromSnapshot(
+    snapshot: BoardSnapshot,
+    telemetry: CanvasGraphStoreTelemetry = noopCanvasGraphStoreTelemetry,
+  ): CanvasGraphStore {
+    return new CanvasGraphStore(snapshot, telemetry)
   }
 
   hydrate(snapshot: BoardSnapshot) {
-    this.state = createMeasuredStateFromSnapshot(snapshot)
+    this.state = this.telemetry.measureHydrate(countBoardSnapshot(snapshot), () =>
+      createStateFromSnapshot(snapshot),
+    )
     this.revision += 1
   }
 
@@ -221,20 +235,16 @@ export class CanvasGraphStore {
   }
 
   _createTransactionDraft(): CanvasGraphTransactionDraft {
-    return measureCanvasPerf(
-      'graph-transaction.draft',
-      () => this.readCounts(),
-      () => ({
-        base: this.state,
-        baseRevision: this.revision,
-        nodeWrites: new Map(),
-        edgeWrites: new Map(),
-        groupWrites: new Map(),
-        nodeOrderPatches: new Map(),
-        edgeOrderPatches: new Map(),
-        groupOrderPatches: new Map(),
-      }),
-    )
+    return this.telemetry.measureDraft(this.readCounts(), () => ({
+      base: this.state,
+      baseRevision: this.revision,
+      nodeWrites: new Map(),
+      edgeWrites: new Map(),
+      groupWrites: new Map(),
+      nodeOrderPatches: new Map(),
+      edgeOrderPatches: new Map(),
+      groupOrderPatches: new Map(),
+    }))
   }
 
   _commitTransaction(draft: CanvasGraphTransactionDraft) {
@@ -260,9 +270,10 @@ export class CanvasGraphStore {
         markDirty: summary.shouldMarkDirty,
       }),
     })
-    recordCanvasInteractionCount('graphCommitCount')
-    if (event.sideEffects.recordHistory) recordCanvasInteractionCount('graphHistoryCommitCount')
-    if (event.sideEffects.markDirty) recordCanvasInteractionCount('graphDirtyCommitCount')
+    this.telemetry.recordCommit({
+      recordHistory: event.sideEffects.recordHistory,
+      markDirty: event.sideEffects.markDirty,
+    })
     this.commitListeners.forEach((listener) => {
       try {
         listener(event)
@@ -334,6 +345,17 @@ export class CanvasGraphStore {
   }
 }
 
-export function createCanvasGraphStore(snapshot?: BoardSnapshot): CanvasGraphStore {
-  return new CanvasGraphStore(snapshot)
+function countBoardSnapshot(snapshot: BoardSnapshot) {
+  return {
+    nodes: snapshot.imageNodes.length + snapshot.promptNodes.length + snapshot.fusionNodes.length,
+    edges: snapshot.connections.length,
+    groups: snapshot.groups.length,
+  }
+}
+
+export function createCanvasGraphStore(
+  snapshot?: BoardSnapshot,
+  telemetry: CanvasGraphStoreTelemetry = noopCanvasGraphStoreTelemetry,
+): CanvasGraphStore {
+  return new CanvasGraphStore(snapshot, telemetry)
 }

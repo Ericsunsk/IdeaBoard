@@ -453,6 +453,9 @@ func performRawAdminRewardRequest(
 	t.Helper()
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
+	// Header-only idempotency: admin create requires the Idempotency-Key
+	// header on the wire; the body carries no key.
+	request.Header.Set("Idempotency-Key", "test-admin-key")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 	return recorder

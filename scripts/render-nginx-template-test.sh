@@ -36,8 +36,8 @@ expected_locations=(
   "location = /api/health"
   "location = /api/auth/health"
   "location /api/auth/"
-  "location /api/user/tasks/"
-  "location = /api/user/events"
+  "location ~ ^/api/v1/workspaces/[^/]+/tasks(/|$)"
+  "location ~ ^/api/v1/workspaces/[^/]+/events(/|$)"
   "location /api/"
   "location /uploads/"
 )

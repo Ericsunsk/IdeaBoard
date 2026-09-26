@@ -40,7 +40,7 @@ describe('task result image URL validation', () => {
     'ftp://example.com/image.png',
     'uploads/canvas/image.png',
     '/assets/admin-preview.png',
-    '/api/user/download?url=https://example.com/image.png',
+    '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
     '/uploads/../admin-secret.png',
     '/\\evil',
   ])('rejects %s', (url) => {

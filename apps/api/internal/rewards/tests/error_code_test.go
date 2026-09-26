@@ -34,7 +34,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 		{
 			name:   "create invalid Code",
 			method: http.MethodPost, path: "/admin/rewards/codes",
-			body: `{"display_name":"Bad","code":"x","credit_amount":1,"idempotency_key":"k1"}`,
+			body: `{"display_name":"Bad","code":"x","credit_amount":1}`,
 			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
 				return CreatedRewardCode{}, ErrInvalidCommand
 			}},
@@ -43,7 +43,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 		{
 			name:   "create idempotency conflict",
 			method: http.MethodPost, path: "/admin/rewards/codes",
-			body: `{"display_name":"Bad","code":"CONFLICT01","credit_amount":1,"idempotency_key":"k2"}`,
+			body: `{"display_name":"Bad","code":"CONFLICT01","credit_amount":1}`,
 			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
 				return CreatedRewardCode{}, ErrRewardCodeConflict
 			}},
@@ -52,7 +52,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 		{
 			name:   "create Code collision",
 			method: http.MethodPost, path: "/admin/rewards/codes",
-			body: `{"display_name":"Bad","code":"DUP00001","credit_amount":1,"idempotency_key":"k3"}`,
+			body: `{"display_name":"Bad","code":"DUP00001","credit_amount":1}`,
 			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
 				return CreatedRewardCode{}, ErrCodeCollision
 			}},

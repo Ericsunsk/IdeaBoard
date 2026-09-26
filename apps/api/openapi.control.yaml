@@ -19,10 +19,12 @@ info:
     idempotency key, reason, outcome, timestamp); audit records never enter
     the public event layer.
 
-    Envelope: dedicated handlers render {data, meta?} success and
+    Envelope: every route renders {data, meta?} success and
     {error: {code, message, request_id}} errors with a Request-Id response
-    header. Routes marked x-control-envelope: legacy proxy the legacy admin
-    handler shape under the same guard until #809 unifies envelopes.
+    header. Proxied platform-config families translate the legacy admin
+    DTO at the control boundary into {data} (parent #809 unified
+    envelope); only the binary brand-logo (image/svg+xml) and the SSE
+    monitor stream stay raw protocol exceptions, never JSON envelopes.
 
     Capability list (frozen): control:users, control:workspaces,
     control:billing, control:credits, control:payments, control:platform,
@@ -1959,7 +1961,6 @@ paths:
       operationId: getControlAIGateway
       summary: Read the AI gateway configuration
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -1967,14 +1968,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: AI gateway configuration (legacy admin shape).
+          description: AI gateway configuration (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1984,7 +1985,6 @@ paths:
       operationId: updateControlAIGateway
       summary: Update the AI gateway configuration (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -1999,7 +1999,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: AI gateway update payload (legacy admin shape).
+              description: AI gateway update payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: AI gateway configuration updated.
@@ -2009,7 +2009,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlAckEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2024,7 +2024,6 @@ paths:
       operationId: listControlAIGatewayModels
       summary: List AI gateway feature model mappings
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2032,14 +2031,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Model mappings (legacy admin shape).
+          description: Model mappings (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2050,7 +2049,6 @@ paths:
       operationId: saveControlAIGatewayModel
       summary: Save an AI gateway feature model mapping (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: ai_gateway_model
@@ -2070,7 +2068,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Model mapping payload (legacy admin shape).
+              description: Model mapping payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: Model mapping saved.
@@ -2080,7 +2078,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlAckEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2095,7 +2093,6 @@ paths:
       operationId: listControlAIGatewayCatalog
       summary: List the AI gateway model catalog
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2103,14 +2100,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Model catalog (legacy admin shape).
+          description: Model catalog (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2120,7 +2117,6 @@ paths:
       operationId: saveControlAIGatewayCatalog
       summary: Save the AI gateway model catalog (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2135,7 +2131,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Catalog payload (legacy admin shape).
+              description: Catalog payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: Catalog saved.
@@ -2145,7 +2141,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlAckEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2160,7 +2156,6 @@ paths:
       operationId: listControlAIGatewayProviders
       summary: List AI gateway providers
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2168,14 +2163,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Providers (legacy admin shape).
+          description: Providers (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2186,7 +2181,6 @@ paths:
       operationId: detectControlAIGatewayModels
       summary: Probe the gateway for available models
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2201,14 +2195,14 @@ paths:
             type: string
       responses:
         '200':
-          description: Model detection result (legacy admin shape).
+          description: Model detection result (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2227,7 +2221,6 @@ paths:
         catalog flows. Only invalid input (missing model identity) is a
         400.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2264,7 +2257,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2324,7 +2317,6 @@ paths:
         cost has no receipt/log source, so every margin row carries an
         explicit unavailable marker instead of a fabricated number.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2332,14 +2324,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Model observations (legacy admin shape).
+          description: Model observations (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2354,7 +2346,6 @@ paths:
         registers as a POST read-guard without reason or idempotency
         requirements.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2378,14 +2369,14 @@ paths:
                   type: string
       responses:
         '200':
-          description: Routing facts (legacy admin shape).
+          description: Routing facts (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2401,7 +2392,6 @@ paths:
         The token is used for this probe only and never persisted. Pure
         diagnosis: no configuration is read or written.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2434,14 +2424,14 @@ paths:
                   type: string
       responses:
         '200':
-          description: Connection probe result (legacy admin shape).
+          description: Connection probe result (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2456,7 +2446,6 @@ paths:
       operationId: listControlStorageProviders
       summary: List storage providers
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2464,14 +2453,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Storage providers (legacy admin shape).
+          description: Storage providers (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2482,7 +2471,6 @@ paths:
       operationId: listControlStorageProfiles
       summary: List storage profiles
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2490,14 +2478,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Storage profiles (legacy admin shape).
+          description: Storage profiles (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2507,7 +2495,6 @@ paths:
       operationId: createControlStorageProfile
       summary: Create a storage profile (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2522,7 +2509,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Storage profile payload (legacy admin shape).
+              description: Storage profile payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: Storage profile created.
@@ -2532,7 +2519,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2547,7 +2534,6 @@ paths:
       operationId: updateControlStorageProfile
       summary: Update a storage profile (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: storage_profile
@@ -2563,7 +2549,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Storage profile payload (legacy admin shape).
+              description: Storage profile payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: Storage profile updated.
@@ -2573,7 +2559,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2587,7 +2573,6 @@ paths:
       operationId: deleteControlStorageProfile
       summary: Delete a storage profile (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: storage_profile
@@ -2606,7 +2591,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2621,7 +2606,6 @@ paths:
       operationId: applyControlStorageProfile
       summary: Apply a storage profile (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: storage_profile
@@ -2640,7 +2624,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2655,7 +2639,6 @@ paths:
       operationId: testControlStorageProfile
       summary: Test a storage profile connection (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: storage_profile
@@ -2674,7 +2657,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2689,7 +2672,6 @@ paths:
       operationId: getControlStorageBucketInfo
       summary: Read storage bucket info
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: storage_profile
@@ -2699,14 +2681,14 @@ paths:
         - $ref: '#/components/parameters/ControlStorageProfileId'
       responses:
         '200':
-          description: Bucket info (legacy admin shape).
+          description: Bucket info (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2717,7 +2699,6 @@ paths:
       operationId: listControlSearchProviders
       summary: List search providers
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2725,14 +2706,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Search providers (legacy admin shape).
+          description: Search providers (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2743,7 +2724,6 @@ paths:
       operationId: updateControlSearchProvider
       summary: Update a search provider (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: search_provider
@@ -2759,7 +2739,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Search provider payload (legacy admin shape).
+              description: Search provider payload (admin DTO shape, unchanged).
       responses:
         '200':
           description: Search provider updated.
@@ -2769,7 +2749,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlAckEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2784,7 +2764,6 @@ paths:
       operationId: testControlSearchProvider
       summary: Test a search provider connection (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: search_provider
@@ -2803,7 +2782,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2818,7 +2797,6 @@ paths:
       operationId: listControlFeaturePrompts
       summary: List feature prompt templates
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2826,14 +2804,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Feature prompts (legacy admin shape).
+          description: Feature prompts (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2844,7 +2822,6 @@ paths:
       operationId: getControlFeaturePrompt
       summary: Read one feature prompt template
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: feature_prompt
@@ -2854,14 +2831,14 @@ paths:
         - $ref: '#/components/parameters/ControlPromptSlug'
       responses:
         '200':
-          description: Feature prompt (legacy admin shape).
+          description: Feature prompt (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2873,7 +2850,6 @@ paths:
       operationId: saveControlFeaturePrompt
       summary: Save a feature prompt template (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: feature_prompt
@@ -2899,7 +2875,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2914,7 +2890,6 @@ paths:
       operationId: getControlMonitor
       summary: Read the runtime monitor snapshot
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2922,14 +2897,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Monitor snapshot (legacy admin shape).
+          description: Monitor snapshot (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2944,7 +2919,7 @@ paths:
         the max connection period with a close event). Read-guard so the
         long-lived stream is never body-buffered; the audit record emits
         on disconnect with the terminal status. Setup failures render
-        the legacy admin shape; the stream itself is text/event-stream,
+        the contract error envelope; the stream itself is text/event-stream,
         never a JSON envelope.
       x-capability: control:platform
       x-audit:
@@ -2978,7 +2953,6 @@ paths:
       operationId: getControlStatistics
       summary: Read task statistics
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -2992,14 +2966,14 @@ paths:
             type: string
       responses:
         '200':
-          description: Statistics (legacy admin shape).
+          description: Statistics (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3010,7 +2984,6 @@ paths:
       operationId: backfillControlStatistics
       summary: Backfill task statistics (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -3035,7 +3008,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3051,9 +3024,8 @@ paths:
       summary: List brand logo overrides
       description: >-
         Data shape is ControlBrandLogoOverrideList ({overrides:
-        ControlBrandLogoOverride[]}) inside the legacy admin envelope.
+        ControlBrandLogoOverride[]}) inside the contract envelope.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -3061,14 +3033,14 @@ paths:
         outcome: read
       responses:
         '200':
-          description: Brand logo overrides (legacy admin shape).
+          description: Brand logo overrides (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3081,9 +3053,8 @@ paths:
       description: >-
         Body carries {logo_key}; the scope-qualified key (scope plus
         target_key) is the audited target. Data shape is
-        ControlBrandLogoOverride inside the legacy admin envelope.
+        ControlBrandLogoOverride inside the contract envelope.
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: brand_logo_override
@@ -3117,7 +3088,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3131,7 +3102,6 @@ paths:
       operationId: deleteControlBrandLogoOverride
       summary: Delete a brand logo override (operator reason required)
       x-capability: control:platform
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: brand_logo_override
@@ -3151,7 +3121,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlAckEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3170,9 +3140,8 @@ paths:
         lookup cannot ride a query string), so it registers as a POST
         read-guard without reason or idempotency requirements. Query
         strings are rejected (400). Data shape is ControlRewardCodePage
-        inside the legacy admin envelope.
+        inside the contract envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: null
@@ -3186,14 +3155,14 @@ paths:
               $ref: '#/components/schemas/ControlRewardCodeSearchRequest'
       responses:
         '200':
-          description: Reward code page (legacy admin shape).
+          description: Reward code page (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3206,13 +3175,12 @@ paths:
       operationId: createControlRewardCode
       summary: Create a reward code (operator reason required)
       description: >-
-        The Idempotency-Key header is canonical; the body
-        idempotency_key stays accepted as fallback, and a mismatch
-        conflicts (409 reward_code_idempotency_conflict) instead of
-        forking codes. Data shape is ControlCreatedRewardCode (reward
-        code plus one-time plaintext) inside the legacy admin envelope.
+        The Idempotency-Key header is the only key (header-only; the
+        body carries no idempotency field). Key reuse with a different
+        payload conflicts (409 reward_code_idempotency_conflict) instead
+        of forking codes. Data shape is ControlCreatedRewardCode (reward
+        code plus one-time plaintext) inside the contract envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_code
@@ -3236,7 +3204,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3255,7 +3223,6 @@ paths:
         envelope. Lowering max_redemptions below redemption_count
         renders 409 reward_code_cap_invalid.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_code
@@ -3280,7 +3247,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3298,9 +3265,8 @@ paths:
       description: >-
         Codes with redemptions cannot be deleted (409
         reward_code_redeemed: disable them instead). Data shape is
-        ControlDeletedRewardCode inside the legacy admin envelope.
+        ControlDeletedRewardCode inside the contract envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_code
@@ -3319,7 +3285,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3339,7 +3305,6 @@ paths:
         Data shape is ControlRewardCode inside the legacy admin
         envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_code
@@ -3364,7 +3329,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3382,9 +3347,8 @@ paths:
       summary: List admin redemption reads for one reward code
       description: >-
         Data shape is ControlAdminRedemptionPage (identity-enriched
-        redemption summaries) inside the legacy admin envelope.
+        redemption summaries) inside the contract envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_code
@@ -3396,14 +3360,14 @@ paths:
         - $ref: '#/components/parameters/ControlLimit'
       responses:
         '200':
-          description: Admin redemption page (legacy admin shape).
+          description: Admin redemption page (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3419,9 +3383,8 @@ paths:
       summary: Read one admin redemption for one reward code
       description: >-
         Data shape is ControlAdminRedemptionDetail (identity-enriched)
-        inside the legacy admin envelope.
+        inside the contract envelope.
       x-capability: control:credits
-      x-control-envelope: legacy
       x-audit:
         operator: true
         target: reward_redemption
@@ -3432,14 +3395,14 @@ paths:
         - $ref: '#/components/parameters/ControlRedemptionId'
       responses:
         '200':
-          description: Admin redemption detail (legacy admin shape).
+          description: Admin redemption detail (contract envelope).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/ControlObjectEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -4603,9 +4566,6 @@ components:
         expires_at:
           type: string
           format: date-time
-        idempotency_key:
-          type: string
-          description: Body fallback; the Idempotency-Key header is canonical.
         reason:
           type: string
           description: Operator note (or X-Operator-Reason header).

@@ -1,4 +1,4 @@
-import { useUserStore } from '../../auth/session/userSession'
+import { useUserStore } from '../../auth'
 import { impersonateAdminUser } from './api'
 
 export type AdminUserRedirect = {
