@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/validation"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -119,6 +120,17 @@ func renderTaskError(c *gin.Context, err error) {
 		c.Abort()
 		return
 	}
+	// Canonical-compile validation failures (prompt bound/policy, mask
+	// shape, plan contract) are client errors: they carry a safe Chinese
+	// message (validation.Error is safe to expose) and converge to 422
+	// validation_failed, never 503.
+	if validation.Is(err) {
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
+			contract.CodeValidationFailed, err.Error(),
+			contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		c.Abort()
+		return
+	}
 	switch {
 	case errors.Is(err, workspacetasks.ErrNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
@@ -150,15 +162,23 @@ func taskLocation(workspaceID, taskID string) string {
 }
 
 // v1CreateTaskBody is the discriminated input union:
-// {workflow_kind, inputs:{media_asset_ids}, params}. DecodeStrict rejects
-// unknown top-level fields; ValidateParams rejects unknown params keys and
-// raw storage URLs.
+// {workflow_kind, inputs:{media_asset_ids}, prompt, params}. DecodeStrict
+// rejects unknown top-level fields; ValidateParams rejects unknown params
+// keys and raw storage URLs.
+//
+// Prompt rides the explicit data.prompt field (bound:
+// workspacetasks.MaxWorkspaceTaskPromptBytes = 8KB, legacy parity), never
+// params.prompt (still 422 unknown_field): it threads into the canonical
+// Generation snapshot (UserPrompt + CompiledPrompt) that the worker
+// bridges to the provider. The v1 mask rides params.mask_asset_id
+// (workspace public asset_... from the upload-session flow, inpaint only).
 type v1CreateTaskBody struct {
 	Data struct {
 		WorkflowKind string `json:"workflow_kind"`
 		Inputs       struct {
 			MediaAssetIDs []string `json:"media_asset_ids"`
 		} `json:"inputs"`
+		Prompt     string         `json:"prompt,omitempty"`
 		Params     map[string]any `json:"params"`
 		Quantity   *int64         `json:"quantity"`
 		Resolution *string        `json:"resolution"`
@@ -270,6 +290,11 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 	for i := range assetIDs {
 		assetIDs[i] = strings.TrimSpace(assetIDs[i])
 	}
+	prompt := strings.TrimSpace(body.Data.Prompt)
+	if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
+		renderTaskError(c, err)
+		return
+	}
 	var quantity int64 = 1
 	if body.Data.Quantity != nil {
 		quantity = *body.Data.Quantity
@@ -291,14 +316,14 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		if len(assetIDs) > 0 {
 			canonicalInput[taskservice.CompilerWorkspaceMediaAssetIDsParam] = append([]string(nil), assetIDs...)
 		}
-		canonicalParams, compileErr = h.deps.TaskCanonicalCompiler(kind, "", canonicalInput)
+		canonicalParams, compileErr = h.deps.TaskCanonicalCompiler(kind, prompt, canonicalInput)
 		if compileErr != nil {
 			renderTaskError(c, compileErr)
 			return
 		}
 	}
 	hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
-		strings.Join(assetIDs, ","), string(paramsJSON),
+		strings.Join(assetIDs, ","), prompt, string(paramsJSON),
 		strconv.FormatInt(quantity, 10), resolution)
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	scope := contract.IdempotencyScope(externalUser, "task:create")
@@ -621,8 +646,27 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	  unit_credits: int64>=0, quantity: int64>=1, total_credits: int64>=0,
 //	  quoted_at: date-time, hold_transaction_id?: string, settlement_state: {enum: [quoted, free, held, captured, released]}}
 //	CreateWorkspaceTaskRequest: {data: {workflow_kind: string, inputs: {media_asset_ids?: asset_...[]},
-//	  params?: object, quantity?: int64>=1, resolution?: string}}
+//	  prompt?: string (max 8KB bytes; required for generation/inpaint, optional for
+//	  render/variations/fusion/outpaint, ignored for cutout/upscale),
+//	  params?: object (params.mask_asset_id?: asset_... — inpaint only; data-URL and
+//	  storage-URL masks rejected 422, params.prompt still 422 unknown_field),
+//	  quantity?: int64>=1, resolution?: string}}
 //	QuoteWorkspaceTaskRequest: {data: {workflow_kind: string, quantity?: int64>=1, resolution?: string}}
+//
+// Prompt/mask spec notes for the merger (v1 task creation gap batch):
+//   - data.prompt is new; the idempotency hash covers it (same key +
+//     different prompt -> 409 task_idempotency_conflict, not a silent replay).
+//   - params.mask_asset_id is new; the only durable mask path (mask bytes
+//     arrive via the existing upload-session flow, linked here by asset id).
+//     Inpaint without a mask, or a mask on any non-inpaint feature, is 422
+//     validation_failed (plan media policy). Mask assets gate on the same
+//     ready/archived semantics as inputs (404 media_not_found, 409
+//     media_not_ready, 410 media_archived).
+//   - Worker Generate bridges CanonicalParams Generation.compiled_prompt
+//     (fallback user_prompt, then legacy params.prompt) into the gateway
+//     TaskPayload.Prompt; provider mask refs resolve from the canonical
+//     Media.mask public asset id through the workspace runtime media
+//     resolver (no params/Extra URL plumbing).
 //
 // Error codes frozen: task_not_found (404 hidden), task_forbidden (403),
 // task_state_conflict (409), task_insufficient_credits (402),

@@ -1,25 +1,44 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { describe, expect, it } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import type { RewardCode } from './resource'
 
+// The redemption transport rides the Control Plane; dialog UX keeps
+// coverage through a fake resource while the resource spec pins the
+// control contract.
+const redemptionFakes = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+}))
+
+vi.mock('./rewardCodeRedemptionResource', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('./rewardCodeRedemptionResource')
+  >()
+  return {
+    ...actual,
+    createRewardCodeRedemptionResource: () => ({
+      list: redemptionFakes.list,
+      get: redemptionFakes.get,
+    }),
+  }
+})
+
 describe('RewardCodeRedemptionsDialog', () => {
-  it('loads a dense Redemption page through the real feature resource HTTP seam', async () => {
-    const requests: Array<{ rewardCodeId: string; beforeId: string | null; limit: string | null }> =
-      []
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ params, request }) => {
-        const query = new URL(request.url).searchParams
-        requests.push({
-          rewardCodeId: String(params.rewardCodeId),
-          beforeId: query.get('before_id'),
-          limit: query.get('limit'),
-        })
-        return redemptionPageResponse([makeRedemptionSummary()])
-      }),
-    )
+  beforeEach(() => {
+    redemptionFakes.list.mockReset()
+    redemptionFakes.get.mockReset()
+  })
+
+  it('loads a dense Redemption page through the feature resource seam', async () => {
+    const calls: Array<{ rewardCodeId: number; beforeId: number | undefined }> = []
+    redemptionFakes.list.mockImplementation(async (rewardCodeId: number, input?: object) => {
+      const beforeId = (input as { beforeId?: number }).beforeId
+      calls.push({ rewardCodeId, beforeId })
+      return viewPage([makeViewSummary()])
+    })
+    redemptionFakes.get.mockResolvedValue(makeViewDetail())
 
     renderDialog()
 
@@ -28,7 +47,7 @@ describe('RewardCodeRedemptionsDialog', () => {
     expect(screen.getByText(/2026/)).toBeVisible()
     expect(screen.queryByText('Redemption ID')).not.toBeInTheDocument()
     expect(screen.queryByText('masked Code hint')).not.toBeInTheDocument()
-    expect(requests).toEqual([{ rewardCodeId: '7', beforeId: null, limit: '20' }])
+    expect(calls).toEqual([{ rewardCodeId: 7, beforeId: undefined }])
   })
 
   it('loads long technical detail only after the row is expanded', async () => {
@@ -36,25 +55,17 @@ describe('RewardCodeRedemptionsDialog', () => {
     const detailGate = new Promise<void>((resolve) => {
       releaseDetail = resolve
     })
-    const detailRequests: Array<{ rewardCodeId: string; redemptionId: string }> = []
-    useMswHandlers(
-      listHandler(),
-      http.get(
-        '/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId',
-        async ({ params }) => {
-          detailRequests.push({
-            rewardCodeId: String(params.rewardCodeId),
-            redemptionId: String(params.redemptionId),
-          })
-          await detailGate
-          return redemptionDetailResponse()
-        },
-      ),
-    )
+    const detailCalls: Array<{ rewardCodeId: number; redemptionId: number }> = []
+    redemptionFakes.list.mockResolvedValue(viewPage([makeViewSummary()]))
+    redemptionFakes.get.mockImplementation(async (rewardCodeId: number, redemptionId: number) => {
+      detailCalls.push({ rewardCodeId, redemptionId })
+      await detailGate
+      return makeViewDetail()
+    })
     const { user } = renderDialog()
     await screen.findByText('用户 #23')
 
-    expect(detailRequests).toEqual([])
+    expect(detailCalls).toEqual([])
     await user.click(screen.getByRole('button', { name: /详情/ }))
     expect(screen.getByLabelText('加载兑换详情')).toBeVisible()
     releaseDetail()
@@ -63,21 +74,17 @@ describe('RewardCodeRedemptionsDialog', () => {
     expect(screen.getByText('Credits Transaction ID')).toBeVisible()
     expect(screen.getByText('masked Code hint')).toBeVisible()
     expect(screen.getByText('credit-transaction-9001-with-a-long-audit-reference')).toBeVisible()
-    expect(detailRequests).toEqual([{ rewardCodeId: '7', redemptionId: '51' }])
+    expect(detailCalls).toEqual([{ rewardCodeId: 7, redemptionId: 51 }])
   })
 
-  it('retries a failed detail request through the same HTTP seam', async () => {
-    let detailRequests = 0
-    useMswHandlers(
-      listHandler(),
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId', () => {
-        detailRequests += 1
-        if (detailRequests === 1) {
-          return HttpResponse.json({ code: 503, msg: 'detail unavailable' }, { status: 503 })
-        }
-        return redemptionDetailResponse()
-      }),
-    )
+  it('retries a failed detail request through the same resource seam', async () => {
+    let detailCalls = 0
+    redemptionFakes.list.mockResolvedValue(viewPage([makeViewSummary()]))
+    redemptionFakes.get.mockImplementation(async () => {
+      detailCalls += 1
+      if (detailCalls === 1) throw new Error('detail unavailable')
+      return makeViewDetail()
+    })
     const { user } = renderDialog()
     await screen.findByText('用户 #23')
 
@@ -86,20 +93,16 @@ describe('RewardCodeRedemptionsDialog', () => {
     await user.click(screen.getByRole('button', { name: '重试兑换详情' }))
 
     expect(await screen.findByText('Credits Transaction ID')).toBeVisible()
-    expect(detailRequests).toBe(2)
+    expect(detailCalls).toBe(2)
   })
 
-  it('distinguishes an initial HTTP error from empty and retries it in place', async () => {
-    let requests = 0
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', () => {
-        requests += 1
-        if (requests === 1) {
-          return HttpResponse.json({ code: 503, msg: 'list unavailable' }, { status: 503 })
-        }
-        return redemptionPageResponse([makeRedemptionSummary()])
-      }),
-    )
+  it('distinguishes an initial resource error from empty and retries it in place', async () => {
+    let calls = 0
+    redemptionFakes.list.mockImplementation(async () => {
+      calls += 1
+      if (calls === 1) throw new Error('list unavailable')
+      return viewPage([makeViewSummary()])
+    })
     const { user } = renderDialog()
 
     expect(await screen.findByText('兑换记录加载失败，请重试。')).toBeVisible()
@@ -107,20 +110,16 @@ describe('RewardCodeRedemptionsDialog', () => {
     await user.click(screen.getByRole('button', { name: '重试加载兑换记录' }))
 
     expect(await screen.findByText('用户 #23')).toBeVisible()
-    expect(requests).toBe(2)
+    expect(calls).toBe(2)
   })
 
   it('preserves the last page when a background refresh fails and can retry it', async () => {
-    let requests = 0
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', () => {
-        requests += 1
-        if (requests === 2) {
-          return HttpResponse.json({ code: 503, msg: 'refresh unavailable' }, { status: 503 })
-        }
-        return redemptionPageResponse([makeRedemptionSummary()])
-      }),
-    )
+    let calls = 0
+    redemptionFakes.list.mockImplementation(async () => {
+      calls += 1
+      if (calls === 2) throw new Error('refresh unavailable')
+      return viewPage([makeViewSummary()])
+    })
     const { user } = renderDialog()
     await screen.findByText('用户 #23')
 
@@ -134,26 +133,24 @@ describe('RewardCodeRedemptionsDialog', () => {
         screen.queryByText('刷新兑换记录失败，正在显示上次成功的数据。'),
       ).not.toBeInTheDocument(),
     )
-    expect(requests).toBe(3)
+    expect(calls).toBe(3)
   })
 
-  it('pages with the next keyset cursor through the generated client URL', async () => {
-    const cursors: Array<string | null> = []
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ request }) => {
-        const beforeId = new URL(request.url).searchParams.get('before_id')
-        cursors.push(beforeId)
-        return beforeId === null
-          ? redemptionPageResponse([makeRedemptionSummary()], 40)
-          : redemptionPageResponse([
-              makeRedemptionSummary({
-                id: 39,
-                user_public_id: '00000000-0000-0000-0000-000000000043',
-                display_name: '用户 #43',
-              }),
-            ])
-      }),
-    )
+  it('pages with the next keyset cursor through the resource seam', async () => {
+    const cursors: Array<number | undefined> = []
+    redemptionFakes.list.mockImplementation(async (_id: number, input?: object) => {
+      const beforeId = (input as { beforeId?: number }).beforeId
+      cursors.push(beforeId)
+      return beforeId === undefined
+        ? viewPage([makeViewSummary()], 40)
+        : viewPage([
+            makeViewSummary({
+              id: 39,
+              userPublicId: '00000000-0000-0000-0000-000000000043',
+              displayName: '用户 #43',
+            }),
+          ])
+    })
     const { user } = renderDialog()
     await screen.findByText('用户 #23')
 
@@ -161,11 +158,11 @@ describe('RewardCodeRedemptionsDialog', () => {
 
     expect(await screen.findByText('用户 #43')).toBeVisible()
     expect(screen.getByText('2 / 2')).toBeVisible()
-    expect(cursors).toEqual([null, '40'])
+    expect(cursors).toEqual([undefined, 40])
   })
 
   it('shows a compact empty state for a RewardCode with no successful Redemption', async () => {
-    useMswHandlers(listHandler([]))
+    redemptionFakes.list.mockResolvedValue(viewPage([]))
     renderDialog()
 
     expect(await screen.findByText('暂无兑换记录')).toBeVisible()
@@ -173,32 +170,22 @@ describe('RewardCodeRedemptionsDialog', () => {
   })
 
   it('clears cursor and expanded detail when switching to another RewardCode', async () => {
-    const listRequests: Array<{ rewardCodeId: string; beforeId: string | null }> = []
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ params, request }) => {
-        const rewardCodeId = String(params.rewardCodeId)
-        listRequests.push({
+    const listCalls: Array<{ rewardCodeId: number; beforeId: number | undefined }> = []
+    redemptionFakes.list.mockImplementation(async (rewardCodeId: number, input?: object) => {
+      const beforeId = (input as { beforeId?: number }).beforeId
+      listCalls.push({ rewardCodeId, beforeId })
+      return viewPage([
+        makeViewSummary({
           rewardCodeId,
-          beforeId: new URL(request.url).searchParams.get('before_id'),
-        })
-        return redemptionPageResponse(
-          [
-            makeRedemptionSummary({
-              reward_code_id: Number(rewardCodeId),
-              user_public_id:
-                rewardCodeId === '7'
-                  ? '00000000-0000-0000-0000-000000000023'
-                  : '00000000-0000-0000-0000-000000000088',
-              display_name: rewardCodeId === '7' ? '用户 #23' : '用户 #88',
-            }),
-          ],
-          rewardCodeId === '7' ? 40 : undefined,
-        )
-      }),
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId', () =>
-        redemptionDetailResponse(),
-      ),
-    )
+          userPublicId:
+            rewardCodeId === 7
+              ? '00000000-0000-0000-0000-000000000023'
+              : '00000000-0000-0000-0000-000000000088',
+          displayName: rewardCodeId === 7 ? '用户 #23' : '用户 #88',
+        }),
+      ])
+    })
+    redemptionFakes.get.mockResolvedValue(makeViewDetail())
     const { rerender, user } = renderDialog()
     await screen.findByText('用户 #23')
     await user.click(screen.getByRole('button', { name: /详情/ }))
@@ -211,7 +198,7 @@ describe('RewardCodeRedemptionsDialog', () => {
 
     expect(await screen.findByText('用户 #88')).toBeVisible()
     expect(screen.queryByText('Credits Transaction ID')).not.toBeInTheDocument()
-    expect(listRequests.at(-1)).toEqual({ rewardCodeId: '8', beforeId: null })
+    expect(listCalls.at(-1)).toEqual({ rewardCodeId: 8, beforeId: undefined })
   })
 
   it('ignores a late page response after close and opens with clean state', async () => {
@@ -219,25 +206,23 @@ describe('RewardCodeRedemptionsDialog', () => {
     const firstPageGate = new Promise<void>((resolve) => {
       releaseFirstPage = resolve
     })
-    let requests = 0
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', async ({ params }) => {
-        requests += 1
-        if (requests === 1) {
-          await firstPageGate
-          return redemptionPageResponse([makeRedemptionSummary()])
-        }
-        return redemptionPageResponse([
-          makeRedemptionSummary({
-            reward_code_id: Number(params.rewardCodeId),
-            user_public_id: '00000000-0000-0000-0000-000000000088',
-            display_name: '用户 #88',
-          }),
-        ])
-      }),
-    )
+    let calls = 0
+    redemptionFakes.list.mockImplementation(async (rewardCodeId: number) => {
+      calls += 1
+      if (calls === 1) {
+        await firstPageGate
+        return viewPage([makeViewSummary()])
+      }
+      return viewPage([
+        makeViewSummary({
+          rewardCodeId,
+          userPublicId: '00000000-0000-0000-0000-000000000088',
+          displayName: '用户 #88',
+        }),
+      ])
+    })
     const { rerender } = renderDialog()
-    await waitFor(() => expect(requests).toBe(1))
+    await waitFor(() => expect(calls).toBe(1))
 
     await rerender({ visible: false, rewardCode: makeRewardCode() })
     releaseFirstPage()
@@ -255,13 +240,11 @@ describe('RewardCodeRedemptionsDialog', () => {
     const detailGate = new Promise<void>((resolve) => {
       releaseDetail = resolve
     })
-    useMswHandlers(
-      listHandler(),
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId', async () => {
-        await detailGate
-        return redemptionDetailResponse()
-      }),
-    )
+    redemptionFakes.list.mockResolvedValue(viewPage([makeViewSummary()]))
+    redemptionFakes.get.mockImplementation(async () => {
+      await detailGate
+      return makeViewDetail()
+    })
     const { rerender, user } = renderDialog()
     await screen.findByText('用户 #23')
     await user.click(screen.getByRole('button', { name: /详情/ }))
@@ -278,7 +261,7 @@ describe('RewardCodeRedemptionsDialog', () => {
 
 function renderDialog(overrides: Record<string, unknown> = {}) {
   // Fresh client per render: the list query caches by key, so sharing one
-  // across tests would serve stale pages and hide HTTP calls.
+  // across tests would serve stale pages and hide resource calls.
   const queryClient = new QueryClient()
   return renderWithUser(RewardCodeRedemptionsDialog, {
     props: {
@@ -292,28 +275,21 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
   })
 }
 
-function listHandler(redemptions = [makeRedemptionSummary()]) {
-  return http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', () =>
-    redemptionPageResponse(redemptions),
-  )
-}
-
-function redemptionPageResponse(
-  redemptions: Array<Record<string, unknown>>,
+function viewPage(
+  redemptions: Array<{
+    id: number
+    rewardCodeId: number
+    userPublicId: string
+    displayName: string
+    creditedAmount: number
+    redeemedAt: string
+  }>,
   nextBeforeId?: number,
 ) {
-  return HttpResponse.json({
-    code: 0,
-    msg: 'ok',
-    data: {
-      redemptions,
-      ...(nextBeforeId === undefined ? {} : { next_before_id: nextBeforeId }),
-    },
-  })
-}
-
-function redemptionDetailResponse() {
-  return HttpResponse.json({ code: 0, msg: 'ok', data: makeRedemptionDetail() })
+  return {
+    redemptions,
+    ...(nextBeforeId === undefined ? {} : { nextBeforeId }),
+  }
 }
 
 function makeRewardCode(overrides: Partial<RewardCode> = {}): RewardCode {
@@ -332,23 +308,31 @@ function makeRewardCode(overrides: Partial<RewardCode> = {}): RewardCode {
   }
 }
 
-function makeRedemptionSummary(overrides: Record<string, unknown> = {}) {
+function makeViewSummary(
+  overrides: Partial<{
+    id: number
+    rewardCodeId: number
+    userPublicId: string
+    displayName: string
+    creditedAmount: number
+    redeemedAt: string
+  }> = {},
+) {
   return {
     id: 51,
-    reward_code_id: 7,
-    user_public_id: '00000000-0000-0000-0000-000000000023',
-    display_name: '用户 #23',
-    credited_amount: 80,
-    redeemed_at: '2026-07-22T03:04:05Z',
+    rewardCodeId: 7,
+    userPublicId: '00000000-0000-0000-0000-000000000023',
+    displayName: '用户 #23',
+    creditedAmount: 80,
+    redeemedAt: '2026-07-22T03:04:05Z',
     ...overrides,
   }
 }
 
-function makeRedemptionDetail(overrides: Record<string, unknown> = {}) {
+function makeViewDetail() {
   return {
-    ...makeRedemptionSummary(),
-    credit_transaction_id: 'credit-transaction-9001-with-a-long-audit-reference',
-    masked_code_hint: '•••• 2026',
-    ...overrides,
+    ...makeViewSummary(),
+    creditTransactionId: 'credit-transaction-9001-with-a-long-audit-reference',
+    maskedCodeHint: '•••• 2026',
   }
 }

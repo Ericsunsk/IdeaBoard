@@ -9,68 +9,90 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
+const WORKSPACE_ID = 'ws_123'
+
+// Rewards ride the v1 Public Data Plane with workspace scope; the deleted
+// `/api/user/rewards/*` routes are gone.
 describe('rewardsResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('reads a cursor page through the feature resource boundary', async () => {
+  it('redeems a code through the v1 public plane with a header-only idempotency key', async () => {
     transport.request.mockResolvedValue({
-      code: 0,
       data: {
-        redemptions: [
-          {
-            id: 42,
-            reward_code_display_name: '夏日灵感奖励',
-            credited_amount: 80,
-            masked_code_hint: '•••• 2922',
-            redeemed_at: '2026-07-15T10:00:00Z',
-          },
-        ],
-        next_before_id: 40,
+        redemption: {
+          id: 7,
+          reward_code_id: 3,
+          user_public_id: 'usr_1',
+          display_name: '夏日灵感奖励',
+          credit_amount: 80,
+          credit_transaction_id: 'txn_1',
+          available_balance_after: 1080,
+          redeemed_at: '2026-07-15T10:00:00Z',
+        },
+        history_item: {
+          id: 7,
+          reward_code_display_name: '夏日灵感奖励',
+          credited_amount: 80,
+          masked_code_hint: '•••• 2922',
+          redeemed_at: '2026-07-15T10:00:00Z',
+        },
+        credited_amount: 80,
+        available_balance: 1080,
+        replayed: false,
       },
+    })
+
+    await expect(redeemRewardCode(WORKSPACE_ID, '  IDEA2026  ')).resolves.toMatchObject({
+      credited_amount: 80,
+      available_balance: 1080,
+      replayed: false,
+      history_item: { reward_code_display_name: '夏日灵感奖励' },
+    })
+    expect(transport.request).toHaveBeenCalledWith(
+      `/v1/workspaces/${WORKSPACE_ID}/rewards/redemptions`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ data: { code: 'IDEA2026' } }),
+      }),
+    )
+    const config = transport.request.mock.calls[0]?.[1] as { headers?: Record<string, string> }
+    expect(config.headers?.['Idempotency-Key']).toMatch(/^rewards:redeem:/)
+  })
+
+  it('reads a cursor page of redemption history through the v1 public plane', async () => {
+    transport.request.mockResolvedValue({
+      data: [
+        {
+          id: 7,
+          reward_code_display_name: '夏日灵感奖励',
+          credited_amount: 80,
+          masked_code_hint: '•••• 2922',
+          redeemed_at: '2026-07-15T10:00:00Z',
+        },
+      ],
+      meta: { next_cursor: 'cursor-next', has_more: true },
     })
 
     const controller = new AbortController()
     await expect(
-      fetchRewardRedemptions({ before_id: 50, limit: 20 }, controller.signal),
+      fetchRewardRedemptions(WORKSPACE_ID, { cursor: 'cursor-prev', page_size: 20 }, controller.signal),
     ).resolves.toMatchObject({
-      redemptions: [{ id: 42, reward_code_display_name: '夏日灵感奖励' }],
-      next_before_id: 40,
+      redemptions: [{ id: 7, reward_code_display_name: '夏日灵感奖励' }],
+      next_cursor: 'cursor-next',
     })
     expect(transport.request).toHaveBeenCalledWith(
-      '/user/rewards/redemptions?before_id=50&limit=20',
+      `/v1/workspaces/${WORKSPACE_ID}/rewards/redemptions?cursor=cursor-prev&page_size=20`,
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
-    expect(rewardRedemptionsQueryKeys.all).toEqual(['user', 'rewards', 'redemptions'])
   })
 
-  it('surfaces API feedback instead of manufacturing an empty page', async () => {
-    transport.request.mockResolvedValue({
-      code: 500,
-      msg: '奖励服务暂不可用',
-      message_safe: true,
-    })
-
-    await expect(fetchRewardRedemptions({ limit: 20 })).rejects.toThrow('奖励服务暂不可用')
-  })
-
-  it.each([
-    [400, 'Invalid request.'],
-    [422, 'This redemption code is invalid or has expired.'],
-    [409, 'You have already redeemed this reward.'],
-    [423, 'This account cannot redeem rewards right now.'],
-    [429, 'Too many attempts. Please try again later.'],
-    [500, 'Network error. Please try again.'],
-  ])('maps redemption HTTP %d to stable user copy', async (status, message) => {
-    transport.request.mockRejectedValue(
-      Object.assign(new Error('unsafe upstream detail'), { status }),
-    )
-
-    await expect(redeemRewardCode('IDEA2026')).rejects.toThrow(message)
-  })
-
-  it('maps redemption transport failures to stable user copy', async () => {
-    transport.request.mockRejectedValue(new Error('fetch failed'))
-
-    await expect(redeemRewardCode('IDEA2026')).rejects.toThrow('Network error. Please try again.')
+  it('keeps the workspace-scoped redemptions query root', () => {
+    expect(rewardRedemptionsQueryKeys.all).toEqual(['workspace', 'rewards', 'redemptions'])
+    expect(rewardRedemptionsQueryKeys.list(WORKSPACE_ID)).toEqual([
+      'workspace',
+      'rewards',
+      'redemptions',
+      WORKSPACE_ID,
+    ])
   })
 })

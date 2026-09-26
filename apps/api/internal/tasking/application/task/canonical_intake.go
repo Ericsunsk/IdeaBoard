@@ -8,11 +8,13 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/validation"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
 )
@@ -51,6 +53,13 @@ const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
 
 // CompileWorkspaceParams applies canonical submit ordering to a workspace v1
 // task envelope and returns the durable typed parameter JSON.
+//
+// Prompt contract (v1 data.prompt, bound: workspacetasks
+// .MaxWorkspaceTaskPromptBytes = 8KB, legacy parity): prompt-required
+// features (generation, inpaint) reject an empty prompt; prompt-ignored
+// features (cutout, upscale) drop user text (binary media operations,
+// legacy parity); the rest carry it into the Generation snapshot
+// (UserPrompt + CompiledPrompt) that the worker bridges to the provider.
 func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
 	feature = strings.TrimSpace(feature)
 	if feature == "" {
@@ -60,6 +69,10 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 	for key, value := range params {
 		working[key] = value
 	}
+	prompt := strings.TrimSpace(userPrompt)
+	if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
+		return "", err
+	}
 	if err := normalizeSubmitExecutionMap(working, feature); err != nil {
 		return "", err
 	}
@@ -67,11 +80,16 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 	if err != nil {
 		return "", err
 	}
+	if plan.PromptPolicy() == workflow.PromptPolicyRequired && prompt == "" {
+		return "", validation.New("prompt 不能为空")
+	}
+	if plan.PromptPolicy() == workflow.PromptPolicyIgnored {
+		prompt = ""
+	}
 	typed, err := finalizeSubmitTypedParams(working, feature, plan)
 	if err != nil {
 		return "", err
 	}
-	prompt := strings.TrimSpace(userPrompt)
 	snapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
 		Plan: plan, UserPrompt: prompt, CompiledPrompt: prompt,
 		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt), Params: typed,
@@ -89,6 +107,9 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug string) error {
 	params["feature"] = featureSlug
 	delete(params, "model")
+	if err := validateWorkspaceMaskParam(params); err != nil {
+		return err
+	}
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
 		return err
 	}
@@ -101,6 +122,25 @@ func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug stri
 		if err := normalizeFusionParams(params); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// validateWorkspaceMaskParam fail-closes the v1 mask reference before any
+// plan work: params.mask_asset_id must be a workspace public asset_... id
+// when present. Data-URL and storage-URL masks are rejected here (mirrored
+// in workspacetasks.ValidateParams) because durable task params must never
+// contain media bytes or URLs; mask bytes arrive via the existing
+// upload-session flow and are linked here by asset id.
+func validateWorkspaceMaskParam(params map[string]interface{}) error {
+	raw, ok := params[paramkeys.MaskAssetID]
+	if !ok {
+		return nil
+	}
+	id, ok := raw.(string)
+	if !ok || !contract.IsAssetID(strings.TrimSpace(id)) ||
+		!contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(id)) {
+		return validation.New("mask_asset_id 非法")
 	}
 	return nil
 }
@@ -456,6 +496,14 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 	}
 	if assetID, ok := readInt64Param(params[paramkeys.MaskImageAssetID]); ok {
 		media.Mask = &tasks.MediaRef{AssetID: assetID, Role: tasks.MediaRoleMask}
+		hasMedia = true
+	}
+	// v1 mask reference (workspace public asset_... id from the
+	// upload-session flow). Wins over the legacy numeric MaskImageAssetID
+	// when both are present; shape was fail-closed in
+	// validateWorkspaceMaskParam above.
+	if id, ok := params[paramkeys.MaskAssetID].(string); ok && strings.TrimSpace(id) != "" {
+		media.Mask = &tasks.MediaRef{PublicAssetID: strings.TrimSpace(id), Role: tasks.MediaRoleMask}
 		hasMedia = true
 	}
 	if v, ok := readBoolParam(params, paramkeys.UseMask); ok {

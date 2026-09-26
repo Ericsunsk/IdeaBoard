@@ -9,6 +9,7 @@
 - `api_account_secrets`：上游模型/API 渠道的 API key、token 或外部 secret 引用。
 - `storage_profile_secrets`：S3-compatible 存储的 access key、secret key 等对象存储凭据。
 - `payment_stripe_configurations`：Stripe Restricted API Key 与 Webhook Secret 的密文，以及当前 Stripe resource references。
+- `event_subscriptions`： outbound webhook 的 endpoint signing secret（`encrypted` 行为 AES-256-GCM 密文，`plaintext` 行为 cutover 前遗留的 `whsec_` 明文）与 `signing_secret_key_version` 主密钥版本指纹。
 - Better Auth 的 `user`、`session`、`account`、`verification` 等身份与会话相关表。
 - 业务用户、任务、画板、媒体索引、Payment Order/Refund/Dispute/Webhook Inbox 与系统配置。
 
@@ -28,9 +29,43 @@
 
 1. 上游模型/API 渠道密钥，对应 `api_account_secrets`。
 2. S3-compatible 对象存储 access key/secret，对应 `storage_profile_secrets`。
-3. 生产环境 Better Auth secret 与 auth internal key，只在怀疑 backup 泄露或传输边界失控时轮换。
+3. Outbound webhook signing secret，对应 `event_subscriptions`（见下节）。
+4. 生产环境 Better Auth secret 与 auth internal key，只在怀疑 backup 泄露或传输边界失控时轮换。
 
 轮换后执行 smoke 检查，确认登录、任务提交、结果回写、上传与 `/uploads/*` 访问正常。
+
+## Outbound Webhook Signing Secret 轮换
+
+`event_subscriptions.signing_secret` 以 `APP_SECRETS_ENCRYPTION_KEY` 信封加密落盘
+（AES-256-GCM，密文覆盖 `whsec_` transport 字符串；`signing_secret_key_version`
+为当前主密钥的 SHA-256 指纹，不含密钥材料）。读链路只返回 masked view
+（`has_secret`），明文仅在创建 server-minted secret 时返回一次。
+
+### 订阅级轮换（subscriber 泄露 / 常规轮换）
+
+删除并重建订阅即可：新订阅 mint 32 字节 secret，加密落盘，`whsec_` 明文仅返回一次。
+通知 subscriber 更新验签密钥。旧订阅删除后，已有 River `webhook_deliver` job
+按未知订阅直接丢弃（不重试、不泄露）。
+
+### 主密钥轮换（`APP_SECRETS_ENCRYPTION_KEY`）
+
+1. 保留旧 key，用同时持有新旧 key 的离线脚本逐行解密再加密：
+   `UPDATE event_subscriptions SET signing_secret = <new_ct>, signing_secret_material_kind = 'encrypted', signing_secret_key_version = <new_fp> WHERE public_id = ...`。
+2. 切换环境变量并重新部署；启动时 `LoadEncryptionKey` fail closed，无 key 拒绝启动。
+3. `key_version` 与当前 key 不一致的行读取直接失败（fail closed，错误不携带任何 secret 材料），
+   以此发现遗漏行并补做步骤 1。
+4. 切 key 窗口期的新写入仍用旧 key 落盘，切换后需要对该窗口行再执行一次步骤 1；
+   要求零窗口时先短暂冻结订阅创建。
+
+### 已知 Residual
+
+- 进程内只有单 key 解密，没有新旧 key 双活 verify：轮换必须走上面的离线重加密流程，
+  不能只换环境变量（否则旧行 fail closed，webhook 投递中断直到补加密）。
+- `plaintext` 遗留行在首次被读到时由 re-encrypt-on-read 自动收敛为密文；
+  该路径是 best-effort（失败只记 `subscription` + `key_version`，不记任何 secret 材料，
+  不影响本次读取）。长期无人访问的遗留行仍以 `whsec_` 明文存在，
+  可用 `SELECT public_id FROM event_subscriptions WHERE signing_secret_material_kind = 'plaintext'`
+  审计并手动触发一次读取完成收敛。
 
 ## Payments 数据边界与保留
 

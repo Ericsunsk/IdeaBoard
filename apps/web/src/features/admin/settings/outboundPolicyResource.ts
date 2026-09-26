@@ -1,10 +1,8 @@
 import { useQuery } from '@tanstack/vue-query'
-import { api } from '../../../shared/api/client'
 import {
-  createApiDataSelector,
-  type ApiResponseWithData,
-} from '../../../shared/api/apiResponse'
-import { updateControlOutboundPolicy } from '../../../shared/api/generated-query/control/control-platform/control-platform'
+  getControlOutboundPolicy,
+  updateControlOutboundPolicy,
+} from '../../../shared/api/generated-query/control/control-platform/control-platform'
 import {
   buildContractRequestHeaders,
   newRequestId,
@@ -12,14 +10,13 @@ import {
 } from '../../../shared/api/contractKernel'
 import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './outboundPolicyContract'
 
-// Admin outbound policy boundary (issue #809). Reads stay on the surviving
-// `/api/admin/settings/outbound-policy` route with the shared envelope;
-// writes go through the Control Plane (`updateControlOutboundPolicy`,
-// operator reason required) with the contract envelope, so every save
-// carries an explicit operator note and an audit record.
+// Admin outbound policy boundary (W2 transports). Reads and writes go
+// through the Control Plane (`getControlOutboundPolicy` /
+// `updateControlOutboundPolicy`, operator reason required) with the
+// contract envelope, so every save carries an explicit operator note and an
+// audit record. The deleted `/api/admin/settings/outbound-policy` route is
+// gone; this module is the single transport.
 export const outboundPolicyQueryKey = ['admin', 'settings', 'outbound-policy'] as const
-const selectOutboundPolicy =
-  createApiDataSelector<OutboundPolicySetting>('加载私有地址访问策略失败')
 
 export type OutboundPolicyMutationOptions = {
   operatorReason: string
@@ -27,26 +24,23 @@ export type OutboundPolicyMutationOptions = {
 }
 
 export function useOutboundPolicyResource() {
-  const query = useQuery<
-    ApiResponseWithData<OutboundPolicySetting>,
-    Error,
-    OutboundPolicySetting
-  >({
+  const query = useQuery<OutboundPolicySetting, Error>({
     queryKey: outboundPolicyQueryKey,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<OutboundPolicySetting>>(
-        '/admin/settings/outbound-policy',
-        {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
-        },
-      ),
-    select: selectOutboundPolicy,
+    queryFn: ({ signal }) => fetchOutboundPolicy(signal),
   })
 
   return {
     query,
     update: updateOutboundPolicy,
+  }
+}
+
+async function fetchOutboundPolicy(signal?: AbortSignal): Promise<OutboundPolicySetting> {
+  try {
+    const body = await getControlOutboundPolicy({ signal })
+    return requireContractData<OutboundPolicySetting>(body, '加载私有地址访问策略失败')
+  } catch (error) {
+    throw withControlCopy(error, '加载私有地址访问策略失败')
   }
 }
 

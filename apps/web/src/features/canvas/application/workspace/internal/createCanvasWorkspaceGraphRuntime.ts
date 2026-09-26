@@ -18,6 +18,7 @@ type CreateCanvasWorkspaceGraphRuntimeOptions = {
   board: CanvasWorkspaceBoardRuntime
   flowPaneAdapter: CanvasVueFlowAdapter
   upload: CanvasGraphEditingUploadAdapter
+  getWorkspaceId?: (() => string) | undefined
   materializeLibraryAsset: LibraryAssetMaterializer
   editingBrowser: CanvasGraphEditingBrowserAdapter
   interactionBrowser: CanvasGraphInteractionBrowserAdapter
@@ -45,6 +46,7 @@ export function createCanvasWorkspaceGraphRuntime(
     screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
     browser: options.editingBrowser,
     upload: options.upload,
+    getWorkspaceId: options.getWorkspaceId,
     materializeLibraryAsset: options.materializeLibraryAsset,
     readLibraryImportAttachment: options.executionCore.currentAttachment,
     selectOnlyNode: flowPaneAdapter.selectOnlyNode,

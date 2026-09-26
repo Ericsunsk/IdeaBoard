@@ -113,27 +113,25 @@ describe('Admin System Settings adapters', () => {
     const updateRequests: unknown[] = []
     let saved = false
     useMswHandlers(
-      http.get('/api/admin/settings/branding', () =>
+      http.get('/api/control/v1/platform/settings/branding', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: saved
             ? { project_name: 'New Brand', logo_url: 'https://cdn.example.com/new.png' }
             : { project_name: 'IdeaBoard', logo_url: '' },
         }),
       ),
-      http.put('/api/admin/settings/branding', async ({ request }) => {
+      http.put('/api/control/v1/platform/settings/branding', async ({ request }) => {
         updateRequests.push(await request.json())
         saved = true
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { project_name: 'New Brand', logo_url: 'https://cdn.example.com/new.png' },
         })
       }),
     )
     const feedback = createBrandingFeedback()
-    const harness = mountComposable(() => useBrandingSettings({ feedback }))
+    const harness = mountComposable(() =>
+      useBrandingSettings({ feedback, confirm: testConfirm() }),
+    )
 
     try {
       await vi.waitFor(() => expect(harness.value.form.value.project_name).toBe('IdeaBoard'))
@@ -165,30 +163,28 @@ describe('Admin System Settings adapters', () => {
     const registrationRequests: unknown[] = []
     let registrationEnabled = false
     useMswHandlers(
-      http.get('/api/admin/settings/registration', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { enabled: registrationEnabled } }),
+      http.get('/api/control/v1/platform/settings/registration', () =>
+        HttpResponse.json({ data: { enabled: registrationEnabled } }),
       ),
-      http.put('/api/admin/settings/registration', async ({ request }) => {
+      http.put('/api/control/v1/platform/settings/registration', async ({ request }) => {
         const body = (await request.json()) as { enabled: boolean }
         registrationRequests.push(body)
         registrationEnabled = body.enabled
-        return HttpResponse.json({ code: 0, msg: 'ok', data: body })
+        return HttpResponse.json({ data: body })
       }),
-      http.get('/api/admin/settings/rate-limit', () =>
+      http.get('/api/control/v1/platform/settings/rate-limit', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { window_seconds: 60, max_requests: 120 },
         }),
       ),
-      http.put('/api/admin/settings/rate-limit', async ({ request }) => {
+      http.put('/api/control/v1/platform/settings/rate-limit', async ({ request }) => {
         const body = await request.json()
         rateLimitRequests.push(body)
-        return HttpResponse.json({ code: 0, msg: 'ok', data: body })
+        return HttpResponse.json({ data: body })
       }),
     )
     const feedback = createAccessFeedback()
-    const harness = mountComposable(() => useAccessSettings({ feedback }))
+    const harness = mountComposable(() => useAccessSettings({ feedback, confirm: testConfirm() }))
 
     try {
       await vi.waitFor(() => expect(harness.value.rateLimitForm.value.window_seconds).toBe(60))
@@ -218,16 +214,21 @@ describe('Admin System Settings adapters', () => {
   it('keeps a failed Media Upload save editable and reports feedback', async () => {
     const updateRequests: unknown[] = []
     useMswHandlers(
-      http.get('/api/admin/settings/media-upload', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { upload_max_concurrent: 8 } }),
+      http.get('/api/control/v1/platform/settings/media-upload', () =>
+        HttpResponse.json({ data: { upload_max_concurrent: 8 } }),
       ),
-      http.put('/api/admin/settings/media-upload', async ({ request }) => {
+      http.put('/api/control/v1/platform/settings/media-upload', async ({ request }) => {
         updateRequests.push(await request.json())
-        return HttpResponse.json({ code: 500, msg: 'save failed' }, { status: 500 })
+        return HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'save failed' } },
+          { status: 500 },
+        )
       }),
     )
     const feedback = createSettingFeedback() as AdminMediaUploadSettingsFeedback
-    const harness = mountComposable(() => useMediaUploadSettings({ feedback }))
+    const harness = mountComposable(() =>
+      useMediaUploadSettings({ feedback, confirm: testConfirm() }),
+    )
 
     try {
       await vi.waitFor(() => expect(harness.value.form.value.upload_max_concurrent).toBe(8))
@@ -253,6 +254,13 @@ describe('Admin System Settings adapters', () => {
     }
   })
 })
+
+function testConfirm() {
+  return {
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: () => 'lifecycle review',
+  }
+}
 
 function mountComposable<T>(setupComposable: () => T) {
   let value: T | null = null

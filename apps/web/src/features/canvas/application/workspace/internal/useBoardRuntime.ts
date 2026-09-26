@@ -16,6 +16,7 @@ type UseBoardRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
+  getWorkspaceId?: (() => string) | undefined
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: BoardRuntimeFeedback
   executionCore: PendingImageExecutionCore
@@ -48,6 +49,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
   const boardSession = useBoardSession({
     getBoardIdQuery: () => options.route.query.boardId,
     getUserIdentity: options.getUserIdentity,
+    getWorkspaceId: options.getWorkspaceId,
     message: {
       warning: options.feedback.warning,
     },

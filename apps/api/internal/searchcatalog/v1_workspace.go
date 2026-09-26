@@ -18,14 +18,19 @@ package searchcatalog
 //     silent empty pages.
 //   - Vision-query inputs reference owned workspace library assets by
 //     lasset_ id (shape-checked here, existence-checked against the
-//     workspace library store at the handler); client bytes never cross
-//     the v1 vision boundary, so no multipart surface is introduced.
+//     workspace library store at the handler), staged workspace uploads
+//     by upload_ id (stage-then-reference through the upload-session
+//     byte PUT; existence, liveness, and staged bytes are checked at
+//     the handler), and external images by allowlisted https URL
+//     (IsV1VisionExternalImageURL). Client bytes never cross the v1
+//     vision boundary, so no multipart surface is introduced.
 //   - Vision billing reuses the ai-search:vision SKU semantics from the
 //     application vision_billing service (quote + hold/capture/release
 //     through credits.Commands); this file only bounds the input.
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -119,16 +124,49 @@ func ParseV1SearchProviders(raw []string) ([]string, error) {
 }
 
 // V1VisionQueryInput is the validated v1 vision request: free text plus
-// owned workspace library references (no client bytes).
+// owned references (workspace library assets, staged workspace uploads,
+// and allowlisted external image URLs). Client bytes never cross the
+// boundary: upload bytes ride the upload-session byte PUT first and are
+// referenced here by upload_ id only.
 type V1VisionQueryInput struct {
 	UserText        string
 	LibraryAssetIDs []string
+	UploadIDs       []string
+	ImageURLs       []string
+}
+
+// V1VisionExternalImageHosts is the fail-closed CDN allowlist for v1
+// vision external refs: exact-host https only. It mirrors the tree's
+// existing gates (the searchcatalog provider-result filter and the
+// legacy vision input reader); hosts outside this set fail validation
+// with ErrV1VisionInput and are never fetched.
+var V1VisionExternalImageHosts = []string{"images.unsplash.com", "plus.unsplash.com", "images.pexels.com"}
+
+// IsV1VisionExternalImageURL reports whether raw is an allowlisted
+// https image URL (exact host match, no exotic ports).
+func IsV1VisionExternalImageURL(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+		return false
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	for _, allowed := range V1VisionExternalImageHosts {
+		if host == allowed {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateV1VisionQueryInput enforces text/refs presence, the 200-rune
-// text bound, at most 4 refs, and lasset_ shape per ref (existence and
-// workspace binding are checked against the library store at the
-// handler; hidden refs converge to 404 there).
+// text bound, at most 4 refs in total across all three ref kinds, and
+// per-ref shapes (lasset_ for library refs, upload_ for staged-upload
+// refs, allowlisted https for external URLs). Existence and workspace
+// binding are checked against the owning stores at the handler; hidden
+// refs converge to 404 there.
 func ValidateV1VisionQueryInput(input V1VisionQueryInput) (V1VisionQueryInput, error) {
 	normalized := V1VisionQueryInput{UserText: strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")}
 	if utf8.RuneCountInString(normalized.UserText) > V1MaxQueryRunes {
@@ -146,22 +184,66 @@ func ValidateV1VisionQueryInput(input V1VisionQueryInput) (V1VisionQueryInput, e
 		seen[trimmed] = struct{}{}
 		normalized.LibraryAssetIDs = append(normalized.LibraryAssetIDs, trimmed)
 	}
-	if len(normalized.LibraryAssetIDs) > V1MaxVisionAssetRefs {
+	seenUploads := make(map[string]struct{}, len(input.UploadIDs))
+	for _, raw := range input.UploadIDs {
+		trimmed := strings.TrimSpace(raw)
+		if !contract.IsUploadID(trimmed) {
+			return V1VisionQueryInput{}, ErrV1VisionInput
+		}
+		if _, ok := seenUploads[trimmed]; ok {
+			continue
+		}
+		seenUploads[trimmed] = struct{}{}
+		normalized.UploadIDs = append(normalized.UploadIDs, trimmed)
+	}
+	seenURLs := make(map[string]struct{}, len(input.ImageURLs))
+	for _, raw := range input.ImageURLs {
+		trimmed := strings.TrimSpace(raw)
+		if !IsV1VisionExternalImageURL(trimmed) {
+			return V1VisionQueryInput{}, ErrV1VisionInput
+		}
+		if _, ok := seenURLs[trimmed]; ok {
+			continue
+		}
+		seenURLs[trimmed] = struct{}{}
+		normalized.ImageURLs = append(normalized.ImageURLs, trimmed)
+	}
+	if len(normalized.LibraryAssetIDs)+len(normalized.UploadIDs)+len(normalized.ImageURLs) > V1MaxVisionAssetRefs {
 		return V1VisionQueryInput{}, ErrV1VisionInput
 	}
-	if normalized.UserText == "" && len(normalized.LibraryAssetIDs) == 0 {
+	if normalized.UserText == "" && len(normalized.LibraryAssetIDs) == 0 && len(normalized.UploadIDs) == 0 && len(normalized.ImageURLs) == 0 {
 		return V1VisionQueryInput{}, ErrV1VisionInput
 	}
 	return normalized, nil
 }
 
-// V1VisionReference is one server-resolved vision input: provider URL +
-// source metadata handed to the extractor seam. Bytes never cross this
-// boundary (provider fetch stays #808-owned).
+// Vision reference kinds carried on V1VisionReference.Kind.
+const (
+	// V1VisionReferenceLibrary is an owned workspace library asset
+	// (the original v1 vision input).
+	V1VisionReferenceLibrary = "library"
+	// V1VisionReferenceUpload is a staged workspace upload referenced
+	// by upload_ id (ObjectKey locates the staged bytes server-side).
+	V1VisionReferenceUpload = "upload"
+	// V1VisionReferenceExternal is an allowlisted external image URL.
+	V1VisionReferenceExternal = "external"
+)
+
+// V1VisionReference is one server-resolved vision input handed to the
+// extractor seam. Library refs carry provider URL + source metadata;
+// upload refs carry the staged byte locator (resolved server-side,
+// never client bytes); external refs carry the validated allowlisted
+// URL. Bytes never cross this boundary (provider fetch stays
+// #808-owned).
 type V1VisionReference struct {
 	Provider   string
 	SourceID   string
 	SourceURL  string
 	PreviewURL string
 	Title      string
+	Kind       string
+	UploadID   string
+	ObjectKey  string
+	MIMEType   string
+	ImageURL   string
 }

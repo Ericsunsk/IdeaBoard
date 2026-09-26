@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"ideaboard/api/internal/platform/secrets"
 )
 
 // PostgresWebhookPersistence stores subscriptions, aggregate deliveries and
@@ -32,12 +36,20 @@ func (p *PostgresWebhookPersistence) CreateSubscription(ctx context.Context, sub
 	if sub == nil {
 		return fmt.Errorf("events: webhook subscription is nil")
 	}
+	// Signing secrets are encrypted at rest (Security H1): the column
+	// holds AES-256-GCM ciphertext over the whsec_ transport string, and
+	// the kind/version columns record the envelope for dual-read and
+	// rotation detection. Writes fail closed without the master key.
+	payload, materialKind, keyVersion, err := encodeStoredWebhookSecret(sub.Secret)
+	if err != nil {
+		return fmt.Errorf("events: encrypt webhook signing secret: %w", err)
+	}
 	result, err := p.db.Exec(ctx, `
-INSERT INTO event_subscriptions (public_id, workspace_id, endpoint_url, signing_secret, event_types, status, created_at, updated_at)
-SELECT $1, internal_id, $3, $4, $5, 'active', $6, $6
+INSERT INTO event_subscriptions (public_id, workspace_id, endpoint_url, signing_secret, signing_secret_material_kind, signing_secret_key_version, event_types, status, created_at, updated_at)
+SELECT $1, internal_id, $3, $4, $5, $6, $7, 'active', $8, $8
 FROM workspaces WHERE public_id = $2 AND archived_at IS NULL
 ON CONFLICT (public_id) DO NOTHING`, sub.ID, sub.WorkspaceID, sub.URL,
-		FormatWhsecSecret(sub.Secret), sub.EventTypes, sub.CreatedAt.UTC())
+		payload, materialKind, keyVersion, sub.EventTypes, sub.CreatedAt.UTC())
 	if err != nil {
 		return err
 	}
@@ -60,7 +72,7 @@ func (p *PostgresWebhookPersistence) LoadSubscriptions(ctx context.Context) ([]*
 		return nil, err
 	}
 	rows, err := p.db.Query(ctx, `
-SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.event_types,
+SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.signing_secret_material_kind, s.signing_secret_key_version, s.event_types,
        s.status, s.created_at, s.updated_at
 FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id
 ORDER BY s.created_at, s.public_id`)
@@ -71,12 +83,12 @@ ORDER BY s.created_at, s.public_id`)
 	var result []*WebhookSubscription
 	for rows.Next() {
 		var sub WebhookSubscription
-		var encoded string
-		if err := rows.Scan(&sub.ID, &sub.WorkspaceID, &sub.URL, &encoded, &sub.EventTypes, &sub.Status, &sub.CreatedAt, &sub.UpdatedAt); err != nil {
+		var payload, materialKind, keyVersion string
+		if err := rows.Scan(&sub.ID, &sub.WorkspaceID, &sub.URL, &payload, &materialKind, &keyVersion, &sub.EventTypes, &sub.Status, &sub.CreatedAt, &sub.UpdatedAt); err != nil {
 			return nil, err
 		}
-		secret, ok := ParseWhsecSecret([]byte(encoded))
-		if !ok {
+		secret, err := decodeStoredWebhookSecret(payload, materialKind, keyVersion)
+		if err != nil {
 			return nil, fmt.Errorf("events: persisted secret for %s is malformed", sub.ID)
 		}
 		sub.Secret = secret
@@ -85,6 +97,9 @@ ORDER BY s.created_at, s.public_id`)
 			return nil, err
 		}
 		result = append(result, &sub)
+		if strings.TrimSpace(materialKind) == webhookSecretMaterialPlaintext {
+			p.maybeReencryptStoredSecret(ctx, sub.ID, secret)
+		}
 	}
 	return result, rows.Err()
 }
@@ -94,20 +109,20 @@ func (p *PostgresWebhookPersistence) LoadSubscription(ctx context.Context, id st
 		return nil, err
 	}
 	var sub WebhookSubscription
-	var encoded string
+	var payload, materialKind, keyVersion string
 	err := p.db.QueryRow(ctx, `
-SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.event_types,
+SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.signing_secret_material_kind, s.signing_secret_key_version, s.event_types,
        s.status, s.created_at, s.updated_at
 FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id
-	WHERE s.public_id = $1`, id).Scan(&sub.ID, &sub.WorkspaceID, &sub.URL, &encoded, &sub.EventTypes, &sub.Status, &sub.CreatedAt, &sub.UpdatedAt)
+	WHERE s.public_id = $1`, id).Scan(&sub.ID, &sub.WorkspaceID, &sub.URL, &payload, &materialKind, &keyVersion, &sub.EventTypes, &sub.Status, &sub.CreatedAt, &sub.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	secret, ok := ParseWhsecSecret([]byte(encoded))
-	if !ok {
+	secret, derr := decodeStoredWebhookSecret(payload, materialKind, keyVersion)
+	if derr != nil {
 		return nil, fmt.Errorf("events: persisted secret for %s is malformed", id)
 	}
 	sub.Secret = secret
@@ -115,7 +130,39 @@ FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id
 	if err := p.hydrateSubscription(ctx, &sub); err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(materialKind) == webhookSecretMaterialPlaintext {
+		p.maybeReencryptStoredSecret(ctx, sub.ID, secret)
+	}
 	return &sub, nil
+}
+
+// maybeReencryptStoredSecret converges a pre-migration plaintext row to
+// the encrypted envelope after a successful dual-read. Best-effort by
+// design: the caller already holds the correct in-memory secret, so a
+// re-encrypt failure only logs (never fails the read, never carries
+// secret material). The conditional UPDATE keeps concurrent readers from
+// clobbering each other.
+func (p *PostgresWebhookPersistence) maybeReencryptStoredSecret(ctx context.Context, subscriptionID string, raw []byte) {
+	if !secrets.IsEncryptionEnabled() {
+		return
+	}
+	payload, materialKind, keyVersion, err := encodeStoredWebhookSecret(raw)
+	if err != nil {
+		slog.Warn("webhook signing key re-encrypt skipped", "subscription", subscriptionID, "err", err)
+		return
+	}
+	result, err := p.db.Exec(ctx, `
+UPDATE event_subscriptions
+SET signing_secret = $2, signing_secret_material_kind = $3, signing_secret_key_version = $4, updated_at = now()
+WHERE public_id = $1 AND signing_secret_material_kind = $5`,
+		subscriptionID, payload, materialKind, keyVersion, webhookSecretMaterialPlaintext)
+	if err != nil {
+		slog.Warn("webhook signing key re-encrypt failed", "subscription", subscriptionID, "err", err)
+		return
+	}
+	if result.RowsAffected() == 1 {
+		slog.Info("webhook signing key re-encrypted", "subscription", subscriptionID, "key_version", keyVersion)
+	}
 }
 
 func (p *PostgresWebhookPersistence) hydrateSubscription(ctx context.Context, sub *WebhookSubscription) error {

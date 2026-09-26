@@ -2567,12 +2567,19 @@ CREATE INDEX idx_workspace_events_type ON workspace_events (event_type, occurred
 CREATE INDEX idx_workspace_events_resource ON workspace_events (resource_type, resource_id, occurred_at DESC);
 
 -- Webhook subscriptions with filtered event types and endpoint signing secrets.
+-- signing_secret is encrypted at rest (AES-256-GCM via APP_SECRETS_ENCRYPTION_KEY):
+-- material_kind='encrypted' rows hold ciphertext over the whsec_ transport string;
+-- material_kind='plaintext' rows predate the encryption cutover and are accepted on
+-- read only (converged to 'encrypted' by best-effort re-encrypt-on-read).
+-- key_version fingerprints the encrypting master key generation for rotation detection.
 CREATE TABLE event_subscriptions (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   endpoint_url TEXT NOT NULL,
   signing_secret TEXT NOT NULL,
+  signing_secret_material_kind TEXT NOT NULL DEFAULT 'plaintext',
+  signing_secret_key_version TEXT NOT NULL DEFAULT '',
   event_types TEXT[] NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2580,7 +2587,12 @@ CREATE TABLE event_subscriptions (
   CONSTRAINT uq_event_subscriptions_public_id UNIQUE (public_id),
   CONSTRAINT chk_event_subscriptions_public_id CHECK (public_id LIKE 'sub\_%'),
   CONSTRAINT chk_event_subscriptions_status CHECK (status IN ('active','paused','disabled')),
-  CONSTRAINT chk_event_subscriptions_event_types CHECK (array_length(event_types, 1) > 0)
+  CONSTRAINT chk_event_subscriptions_event_types CHECK (array_length(event_types, 1) > 0),
+  CONSTRAINT chk_event_subscriptions_secret_material CHECK (signing_secret_material_kind IN ('plaintext', 'encrypted')),
+  CONSTRAINT chk_event_subscriptions_secret_payload CHECK (
+    (signing_secret_material_kind = 'encrypted' AND btrim(signing_secret) <> '')
+    OR (signing_secret_material_kind = 'plaintext' AND signing_secret LIKE 'whsec\_%')
+  )
 );
 
 CREATE INDEX idx_event_subscriptions_workspace ON event_subscriptions (workspace_id, created_at DESC);

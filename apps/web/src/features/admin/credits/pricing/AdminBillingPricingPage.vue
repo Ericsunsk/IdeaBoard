@@ -147,7 +147,8 @@ import { adminDashboardRootClass, adminEmptyStateClass } from '../../shared/lib/
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
 import { usePricingModelAdapter } from './usePricingModelAdapter'
 import {
@@ -305,20 +306,22 @@ async function confirmArchivedDelete(item: AdminBillableItemCard) {
   if (item.status !== 'archived' || deletePending[item.sku]) return
   const confirmed = await confirm.confirm({
     title: '删除已归档功能',
-    message: `确定彻底删除“${item.displayName}”及其价格配置吗？此操作不可撤销。`,
+    message: `确定彻底删除“${item.displayName}”及其价格配置吗？此操作不可撤销，且将记录操作人与原因。`,
     confirmLabel: '确认删除',
     intent: 'danger',
+    reason: { required: true },
   })
-  if (confirmed) {
-    await deleteArchived(item)
-  }
+  if (!confirmed) return
+  const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
+  if (!operatorReason) return
+  await deleteArchived(item, operatorReason)
 }
 
-async function deleteArchived(item: AdminBillableItemCard) {
+async function deleteArchived(item: AdminBillableItemCard, operatorReason: string) {
   if (deletePending[item.sku]) return
   deletePending[item.sku] = true
   try {
-    await resource.deleteArchived(item.sku)
+    await resource.deleteArchived(item.sku, { operatorReason })
     items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
     toast.success('已归档功能已删除')
   } catch (error) {
@@ -331,10 +334,18 @@ async function deleteArchived(item: AdminBillableItemCard) {
 async function publishPrice(prices: Record<PricingVariant, number | undefined>) {
   const item = selectedItem.value
   if (!item || publishPending.value) return
+  // Control writes require an operator reason (audit); a cancelled dialog
+  // aborts silently.
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: '发布价格',
+    message: `确定发布“${item.displayName}”的价格配置吗？该操作将记录操作人与原因。`,
+    confirmLabel: '发布价格',
+  })
+  if (!operatorReason) return
   publishPending.value = true
   publishError.value = ''
   try {
-    const published = await resource.publishPrices(item.sku, prices)
+    const published = await resource.publishPrices(item.sku, prices, { operatorReason })
     item.currentPrices = published
     const latest = Object.values(published).sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
@@ -354,9 +365,15 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
   if (availabilityPending[item.sku] || item.status === 'unpriced' || item.status === 'archived') {
     return
   }
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: enabled ? '启用功能' : '停用功能',
+    message: `确定${enabled ? '启用' : '停用'}“${item.displayName}”吗？该操作将记录操作人与原因。`,
+    confirmLabel: enabled ? '启用' : '停用',
+  })
+  if (!operatorReason) return
   availabilityPending[item.sku] = true
   try {
-    const availability = await resource.setAvailability(item.sku, enabled)
+    const availability = await resource.setAvailability(item.sku, enabled, { operatorReason })
     item.status = availability.status
     item.updatedAt = availability.updatedAt
     toast.success(enabled ? '功能已启用' : '功能已停用')

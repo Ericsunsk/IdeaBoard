@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
+import { readConfirmReason } from '../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import {
   createAdminStorageResource,
   type AdminStorageResource,
@@ -113,24 +115,54 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     }
   }
 
-  async function saveProfile(input: SaveStorageProfileInput): Promise<StorageProfileCommandResult> {
-    const response = await resource.saveProfile(input)
+  async function saveProfile(
+    input: SaveStorageProfileInput,
+  ): Promise<StorageProfileCommandResult | null> {
+    const operatorReason = await confirmStorageWrite({
+      title: input.id ? '保存存储配置' : '新建存储配置',
+      message: '确定保存该存储配置吗？该操作将记录操作人与原因。',
+      confirmLabel: '保存配置',
+    })
+    if (!operatorReason) return null
+    const response = await resource.saveProfile(input, { operatorReason })
     await refreshAfterCommand()
     return response
   }
 
-  async function applyProfile(id: string): Promise<StorageProfileCommandResult> {
-    const response = await resource.applyProfile(id)
+  async function applyProfile(id: string): Promise<StorageProfileCommandResult | null> {
+    const operatorReason = await confirmStorageWrite({
+      title: '设为当前存储',
+      message: '确定将该存储设为当前存储吗？该操作将记录操作人与原因。',
+      confirmLabel: '设为当前',
+    })
+    if (!operatorReason) return null
+    const response = await resource.applyProfile(id, { operatorReason })
     await refreshAfterCommand()
     return response
   }
 
   function testProfile(id: string) {
-    return resource.testProfile(id)
+    return testStorageById(id)
+  }
+
+  async function testStorageById(id: string) {
+    const operatorReason = await confirmStorageWrite({
+      title: '测试存储连接',
+      message: '将使用已保存的配置发起一次真实连接测试。该操作将记录操作人与原因。',
+      confirmLabel: '测试连接',
+    })
+    if (!operatorReason) return null
+    return resource.testProfile(id, { operatorReason })
   }
 
   async function deleteProfile(id: string) {
-    const response = await resource.deleteProfile(id)
+    const operatorReason = await confirmStorageWrite({
+      title: '确认删除存储',
+      message: '确定删除该存储配置吗？此操作不可恢复，且将记录操作人与原因。',
+      confirmLabel: '确定删除',
+    })
+    if (!operatorReason) return null
+    const response = await resource.deleteProfile(id, { operatorReason })
     await refreshAfterCommand()
     return response
   }
@@ -142,6 +174,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     await options.runAsyncAction(
       async () => {
         const response = await applyProfile(storage.id)
+        if (!response) return
         options.feedback.applyCurrentSucceeded(response.message)
       },
       {
@@ -165,7 +198,8 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     await options.runAsyncAction(
       async () => {
-        const response = await resource.testProfile(storage.id)
+        const response = await testStorageById(storage.id)
+        if (!response) return
         options.feedback.testConnectionSucceeded(response.message)
       },
       {
@@ -192,13 +226,16 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
     const confirmed = await options.confirm.confirm({
       title: '确认删除存储',
-      message: `确定删除存储「${storage.name}」吗？此操作不可恢复。`,
+      message: `确定删除存储「${storage.name}」吗？此操作不可恢复，且将记录操作人与原因。`,
       confirmLabel: '确定删除',
       intent: 'danger',
+      reason: { required: true },
     })
     if (!confirmed) return
+    const operatorReason = (options.confirm.readReason?.() ?? readConfirmReason()).trim()
+    if (!operatorReason) return
     try {
-      const response = await resource.deleteProfile(storage.id)
+      const response = await resource.deleteProfile(storage.id, { operatorReason })
       options.feedback.profileDeleted(response.message)
       commandOptions.afterDeleted?.(storage.id)
       await refreshAfterCommand()
@@ -209,6 +246,17 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   function fetchBucketDomains(id: string) {
     return resource.fetchBucketDomains(id)
+  }
+
+  // Control storage mutations require an operator reason (audit). Collect
+  // it through the shared confirm dialog; a cancelled dialog aborts
+  // silently (null) so no failure feedback fires.
+  function confirmStorageWrite(dialog: {
+    title: string
+    message: string
+    confirmLabel: string
+  }): Promise<string | null> {
+    return confirmSettingsSave(options.confirm, dialog)
   }
 
   function providerLabel(provider: string) {

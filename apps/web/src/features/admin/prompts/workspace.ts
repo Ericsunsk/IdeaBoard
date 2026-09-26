@@ -1,5 +1,7 @@
 import { computed, onMounted, reactive, ref, toRef } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 import {
   getWorkflowFeaturePromptVariables,
@@ -29,6 +31,7 @@ export type PromptDraftValidation = {
 
 export type AdminPromptConfigWorkspaceOptions = {
   feedback: AdminPromptConfigFeedback
+  confirm: AdminConfirmPort
   runAsyncAction: RunAsyncAction
   getFeatureTitle?: (slug: string) => string
   resource?: AdminPromptConfigResource
@@ -167,12 +170,24 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       return null
     }
 
+    // Control writes require an operator reason (audit); a cancelled
+    // dialog aborts silently.
+    const operatorReason = await confirmSettingsSave(options.confirm, {
+      title: '保存提示词',
+      message: `确定保存 ${getFeatureTitle(slug)} 的提示词模板吗？该操作将记录操作人与原因。`,
+      confirmLabel: '保存',
+    })
+    if (!operatorReason) return null
+
     const config = await options.runAsyncAction(
       async () => {
-        const savedConfig = await resource.savePrompt({
-          slug,
-          prompt: promptMap[slug] || '',
-        })
+        const savedConfig = await resource.savePrompt(
+          {
+            slug,
+            prompt: promptMap[slug] || '',
+          },
+          { operatorReason },
+        )
         syncPromptConfig(savedConfig, { preserveDirtyDraft: false })
         await refreshPromptData({ preserveDirtyDraft: true })
         return savedConfig

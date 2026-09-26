@@ -2,11 +2,10 @@ import {
   WORKFLOW_FEATURE,
   type WorkflowFeature,
 } from '../../../../../shared/domain/workflowFeatures'
-import {
-  taskApi,
-  type SubmitTaskData,
-  type SubmitTaskReadinessData,
-} from '../../../../../shared/api/task'
+import type {
+  SubmitTaskData,
+  SubmitTaskReadinessData,
+} from '../../../domain/execution-contracts/canvasTaskRequest'
 import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
@@ -18,7 +17,11 @@ import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
-import type { SubmitTaskReadinessMatrixRequest } from '../../../../../shared/api/task'
+import type { SubmitTaskReadinessMatrixRequest } from '../../../domain/execution-contracts/canvasTaskRequest'
+import {
+  fetchCanvasWorkspaceTaskReadiness,
+  fetchCanvasWorkspaceTaskReadinessMatrix,
+} from '../workspace/canvasWorkspaceTaskAdapter'
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
@@ -45,19 +48,19 @@ export async function fetchCanvasBillingReadiness(
   feature: WorkflowFeature,
   request?: SubmitTaskData,
 ): Promise<SubmitTaskReadinessData> {
-  return taskApi.checkSubmitReadiness({
-    ...withTaskClientActionId(
+  return fetchCanvasWorkspaceTaskReadiness(
+    withTaskClientActionId(
       request ?? buildCanvasBillingReadinessRequest(feature),
       createCanvasTaskClientActionId(),
     ),
-  })
+  )
 }
 
 export async function fetchCanvasBillingReadinessMatrix(
   requests: NonNullable<SubmitTaskReadinessMatrixRequest['requests']>,
 ): Promise<SubmitTaskReadinessData[]> {
   if (requests.length === 0) return []
-  return taskApi.checkSubmitReadinessMatrix({ requests })
+  return fetchCanvasWorkspaceTaskReadinessMatrix(requests)
 }
 
 export function buildFusionBillingReadinessRequest(input: {

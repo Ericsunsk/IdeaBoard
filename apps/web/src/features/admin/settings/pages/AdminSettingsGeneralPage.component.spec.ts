@@ -11,10 +11,8 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 describe('AdminSettingsGeneralPage', () => {
   beforeEach(() => {
     useMswHandlers(
-      http.get('/api/admin/settings/branding', () =>
+      http.get('/api/control/v1/platform/settings/branding', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { project_name: 'IdeaBoard Test', logo_url: '' },
         }),
       ),

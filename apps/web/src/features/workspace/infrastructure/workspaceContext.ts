@@ -25,6 +25,7 @@ import {
   writeLocalStorageItem,
 } from '../../../shared/utils/storage'
 import { isOpaqueId, opaqueIdPrefix } from '../../../shared/api/contractKernel'
+import { setMediaWorkspaceIdResolver } from '../../../shared/api/mediaWorkspaceScope'
 
 export const WORKSPACE_URL_PARAM = 'workspace'
 export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'
@@ -194,6 +195,10 @@ let sharedStore: WorkspaceSelectionStore | null = null
 
 export function getWorkspaceSelectionStore(): WorkspaceSelectionStore {
   if (!sharedStore) sharedStore = createWorkspaceSelectionStore()
+  // IoC registration for `shared/api/mediaAssetDelivery` (which must not
+  // import this feature module): resolve implicit workspace ids from the
+  // shared singleton. Idempotent; runs on every access.
+  setMediaWorkspaceIdResolver(() => sharedStore?.getSelectedId() ?? null)
   return sharedStore
 }
 

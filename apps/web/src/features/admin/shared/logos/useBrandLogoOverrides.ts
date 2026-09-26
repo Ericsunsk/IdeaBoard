@@ -1,7 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue'
 import { watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { api } from '../../../../shared/api/client'
+import { adminControlUnavailable } from '../lib/controlGuidance'
 import {
   ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY,
   hydrateAdminBrandLogoOverrides,
@@ -9,15 +9,12 @@ import {
 } from './brandLogoResource'
 
 export function useBrandLogoOverrides(enabled: MaybeRefOrGetter<boolean>) {
-  const query = useQuery({
+  const query = useQuery<ApiResponseAdminBrandLogoOverrideList, Error>({
     queryKey: ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseAdminBrandLogoOverrideList>('/admin/brand-logo-overrides', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
+    queryFn: () => Promise.reject(adminControlUnavailable('logo-upload')),
     enabled,
     staleTime: Infinity,
+    retry: false,
   })
 
   watch(

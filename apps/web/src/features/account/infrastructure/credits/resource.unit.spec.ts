@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchCreditWallet } from './resource'
+import { fetchCreditWallet, creditsQueryKeys } from './resource'
+import { WORKSPACE_SELECTION_REQUIRED_CODE } from '../workspaceBilling'
 
 const transport = vi.hoisted(() => ({
   request: vi.fn(),
@@ -9,38 +10,61 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
+const WORKSPACE_ID = 'ws_123'
+
 describe('creditsResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('reads only the authenticated user wallet endpoint', async () => {
+  it('reads the workspace balance through the v1 public plane', async () => {
     transport.request.mockResolvedValue({
-      code: 0,
-      data: { user_id: 7, status: 'active', available_credits: 128, reserved_credits: 4 },
+      data: {
+        workspace_id: WORKSPACE_ID,
+        available_credits: 128,
+        reserved_credits: 4,
+        status: 'active',
+      },
     })
 
-    await expect(fetchCreditWallet()).resolves.toMatchObject({
-      user_id: 7,
+    const controller = new AbortController()
+    await expect(fetchCreditWallet(WORKSPACE_ID, controller.signal)).resolves.toMatchObject({
+      public_id: WORKSPACE_ID,
       available_credits: 128,
+      reserved_credits: 4,
     })
     expect(transport.request).toHaveBeenCalledWith(
-      '/user/credits/wallet',
-      expect.objectContaining({ method: 'GET' }),
+      `/v1/workspaces/${WORKSPACE_ID}/credits/balance`,
+      expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
+    expect(creditsQueryKeys.wallet(WORKSPACE_ID)).toEqual([
+      'workspace',
+      'credits',
+      'wallet',
+      WORKSPACE_ID,
+    ])
   })
 
-  it('surfaces API feedback instead of returning an empty wallet', async () => {
+  it('fails closed with guidance when no workspace is selected', async () => {
+    await expect(fetchCreditWallet('')).rejects.toMatchObject({
+      code: WORKSPACE_SELECTION_REQUIRED_CODE,
+    })
+    expect(transport.request).not.toHaveBeenCalled()
+  })
+
+  it('surfaces contract error feedback instead of returning an empty wallet', async () => {
     transport.request.mockResolvedValue({
-      code: 404,
-      msg: 'Idea钱包不存在',
-      message_safe: true,
+      error: { code: 'billing_wallet_restricted', message: '钱包受限' },
     })
 
-    await expect(fetchCreditWallet()).rejects.toThrow('Idea钱包不存在')
+    await expect(fetchCreditWallet(WORKSPACE_ID)).rejects.toThrow('钱包受限')
   })
 
   it('uses the resource fallback when API feedback contains sensitive details', async () => {
-    transport.request.mockResolvedValue({ code: 500, msg: 'api_key=exposed' })
+    transport.request.mockResolvedValue({
+      error: { code: 'internal_error', message: 'api_key=exposed' },
+    })
 
-    await expect(fetchCreditWallet()).rejects.toThrow('Could not load your Ideas balance.')
+    await expect(fetchCreditWallet(WORKSPACE_ID)).rejects.toThrow(
+      'Could not load your Ideas balance.',
+    )
   })
 })

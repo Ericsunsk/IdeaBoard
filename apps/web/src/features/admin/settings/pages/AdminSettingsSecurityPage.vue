@@ -117,11 +117,15 @@ import {
   useAccessSettings,
 } from '../useAccessSettings'
 import { useAdminAccessSettingsFeedback } from '../useSettingsFeedback'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 
-const access = useAccessSettings({ feedback: useAdminAccessSettingsFeedback() })
+const access = useAccessSettings({
+  feedback: useAdminAccessSettingsFeedback(),
+  confirm: useAdminConfirm(),
+})
 
 const {
   rateLimitForm,

@@ -13,8 +13,12 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { MediaAssetId } from './mediaAssetId'
 
 /**
- * Feature params object (unknown fields rejected; no storage URLs).
+ * Feature params object (unknown fields rejected; no storage URLs; params.prompt still renders 422 unknown_field).
  */
-export type CreateWorkspaceTaskRequestDataParams = { [key: string]: unknown }
+export type CreateWorkspaceTaskRequestDataParams = {
+  /** Inpaint-only durable mask path (mask bytes arrive via the upload-session flow, linked here by asset id). Data-URL and storage-URL masks render 422; inpaint without a mask, or a mask on any non-inpaint feature, renders 422 validation_failed. Mask assets gate on the same ready/archived semantics as inputs (404 media_not_found, 409 media_not_ready, 410 media_archived). */
+  mask_asset_id?: MediaAssetId
+}

@@ -11,7 +11,7 @@ import {
 } from '../../editing'
 import type { CanvasImageWorkflowUiAdapter } from '../../image-workflow'
 import { createCanvasTaskLifecycle } from '../../execution/task-lifecycle'
-import { taskApi } from '../../../../../shared/api/task'
+import { cancelCanvasWorkspaceTask } from '../../execution/workspace/canvasWorkspaceTaskAdapter'
 import type { CanvasWorkspaceRuntime } from '../model.ts'
 import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
@@ -24,6 +24,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
+  getWorkspaceId?: (() => string) | undefined
   flowPaneAdapter: CanvasVueFlowAdapter
   uploadApi: CanvasGraphEditingUploadAdapter
   materializeLibraryAsset: LibraryAssetMaterializer
@@ -38,7 +39,9 @@ export type UseCanvasWorkspaceRuntimeOptions = {
 
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback(options.openRecharge)
-  const taskLifecycle = createCanvasTaskLifecycle({ cancel: taskApi.cancel })
+  const taskLifecycle = createCanvasTaskLifecycle({
+    cancel: (taskId) => cancelCanvasWorkspaceTask(taskId),
+  })
   const executionCore = createPendingImageExecutionCore()
   let hydratePendingImageLeases = (_snapshot?: BoardSnapshot) => 0
 
@@ -46,6 +49,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     route: options.route,
     router: options.router,
     getUserIdentity: options.getUserIdentity,
+    getWorkspaceId: options.getWorkspaceId,
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     executionCore,
@@ -60,6 +64,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     board,
     flowPaneAdapter: options.flowPaneAdapter,
     upload: options.uploadApi,
+    getWorkspaceId: options.getWorkspaceId,
     materializeLibraryAsset: options.materializeLibraryAsset,
     editingBrowser: options.graphEditingBrowser,
     interactionBrowser: options.graphInteractionBrowser,

@@ -2,120 +2,110 @@ import { describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../test/msw'
 import { UPLOAD_OPERATION_TIMEOUT_MS, uploadApi } from './upload'
 
-async function readUploadedFile(request: Request): Promise<File> {
-  const formData = await request.formData()
-  const file = formData.get('file')
-  expect(file).toBeInstanceOf(File)
-  return file as File
+const WORKSPACE_ID = 'ws_board1'
+const UPLOAD_ID = 'upload_upload42'
+const ASSET_ID = 'asset_upload42'
+const CHECKSUM = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+function sessionFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: UPLOAD_ID,
+    workspace_id: WORKSPACE_ID,
+    status: 'pending',
+    filename: 'image.png',
+    mime_type: 'image/png',
+    size_bytes: 5,
+    checksum_sha256: CHECKSUM,
+    media_kind: 'image',
+    upload_target: { kind: 'same-origin-slot', slot: UPLOAD_ID, expires_at: '2026-09-23T01:00:00Z' },
+    created_at: '2026-09-23T00:00:00Z',
+    updated_at: '2026-09-23T00:00:00Z',
+    expires_at: '2026-09-23T00:30:00Z',
+    ...overrides,
+  }
+}
+
+function assetFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: ASSET_ID,
+    workspace_id: WORKSPACE_ID,
+    status: 'ready',
+    media_kind: 'image',
+    mime_type: 'image/png',
+    width: 640,
+    height: 480,
+    size_bytes: 5,
+    checksum_sha256: CHECKSUM,
+    content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
+    created_at: '2026-09-23T00:00:00Z',
+    updated_at: '2026-09-23T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function registerSuccessfulUploadHandlers() {
+  return useMswHandlers(
+    http.post('/api/v1/workspaces/:workspaceId/uploads', () =>
+      HttpResponse.json({ data: sessionFixture() }),
+    ),
+    http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
+      HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
+    ),
+    http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
+      HttpResponse.json({ data: { upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }), asset: assetFixture() } }),
+    ),
+  )
 }
 
 describe('uploadApi', () => {
-  it('uploads a board asset through the HTTP boundary', async () => {
+  it('uploads a workspace media asset through the HTTP boundary', async () => {
     const file = new File(['image'], 'image.png', { type: 'image/png' })
-    const receivedRequests: Array<{
-      method: string
-      path: string
-      fileName: string
-      fileType: string
-      fileText: string
-    }> = []
+    registerSuccessfulUploadHandlers()
 
-    useMswHandlers(
-      http.post('/api/user/boards/:boardId/uploads', async ({ request }) => {
-        const uploadedFile = await readUploadedFile(request)
-        receivedRequests.push({
-          method: request.method,
-          path: new URL(request.url).pathname,
-          fileName: uploadedFile.name,
-          fileType: uploadedFile.type,
-          fileText: await uploadedFile.text(),
-        })
-
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            url: '/uploads/boards/board-1/image.png',
-            asset_id: 'asset_upload_42',
-            width: 640,
-            height: 480,
-            mime: uploadedFile.type,
-            ext: '.png',
-          },
-        })
-      }),
-    )
-
-    await expect(uploadApi.upload(file, ' board 1 ')).resolves.toEqual({
-      url: '/uploads/boards/board-1/image.png',
-      asset_id: 'asset_upload_42',
+    await expect(uploadApi.upload(file, ` ${WORKSPACE_ID} `)).resolves.toEqual({
+      url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
+      asset_id: ASSET_ID,
       width: 640,
       height: 480,
       mime: 'image/png',
-      ext: '.png',
     })
-    expect(receivedRequests).toEqual([
-      {
-        method: 'POST',
-        path: '/api/user/boards/board%201/uploads',
-        fileName: 'image.png',
-        fileType: 'image/png',
-        fileText: 'image',
-      },
-    ])
   })
 
-  it('uploads a profile avatar through the HTTP boundary', async () => {
+  it('uploads a profile avatar through the v1 HTTP boundary (raw bytes)', async () => {
     const file = new File(['avatar'], 'avatar.jpg', { type: 'image/jpeg' })
     const receivedRequests: Array<{
       method: string
       path: string
-      fileName: string
-      fileType: string
-      fileText: string
+      contentType: string | null
+      idempotencyKey: string | null
+      bodyText: string
     }> = []
 
     useMswHandlers(
-      http.post('/api/user/profile/avatar', async ({ request }) => {
-        const uploadedFile = await readUploadedFile(request)
+      http.put('/api/v1/me/avatar', async ({ request }) => {
         receivedRequests.push({
           method: request.method,
           path: new URL(request.url).pathname,
-          fileName: uploadedFile.name,
-          fileType: uploadedFile.type,
-          fileText: await uploadedFile.text(),
+          contentType: request.headers.get('Content-Type'),
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          bodyText: await request.text(),
         })
 
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            avatar: '/uploads/avatars/me.jpg',
-            width: 128,
-            height: 128,
-            mime: uploadedFile.type,
-            ext: '.jpg',
-          },
-        })
+        return HttpResponse.json({ data: { avatar_url: '/uploads/profile/me/avatar' } })
       }),
     )
 
     await expect(uploadApi.uploadAvatar(file)).resolves.toEqual({
-      avatar: '/uploads/avatars/me.jpg',
-      width: 128,
-      height: 128,
+      avatar: '/uploads/profile/me/avatar',
       mime: 'image/jpeg',
       ext: '.jpg',
     })
-    expect(receivedRequests).toEqual([
-      {
-        method: 'POST',
-        path: '/api/user/profile/avatar',
-        fileName: 'avatar.jpg',
-        fileType: 'image/jpeg',
-        fileText: 'avatar',
-      },
-    ])
+    expect(receivedRequests).toHaveLength(1)
+    expect(receivedRequests[0]?.method).toBe('PUT')
+    expect(receivedRequests[0]?.path).toBe('/api/v1/me/avatar')
+    expect(receivedRequests[0]?.contentType).toBe('image/jpeg')
+    expect(receivedRequests[0]?.idempotencyKey).toMatch(/^avatar:upload:/)
+    expect(receivedRequests[0]?.bodyText).toBe('avatar')
   })
 
   it('keeps the upload timeout long enough for slow HTTP responses', async () => {
@@ -130,19 +120,12 @@ describe('uploadApi', () => {
       })
 
       useMswHandlers(
-        http.post('/api/user/profile/avatar', async ({ request }) => {
-          await readUploadedFile(request)
+        http.put('/api/v1/me/avatar', async ({ request }) => {
+          await request.arrayBuffer()
           resolveUploadStarted()
           await new Promise((resolve) => setTimeout(resolve, slowResponseDelayMs))
 
-          return HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              avatar: '/uploads/avatars/slow-avatar.jpg',
-              mime: 'image/jpeg',
-            },
-          })
+          return HttpResponse.json({ data: { avatar_url: '/uploads/profile/me/slow-avatar' } })
         }),
       )
 
@@ -153,82 +136,83 @@ describe('uploadApi', () => {
       await vi.advanceTimersByTimeAsync(slowResponseDelayMs)
 
       await expect(response).resolves.toEqual({
-        avatar: '/uploads/avatars/slow-avatar.jpg',
+        avatar: '/uploads/profile/me/slow-avatar',
         mime: 'image/jpeg',
+        ext: '.jpg',
       })
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('surfaces upload API failures from the HTTP response body', async () => {
+  it('surfaces canonical workspace upload failures from the HTTP response body', async () => {
     useMswHandlers(
-      http.post('/api/user/boards/:boardId/uploads', () => {
-        return HttpResponse.json({ code: 413, msg: 'upload too large', message_safe: true })
+      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
+        return HttpResponse.json(
+          { error: { code: 'upload_too_large', message: 'Upload too large', request_id: 'req-413' } },
+          { status: 413 },
+        )
       }),
     )
 
     await expect(
-      uploadApi.upload(new File(['too large'], 'large.png', { type: 'image/png' }), 'board-1'),
-    ).rejects.toThrow('upload too large')
+      uploadApi.upload(new File(['too large'], 'large.png', { type: 'image/png' }), WORKSPACE_ID),
+    ).rejects.toThrow('Upload too large')
   })
 
   it('rejects successful upload envelopes without domain data', async () => {
     useMswHandlers(
-      http.post('/api/user/boards/:boardId/uploads', () => {
-        return HttpResponse.json({ code: 0, msg: 'ok' })
+      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
+        return HttpResponse.json({ meta: { request_id: 'req-empty' } })
       }),
     )
 
     await expect(
-      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), WORKSPACE_ID),
+    ).rejects.toThrow('Malformed API envelope')
+  })
+
+  it('rejects workspace uploads that were not registered as media assets', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/uploads', () =>
+        HttpResponse.json({ data: sessionFixture() }),
+      ),
+      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', () =>
+        HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
+      ),
+      http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
+        HttpResponse.json({ data: { upload: sessionFixture({ status: 'completed' }) } }),
+      ),
+    )
+
+    await expect(
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), WORKSPACE_ID),
     ).rejects.toThrow('Upload failed. Please try again.')
   })
 
-  it('rejects board uploads that were not registered as media assets', async () => {
+  it('preserves structured workspace transport errors without exposing unsafe legacy fields', async () => {
     useMswHandlers(
-      http.post('/api/user/boards/:boardId/uploads', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { url: '/uploads/boards/board-1/unregistered.png' },
-        })
-      }),
-    )
-
-    await expect(
-      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
-    ).rejects.toThrow('The uploaded image could not be processed. Try again.')
-  })
-
-  it('adds a contextual fallback to sanitized transport errors without dropping metadata', async () => {
-    useMswHandlers(
-      http.post('/api/user/boards/:boardId/uploads', () => {
+      http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
         return HttpResponse.json(
-          {
-            code: 'upstream_failure',
-            msg: 'authorization=Bearer exposed-token',
-            data: { retry: true },
-          },
+          { error: { code: 'upstream_failure', message: 'Upload service unavailable', request_id: 'req-1' } },
           { status: 503 },
         )
       }),
     )
 
     await expect(
-      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), WORKSPACE_ID),
     ).rejects.toMatchObject({
       code: 'upstream_failure',
-      data: { retry: true },
-      message: 'Upload failed. Please try again.',
+      message: 'Upload service unavailable',
       status: 503,
     })
   })
 
   it('rejects avatar responses without a usable URL', async () => {
     useMswHandlers(
-      http.post('/api/user/profile/avatar', () => {
-        return HttpResponse.json({ code: 0, msg: 'ok', data: { avatar: '   ' } })
+      http.put('/api/v1/me/avatar', () => {
+        return HttpResponse.json({ data: { avatar_url: '   ' } })
       }),
     )
 

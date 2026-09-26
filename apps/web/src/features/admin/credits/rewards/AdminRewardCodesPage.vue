@@ -237,8 +237,10 @@ import {
 } from './resource'
 import { useRewardCodeList } from './useRewardCodeList'
 import { useRewardCodeRowActions } from './useRewardCodeRowActions'
+import { readConfirmReason, useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 
 const resource = createAdminRewardCodeResource()
+const confirm = useAdminConfirm()
 const {
   searchKeyword,
   statusFilter,
@@ -292,34 +294,64 @@ function openCreateDialog() {
   createDialogVisible.value = true
 }
 
-async function saveRewardCode(input: RewardCodeFormSubmit) {
-  if (saving.value) return
-  saving.value = true
-  saveError.value = ''
-  try {
-    const editing = editingRewardCode.value
-    if (!editing) {
-      const created = await resource.create(input)
-      createdPlaintext.value = created.plaintext || input.code
-      plaintextHeader.value = '保存兑换码'
-      plaintextDialogVisible.value = true
-      toast.success('兑换码已创建')
-    } else {
-      const updated = await resource.update(editing.id, {
+async function confirmRewardCodeSave(editing: RewardCode | null, displayName: string) {
+  // Control mutations require an operator reason: collect it through the
+  // shared confirm shell before touching the transport.
+  const confirmed = await confirm.confirm({
+    title: editing ? '确认更新兑换码' : '确认创建兑换码',
+    message: editing
+      ? `确定更新“${editing.displayName}”吗？该操作将记录审计。`
+      : `确定创建兑换码“${displayName}”吗？该操作将记录审计。`,
+    confirmLabel: editing ? '确认更新' : '确认创建',
+    intent: 'warn',
+    reason: { required: true },
+  })
+  if (!confirmed) return null
+  return (confirm.readReason?.() ?? readConfirmReason()).trim()
+}
+
+async function persistRewardCode(
+  input: RewardCodeFormSubmit,
+  editing: RewardCode | null,
+  operatorReason: string,
+) {
+  if (!editing) {
+    const created = await resource.create(input, { operatorReason })
+    createdPlaintext.value = created.plaintext || input.code
+    plaintextHeader.value = '保存兑换码'
+    plaintextDialogVisible.value = true
+    toast.success('兑换码已创建')
+  } else {
+    const updated = await resource.update(
+      editing.id,
+      {
         displayName: input.displayName,
         creditAmount: input.creditAmount,
         maxRedemptions: input.maxRedemptions,
         expiresAt: input.expiresAt,
         ...(input.code ? { code: input.code } : {}),
-      })
-      replaceRewardCode(updated.rewardCode)
-      if (input.code) {
-        createdPlaintext.value = updated.plaintext || input.code
-        plaintextHeader.value = '保存新 Code'
-        plaintextDialogVisible.value = true
-      }
-      toast.success(input.code ? '兑换码与 Code 已更新' : '兑换码已更新')
+      },
+      { operatorReason },
+    )
+    replaceRewardCode(updated.rewardCode)
+    if (input.code) {
+      createdPlaintext.value = updated.plaintext || input.code
+      plaintextHeader.value = '保存新 Code'
+      plaintextDialogVisible.value = true
     }
+    toast.success(input.code ? '兑换码与 Code 已更新' : '兑换码已更新')
+  }
+}
+
+async function saveRewardCode(input: RewardCodeFormSubmit) {
+  if (saving.value) return
+  const editing = editingRewardCode.value
+  const operatorReason = await confirmRewardCodeSave(editing, input.displayName)
+  if (!operatorReason) return
+  saving.value = true
+  saveError.value = ''
+  try {
+    await persistRewardCode(input, editing, operatorReason)
     createDialogVisible.value = false
     // Resetting the cursor reloads the first page via the key — unless
     // already there, in which case the key is unchanged and needs a refetch.

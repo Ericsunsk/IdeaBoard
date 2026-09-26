@@ -117,7 +117,7 @@ describe('AdminCreditsBillingLayout', () => {
           },
         }),
       ),
-      http.get('/api/admin/payments/stripe-config', () =>
+      http.get('/api/control/v1/payments/stripe-config', () =>
         HttpResponse.json({
                     data: {
             configured: false,

@@ -24,9 +24,11 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasksdomain "ideaboard/api/internal/tasking/domain"
@@ -75,7 +77,7 @@ type ControlTaskAdmin interface {
 	GetTask(ctx context.Context, taskID string) (*taskapp.AdminMonitorDetail, error)
 	ListTasks(ctx context.Context, req *tasksdomain.TaskListRequest) ([]taskapp.AdminMonitorListItem, tasksdomain.TaskListCounts, error)
 	ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error)
-	CancelAdminTask(ctx context.Context, taskID string, adminID int64) error
+	CancelAdminTask(ctx context.Context, taskID string, adminID int64, reason string) error
 }
 
 // ControlBillingAccountStore provisions the implicit per-workspace
@@ -114,9 +116,27 @@ type ContractControlDeps struct {
 	SearchProviders   *searchhttp.Handler
 	FeaturePrompts    *prompts.FeaturePromptHandler
 	Monitor           *statisticshttp.Handler
-	Idempotency       *contract.IdempotencyStore
-	RateLimiter       *ControlRateLimiter
-	AuditSink         ControlAuditSink
+	// RewardCommands and RewardReads reuse the Rewards admin handlers
+	// under the control guard (single-sourced validation, idempotency,
+	// and error mapping; legacy envelope until the control envelope is
+	// unified). Nil keeps the reward routes fail-closed with 501.
+	RewardCommands *rewardhttp.AdminCommandHandler
+	RewardReads    *rewardhttp.AdminReadHandler
+	// OAuth is the Auth-owned social-provider seam behind the dedicated
+	// control OAuth handlers (contract envelope); nil keeps the OAuth
+	// routes fail-closed with 503.
+	OAuth ControlOAuthService
+	// BrandLogos reuses the platform brand-logo override handler under
+	// the control guard (legacy envelope); nil keeps the override
+	// routes fail-closed with 501.
+	BrandLogos *adminbranding.Handler
+	// BrandingUpload stores the site branding logo file (multipart)
+	// through the Storage service; nil keeps the upload route
+	// fail-closed with 503.
+	BrandingUpload ControlBrandingUploadService
+	Idempotency    *contract.IdempotencyStore
+	RateLimiter    *ControlRateLimiter
+	AuditSink      ControlAuditSink
 	// Mail is the Auth-owned transactional mail seam behind the control
 	// mail-setting handlers (same instance serving legacy admin mail
 	// settings); nil keeps the mail routes fail-closed with 503.
@@ -397,6 +417,9 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			return
 		}
 		handler(c, controlContext{Operator: p, Reason: record.Reason, Body: body})
+		if reason := controlReasonFromContext(c); validControlReason(reason) {
+			record.Reason = reason
+		}
 		outcome = controlOutcomeFromStatus(c.Writer.Status())
 		record.Status = c.Writer.Status()
 		record.Outcome = outcome
@@ -472,6 +495,9 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 	c.Writer = capture
 	handler(c, ctx)
 	c.Writer = original
+	if reason := controlReasonFromContext(c); validControlReason(reason) {
+		record.Reason = reason
+	}
 	status := capture.status
 	if status == 0 {
 		status = http.StatusOK

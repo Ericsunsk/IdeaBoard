@@ -10,6 +10,13 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   useAdminToast: () => toast,
 }))
 
+vi.mock('../../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => ({
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: () => 'stripe review',
+  }),
+}))
+
 const configuredSummary: StripeConfigurationSummary = {
   configured: true,
   apiKeyConfigured: true,
@@ -98,12 +105,15 @@ describe('StripeSettingsDialog', () => {
     await user.click(screen.getByRole('button', { name: '保存设置' }))
 
     await waitFor(() =>
-      expect(resource.save).toHaveBeenCalledWith({
-        apiKey: 'sk_test_secret',
-        paymentMethodConfigurationId: 'pmc_ideaboard',
-        productTaxCode: 'txcd_10105001',
-        purchasesEnabled: true,
-      }),
+      expect(resource.save).toHaveBeenCalledWith(
+        {
+          apiKey: 'sk_test_secret',
+          paymentMethodConfigurationId: 'pmc_ideaboard',
+          productTaxCode: 'txcd_10105001',
+          purchasesEnabled: true,
+        },
+        { operatorReason: 'stripe review' },
+      ),
     )
     await waitFor(() => expect(emitted()['update:visible']).toEqual([[false]]))
     expect((screen.getByLabelText('Stripe API Key') as HTMLInputElement).value).toBe('')

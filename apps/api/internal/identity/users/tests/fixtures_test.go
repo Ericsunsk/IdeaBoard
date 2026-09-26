@@ -43,6 +43,7 @@ type (
 	UserCreditBalanceReader      = ports.UserCreditBalanceReader
 	UserEmailReader              = ports.UserEmailReader
 	AdminUserImpersonator        = ports.AdminUserImpersonator
+	ImpersonationAuditor         = userhttp.ImpersonationAuditor
 	IdentityAdminCommands        = ports.IdentityAdminCommands
 	UserLifecycle                = ports.UserLifecycle
 

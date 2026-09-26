@@ -1,6 +1,6 @@
 import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, nextTick, ref, shallowRef, type Ref } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../board'
 import { renderRetouchLayerStackFile } from '../retouch/services/renderer'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../../application/execution'
@@ -10,6 +10,10 @@ import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { deserializeRetouchStack } from '../retouch/processing/stackPersistence.ts'
 import * as mediaAssetDelivery from '../../../../shared/api/mediaAssetDelivery'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaAssetDelivery'
 
 vi.mock('../retouch/services/renderer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../retouch/services/renderer')>()
@@ -61,9 +65,13 @@ const mediaAssetRequestMock = vi.hoisted(() => vi.fn())
 vi.mock('../../../../shared/api/client', () => ({
   api: { request: mediaAssetRequestMock },
 }))
-vi.mock('../../../../shared/api/userEventStream', () => ({
-  subscribeUserEvent: vi.fn(() => vi.fn()),
+vi.mock('../../../../shared/api/workspaceEventStream', () => ({
+  subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),
 }))
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
 
 const imageNodeFixtures: Record<
   string,
@@ -302,6 +310,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   renderLayerStackFileMock.mockReset()
   mediaAssetRequestMock.mockReset()
+  resetMediaWorkspaceIdResolver()
 })
 
 describe('useCanvasImageTools image retouch final apply', () => {
@@ -433,17 +442,19 @@ describe('useCanvasImageTools image retouch final apply', () => {
     }
   })
 
-  it('renders materialized Library images through the same-origin processing derivative', async () => {
+  it('renders materialized Library images through the same-origin original content', async () => {
     mediaAssetRequestMock.mockResolvedValue({
       code: 0,
       msg: '',
       data: {
+        id: 'asset-3',
         asset_id: 'asset-3',
         status: 'ready',
         mime_type: 'image/jpeg',
         width: 2048,
         height: 1024,
         size_bytes: 100,
+        content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
         original: { status: 'ready', url: '/api/original.jpg' },
         derivatives: {
           'processing-input': {
@@ -468,7 +479,7 @@ describe('useCanvasImageTools image retouch final apply', () => {
 
       expect(renderLayerStackFileMock).toHaveBeenCalledWith(
         {
-          url: '/api/processing-input.webp',
+          url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
           title: 'Library image',
         },
         expect.any(Array),
@@ -485,12 +496,14 @@ describe('useCanvasImageTools image retouch final apply', () => {
       code: 0,
       msg: '',
       data: {
+        id: 'asset-3',
         asset_id: 'asset-3',
         status: 'ready',
         mime_type: 'image/jpeg',
         width: 2048,
         height: 1024,
         size_bytes: 100,
+        content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-3/content',
         original: { status: 'ready', url: '/api/original.jpg' },
         derivatives: {
           'processing-input': {

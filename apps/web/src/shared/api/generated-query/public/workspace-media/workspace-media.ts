@@ -31,6 +31,8 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  BatchGetMediaAssetsRequest,
+  BatchGetMediaAssetsResultEnvelope,
   CompleteUploadEnvelope,
   CompleteUploadRequest,
   ConflictResponse,
@@ -268,12 +270,145 @@ export function useGetWorkspaceUpload<
   return query
 }
 
+export const getStageWorkspaceUploadBytesUrl = (workspaceId: string, uploadId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/uploads/${encodeURIComponent(String(uploadId))}/bytes`
+}
+
+/**
+ * Stages the raw image bytes matching the session declaration (size, checksum, MIME). Raw image bytes body (never JSON, never multipart). Retryable: 422 validation mismatches change no state. Success reuses the UploadSession envelope. Requires the Idempotency-Key header (scope upload:bytes): key reuse with a different body renders 409 upload_idempotency_conflict.
+ * @summary Stage declared upload bytes (members only, retryable)
+ */
+export const stageWorkspaceUploadBytes = async (
+  workspaceId: string,
+  uploadId: string,
+  stageWorkspaceUploadBytesBody: Blob,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<UploadSessionEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<UploadSessionEnvelope>(
+    getStageWorkspaceUploadBytesUrl(workspaceId, uploadId),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+      body: stageWorkspaceUploadBytesBody,
+    },
+  )
+}
+
+export const getStageWorkspaceUploadBytesMutationKey = () => ['stageWorkspaceUploadBytes'] as const
+
+export const getStageWorkspaceUploadBytesMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | ErrorEnvelope
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>,
+    TError,
+    StageWorkspaceUploadBytesMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>,
+  TError,
+  StageWorkspaceUploadBytesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getStageWorkspaceUploadBytesMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>,
+    StageWorkspaceUploadBytesMutationVariables
+  > = (props) => {
+    const { workspaceId, uploadId, data } = props ?? {}
+
+    return stageWorkspaceUploadBytes(workspaceId, uploadId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type StageWorkspaceUploadBytesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>
+>
+export type StageWorkspaceUploadBytesMutationBody = Blob
+export type StageWorkspaceUploadBytesMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | NotFoundResponse
+  | ErrorEnvelope
+  | UnprocessableEntityResponse
+export type StageWorkspaceUploadBytesMutationVariables = {
+  workspaceId: string
+  uploadId: string
+  data: Blob
+}
+
+/**
+ * @summary Stage declared upload bytes (members only, retryable)
+ */
+export const useStageWorkspaceUploadBytes = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | ErrorEnvelope
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>,
+      TError,
+      StageWorkspaceUploadBytesMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof stageWorkspaceUploadBytes>>,
+  TError,
+  StageWorkspaceUploadBytesMutationVariables,
+  TContext
+> => {
+  return useMutation(getStageWorkspaceUploadBytesMutationOptions(options), queryClient)
+}
 export const getCompleteWorkspaceUploadUrl = (workspaceId: string, uploadId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/uploads/${encodeURIComponent(String(uploadId))}/complete`
 }
 
 /**
- * Verifies the completion echo against the declaration and materializes the media asset atomically. Requires the Idempotency-Key header (scope upload:complete): key reuse with a different request renders 409 upload_idempotency_conflict.
+ * Verifies the completion echo against the declaration and materializes the media asset atomically. Complete-after-bytes: with a byte backend wired, the staged object must exist at the session slot and match the declaration first: completion without staged bytes renders 422 upload_validation_failed (details.fields.bytes=missing), staged mismatches render 422 under details.fields size_bytes/checksum_sha256/mime_type (the session fails), and transient staged-read failures render 503 service_unavailable. Requires the Idempotency-Key header (scope upload:complete): key reuse with a different request renders 409 upload_idempotency_conflict.
  * @summary Complete a workspace upload session (members only, 200 + asset)
  */
 export const completeWorkspaceUpload = async (
@@ -507,6 +642,126 @@ export function useListWorkspaceMediaAssets<
   return query
 }
 
+export const getBatchGetWorkspaceMediaAssetsUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/media-assets/batch`
+}
+
+/**
+ * Bounded read-only batch over the same asset DTOs as the single-read endpoint, in request order. Read-only, so no Idempotency-Key (library asset-resolutions precedent). Any malformed, unknown, or cross-workspace id converges to 404 media_not_found; over-bound inputs render 422 media_validation_failed.
+ * @summary Read up to 50 media assets in one call (members only)
+ */
+export const batchGetWorkspaceMediaAssets = async (
+  workspaceId: string,
+  batchGetMediaAssetsRequest: BatchGetMediaAssetsRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<BatchGetMediaAssetsResultEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<BatchGetMediaAssetsResultEnvelope>(
+    getBatchGetWorkspaceMediaAssetsUrl(workspaceId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(batchGetMediaAssetsRequest),
+    },
+  )
+}
+
+export const getBatchGetWorkspaceMediaAssetsMutationKey = () =>
+  ['batchGetWorkspaceMediaAssets'] as const
+
+export const getBatchGetWorkspaceMediaAssetsMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>,
+    TError,
+    BatchGetWorkspaceMediaAssetsMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>,
+  TError,
+  BatchGetWorkspaceMediaAssetsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getBatchGetWorkspaceMediaAssetsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>,
+    BatchGetWorkspaceMediaAssetsMutationVariables
+  > = (props) => {
+    const { workspaceId, data } = props ?? {}
+
+    return batchGetWorkspaceMediaAssets(workspaceId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type BatchGetWorkspaceMediaAssetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>
+>
+export type BatchGetWorkspaceMediaAssetsMutationBody = BatchGetMediaAssetsRequest
+export type BatchGetWorkspaceMediaAssetsMutationError =
+  BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse
+export type BatchGetWorkspaceMediaAssetsMutationVariables = {
+  workspaceId: string
+  data: BatchGetMediaAssetsRequest
+}
+
+/**
+ * @summary Read up to 50 media assets in one call (members only)
+ */
+export const useBatchGetWorkspaceMediaAssets = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>,
+      TError,
+      BatchGetWorkspaceMediaAssetsMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof batchGetWorkspaceMediaAssets>>,
+  TError,
+  BatchGetWorkspaceMediaAssetsMutationVariables,
+  TContext
+> => {
+  return useMutation(getBatchGetWorkspaceMediaAssetsMutationOptions(options), queryClient)
+}
 export const getGetWorkspaceMediaAssetUrl = (workspaceId: string, assetId: string) => {
   return `/workspaces/${encodeURIComponent(String(workspaceId))}/media-assets/${encodeURIComponent(String(assetId))}`
 }

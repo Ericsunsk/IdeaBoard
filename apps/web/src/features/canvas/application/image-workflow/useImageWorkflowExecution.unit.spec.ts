@@ -67,6 +67,9 @@ function createRuntime() {
     executionCore: createPendingImageExecutionCore(),
     cancelTasks: vi.fn(),
     feedback,
+    // Workspace gate stubbed available: selection-store coverage lives in
+    // the adapter spec; runtime specs stay hermetic.
+    isWorkspaceAvailable: () => true,
   }
   const runtime = useImageWorkflowExecution(runtimeOptions as never)
   return { runtime, feedback }
@@ -121,5 +124,32 @@ describe('useImageWorkflowExecution', () => {
 
     expect(feedback.insufficientCredits).toHaveBeenCalledOnce()
     expect(feedback.warning).not.toHaveBeenCalled()
+  })
+
+  it('disables task actions with guidance when no workspace is selected', async () => {
+    const feedback = {
+      succeeded: vi.fn<(message: string) => void>(),
+      warning: vi.fn<(message: string) => void>(),
+      insufficientCredits: vi.fn<() => void>(),
+    }
+    const gated = useImageWorkflowExecution({
+      nodes: ref([]),
+      edges: ref([]),
+      readCanvasGraphStore: vi.fn(() => ({})),
+      flushAutosave: vi.fn(async () => undefined),
+      refreshNodeInternals: vi.fn(),
+      executionCore: createPendingImageExecutionCore(),
+      cancelTasks: vi.fn(),
+      feedback,
+      isWorkspaceAvailable: () => false,
+    } as never)
+
+    expect(gated.isGenerationAvailable()).toBe(false)
+    await gated.runGeneration('prompt-1', [], 'draw this', 1, 'auto')
+
+    expect(mocks.workflow.executeImageWorkflow).not.toHaveBeenCalled()
+    expect(feedback.warning).toHaveBeenCalledWith(
+      'Select a workspace before running image tasks.',
+    )
   })
 })

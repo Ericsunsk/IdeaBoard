@@ -20,27 +20,35 @@ import {
   toWorkspaceLibraryResolveResult,
   WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
   workspaceLibraryApi,
-  workspaceLibraryAssetSuffix,
-  workspaceLibraryAssetsSuffix,
-  workspaceLibraryFolderSuffix,
-  workspaceLibraryFoldersSuffix,
-  workspaceLibraryMaterializationSuffix,
-  workspaceLibraryMaterializationsSuffix,
-  workspaceLibraryResolveSuffix,
 } from './workspace'
+import {
+  getCreateWorkspaceLibraryMaterializationUrl,
+  getDeleteWorkspaceLibraryAssetUrl,
+  getDeleteWorkspaceLibraryFolderUrl,
+  getGetWorkspaceLibraryMaterializationUrl,
+  getListWorkspaceLibraryAssetsUrl,
+  getListWorkspaceLibraryFoldersUrl,
+  getMoveWorkspaceLibraryAssetUrl,
+  getRenameWorkspaceLibraryFolderUrl,
+  getResolveWorkspaceLibraryAssetsUrl,
+  getSaveWorkspaceLibraryAssetUrl,
+} from '../../shared/api/generated-query/public/workspace-library/workspace-library'
 
 vi.mock('../../shared/api/mediaAssetDelivery', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../shared/api/mediaAssetDelivery')>()
   return {
     ...actual,
-    getMediaAssetMetadata: vi.fn(async () => ({
+    getWorkspaceMediaAssetMetadata: vi.fn(async () => ({
       asset_id: 'asset_media0001',
       status: 'ready',
       mime_type: 'image/png',
       width: 400,
       height: 200,
       size_bytes: 1234,
-      original: { status: 'ready', url: '/api/user/media-assets/asset_media0001/original/content' },
+      original: {
+        status: 'ready',
+        url: '/api/v1/workspaces/ws_abc123/media-assets/asset_media0001/content',
+      },
       derivatives: {},
     })),
   }
@@ -99,38 +107,49 @@ function materializationFixture(
 }
 
 describe('workspace library paths', () => {
-  it('builds canonical transport suffixes with opaque ids only', () => {
-    expect(workspaceLibraryFoldersSuffix(WORKSPACE_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/folders',
+  it('builds canonical routes matching the generated hooks (publicMutator adds /v1)', () => {
+    expect(getListWorkspaceLibraryFoldersUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/library/folders',
     )
-    expect(workspaceLibraryFolderSuffix(WORKSPACE_ID, FOLDER_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/folders/lfolder_folder0001',
+    expect(getRenameWorkspaceLibraryFolderUrl(WORKSPACE_ID, FOLDER_ID)).toBe(
+      '/workspaces/ws_abc123/library/folders/lfolder_folder0001',
     )
-    expect(workspaceLibraryAssetsSuffix(WORKSPACE_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/assets',
+    expect(getDeleteWorkspaceLibraryFolderUrl(WORKSPACE_ID, FOLDER_ID)).toBe(
+      '/workspaces/ws_abc123/library/folders/lfolder_folder0001',
     )
-    expect(workspaceLibraryAssetSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/assets/lasset_asset0001',
+    expect(getListWorkspaceLibraryAssetsUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/library/assets',
     )
-    expect(workspaceLibraryResolveSuffix(WORKSPACE_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/asset-resolutions',
+    expect(getSaveWorkspaceLibraryAssetUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/library/assets',
     )
-    expect(workspaceLibraryMaterializationsSuffix(WORKSPACE_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/materializations',
+    expect(getMoveWorkspaceLibraryAssetUrl(WORKSPACE_ID, ASSET_ID)).toBe(
+      '/workspaces/ws_abc123/library/assets/lasset_asset0001',
     )
-    expect(workspaceLibraryMaterializationSuffix(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/materializations/lmat_job0001',
+    expect(getDeleteWorkspaceLibraryAssetUrl(WORKSPACE_ID, ASSET_ID)).toBe(
+      '/workspaces/ws_abc123/library/assets/lasset_asset0001',
+    )
+    expect(getResolveWorkspaceLibraryAssetsUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/library/asset-resolutions',
+    )
+    expect(getCreateWorkspaceLibraryMaterializationUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/library/materializations',
+    )
+    expect(getGetWorkspaceLibraryMaterializationUrl(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
+      '/workspaces/ws_abc123/library/materializations/lmat_job0001',
     )
   })
 
-  it('rejects malformed ids before any network call (integer ids included)', () => {
+  it('rejects malformed ids before any network call (integer ids included)', async () => {
     expect(() => assertWorkspaceId('nope')).toThrow()
     expect(() => assertLibraryFolderId('42')).toThrow()
     expect(() => assertLibraryFolderId('lasset_asset0001')).toThrow()
     expect(() => assertLibraryAssetId('42')).toThrow()
     expect(() => assertLibraryMaterializationId('nope')).toThrow()
     expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()
-    expect(() => workspaceLibraryAssetSuffix(WORKSPACE_ID, 'asset with space')).toThrow()
+    await expect(
+      workspaceLibraryApi.moveAsset(WORKSPACE_ID, 'asset with space', null),
+    ).rejects.toThrow()
   })
 })
 
@@ -482,7 +501,7 @@ describe('workspace library use cases', () => {
     expect(polls).toBeGreaterThan(1)
     expect(media).toMatchObject({
       mediaAssetId: 'asset_abc123',
-      url: '/api/user/media-assets/asset_media0001/original/content',
+      url: '/api/v1/workspaces/ws_abc123/media-assets/asset_media0001/content',
       width: 400,
       height: 200,
     })
@@ -519,15 +538,15 @@ describe('workspace library canonical ids (lfolder_/lasset_/lmat_)', () => {
   const ASSET_ID = 'lasset_asset0001'
   const MATERIALIZATION_ID = 'lmat_job0001'
 
-  it('accepts canonical ids in suffixes, asserts, and mapping', () => {
-    expect(workspaceLibraryFolderSuffix(WORKSPACE_ID, FOLDER_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/folders/lfolder_folder0001',
+  it('accepts canonical ids in routes, asserts, and mapping', () => {
+    expect(getRenameWorkspaceLibraryFolderUrl(WORKSPACE_ID, FOLDER_ID)).toBe(
+      '/workspaces/ws_abc123/library/folders/lfolder_folder0001',
     )
-    expect(workspaceLibraryAssetSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/assets/lasset_asset0001',
+    expect(getMoveWorkspaceLibraryAssetUrl(WORKSPACE_ID, ASSET_ID)).toBe(
+      '/workspaces/ws_abc123/library/assets/lasset_asset0001',
     )
-    expect(workspaceLibraryMaterializationSuffix(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
-      '/v1/workspaces/ws_abc123/library/materializations/lmat_job0001',
+    expect(getGetWorkspaceLibraryMaterializationUrl(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
+      '/workspaces/ws_abc123/library/materializations/lmat_job0001',
     )
     expect(() => assertLibraryFolderId(FOLDER_ID)).not.toThrow()
     expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()

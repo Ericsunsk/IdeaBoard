@@ -210,8 +210,11 @@ func v1MediaAssetID(t *testing.T, data any) string {
 // -> archive -> post-archive gates.
 func TestV1MediaUploadLifecycle(t *testing.T) {
 	f := newV1MediaFixture(t, true)
+	staged := v1GapsPNGBytes(1024)
+	checksum := v1GapsChecksum(staged)
+	createBody := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, checksum)
 
-	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-life-1"}})
+	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: createBody, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-life-1"}})
 	if status != http.StatusCreated {
 		t.Fatalf("create = %d %v, want 201", status, payload)
 	}
@@ -225,7 +228,11 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 		t.Fatalf("session status = %q, want transferring after first read", got)
 	}
 
-	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: v1FinishUploadBody(), userID: f.member, headers: map[string]string{"Idempotency-Key": "media-life-2"}})
+	// Stage the declared bytes before completing (complete-after-bytes).
+	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", staged, f.member, "media-life-stage")
+
+	finishBody := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":1024,"width":100,"height":80}}`, checksum)
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: finishBody, userID: f.member, headers: map[string]string{"Idempotency-Key": "media-life-2"}})
 	if status != http.StatusOK {
 		t.Fatalf("complete = %d %v, want 200", status, payload)
 	}
@@ -241,7 +248,7 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 	if got, _ := assetDTO["status"].(string); got != "ready" {
 		t.Fatalf("asset status = %q, want ready", got)
 	}
-	if got, _ := assetDTO["checksum_sha256"].(string); got != v1MediaTestChecksum {
+	if got, _ := assetDTO["checksum_sha256"].(string); got != checksum {
 		t.Fatalf("asset checksum = %q", got)
 	}
 
@@ -259,10 +266,10 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 		t.Fatalf("list items = %v, want 1 asset", v1Data(t, payload))
 	}
 
-	// Bytes never ride the JSON envelope: plain 200 with bytes.
+	// Bytes never ride the JSON envelope: plain 200 with the staged bytes.
 	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.member}, "test-media-")
-	if status != http.StatusOK || body != "fake-png-bytes" {
-		t.Fatalf("content = %d %q, want 200 fake-png-bytes", status, body)
+	if status != http.StatusOK || body != string(staged) {
+		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(staged))
 	}
 	// Generation ran at complete (fake renderer): thumb serves.
 	status, _, body = doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/derivatives/thumb", userID: f.member}, "test-media-")
@@ -307,14 +314,18 @@ func TestV1MediaUploadLifecycle(t *testing.T) {
 
 func TestV1MediaCompleteMismatch(t *testing.T) {
 	f := newV1MediaFixture(t, true)
+	staged := v1GapsPNGBytes(1024)
+	checksum := v1GapsChecksum(staged)
+	createBody := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, checksum)
 
-	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-mismatch-1"}})
+	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: createBody, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-mismatch-1"}})
 	if status != http.StatusCreated {
 		t.Fatalf("create = %d %v, want 201", status, payload)
 	}
 	uploadID := v1MediaUploadID(t, v1Data(t, payload))
+	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", staged, f.owner, "media-mismatch-stage")
 
-	badBody := strings.Replace(v1FinishUploadBody(), "1024", "2048", 1)
+	badBody := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":2048,"width":100,"height":80}}`, checksum)
 	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: badBody, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-mismatch-2"}})
 	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeUploadValidationFailed) {
 		t.Fatalf("mismatch complete = %d %v, want 422 upload_validation_failed", status, payload)
@@ -385,7 +396,9 @@ func TestV1MediaAuthMatrix(t *testing.T) {
 	}
 
 	// Cross-workspace ids are invisible even to workspace members.
-	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-auth-3"}})
+	authStagedForCreate := v1GapsPNGBytes(1024)
+	authCreateBody := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, v1GapsChecksum(authStagedForCreate))
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: authCreateBody, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-auth-3"}})
 	if status != http.StatusCreated {
 		t.Fatalf("create = %d %v, want 201", status, payload)
 	}
@@ -406,8 +419,12 @@ func TestV1MediaAuthMatrix(t *testing.T) {
 		t.Fatalf("unknown asset = %d %v, want 404 media_not_found", status, payload)
 	}
 
-	// Create + complete an asset, then probe binary gates.
-	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: v1FinishUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-auth-4"}})
+	// Create + stage + complete an asset, then probe binary gates.
+	stagedAuth := authStagedForCreate
+	checksumAuth := v1GapsChecksum(stagedAuth)
+	authFinish := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":1024,"width":100,"height":80}}`, checksumAuth)
+	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", stagedAuth, f.owner, "media-auth-stage")
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: authFinish, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-auth-4"}})
 	if status != http.StatusOK {
 		t.Fatalf("complete = %d %v, want 200", status, payload)
 	}
@@ -433,12 +450,19 @@ func TestV1MediaDerivativePendingWithoutRenderer(t *testing.T) {
 	// pending-shaped and the binary endpoint stays 409.
 	f := newV1MediaFixture(t, false)
 
-	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: v1NewUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-pending-1"}})
+	// Declare with a stageable checksum (the fixed-checksum helper
+	// cannot be staged: sha256 preimage).
+	pendingStaged := v1GapsPNGBytes(1024)
+	pendingChecksum := v1GapsChecksum(pendingStaged)
+	pendingCreate := fmt.Sprintf(`{"data":{"filename":"photo.png","mime_type":"image/png","size_bytes":1024,"checksum_sha256":%q,"media_kind":"image"}}`, pendingChecksum)
+	status, _, payload := doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath(), body: pendingCreate, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-pending-1"}})
 	if status != http.StatusCreated {
 		t.Fatalf("create = %d %v, want 201", status, payload)
 	}
 	uploadID := v1MediaUploadID(t, v1Data(t, payload))
-	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: v1FinishUploadBody(), userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-pending-2"}})
+	v1GapsStage(t, f.engine, f.uploadsPath()+"/"+uploadID+"/bytes", pendingStaged, f.owner, "media-pending-stage")
+	pendingFinish := fmt.Sprintf(`{"data":{"checksum_sha256":%q,"size_bytes":1024,"width":100,"height":80}}`, pendingChecksum)
+	status, _, payload = doV1(t, f.engine, v1Call{method: "POST", path: f.uploadsPath() + "/" + uploadID + "/complete", body: pendingFinish, userID: f.owner, headers: map[string]string{"Idempotency-Key": "media-pending-2"}})
 	if status != http.StatusOK {
 		t.Fatalf("complete = %d %v, want 200", status, payload)
 	}
@@ -450,8 +474,8 @@ func TestV1MediaDerivativePendingWithoutRenderer(t *testing.T) {
 	}
 	// The original still serves: only derivatives are pending.
 	status, _, body := doV1RoundTrip(t, f.engine, v1Call{method: "GET", path: f.assetsPath() + "/" + assetID + "/content", userID: f.owner}, "test-media-")
-	if status != http.StatusOK || body != "fake-png-bytes" {
-		t.Fatalf("content = %d %q, want 200 fake-png-bytes", status, body)
+	if status != http.StatusOK || body != string(pendingStaged) {
+		t.Fatalf("content = %d len %d, want 200 staged bytes len %d", status, len(body), len(pendingStaged))
 	}
 }
 

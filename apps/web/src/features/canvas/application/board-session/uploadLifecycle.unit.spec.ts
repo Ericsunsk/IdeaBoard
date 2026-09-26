@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { uploadApi } from '../../../../shared/api/upload'
 import { makeBoardSnapshot } from '../testing/boardFixtures'
 import { createBoardSessionUploadLifecycle } from './uploadLifecycle'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
@@ -23,11 +27,13 @@ describe('createBoardSessionUploadLifecycle', () => {
       warnings: [],
       compressed: false,
     }))
+    setMediaWorkspaceIdResolver(() => 'ws_test123')
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    resetMediaWorkspaceIdResolver()
   })
 
   it('stabilizes the save-owned snapshot without cloning it', async () => {
@@ -54,6 +60,7 @@ describe('createBoardSessionUploadLifecycle', () => {
     const lifecycle = createBoardSessionUploadLifecycle({
       userUid: 'user-uid',
       boardId: 'board-a',
+      workspaceId: 'ws_test123',
       warning: vi.fn(),
     })
 
@@ -117,15 +124,16 @@ describe('createBoardSessionUploadLifecycle', () => {
     await createBoardSessionUploadLifecycle({
       userUid: 'user-uid',
       boardId: 'board-a',
+      workspaceId: 'ws_test123',
       warning: vi.fn(),
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_201/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_201/derivatives/preview',
       mediaRef: { assetId: 'asset_201', derivativeTier: 'preview' },
     })
     expect(snapshot.fusionNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_202/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_202/derivatives/preview',
       mediaRef: { assetId: 'asset_202', derivativeTier: 'preview' },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
@@ -196,15 +204,16 @@ describe('createBoardSessionUploadLifecycle', () => {
     await createBoardSessionUploadLifecycle({
       userUid: 'user-uid',
       boardId: 'board-a',
+      workspaceId: 'ws_test123',
       warning: vi.fn(),
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_301/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_301/derivatives/preview',
       mediaRef: { assetId: 'asset_301', derivativeTier: 'preview' },
     })
     expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_302/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_302/derivatives/preview',
       mediaRef: { assetId: 'asset_302', derivativeTier: 'preview' },
     })
     expect(snapshot.mediaRefs).toBeUndefined()
@@ -247,14 +256,14 @@ describe('createBoardSessionUploadLifecycle', () => {
     }).stabilizeSnapshotForSave(snapshot)
 
     expect(snapshot.imageNodes[0]).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/asset_401/derivatives/preview/content',
+      sourceImageUrl: '/api/v1/workspaces/ws_test123/media-assets/asset_401/derivatives/preview',
       sourceMediaRef: {
         assetId: 'asset_401',
         derivativeTier: 'preview',
       },
     })
     expect(snapshot.imageNodes[0]?.outputImages[0]).toMatchObject({
-      url: '/api/user/media-assets/asset_402/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_402/derivatives/preview',
       mediaRef: {
         assetId: 'asset_402',
         derivativeTier: 'preview',

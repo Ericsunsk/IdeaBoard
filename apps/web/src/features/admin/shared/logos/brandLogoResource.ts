@@ -1,9 +1,5 @@
-import { api } from '../../../../shared/api/client'
-import {
-  resolveApiData,
-  resolveApiOk,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
+import { adminControlUnavailable } from '../lib/controlGuidance'
+import type { ApiResponseWithData } from '../../../../shared/api/apiResponse'
 import { useQueryClient, type QueryClient } from '@tanstack/vue-query'
 import {
   replaceAdminBrandLogoOverrides,
@@ -11,10 +7,13 @@ import {
   type AdminBrandLogoScope,
 } from './brandLogos'
 
-// Admin brand logo override boundary (issue #809). The generated
-// `admin-brand-logos` client is gone but the backend admin plane still
-// serves `/api/admin/brand-logo-overrides*` with the shared envelope, so
-// this boundary transports through the central `api.request`.
+// Admin brand logo override boundary (W2 transports, fail-closed). The
+// Control Plane has no brand-logo operations, so the override read and
+// save/remove fail closed with guidance instead of calling the deleted
+// `/api/admin/brand-logo-overrides*` routes. Local override hydration
+// stays (defaults render when nothing is stored). The models.dev logo
+// proxy URLs in `brandLogos.ts` are a separate backend gap (images fall
+// back to placeholders via onError). See the stream report.
 export type AdminBrandLogoOverrideDto = {
   scope: AdminBrandLogoScope
   target_key: string
@@ -29,10 +28,7 @@ export type ApiResponseAdminBrandLogoOverrideList = ApiResponseWithData<{
 
 export const ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY = ['admin', 'brand-logo-overrides'] as const
 
-type BrandLogoOverrideQueryClient = Pick<
-  QueryClient,
-  'cancelQueries' | 'getQueryData' | 'setQueryData'
->
+type BrandLogoOverrideQueryClient = Pick<QueryClient, 'cancelQueries'>
 
 export function hydrateAdminBrandLogoOverrides(
   overrides: Array<{ scope: AdminBrandLogoScope; target_key: string; logo_key: string }>,
@@ -48,36 +44,14 @@ export function hydrateAdminBrandLogoOverrides(
 
 export function createAdminBrandLogoResource(queryClient: BrandLogoOverrideQueryClient) {
   return {
-    async save(scope: AdminBrandLogoScope, targetKey: string | number, logoKey: AdminBrandLogoKey) {
+    async save(_scope: AdminBrandLogoScope, _targetKey: string | number, _logoKey: AdminBrandLogoKey) {
       await cancelBrandLogoOverrideQuery(queryClient)
-      const data = await resolveApiData(
-        api.request<ApiResponseWithData<AdminBrandLogoOverrideDto>>(
-          `/admin/brand-logo-overrides/${encodeURIComponent(scope)}/${encodeURIComponent(String(targetKey))}`,
-          {
-            method: 'PUT',
-            body: { logo_key: logoKey } as unknown as Record<string, unknown>,
-          },
-        ),
-        '保存品牌 Logo 配置失败',
-      )
-      syncBrandLogoOverrideQuery(queryClient, data, false)
+      throw adminControlUnavailable('logo-upload')
     },
 
-    async remove(scope: AdminBrandLogoScope, targetKey: string | number) {
-      const normalizedTargetKey = String(targetKey)
+    async remove(_scope: AdminBrandLogoScope, _targetKey: string | number) {
       await cancelBrandLogoOverrideQuery(queryClient)
-      await resolveApiOk(
-        api.request<{ code: number; msg: string }>(
-          `/admin/brand-logo-overrides/${encodeURIComponent(scope)}/${encodeURIComponent(normalizedTargetKey)}`,
-          { method: 'DELETE' },
-        ),
-        '恢复智能识别失败',
-      )
-      syncBrandLogoOverrideQuery(
-        queryClient,
-        { scope, target_key: normalizedTargetKey } as AdminBrandLogoOverrideDto,
-        true,
-      )
+      throw adminControlUnavailable('logo-upload')
     },
   }
 }
@@ -88,25 +62,4 @@ export function useAdminBrandLogoResource() {
 
 async function cancelBrandLogoOverrideQuery(queryClient: BrandLogoOverrideQueryClient) {
   await queryClient.cancelQueries({ queryKey: ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY })
-}
-
-function syncBrandLogoOverrideQuery(
-  queryClient: BrandLogoOverrideQueryClient,
-  override: AdminBrandLogoOverrideDto,
-  remove: boolean,
-) {
-  const queryKey = ADMIN_BRAND_LOGO_OVERRIDES_QUERY_KEY
-  const cached = queryClient.getQueryData<ApiResponseAdminBrandLogoOverrideList>(queryKey)
-  const prior = cached?.data?.overrides ?? []
-  const withoutTarget = prior.filter(
-    (item) => item.scope !== override.scope || item.target_key !== override.target_key,
-  )
-  const overrides = remove ? withoutTarget : [...withoutTarget, override]
-  const next: ApiResponseAdminBrandLogoOverrideList = {
-    code: cached?.code ?? 0,
-    msg: cached?.msg ?? 'ok',
-    data: { overrides },
-  }
-  queryClient.setQueryData<ApiResponseAdminBrandLogoOverrideList>(queryKey, next)
-  hydrateAdminBrandLogoOverrides(overrides)
 }

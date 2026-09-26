@@ -9,12 +9,13 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
+const WORKSPACE_ID = 'ws_123'
+
 describe('usageResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('reads lifetime and the server-owned trend in one authenticated request', async () => {
+  it('reads lifetime and the server-owned trend through the v1 public plane', async () => {
     transport.request.mockResolvedValue({
-      code: 0,
       data: {
         timezone: 'Asia/Shanghai',
         lifetime: {
@@ -29,31 +30,39 @@ describe('usageResource', () => {
     })
 
     const controller = new AbortController()
-    await expect(fetchUsage('7d', controller.signal)).resolves.toMatchObject({
+    await expect(fetchUsage(WORKSPACE_ID, '7d', controller.signal)).resolves.toMatchObject({
       lifetime: { total_credits: 12 },
       trend: [{ date: '2026-07-13', credits: 12 }],
     })
     expect(transport.request).toHaveBeenCalledOnce()
     expect(transport.request).toHaveBeenCalledWith(
-      '/user/usage?range=7d',
+      `/v1/workspaces/${WORKSPACE_ID}/usage?range=7d`,
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
-    expect(usageQueryKeys.current('7d')).toEqual(['user', 'usage', 'current', '7d'])
+    expect(usageQueryKeys.current(WORKSPACE_ID, '7d')).toEqual([
+      'workspace',
+      'usage',
+      'current',
+      WORKSPACE_ID,
+      '7d',
+    ])
   })
 
-  it('surfaces API feedback instead of manufacturing an empty trend', async () => {
+  it('surfaces contract error feedback instead of manufacturing an empty trend', async () => {
     transport.request.mockResolvedValue({
-      code: 500,
-      msg: '用量统计暂不可用',
-      message_safe: true,
+      error: { code: 'service_unavailable', message: '用量统计暂不可用' },
     })
 
-    await expect(fetchUsage('30d')).rejects.toThrow('用量统计暂不可用')
+    await expect(fetchUsage(WORKSPACE_ID, '30d')).rejects.toThrow('用量统计暂不可用')
   })
 
   it('uses the resource fallback when API feedback exposes internal transport details', async () => {
-    transport.request.mockResolvedValue({ code: 500, msg: 'dial tcp 127.0.0.1:5432' })
+    transport.request.mockResolvedValue({
+      error: { code: 'internal_error', message: 'dial tcp 127.0.0.1:5432' },
+    })
 
-    await expect(fetchUsage('30d')).rejects.toThrow('Could not load usage statistics.')
+    await expect(fetchUsage(WORKSPACE_ID, '30d')).rejects.toThrow(
+      'Could not load usage statistics.',
+    )
   })
 })

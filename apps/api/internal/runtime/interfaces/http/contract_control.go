@@ -86,6 +86,23 @@ const (
 // fields; the header is the uniform fallback either way.
 const OperatorReasonHeader = "X-Operator-Reason"
 
+const controlReasonContextKey = "control.operator_reason"
+
+func setControlReason(c *gin.Context, reason string) {
+	if c != nil {
+		c.Set(controlReasonContextKey, strings.TrimSpace(reason))
+	}
+}
+
+func controlReasonFromContext(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	raw, _ := c.Get(controlReasonContextKey)
+	reason, _ := raw.(string)
+	return strings.TrimSpace(reason)
+}
+
 // maxControlBodyBytes bounds control request bodies buffered by the guard
 // for reason extraction and idempotency hashing. Control payloads are
 // small operator JSON documents; larger uploads never belong here.

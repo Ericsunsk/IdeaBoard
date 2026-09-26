@@ -101,24 +101,9 @@ describe('AdminUsersPage', () => {
               : { next_cursor: 'cursor-page-2', has_more: true },
         }),
       ),
-      http.get('/api/admin/users/oauth-providers/:provider', ({ params }) =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            provider: String(params.provider),
-            enabled: false,
-            configured: false,
-            available: false,
-            client_id: '',
-            client_secret_configured: false,
-            scopes: ['openid', 'email', 'profile'],
-            config_version: 0,
-            callback_url: 'https://example.com/api/auth/callback/google',
-            updated_at: null,
-          },
-        }),
-      ),
+      // OAuth providers have no control equivalent (fail-closed): no
+      // transport handler. The dialog opens against the fail-closed
+      // resource; see oauthProviderSettingsResource.contract.spec.ts.
       http.post('/api/control/v1/credits/grants', async ({ request }) => {
         commandRequests.push({
           body: (await request.json()) as Record<string, unknown>,

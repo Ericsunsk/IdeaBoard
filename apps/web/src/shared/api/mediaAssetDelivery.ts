@@ -8,41 +8,61 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
-import {
-  requireApiData,
-  type ApiResponseWithData,
-} from './apiResponse'
-import { api } from './client'
+import { getWorkspaceMediaAsset } from './generated-query/public/workspace-media/workspace-media'
+import type { MediaAsset } from './generated-query/public/model/mediaAsset'
 import {
   workspaceMediaAssetContentSuffix,
   workspaceMediaAssetDerivativeSuffix,
   type WorkspaceMediaDerivativeVariant,
 } from './upload'
-import { subscribeUserEvent } from './userEventStream'
 import { subscribeWorkspaceMediaInvalidation } from './workspaceEventStream'
 import { createPollDelay } from '../utils/polling'
 import { i18n } from '../i18n'
-// Legacy user media-asset delivery endpoints (issue #809). The backend user
-// plane still serves `/api/user/media-assets/*`, so this boundary keeps the
-// same URL shapes the deleted generated client produced (single source of
-// truth here, never hand-concatenated at call sites).
-function getUserMediaAssetMetadataUrl(assetId: string): string {
-  return `/user/media-assets/${encodeURIComponent(String(assetId))}`
+import {
+  readMediaWorkspaceId,
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from './mediaWorkspaceScope'
+
+export { resetMediaWorkspaceIdResolver, setMediaWorkspaceIdResolver }
+
+// Workspace media-asset delivery boundary (Public Data Plane, `/api/v1`).
+//
+// Metadata reads go through the generated `public/workspace-media`
+// `getWorkspaceMediaAsset` (members only); browser URL builders mount the
+// canonical `/api/v1/workspaces/{workspace_id}/media-assets/...` suffixes
+// owned by `./upload` (single source of truth, validated opaque ids).
+// Callers pass bare `asset_...` ids; the workspace resolves per call from
+// the `features/workspace` selection store and fail-closed (throw with
+// guidance) when unset — never an inferred workspace.
+//
+// Notes on v1 semantics:
+// - v1 statuses are `pending | ready` only (no `processing`/`failed`
+//   vocabulary); binary reads on non-ready assets stay 409 upstream.
+// - v1 has no batch metadata endpoint: the legacy
+//   `/user/media-assets/delivery/batch` single-round-trip fetch is retired
+//   (zero importers); callers read through the shared cache instead.
+// - v1 has no `processing-input` derivative tier: that metadata lookup
+//   stays strict (throws `MediaAssetDerivativeNotReadyError`) so
+//   generation inputs never silently change. Backend hook gap, reported.
+// - Invalidation rides the versioned workspace stream
+//   (`media.asset_ready` / `media.asset_archived`); the deleted
+//   `/api/user/events` legacy stream is gone (backend #809 hard cut).
+
+export class MediaWorkspaceUnavailableError extends Error {
+  constructor() {
+    super('Media workspace is unavailable. Select a workspace before loading media.')
+    this.name = 'MediaWorkspaceUnavailableError'
+  }
 }
 
-function getUserMediaAssetMetadataBatchUrl(): string {
-  return '/user/media-assets/delivery/batch'
-}
-
-function getUserMediaAssetOriginalContentUrl(assetId: string): string {
-  return `/user/media-assets/${encodeURIComponent(String(assetId))}/original/content`
-}
-
-function getUserMediaAssetDerivativeContentUrl(
-  assetId: string,
-  tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input',
-): string {
-  return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/content`
+/** Fail-closed workspace resolution: throws before any network call when unset. */
+export function requireMediaWorkspaceId(explicit?: string | null): string {
+  const trimmed = (explicit ?? '').trim()
+  if (trimmed) return trimmed
+  const selected = readMediaWorkspaceId()
+  if (!selected) throw new MediaWorkspaceUnavailableError()
+  return selected
 }
 
 export type MediaAssetDeliveryVariantStatus = 'pending' | 'processing' | 'ready' | 'failed'
@@ -68,13 +88,7 @@ export type MediaAssetDeliveryMetadata = {
   derivatives: { [key: string]: MediaAssetDeliveryVariant }
 }
 
-export type MediaAssetDeliveryMetadataBatch = {
-  items: MediaAssetDeliveryMetadata[]
-}
-
-export type ApiResponseMediaAssetMetadata = ApiResponseWithData<MediaAssetDeliveryMetadata>
-export type ApiResponseMediaAssetMetadataBatch =
-  ApiResponseWithData<MediaAssetDeliveryMetadataBatch>
+export type ApiResponseMediaAssetMetadata = { data: MediaAssetDeliveryMetadata }
 
 export type MediaAssetDeliveryTier =
   'thumb' | 'preview' | 'large-preview' | 'processing-input' | 'original'
@@ -84,15 +98,12 @@ export type MediaAssetDeliveryStatus =
 /** Canonical delivery identity: string `asset_...`. No numeric legacy. */
 export type MediaAssetId = string
 
-
-
-
 export class MediaAssetDerivativeNotReadyError extends Error {
-  readonly tier: Exclude<MediaAssetDeliveryTier, 'original'>
+  readonly tier: MediaAssetDeliveryTier
   readonly status: string
 
-  constructor(tier: Exclude<MediaAssetDeliveryTier, 'original'>, status: string) {
-    super(`Media asset ${tier} derivative is ${status}`)
+  constructor(tier: MediaAssetDeliveryTier, status: string) {
+    super(`Media asset ${tier} source is ${status}`)
     this.name = 'MediaAssetDerivativeNotReadyError'
     this.tier = tier
     this.status = status
@@ -108,12 +119,7 @@ const METADATA_CACHE_TTL_MS = 5 * 60 * 1000
 
 const metadataCache = new Map<string, CachedMetadata>()
 const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
-const metadataBatchRequests = new Map<
-  string,
-  Promise<ReadonlyMap<string, MediaAssetDeliveryMetadata>>
->()
 const invalidationListeners = new Map<string, Set<() => void>>()
-let stopMediaEventSubscription: (() => void) | null = null
 
 export function normalizeMediaAssetId(value: MediaAssetId | null | undefined): string | null {
   if (typeof value !== 'string') return null
@@ -121,38 +127,40 @@ export function normalizeMediaAssetId(value: MediaAssetId | null | undefined): s
   return trimmed.length > 0 ? trimmed : null
 }
 
+function metadataCacheKey(workspaceId: string, assetId: string): string {
+  return `${workspaceId}:${assetId}`
+}
+
 // Delivery URLs are same-origin API routes (not expiring signed storage
-// URLs), so metadata freshness is a plain TTL; per-asset SSE invalidation
-// handles updates inside the window.
+// URLs), so metadata freshness is a plain TTL; per-asset workspace-stream
+// invalidation handles updates inside the window.
 function resolveMetadataExpiry(_metadata: MediaAssetDeliveryMetadata): number {
   return Date.now() + METADATA_CACHE_TTL_MS
 }
 
-function notifyAssetInvalidated(assetId: MediaAssetId) {
+function clearCachedMetadata(workspaceId: string | null, assetId: string): void {
   const key = normalizeMediaAssetId(assetId) ?? ''
-  metadataCache.delete(key)
-  for (const listener of invalidationListeners.get(key) ?? []) listener()
+  if (!key) return
+  if (workspaceId) {
+    metadataCache.delete(metadataCacheKey(workspaceId, key))
+    return
+  }
+  for (const cacheKey of [...metadataCache.keys()]) {
+    if (cacheKey === key || cacheKey.endsWith(`:${key}`)) metadataCache.delete(cacheKey)
+  }
 }
 
-function ensureMediaEventSubscription() {
-  if (stopMediaEventSubscription) return
-  stopMediaEventSubscription = subscribeUserEvent('media.derivative.updated', (event) => {
-    try {
-      const payload = JSON.parse(event.data) as { media_asset_id?: unknown }
-      const raw = payload.media_asset_id
-      const assetId = typeof raw === 'string' ? raw.trim() : ''
-      if (assetId.length > 0) notifyAssetInvalidated(assetId)
-    } catch {
-      return
-    }
-  })
+function notifyAssetInvalidated(workspaceId: string | null, assetId: MediaAssetId) {
+  const key = normalizeMediaAssetId(assetId) ?? ''
+  clearCachedMetadata(workspaceId, key)
+  for (const listener of invalidationListeners.get(key) ?? []) listener()
 }
 
 // Workspace media invalidation (issue #807). Workspace-scoped callers
 // subscribe per workspace id; the versioned stream (`media.asset_ready` /
-// `media.asset_archived`) invalidates the same metadata cache the legacy
-// user-scope subscription feeds. Legacy behavior above is untouched.
-// Entries are refcounted so overlapping composables share one transport.
+// `media.asset_archived`) invalidates the same metadata cache the delivery
+// composable feeds. Entries are refcounted so overlapping composables
+// share one transport.
 type WorkspaceMediaSubscription = {
   stop: () => void
   count: number
@@ -169,7 +177,7 @@ export function ensureWorkspaceMediaInvalidation(workspaceId: string): () => voi
     return () => releaseWorkspaceMediaInvalidation(key)
   }
   const stop = subscribeWorkspaceMediaInvalidation(key, (assetId) => {
-    notifyAssetInvalidated(assetId)
+    notifyAssetInvalidated(key, assetId)
   })
   workspaceMediaSubscriptions.set(key, { stop, count: 1 })
   return () => releaseWorkspaceMediaInvalidation(key)
@@ -186,7 +194,6 @@ function releaseWorkspaceMediaInvalidation(workspaceId: string): void {
 }
 
 function subscribeAssetInvalidation(assetId: MediaAssetId, listener: () => void): () => void {
-  ensureMediaEventSubscription()
   const key = normalizeMediaAssetId(assetId) ?? ''
   let listeners = invalidationListeners.get(key)
   if (!listeners) {
@@ -197,19 +204,18 @@ function subscribeAssetInvalidation(assetId: MediaAssetId, listener: () => void)
   return () => {
     listeners?.delete(listener)
     if (listeners?.size === 0) invalidationListeners.delete(key)
-    if (invalidationListeners.size === 0 && stopMediaEventSubscription) {
-      stopMediaEventSubscription()
-      stopMediaEventSubscription = null
-    }
   }
 }
 
-function getCachedMetadata(assetId: MediaAssetId): MediaAssetDeliveryMetadata | null {
+function getCachedMetadata(
+  workspaceId: string,
+  assetId: MediaAssetId,
+): MediaAssetDeliveryMetadata | null {
   const key = normalizeMediaAssetId(assetId) ?? ''
-  const cached = metadataCache.get(key)
+  const cached = metadataCache.get(metadataCacheKey(workspaceId, key))
   if (!cached) return null
   if (cached.expiresAt <= Date.now()) {
-    metadataCache.delete(key)
+    metadataCache.delete(metadataCacheKey(workspaceId, key))
     return null
   }
   return cached.value
@@ -220,36 +226,102 @@ export function invalidateMediaAssetMetadata(assetId?: MediaAssetId) {
     metadataCache.clear()
     return
   }
-  notifyAssetInvalidated(assetId)
+  notifyAssetInvalidated(null, assetId)
 }
 
-export async function getMediaAssetMetadata(
+function mapDeliveryVariantStatus(value: unknown, field: string): MediaAssetDeliveryVariantStatus {
+  if (value === 'pending' || value === 'processing' || value === 'ready' || value === 'failed') {
+    return value
+  }
+  throw new Error(`Invalid media asset payload: ${field}`)
+}
+
+function toDeliveryVariant(
+  tier: string,
+  variant: unknown,
+): MediaAssetDeliveryVariant | null {
+  if (!variant || typeof variant !== 'object') return null
+  const record = variant as { status?: unknown; url?: unknown }
+  const url =
+    typeof record.url === 'string' && record.url.trim() ? record.url.trim() : undefined
+  return {
+    status: mapDeliveryVariantStatus(record.status, `derivatives.${tier}`),
+    ...(url == null ? {} : { url }),
+  }
+}
+
+function toDeliveryDerivatives(
+  derivatives: MediaAsset['derivatives'],
+): { [key: string]: MediaAssetDeliveryVariant } {
+  const mapped: { [key: string]: MediaAssetDeliveryVariant } = {}
+  for (const [tier, variant] of Object.entries(derivatives ?? {})) {
+    const delivery = toDeliveryVariant(tier, variant)
+    if (delivery) mapped[tier] = delivery
+  }
+  return mapped
+}
+
+function assertDeliveryContentUrl(contentUrl: string, assetId: string): string {
+  const trimmed = contentUrl?.trim()
+  if (!trimmed) throw new Error('Invalid media asset payload: content_url')
+  // Content URLs carry asset_... only; storage keys never leave the server.
+  if (!trimmed.includes(assetId) || /storage[_-]?key/i.test(trimmed)) {
+    throw new Error('Invalid media asset payload: content_url')
+  }
+  return trimmed
+}
+
+function toDeliveryMetadata(asset: MediaAsset): MediaAssetDeliveryMetadata {
+  const id = normalizeMediaAssetId(asset.id)
+  if (!id) throw new Error('Invalid media asset payload: id')
+  if (!Number.isFinite(asset.width) || !Number.isFinite(asset.height)) {
+    throw new Error('Invalid media asset payload: dimensions')
+  }
+  if (!Number.isFinite(asset.size_bytes)) {
+    throw new Error('Invalid media asset payload: size_bytes')
+  }
+  const contentUrl = assertDeliveryContentUrl(asset.content_url, id)
+  return {
+    asset_id: id,
+    status: mapDeliveryVariantStatus(asset.status, 'status'),
+    mime_type: asset.mime_type,
+    width: asset.width,
+    height: asset.height,
+    size_bytes: asset.size_bytes,
+    original: { status: 'ready', url: contentUrl },
+    derivatives: toDeliveryDerivatives(asset.derivatives),
+  }
+}
+
+/**
+ * Reads one workspace media asset and projects it onto the delivery
+ * metadata shape shared delivery consumers (cache, composable, library
+ * materialization) read. Results hydrate the same cache the
+ * workspace-stream invalidation feeds.
+ */
+export async function getWorkspaceMediaAssetMetadata(
+  workspaceId: string | null | undefined,
   assetId: MediaAssetId,
   options: {
     signal?: AbortSignal | undefined
     force?: boolean | undefined
   } = {},
 ): Promise<MediaAssetDeliveryMetadata> {
+  const workspace = requireMediaWorkspaceId(workspaceId)
   const normalized = normalizeMediaAssetId(assetId)
   if (!normalized) throw new Error(i18n.global.t('common.errors.mediaInvalid'))
-  const requestKey = normalized
+  const requestKey = metadataCacheKey(workspace, normalized)
   if (!options.force) {
-    const cached = getCachedMetadata(assetId)
+    const cached = getCachedMetadata(workspace, assetId)
     if (cached) return cached
   }
   const existing = metadataRequests.get(requestKey)
   if (existing) return existing
 
-  const request = api
-    .request<ApiResponseMediaAssetMetadata>(getUserMediaAssetMetadataUrl(normalized), {
-      method: 'GET',
-      signal: options.signal,
-    })
-    .then((response) =>
-      requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
-    )
+  const request = getWorkspaceMediaAsset(workspace, normalized, { signal: options.signal })
+    .then((envelope) => toDeliveryMetadata(envelope.data))
     .then((metadata) => {
-      metadataCache.set(normalized, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
+      metadataCache.set(requestKey, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
       return metadata
     })
     .finally(() => {
@@ -260,73 +332,30 @@ export async function getMediaAssetMetadata(
 }
 
 /**
- * Fetch metadata for multiple assets in one round trip and hydrate the same
- * cache used by useMediaAssetDelivery. Results are keyed by string asset ID;
- * assets the user cannot access are omitted by the API and therefore absent.
+ * Workspace-implicit metadata read for call sites holding bare `asset_`
+ * ids (canvas surfaces). The workspace resolves from the selection store
+ * and fail-closed when unset; prefer `getWorkspaceMediaAssetMetadata`
+ * where the workspace is already known.
  */
-export async function getMediaAssetMetadataBatch(
-  assetIds: readonly MediaAssetId[],
+export async function getMediaAssetMetadata(
+  assetId: MediaAssetId,
   options: {
     signal?: AbortSignal | undefined
     force?: boolean | undefined
   } = {},
-): Promise<ReadonlyMap<string, MediaAssetDeliveryMetadata>> {
-  const ids = Array.from(
-    new Set(
-      assetIds
-        .map((value) => normalizeMediaAssetId(value))
-        .filter((value): value is string => value !== null),
-    ),
-  )
-  if (ids.length === 0) return new Map()
-  if (ids.length > 100) throw new Error('Too many media assets requested')
-  const sortedIDs = [...ids].sort()
-  const requestKey = sortedIDs.join(',')
-  if (!options.force) {
-    const cached = new Map<string, MediaAssetDeliveryMetadata>()
-    for (const id of ids) {
-      const metadata = getCachedMetadata(id)
-      if (metadata) cached.set(id, metadata)
-    }
-    if (cached.size === ids.length) return cached
-  }
-  const existing = metadataBatchRequests.get(requestKey)
-  if (existing) return existing
-  const request = api
-    .request<ApiResponseMediaAssetMetadataBatch>(getUserMediaAssetMetadataBatchUrl(), {
-      method: 'POST',
-      signal: options.signal,
-      body: JSON.stringify({ asset_ids: sortedIDs }),
-    })
-    .then((response) =>
-      requireApiData(response, i18n.global.t('common.errors.mediaInfoLoadFailed')),
-    )
-    .then((data) => {
-      const result = new Map<string, MediaAssetDeliveryMetadata>()
-      for (const metadata of data.items ?? []) {
-        const id = normalizeMediaAssetId(metadata.asset_id)
-        if (!id) continue
-        metadataCache.set(id, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
-        result.set(id, metadata)
-      }
-      return result as ReadonlyMap<string, MediaAssetDeliveryMetadata>
-    })
-    .finally(() => {
-      if (metadataBatchRequests.get(requestKey) === request)
-        metadataBatchRequests.delete(requestKey)
-    })
-  metadataBatchRequests.set(requestKey, request)
-  return request
+): Promise<MediaAssetDeliveryMetadata> {
+  return getWorkspaceMediaAssetMetadata(null, assetId, options)
 }
 
 export function resolveMediaAssetOriginalURL(assetId: MediaAssetId): string {
-  return resolveApiUrl(getUserMediaAssetOriginalContentUrl(assetId.trim()))
+  const normalized = assetId.trim()
+  return resolveApiUrl(workspaceMediaAssetContentSuffix(requireMediaWorkspaceId(), normalized))
 }
 
 /**
  * Format-agnostic derivative delivery URL. The backend negotiates the ready
  * physical encoding server-side; callers never specify a format. The path
- * comes from the generated client (never hand-concatenated) so legacy
+ * comes from the `./upload` suffix builders (never hand-concatenated) so
  * delivery URLs cannot drift from the OpenAPI contract.
  */
 export function resolveMediaAssetDerivativeURL(
@@ -334,20 +363,28 @@ export function resolveMediaAssetDerivativeURL(
   tier: 'thumb' | 'preview' | 'large-preview' | 'processing-input' = 'large-preview',
 ): string {
   const normalized = assetId.trim()
-  return resolveApiUrl(getUserMediaAssetDerivativeContentUrl(normalized, tier))
+  return resolveApiUrl(
+    workspaceMediaAssetDerivativeSuffix(
+      requireMediaWorkspaceId(),
+      normalized,
+      tier as WorkspaceMediaDerivativeVariant,
+    ),
+  )
 }
 
 /**
- * Resolve the provider-neutral processing input for generation. The tier is
- * materialized synchronously during ingestion, so this is a single metadata
- * read: there is no work to enqueue and nothing to poll for.
+ * Resolve the full-resolution export source for generation. v1 carries no
+ * `processing-input` derivative tier; the source is the `original` content
+ * derived from the asset payload, so this throws
+ * `MediaAssetDerivativeNotReadyError` while the asset itself is not ready —
+ * generation inputs must never silently change.
  */
 export async function resolveMediaAssetProcessingURL(assetId: MediaAssetId): Promise<string> {
   const metadata = await getMediaAssetMetadata(assetId)
-  const variant = metadata.derivatives['processing-input']
-  const status = variant?.status ?? metadata.status
-  if (status === 'ready' && variant?.url) return resolveAssetUrl(variant.url)
-  throw new MediaAssetDerivativeNotReadyError('processing-input', status)
+  if (metadata.status !== 'ready' || !metadata.original?.url) {
+    throw new MediaAssetDerivativeNotReadyError('original', metadata.status)
+  }
+  return resolveAssetUrl(metadata.original.url)
 }
 
 // ---------------------------------------------------------------------------
@@ -358,7 +395,6 @@ export async function resolveMediaAssetProcessingURL(assetId: MediaAssetId): Pro
 // `asset_...` only (storage keys never leave the server). Path suffixes
 // are owned by `./upload` (single source of truth, validated opaque
 // ids); this module only mounts them onto the runtime base URL.
-// Board/Task/Library adoption of these URLs is #805/#806.
 
 export function resolveWorkspaceMediaAssetOriginalURL(
   workspaceId: string,
@@ -404,6 +440,7 @@ export function useMediaAssetDelivery(
   let requestToken = 0
   let abortController: AbortController | null = null
   let unsubscribeInvalidation: (() => void) | null = null
+  let releaseWorkspaceSubscription: (() => void) | null = null
   let retryTimer = 0
   const retryDelay = createPollDelay({ initialDelayMs: 800, maxDelayMs: 2_000, backoffFactor: 2 })
 
@@ -426,9 +463,20 @@ export function useMediaAssetDelivery(
       abortController = null
       unsubscribeInvalidation?.()
       unsubscribeInvalidation = null
+      releaseWorkspaceSubscription?.()
+      releaseWorkspaceSubscription = null
       reset()
       if (currentAssetId === null || !enabled) return
 
+      try {
+        releaseWorkspaceSubscription = ensureWorkspaceMediaInvalidation(
+          requireMediaWorkspaceId(),
+        )
+      } catch {
+        status.value = 'error'
+        error.value = new MediaWorkspaceUnavailableError()
+        return
+      }
       unsubscribeInvalidation = subscribeAssetInvalidation(currentAssetId, () => {
         if (token !== requestToken) return
         void load(currentAssetId, currentTier, true)
@@ -495,6 +543,7 @@ export function useMediaAssetDelivery(
       abortController?.abort()
       window.clearTimeout(retryTimer)
       unsubscribeInvalidation?.()
+      releaseWorkspaceSubscription?.()
     })
   }
 

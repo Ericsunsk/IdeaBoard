@@ -237,7 +237,7 @@ import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { usePaymentOrdersFeedback } from '../useStripeSettingsFeedback'
 import {
@@ -403,17 +403,26 @@ function retryDetail() {
 async function requestRefund(ideaQuantity: number) {
   const publicOrderNumber = selectedOrderNumber.value
   if (!publicOrderNumber || refundLoading.value) return
+  // Control refunds require an operator reason (audit); a cancelled dialog
+  // aborts silently.
   const confirmed = await adminConfirm.confirm({
     title: '确认退款',
-    message: `将为订单 ${publicOrderNumber} 发起 ${formatLocaleNumber(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？`,
+    message: `将为订单 ${publicOrderNumber} 发起 ${formatLocaleNumber(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？该操作将记录操作人与原因。`,
     confirmLabel: '发起退款',
     intent: 'danger',
+    reason: { required: true },
   })
   if (!confirmed) return
-  await executeRefund(publicOrderNumber, ideaQuantity)
+  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+  if (!operatorReason) return
+  await executeRefund(publicOrderNumber, ideaQuantity, operatorReason)
 }
 
-async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
+async function executeRefund(
+  publicOrderNumber: string,
+  ideaQuantity: number,
+  operatorReason: string,
+) {
   const key = `${publicOrderNumber}:${ideaQuantity}`
   let idempotencyKey = refundIdempotencyKeys.get(key)
   if (!idempotencyKey) {
@@ -423,7 +432,11 @@ async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
   refundLoading.value = true
   refundError.value = ''
   try {
-    detail.value = await resource.refund(publicOrderNumber, { ideaQuantity, idempotencyKey })
+    detail.value = await resource.refund(publicOrderNumber, {
+      ideaQuantity,
+      idempotencyKey,
+      operatorReason,
+    })
     refundIdempotencyKeys.delete(key)
     feedback.refundSubmitted()
     refreshOrders()

@@ -6,11 +6,42 @@ import { renderWithUser, screen, waitFor } from '../../../../../test/render'
 import AdminModelsPage from './AdminModelsPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('catalog review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+const gatewayFakes = vi.hoisted(() => ({
+  detect: vi.fn(),
+  listObserved: vi.fn(),
+  previewRoute: vi.fn(),
+}))
 
 vi.mock('../../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: confirmMock }),
+  useAdminConfirm: () => ({ confirm: confirmMock, readReason: readReasonMock }),
 }))
+
+// Detect/observed/route-preview have no control equivalent (fail-closed in
+// the resource); page UX keeps coverage through fakes while the resource
+// spec pins the fail-closed contract. Everything else rides the real
+// resource over MSW control handlers.
+vi.mock('../../infrastructure/adminGatewayResource', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('../../infrastructure/adminGatewayResource')
+  >()
+  return {
+    ...actual,
+    createAdminGatewayResource: () => {
+      const real = actual.createAdminGatewayResource()
+      return {
+        ...real,
+        catalog: {
+          ...real.catalog,
+          detect: gatewayFakes.detect,
+          listObserved: gatewayFakes.listObserved,
+          previewRoute: gatewayFakes.previewRoute,
+        },
+      }
+    },
+  }
+})
 
 vi.mock('../../../shared/lib/toast', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../shared/lib/toast')>()),
@@ -24,32 +55,42 @@ describe('AdminModelsPage', () => {
   beforeEach(() => {
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
+    readReasonMock.mockReset()
+    readReasonMock.mockReturnValue('catalog review')
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
     storedCatalog = wireCatalogModels()
+    gatewayFakes.detect.mockReset()
+    gatewayFakes.listObserved.mockReset()
+    gatewayFakes.previewRoute.mockReset()
+    gatewayFakes.detect.mockResolvedValue({
+      models: [
+        {
+          id: 'anthropic/claude-image-v1',
+          name: 'Claude Image V1',
+          provider: 'Anthropic',
+        },
+      ],
+      configured_providers: 1,
+    })
+    gatewayFakes.listObserved.mockResolvedValue([makeObservedSnapshot()])
+    gatewayFakes.previewRoute.mockResolvedValue({
+      provider_slug: 'custom-test',
+      is_first_party: false,
+      target_path: 'v1/images/generations',
+      path_source: 'generations',
+    })
 
     useMswHandlers(
       http.get('/api/control/v1/platform/ai-gateway/catalog', () => {
         // MSW 模拟的是线路格式（snake_case），与真实后端一致。
         return HttpResponse.json({ code: 0, msg: 'ok', data: storedCatalog })
       }),
-      http.put('/api/admin/settings/ai-gateway/catalog', async ({ request }) => {
+      http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         const body = (await request.json()) as { items?: typeof storedCatalog }
         storedCatalog = body.items ?? storedCatalog
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })
-      }),
-      http.post('/api/admin/settings/ai-gateway/route-preview', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            provider_slug: 'custom-test',
-            is_first_party: false,
-            target_path: 'v1/images/generations',
-            path_source: 'generations',
-          },
-        })
       }),
       http.get('/api/control/v1/platform/ai-gateway', () => {
         return HttpResponse.json({
@@ -58,24 +99,8 @@ describe('AdminModelsPage', () => {
           data: { account_id: 'cf-acc-1', gateway_id: 'gw-1', token_configured: true },
         })
       }),
-      http.put('/api/admin/settings/ai-gateway', () => {
+      http.put('/api/control/v1/platform/ai-gateway', () => {
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })
-      }),
-      http.get('/api/admin/settings/ai-gateway/detect-models', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            models: [
-              {
-                id: 'anthropic/claude-image-v1',
-                name: 'Claude Image V1',
-                provider: 'Anthropic',
-              },
-            ],
-            configured_providers: 1,
-          },
-        })
       }),
       http.get('/api/control/v1/platform/ai-gateway/providers', () =>
         HttpResponse.json({
@@ -85,46 +110,6 @@ describe('AdminModelsPage', () => {
             { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
             { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
             { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
-          ],
-        }),
-      ),
-      http.get('/api/admin/settings/ai-gateway/models-observed', () =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: [
-            {
-              model: 'openai/gpt-image-1',
-              provider: 'OpenAI',
-              window_days: 7,
-              window_since: '2026-09-15T00:00:00Z',
-              attempts_total: 100,
-              completed: 92,
-              failed: 8,
-              cache_hits: 30,
-              success_rate: 0.92,
-              cache_hit_rate: 0.3,
-              top_failure_stage: 'render',
-              top_failure_category: 'timeout',
-              top_failure_count: 5,
-              has_observations: true,
-              has_sku_margin: true,
-              sku_margins: [
-                {
-                  sku: 'ai-image:gpt-image-1',
-                  display_name: 'GPT Image 1',
-                  feature: 'generation',
-                  on_sale: true,
-                  unit_credits_by_variant: { default: 100 },
-                  actual_cost_credits: null,
-                  has_actual_cost: false,
-                  cost_source: 'unavailable',
-                  cost_note: '网关实际成本暂无来源',
-                  margin_credits: null,
-                  margin_status: 'unknown_no_cost',
-                },
-              ],
-            },
           ],
         }),
       ),
@@ -219,7 +204,7 @@ describe('AdminModelsPage', () => {
   it('opens add model dialog and successfully imports a detected model', async () => {
     let savedList: unknown = null
     useMswHandlers(
-      http.put('/api/admin/settings/ai-gateway/catalog', async ({ request }) => {
+      http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         savedList = await request.json()
         storedCatalog = (savedList as { items: typeof storedCatalog }).items ?? storedCatalog
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })
@@ -284,7 +269,7 @@ describe('AdminModelsPage', () => {
   it('confirms and deletes a model', async () => {
     let savedList: unknown = null
     useMswHandlers(
-      http.put('/api/admin/settings/ai-gateway/catalog', async ({ request }) => {
+      http.put('/api/control/v1/platform/ai-gateway/catalog', async ({ request }) => {
         savedList = await request.json()
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })
       }),
@@ -335,6 +320,41 @@ describe('AdminModelsPage', () => {
     expect(within(dialog).getByLabelText(/API 密钥/)).toBeInTheDocument()
   })
 })
+
+function makeObservedSnapshot() {
+  return {
+    model: 'openai/gpt-image-1',
+    provider: 'OpenAI',
+    windowDays: 7,
+    windowSince: '2026-09-15T00:00:00Z',
+    attemptsTotal: 100,
+    completed: 92,
+    failed: 8,
+    cacheHits: 30,
+    successRate: 0.92,
+    cacheHitRate: 0.3,
+    topFailureStage: 'render',
+    topFailureCategory: 'timeout',
+    topFailureCount: 5,
+    hasObservations: true,
+    hasSkuMargin: true,
+    skuMargins: [
+      {
+        sku: 'ai-image:gpt-image-1',
+        displayName: 'GPT Image 1',
+        feature: 'generation',
+        onSale: true,
+        unitCreditsByVariant: { default: 100 },
+        actualCostCredits: null,
+        hasActualCost: false,
+        costSource: 'unavailable',
+        costNote: '网关实际成本暂无来源',
+        marginCredits: null,
+        marginStatus: 'unknown_no_cost',
+      },
+    ],
+  }
+}
 
 function renderModelsPage() {
   // Fresh client per render: the catalog query caches by key, so sharing one

@@ -1,4 +1,3 @@
-const SHANGHAI_OFFSET = '+08:00'
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
 const DATE_TIME_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 
@@ -30,23 +29,6 @@ export function shanghaiEndOfDayPlusDays(days: number, now: Date = new Date()): 
     59,
   )
   return pickerDateToShanghaiDateTimeInput(target)
-}
-
-export function shanghaiDateTimeInputToISO(value: string): string | undefined {
-  const normalized = value.trim()
-  if (!normalized) return undefined
-  if (!DATE_TIME_INPUT_PATTERN.test(normalized)) {
-    throw new Error('时间格式无效')
-  }
-
-  const date = new Date(`${normalized}:00${SHANGHAI_OFFSET}`)
-  if (
-    Number.isNaN(date.getTime()) ||
-    isoToShanghaiDateTimeInput(date.toISOString()) !== normalized
-  ) {
-    throw new Error('时间格式无效')
-  }
-  return date.toISOString()
 }
 
 export function isoToShanghaiDateTimeInput(value: string): string {

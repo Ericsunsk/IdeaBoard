@@ -1,14 +1,31 @@
-import { api } from '../../../../shared/api/client'
 import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
-import { shanghaiDateTimeInputToISO } from './rewardCodeTime'
+  createControlRewardCode,
+  deleteControlRewardCode,
+  searchControlRewardCodes,
+  setControlRewardCodeEnabled,
+  updateControlRewardCode,
+} from '../../../../shared/api/generated-query/control/control-credits/control-credits'
+import type {
+  ControlCreatedRewardCode,
+  ControlRewardCode,
+  ControlRewardCodePage,
+  ControlUpdatedRewardCode,
+} from '../../../../shared/api/generated-query/control/model'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+} from '../../../../shared/api/contractKernel'
+import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 
-// Admin reward code boundary (issue #809). The generated `admin-rewards`
-// client is gone but the backend admin plane still serves
-// `/api/admin/rewards/codes/*` with the shared envelope, so this boundary
-// transports through the central `api.request` with local view types.
+// Admin reward code boundary (W2 transports). Search/create/update/
+// enable/delete ride the Control Plane reward-code operations
+// (`/api/control/v1/rewards/codes*`, guarded proxies keeping the legacy
+// `{code, msg, data}` envelope). Every mutation carries a header-only
+// Idempotency-Key plus an operator reason collected through the shared
+// confirm dialog, and emits a control audit record. The deleted
+// `/api/admin/rewards/codes/*` routes are gone; this module is the
+// single transport. View types and normalizers keep their shapes so the
+// UI and specs keep working.
 const RewardCodeStatus = {
   disabled: 'disabled',
   expired: 'expired',
@@ -112,137 +129,267 @@ export type SearchRewardCodesInput = {
   signal?: AbortSignal
 }
 
+export type RewardCodeMutationOptions = {
+  operatorReason: string
+  idempotencyKey?: string | undefined
+}
+
 export type AdminRewardCodeResource = {
   search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>
-  create: (input: CreateRewardCodeInput) => Promise<CreatedRewardCode>
-  update: (id: number, input: UpdateRewardCodeInput) => Promise<UpdatedRewardCode>
-  setEnabled: (id: number, enabled: boolean) => Promise<RewardCode>
-  delete: (id: number) => Promise<void>
+  create: (input: CreateRewardCodeInput, options: RewardCodeMutationOptions) => Promise<CreatedRewardCode>
+  update: (
+    id: number,
+    input: UpdateRewardCodeInput,
+    options: RewardCodeMutationOptions,
+  ) => Promise<UpdatedRewardCode>
+  setEnabled: (
+    id: number,
+    enabled: boolean,
+    options: RewardCodeMutationOptions,
+  ) => Promise<RewardCode>
+  delete: (id: number, options: RewardCodeMutationOptions) => Promise<void>
 }
 
 export function createAdminRewardCodeResource(): AdminRewardCodeResource {
   return {
-    search: async ({ query, status, beforeId, limit = 20, signal }) =>
-      toRewardCodePage(
-        await resolveApiData(
-          api.request<ApiResponseWithData<GeneratedRewardCodePage>>(
-            '/admin/rewards/codes/search',
-            {
-              method: 'POST',
-              body: {
-                ...(query.trim() ? { query: query.trim() } : {}),
-                ...(status ? { status } : {}),
-                ...(beforeId !== undefined ? { before_id: beforeId } : {}),
-                limit,
-              } as unknown as Record<string, unknown>,
-              ...(signal == null ? {} : { signal }),
-            },
-          ),
-          '加载兑换码失败',
-        ),
+    search: searchRewardCodes,
+    create: createRewardCode,
+    update: updateRewardCode,
+    setEnabled: setRewardCodeEnabled,
+    delete: deleteRewardCode,
+  }
+}
+
+async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardCodePage> {
+  const criteria: { query?: string; status?: RewardCodeStatus; before_id?: number; limit?: number } = {}
+  if (input.query.trim()) criteria.query = input.query.trim()
+  if (input.status != null) criteria.status = input.status
+  if (input.beforeId != null) criteria.before_id = input.beforeId
+  if (input.limit != null) criteria.limit = input.limit
+  const body = await searchControlRewardCodes(criteria, {
+    ...(input.signal == null ? {} : { signal: input.signal }),
+  })
+  const page = readLegacyData<ControlRewardCodePage>(body, '加载兑换码失败')
+  if (!Array.isArray(page.reward_codes) || typeof page.total !== 'number') {
+    throw controlError('control_failed', '加载兑换码失败')
+  }
+  const result: RewardCodePage = {
+    rewardCodes: page.reward_codes.map(normalizeRewardCode),
+    total: page.total,
+  }
+  if (page.next_before_id != null) result.nextBeforeId = page.next_before_id
+  return result
+}
+
+async function createRewardCode(
+  input: CreateRewardCodeInput,
+  options: RewardCodeMutationOptions,
+): Promise<CreatedRewardCode> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  const idempotencyKey = input.idempotencyKey.trim() || controlCreditIdempotencyKey('reward-create')
+  let body: unknown
+  try {
+    body = await createControlRewardCode(
+      {
+        display_name: input.displayName.trim(),
+        code: input.code,
+        credit_amount: input.creditAmount,
+        max_redemptions: input.maxRedemptions,
+        expires_at: input.expiresAt,
+        reason: operatorReason,
+      },
+      { headers: mutationHeaders(idempotencyKey, operatorReason) },
+    )
+  } catch (error) {
+    throw withControlCopy(error, '创建兑换码失败')
+  }
+  const created = readLegacyData<ControlCreatedRewardCode>(body, '创建兑换码失败')
+  if (!created.reward_code || !created.plaintext) {
+    throw controlError('control_failed', '创建兑换码失败')
+  }
+  return {
+    rewardCode: normalizeRewardCode(created.reward_code),
+    plaintext: created.plaintext,
+    replayed: created.replayed === true,
+  }
+}
+
+async function updateRewardCode(
+  id: number,
+  input: UpdateRewardCodeInput,
+  options: RewardCodeMutationOptions,
+): Promise<UpdatedRewardCode> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  let body: unknown
+  try {
+    const payload: {
+      display_name: string
+      credit_amount: number
+      max_redemptions: number
+      expires_at: string
+      code?: string
+      reason: string
+    } = {
+      display_name: input.displayName.trim(),
+      credit_amount: input.creditAmount,
+      max_redemptions: input.maxRedemptions,
+      expires_at: input.expiresAt,
+      reason: operatorReason,
+    }
+    if (input.code) payload.code = input.code
+    body = await updateControlRewardCode(id, payload, {
+      headers: mutationHeaders(
+        options.idempotencyKey ?? controlCreditIdempotencyKey('reward-update'),
+        operatorReason,
       ),
-    create: async (input) => {
-      const expiresAt = shanghaiDateTimeInputToISO(input.expiresAt)
-      return toCreatedRewardCode(
-        await resolveApiData(
-          api.request<ApiResponseWithData<GeneratedCreatedRewardCode>>(
-            '/admin/rewards/codes',
-            {
-              method: 'POST',
-              body: {
-                display_name: input.displayName.trim(),
-                code: input.code.trim(),
-                credit_amount: input.creditAmount,
-                max_redemptions: input.maxRedemptions,
-                idempotency_key: input.idempotencyKey,
-                ...(expiresAt ? { expires_at: expiresAt } : {}),
-              } as unknown as Record<string, unknown>,
-            },
-          ),
-          '创建兑换码失败',
+    })
+  } catch (error) {
+    throw withControlCopy(error, '更新兑换码失败')
+  }
+  const updated = readLegacyData<ControlUpdatedRewardCode>(body, '更新兑换码失败')
+  if (!updated.reward_code) throw controlError('control_failed', '更新兑换码失败')
+  const result: UpdatedRewardCode = { rewardCode: normalizeRewardCode(updated.reward_code) }
+  if (updated.plaintext != null) result.plaintext = updated.plaintext
+  if (updated.replayed != null) result.replayed = updated.replayed
+  return result
+}
+
+async function setRewardCodeEnabled(
+  id: number,
+  enabled: boolean,
+  options: RewardCodeMutationOptions,
+): Promise<RewardCode> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  let body: unknown
+  try {
+    body = await setControlRewardCodeEnabled(
+      id,
+      { enabled, reason: operatorReason },
+      {
+        headers: mutationHeaders(
+          options.idempotencyKey ?? controlCreditIdempotencyKey('reward-enabled'),
+          operatorReason,
         ),
-      )
-    },
-    update: async (id, input) =>
-      toUpdatedRewardCode(
-        await resolveApiData(
-          api.request<ApiResponseWithData<GeneratedUpdatedRewardCode>>(
-            `/admin/rewards/codes/${encodeURIComponent(String(id))}`,
-            {
-              method: 'PATCH',
-              body: {
-                display_name: input.displayName.trim(),
-                credit_amount: input.creditAmount,
-                max_redemptions: input.maxRedemptions,
-                expires_at: shanghaiDateTimeInputToISO(input.expiresAt) ?? null,
-                ...(input.code?.trim() ? { code: input.code.trim() } : {}),
-              } as unknown as Record<string, unknown>,
-            },
-          ),
-          '更新兑换码失败',
-        ),
+      },
+    )
+  } catch (error) {
+    throw withControlCopy(error, enabled ? '启用兑换码失败' : '停用兑换码失败')
+  }
+  return normalizeRewardCode(
+    readLegacyData<ControlRewardCode>(body, enabled ? '启用兑换码失败' : '停用兑换码失败'),
+  )
+}
+
+async function deleteRewardCode(id: number, options: RewardCodeMutationOptions): Promise<void> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await deleteControlRewardCode(id, {
+      headers: mutationHeaders(
+        options.idempotencyKey ?? controlCreditIdempotencyKey('reward-delete'),
+        operatorReason,
       ),
-    setEnabled: async (id, enabled) =>
-      toRewardCode(
-        await resolveApiData(
-          api.request<ApiResponseWithData<GeneratedRewardCode>>(
-            `/admin/rewards/codes/${encodeURIComponent(String(id))}/enabled`,
-            {
-              method: 'PATCH',
-              body: { enabled } as unknown as Record<string, unknown>,
-            },
-          ),
-          enabled ? '启用兑换码失败' : '停用兑换码失败',
-        ),
-      ),
-    delete: async (id) => {
-      await resolveApiData(
-        api.request<ApiResponseWithData<unknown>>(
-          `/admin/rewards/codes/${encodeURIComponent(String(id))}`,
-          { method: 'DELETE' },
-        ),
-        '删除兑换码失败',
-      )
-    },
+    })
+    readLegacyOk(body, '删除兑换码失败')
+  } catch (error) {
+    throw withControlCopy(error, '删除兑换码失败')
   }
 }
 
-function toRewardCode(value: GeneratedRewardCode): RewardCode {
-  return {
-    id: value.id,
-    displayName: value.display_name,
-    maskedCodeHint: value.masked_code_hint,
-    creditAmount: value.credit_amount,
-    maxRedemptions: value.max_redemptions,
-    redemptionCount: value.redemption_count,
-    expiresAt: value.expires_at,
-    enabled: value.enabled,
-    status: value.status,
-    createdAt: value.created_at,
-    updatedAt: value.updated_at,
+function normalizeRewardCode(code: ControlRewardCode): RewardCode {
+  const result: RewardCode = {
+    id: code.id,
+    displayName: code.display_name,
+    maskedCodeHint: code.masked_code_hint,
+    creditAmount: code.credit_amount,
+    maxRedemptions: code.max_redemptions,
+    redemptionCount: code.redemption_count,
+    enabled: code.enabled,
+    status: normalizeRewardCodeStatus(code.status),
+    createdAt: code.created_at,
+    updatedAt: code.updated_at,
   }
+  if (typeof code.expires_at === 'string' && code.expires_at) {
+    result.expiresAt = code.expires_at
+  }
+  return result
 }
 
-function toCreatedRewardCode(value: GeneratedCreatedRewardCode): CreatedRewardCode {
-  return {
-    rewardCode: toRewardCode(value.reward_code),
-    plaintext: value.plaintext,
-    replayed: value.replayed,
+function normalizeRewardCodeStatus(status: ControlRewardCode['status']): RewardCodeStatus {
+  if (
+    status === RewardCodeStatus.disabled ||
+    status === RewardCodeStatus.expired ||
+    status === RewardCodeStatus.exhausted ||
+    status === RewardCodeStatus.enabled
+  ) {
+    return status
   }
+  throw controlError('control_failed', '未知的兑换码状态')
 }
 
-function toUpdatedRewardCode(value: GeneratedUpdatedRewardCode): UpdatedRewardCode {
-  return {
-    rewardCode: toRewardCode(value.reward_code),
-    plaintext: value.plaintext,
-    replayed: value.replayed,
-  }
+function mutationHeaders(idempotencyKey: string, operatorReason: string) {
+  return buildContractRequestHeaders({
+    requestId: newRequestId(),
+    idempotencyKey,
+    operatorReason,
+  })
 }
 
-function toRewardCodePage(value: GeneratedRewardCodePage): RewardCodePage {
-  return {
-    rewardCodes: value.reward_codes.map(toRewardCode),
-    total: value.total,
-    nextBeforeId: value.next_before_id,
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
   }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 409) return 409
+  }
+  return undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+// Control reward routes keep the legacy `{ code, msg, data? }` shape: a
+// numeric `code` of 0 means success, anything else is a failure.
+function readLegacyData<T>(body: unknown, fallback: string): T {
+  if (isRecord(body) && 'code' in body) {
+    if (body.code !== 0) {
+      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
+      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
+    }
+    if (body.data == null) throw controlError('control_failed', fallback)
+    return body.data as T
+  }
+  throw controlError('control_failed', fallback)
+}
+
+function readLegacyOk(body: unknown, fallback: string): void {
+  readLegacyData<unknown>(body, fallback)
 }

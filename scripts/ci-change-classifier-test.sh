@@ -119,6 +119,41 @@ assert_output_line "${openapi_output}" 'web=true'
 assert_output_line "${openapi_output}" 'api=true'
 assert_output_line "${openapi_output}" 'auth=false'
 
+openapi_public_output="$(printf '%s\n' apps/api/openapi.public.yaml | "${classifier}")"
+
+assert_output_line "${openapi_public_output}" 'web=true'
+assert_output_line "${openapi_public_output}" 'api=true'
+assert_output_line "${openapi_public_output}" 'auth=false'
+assert_output_line "${openapi_public_output}" 'docs_only=false'
+
+openapi_control_output="$(printf '%s\n' apps/api/openapi.control.yaml | "${classifier}")"
+
+assert_output_line "${openapi_control_output}" 'web=true'
+assert_output_line "${openapi_control_output}" 'api=true'
+assert_output_line "${openapi_control_output}" 'auth=false'
+assert_output_line "${openapi_control_output}" 'docs_only=false'
+
+openapi_events_output="$(printf '%s\n' apps/api/openapi.events.yaml | "${classifier}")"
+
+assert_output_line "${openapi_events_output}" 'web=true'
+assert_output_line "${openapi_events_output}" 'api=true'
+assert_output_line "${openapi_events_output}" 'auth=false'
+assert_output_line "${openapi_events_output}" 'docs_only=false'
+
+atlas_hcl_output="$(printf '%s\n' apps/api/atlas.hcl | "${classifier}")"
+
+assert_output_line "${atlas_hcl_output}" 'api=true'
+assert_output_line "${atlas_hcl_output}" 'migration_integration=true'
+assert_output_line "${atlas_hcl_output}" 'web=false'
+assert_output_line "${atlas_hcl_output}" 'docs_only=false'
+
+queries_output="$(printf '%s\n' apps/api/internal/db/queries/users.sql | "${classifier}")"
+
+assert_output_line "${queries_output}" 'api=true'
+assert_output_line "${queries_output}" 'schema=true'
+assert_output_line "${queries_output}" 'web=false'
+assert_output_line "${queries_output}" 'docs_only=false'
+
 docker_output="$(printf '%s\n' docker/compose.yml | "${classifier}")"
 
 assert_output_line "${docker_output}" 'api=false'

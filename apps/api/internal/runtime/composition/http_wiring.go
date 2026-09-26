@@ -5,14 +5,17 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/aigateway"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	"ideaboard/api/internal/library"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
+	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	"ideaboard/api/internal/runtime/adapters/webdist"
 	configinfra "ideaboard/api/internal/runtime/infrastructure/config"
 	httpinfra "ideaboard/api/internal/runtime/infrastructure/http"
@@ -23,10 +26,15 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
+	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
+	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
+	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
+	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
 	tenancypg "ideaboard/api/internal/tenancy/postgres"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func newAppRouter(
@@ -136,18 +144,34 @@ func newAppRouter(
 			Quoter:          services.billingCatalog,
 			Checkout: httpapi.NewPaymentsCheckoutAdapter(services.paymentService,
 				cfg.PublicOrigins.WebURL("/user/boards")),
+			// Gaps batch (#809-close, backend B): the Payments service
+			// implements the full UserCheckoutService seam (purchase
+			// options, pending continue/abandon, recharge history), the
+			// billing catalog backs billing-quotes (incl.
+			// ai-search:vision), and the Rewards service owns
+			// redeem/history (Grant via credits.Commands inside its own
+			// transaction; no handler ledger writes).
+			PurchaseOptions: services.paymentService,
+			PendingOrders:   services.paymentService,
+			Recharges:       services.paymentService,
+			Rewards:         services.rewardService,
 		},
 		// Control Plane administration (issue #808). Every seam below is
 		// shared with the platform-config handlers (no second ledger,
 		// queue, or settings store); the control guard adds capability
 		// auth, the separate rate-limit bucket, header-only idempotency,
 		// the operator reason, and the mandatory audit record.
-		// #809 hard cut: Tasks and Monitor stay nil (the legacy task
-		// services are deleted with the stub), so the control task
-		// read/ops routes fail closed with 503 and the monitor/
-		// statistics proxies with 501 until the workspace task read
-		// model lands. Routes stay registered (openapi operationIds
-		// intact).
+		// #809-close: Tasks rides the workspace task read model
+		// (workspaceControlTaskAdapter over the shared workspace store +
+		// global control queries; cancel settles through the shared
+		// holder with the operator reason). Rewards, OAuth providers,
+		// brand-logo overrides, and the AI gateway extras reuse their
+		// domain handlers under the guard (single-sourced validation);
+		// branding logo upload stores through the shared Storage
+		// service. Monitor rides the workspace-backed statistics store
+		// (task_daily_stats / task_stat_events / task_execution_attempts
+		// over the workspace tasks table) plus the River queue monitor,
+		// so the monitor / statistics / stream proxies are live.
 		ContractControl: httpapi.ContractControlDeps{
 			Users:             services.userService,
 			Identity:          administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
@@ -156,6 +180,7 @@ func newAppRouter(
 			CreditUsers:       creditUserResolver,
 			CreditReads:       services.creditService,
 			Reconciliation:    services.creditService,
+			Tasks:             httpapi.NewWorkspaceControlTasks(services.dbPool, taskServices.workspaceTaskStore, taskServices.workspaceTaskHolder, creditUserResolver),
 			Tenancy:           tenancypg.NewStore(repos.db),
 			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
@@ -167,7 +192,13 @@ func newAppRouter(
 			Storage:           storagehttp.NewHandler(services.storageService),
 			SearchProviders:   searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
 			FeaturePrompts:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			Monitor:           newControlMonitorHandler(repos.db),
 			Mail:              services.authServiceClient,
+			RewardCommands:    rewardhttp.NewAdminCommandHandler(services.rewardService),
+			RewardReads:       rewardhttp.NewAdminReadHandler(services.rewardService, rewardIdentityProjector{repo: repos.userRepo}),
+			OAuth:             services.authServiceClient,
+			BrandLogos:        adminbranding.NewHandler(repos.adminBrandLogoRepo, controlRequireAdmin),
+			BrandingUpload:    services.storageService,
 		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		PaymentWebhook:      paymentWebhookHandler,
@@ -186,6 +217,30 @@ func newAppRouter(
 	})
 
 	return router, nil
+}
+
+// newControlMonitorHandler wires the workspace-backed statistics store
+// plus the River queue monitor into the control monitor/statistics
+// handler (GetMonitor, StreamMonitor, GetStatistics, BackfillStatistics).
+// The River client stays nil: queue monitoring only needs the database
+// handle (river_job depth/lag, running attempts). A nil pool keeps the
+// handler nil so the monitor routes stay fail-closed with 501.
+func newControlMonitorHandler(db *pgxpool.Pool) *statisticshttp.Handler {
+	if db == nil {
+		return nil
+	}
+	store := taskpostgres.NewStatisticsStore(db)
+	monitor := taskqueue.NewRiverQueue(nil, db, taskqueue.RiverMaxAttemptsDefault)
+	return statisticshttp.NewHandler(statisticsapp.NewService(store), monitor)
+}
+
+// controlRequireAdmin adapts the identity admin check to the platform
+// brand-logo override handler port. The control guard already enforced
+// the capability; this keeps the handler's fail-closed default when it
+// is ever served outside the guard.
+func controlRequireAdmin(c *gin.Context) bool {
+	_, ok := principal.RequireAdmin(c)
+	return ok
 }
 
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOptions httpapi.FrontendRouteOptions) {

@@ -250,10 +250,10 @@ func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *workspaceta
 // TaskAssets adapter. Invisible/archived/non-ready assets fail the task
 // deterministically; the worker never mutates media.
 func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
-	if len(task.MediaAssetIDs) == 0 {
+	if len(task.MediaAssetIDs) == 0 && task.Params == nil {
 		return nil
 	}
-	if w.assets == nil {
+	if w.assets == nil && (len(task.MediaAssetIDs) > 0 || hasWorkspaceMaskParam(task)) {
 		return errors.New("任务媒体引用无法校验: 媒体读取器未配置")
 	}
 	for i, id := range task.MediaAssetIDs {
@@ -268,7 +268,33 @@ func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *worksp
 			}
 		}
 	}
+	// The v1 mask reference (params.mask_asset_id) resolves through the
+	// same read-only gate so a mask that vanished between submit and
+	// dispatch fails deterministically instead of reaching the provider.
+	if maskID, ok := workspacetasks.MaskAssetIDFromParams(task.Params); ok {
+		if w.assets == nil {
+			return errors.New("任务遮罩引用无法校验: 媒体读取器未配置")
+		}
+		if _, err := w.assets.GetAsset(ctx, task.WorkspaceID, maskID); err != nil {
+			switch {
+			case errors.Is(err, workspacetasks.ErrMediaArchived):
+				return fmt.Errorf("任务遮罩已归档: %w", err)
+			case errors.Is(err, workspacetasks.ErrMediaNotReady):
+				return fmt.Errorf("任务遮罩未就绪: %w", err)
+			default:
+				return fmt.Errorf("任务遮罩不存在: %w", workspacetasks.ErrMediaNotFound)
+			}
+		}
+	}
 	return nil
+}
+
+func hasWorkspaceMaskParam(task *workspacetasks.WorkspaceTask) bool {
+	if task == nil {
+		return false
+	}
+	_, ok := workspacetasks.MaskAssetIDFromParams(task.Params)
+	return ok
 }
 
 // claim fences pending -> running with the lease token. Lease-guarded
@@ -482,19 +508,36 @@ func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.Task
 	if err != nil {
 		return nil, fmt.Errorf("任务 canonical 参数编码失败: %w", err)
 	}
-	prompt := ""
-	if task.Params != nil {
-		if value, ok := task.Params["prompt"].(string); ok {
-			prompt = value
-		}
-	}
 	return &tasks.TaskPayload{
 		TaskID:    strings.TrimSpace(task.ID),
 		UserID:    task.OwnerUserID,
-		Prompt:    prompt,
+		Prompt:    workspaceBridgePrompt(task, &typed),
 		Params:    string(encoded),
 		CreatedAt: task.CreatedAt.Unix(),
 	}, nil
+}
+
+// workspaceBridgePrompt resolves the provider prompt the worker actually
+// sends. The durable fact is the canonical Generation snapshot
+// (CompiledPrompt, fallback UserPrompt) stamped by CompileWorkspaceParams
+// from the v1 data.prompt input; the legacy params.prompt fallback keeps
+// compiler-less tasks (and existing tests) working. A task with no prompt
+// fact bridges "" and lets the executor enforce feature policy.
+func workspaceBridgePrompt(task *workspacetasks.WorkspaceTask, typed *tasks.WorkflowTaskParams) string {
+	if typed != nil && typed.Generation != nil {
+		if prompt := strings.TrimSpace(typed.Generation.CompiledPrompt); prompt != "" {
+			return prompt
+		}
+		if prompt := strings.TrimSpace(typed.Generation.UserPrompt); prompt != "" {
+			return prompt
+		}
+	}
+	if task != nil && task.Params != nil {
+		if value, ok := task.Params["prompt"].(string); ok {
+			return value
+		}
+	}
+	return ""
 }
 
 // mapWorkspaceProviderOutputs projects legacy provider outputs onto the

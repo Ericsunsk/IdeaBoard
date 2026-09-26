@@ -243,6 +243,7 @@ import { taskMetricDefinitions } from '../../../../shared/domain/taskMetricToken
 import { getWorkflowFeatureIcon } from '../../../../shared/domain/workflowFeatureIcons'
 import { useAdminPromptConfigWorkspace } from '../workspace'
 import type { FeaturePromptVariable } from '../workspace'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -254,6 +255,7 @@ import {
 const feedback = usePromptConfigFeedback()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback,
+  confirm: useAdminConfirm(),
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
 const {

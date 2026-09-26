@@ -1,7 +1,9 @@
-import { api } from '../../../shared/api/client'
+import {
+  createWorkspaceVisionQuery as createWorkspaceVisionQueryTransport,
+  searchWorkspace as searchWorkspaceTransport,
+} from '../../../shared/api/generated-query/public/workspace-search/workspace-search'
 import {
   buildContractRequestHeaders,
-  parseContractEnvelope,
   requireContractData,
 } from '../../../shared/api/contractKernel'
 import { i18n } from '../../../shared/i18n'
@@ -10,24 +12,28 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // Workspace-scoped search resource (issue #806).
 //
 // Talks to the v1 endpoints under `/api/v1/workspaces/{id}/search`
-// through the central `api.request` client (envelope `{ data, meta }` /
-// `{ error: { code, message, details, request_id } }`). Search UI must
-// consume this module, never generated code directly.
+// through the generated `public/workspace-search` hooks (`/api/v1/...`
+// via `publicMutator`). Search UI must consume this module, never
+// generated code directly.
 //
 // Migration note: `feed.ts` / `useSearchSession` still read the legacy
 // `search` + `user` generated clients. They move onto this module once
-// `generated-query/public` regenerates from `openapi.public.yaml`
-// (regeneration TODO, owned by the #802-804 merger follow-up); legacy
-// routes are removed in #809. Query length validation stays
-// server-owned: over-limit queries surface as 422 validation_failed
-// (never a silent empty page).
+// their call sites migrate; legacy routes are removed in #809. Query
+// length validation stays server-owned: over-limit queries surface as
+// 422 validation_failed (never a silent empty page).
 //
-// TODO(#806-regen, 2026-09-25): BLOCKED on the same regen — generated
-// Search requests use the feature adapter so route and response validation
-// stay owned by this context while this
-// module ships `/v1/...` suffixes; `orval.config.ts publicQuery` must point
-// at `publicMutator` and regen (`api:generate`) is out of scope here. Keep
-// this transport until then; do not force-fit.
+// Transport note: the generated hooks own routes/envelopes; this adapter
+// keeps query normalization, opaque-id asserts, idempotency plumbing,
+// and error-code mapping that have no generated equivalent.
+//
+// TODO(2026-09-26, orval array serialization): the generated
+// `getSearchWorkspaceUrl` serializes array params with `String(value)`
+// (comma-joined, single `provider=`), while the backend reads
+// `c.QueryArray("provider")` with no comma split (`ParseV1SearchProviders`
+// 422s `unsplash,pexels`). Multi-provider filters therefore fail closed
+// below instead of riding the hook. Missing shape: repeated `provider=`
+// params in the generated URL helper. Single/empty filters ride the hook
+// wire-identical to the retired transport.
 
 const WORKSPACE_ID_RE = /^ws_[A-Za-z0-9_-]+$/
 const LIBRARY_ASSET_ID_RE = /^lasset_[A-Za-z0-9_-]+$/
@@ -46,16 +52,22 @@ export function assertWorkspaceLibraryAssetId(value: string): string {
   return trimmed
 }
 
-function encodeId(value: string): string {
-  return encodeURIComponent(value)
+function assertWorkspaceUploadId(value: string): string {
+  const trimmed = value.trim()
+  if (!/^upload_[A-Za-z0-9_-]+$/.test(trimmed)) {
+    throw new Error('Invalid workspace upload id: expected upload_...')
+  }
+  return trimmed
 }
 
-export function workspaceSearchSuffix(workspaceId: string): string {
-  return `/v1/workspaces/${encodeId(assertWorkspaceId(workspaceId))}/search`
-}
-
-export function workspaceVisionQueriesSuffix(workspaceId: string): string {
-  return `${workspaceSearchSuffix(workspaceId)}/vision-queries`
+function toGeneratedOptions(options: WorkspaceSearchRequestOptions): {
+  headers: Record<string, string>
+  signal?: AbortSignal | undefined
+} {
+  return {
+    headers: workspaceSearchHeaders(options),
+    ...(options.signal == null ? {} : { signal: options.signal }),
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -168,6 +180,10 @@ export type WorkspaceVisionQueryInput = {
   workspaceId: string
   userText?: string | undefined
   libraryAssetIds?: string[] | undefined
+  /** Staged workspace upload refs (`upload_...`, stage-then-reference). */
+  uploadIds?: string[] | undefined
+  /** Allowlisted https image URLs (server-enforced CDN allowlist). */
+  imageUrls?: string[] | undefined
 }
 
 export const workspaceSearchApi = {
@@ -175,32 +191,31 @@ export const workspaceSearchApi = {
     input: WorkspaceSearchInput,
     options: WorkspaceSearchRequestOptions = {},
   ): Promise<WorkspaceSearchPage> => {
-    const query = new URLSearchParams()
-    query.set('q', normalizeSearchQuery(input.query))
-    for (const provider of input.providers ?? []) query.append('provider', provider)
-    if (input.cursor) query.set('cursor', input.cursor)
-    if (input.pageSize != null) query.set('page_size', String(input.pageSize))
-    const response = await api.request<unknown>(
-      `${workspaceSearchSuffix(input.workspaceId)}?${query}`,
-      {
-        method: 'GET',
-        headers: workspaceSearchHeaders(options),
-        signal: options.signal,
-      },
-    )
-    const parsed = parseContractEnvelope<unknown[]>(response)
-    if (!parsed.ok) {
-      const error = new Error(parsed.error.message || i18n.global.t('search.loadFailed')) as Error & {
-        code?: string | undefined
-      }
-      error.code = parsed.error.code
-      throw error
+    const providers = input.providers ?? []
+    if (providers.length > 1) {
+      // See the module TODO: the generated URL helper cannot express
+      // repeated `provider=` params. Fail closed instead of sending a
+      // comma-joined filter the backend 422s.
+      throw new Error(
+        `${i18n.global.t('search.loadFailed')}: multi-provider search needs repeated provider params`,
+      )
     }
-    if (!Array.isArray(parsed.data)) throw new Error(i18n.global.t('search.loadFailed'))
-    const meta = parsed.meta ?? {}
+    const query: { q: string; provider?: ('unsplash' | 'pexels')[]; cursor?: string; page_size?: number } = {
+      q: normalizeSearchQuery(input.query),
+    }
+    if (providers.length === 1) query.provider = [providers[0] as 'unsplash' | 'pexels']
+    if (input.cursor) query.cursor = input.cursor
+    if (input.pageSize != null) query.page_size = input.pageSize
+    const page = await searchWorkspaceTransport(
+      assertWorkspaceId(input.workspaceId),
+      query,
+      toGeneratedOptions(options),
+    )
+    if (!Array.isArray(page?.data)) throw new Error(i18n.global.t('search.loadFailed'))
+    const meta = page.meta ?? { next_cursor: null, has_more: false }
     const nextCursor = typeof meta.next_cursor === 'string' ? meta.next_cursor : ''
     return {
-      items: parsed.data.map(toWorkspaceSearchResult),
+      items: page.data.map(toWorkspaceSearchResult),
       nextCursor,
       hasMore: meta.has_more === true,
     }
@@ -210,22 +225,30 @@ export const workspaceSearchApi = {
     input: WorkspaceVisionQueryInput,
     options: WorkspaceSearchRequestOptions = {},
   ): Promise<WorkspaceVisionQuery> => {
-    const response = await api.request<unknown>(workspaceVisionQueriesSuffix(input.workspaceId), {
-      method: 'POST',
-      headers: workspaceSearchHeaders(options),
-      body: JSON.stringify({
-        data: {
-          ...(input.userText == null ? {} : { user_text: input.userText }),
-          ...((input.libraryAssetIds ?? []).length === 0
-            ? {}
-            : { library_asset_ids: (input.libraryAssetIds ?? []).map(assertWorkspaceLibraryAssetId) }),
-        },
-      }),
-      signal: options.signal,
-    })
+    const data: {
+      user_text?: string
+      library_asset_ids?: string[]
+      upload_ids?: string[]
+      image_urls?: string[]
+    } = {}
+    if (input.userText != null) data.user_text = input.userText
+    if ((input.libraryAssetIds ?? []).length > 0) {
+      data.library_asset_ids = (input.libraryAssetIds ?? []).map(assertWorkspaceLibraryAssetId)
+    }
+    if ((input.uploadIds ?? []).length > 0) {
+      data.upload_ids = (input.uploadIds ?? []).map(assertWorkspaceUploadId)
+    }
+    if ((input.imageUrls ?? []).length > 0) {
+      data.image_urls = (input.imageUrls ?? []).filter((url) => url.trim()).map((url) => url.trim())
+    }
+    const envelope = await createWorkspaceVisionQueryTransport(
+      assertWorkspaceId(input.workspaceId),
+      { data },
+      toGeneratedOptions(options),
+    )
     return toWorkspaceVisionQuery(
       requireContractData<Record<string, unknown>>(
-        response,
+        envelope,
         i18n.global.t('search.visionSearchFailed'),
       ),
     )

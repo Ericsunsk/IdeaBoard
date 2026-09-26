@@ -411,6 +411,7 @@ type fakeControlTasks struct {
 	cancelCalls  int
 	cancelActor  int64
 	cancelTaskID string
+	cancelReason string
 	failCancel   error
 	failGet      error
 	failList     error
@@ -434,12 +435,13 @@ func (f *fakeControlTasks) ResolveAdminTaskUserID(_ context.Context, raw string)
 	return controlUserAID, nil
 }
 
-func (f *fakeControlTasks) CancelAdminTask(_ context.Context, taskID string, adminID int64) error {
+func (f *fakeControlTasks) CancelAdminTask(_ context.Context, taskID string, adminID int64, reason string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cancelCalls++
 	f.cancelActor = adminID
 	f.cancelTaskID = taskID
+	f.cancelReason = reason
 	return f.failCancel
 }
 

@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { extractImageResultsFromTaskPayload, normalizeTaskImageResults } from './taskResult'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../api/mediaAssetDelivery'
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
+
+afterEach(() => {
+  resetMediaWorkspaceIdResolver()
+})
 
 describe('taskResult image result helpers', () => {
   it('extracts normalized image output metadata from materialized outputs', () => {
@@ -17,7 +29,7 @@ describe('taskResult image result helpers', () => {
       }),
     ).toEqual([
       {
-        url: '/api/user/media-assets/asset_42/derivatives/preview/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',
         assetId: 'asset_42',
         width: 1024,
         height: 768,

@@ -2,9 +2,9 @@ import {
   isTaskResultPendingError,
   TaskCancelledError,
   TaskResultPendingError,
-} from '../../../../../shared/api/taskEvents'
+} from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../shared/i18n'
-import type { SubmitTaskData } from '../../../../../shared/api/task'
+import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
@@ -20,6 +20,10 @@ import {
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
 import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
+import {
+  isCanvasWorkspaceTaskUnmappableError,
+  isCanvasWorkspaceUnavailableError,
+} from '../workspace/canvasWorkspaceTaskAdapter'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
@@ -77,6 +81,11 @@ function imageGenerationFailureMessage(): string {
 
 /** Presentation boundary: transport errors carry a kind; copy is resolved here. */
 function taskExecutionWarning(error: unknown): string {
+  // Fail-closed guidance is user-safe by construction: surface it verbatim
+  // instead of collapsing to the generic failure copy.
+  if (isCanvasWorkspaceUnavailableError(error) || isCanvasWorkspaceTaskUnmappableError(error)) {
+    return error.message
+  }
   if (error instanceof TaskResultPendingError) {
     return i18n.global.t(
       error.kind === 'timeout' ? 'canvas.task.progressTimeout' : 'canvas.task.stillProcessing',

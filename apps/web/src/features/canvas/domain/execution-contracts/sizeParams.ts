@@ -1,4 +1,4 @@
-import type { SubmitTaskParams } from '../../../../shared/api/task'
+import type { SubmitTaskParams } from './canvasTaskRequest'
 
 export interface ExecutionImageSize {
   width: number

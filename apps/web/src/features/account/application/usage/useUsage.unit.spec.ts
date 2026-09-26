@@ -13,6 +13,13 @@ vi.mock('../../infrastructure/usage/resource', async (importOriginal) => {
   return { ...actual, fetchUsage: fetchUsageMock }
 })
 
+vi.mock('../accountWorkspace', () => ({
+  useAccountWorkspace: () => ({
+    workspaceId: ref('ws_1'),
+    selectionSettled: ref(true),
+  }),
+}))
+
 const UsageHost = defineComponent({
   setup() {
     const range = ref<UsageRange>('30d')
@@ -62,11 +69,11 @@ describe('useUsage', () => {
     const year = deferred<AccountUsage>()
     fetchUsageMock
       .mockResolvedValueOnce(buildUsage('30d', 30))
-      .mockImplementationOnce((_range: UsageRange, signal?: AbortSignal) => {
+      .mockImplementationOnce((_workspaceId: string, _range: UsageRange, signal?: AbortSignal) => {
         expect(signal).toBeInstanceOf(AbortSignal)
         return week.promise
       })
-      .mockImplementationOnce((_range: UsageRange, signal?: AbortSignal) => {
+      .mockImplementationOnce((_workspaceId: string, _range: UsageRange, signal?: AbortSignal) => {
         expect(signal).toBeInstanceOf(AbortSignal)
         return year.promise
       })
@@ -75,7 +82,7 @@ describe('useUsage', () => {
     await waitFor(() => expect(screen.getByTestId('display-range')).toHaveTextContent('30d'))
     await user.click(screen.getByRole('button', { name: '周' }))
     await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(2))
-    const weekSignal = fetchUsageMock.mock.calls[1]?.[1] as AbortSignal
+    const weekSignal = fetchUsageMock.mock.calls[1]?.[2] as AbortSignal
     await user.click(screen.getByRole('button', { name: '年' }))
     await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(3))
     expect(weekSignal.aborted).toBe(true)
@@ -97,7 +104,7 @@ describe('useUsage', () => {
 
     await waitFor(() => expect(fetchUsageMock).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getByTestId('request-state')).toHaveTextContent('ready'))
-    const queryKey = ['user', 'usage', 'current', '30d'] as const
+    const queryKey = ['workspace', 'usage', 'current', 'ws_1', '30d'] as const
     const query = queryClient.getQueryCache().find({ queryKey })
     expect(query?.options).toMatchObject({
       staleTime: 30_000,

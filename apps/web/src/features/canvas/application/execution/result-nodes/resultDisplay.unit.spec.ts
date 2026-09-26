@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resolveTaskImageResultAtIndexDisplay,
   resolveTaskImageResultDisplay,
 } from './resultDisplay'
-import { getMediaAssetMetadata } from '../../../../../shared/api/mediaAssetDelivery'
+import {
+  getMediaAssetMetadata,
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../../shared/api/mediaAssetDelivery'
 
 vi.mock('../../../../../shared/api/mediaAssetDelivery', async (importOriginal) => {
   const original =
@@ -25,6 +29,11 @@ describe('resultDisplay', () => {
   beforeEach(() => {
     metadataMock.mockReset()
     metadataMock.mockResolvedValue(readyMetadata())
+    setMediaWorkspaceIdResolver(() => 'ws_test123')
+  })
+
+  afterEach(() => {
+    resetMediaWorkspaceIdResolver()
   })
 
   it('waits for the preview derivative before binding the receipt', async () => {
@@ -44,7 +53,7 @@ describe('resultDisplay', () => {
         loadImageSize,
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
       ratio: 0.5,
     })
     expect(metadataMock).toHaveBeenCalledWith('asset_1')
@@ -82,7 +91,7 @@ describe('resultDisplay', () => {
         loadImageSize,
       ),
     ).resolves.toEqual({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
       mediaRef: { assetId: 'asset_1', derivativeTier: 'preview' },
       ratio: 0.5,
       width: 400,
@@ -101,7 +110,7 @@ describe('resultDisplay', () => {
         loadImageSize,
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/asset_42/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',
       mediaRef: { assetId: 'asset_42', derivativeTier: 'preview' },
     })
   })
@@ -116,12 +125,12 @@ describe('resultDisplay', () => {
         loadImageSize,
       ),
     ).resolves.toEqual({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
       mediaRef: { assetId: 'asset_1', derivativeTier: 'preview' },
       ratio: 1.25,
     })
     expect(loadImageSize).toHaveBeenCalledWith(
-      '/api/user/media-assets/asset_1/derivatives/preview/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
     )
   })
 
@@ -137,7 +146,7 @@ describe('resultDisplay', () => {
         vi.fn(async () => ({ width: 100, height: 100 })),
       ),
     ).resolves.toMatchObject({
-      url: '/api/user/media-assets/asset_1/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_1/derivatives/preview',
       resultIndex: 0,
     })
   })

@@ -9,7 +9,10 @@ import type { AdminModelItem } from '../domain/catalogData'
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
-  useAdminConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+  useAdminConfirm: () => ({
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: () => 'catalog review',
+  }),
 }))
 
 vi.mock('../../shared/lib/toast', async (importOriginal) => ({

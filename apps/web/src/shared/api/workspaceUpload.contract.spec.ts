@@ -16,16 +16,17 @@ import {
   toWorkspaceMediaAsset,
   toWorkspaceUploadSession,
   workspaceMediaApi,
-  workspaceMediaAssetArchiveSuffix,
   workspaceMediaAssetContentSuffix,
   workspaceMediaAssetDerivativeSuffix,
-  workspaceMediaAssetSuffix,
-  workspaceMediaAssetsSuffix,
   workspaceUploadApi,
-  workspaceUploadCompleteSuffix,
-  workspaceUploadSessionSuffix,
-  workspaceUploadsSuffix,
 } from './upload'
+import {
+  getArchiveWorkspaceMediaAssetUrl,
+  getCompleteWorkspaceUploadUrl,
+  getCreateWorkspaceUploadUrl,
+  getGetWorkspaceUploadUrl,
+  getStageWorkspaceUploadBytesUrl,
+} from './generated-query/public/workspace-media/workspace-media'
 import {
   resolveWorkspaceMediaAssetDerivativeURL,
   resolveWorkspaceMediaAssetOriginalURL,
@@ -74,17 +75,19 @@ function assetFixture(overrides: Record<string, unknown> = {}): Record<string, u
 }
 
 describe('workspace upload paths', () => {
-  it('builds canonical transport suffixes without storage material', () => {
-    expect(workspaceUploadsSuffix(WORKSPACE_ID)).toBe('/v1/workspaces/ws_abc123/uploads')
-    expect(workspaceUploadSessionSuffix(WORKSPACE_ID, UPLOAD_ID)).toBe(
-      '/v1/workspaces/ws_abc123/uploads/upload_def456',
+  it('builds canonical routes matching the generated hooks (publicMutator adds /v1)', () => {
+    expect(getCreateWorkspaceUploadUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/uploads')
+    expect(getGetWorkspaceUploadUrl(WORKSPACE_ID, UPLOAD_ID)).toBe(
+      '/workspaces/ws_abc123/uploads/upload_def456',
     )
-    expect(workspaceUploadCompleteSuffix(WORKSPACE_ID, UPLOAD_ID)).toBe(
-      '/v1/workspaces/ws_abc123/uploads/upload_def456/complete',
+    expect(getCompleteWorkspaceUploadUrl(WORKSPACE_ID, UPLOAD_ID)).toBe(
+      '/workspaces/ws_abc123/uploads/upload_def456/complete',
     )
-    expect(workspaceMediaAssetsSuffix(WORKSPACE_ID)).toBe('/v1/workspaces/ws_abc123/media-assets')
-    expect(workspaceMediaAssetSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
-      '/v1/workspaces/ws_abc123/media-assets/asset_789abc',
+    expect(getStageWorkspaceUploadBytesUrl(WORKSPACE_ID, UPLOAD_ID)).toBe(
+      '/workspaces/ws_abc123/uploads/upload_def456/bytes',
+    )
+    expect(getArchiveWorkspaceMediaAssetUrl(WORKSPACE_ID, ASSET_ID)).toBe(
+      '/workspaces/ws_abc123/media-assets/asset_789abc/archive',
     )
     expect(workspaceMediaAssetContentSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
       '/v1/workspaces/ws_abc123/media-assets/asset_789abc/content',
@@ -92,18 +95,20 @@ describe('workspace upload paths', () => {
     expect(workspaceMediaAssetDerivativeSuffix(WORKSPACE_ID, ASSET_ID, 'preview')).toBe(
       '/v1/workspaces/ws_abc123/media-assets/asset_789abc/derivatives/preview',
     )
-    expect(workspaceMediaAssetArchiveSuffix(WORKSPACE_ID, ASSET_ID)).toBe(
-      '/v1/workspaces/ws_abc123/media-assets/asset_789abc/archive',
-    )
   })
 
-  it('rejects malformed opaque ids before any network call', () => {
+  it('rejects malformed opaque ids before any network call', async () => {
     expect(() => assertWorkspaceId('nope')).toThrow()
     expect(() => assertWorkspaceId('upload_def456')).toThrow()
     expect(() => assertUploadId(UPLOAD_ID)).not.toThrow()
     expect(() => assertWorkspaceAssetId('42')).toThrow()
-    expect(() => workspaceUploadsSuffix('  ')).toThrow()
-    expect(() => workspaceMediaAssetSuffix(WORKSPACE_ID, 'asset with space')).toThrow()
+    await expect(workspaceUploadApi.createSession('  ', {
+      filename: 'x.png',
+      mimeType: 'image/png',
+      sizeBytes: 1,
+      checksumSha256: CHECKSUM,
+    })).rejects.toThrow()
+    expect(() => workspaceMediaAssetContentSuffix(WORKSPACE_ID, 'asset with space')).toThrow()
   })
 })
 
@@ -163,6 +168,7 @@ describe('workspace media delivery URLs', () => {
 describe('workspace upload idempotency keys', () => {
   it('scopes keys per operation with the backend upload:/media: prefixes', () => {
     expect(workspaceUploadIdempotencyKey('create')).toMatch(/^upload:create:.+/)
+    expect(workspaceUploadIdempotencyKey('bytes')).toMatch(/^upload:bytes:.+/)
     expect(workspaceUploadIdempotencyKey('complete')).toMatch(/^upload:complete:.+/)
     expect(workspaceMediaIdempotencyKey('archive')).toMatch(/^media:archive:.+/)
     expect(workspaceUploadIdempotencyKey('create')).not.toBe(workspaceUploadIdempotencyKey('create'))
@@ -197,6 +203,32 @@ describe('workspace upload client', () => {
         path: '/api/v1/workspaces/ws_abc123/uploads',
       },
     ])
+  })
+
+  it('stages raw bytes with the declared MIME and header-only idempotency keys', async () => {
+    const seen: Array<{ idempotencyKey: string | null; contentType: string | null }> = []
+    useMswHandlers(
+      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', async ({ request, params }) => {
+        expect(params.workspaceId).toBe('ws_abc123')
+        expect(params.uploadId).toBe(UPLOAD_ID)
+        seen.push({
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          contentType: request.headers.get('Content-Type'),
+        })
+        const bytes = new Uint8Array(await request.arrayBuffer())
+        expect(bytes.length).toBe(4)
+        return HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) })
+      }),
+    )
+    const session = await workspaceUploadApi.stageBytes(
+      WORKSPACE_ID,
+      UPLOAD_ID,
+      new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
+      { contentType: 'image/png', idempotencyKey: 'upload:bytes:1' },
+    )
+    expect(session.id).toBe(UPLOAD_ID)
+    expect(session.status).toBe('transferring')
+    expect(seen).toEqual([{ idempotencyKey: 'upload:bytes:1', contentType: 'image/png' }])
   })
 
   it('completes sessions and returns the same asset id on replay', async () => {

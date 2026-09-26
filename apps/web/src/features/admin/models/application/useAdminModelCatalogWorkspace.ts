@@ -1,7 +1,8 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import {
@@ -60,7 +61,8 @@ export function useAdminModelCatalogWorkspace(
   }
 
   const saveCatalogMutation = useMutation({
-    mutationFn: (items: AdminModelItem[]) => resource.save(items),
+    mutationFn: (input: { items: AdminModelItem[]; operatorReason: string }) =>
+      resource.save(input.items, { operatorReason: input.operatorReason }),
     onSuccess: () => {
       void invalidateCatalog()
     },
@@ -174,7 +176,16 @@ export function useAdminModelCatalogWorkspace(
           return model
         })
         if (enrichedCount > 0) {
-          await resource.save(currentList)
+          // Best-effort enrichment still writes through control, so it
+          // needs an operator reason like any other catalog save.
+          const operatorReason = await confirmSettingsSave(adminConfirm, {
+            title: '保存模型富化结果',
+            message: `探测补全了 ${enrichedCount} 个模型的官方简介或上下文信息，确定保存吗？该操作将记录操作人与原因。`,
+            confirmLabel: '保存',
+          })
+          if (operatorReason) {
+            await resource.save(currentList, { operatorReason })
+          }
         }
       } catch {
         // 探测富化是 best-effort：网络异常不阻塞刷新，列表仍按服务端当前数据展示。
@@ -210,7 +221,13 @@ export function useAdminModelCatalogWorkspace(
         addDialogVisible.value = false
         return
       }
-      await saveCatalogMutation.mutateAsync([...toAdd, ...allModels.value])
+      const operatorReason = await confirmSettingsSave(adminConfirm, {
+        title: '导入模型',
+        message: `确定导入 ${toAdd.length} 个模型吗？该操作将记录操作人与原因。`,
+        confirmLabel: '导入',
+      })
+      if (!operatorReason) return
+      await saveCatalogMutation.mutateAsync({ items: [...toAdd, ...allModels.value], operatorReason })
       addDialogVisible.value = false
       feedback.imported(toAdd.length)
     } catch (err) {
@@ -226,14 +243,17 @@ export function useAdminModelCatalogWorkspace(
   async function handleDeleteModel(model: AdminModelItem) {
     const confirmed = await adminConfirm.confirm({
       title: '删除模型',
-      message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。`,
+      message: `确定要从模型库中移除模型「${model.name} (${model.id})」吗？引用该模型的功能定价映射将一并移除，需重新指定模型。该操作将记录操作人与原因。`,
       confirmLabel: '确认删除',
       intent: 'danger',
+      reason: { required: true },
     })
     if (!confirmed) return
+    const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+    if (!operatorReason) return
     const nextList = allModels.value.filter((m) => m.id !== model.id)
     try {
-      await saveCatalogMutation.mutateAsync(nextList)
+      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason })
       feedback.deleted(model.name)
     } catch (err) {
       feedback.deleteFailed(err)
@@ -252,7 +272,13 @@ export function useAdminModelCatalogWorkspace(
         }
         nextList = [item, ...allModels.value]
       }
-      await saveCatalogMutation.mutateAsync(nextList)
+      const operatorReason = await confirmSettingsSave(adminConfirm, {
+        title: editingModel.value ? '保存模型' : '新增模型',
+        message: `确定保存模型「${item.name} (${item.id})」吗？该操作将记录操作人与原因。`,
+        confirmLabel: '保存',
+      })
+      if (!operatorReason) return
+      await saveCatalogMutation.mutateAsync({ items: nextList, operatorReason })
       editDialogVisible.value = false
       feedback.saved(editingModel.value != null)
       editingModel.value = null

@@ -91,6 +91,7 @@ function useSearchQueryState(
     requireLogin: (action) => options.requireLogin?.(action),
     cacheScope,
     initialReferences: options.initialVisionReferences,
+    workspaceId: options.workspaceId,
     router,
     toast,
   })

@@ -39,6 +39,20 @@ function makeDeps(): BoardCommandDependencies {
     }),
     clearSyncRollback: vi.fn(),
     isMutationCurrent: vi.fn(() => true),
+    resolveWorkspace: vi.fn(() => 'ws_test123'),
+    createServerBoard: vi.fn(async (_workspaceId: string, name: string) => ({
+      id: 'board-server-1',
+      workspace_id: 'ws_test123',
+      name,
+      revision: 1,
+      schema_version: 4,
+      archived_at: null,
+      created_at: '2026-09-25T00:00:00.000Z',
+      updated_at: '2026-09-25T00:00:00.000Z',
+    })),
+    registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
+      makeBoard(input.id, input.name),
+    ),
   }
 }
 
@@ -47,6 +61,18 @@ describe('boardCommands', () => {
 
   beforeEach(() => {
     deps = makeDeps()
+  })
+
+  it('creates the board on the server first, then syncs the minted identity', async () => {
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.create()) as BoardCreateResult
+
+    expect(result).toMatchObject({ ok: true, board: { id: 'board-server-1' } })
+    expect(deps.createBoard).toHaveBeenCalledWith('Untitled')
+    expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Untitled')
+    expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
   })
 
   it('cleans up local meta and state when create remote sync fails', async () => {
@@ -58,10 +84,25 @@ describe('boardCommands', () => {
 
     expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
     expect(deps.createBoard).toHaveBeenCalledWith('Untitled')
-    expect(deps.syncBoard).toHaveBeenCalledWith('created-board')
-    expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
-    expect(deps.deleteBoardState).toHaveBeenCalledWith('created-board')
+    expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
     expect(deps.hydrateBoards).not.toHaveBeenCalled()
+  })
+
+  it('fails create closed when no workspace is selected', async () => {
+    const workspaceError = new Error('Board workspace is unavailable.')
+    vi.mocked(deps.resolveWorkspace!).mockImplementationOnce(() => {
+      throw workspaceError
+    })
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.create()) as BoardCreateResult
+
+    expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
+    expect(deps.createServerBoard).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+    expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
   })
 
   it('rolls back rename by hydrating the conflict target when remote reports a name conflict', async () => {
@@ -167,10 +208,11 @@ describe('boardCommands', () => {
 
     expect(result).toMatchObject({ ok: false, reason: 'sync-failed' })
     expect(deps.duplicateBoard).toHaveBeenCalledWith('source-board')
-    expect(deps.duplicateBoardState).toHaveBeenCalledWith('source-board', 'copy-board')
-    expect(deps.syncBoard).toHaveBeenCalledWith('copy-board')
-    expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
-    expect(deps.deleteBoardState).toHaveBeenCalledWith('copy-board')
+    expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Source Copy')
+    expect(deps.duplicateBoardState).toHaveBeenCalledWith('source-board', 'board-server-1')
+    expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
   })
 
   it('allows duplicate to succeed when source state is missing', async () => {
@@ -181,9 +223,9 @@ describe('boardCommands', () => {
       sourceBoardId: 'source-board',
     })) as BoardDuplicateResult
 
-    expect(result).toMatchObject({ ok: true, board: { id: 'copy-board' } })
-    expect(deps.syncBoard).toHaveBeenCalledWith('copy-board')
-    expect(deps.deleteBoard).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ ok: true, board: { id: 'board-server-1' } })
+    expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
     expect(deps.deleteBoardState).not.toHaveBeenCalled()
   })
 
@@ -197,8 +239,8 @@ describe('boardCommands', () => {
     })) as BoardDuplicateResult
 
     expect(result).toMatchObject({ ok: false, reason: 'name-conflict' })
-    expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
-    expect(deps.deleteBoardState).toHaveBeenCalledWith('copy-board')
+    expect(deps.deleteBoard).toHaveBeenCalledWith('board-server-1')
+    expect(deps.deleteBoardState).toHaveBeenCalledWith('board-server-1')
     expect(deps.hydrateBoards).toHaveBeenCalledWith()
   })
 

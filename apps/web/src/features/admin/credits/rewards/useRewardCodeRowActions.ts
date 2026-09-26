@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { readConfirmReason, useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
   createAdminRewardCodeResource,
@@ -30,9 +30,18 @@ export function useRewardCodeRowActions(options: {
 
   async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
     if (enabledPending[rewardCode.id]) return
+    const confirmed = await confirm.confirm({
+      title: enabled ? '启用兑换码' : '停用兑换码',
+      message: `确定${enabled ? '启用' : '停用'}“${rewardCode.displayName}”吗？该操作将记录审计。`,
+      confirmLabel: enabled ? '确认启用' : '确认停用',
+      intent: 'warn',
+      reason: { required: true },
+    })
+    if (!confirmed) return
+    const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
     enabledPending[rewardCode.id] = true
     try {
-      replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled))
+      replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled, { operatorReason }))
       feedback.enabledToggled(enabled)
       options.refreshRewardCodes()
     } catch (error) {
@@ -42,11 +51,11 @@ export function useRewardCodeRowActions(options: {
     }
   }
 
-  async function deleteRewardCode(rewardCode: RewardCode) {
+  async function deleteRewardCode(rewardCode: RewardCode, operatorReason: string) {
     if (deletePending[rewardCode.id]) return
     deletePending[rewardCode.id] = true
     try {
-      await resource.delete(rewardCode.id)
+      await resource.delete(rewardCode.id, { operatorReason })
       options.updateRewardCodes((page) => ({
         ...page,
         rewardCodes: page.rewardCodes.filter((candidate) => candidate.id !== rewardCode.id),
@@ -67,9 +76,11 @@ export function useRewardCodeRowActions(options: {
       message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
       confirmLabel: '确认删除',
       intent: 'danger',
+      reason: { required: true },
     })
     if (!confirmed) return
-    await deleteRewardCode(rewardCode)
+    const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
+    await deleteRewardCode(rewardCode, operatorReason)
   }
 
   return {

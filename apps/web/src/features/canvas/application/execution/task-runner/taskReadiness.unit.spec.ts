@@ -3,13 +3,11 @@ import { subscribeCanvasTaskReadiness } from '../billing/taskReadinessEvents'
 import { assertTaskSubmitReady } from './taskReadiness'
 
 const mocks = vi.hoisted(() => ({
-  checkSubmitReadiness: vi.fn(),
+  fetchReadiness: vi.fn(),
 }))
 
-vi.mock('../../../../../shared/api/task', () => ({
-  taskApi: {
-    checkSubmitReadiness: mocks.checkSubmitReadiness,
-  },
+vi.mock('../workspace/canvasWorkspaceTaskAdapter', () => ({
+  fetchCanvasWorkspaceTaskReadiness: mocks.fetchReadiness,
 }))
 
 describe('task readiness billing updates', () => {
@@ -35,7 +33,7 @@ describe('task readiness billing updates', () => {
         sufficient: false,
       },
     } as const
-    mocks.checkSubmitReadiness.mockResolvedValue(readiness)
+    mocks.fetchReadiness.mockResolvedValue(readiness)
     const listener = vi.fn()
     const unsubscribe = subscribeCanvasTaskReadiness(listener)
 
@@ -69,7 +67,7 @@ describe('task readiness billing updates', () => {
         sufficient: true,
       },
     } as const
-    mocks.checkSubmitReadiness.mockResolvedValue(readiness)
+    mocks.fetchReadiness.mockResolvedValue(readiness)
 
     await expect(
       assertTaskSubmitReady({
@@ -82,7 +80,7 @@ describe('task readiness billing updates', () => {
   })
 
   it('classifies confirmed browser connection failures separately from server quote failures', async () => {
-    mocks.checkSubmitReadiness.mockRejectedValueOnce(new Error('fetch failed'))
+    mocks.fetchReadiness.mockRejectedValueOnce(new Error('fetch failed'))
 
     await expect(
       assertTaskSubmitReady({
@@ -92,10 +90,10 @@ describe('task readiness billing updates', () => {
       }),
     ).rejects.toMatchObject({ kind: 'network', message: 'The request could not be completed.' })
 
-    mocks.checkSubmitReadiness.mockRejectedValueOnce(
+    mocks.fetchReadiness.mockRejectedValueOnce(
       Object.assign(new Error('pricing unavailable'), {
         status: 503,
-        code: 'pricing_unavailable',
+        code: 'billing_quote_unavailable',
       }),
     )
 

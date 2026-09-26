@@ -37,10 +37,3 @@ export type VisionReference = {
   previewUrl: string
   key: string
 }
-
-export type VisionExtraction = {
-  query?: string
-  operation_id: string
-  status: 'succeeded' | 'pending' | 'reconciliation_pending'
-  replayed?: boolean
-}

@@ -1,5 +1,15 @@
-import { api } from '../../../../shared/api/client'
-import { resolveApiData } from '../../../../shared/api/apiResponse'
+import {
+  createControlPaymentRefund,
+  getControlPaymentOrder,
+  listControlPaymentOrders,
+} from '../../../../shared/api/generated-query/control/control-payments/control-payments'
+import type { ListControlPaymentOrdersParams } from '../../../../shared/api/generated-query/control/model'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../../../../shared/api/contractKernel'
+import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 export type PaymentOrderApiUser = {
@@ -103,57 +113,116 @@ export type PaymentOrderApiDetail = {
   refundable_idea_quantity?: number
 }
 
-type ApiEnvelope<T> = {
-  code: number
-  msg: string
-  data?: T | null
-}
-
 export type AdminPaymentOrderApiAdapter = {
   search: (input: SearchAdminPaymentOrdersInput) => Promise<PaymentOrderApiPage>
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<PaymentOrderApiDetail>
   refund: (
     publicOrderNumber: string,
-    input: { idea_quantity: number; idempotency_key: string },
+    input: { idea_quantity: number; idempotency_key: string; operatorReason: string },
   ) => Promise<PaymentOrderApiRefund>
 }
 
-type PaymentOrderApiTransport = Pick<typeof api, 'request'>
-
-export function createAdminPaymentOrderApiAdapter(
-  transport: PaymentOrderApiTransport = api,
-): AdminPaymentOrderApiAdapter {
+// Admin payment order transport (W2 transports). Reads and refunds go
+// through the Control Plane order operations with the contract envelope
+// (`{data}` over the same AdminService projections); refunds carry a
+// header-only Idempotency-Key plus an operator reason (mirrored into the
+// body `reason` field) and emit a control audit record. The deleted
+// `/api/admin/payments/orders*` routes are gone; this module is the single
+// transport.
+export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
   return {
-    search: ({ orderNumber, user, status, anomalyOnly, cursor, limit = 20, signal }) =>
-      resolveApiData(
-        transport.request<ApiEnvelope<PaymentOrderApiPage>>('/admin/payments/orders', {
-          query: {
-            ...(orderNumber?.trim() ? { order_number: orderNumber.trim().toUpperCase() } : {}),
-            ...(user?.trim() ? { user: user.trim() } : {}),
-            ...(status ? { status } : {}),
-            ...(anomalyOnly ? { anomaly_only: true } : {}),
-            ...(cursor ? { cursor } : {}),
-            limit,
+    search: async ({ orderNumber, user, status, anomalyOnly, cursor, limit = 20, signal }) => {
+      // The generated filter param is typed as order_number only, but the
+      // control contract accepts the same six legacy filters (see the
+      // openapi description on ListControlPaymentOrdersParams).
+      const params = stripUndefined({
+        order_number: orderNumber?.trim() ? orderNumber.trim().toUpperCase() : undefined,
+        user: user?.trim() ? user.trim() : undefined,
+        status: status ?? undefined,
+        anomaly_only: anomalyOnly ? 'true' : undefined,
+        cursor: cursor ?? undefined,
+        limit,
+      }) as ListControlPaymentOrdersParams
+      try {
+        const body = await listControlPaymentOrders(
+          params,
+          ...(signal == null ? [] : [{ signal }]),
+        )
+        return requireContractData<PaymentOrderApiPage>(body, '加载支付订单失败')
+      } catch (error) {
+        throw withControlCopy(error, '加载支付订单失败')
+      }
+    },
+    get: async (publicOrderNumber, signal) => {
+      try {
+        const body = await getControlPaymentOrder(
+          publicOrderNumber.trim().toUpperCase(),
+          ...(signal == null ? [] : [{ signal }]),
+        )
+        return requireContractData<PaymentOrderApiDetail>(body, '加载支付订单详情失败')
+      } catch (error) {
+        throw withControlCopy(error, '加载支付订单详情失败')
+      }
+    },
+    refund: async (publicOrderNumber, input) => {
+      const operatorReason = requireOperatorReason(input.operatorReason)
+      try {
+        const body = await createControlPaymentRefund(
+          publicOrderNumber.trim().toUpperCase(),
+          { idea_quantity: input.idea_quantity, reason: operatorReason },
+          {
+            headers: buildContractRequestHeaders({
+              requestId: newRequestId(),
+              idempotencyKey: input.idempotency_key,
+              operatorReason,
+            }),
           },
-          ...(signal ? { signal } : {}),
-        }),
-        '加载支付订单失败',
-      ),
-    get: (publicOrderNumber, signal) =>
-      resolveApiData(
-        transport.request<ApiEnvelope<PaymentOrderApiDetail>>(
-          `/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}`,
-          signal ? { signal } : undefined,
-        ),
-        '加载支付订单详情失败',
-      ),
-    refund: (publicOrderNumber, input) =>
-      resolveApiData(
-        transport.request<ApiEnvelope<PaymentOrderApiRefund>>(
-          `/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}/refunds`,
-          { method: 'POST', body: input },
-        ),
-        '发起退款失败',
-      ),
+        )
+        return requireContractData<PaymentOrderApiRefund>(body, '发起退款失败')
+      } catch (error) {
+        throw withControlCopy(error, '发起退款失败')
+      }
+    },
   }
+}
+
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+  }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
+    return controlError('control_not_found', '支付订单不存在')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 404 || status === 409) return status
+  }
+  return undefined
 }

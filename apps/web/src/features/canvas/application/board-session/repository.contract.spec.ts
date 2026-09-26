@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import {
   createBoard,
@@ -16,6 +16,11 @@ import {
   createMockBoardApiRequest,
 } from '../testing/boardFixtures'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
+import {
+  getWorkspaceSelectionStore,
+  resetWorkspaceSelectionStore,
+} from '../../../workspace/infrastructure/workspaceContext'
+import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
@@ -44,6 +49,149 @@ vi.mock('../../../../shared/api/client', () => ({
     request: mocks.request,
   },
 }))
+
+const WORKSPACE_ID = 'ws_test123'
+
+type V1BoardDto = {
+  id: string
+  workspace_id: string
+  name: string
+  revision: number
+  schema_version: number
+  archived_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+type V1BoardDocument = {
+  board_id: string
+  revision: number
+  schema_version: number
+  document: Record<string, unknown>
+  updated_at: string
+}
+
+const v1Boards: V1BoardDto[] = []
+const v1Documents: Record<string, V1BoardDocument> = {}
+
+function resetV1BoardApi() {
+  v1Boards.length = 0
+  for (const key of Object.keys(v1Documents)) delete v1Documents[key]
+}
+
+function findOrCreateV1BoardDto(boardId: string): V1BoardDto {
+  let dto = v1Boards.find((item) => item.id === boardId)
+  if (!dto) {
+    dto = {
+      id: boardId,
+      workspace_id: WORKSPACE_ID,
+      name: 'Board',
+      revision: 1,
+      schema_version: BOARD_STATE_SCHEMA_VERSION,
+      archived_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    v1Boards.push(dto)
+  }
+  return dto
+}
+
+function parseV1JsonBody(body: unknown): {
+  data?: { schema_version?: number; payload?: Record<string, unknown>; name?: string }
+} {
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body) as {
+        data?: { schema_version?: number; payload?: Record<string, unknown>; name?: string }
+      }
+    } catch {
+      return {}
+    }
+  }
+  if (body && typeof body === 'object') {
+    return body as {
+      data?: { schema_version?: number; payload?: Record<string, unknown>; name?: string }
+    }
+  }
+  return {}
+}
+
+type V1RequestConfig = { method?: string; body?: unknown }
+
+function readV1Document(boardId: string): Promise<unknown> {
+  const document = v1Documents[boardId]
+  if (!document) {
+    return Promise.reject({ status: 404, code: 'board_not_found', msg: 'board missing' })
+  }
+  return Promise.resolve({ data: document })
+}
+
+function replaceV1Document(boardId: string, config?: V1RequestConfig): Promise<unknown> {
+  const payload = parseV1JsonBody(config?.body)
+  const previous = v1Documents[boardId]
+  const next: V1BoardDocument = {
+    board_id: boardId,
+    revision: Number(previous?.revision ?? 1) + 1,
+    schema_version: Number(payload?.data?.schema_version ?? BOARD_STATE_SCHEMA_VERSION),
+    document: payload?.data?.payload ?? {},
+    updated_at: new Date().toISOString(),
+  }
+  v1Documents[boardId] = next
+  findOrCreateV1BoardDto(boardId)
+  return Promise.resolve({ data: next })
+}
+
+function readOrRenameV1Board(boardId: string, config?: V1RequestConfig): Promise<unknown> {
+  const dto = findOrCreateV1BoardDto(boardId)
+  if (config?.method === 'PATCH') {
+    const payload = parseV1JsonBody(config?.body)
+    if (typeof payload?.data?.name === 'string') dto.name = payload.data.name
+  }
+  return Promise.resolve({ data: { ...dto } })
+}
+
+function routeV1DocumentRequest(
+  boardId: string,
+  method: string,
+  config: V1RequestConfig | undefined,
+): Promise<unknown> | null {
+  if (method === 'GET') return readV1Document(boardId)
+  if (method === 'PUT') return replaceV1Document(boardId, config)
+  return null
+}
+
+function routeV1BoardRequest(
+  url: string,
+  config: V1RequestConfig | undefined,
+  legacy: (url: string, config?: { method?: string }) => Promise<unknown>,
+): Promise<unknown> {
+  const method = config?.method ?? 'GET'
+  const path = url.split('?')[0] ?? url
+  if (path === `/v1/workspaces/${WORKSPACE_ID}/boards` && method === 'GET') {
+    return Promise.resolve({
+      data: [...v1Boards],
+      meta: { has_more: false, next_cursor: null },
+    })
+  }
+  const documentMatch = path.match(/^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/document$/)
+  const documentResult = documentMatch
+    ? routeV1DocumentRequest(documentMatch[1] ?? '', method, config)
+    : null
+  if (documentResult) return documentResult
+  const boardMatch = path.match(/^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)$/)
+  if (boardMatch && (method === 'GET' || method === 'PATCH')) {
+    return readOrRenameV1Board(boardMatch[1] ?? '', config)
+  }
+  return legacy(url, config)
+}
+
+/** v1 workspace boards routes composed over the legacy mock (fallback for old URLs). */
+function createV1BoardApiRequest(
+  legacy: (url: string, config?: { method?: string }) => Promise<unknown>,
+) {
+  return (url: string, config?: V1RequestConfig) => routeV1BoardRequest(url, config, legacy)
+}
 
 function makeSnapshot(promptText: string): BoardSnapshot {
   return makeBoardSnapshot({
@@ -88,9 +236,19 @@ describe('createBoardSessionRepository', () => {
       updated_at: '2026-01-01T00:00:00.000Z',
     })
     vi.clearAllMocks()
+    resetV1BoardApi()
     mocks.state.listResponse = { data: { list: [] } }
     mocks.state.upsertResponse = { code: 0, data: { board: {}, new_revision: 1 } }
-    mocks.request.mockImplementation(createMockBoardApiRequest(mocks.state))
+    mocks.request.mockImplementation(
+      createV1BoardApiRequest(createMockBoardApiRequest(mocks.state)),
+    )
+    resetWorkspaceSelectionStore()
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+  })
+
+  afterEach(() => {
+    resetWorkspaceSelectionStore()
+    resetMediaWorkspaceIdResolver()
   })
 
   it('drops preview data and still syncs remotely when localStorage write throws', async () => {
@@ -121,11 +279,13 @@ describe('createBoardSessionRepository', () => {
     expect(savedState?.promptNodes[0]?.text).toBe('saved')
     expect(savedState).not.toHaveProperty('viewport')
     expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
-    expect(mocks.request).toHaveBeenCalledTimes(1)
-    const payload = readUpsertBoardPayload(board.id)
-    expect(payload?.state?.promptNodes[0]?.text).toBe('saved')
-    expect(payload?.state).not.toHaveProperty('viewport')
-    expect(payload?.state?.previewSnapshotDataUrl).toBeUndefined()
+    // v1 save fans out to rename (PATCH) + document replace (PUT) + meta read (GET).
+    expect(mocks.request).toHaveBeenCalledTimes(3)
+    const documentBody = readPutDocumentBody(board.id)
+    expect(documentBody?.schema_version).toBe(BOARD_STATE_SCHEMA_VERSION)
+    expect(documentBody?.payload?.promptNodes[0]?.text).toBe('saved')
+    expect(documentBody?.payload).not.toHaveProperty('viewport')
+    expect(documentBody?.payload?.previewSnapshotDataUrl).toBeUndefined()
   })
 
   it('keeps the local state and reports recoverable remote sync failure', async () => {
@@ -325,35 +485,37 @@ describe('createBoardSessionRepository', () => {
 
   it('rejects invalid remote hydration state with recoverable validation context', async () => {
     const board = createBoard('Invalid Remote Snapshot')
-    mocks.state.listResponse = {
-      data: {
-        list: [
+    v1Boards.push({
+      id: board.id,
+      workspace_id: WORKSPACE_ID,
+      name: board.name,
+      revision: 1,
+      schema_version: BOARD_STATE_SCHEMA_VERSION,
+      archived_at: null,
+      created_at: new Date(board.createdAt).toISOString(),
+      updated_at: new Date(board.updatedAt).toISOString(),
+    })
+    v1Documents[board.id] = {
+      board_id: board.id,
+      revision: 1,
+      schema_version: BOARD_STATE_SCHEMA_VERSION,
+      document: {
+        ...makeBoardState(),
+        imageNodes: [
           {
-            board_id: board.id,
-            name: board.name,
-            created_at: board.createdAt,
-            updated_at: board.updatedAt,
-            revision: 1,
-            state_schema_version: BOARD_STATE_SCHEMA_VERSION,
-            state: {
-              ...makeBoardState(),
-              imageNodes: [
-                {
-                  id: 1,
-                  type: 'image-node',
-                  x: 0,
-                  y: 0,
-                  width: 280,
-                  sourceImageUrl: 'https://example.com/source.png',
-                  sourceImageRatio: 0,
-                  outputStatus: 'ready',
-                  outputImages: [],
-                },
-              ],
-            } as never,
+            id: 1,
+            type: 'image-node',
+            x: 0,
+            y: 0,
+            width: 280,
+            sourceImageUrl: 'https://example.com/source.png',
+            sourceImageRatio: 0,
+            outputStatus: 'ready',
+            outputImages: [],
           },
         ],
       },
+      updated_at: new Date(board.updatedAt).toISOString(),
     }
     const repository = createBoardSessionRepository()
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -402,18 +564,31 @@ describe('createBoardSessionRepository', () => {
   })
 })
 
-function readUpsertBoardPayload(boardId: string): { state?: BoardState } {
+function readPutDocumentBody(boardId: string): {
+  schema_version?: number
+  payload?: BoardState
+} {
   const call = mocks.request.mock.calls.find(
     ([url, config]) =>
-      url === `/user/boards/${boardId}` &&
+      url === `/v1/workspaces/${WORKSPACE_ID}/boards/${boardId}/document` &&
       typeof config === 'object' &&
       config !== null &&
       'method' in config &&
       config.method === 'PUT',
   )
-  if (!call) throw new Error(`Missing upsert call for ${boardId}`)
-  const body = call[1]?.body
-  if (typeof body === 'string') return JSON.parse(body) as { state?: BoardState }
-  if (body && typeof body === 'object') return body as { state?: BoardState }
-  throw new Error(`Missing upsert body for ${boardId}`)
+  if (!call) throw new Error(`Missing document PUT call for ${boardId}`)
+  const body = call[1]?.body as unknown
+  if (typeof body === 'string') {
+    const parsed = JSON.parse(body) as {
+      data?: { schema_version?: number; payload?: BoardState }
+    }
+    return parsed.data ?? {}
+  }
+  if (body && typeof body === 'object') {
+    return ((body as { data?: { schema_version?: number; payload?: BoardState } }).data ?? {}) as {
+      schema_version?: number
+      payload?: BoardState
+    }
+  }
+  throw new Error(`Missing document PUT body for ${boardId}`)
 }

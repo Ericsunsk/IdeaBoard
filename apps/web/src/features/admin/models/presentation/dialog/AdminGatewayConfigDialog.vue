@@ -143,6 +143,7 @@ import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
 import { formatAdminDisplayError } from '../../../shared/lib/toast'
 import { useAdminGatewayConfigFeedback } from '../../application/useAdminModelCatalogFeedback'
+import { useAdminConfirm, readConfirmReason } from '../../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import {
   createAdminGatewayResource,
@@ -163,6 +164,7 @@ const emit = defineEmits<{
 const defaultResource = createAdminGatewayResource().connection
 const resource = computed(() => props.resource ?? defaultResource)
 const feedback = useAdminGatewayConfigFeedback()
+const adminConfirm = useAdminConfirm()
 
 const summary = ref<GatewayConnectionSummary | null>(null)
 const loading = ref(false)
@@ -216,6 +218,18 @@ async function loadGatewayConfig() {
 }
 
 const handleTestConnection = form.handleSubmit(async (values) => {
+  // The server-side probe is mutation-guarded: collect the operator
+  // reason through the shared confirm shell first.
+  const confirmed = await adminConfirm.confirm({
+    title: '测试网关连接',
+    message: '确定使用当前表单配置探测网关连通性吗？该操作将记录操作人与原因。',
+    confirmLabel: '开始测试',
+    intent: 'warn',
+    reason: { required: true },
+  })
+  if (!confirmed) return
+  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+  if (!operatorReason) return
   testing.value = true
   error.value = ''
 
@@ -223,10 +237,13 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
     // testConnection 是 connection interface 必需成员：直调服务端探活，无假成功回退。
-    const res = await resource.value.testConnection({
-      base_url: finalBaseUrl,
-      token: values.token.trim() || undefined,
-    })
+    const res = await resource.value.testConnection(
+      {
+        base_url: finalBaseUrl,
+        token: values.token.trim() || undefined,
+      },
+      { operatorReason },
+    )
     if (res.success) {
       feedback.testPassed(res.message)
     } else {
@@ -243,6 +260,18 @@ const handleTestConnection = form.handleSubmit(async (values) => {
 })
 
 const handleSave = form.handleSubmit(async (values) => {
+  // Control writes require an operator reason (audit); a cancelled dialog
+  // aborts the save silently.
+  const confirmed = await adminConfirm.confirm({
+    title: '保存 AI 网关配置',
+    message: '确定保存 AI 网关连接配置吗？该操作将记录操作人与原因。',
+    confirmLabel: '保存配置',
+    intent: 'warn',
+    reason: { required: true },
+  })
+  if (!confirmed) return
+  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+  if (!operatorReason) return
   saving.value = true
   error.value = ''
 
@@ -264,7 +293,7 @@ const handleSave = form.handleSubmit(async (values) => {
     payload.account_id = values.account_id.trim().toLowerCase()
     payload.gateway_id = values.gateway_id.trim().toLowerCase()
 
-    await resource.value.update(payload)
+    await resource.value.update(payload, { operatorReason })
 
     feedback.saved()
     // saved 必须是服务端确认的真相：重读失败就报错、不关弹窗、不 emit。

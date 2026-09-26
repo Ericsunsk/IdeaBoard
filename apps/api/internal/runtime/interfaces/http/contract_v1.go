@@ -62,6 +62,11 @@ type ContractV1Deps struct {
 	Media         WorkspaceMediaStore
 	MediaObjects  WorkspaceMediaObjects
 	MediaRenderer v1MediaRenderer
+	// AvatarUID resolves a caller's storage UID for the user-scoped
+	// avatar PUT (issue #809 media gap batch). Nil fails ONLY the
+	// avatar endpoint closed with 501; every other v1 route is
+	// unaffected. Production wires NewV1AvatarDirectory(userRepo).
+	AvatarUID V1AvatarUIDDirectory
 	// Events is the workspace event hot log + SSE replay window (issue
 	// #807). Nil normalizes to a process-local log; tests inject a
 	// fresh instance per engine for isolation.

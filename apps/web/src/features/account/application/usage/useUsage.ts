@@ -6,6 +6,7 @@ import {
   type AccountUsage,
   type UsageRange,
 } from '../../infrastructure/usage/resource'
+import { useAccountWorkspace } from '../accountWorkspace'
 
 const USAGE_STALE_TIME_MS = 30_000
 
@@ -19,17 +20,19 @@ export function useUsage(
   enabled: MaybeRefOrGetter<boolean> = true,
 ) {
   const selectedRange = computed(() => toValue(range))
+  const { workspaceId, selectionSettled } = useAccountWorkspace()
   const lastSuccessful = shallowRef<SuccessfulUsage>()
   const query = useQuery({
-    queryKey: computed(() => usageQueryKeys.current(selectedRange.value)),
+    queryKey: computed(() => usageQueryKeys.current(workspaceId.value ?? '', selectedRange.value)),
     queryFn: async ({ queryKey, signal }): Promise<SuccessfulUsage> => {
-      const requestRange = queryKey[3] as UsageRange
+      const requestWorkspaceId = queryKey[3] as string
+      const requestRange = queryKey[4] as UsageRange
       return {
         range: requestRange,
-        usage: await fetchUsage(requestRange, signal),
+        usage: await fetchUsage(requestWorkspaceId, requestRange, signal),
       }
     },
-    enabled: () => toValue(enabled),
+    enabled: () => toValue(enabled) && selectionSettled.value,
     staleTime: USAGE_STALE_TIME_MS,
     refetchOnWindowFocus: true,
     retry: false,

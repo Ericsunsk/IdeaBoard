@@ -7,13 +7,13 @@ import {
   setBillableItemAvailability,
 } from './billableCatalogResource'
 
+const reason = { operatorReason: 'pricing review' }
+
 describe('Admin Billable Catalog resource', () => {
-  it('owns generated API normalization for the pricing feature', async () => {
+  it('lists the catalog through the control plane with pricing normalization', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             items: [
               {
@@ -46,15 +46,18 @@ describe('Admin Billable Catalog resource', () => {
     ])
   })
 
-  it('publishes the configured fixed price', async () => {
+  it('publishes the configured fixed price with an operator reason', async () => {
     let requestBody: unknown
+    let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
-      http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async ({ request, params }) => {
         requestBody = await request.json()
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
         expect(params.sku).toBe('ai-image:inpaint')
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             prices: {
               default: {
@@ -70,7 +73,9 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(publishBillableItemPrices('ai-image:inpaint', { default: 0 })).resolves.toEqual({
+    await expect(
+      publishBillableItemPrices('ai-image:inpaint', { default: 0 }, reason),
+    ).resolves.toEqual({
       default: {
         priceVersionId: 9,
         version: 1,
@@ -78,18 +83,18 @@ describe('Admin Billable Catalog resource', () => {
         createdAt: '2026-07-16T08:00:00Z',
       },
     })
-    expect(requestBody).toEqual({ prices: { default: 0 } })
+    expect(requestBody).toEqual({ prices: { default: 0 }, reason: 'pricing review' })
+    expect(seenHeaders.idempotencyKey).toMatch(/.+/)
+    expect(seenHeaders.operatorReason).toBe('pricing review')
   })
 
-  it('sets feature availability without a manual reason', async () => {
+  it('sets feature availability with an operator reason', async () => {
     let requestBody: unknown
     useMswHandlers(
-      http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
+      http.put('/api/control/v1/billing/catalog/:sku/availability', async ({ request, params }) => {
         requestBody = await request.json()
         expect(params.sku).toBe('ai-image:inpaint')
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             sku: 'ai-image:inpaint',
             status: 'disabled',
@@ -99,21 +104,31 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(setBillableItemAvailability('ai-image:inpaint', false)).resolves.toEqual({
+    await expect(
+      setBillableItemAvailability('ai-image:inpaint', false, reason),
+    ).resolves.toEqual({
       sku: 'ai-image:inpaint',
       status: 'disabled',
       updatedAt: '2026-07-16T10:00:00Z',
     })
-    expect(requestBody).toEqual({ enabled: false })
+    expect(requestBody).toEqual({ enabled: false, reason: 'pricing review' })
   })
 
-  it('deletes an Archived item through the generated API boundary', async () => {
+  it('deletes an Archived item through the control plane', async () => {
     useMswHandlers(
-      http.delete('/api/admin/billing/catalog/:sku', ({ params }) =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { sku: params.sku } }),
+      http.delete('/api/control/v1/billing/catalog/:sku', ({ params }) =>
+        HttpResponse.json({ data: { sku: params.sku } }),
       ),
     )
 
-    await expect(deleteArchivedBillableItem('legacy:removed')).resolves.toBe('legacy:removed')
+    await expect(deleteArchivedBillableItem('legacy:removed', reason)).resolves.toBe(
+      'legacy:removed',
+    )
+  })
+
+  it('requires an operator reason before mutating the catalog', async () => {
+    await expect(
+      publishBillableItemPrices('ai-image:inpaint', { default: 0 }, { operatorReason: '  ' }),
+    ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

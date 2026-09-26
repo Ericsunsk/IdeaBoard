@@ -1,4 +1,8 @@
-import { joinUserBoardByShareToken } from '../../infrastructure/api/boardsResource'
+import {
+  BoardPayloadError,
+  BoardWorkspaceUnavailableError,
+  joinWorkspaceBoardByShareToken,
+} from '../../infrastructure/api/boardsResource'
 import { i18n } from '../../../../shared/i18n'
 import { useBoardRepository } from '../catalog/repository'
 
@@ -18,9 +22,17 @@ export async function joinSharedBoardByToken(token: string): Promise<JoinSharedB
     token,
     i18n.global.t('workspace.joinSharedBoard.missingToken'),
   )
-  const data = await joinUserBoardByShareToken(normalizedToken)
+  // The target workspace resolves from the selection store (share links
+  // carry `?workspace=`); without a selection the join fails closed with
+  // guidance instead of guessing a workspace for the bearer.
+  let board: Awaited<ReturnType<typeof joinWorkspaceBoardByShareToken>>
+  try {
+    board = await joinWorkspaceBoardByShareToken(null, normalizedToken)
+  } catch (error) {
+    throw toJoinError(error)
+  }
   const boardId = normalizeRequiredText(
-    data.board?.board_id,
+    board.id,
     i18n.global.t('workspace.joinSharedBoard.missingBoardId'),
   )
 
@@ -32,4 +44,26 @@ export async function joinSharedBoardByToken(token: string): Promise<JoinSharedB
   }
 
   return { boardId }
+}
+
+function toJoinError(error: unknown): Error {
+  // Fail-closed guidance and safe backend messages pass through; unsafe
+  // transport payloads collapse to the workflow fallback (never leak).
+  if (error instanceof BoardWorkspaceUnavailableError) return error
+  // A well-formed transport with an unusable board envelope means the
+  // server returned no usable canvas identity.
+  if (error instanceof BoardPayloadError) {
+    return new Error(i18n.global.t('workspace.joinSharedBoard.missingBoardId'), {
+      cause: error,
+    })
+  }
+  if (
+    error &&
+    typeof error === 'object' &&
+    'hasSafeDisplayMessage' in error &&
+    (error as { hasSafeDisplayMessage?: unknown }).hasSafeDisplayMessage === true
+  ) {
+    return error as unknown as Error
+  }
+  return new Error(i18n.global.t('workspace.joinSharedBoard.joinFailed'), { cause: error })
 }

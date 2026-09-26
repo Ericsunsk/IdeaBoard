@@ -1,12 +1,20 @@
 import type { Edge, Elements, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot, type BoardSnapshot, type ImageNodeItem } from '../../../board'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { CanvasGraphSession } from '../../domain/graph'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaAssetDelivery'
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
 
 function createImageSnapshot(): ImageNodeItem {
   return {
@@ -95,6 +103,7 @@ function createHarness() {
 describe('useCanvasGraphInteractions', () => {
   afterEach(() => {
     ;(i18n.global.locale as { value: string }).value = 'en'
+    resetMediaWorkspaceIdResolver()
   })
 
   it('enables image export when selection changes after the Graph Session attaches', () => {

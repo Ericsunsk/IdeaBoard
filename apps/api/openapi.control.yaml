@@ -348,6 +348,86 @@ paths:
           $ref: '#/components/responses/ControlNotFound'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /users/oauth-providers/{provider}:
+    get:
+      tags: [ControlUsers]
+      operationId: getControlOAuthProvider
+      summary: Read one social OAuth provider channel
+      description: >-
+        Reads the social login channel behind control:users through the
+        Auth-owned social-provider seam. Client secrets never cross this
+        boundary (only client_secret_configured). Unknown or malformed
+        slugs fail closed with 404 (invisible, never 403).
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: oauth_provider
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlOAuthProvider'
+      responses:
+        '200':
+          description: OAuth provider channel summary.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlOAuthProviderEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+    put:
+      tags: [ControlUsers]
+      operationId: updateControlOAuthProvider
+      summary: Update one social OAuth provider channel (operator reason required)
+      description: >-
+        Updates the social login channel (enabled, client_id,
+        client_secret) through the Auth-owned social-provider seam.
+        reason/operator_note body fields are tolerated so a body-carried
+        operator note survives strict binding; the guard already
+        enforced its presence.
+      x-capability: control:users
+      x-audit:
+        operator: true
+        target: oauth_provider
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlOAuthProvider'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlOAuthProviderUpdateRequest'
+      responses:
+        '200':
+          description: OAuth provider channel updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlOAuthProviderEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /workspaces/{workspace_id}:
     get:
       tags: [ControlWorkspaces]
@@ -1326,6 +1406,9 @@ paths:
       tags: [ControlTasks]
       operationId: cancelControlTask
       summary: Cancel a task with operator reason (no creation path exists on control)
+      description: >-
+        Cancelling a task in a non-cancellable state renders 409
+        conflict; unknown tasks render 404.
       x-capability: control:tasks
       x-audit:
         operator: true
@@ -1355,7 +1438,9 @@ paths:
         '404':
           $ref: '#/components/responses/ControlNotFound'
         '409':
-          $ref: '#/components/responses/IdempotencyConflict'
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /platform/settings/registration:
     get:
       tags: [ControlPlatform]
@@ -1545,6 +1630,73 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /platform/settings/branding/logo:
+    post:
+      tags: [ControlPlatform]
+      operationId: uploadControlBrandingLogo
+      summary: Upload a branding logo file (multipart, operator reason required)
+      description: >-
+        Multipart site-asset upload behind control:platform. The file
+        rides the Storage service into the site-assets prefix (the same
+        delivery plane the public branding read serves), so the returned
+        logo_url drops straight into the branding setting update.
+        Validation mirrors the deleted legacy admin upload (50MB image
+        cap, detected-format allowlist, never trust the filename). The
+        control guard cannot buffer multipart bodies, so this route
+        registers as a POST read-guard and enforces the mutation
+        guarantees in-handler: X-Operator-Reason (or the multipart
+        reason/operator_note field) and a header-only Idempotency-Key are
+        both required (400 otherwise); the key replays the first stored
+        response on content-identical reuse and conflicts (409) on
+        divergent reuse; every call is audited.
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              additionalProperties: false
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Logo image bytes (50MB cap, detected-format allowlist).
+                reason:
+                  type: string
+                  description: Operator note alias (or X-Operator-Reason header).
+                operator_note:
+                  type: string
+                  description: Operator note alias (or X-Operator-Reason header).
+      responses:
+        '200':
+          description: Logo stored; logo_url feeds the branding setting update.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlBrandingLogoUploadEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /platform/settings/media-upload:
     get:
       tags: [ControlPlatform]
@@ -2028,6 +2180,276 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/detect-models:
+    get:
+      tags: [ControlPlatform]
+      operationId: detectControlAIGatewayModels
+      summary: Probe the gateway for available models
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          description: Provider filter for detection.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model detection result (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/models-reference:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlAIGatewayModelReference
+      summary: Read-only models.dev reference lookup for one model
+      description: >-
+        Degraded outcomes (allowlist gap, upstream failure, miss) return
+        HTTP 200 with found=false and an explicit error_code inside the
+        payload, never an HTTP error: reference display must not block
+        catalog flows. Only invalid input (missing model identity) is a
+        400.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - name: model_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: refresh
+          in: query
+          required: false
+          description: Truthy values bypass the reference cache.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model reference (legacy admin shape; found=false on degraded outcomes).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/brand-logo:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlAIGatewayBrandLogo
+      summary: Admin brand-logo passthrough (binary SVG)
+      description: >-
+        Serves the provider mark as image/svg+xml. Degraded outcomes
+        (allowlist gap, upstream failure, upstream miss) still return
+        HTTP 200 with the default mark and an X-Brand-Logo-Fallback
+        marker header so admin cards never break; only invalid input
+        (bad provider) is a 400. Binary response, never a JSON envelope.
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Brand logo SVG bytes (default mark plus fallback header on degraded outcomes).
+          headers:
+            X-Brand-Logo-Fallback:
+              description: Present (models-dev-default) when the default mark is served.
+              schema:
+                type: string
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/models-observed:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlAIGatewayModelsObserved
+      summary: Read-only 7-day first-party model observations
+      description: >-
+        Per-model success rate, top failure stage/category, cache hit
+        rate, plus on-sale SKU UnitCredits margin rows. Gateway actual
+        cost has no receipt/log source, so every margin row carries an
+        explicit unavailable marker instead of a fabricated number.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Model observations (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/route-preview:
+    post:
+      tags: [ControlPlatform]
+      operationId: previewControlAIGatewayRoute
+      summary: Dry-run gateway routing for a model identifier
+      description: >-
+        Pure routing dry-run (no configuration read or write), so it
+        registers as a POST read-guard without reason or idempotency
+        requirements.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model_id]
+              additionalProperties: false
+              properties:
+                model_id:
+                  type: string
+                  minLength: 1
+                custom_path:
+                  type: string
+                custom_params:
+                  type: string
+      responses:
+        '200':
+          description: Routing facts (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/ai-gateway/test-connection:
+    post:
+      tags: [ControlPlatform]
+      operationId: testControlAIGatewayConnection
+      summary: Probe gateway reachability server-side (operator reason required)
+      description: >-
+        The token is used for this probe only and never persisted. Pure
+        diagnosis: no configuration is read or written.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_url]
+              additionalProperties: false
+              properties:
+                base_url:
+                  type: string
+                  minLength: 1
+                token:
+                  type: string
+                provider:
+                  type: string
+                model:
+                  type: string
+                path:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Connection probe result (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /platform/storage/providers:
     get:
       tags: [ControlPlatform]
@@ -2512,6 +2934,44 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /platform/monitor/stream:
+    get:
+      tags: [ControlPlatform]
+      operationId: streamControlMonitor
+      summary: Stream the runtime monitor snapshot (SSE)
+      description: >-
+        Global monitor snapshot stream (snapshot every 10s, closes after
+        the max connection period with a close event). Read-guard so the
+        long-lived stream is never body-buffered; the audit record emits
+        on disconnect with the terminal status. Setup failures render
+        the legacy admin shape; the stream itself is text/event-stream,
+        never a JSON envelope.
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Monitor snapshot event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          description: Monitor stream concurrency limited (task_monitor_concurrency_limited).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlErrorEnvelope'
   /platform/statistics:
     get:
       tags: [ControlPlatform]
@@ -2584,6 +3044,410 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /platform/brand-logo-overrides:
+    get:
+      tags: [ControlPlatform]
+      operationId: listControlBrandLogoOverrides
+      summary: List brand logo overrides
+      description: >-
+        Data shape is ControlBrandLogoOverrideList ({overrides:
+        ControlBrandLogoOverride[]}) inside the legacy admin envelope.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Brand logo overrides (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /platform/brand-logo-overrides/{scope}/{target_key}:
+    put:
+      tags: [ControlPlatform]
+      operationId: saveControlBrandLogoOverride
+      summary: Upsert a brand logo override (operator reason required)
+      description: >-
+        Body carries {logo_key}; the scope-qualified key (scope plus
+        target_key) is the audited target. Data shape is
+        ControlBrandLogoOverride inside the legacy admin envelope.
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: brand_logo_override
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlBrandLogoScope'
+        - $ref: '#/components/parameters/ControlBrandLogoTargetKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [logo_key]
+              additionalProperties: false
+              properties:
+                logo_key:
+                  type: string
+                  minLength: 1
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Brand logo override saved.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+    delete:
+      tags: [ControlPlatform]
+      operationId: deleteControlBrandLogoOverride
+      summary: Delete a brand logo override (operator reason required)
+      x-capability: control:platform
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: brand_logo_override
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlBrandLogoScope'
+        - $ref: '#/components/parameters/ControlBrandLogoTargetKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Brand logo override deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /rewards/codes/search:
+    post:
+      tags: [ControlCredits]
+      operationId: searchControlRewardCodes
+      summary: Search reward codes (fuzzy name / full-code lookup)
+      description: >-
+        Reward search is a POST-body read (fuzzy name / full-code HMAC
+        lookup cannot ride a query string), so it registers as a POST
+        read-guard without reason or idempotency requirements. Query
+        strings are rejected (400). Data shape is ControlRewardCodePage
+        inside the legacy admin envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRewardCodeSearchRequest'
+      responses:
+        '200':
+          description: Reward code page (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /rewards/codes:
+    post:
+      tags: [ControlCredits]
+      operationId: createControlRewardCode
+      summary: Create a reward code (operator reason required)
+      description: >-
+        The Idempotency-Key header is canonical; the body
+        idempotency_key stays accepted as fallback, and a mismatch
+        conflicts (409 reward_code_idempotency_conflict) instead of
+        forking codes. Data shape is ControlCreatedRewardCode (reward
+        code plus one-time plaintext) inside the legacy admin envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_code
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRewardCodeCreateRequest'
+      responses:
+        '200':
+          description: Reward code created (plaintext shown once).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /rewards/codes/{id}:
+    patch:
+      tags: [ControlCredits]
+      operationId: updateControlRewardCode
+      summary: Update a reward code (operator reason required)
+      description: >-
+        Data shape is ControlUpdatedRewardCode inside the legacy admin
+        envelope. Lowering max_redemptions below redemption_count
+        renders 409 reward_code_cap_invalid.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_code
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlRewardCodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRewardCodeUpdateRequest'
+      responses:
+        '200':
+          description: Reward code updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [ControlCredits]
+      operationId: deleteControlRewardCode
+      summary: Delete a reward code (operator reason required)
+      description: >-
+        Codes with redemptions cannot be deleted (409
+        reward_code_redeemed: disable them instead). Data shape is
+        ControlDeletedRewardCode inside the legacy admin envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_code
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlRewardCodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      responses:
+        '200':
+          description: Reward code deleted.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /rewards/codes/{id}/enabled:
+    patch:
+      tags: [ControlCredits]
+      operationId: setControlRewardCodeEnabled
+      summary: Enable or disable a reward code (operator reason required)
+      description: >-
+        Data shape is ControlRewardCode inside the legacy admin
+        envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_code
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlRewardCodeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRewardCodeEnabledRequest'
+      responses:
+        '200':
+          description: Reward code flag updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /rewards/codes/{id}/redemptions:
+    get:
+      tags: [ControlCredits]
+      operationId: listControlRewardRedemptions
+      summary: List admin redemption reads for one reward code
+      description: >-
+        Data shape is ControlAdminRedemptionPage (identity-enriched
+        redemption summaries) inside the legacy admin envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_code
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlRewardCodeId'
+        - $ref: '#/components/parameters/ControlBeforeId'
+        - $ref: '#/components/parameters/ControlLimit'
+      responses:
+        '200':
+          description: Admin redemption page (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
+  /rewards/codes/{id}/redemptions/{redemption_id}:
+    get:
+      tags: [ControlCredits]
+      operationId: getControlRewardRedemption
+      summary: Read one admin redemption for one reward code
+      description: >-
+        Data shape is ControlAdminRedemptionDetail (identity-enriched)
+        inside the legacy admin envelope.
+      x-capability: control:credits
+      x-control-envelope: legacy
+      x-audit:
+        operator: true
+        target: reward_redemption
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlRewardCodeId'
+        - $ref: '#/components/parameters/ControlRedemptionId'
+      responses:
+        '200':
+          description: Admin redemption detail (legacy admin shape).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ControlNotFound'
 components:
   securitySchemes:
     controlSession:
@@ -2703,6 +3567,46 @@ components:
       schema:
         type: string
         minLength: 1
+    ControlOAuthProvider:
+      name: provider
+      in: path
+      required: true
+      description: Social OAuth provider slug (lowercase allowlist; unknown slugs fail closed with 404).
+      schema:
+        type: string
+        pattern: '^[a-z0-9_-]{1,64}$'
+    ControlBrandLogoScope:
+      name: scope
+      in: path
+      required: true
+      description: Brand logo override scope (provider-endpoint, storage-profile, search-provider, oauth-provider).
+      schema:
+        type: string
+        enum: [provider-endpoint, storage-profile, search-provider, oauth-provider]
+    ControlBrandLogoTargetKey:
+      name: target_key
+      in: path
+      required: true
+      description: Brand logo override target key.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+    ControlRewardCodeId:
+      name: id
+      in: path
+      required: true
+      description: Reward code integer id (malformed shapes render 400 reward_code_id_invalid).
+      schema:
+        type: integer
+        minimum: 1
+    ControlRedemptionId:
+      name: redemption_id
+      in: path
+      required: true
+      description: Reward redemption integer id (malformed shapes render 400 reward_redemption_id_invalid).
+      schema:
+        type: integer
+        minimum: 1
     ControlKeyword:
       name: keyword
       in: query
@@ -2797,6 +3701,15 @@ components:
             $ref: '#/components/schemas/ControlErrorEnvelope'
     ControlNotFound:
       description: Control resource not found (hidden resources converge here).
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ControlErrorEnvelope'
+    Conflict:
+      description: State conflict (conflict), or Idempotency-Key reused with a different request (idempotency_conflict).
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
@@ -3464,3 +4377,322 @@ components:
         data:
           type: object
           description: Opaque control payload (reconciliation, payments, monitor shapes).
+    ControlOAuthProviderSummary:
+      type: object
+      required: [provider, enabled, configured, available, client_id, client_secret_configured, scopes, config_version, callback_url]
+      additionalProperties: false
+      properties:
+        provider:
+          type: string
+        enabled:
+          type: boolean
+        configured:
+          type: boolean
+        available:
+          type: boolean
+        client_id:
+          type: string
+        client_secret_configured:
+          type: boolean
+          description: Client secrets never cross this boundary (presence flag only).
+        scopes:
+          type: array
+          items:
+            type: string
+        config_version:
+          type: integer
+        callback_url:
+          type: string
+        updated_at:
+          type: string
+          nullable: true
+    ControlOAuthProviderEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlOAuthProviderSummary'
+    ControlOAuthProviderUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          description: Omit to keep the stored secret.
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+    ControlBrandingLogoUpload:
+      type: object
+      required: [logo_url]
+      additionalProperties: false
+      properties:
+        logo_url:
+          type: string
+          description: Stored logo URL feeding the branding setting update.
+        mime:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        ext:
+          type: string
+    ControlBrandingLogoUploadEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ControlBrandingLogoUpload'
+    ControlBrandLogoOverride:
+      type: object
+      required: [scope, target_key, logo_key, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        scope:
+          type: string
+          enum: [provider-endpoint, storage-profile, search-provider, oauth-provider]
+        target_key:
+          type: string
+        logo_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ControlBrandLogoOverrideList:
+      type: object
+      required: [overrides]
+      additionalProperties: false
+      properties:
+        overrides:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlBrandLogoOverride'
+    ControlRewardCode:
+      type: object
+      required: [id, display_name, masked_code_hint, credit_amount, max_redemptions, redemption_count, enabled, status, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+        display_name:
+          type: string
+        masked_code_hint:
+          type: string
+        credit_amount:
+          type: integer
+          format: int64
+          description: Integer minor units.
+        max_redemptions:
+          type: integer
+          format: int64
+        redemption_count:
+          type: integer
+          format: int64
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        enabled:
+          type: boolean
+        status:
+          type: string
+          enum: [disabled, expired, exhausted, enabled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ControlRewardCodePage:
+      type: object
+      required: [reward_codes, total]
+      additionalProperties: false
+      properties:
+        reward_codes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlRewardCode'
+        total:
+          type: integer
+          format: int64
+        next_before_id:
+          type: integer
+          format: int64
+          description: Omitted when exhausted.
+    ControlCreatedRewardCode:
+      type: object
+      required: [reward_code, plaintext, replayed]
+      additionalProperties: false
+      properties:
+        reward_code:
+          $ref: '#/components/schemas/ControlRewardCode'
+        plaintext:
+          type: string
+          description: One-time code plaintext (shown once, never stored).
+        replayed:
+          type: boolean
+    ControlUpdatedRewardCode:
+      type: object
+      required: [reward_code]
+      additionalProperties: false
+      properties:
+        reward_code:
+          $ref: '#/components/schemas/ControlRewardCode'
+        plaintext:
+          type: string
+          description: Present only when the code itself was rotated.
+        replayed:
+          type: boolean
+    ControlDeletedRewardCode:
+      type: object
+      required: [reward_code_id]
+      additionalProperties: false
+      properties:
+        reward_code_id:
+          type: integer
+          format: int64
+    ControlRewardCodeSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          description: Fuzzy name fragment or full code (HMAC lookup, never logged).
+        status:
+          type: string
+          enum: [disabled, expired, exhausted, enabled]
+        before_id:
+          type: integer
+          format: int64
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+    ControlRewardCodeCreateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name:
+          type: string
+        code:
+          type: string
+          description: Plaintext code (hashed server-side, never stored raw).
+        credit_amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Integer minor units.
+        max_redemptions:
+          type: integer
+          format: int64
+        expires_at:
+          type: string
+          format: date-time
+        idempotency_key:
+          type: string
+          description: Body fallback; the Idempotency-Key header is canonical.
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+    ControlRewardCodeUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name:
+          type: string
+        credit_amount:
+          type: integer
+          format: int64
+        max_redemptions:
+          type: integer
+          format: int64
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        code:
+          type: string
+          description: Present only to rotate the code plaintext.
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+    ControlRewardCodeEnabledRequest:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        reason:
+          type: string
+          description: Operator note (or X-Operator-Reason header).
+        operator_note:
+          type: string
+          description: Operator note alias (or X-Operator-Reason header).
+    ControlAdminRedemption:
+      type: object
+      required: [id, reward_code_id, user_public_id, display_name, credited_amount, redeemed_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          format: int64
+        reward_code_id:
+          type: integer
+          format: int64
+        user_public_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        credited_amount:
+          type: integer
+          format: int64
+          description: Integer minor units.
+        redeemed_at:
+          type: string
+          format: date-time
+    ControlAdminRedemptionPage:
+      type: object
+      required: [redemptions]
+      additionalProperties: false
+      properties:
+        redemptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlAdminRedemption'
+        next_before_id:
+          type: integer
+          format: int64
+          description: Omitted when exhausted.
+    ControlAdminRedemptionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ControlAdminRedemption'
+        - type: object
+          required: [credit_transaction_id, masked_code_hint]
+          properties:
+            credit_transaction_id:
+              type: string
+            masked_code_hint:
+              type: string

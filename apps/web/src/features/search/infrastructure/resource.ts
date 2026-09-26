@@ -1,18 +1,18 @@
-import type {
-  SearchPage,
-  VisionReference,
-  VisionExtraction,
-} from '../domain/models'
+import type { SearchPage } from '../domain/models'
 import { api } from '../../../shared/api/client'
 import { resolveApiData, type ApiResponseWithData } from '../../../shared/api/apiResponse'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
 import { i18n } from '../../../shared/i18n'
 
-// Search boundary (issue #809). The generated `search`/`user` clients are
-// gone but the backend still serves `GET /search` (public inspiration) and
-// `POST /api/user/search/vision-extract` with the shared envelope, so this
-// boundary transports through the central `api.request`. Domain shapes stay
-// owned by `../domain/models`.
+// Search boundary (issue #809).
+//
+// `searchInspiration` (GET `/search`, public inspiration) stays on the
+// shared envelope through the central `api.request`: that public route is
+// alive (see `registerPublicRoutes`) and anonymous-capable by design —
+// the member-only workspace search (`searchWorkspace`, workspace-scoped,
+// `ws_` required) is not a substitute. Domain shapes stay owned by
+// `../domain/models`.
+//
 
 export function generateRandomInspirationCursor(): string {
   const page = Math.floor(Math.random() * 8) + 1
@@ -77,39 +77,4 @@ export async function searchInspiration(input: {
   })
   inFlightRequests.set(key, { promise: request, signal: input.signal })
   return request
-}
-
-export async function extractVisionSearch(input: {
-  references: VisionReference[]
-  userText: string
-  idempotencyKey: string
-  signal?: AbortSignal
-}): Promise<VisionExtraction> {
-  const formData = new FormData()
-  for (const file of input.references.flatMap((reference) =>
-    reference.file ? [reference.file] : [],
-  )) {
-    formData.append('images', file)
-  }
-  for (const assetID of input.references.flatMap((reference) =>
-    reference.libraryAssetID ? [reference.libraryAssetID] : [],
-  )) {
-    formData.append('library_asset_ids', String(assetID))
-  }
-  for (const external of input.references.flatMap((reference) =>
-    reference.externalReference ? [JSON.stringify(reference.externalReference)] : [],
-  )) {
-    formData.append('external_references', external)
-  }
-  if (input.userText) formData.append('user_text', input.userText)
-  return resolveApiData(
-    api.request<ApiResponseWithData<VisionExtraction>>('/user/search/vision-extract', {
-      method: 'POST',
-      body: formData,
-      timeout: 40_000,
-      headers: { 'Idempotency-Key': input.idempotencyKey },
-      ...(input.signal == null ? {} : { signal: input.signal }),
-    }),
-    i18n.global.t('search.visionSearchFailed'),
-  )
 }

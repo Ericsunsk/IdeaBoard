@@ -124,7 +124,15 @@ func (d *ContractControlDeps) cancelControlTask(c *gin.Context, ctx controlConte
 		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
 		return
 	}
-	if err := d.Tasks.CancelAdminTask(c.Request.Context(), taskID, ctx.Operator.UserID()); err != nil {
+	if err := d.Tasks.CancelAdminTask(c.Request.Context(), taskID, ctx.Operator.UserID(), ctx.Reason); err != nil {
+		if isControlTaskNotFound(err) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
+			return
+		}
+		if isControlTaskConflict(err) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "任务状态不允许取消")
+			return
+		}
 		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "取消失败")
 		return
 	}

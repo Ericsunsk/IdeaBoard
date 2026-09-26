@@ -176,6 +176,7 @@ import {
   useMediaUploadSettings,
 } from '../useMediaUploadSettings'
 import { useAdminMediaUploadSettingsFeedback } from '../useSettingsFeedback'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import {
   adminActionButtonClass,
   adminDashboardRootClass,
@@ -187,6 +188,7 @@ import {
 
 const mediaUpload = useMediaUploadSettings({
   feedback: useAdminMediaUploadSettingsFeedback(),
+  confirm: useAdminConfirm(),
 })
 
 const {

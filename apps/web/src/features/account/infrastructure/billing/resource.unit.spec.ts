@@ -9,58 +9,74 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
+const WORKSPACE_ID = 'ws_123'
+
 describe('billingResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('reads a cursor page through the feature resource boundary', async () => {
+  it('reads a cursor page through the v1 public plane', async () => {
     transport.request.mockResolvedValue({
-      code: 0,
-      data: {
-        records: [
-          {
-            record_id: 'record-1',
-            occurred_at: '2026-07-14T08:30:00Z',
-            kind: 'ai_usage',
-            title: '局部重绘',
-            credit_delta: -20,
-            available_credits_after: 980,
-          },
-        ],
-        next_before_sequence: 88,
-      },
+      data: [
+        {
+          record_id: 'record-1',
+          occurred_at: '2026-07-14T08:30:00Z',
+          kind: 'ai_usage',
+          title: '局部重绘',
+          credit_delta: -20,
+          available_credits_after: 980,
+        },
+      ],
+      meta: { next_cursor: 'cursor-next', has_more: true },
     })
 
     const controller = new AbortController()
     await expect(
-      fetchBillingRecords({ before_sequence: 99, limit: 20 }, controller.signal),
+      fetchBillingRecords(WORKSPACE_ID, { cursor: 'cursor-prev', page_size: 20 }, controller.signal),
     ).resolves.toMatchObject({
       records: [{ record_id: 'record-1', title: '局部重绘' }],
-      next_before_sequence: 88,
+      next_cursor: 'cursor-next',
     })
     expect(transport.request).toHaveBeenCalledWith(
-      '/user/billing/records?before_sequence=99&limit=20',
+      `/v1/workspaces/${WORKSPACE_ID}/billing-records?cursor=cursor-prev&page_size=20`,
       expect.objectContaining({ method: 'GET', signal: controller.signal }),
     )
-    expect(billingRecordsQueryKeys.all).toEqual(['user', 'billing', 'records'])
+    expect(billingRecordsQueryKeys.list(WORKSPACE_ID)).toEqual([
+      'workspace',
+      'billing',
+      'records',
+      WORKSPACE_ID,
+    ])
   })
 
-  it('surfaces API feedback instead of manufacturing an empty page', async () => {
+  it('omits the next cursor when the page is exhausted', async () => {
     transport.request.mockResolvedValue({
-      code: 500,
-      msg: '账单服务暂不可用',
-      message_safe: true,
+      data: [],
+      meta: { next_cursor: null, has_more: false },
     })
 
-    await expect(fetchBillingRecords({ limit: 20 })).rejects.toThrow('账单服务暂不可用')
+    await expect(
+      fetchBillingRecords(WORKSPACE_ID, { page_size: 20 }),
+    ).resolves.toMatchObject({ records: [] })
+    const page = await fetchBillingRecords(WORKSPACE_ID, { page_size: 20 })
+    expect(page.next_cursor).toBeUndefined()
+  })
+
+  it('surfaces contract error feedback instead of manufacturing an empty page', async () => {
+    transport.request.mockResolvedValue({
+      error: { code: 'service_unavailable', message: '账单服务暂不可用' },
+    })
+
+    await expect(fetchBillingRecords(WORKSPACE_ID, { page_size: 20 })).rejects.toThrow(
+      '账单服务暂不可用',
+    )
   })
 
   it('uses the resource fallback when API feedback contains credential details', async () => {
     transport.request.mockResolvedValue({
-      code: 500,
-      msg: 'credential=exposed',
+      error: { code: 'internal_error', message: 'credential=exposed' },
     })
 
-    await expect(fetchBillingRecords({ limit: 20 })).rejects.toThrow(
+    await expect(fetchBillingRecords(WORKSPACE_ID, { page_size: 20 })).rejects.toThrow(
       'Could not load billing records.',
     )
   })

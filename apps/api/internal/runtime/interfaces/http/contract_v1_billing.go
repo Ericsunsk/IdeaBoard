@@ -155,6 +155,15 @@ type ContractV1BillingDeps struct {
 	Usage           billingUsageReader
 	Quoter          billingQuoter
 	Checkout        workspaceCheckoutService
+	// Gaps batch (#809-close, backend B): purchase options, pending
+	// orders (continue/abandon), recharge history, billing quotes, and
+	// rewards redeem/history. Zero values keep each route fail-closed;
+	// production fills them in http_wiring.go. The Quoter above is
+	// reused for billing-quotes (no second quoter).
+	PurchaseOptions v1PurchaseOptionsService
+	PendingOrders   v1PendingOrderService
+	Recharges       v1RechargeHistoryService
+	Rewards         v1RewardsUserService
 }
 
 func (d *ContractV1BillingDeps) normalize() {
@@ -179,6 +188,9 @@ func RegisterContractV1BillingRoutesOnEngine(r *gin.Engine, authDeps AuthDeps, d
 	group.GET("/workspaces/:workspace_id/usage", handler.getUsage)
 	group.POST("/workspaces/:workspace_id/checkout-sessions", handler.createCheckoutSession)
 	group.GET("/workspaces/:workspace_id/checkout-sessions/:session_id", handler.getCheckoutSession)
+	// Gaps batch (#809-close, backend B): purchase options, pending
+	// orders, recharge history, billing quotes, rewards redeem/history.
+	registerContractV1BillingGapsRoutes(group, handler)
 }
 
 type contractV1BillingHandler struct {

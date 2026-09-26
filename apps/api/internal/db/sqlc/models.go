@@ -361,15 +361,17 @@ type EventDeliveryAttempt struct {
 }
 
 type EventSubscription struct {
-	InternalID    int64              `json:"internal_id"`
-	PublicID      string             `json:"public_id"`
-	WorkspaceID   int64              `json:"workspace_id"`
-	EndpointUrl   string             `json:"endpoint_url"`
-	SigningSecret string             `json:"signing_secret"`
-	EventTypes    []string           `json:"event_types"`
-	Status        string             `json:"status"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	InternalID                int64              `json:"internal_id"`
+	PublicID                  string             `json:"public_id"`
+	WorkspaceID               int64              `json:"workspace_id"`
+	EndpointUrl               string             `json:"endpoint_url"`
+	SigningSecret             string             `json:"signing_secret"`
+	SigningSecretMaterialKind string             `json:"signing_secret_material_kind"`
+	SigningSecretKeyVersion   string             `json:"signing_secret_key_version"`
+	EventTypes                []string           `json:"event_types"`
+	Status                    string             `json:"status"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 }
 
 type FeaturePrompt struct {

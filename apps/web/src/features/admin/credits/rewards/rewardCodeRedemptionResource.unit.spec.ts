@@ -9,80 +9,68 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
+function legacyOk(data: unknown): Record<string, unknown> {
+  return { code: 0, msg: 'ok', data }
+}
+
+function redemptionFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 51,
+    reward_code_id: 7,
+    user_public_id: 'usr_1',
+    display_name: '夏日灵感奖励',
+    credited_amount: 80,
+    redeemed_at: '2026-07-15T10:00:00Z',
+    ...overrides,
+  }
+}
+
+// Reward redemptions ride the Control Plane with the legacy
+// `{code, msg, data}` envelope.
 describe('RewardCodeRedemptionResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('maps a keyset page to RewardCode vocabulary and forwards cancellation', async () => {
-    transport.request.mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: {
-        redemptions: [
-          {
-            id: 51,
-            reward_code_id: 7,
-            user_public_id: '22222222-2222-4222-8222-222222222222',
-            display_name: '兑换用户',
-            credited_amount: 80,
-            redeemed_at: '2026-07-22T03:04:05Z',
-          },
-        ],
-        next_before_id: 40,
-      },
-    })
+  it('lists redemptions through the control plane', async () => {
+    transport.request.mockResolvedValue(
+      legacyOk({ redemptions: [redemptionFixture()], next_before_id: 51 }),
+    )
     const signal = new AbortController().signal
 
-    await expect(
-      createRewardCodeRedemptionResource().list(7, { beforeId: 60, limit: 10, signal }),
-    ).resolves.toEqual({
-      redemptions: [
-        {
-          id: 51,
-          rewardCodeId: 7,
-          userPublicId: '22222222-2222-4222-8222-222222222222',
-          displayName: '兑换用户',
-          creditedAmount: 80,
-          redeemedAt: '2026-07-22T03:04:05Z',
-        },
-      ],
-      nextBeforeId: 40,
+    const page = await createRewardCodeRedemptionResource().list(7, {
+      beforeId: 60,
+      limit: 10,
+      signal,
+    })
+
+    expect(page).toMatchObject({
+      redemptions: [{ id: 51, rewardCodeId: 7, displayName: '夏日灵感奖励' }],
+      nextBeforeId: 51,
     })
     expect(transport.request).toHaveBeenCalledWith(
-      '/admin/rewards/codes/7/redemptions?before_id=60&limit=10',
+      '/control/v1/rewards/codes/7/redemptions?before_id=60&limit=10',
       expect.objectContaining({ method: 'GET', signal }),
     )
   })
 
-  it('maps technical detail without exposing Identity PII or Code secrets', async () => {
-    transport.request.mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: {
-        id: 51,
-        reward_code_id: 7,
-        user_public_id: '22222222-2222-4222-8222-222222222222',
-        display_name: '兑换用户',
-        credited_amount: 80,
-        redeemed_at: '2026-07-22T03:04:05Z',
-        credit_transaction_id: 'credit-transaction-9001',
-        masked_code_hint: '•••• 2026',
-      },
-    })
-    const signal = new AbortController().signal
+  it('reads one redemption detail through the control plane', async () => {
+    transport.request.mockResolvedValue(
+      legacyOk({
+        ...redemptionFixture(),
+        credit_transaction_id: 'txn_1',
+        masked_code_hint: '•••• 2922',
+      }),
+    )
 
-    await expect(createRewardCodeRedemptionResource().get(7, 51, { signal })).resolves.toEqual({
+    const detail = await createRewardCodeRedemptionResource().get(7, 51)
+
+    expect(detail).toMatchObject({
       id: 51,
-      rewardCodeId: 7,
-      userPublicId: '22222222-2222-4222-8222-222222222222',
-      displayName: '兑换用户',
-      creditedAmount: 80,
-      redeemedAt: '2026-07-22T03:04:05Z',
-      creditTransactionId: 'credit-transaction-9001',
-      maskedCodeHint: '•••• 2026',
+      creditTransactionId: 'txn_1',
+      maskedCodeHint: '•••• 2922',
     })
     expect(transport.request).toHaveBeenCalledWith(
-      '/admin/rewards/codes/7/redemptions/51',
-      expect.objectContaining({ method: 'GET', signal }),
+      '/control/v1/rewards/codes/7/redemptions/51',
+      expect.objectContaining({ method: 'GET' }),
     )
   })
 })

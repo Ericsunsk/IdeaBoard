@@ -23,8 +23,14 @@ const (
 	ReferenceImageAssetIDs = "reference_image_asset_ids"
 	OriginalImageAssetID   = "original_image_asset_id"
 	MaskImageAssetID       = "mask_image_asset_id"
-	CanvasImageRef         = "canvas_image_ref"
-	UseMask                = "use_mask"
+	// MaskAssetID carries a workspace public asset_... mask reference for
+	// v1 inpaint submits. Unlike MaskImageAssetID (legacy numeric asset id)
+	// and MaskImageURL(s) (legacy URLs, never persisted), MaskAssetID is
+	// the durable contract: the mask bytes arrive via the existing
+	// upload-session flow and the task links the resulting asset id.
+	MaskAssetID    = "mask_asset_id"
+	CanvasImageRef = "canvas_image_ref"
+	UseMask        = "use_mask"
 
 	CustomWidth         = "custom_width"
 	CustomHeight        = "custom_height"
@@ -125,6 +131,7 @@ var submitTaskParamKeys = keySet(
 	ReferenceImageAssetIDs,
 	OriginalImageAssetID,
 	MaskImageAssetID,
+	MaskAssetID,
 	UseMask,
 	CustomWidth,
 	CustomHeight,

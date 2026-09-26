@@ -5,11 +5,13 @@ import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pricing review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
     confirm: confirmMock,
+    readReason: readReasonMock,
   }),
 }))
 
@@ -22,6 +24,8 @@ describe('AdminBillingPricingPage', () => {
   beforeEach(() => {
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
+    readReasonMock.mockReset()
+    readReasonMock.mockReturnValue('pricing review')
     toast.success.mockReset()
     toast.warning.mockReset()
     toast.error.mockReset()
@@ -36,7 +40,7 @@ describe('AdminBillingPricingPage', () => {
   })
   it('preserves the grid surface while the Catalog is loading', () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', async () => {
+      http.get('/api/control/v1/billing/catalog', async () => {
         await new Promise(() => {})
         return HttpResponse.json({ code: 0, msg: 'ok', data: { items: [] } })
       }),
@@ -49,7 +53,7 @@ describe('AdminBillingPricingPage', () => {
 
   it('renders namespace tables with node subtitles in Service cells', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
     )
@@ -100,7 +104,7 @@ describe('AdminBillingPricingPage', () => {
       },
     ]
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items } }),
       ),
     )
@@ -113,7 +117,7 @@ describe('AdminBillingPricingPage', () => {
 
   it('shows an empty state when no products are registered', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: [] } }),
       ),
     )
@@ -126,7 +130,7 @@ describe('AdminBillingPricingPage', () => {
   it('keeps load failures visible and retryable', async () => {
     let requests = 0
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () => {
+      http.get('/api/control/v1/billing/catalog', () => {
         requests += 1
         if (requests === 1) {
           return HttpResponse.json({ code: 500, msg: 'catalog unavailable' }, { status: 500 })
@@ -142,19 +146,17 @@ describe('AdminBillingPricingPage', () => {
     expect(await screen.findByText('inpaint')).toBeVisible()
   })
 
-  it('publishes an explicit zero price from the card dialog without confirmation', async () => {
+  it('publishes an explicit zero price from the card dialog with an operator reason', async () => {
     let publishRequests = 0
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
         expect(params.sku).toBe('ai-image:inpaint')
-        await expect(request.json()).resolves.toEqual({ prices: { default: 0 } })
+        await expect(request.json()).resolves.toEqual({ prices: { default: 0 }, reason: 'pricing review' })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             prices: {
               default: {
@@ -189,16 +191,14 @@ describe('AdminBillingPricingPage', () => {
   it('disables and re-enables a priced feature from its card', async () => {
     const requests: boolean[] = []
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
+      http.put('/api/control/v1/billing/catalog/:sku/availability', async ({ request, params }) => {
         expect(params.sku).toBe('ai-image:cutout')
         const body = (await request.json()) as { enabled: boolean }
         requests.push(body.enabled)
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             sku: params.sku,
             status: body.enabled ? 'active' : 'disabled',
@@ -224,20 +224,18 @@ describe('AdminBillingPricingPage', () => {
   it('keeps publish failures in the dialog and allows a single retry', async () => {
     let requests = 0
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.post('/api/admin/billing/catalog/:sku/prices', () => {
+      http.post('/api/control/v1/billing/catalog/:sku/prices', () => {
         requests += 1
         if (requests === 1) {
           return HttpResponse.json(
-            { code: 500, msg: 'publish unavailable', message_safe: true },
+            { error: { code: 'service_unavailable', message: 'publish unavailable' } },
             { status: 500 },
           )
         }
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             prices: {
               default: {
@@ -272,15 +270,13 @@ describe('AdminBillingPricingPage', () => {
       releasePublish = resolve
     })
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.post('/api/admin/billing/catalog/:sku/prices', async () => {
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async () => {
         publishRequests += 1
         await publishGate
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             prices: {
               default: {
@@ -315,11 +311,11 @@ describe('AdminBillingPricingPage', () => {
 
   it('confirms and removes an unreferenced Archived card', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.delete('/api/admin/billing/catalog/:sku', ({ params }) =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { sku: params.sku } }),
+      http.delete('/api/control/v1/billing/catalog/:sku', ({ params }) =>
+        HttpResponse.json({ data: { sku: params.sku } }),
       ),
     )
 
@@ -335,12 +331,12 @@ describe('AdminBillingPricingPage', () => {
 
   it('keeps the Archived card when durable history blocks deletion', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
-      http.delete('/api/admin/billing/catalog/:sku', () =>
+      http.delete('/api/control/v1/billing/catalog/:sku', () =>
         HttpResponse.json(
-          { code: 409, msg: '功能已有历史计费记录，无法删除', message_safe: true },
+          { error: { code: 'conflict', message: '功能已有历史计费记录，无法删除' } },
           { status: 409 },
         ),
       ),
@@ -359,7 +355,7 @@ describe('AdminBillingPricingPage', () => {
   it('prefills per-feature models and saves without touching prices', async () => {
     let savedBody: unknown
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
@@ -376,7 +372,7 @@ describe('AdminBillingPricingPage', () => {
           data: [makeCatalogModel()],
         }),
       ),
-      http.put('/api/admin/settings/ai-gateway/models/:feature', async ({ request }) => {
+      http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ request }) => {
         savedBody = await request.json()
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })
       }),
@@ -403,7 +399,7 @@ describe('AdminBillingPricingPage', () => {
 
   it('keeps model save failures inline on the card', async () => {
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
       http.get('/api/control/v1/platform/ai-gateway/models', () =>
@@ -416,7 +412,7 @@ describe('AdminBillingPricingPage', () => {
           data: [makeCatalogModel({ id: 'bad/model', name: 'Bad Model' })],
         }),
       ),
-      http.put('/api/admin/settings/ai-gateway/models/:feature', () =>
+      http.put('/api/control/v1/platform/ai-gateway/models/:feature', () =>
         HttpResponse.json({ code: 400, msg: '网关写入失败', message_safe: true }, { status: 400 }),
       ),
     )
@@ -434,7 +430,7 @@ describe('AdminBillingPricingPage', () => {
     let putFeature = ''
     let putBody: unknown = null
     useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
+      http.get('/api/control/v1/billing/catalog', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -463,7 +459,7 @@ describe('AdminBillingPricingPage', () => {
           data: [makeCatalogModel({ id: 'test-provider/test-model', name: 'Vision Model' })],
         }),
       ),
-      http.put('/api/admin/settings/ai-gateway/models/:feature', async ({ request, params }) => {
+      http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ request, params }) => {
         putFeature = String(params.feature)
         putBody = await request.json()
         return HttpResponse.json({ code: 0, msg: 'ok', data: null })

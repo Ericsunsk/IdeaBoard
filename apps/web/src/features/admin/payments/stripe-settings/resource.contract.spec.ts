@@ -20,8 +20,8 @@ const responseData = {
 describe('stripeSettingsResource', () => {
   it('maps the GET safe configuration summary without exposing either Secret', async () => {
     useMswHandlers(
-      http.get('/api/admin/payments/stripe-config', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: responseData }),
+      http.get('/api/control/v1/payments/stripe-config', () =>
+        HttpResponse.json({ data: responseData }),
       ),
     )
 
@@ -41,29 +41,53 @@ describe('stripeSettingsResource', () => {
     })
   })
 
-  it('omits an empty API Key while saving the non-secret Stripe settings', async () => {
+  it('omits an empty API Key while saving the non-secret Stripe settings with a reason', async () => {
+    let seenHeaders: Record<string, string | null> = {}
     useMswHandlers(
-      http.put('/api/admin/payments/stripe-config', async ({ request }) => {
+      http.put('/api/control/v1/payments/stripe-config', async ({ request }) => {
         expect(await request.json()).toEqual({
           payment_method_configuration_id: 'pmc_ideaboard',
           product_tax_code: 'txcd_10105001',
           purchases_enabled: true,
+          reason: 'rotate test key',
         })
-        return HttpResponse.json({ code: 0, msg: 'ok', data: responseData })
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
+        return HttpResponse.json({ data: responseData })
       }),
     )
 
     await expect(
-      saveStripeConfiguration({
-        apiKey: '   ',
-        paymentMethodConfigurationId: ' pmc_ideaboard ',
-        productTaxCode: ' txcd_10105001 ',
-        purchasesEnabled: true,
-      }),
+      saveStripeConfiguration(
+        {
+          apiKey: '   ',
+          paymentMethodConfigurationId: ' pmc_ideaboard ',
+          productTaxCode: ' txcd_10105001 ',
+          purchasesEnabled: true,
+        },
+        { operatorReason: 'rotate test key' },
+      ),
     ).resolves.toMatchObject({
       apiKeyConfigured: true,
       webhookSecretConfigured: true,
       accountId: 'acct_123',
     })
+    expect(seenHeaders.idempotencyKey).toMatch(/.+/)
+    expect(seenHeaders.operatorReason).toBe('rotate test key')
+  })
+
+  it('requires an operator reason before saving', async () => {
+    await expect(
+      saveStripeConfiguration(
+        {
+          paymentMethodConfigurationId: 'pmc_ideaboard',
+          productTaxCode: 'txcd_10105001',
+          purchasesEnabled: true,
+        },
+        { operatorReason: '   ' },
+      ),
+    ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

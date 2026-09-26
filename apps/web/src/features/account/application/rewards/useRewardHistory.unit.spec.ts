@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { screen, waitFor } from '@testing-library/vue'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser } from '../../../../test/render'
 import type { RewardRedemptionPageData } from '../../infrastructure'
@@ -12,6 +12,13 @@ vi.mock('../../infrastructure/rewards/resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../infrastructure/rewards/resource')>()
   return { ...actual, fetchRewardRedemptions: fetchRewardRedemptionsMock }
 })
+
+vi.mock('../accountWorkspace', () => ({
+  useAccountWorkspace: () => ({
+    workspaceId: ref('ws_1'),
+    selectionSettled: ref(true),
+  }),
+}))
 
 const RewardsHost = defineComponent({
   setup() {
@@ -32,7 +39,7 @@ describe('useRewardHistory', () => {
 
   it('loads 20-record cursor pages and appends the next page', async () => {
     fetchRewardRedemptionsMock
-      .mockResolvedValueOnce(buildPage('夏日灵感奖励', 41))
+      .mockResolvedValueOnce(buildPage('夏日灵感奖励', 'cursor-41'))
       .mockResolvedValueOnce(buildPage('新用户奖励'))
     const { user } = renderRewardsHost()
 
@@ -41,7 +48,8 @@ describe('useRewardHistory', () => {
     )
     expect(fetchRewardRedemptionsMock).toHaveBeenNthCalledWith(
       1,
-      { limit: 20 },
+      'ws_1',
+      { page_size: 20 },
       expect.any(AbortSignal),
     )
 
@@ -52,7 +60,8 @@ describe('useRewardHistory', () => {
     )
     expect(fetchRewardRedemptionsMock).toHaveBeenNthCalledWith(
       2,
-      { before_id: 41, limit: 20 },
+      'ws_1',
+      { page_size: 20, cursor: 'cursor-41' },
       expect.any(AbortSignal),
     )
   })
@@ -60,7 +69,7 @@ describe('useRewardHistory', () => {
   it('exposes separate recovery paths for initial and load-more failures', async () => {
     fetchRewardRedemptionsMock
       .mockRejectedValueOnce(new Error('首次加载失败'))
-      .mockResolvedValueOnce(buildPage('夏日灵感奖励', 41))
+      .mockResolvedValueOnce(buildPage('夏日灵感奖励', 'cursor-41'))
       .mockRejectedValueOnce(new Error('下一页失败'))
       .mockResolvedValueOnce(buildPage('新用户奖励'))
     const { user } = renderRewardsHost()
@@ -93,7 +102,7 @@ function renderRewardsHost() {
   })
 }
 
-function buildPage(rewardCodeDisplayName: string, nextBeforeID?: number): RewardRedemptionPageData {
+function buildPage(rewardCodeDisplayName: string, nextCursor?: string): RewardRedemptionPageData {
   return {
     redemptions: [
       {
@@ -104,6 +113,6 @@ function buildPage(rewardCodeDisplayName: string, nextBeforeID?: number): Reward
         redeemed_at: '2026-07-15T10:00:00Z',
       },
     ],
-    ...(nextBeforeID ? { next_before_id: nextBeforeID } : {}),
+    ...(nextCursor ? { next_cursor: nextCursor } : {}),
   }
 }

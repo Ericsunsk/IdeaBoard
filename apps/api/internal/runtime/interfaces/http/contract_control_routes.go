@@ -13,6 +13,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"ideaboard/api/internal/platform/contract"
 
@@ -48,6 +49,7 @@ func RegisterContractControlRoutes(group *gin.RouterGroup, authDeps AuthDeps, de
 	d.registerControlCreditRoutes(group)
 	d.registerControlPaymentRoutes(group)
 	d.registerControlTaskRoutes(group)
+	d.registerControlOAuthRoutes(group)
 	d.registerControlPlatformSettingsRoutes(group)
 	d.registerControlProxiedRoutes(group)
 	// No catch-all here: gin cannot combine a /* wildcard with the
@@ -172,6 +174,14 @@ func (d *ContractControlDeps) registerControlTaskRoutes(control *gin.RouterGroup
 		controlRoute{Operation: "tasks.cancel", Route: "POST /tasks/{task_id}/cancel", Mutation: true, Target: taskTarget}, d.cancelControlTask))
 }
 
+func (d *ContractControlDeps) registerControlOAuthRoutes(control *gin.RouterGroup) {
+	providerTarget := controlTargetParam("provider", "oauth_provider")
+	control.GET("/users/oauth-providers/:provider", d.guard(ControlCapabilityUsers,
+		controlRoute{Operation: "users.get_oauth_provider", Route: "GET /users/oauth-providers/{provider}", Target: providerTarget}, d.getControlOAuthProvider))
+	control.PUT("/users/oauth-providers/:provider", d.guard(ControlCapabilityUsers,
+		controlRoute{Operation: "users.update_oauth_provider", Route: "PUT /users/oauth-providers/{provider}", Mutation: true, Target: providerTarget}, d.updateControlOAuthProvider))
+}
+
 func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin.RouterGroup) {
 	control.GET("/platform/settings/registration", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_registration", Route: "GET /platform/settings/registration"}, d.getControlRegistrationSetting))
@@ -185,6 +195,11 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 		controlRoute{Operation: "platform.get_branding", Route: "GET /platform/settings/branding"}, d.getControlBrandingSetting))
 	control.PUT("/platform/settings/branding", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.update_branding", Route: "PUT /platform/settings/branding", Mutation: true}, d.updateControlBrandingSetting))
+	// Branding logo upload is a POST read-guard (the guard cannot buffer
+	// multipart bodies): reason + Idempotency-Key are enforced in-handler
+	// with content-hash replay, and every call is audited.
+	control.POST("/platform/settings/branding/logo", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.upload_branding_logo", Route: "POST /platform/settings/branding/logo"}, d.uploadControlBrandingLogo))
 	control.GET("/platform/settings/media-upload", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.get_media_upload", Route: "GET /platform/settings/media-upload"}, d.getControlMediaUploadSetting))
 	control.PUT("/platform/settings/media-upload", d.guard(ControlCapabilityPlatform,
@@ -232,6 +247,21 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.save_ai_gateway_catalog", Route: "PUT /platform/ai-gateway/catalog", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.SaveCatalog))
 		control.GET("/platform/ai-gateway/providers", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_providers", Route: "GET /platform/ai-gateway/providers"}, ControlCapabilityPlatform, gatewayAvailable, h.ListProviders))
+		control.GET("/platform/ai-gateway/detect-models", d.controlProxy(
+			controlRoute{Operation: "platform.detect_ai_gateway_models", Route: "GET /platform/ai-gateway/detect-models"}, ControlCapabilityPlatform, gatewayAvailable, h.DetectModels))
+		control.GET("/platform/ai-gateway/models-reference", d.controlProxy(
+			controlRoute{Operation: "platform.get_ai_gateway_model_reference", Route: "GET /platform/ai-gateway/models-reference"}, ControlCapabilityPlatform, gatewayAvailable, h.GetModelReference))
+		control.GET("/platform/ai-gateway/brand-logo", d.controlProxy(
+			controlRoute{Operation: "platform.get_ai_gateway_brand_logo", Route: "GET /platform/ai-gateway/brand-logo"}, ControlCapabilityPlatform, gatewayAvailable, h.GetBrandLogo))
+		control.GET("/platform/ai-gateway/models-observed", d.controlProxy(
+			controlRoute{Operation: "platform.list_ai_gateway_models_observed", Route: "GET /platform/ai-gateway/models-observed"}, ControlCapabilityPlatform, gatewayAvailable, h.ListModelsObserved))
+		// Route preview is a pure routing dry-run (no configuration read
+		// or write), so it registers as a POST read-guard without reason
+		// or idempotency requirements.
+		control.POST("/platform/ai-gateway/route-preview", d.controlProxy(
+			controlRoute{Operation: "platform.preview_ai_gateway_route", Route: "POST /platform/ai-gateway/route-preview"}, ControlCapabilityPlatform, gatewayAvailable, h.PreviewGatewayRoute))
+		control.POST("/platform/ai-gateway/test-connection", d.controlProxy(
+			controlRoute{Operation: "platform.test_ai_gateway_connection", Route: "POST /platform/ai-gateway/test-connection", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.TestConnection))
 	}
 	{
 		h := d.Storage
@@ -274,11 +304,60 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		h := d.Monitor
 		control.GET("/platform/monitor", d.controlProxy(
 			controlRoute{Operation: "platform.get_monitor", Route: "GET /platform/monitor"}, ControlCapabilityPlatform, monitorAvailable, h.GetMonitor))
+		// Global monitor stream (SSE, snapshot every 10s): read-guard so
+		// the long-lived stream is never body-buffered; the audit record
+		// emits on disconnect with the terminal status.
+		control.GET("/platform/monitor/stream", d.controlProxy(
+			controlRoute{Operation: "platform.stream_monitor", Route: "GET /platform/monitor/stream"}, ControlCapabilityPlatform, monitorAvailable, h.StreamMonitor))
 		control.GET("/platform/statistics", d.controlProxy(
 			controlRoute{Operation: "platform.get_statistics", Route: "GET /platform/statistics"}, ControlCapabilityPlatform, monitorAvailable, h.GetStatistics))
 		control.POST("/platform/statistics/backfill", d.controlProxy(
 			controlRoute{Operation: "platform.backfill_statistics", Route: "POST /platform/statistics/backfill", Mutation: true}, ControlCapabilityPlatform, monitorAvailable, h.BackfillStatistics))
 	}
+	{
+		h := d.BrandLogos
+		brandLogosAvailable := d != nil && d.BrandLogos != nil
+		control.GET("/platform/brand-logo-overrides", d.controlProxy(
+			controlRoute{Operation: "platform.list_brand_logo_overrides", Route: "GET /platform/brand-logo-overrides"}, ControlCapabilityPlatform, brandLogosAvailable, h.List))
+		control.PUT("/platform/brand-logo-overrides/:scope/:target_key", d.controlProxy(
+			controlRoute{Operation: "platform.upsert_brand_logo_override", Route: "PUT /platform/brand-logo-overrides/{scope}/{target_key}", Mutation: true, Target: controlBrandLogoOverrideTarget}, ControlCapabilityPlatform, brandLogosAvailable, h.Upsert))
+		control.DELETE("/platform/brand-logo-overrides/:scope/:target_key", d.controlProxy(
+			controlRoute{Operation: "platform.delete_brand_logo_override", Route: "DELETE /platform/brand-logo-overrides/{scope}/{target_key}", Mutation: true, Target: controlBrandLogoOverrideTarget}, ControlCapabilityPlatform, brandLogosAvailable, h.Delete))
+	}
+	{
+		cmdAvailable := d != nil && d.RewardCommands != nil
+		readAvailable := d != nil && d.RewardReads != nil
+		cmd := d.RewardCommands
+		read := d.RewardReads
+		// Reward search is a POST-body read (fuzzy name / full-code HMAC
+		// lookup cannot ride a query string), so it registers as a POST
+		// read-guard without reason or idempotency requirements.
+		control.POST("/rewards/codes/search", d.controlProxy(
+			controlRoute{Operation: "rewards.search_codes", Route: "POST /rewards/codes/search"}, ControlCapabilityCredits, readAvailable, read.SearchRewardCodes))
+		control.POST("/rewards/codes", d.controlProxy(
+			controlRoute{Operation: "rewards.create_code", Route: "POST /rewards/codes", Mutation: true}, ControlCapabilityCredits, cmdAvailable, cmd.CreateRewardCode))
+		control.GET("/rewards/codes/:id/redemptions", d.controlProxy(
+			controlRoute{Operation: "rewards.list_redemptions", Route: "GET /rewards/codes/{id}/redemptions", Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, readAvailable, read.ListAdminRedemptions))
+		control.GET("/rewards/codes/:id/redemptions/:redemption_id", d.controlProxy(
+			controlRoute{Operation: "rewards.get_redemption", Route: "GET /rewards/codes/{id}/redemptions/{redemption_id}", Target: controlTargetParam("redemption_id", "reward_redemption")}, ControlCapabilityCredits, readAvailable, read.GetAdminRedemption))
+		control.PATCH("/rewards/codes/:id", d.controlProxy(
+			controlRoute{Operation: "rewards.update_code", Route: "PATCH /rewards/codes/{id}", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.UpdateRewardCode))
+		control.PATCH("/rewards/codes/:id/enabled", d.controlProxy(
+			controlRoute{Operation: "rewards.set_code_enabled", Route: "PATCH /rewards/codes/{id}/enabled", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.SetRewardCodeEnabled))
+		control.DELETE("/rewards/codes/:id", d.controlProxy(
+			controlRoute{Operation: "rewards.delete_code", Route: "DELETE /rewards/codes/{id}", Mutation: true, Target: controlTargetParam("id", "reward_code")}, ControlCapabilityCredits, cmdAvailable, cmd.DeleteRewardCode))
+	}
+}
+
+// controlBrandLogoOverrideTarget audits brand-logo overrides by their
+// scope-qualified key (scope + target_key are operator-facing ids).
+func controlBrandLogoOverrideTarget(c *gin.Context, _ []byte) (string, string) {
+	scope := strings.TrimSpace(c.Param("scope"))
+	target := strings.TrimSpace(c.Param("target_key"))
+	if scope == "" || target == "" {
+		return "", ""
+	}
+	return "brand_logo_override", scope + ":" + target
 }
 
 // RegisterContractControlRoutesOnEngine mounts the Control Plane group on

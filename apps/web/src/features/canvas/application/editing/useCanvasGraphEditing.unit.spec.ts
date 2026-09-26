@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createEmptyBoardSnapshot,
   resolveImageNodeStageHeight,
@@ -21,6 +21,10 @@ import {
   writeCanvasLibraryImportTransfer,
   type CanvasLibraryImportDescriptor,
 } from '../../../library'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
@@ -29,6 +33,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../shared/media/imageAssetPipeline', () => ({
   prepareImageAssetForUpload: mocks.prepareImageAssetForUpload,
 }))
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
+
+afterEach(() => {
+  resetMediaWorkspaceIdResolver()
+})
 
 function createFlowNode(
   id: string,
@@ -98,6 +110,7 @@ function createHarness(initialNodes: Node[] = []) {
     edges,
     boardBaseSnapshot: ref(graphSnapshot),
     currentBoardId: ref('board-a'),
+    getWorkspaceId: () => 'ws_test123',
     graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
     deleteNode: vi.fn(() => true),
@@ -181,10 +194,10 @@ describe('useCanvasGraphEditing', () => {
 
     await interactions.onFlowImageOpenFile('image-1')
     const snapshot = harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem
-    expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'board-a')
+    expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'ws_test123')
     expect(snapshot).toMatchObject({
       title: 'picked.png',
-      sourceImageUrl: '/api/user/media-assets/asset_42/derivatives/preview/content',
+      sourceImageUrl: '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',
       sourceMediaRef: {
         assetId: 'asset_42',
         derivativeTier: 'preview',
@@ -220,7 +233,7 @@ describe('useCanvasGraphEditing', () => {
     expect(promptSnapshot.inputImages).toEqual([
       expect.objectContaining({
         sourceType: 'external',
-        url: '/api/user/media-assets/asset_42/derivatives/preview/content',
+        url: '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',
         mediaRef: {
           assetId: 'asset_42',
           derivativeTier: 'preview',

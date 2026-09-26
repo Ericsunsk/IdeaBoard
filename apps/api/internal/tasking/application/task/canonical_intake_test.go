@@ -11,7 +11,7 @@ import (
 )
 
 func TestCompileWorkspaceParamsPersistsDurableExecutionFacts(t *testing.T) {
-	raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "", map[string]interface{}{
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugGeneration, "durability probe", map[string]interface{}{
 		"output_count": 2,
 	})
 	if err != nil {

@@ -26,9 +26,11 @@ type SaveStorageProfile = (input: {
   id?: string | undefined
   payload: StorageProfilePayload
   apply?: boolean | undefined
-}) => Promise<{ profile: StorageProfile; message: string }>
+}) => Promise<{ profile: StorageProfile; message: string } | null>
 
-type StorageProfileCommand = (id: string) => Promise<{ profile: StorageProfile; message: string }>
+type StorageProfileCommand = (
+  id: string,
+) => Promise<{ profile: StorageProfile; message: string } | null>
 
 type StorageProfileEditorOptions = {
   creatableProviders: { value: StorageProviderMeta[] }
@@ -36,8 +38,8 @@ type StorageProfileEditorOptions = {
   storages: { value: StorageCard[] }
   saveProfile: SaveStorageProfile
   applyProfile: StorageProfileCommand
-  testProfile: (id: string) => Promise<{ message: string }>
-  deleteProfile: (id: string) => Promise<{ message: string }>
+  testProfile: (id: string) => Promise<{ message: string } | null>
+  deleteProfile: (id: string) => Promise<{ message: string } | null>
   fetchBucketDomains: (id: string) => Promise<string[]>
 }
 
@@ -120,6 +122,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
       payload,
       apply: apply || undefined,
     })
+    if (!response) return null
     const saved = normalizeProfile(response.profile, options.providerMap.value)
     editorMode.value = 'edit'
     editingId.value = saved.id
@@ -169,6 +172,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     await runAsyncAction(
       async () => {
         const response = await options.applyProfile(id)
+        if (!response) return
         storageFeedback.applyCurrentSucceeded(response.message)
       },
       {
@@ -189,6 +193,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     await runAsyncAction(
       async () => {
         const response = await options.testProfile(storage.id)
+        if (!response) return
         storageFeedback.testConnectionSucceeded(response.message)
       },
       {
@@ -234,6 +239,7 @@ export function useStorageProfileEditor(options: StorageProfileEditorOptions) {
     await runAsyncAction(
       async () => {
         const response = await options.deleteProfile(id)
+        if (!response) return
         storageFeedback.profileDeleted(response.message)
         if (editingId.value === id) closeEditor()
       },

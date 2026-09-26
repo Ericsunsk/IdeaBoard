@@ -31,19 +31,26 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  CreateWorkspaceBillingQuoteRequest,
   CreateWorkspaceCheckoutRequest,
   ErrorEnvelope,
   GetWorkspaceUsageParams,
   ListWorkspaceBillingRecordsParams,
   ListWorkspaceCreditsLedgerParams,
+  ListWorkspaceRechargesParams,
   NotFoundResponse,
   PaginatedBillingRecords,
   PaginatedCreditsLedger,
+  PaginatedWorkspaceRecharges,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   WorkspaceBillingAccountEnvelope,
+  WorkspaceBillingQuoteEnvelope,
   WorkspaceCheckoutSessionEnvelope,
   WorkspaceCreditsBalanceEnvelope,
+  WorkspacePendingOrderEnvelope,
+  WorkspacePendingOrderListEnvelope,
+  WorkspacePurchaseOptionsEnvelope,
   WorkspaceUsageEnvelope,
 } from '../model'
 
@@ -775,4 +782,609 @@ export function useGetWorkspaceCheckoutSession<
   query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
   return query
+}
+
+export const getGetWorkspacePurchaseOptionsUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/purchase-options`
+}
+
+/**
+ * Caller-owned read over the Payments purchase-eligibility projection (static quantities plus terms versions plus wallet gate). No ledger writes. Pricing stays server-side; this read carries eligibility only, never amounts.
+ * @summary Get recharge purchase options (members only)
+ */
+export const getWorkspacePurchaseOptions = async (
+  workspaceId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspacePurchaseOptionsEnvelope> => {
+  return publicMutator<WorkspacePurchaseOptionsEnvelope>(
+    getGetWorkspacePurchaseOptionsUrl(workspaceId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetWorkspacePurchaseOptionsQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
+  return ['workspaces', workspaceId, 'purchase-options'] as const
+}
+
+export const getGetWorkspacePurchaseOptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetWorkspacePurchaseOptionsQueryKey(workspaceId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>> = ({
+    signal,
+  }) => getWorkspacePurchaseOptions(toValue(workspaceId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>, TError, TData>
+}
+
+export type GetWorkspacePurchaseOptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>
+>
+export type GetWorkspacePurchaseOptionsQueryError =
+  UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
+
+/**
+ * @summary Get recharge purchase options (members only)
+ */
+
+export function useGetWorkspacePurchaseOptions<
+  TData = Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getWorkspacePurchaseOptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetWorkspacePurchaseOptionsQueryOptions(workspaceId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListWorkspacePendingOrdersUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/pending-orders`
+}
+
+/**
+ * Pending order intents are bounded (max 3 unpaid, service-enforced) and intentionally unpaginated. Facts stay caller-scoped with the workspace as the authZ scope only. Malformed or foreign order tokens converge to 404 billing_session_not_found, never 400.
+ * @summary List caller-owned pending recharge orders (members only)
+ */
+export const listWorkspacePendingOrders = async (
+  workspaceId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspacePendingOrderListEnvelope> => {
+  return publicMutator<WorkspacePendingOrderListEnvelope>(
+    getListWorkspacePendingOrdersUrl(workspaceId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListWorkspacePendingOrdersQueryKey = (workspaceId: MaybeRefOrGetter<string>) => {
+  return ['workspaces', workspaceId, 'pending-orders'] as const
+}
+
+export const getListWorkspacePendingOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWorkspacePendingOrders>>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspacePendingOrders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListWorkspacePendingOrdersQueryKey(workspaceId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspacePendingOrders>>> = ({
+    signal,
+  }) => listWorkspacePendingOrders(toValue(workspaceId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listWorkspacePendingOrders>>, TError, TData>
+}
+
+export type ListWorkspacePendingOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWorkspacePendingOrders>>
+>
+export type ListWorkspacePendingOrdersQueryError =
+  UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
+
+/**
+ * @summary List caller-owned pending recharge orders (members only)
+ */
+
+export function useListWorkspacePendingOrders<
+  TData = Awaited<ReturnType<typeof listWorkspacePendingOrders>>,
+  TError = UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspacePendingOrders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListWorkspacePendingOrdersQueryOptions(workspaceId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getContinueWorkspacePendingOrderUrl = (workspaceId: string, orderId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/pending-orders/${encodeURIComponent(String(orderId))}/continue`
+}
+
+/**
+ * Converges provider state inside Payments and returns the refreshed order (checkout_url when checkout is open). Empty body: a body is a caller bug and renders 400. Requires the Idempotency-Key header: key reuse with a different request renders 409 billing_checkout_conflict. Restricted wallets render 403 billing_wallet_restricted.
+ * @summary Continue a pending recharge order (members only)
+ */
+export const continueWorkspacePendingOrder = async (
+  workspaceId: string,
+  orderId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspacePendingOrderEnvelope> => {
+  return publicMutator<WorkspacePendingOrderEnvelope>(
+    getContinueWorkspacePendingOrderUrl(workspaceId, orderId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getContinueWorkspacePendingOrderMutationKey = () =>
+  ['continueWorkspacePendingOrder'] as const
+
+export const getContinueWorkspacePendingOrderMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof continueWorkspacePendingOrder>>,
+    TError,
+    ContinueWorkspacePendingOrderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof continueWorkspacePendingOrder>>,
+  TError,
+  ContinueWorkspacePendingOrderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getContinueWorkspacePendingOrderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof continueWorkspacePendingOrder>>,
+    ContinueWorkspacePendingOrderMutationVariables
+  > = (props) => {
+    const { workspaceId, orderId } = props ?? {}
+
+    return continueWorkspacePendingOrder(workspaceId, orderId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type ContinueWorkspacePendingOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof continueWorkspacePendingOrder>>
+>
+
+export type ContinueWorkspacePendingOrderMutationError =
+  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope
+export type ContinueWorkspacePendingOrderMutationVariables = {
+  workspaceId: string
+  orderId: string
+}
+
+/**
+ * @summary Continue a pending recharge order (members only)
+ */
+export const useContinueWorkspacePendingOrder = <
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof continueWorkspacePendingOrder>>,
+      TError,
+      ContinueWorkspacePendingOrderMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof continueWorkspacePendingOrder>>,
+  TError,
+  ContinueWorkspacePendingOrderMutationVariables,
+  TContext
+> => {
+  return useMutation(getContinueWorkspacePendingOrderMutationOptions(options), queryClient)
+}
+export const getAbandonWorkspacePendingOrderUrl = (workspaceId: string, orderId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/pending-orders/${encodeURIComponent(String(orderId))}/abandon`
+}
+
+/**
+ * Marks the caller-owned order intent abandoned. Empty body: a body is a caller bug and renders 400. Requires the Idempotency-Key header: key reuse with a different request renders 409 billing_checkout_conflict.
+ * @summary Abandon a pending recharge order (members only)
+ */
+export const abandonWorkspacePendingOrder = async (
+  workspaceId: string,
+  orderId: string,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspacePendingOrderEnvelope> => {
+  return publicMutator<WorkspacePendingOrderEnvelope>(
+    getAbandonWorkspacePendingOrderUrl(workspaceId, orderId),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getAbandonWorkspacePendingOrderMutationKey = () =>
+  ['abandonWorkspacePendingOrder'] as const
+
+export const getAbandonWorkspacePendingOrderMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>,
+    TError,
+    AbandonWorkspacePendingOrderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>,
+  TError,
+  AbandonWorkspacePendingOrderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAbandonWorkspacePendingOrderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>,
+    AbandonWorkspacePendingOrderMutationVariables
+  > = (props) => {
+    const { workspaceId, orderId } = props ?? {}
+
+    return abandonWorkspacePendingOrder(workspaceId, orderId, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type AbandonWorkspacePendingOrderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>
+>
+
+export type AbandonWorkspacePendingOrderMutationError =
+  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope
+export type AbandonWorkspacePendingOrderMutationVariables = { workspaceId: string; orderId: string }
+
+/**
+ * @summary Abandon a pending recharge order (members only)
+ */
+export const useAbandonWorkspacePendingOrder = <
+  TError = BadRequestResponse | UnauthorizedResponse | ErrorEnvelope,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>,
+      TError,
+      AbandonWorkspacePendingOrderMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof abandonWorkspacePendingOrder>>,
+  TError,
+  AbandonWorkspacePendingOrderMutationVariables,
+  TContext
+> => {
+  return useMutation(getAbandonWorkspacePendingOrderMutationOptions(options), queryClient)
+}
+export const getListWorkspaceRechargesUrl = (
+  workspaceId: string,
+  params?: ListWorkspaceRechargesParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/workspaces/${encodeURIComponent(String(workspaceId))}/recharges?${stringifiedParams}`
+    : `/workspaces/${encodeURIComponent(String(workspaceId))}/recharges`
+}
+
+/**
+ * Settled-facts read model (credited plus refunded plus user-abandoned, latest 12 months). Read-only. The service owns the opaque NextCursor dialect directly in meta.
+ * @summary List caller-owned recharge history (members only)
+ */
+export const listWorkspaceRecharges = async (
+  workspaceId: string,
+  params?: ListWorkspaceRechargesParams,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<PaginatedWorkspaceRecharges> => {
+  return publicMutator<PaginatedWorkspaceRecharges>(
+    getListWorkspaceRechargesUrl(workspaceId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListWorkspaceRechargesQueryKey = (
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListWorkspaceRechargesParams>,
+) => {
+  return ['workspaces', workspaceId, 'recharges', ...(params ? [params] : [])] as const
+}
+
+export const getListWorkspaceRechargesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWorkspaceRecharges>>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListWorkspaceRechargesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceRecharges>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListWorkspaceRechargesQueryKey(workspaceId, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkspaceRecharges>>> = ({ signal }) =>
+    listWorkspaceRecharges(toValue(workspaceId), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(workspaceId) !== null && toValue(workspaceId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceRecharges>>, TError, TData>
+}
+
+export type ListWorkspaceRechargesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWorkspaceRecharges>>
+>
+export type ListWorkspaceRechargesQueryError =
+  BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
+
+/**
+ * @summary List caller-owned recharge history (members only)
+ */
+
+export function useListWorkspaceRecharges<
+  TData = Awaited<ReturnType<typeof listWorkspaceRecharges>>,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
+>(
+  workspaceId: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListWorkspaceRechargesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWorkspaceRecharges>>, TError, TData>
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListWorkspaceRechargesQueryOptions(workspaceId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCreateWorkspaceBillingQuoteUrl = (workspaceId: string) => {
+  return `/workspaces/${encodeURIComponent(String(workspaceId))}/billing-quotes`
+}
+
+/**
+ * Mints an immutable price snapshot with no persistence (preflight, like task-quotes): the quote path is the only place a price is ever shown, and settlement re-quotes authoritatively. Covers the ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and read total_credits). No price fields are accepted (unknown fields rejected with 400); unknown SKUs converge to billing_quote_unavailable (503, no SKU oracle). No Idempotency-Key: pure read, safe to retry.
+ * @summary Mint a server-side billing quote (members only, no persistence)
+ */
+export const createWorkspaceBillingQuote = async (
+  workspaceId: string,
+  createWorkspaceBillingQuoteRequest: CreateWorkspaceBillingQuoteRequest,
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<WorkspaceBillingQuoteEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return publicMutator<WorkspaceBillingQuoteEnvelope>(
+    getCreateWorkspaceBillingQuoteUrl(workspaceId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(createWorkspaceBillingQuoteRequest),
+    },
+  )
+}
+
+export const getCreateWorkspaceBillingQuoteMutationKey = () =>
+  ['createWorkspaceBillingQuote'] as const
+
+export const getCreateWorkspaceBillingQuoteMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse
+    | ErrorEnvelope,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWorkspaceBillingQuote>>,
+    TError,
+    CreateWorkspaceBillingQuoteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof publicMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createWorkspaceBillingQuote>>,
+  TError,
+  CreateWorkspaceBillingQuoteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateWorkspaceBillingQuoteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createWorkspaceBillingQuote>>,
+    CreateWorkspaceBillingQuoteMutationVariables
+  > = (props) => {
+    const { workspaceId, data } = props ?? {}
+
+    return createWorkspaceBillingQuote(workspaceId, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type CreateWorkspaceBillingQuoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createWorkspaceBillingQuote>>
+>
+export type CreateWorkspaceBillingQuoteMutationBody = CreateWorkspaceBillingQuoteRequest
+export type CreateWorkspaceBillingQuoteMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | NotFoundResponse
+  | UnprocessableEntityResponse
+  | ErrorEnvelope
+export type CreateWorkspaceBillingQuoteMutationVariables = {
+  workspaceId: string
+  data: CreateWorkspaceBillingQuoteRequest
+}
+
+/**
+ * @summary Mint a server-side billing quote (members only, no persistence)
+ */
+export const useCreateWorkspaceBillingQuote = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse
+    | ErrorEnvelope,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createWorkspaceBillingQuote>>,
+      TError,
+      CreateWorkspaceBillingQuoteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createWorkspaceBillingQuote>>,
+  TError,
+  CreateWorkspaceBillingQuoteMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateWorkspaceBillingQuoteMutationOptions(options), queryClient)
 }

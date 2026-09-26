@@ -10,6 +10,14 @@ import {
   type PaymentsResource,
 } from '../../infrastructure'
 import RechargePane from './RechargePane.vue'
+import { ref } from 'vue'
+
+vi.mock('../../application/accountWorkspace', () => ({
+  useAccountWorkspace: () => ({
+    workspaceId: ref('ws_1'),
+    selectionSettled: ref(true),
+  }),
+}))
 
 const purchaseOptions = {
   purchases_available: true,
@@ -119,7 +127,7 @@ describe('RechargePane', () => {
     await user.click(checkout)
 
     await waitFor(() => {
-      expect(createCheckout).toHaveBeenCalledWith({
+      expect(createCheckout).toHaveBeenCalledWith('ws_1', {
         idea_quantity: 1000,
         idempotency_key: expect.stringMatching(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -147,7 +155,7 @@ describe('RechargePane', () => {
     expect(screen.getByText('$5.01 USD')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Pay now' }))
 
-    expect(createCheckout).toHaveBeenCalledWith({
+    expect(createCheckout).toHaveBeenCalledWith('ws_1', {
       idea_quantity: 501,
       idempotency_key: expect.any(String),
       refund_policy_version: '2026-08-01',
@@ -300,11 +308,11 @@ describe('RechargePane', () => {
     expect(within(historyTable).queryByText('1,000')).not.toBeInTheDocument()
 
     await user.click(within(pendingOrder).getByRole('button', { name: 'Continue payment' }))
-    await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledWith('open-order'))
+    await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledWith('ws_1', 'open-order'))
     expect(navigate).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/open-order')
 
     await user.click(within(pendingOrder).getByRole('button', { name: 'Abandon order' }))
-    await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledWith('open-order'))
+    await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledWith('ws_1', 'open-order'))
     await waitFor(() =>
       expect(screen.queryByTestId('pending-payment-order-open-order')).not.toBeInTheDocument(),
     )
@@ -455,16 +463,17 @@ describe('RechargePane', () => {
     expect(await within(table).findByText('$10.00 USD')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Load more' }))
     expect(await within(table).findByText('$20.00 USD')).toBeVisible()
-    expect(listRecharges).toHaveBeenNthCalledWith(1, { limit: 20 }, expect.any(AbortSignal))
+    expect(listRecharges).toHaveBeenNthCalledWith(1, 'ws_1', { limit: 20 }, expect.any(AbortSignal))
     expect(listRecharges).toHaveBeenNthCalledWith(
       2,
+      'ws_1',
       { cursor: 'cursor_opaque_page_2', limit: 20 },
       expect.any(AbortSignal),
     )
   })
 
   it('uses the user payment event only to invalidate visible account queries', async () => {
-    let paymentListener: Parameters<PaymentsResource['subscribe']>[0] | undefined
+    let paymentListener: Parameters<PaymentsResource['subscribe']>[1] | undefined
     const unsubscribe = vi.fn()
     const listPendingOrders = vi.fn().mockResolvedValue({ items: [] })
     const listRecharges = vi
@@ -481,7 +490,7 @@ describe('RechargePane', () => {
           },
         ],
       })
-    const subscribe = vi.fn((listener: Parameters<PaymentsResource['subscribe']>[0]) => {
+    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
       paymentListener = listener
       return unsubscribe
     })
@@ -502,7 +511,7 @@ describe('RechargePane', () => {
   })
 
   it('keeps reconciliation processing visible, then refreshes the wallet and history after credit', async () => {
-    let paymentListener: Parameters<PaymentsResource['subscribe']>[0] | undefined
+    let paymentListener: Parameters<PaymentsResource['subscribe']>[1] | undefined
     const processingOrder = {
       public_token: 'reconciling-order',
       idea_quantity: 3000,
@@ -530,7 +539,7 @@ describe('RechargePane', () => {
           },
         ],
       })
-    const subscribe = vi.fn((listener: Parameters<PaymentsResource['subscribe']>[0]) => {
+    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
       paymentListener = listener
       return () => undefined
     })
@@ -556,14 +565,14 @@ describe('RechargePane', () => {
   })
 
   it('keeps a final reconciliation failure visible while allowing a replacement purchase', async () => {
-    let paymentListener: Parameters<PaymentsResource['subscribe']>[0] | undefined
+    let paymentListener: Parameters<PaymentsResource['subscribe']>[1] | undefined
     const createCheckout = vi.fn().mockResolvedValue({
       checkout_url: 'https://checkout.stripe.com/c/pay/replacement-order',
       public_token: 'replacement-order',
       expires_at: '2026-08-01T01:00:00Z',
       reused: false,
     })
-    const subscribe = vi.fn((listener: Parameters<PaymentsResource['subscribe']>[0]) => {
+    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
       paymentListener = listener
       return () => undefined
     })
@@ -598,7 +607,7 @@ describe('RechargePane', () => {
   })
 
   it('retains a failed pending Checkout in the visible cache after its SSE event', async () => {
-    let paymentListener: Parameters<PaymentsResource['subscribe']>[0] | undefined
+    let paymentListener: Parameters<PaymentsResource['subscribe']>[1] | undefined
     const listPendingOrders = vi.fn().mockResolvedValue({
       items: [
         {
@@ -612,7 +621,7 @@ describe('RechargePane', () => {
       ],
     })
     const listRecharges = vi.fn().mockResolvedValue({ items: [] })
-    const subscribe = vi.fn((listener: Parameters<PaymentsResource['subscribe']>[0]) => {
+    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
       paymentListener = listener
       return () => undefined
     })
@@ -654,14 +663,14 @@ describe('RechargePane', () => {
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(2))
 
-    const firstKey = createCheckout.mock.calls[0]![0].idempotency_key
-    expect(createCheckout.mock.calls[1]![0].idempotency_key).toBe(firstKey)
+    const firstKey = createCheckout.mock.calls[0]![1].idempotency_key
+    expect(createCheckout.mock.calls[1]![1].idempotency_key).toBe(firstKey)
 
     await user.type(screen.getByRole('textbox', { name: 'Custom amount' }), '501')
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(3))
 
-    expect(createCheckout.mock.calls[2]![0].idempotency_key).not.toBe(firstKey)
+    expect(createCheckout.mock.calls[2]![1].idempotency_key).not.toBe(firstKey)
   })
 
   it('rotates the idempotency key after Checkout creation succeeds', async () => {
@@ -681,8 +690,8 @@ describe('RechargePane', () => {
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(2))
 
-    expect(createCheckout.mock.calls[1]![0].idempotency_key).not.toBe(
-      createCheckout.mock.calls[0]![0].idempotency_key,
+    expect(createCheckout.mock.calls[1]![1].idempotency_key).not.toBe(
+      createCheckout.mock.calls[0]![1].idempotency_key,
     )
     expect(navigate).toHaveBeenCalledTimes(2)
   })
@@ -703,8 +712,8 @@ describe('RechargePane', () => {
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(2))
 
-    expect(createCheckout.mock.calls[1]![0].idempotency_key).not.toBe(
-      createCheckout.mock.calls[0]![0].idempotency_key,
+    expect(createCheckout.mock.calls[1]![1].idempotency_key).not.toBe(
+      createCheckout.mock.calls[0]![1].idempotency_key,
     )
   })
 

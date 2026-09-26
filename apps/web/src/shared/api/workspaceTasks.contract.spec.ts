@@ -4,8 +4,8 @@
 // Idempotency-Key headers, terminal-state mapping, output-ref adapter
 // (asset vs remote, no storage internals), and the 404-vs-403 branches.
 // MSW only by design (contract specs must not mock generated-query
-// modules); legacy `/api/user` task behavior is owned by
-// `task.unit.spec.ts` + `taskEvents.contract.spec.ts` and untouched here.
+// modules); the legacy `/api/user` task transport is retired (W2 stream 1:
+// canvas migrates onto this surface).
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../test/msw'
 import {
@@ -22,14 +22,16 @@ import {
   quoteWorkspaceTask,
   toWorkspaceTask,
   toWorkspaceTaskOutputs,
-  workspaceTaskCancelSuffix,
   workspaceTaskLocation,
-  workspaceTaskOutputsSuffix,
-  workspaceTaskQuotesSuffix,
-  workspaceTaskSuffix,
-  workspaceTasksApiUrls,
-  workspaceTasksSuffix,
 } from './workspaceTasks'
+import {
+  getCancelWorkspaceTaskUrl,
+  getCreateWorkspaceTaskUrl,
+  getGetWorkspaceTaskUrl,
+  getListWorkspaceTaskOutputsUrl,
+  getListWorkspaceTasksUrl,
+  getQuoteWorkspaceTaskUrl,
+} from './generated-query/public/workspace-tasks/workspace-tasks'
 import { workspaceTaskIdempotencyKey } from './idempotencyKey'
 
 const WORKSPACE_ID = 'ws_abc123'
@@ -69,27 +71,30 @@ function taskFixture(overrides: Record<string, unknown> = {}): Record<string, un
 }
 
 describe('workspace task paths', () => {
-  it('builds canonical transport suffixes (Gin-safe /cancel, no colon form)', () => {
-    expect(workspaceTasksSuffix(WORKSPACE_ID)).toBe('/v1/workspaces/ws_abc123/tasks')
-    expect(workspaceTaskSuffix(WORKSPACE_ID, TASK_ID)).toBe('/v1/workspaces/ws_abc123/tasks/task_def456')
-    expect(workspaceTaskCancelSuffix(WORKSPACE_ID, TASK_ID)).toBe(
-      '/v1/workspaces/ws_abc123/tasks/task_def456/cancel',
+  it('builds canonical routes matching the generated hooks (publicMutator adds /v1)', () => {
+    expect(getListWorkspaceTasksUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/tasks')
+    expect(getCreateWorkspaceTaskUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/tasks')
+    expect(getGetWorkspaceTaskUrl(WORKSPACE_ID, TASK_ID)).toBe(
+      '/workspaces/ws_abc123/tasks/task_def456',
     )
-    expect(workspaceTaskOutputsSuffix(WORKSPACE_ID, TASK_ID)).toBe(
-      '/v1/workspaces/ws_abc123/tasks/task_def456/outputs',
+    expect(getCancelWorkspaceTaskUrl(WORKSPACE_ID, TASK_ID)).toBe(
+      '/workspaces/ws_abc123/tasks/task_def456/cancel',
     )
-    expect(workspaceTaskQuotesSuffix(WORKSPACE_ID)).toBe('/v1/workspaces/ws_abc123/task-quotes')
+    expect(getListWorkspaceTaskOutputsUrl(WORKSPACE_ID, TASK_ID)).toBe(
+      '/workspaces/ws_abc123/tasks/task_def456/outputs',
+    )
+    expect(getQuoteWorkspaceTaskUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/task-quotes')
     expect(workspaceTaskLocation(WORKSPACE_ID, TASK_ID)).toBe(
       '/api/v1/workspaces/ws_abc123/tasks/task_def456',
     )
   })
 
-  it('rejects malformed opaque ids before any network call', () => {
+  it('rejects malformed opaque ids before any network call', async () => {
     expect(() => assertWorkspaceTaskWorkspaceId('nope')).toThrow()
     expect(() => assertWorkspaceTaskId('upload_x')).toThrow()
     expect(() => assertWorkspaceTaskAssetId('42')).toThrow()
-    expect(() => workspaceTasksSuffix('  ')).toThrow()
-    expect(() => workspaceTaskSuffix(WORKSPACE_ID, 'task with space')).toThrow()
+    await expect(listWorkspaceTasks('  ')).rejects.toThrow()
+    await expect(getWorkspaceTask(WORKSPACE_ID, 'task with space')).rejects.toThrow()
   })
 })
 
@@ -173,6 +178,47 @@ describe('workspace task cancel headers', () => {
       createWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'render' }, { idempotencyKey: 'k' }),
     ).rejects.toMatchObject({ code: 'task_idempotency_conflict' })
   })
+
+  it('sends data.prompt and params.mask_asset_id in the v1 create body', async () => {
+    const seen: Array<Record<string, unknown>> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/tasks', async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>)
+        return HttpResponse.json(taskFixture(), { status: 202 })
+      }),
+    )
+    await createWorkspaceTask(
+      WORKSPACE_ID,
+      {
+        workflow_kind: 'inpaint',
+        media_asset_ids: [ASSET_ID],
+        prompt: 'redraw the area',
+        params: { mask_asset_id: ASSET_ID, use_mask: true },
+      },
+      { idempotencyKey: workspaceTaskIdempotencyKey('create') },
+    )
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({
+      data: {
+        workflow_kind: 'inpaint',
+        inputs: { media_asset_ids: [ASSET_ID] },
+        prompt: 'redraw the area',
+        params: { mask_asset_id: ASSET_ID, use_mask: true },
+      },
+    })
+  })
+
+  it('omits data.prompt when the input carries none', async () => {
+    const seen: Array<Record<string, unknown>> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/tasks', async ({ request }) => {
+        seen.push((await request.json()) as Record<string, unknown>)
+        return HttpResponse.json(taskFixture(), { status: 202 })
+      }),
+    )
+    await createWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'upscale' })
+    expect((seen[0] as { data: Record<string, unknown> }).data).not.toHaveProperty('prompt')
+  })
 })
 
 describe('workspace task 404/403 matrix', () => {
@@ -225,6 +271,6 @@ describe('workspace task 404/403 matrix', () => {
     await listWorkspaceTasks(WORKSPACE_ID, { pageSize: 2 })
     const quote = await quoteWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'render' })
     expect(quote.settlement_state).toBe('quoted')
-    expect(workspaceTasksApiUrls.collection(WORKSPACE_ID)).toContain('/api/v1/workspaces/ws_abc123/tasks')
+    expect(getCreateWorkspaceTaskUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/tasks')
   })
 })

@@ -1,15 +1,12 @@
-import { api } from '../../../shared/api/client'
-import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../shared/api/apiResponse'
-import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
+import { adminControlUnavailable } from '../shared/lib/controlGuidance'
+import type { OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 
-// Admin OAuth provider boundary (issue #809). The generated `admin-users`
-// client is gone but the backend admin plane still serves
-// `/api/admin/users/oauth-providers/:provider` (GET/PUT) with the shared
-// envelope, so this boundary transports through the central `api.request`
-// with local wire types.
+// Admin OAuth provider boundary (W2 transports, fail-closed). The Control
+// Plane has no OAuth provider operations, so get/save fail closed with
+// guidance instead of calling the deleted
+// `/api/admin/users/oauth-providers/:provider` routes. View types stay so
+// the UI and specs keep their shapes. Backend gap: control OAuth providers
+// (see the stream report).
 export type OAuthProviderSettings = {
   provider: string
   enabled: boolean
@@ -22,14 +19,6 @@ export type OAuthProviderSettings = {
   callback_url: string
   updated_at: string | null
 }
-
-export type OAuthProviderSettingsUpdate = {
-  enabled: boolean
-  client_id: string
-  client_secret?: string
-}
-
-export type ApiResponseOAuthProviderSettings = ApiResponseWithData<OAuthProviderSettings>
 
 export type OAuthProviderSettingsSummary = {
   enabled: boolean
@@ -53,66 +42,13 @@ export type OAuthProviderSettingsResource = {
   ): Promise<OAuthProviderSettingsSummary>
 }
 
-type OAuthProviderSettingsApi = {
-  getSettings(provider: OAuthProviderCode): Promise<ApiResponseOAuthProviderSettings>
-  updateSettings(
-    provider: OAuthProviderCode,
-    input: OAuthProviderSettingsUpdate,
-  ): Promise<ApiResponseOAuthProviderSettings>
-}
-
-const userOAuthProviderApi: OAuthProviderSettingsApi = {
-  getSettings: (provider) =>
-    api.request<ApiResponseOAuthProviderSettings>(
-      `/admin/users/oauth-providers/${encodeURIComponent(provider)}`,
-      { method: 'GET' },
-    ),
-  updateSettings: (provider, input) =>
-    api.request<ApiResponseOAuthProviderSettings>(
-      `/admin/users/oauth-providers/${encodeURIComponent(provider)}`,
-      {
-        method: 'PUT',
-        body: input as unknown as Record<string, unknown>,
-      },
-    ),
-}
-
-export function createOAuthProviderSettingsResource(
-  api: OAuthProviderSettingsApi = userOAuthProviderApi,
-): OAuthProviderSettingsResource {
+export function createOAuthProviderSettingsResource(): OAuthProviderSettingsResource {
   return {
-    async get(provider) {
-      const settings = await resolveApiData(
-        api.getSettings(provider),
-        `加载 ${providerLabel(provider)} OAuth 设置失败`,
-      )
-      return normalizeSettings(settings)
+    async get() {
+      throw adminControlUnavailable('oauth-providers')
     },
-    async save(provider, input) {
-      const body: OAuthProviderSettingsUpdate = {
-        enabled: input.enabled,
-        client_id: input.clientId.trim(),
-        ...(input.clientSecret.trim() ? { client_secret: input.clientSecret } : {}),
-      }
-      const settings = await resolveApiData(
-        api.updateSettings(provider, body),
-        `保存 ${providerLabel(provider)} OAuth 设置失败`,
-      )
-      return normalizeSettings(settings)
+    async save() {
+      throw adminControlUnavailable('oauth-providers')
     },
   }
-}
-
-function normalizeSettings(settings: OAuthProviderSettings): OAuthProviderSettingsSummary {
-  return {
-    enabled: settings.enabled,
-    configured: settings.configured,
-    clientId: settings.client_id,
-    clientSecretConfigured: settings.client_secret_configured,
-    callbackUrl: settings.callback_url,
-  }
-}
-
-function providerLabel(provider: OAuthProviderCode): string {
-  return getOAuthProviderLabel(provider)
 }

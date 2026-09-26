@@ -45,6 +45,7 @@ type UploadedImageData = {
 
 type UseFlowImageUploadActionsOptions = {
   currentBoardId: { value: string | null | undefined }
+  workspaceId?: (() => string) | undefined
   createNodeAtPosition: (
     kind: Extract<CanvasCreatableNodeKind, 'image'>,
     x: number,
@@ -180,7 +181,9 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       try {
         const prepared = await prepareImageAssetForUpload(file)
         prepared.warnings.forEach((message) => options.onWarning(message))
-        const uploaded = await options.uploadApi.upload(prepared.uploadFile, boardId)
+        const workspaceId = options.workspaceId?.().trim()
+        if (!workspaceId) throw new Error(i18n.global.t('canvas.session.uploadFailed'))
+        const uploaded = await options.uploadApi.upload(prepared.uploadFile, workspaceId)
         const assetId = `${uploaded.asset_id ?? ''}`.trim()
         if (!assetId) throw new Error(i18n.global.t('canvas.session.uploadMissingMediaAsset'))
         const width = Number(uploaded.width)

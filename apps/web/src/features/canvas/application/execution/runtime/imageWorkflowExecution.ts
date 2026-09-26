@@ -8,8 +8,9 @@ import {
   buildImageExecutionTaskRequest,
   buildPreparedImageInpaintTaskRequest,
 } from '../commands/imageTaskRequests'
-import { prepareInpaintMask } from '../media/inpaintMask'
+import { prepareInpaintMaskAsset } from '../media/inpaintMask'
 import { loadImageSizeFromUrl } from '../media/imageSize'
+import { requireCanvasWorkspaceId } from '../workspace/canvasWorkspaceTaskAdapter'
 import {
   prepareFusionExecutionPlan,
   type ActivatedImageExecutionPlan,
@@ -134,15 +135,17 @@ export function useImageWorkflowExecution(options: UseImageWorkflowExecutionOpti
     plan: ImageInpaintExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
-    const boardId = attachment.boardId
+    const workspaceId = requireCanvasWorkspaceId()
     const source = await resolveExecutionSource(plan.source)
-    const [maskImageUrl, imageSize] = await Promise.all([
-      prepareInpaintMask(plan.rawMaskDataUrl, boardId),
+    // v1 inpaint links the mask by asset id: the painted data-URL travels
+    // the upload-session flow first, then submits with mask_asset_id.
+    const [maskAssetId, imageSize] = await Promise.all([
+      prepareInpaintMaskAsset(plan.rawMaskDataUrl, workspaceId),
       loadImageSizeFromUrl(source.url),
     ])
     const taskRequest = buildPreparedImageInpaintTaskRequest({
       plan: { ...plan, source },
-      maskImageUrl,
+      maskAssetId,
       imageSize,
     })
     await workflowRunner.execute({

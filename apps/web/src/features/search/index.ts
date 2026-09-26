@@ -4,7 +4,6 @@ export type {
   SearchPage,
   VisionReference,
   VisionExternalReference,
-  VisionExtraction,
   SearchCatalogProvider,
 } from './domain/models'
 export type { SearchAuthAction, LibrarySearchReference } from './domain/authAction'

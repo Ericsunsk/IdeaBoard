@@ -11,10 +11,8 @@ type OutboundPolicyLifecycle = ReturnType<typeof useOutboundPolicy>
 describe('useOutboundPolicy', () => {
   it('loads the saved policy, tracks edits, and resets to the last synced value', async () => {
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () =>
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { allow_hosts: ['models.internal'] },
         }),
       ),
@@ -44,8 +42,10 @@ describe('useOutboundPolicy', () => {
 
   it('reports validation feedback and stops invalid drafts before saving', async () => {
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { allow_hosts: [] } }),
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
+        HttpResponse.json({
+          data: { allow_hosts: [] },
+        }),
       ),
     )
     const harness = mountOutboundPolicy()
@@ -82,20 +82,16 @@ describe('useOutboundPolicy', () => {
     const updateRequests: Array<{ body: unknown; operatorReason: string | null }> = []
     let loadCount = 0
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', async () => {
+      http.get('/api/control/v1/platform/settings/outbound-policy', async () => {
         loadCount += 1
         if (loadCount === 1) {
           return HttpResponse.json({
-            code: 0,
-            msg: 'ok',
             data: { allow_hosts: ['models.internal'] },
           })
         }
         invalidationStarted.open()
         await releaseInvalidation.promise
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { allow_hosts: ['server.internal'] },
         })
       }),
@@ -149,7 +145,7 @@ describe('useOutboundPolicy', () => {
 
   it('surfaces load errors through state and feedback', async () => {
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () =>
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
         HttpResponse.json({ code: 500, msg: 'load failed' }, { status: 500 }),
       ),
     )
@@ -170,11 +166,9 @@ describe('useOutboundPolicy', () => {
   it('keeps a failed save editable and reports save feedback', async () => {
     let loadCount = 0
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () => {
+      http.get('/api/control/v1/platform/settings/outbound-policy', () => {
         loadCount += 1
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { allow_hosts: ['models.internal'] },
         })
       }),
@@ -212,8 +206,10 @@ describe('useOutboundPolicy', () => {
   it('aborts the save silently when the operator cancels the confirm dialog', async () => {
     let putCalls = 0
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { allow_hosts: [] } }),
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
+        HttpResponse.json({
+          data: { allow_hosts: [] },
+        }),
       ),
       http.put('/api/control/v1/platform/settings/outbound-policy', () => {
         putCalls += 1

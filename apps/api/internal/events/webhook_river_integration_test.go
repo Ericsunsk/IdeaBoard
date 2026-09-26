@@ -13,6 +13,7 @@ import (
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -40,6 +41,7 @@ func (f *riverProvenSender) Send(_ context.Context, _ string, headers map[string
 // to one row, and the worker converges the redelivered job after the
 // restart.
 func TestWebhookRiverDurability(t *testing.T) {
+	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatalf("MigrateRiver() error = %v", err)
@@ -176,6 +178,7 @@ WHERE s.public_id = $1 AND e.public_id = $2 AND a.attempt_number = 1`, sub.ID, e
 }
 
 func TestWebhookDeadLetterSurvivesRestart(t *testing.T) {
+	secretstest.EnableEncryption(t)
 	_, pool := testdb.OpenWithPool(t)
 	if err := workerriver.MigrateRiver(t.Context(), pool); err != nil {
 		t.Fatal(err)

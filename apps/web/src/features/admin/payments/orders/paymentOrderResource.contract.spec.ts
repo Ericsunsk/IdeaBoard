@@ -6,38 +6,10 @@ import { createAdminPaymentOrderResource } from './paymentOrderResource'
 const orderNumber = 'IBP-20260803-ABCDEF123456'
 
 describe('paymentOrderResource', () => {
-  it('passes canonical paths without duplicating the API base path', async () => {
-    const requests: string[] = []
-    const transport = {
-      request: async <T>(path: string): Promise<T> => {
-        requests.push(path)
-        return {
-          code: 0,
-          msg: 'ok',
-          data: path.endsWith('/refunds')
-            ? { status: 'pending' }
-            : path === '/admin/payments/orders'
-              ? { orders: [], total: 0 }
-              : makeApiDetail(),
-        } as T
-      },
-    }
-    const adapter = createAdminPaymentOrderApiAdapter(transport)
-
-    await adapter.search({})
-    await adapter.get(orderNumber)
-    await adapter.refund(orderNumber, { idea_quantity: 500, idempotency_key: 'refund-1' })
-
-    expect(requests).toEqual([
-      '/admin/payments/orders',
-      `/admin/payments/orders/${orderNumber}`,
-      `/admin/payments/orders/${orderNumber}/refunds`,
-    ])
-  })
-
-  it('sends bounded filters and maps the Admin read model without rebuilding status semantics', async () => {
+  it('searches through the control plane with bounded filters', async () => {
+    const seen: Array<{ url: string; headers: Record<string, string | null> }> = []
     useMswHandlers(
-      http.get('/api/admin/payments/orders', ({ request }) => {
+      http.get('/api/control/v1/payments/orders', ({ request }) => {
         const url = new URL(request.url)
         expect(url.searchParams.get('order_number')).toBe(orderNumber)
         expect(url.searchParams.get('user')).toBe('42')
@@ -45,9 +17,8 @@ describe('paymentOrderResource', () => {
         expect(url.searchParams.get('anomaly_only')).toBe('true')
         expect(url.searchParams.get('cursor')).toBe('cursor-2')
         expect(url.searchParams.get('limit')).toBe('20')
+        seen.push({ url: request.url, headers: {} })
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             orders: [makeApiSummary()],
             total: 37,
@@ -65,6 +36,7 @@ describe('paymentOrderResource', () => {
       cursor: 'cursor-2',
     })
 
+    expect(seen).toHaveLength(1)
     expect(page).toEqual({
       orders: [
         expect.objectContaining({
@@ -82,11 +54,9 @@ describe('paymentOrderResource', () => {
 
   it('whitelists the safe detail DTO and omits unexpected Secret/provider payload fields', async () => {
     useMswHandlers(
-      http.get('/api/admin/payments/orders/:orderNumber', ({ params }) => {
+      http.get('/api/control/v1/payments/orders/:orderNumber', ({ params }) => {
         expect(params.orderNumber).toBe(orderNumber)
         return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: {
             ...makeApiDetail(),
             api_key: 'rk_live_secret',
@@ -116,6 +86,36 @@ describe('paymentOrderResource', () => {
     expect(serialized).not.toContain('rk_live_secret')
     expect(serialized).not.toContain('whsec_secret')
     expect(serialized).not.toContain('4242424242424242')
+  })
+
+  it('creates refunds through control with the idempotency key and operator reason', async () => {
+    let seenBody: unknown
+    let seenHeaders: Record<string, string | null> = {}
+    useMswHandlers(
+      http.get('/api/control/v1/payments/orders/:orderNumber', () =>
+        HttpResponse.json({ data: makeApiDetail() }),
+      ),
+      http.post('/api/control/v1/payments/orders/:orderNumber/refunds', async ({ request }) => {
+        seenBody = await request.json()
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
+        return HttpResponse.json({ data: { status: 'pending' } })
+      }),
+    )
+
+    const adapter = createAdminPaymentOrderApiAdapter()
+    await expect(
+      adapter.refund(orderNumber, {
+        idea_quantity: 500,
+        idempotency_key: 'refund-1',
+        operatorReason: 'duplicate charge',
+      }),
+    ).resolves.toMatchObject({ status: 'pending' })
+    expect(seenBody).toEqual({ idea_quantity: 500, reason: 'duplicate charge' })
+    expect(seenHeaders.idempotencyKey).toBe('refund-1')
+    expect(seenHeaders.operatorReason).toBe('duplicate charge')
   })
 })
 

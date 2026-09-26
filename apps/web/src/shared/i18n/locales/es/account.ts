@@ -247,5 +247,7 @@ export default {
     quantityIntegerRange: 'Introduce un número entero entre {min} y {max}.',
     quantityBelowMin: 'La recarga mínima es de {min} Ideas.',
     quantityAboveMax: 'La recarga máxima es de {max} Ideas.',
+    workspaceRequired: 'Seleccione un espacio de trabajo para ver la información de facturación.',
+    featureUnavailable: 'Esta función no está disponible actualmente.',
   },
 } as const

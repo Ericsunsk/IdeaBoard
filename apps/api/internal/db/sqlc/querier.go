@@ -18,6 +18,13 @@ type Querier interface {
 	ArchiveOrganization(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspace(ctx context.Context, publicID string) (int64, error)
 	ArchiveWorkspaceBoard(ctx context.Context, arg ArchiveWorkspaceBoardParams) (int64, error)
+	// BackfillDailyStatsByCreatedRange freezes one day of terminal workspace
+	// tasks into task_stat_events + task_daily_stats. started_at/ended_at
+	// bound the terminal-timestamp window (COALESCE(completed_at,
+	// cancelled_at, updated_at)); stat_date stamps the frozen day bucket;
+	// mark_done records the day marker (today is never marked so the current
+	// day stays re-backfillable).
+	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	// CancelWorkspaceTask flips a live task to cancelled (chk constraint
 	// requires cancelled_at) and releases the lease. The tasks table carries
@@ -42,10 +49,48 @@ type Querier interface {
 	// transaction (see InsertWorkspaceTaskOutput).
 	CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspaceTaskParams) (Task, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
+	// Counts honor the user/keyword filters but never the status filter, so
+	// the status pills keep their global breakdown while a status is active.
+	CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountWorkspaceBoardOwners(ctx context.Context, arg CountWorkspaceBoardOwnersParams) (int64, error)
 	CountWorkspaceOwners(ctx context.Context, workspaceID int64) (int64, error)
 	CountWorkspaceTasks(ctx context.Context, workspacePublicID string) (int64, error)
+	// Workspace-backed control monitor/statistics reads (#809-close).
+	//
+	// The workspace schema keeps the legacy stat tables (task_daily_stats,
+	// task_stat_events, task_daily_stat_backfills) and the execution
+	// attribution tables (task_execution_attempts, task_execution_metrics),
+	// but the task fact source is now the workspace-scoped tasks table
+	// (public_id LIKE 'task_%', statuses
+	// pending/running/completed/failed/cancelled). There is no
+	// cancelled_with_results status in this schema: counts for it read as 0.
+	//
+	// Backfill dimension mapping (clean cut, no legacy compat):
+	//   task_id              <- tasks.public_id (VARCHAR(64) fits task_... ids)
+	//   user_id              <- tasks.submitter_user_id
+	//   account_id           <- tasks.billing_account_id (workspace billing
+	//                           account; preserves the per-account breakdown)
+	//   provider_endpoint_id <- 0 (the workspace schema records no provider
+	//                           endpoint assignment on tasks)
+	//   credential_id        <- 0 (same: no credential assignment on tasks)
+	//   feature_slug         <- tasks.workflow_type
+	//   api_type             <- '' (no provider api_type on workspace tasks)
+	//   model_name           <- latest execution attempt resolved_model, else
+	//                           '未识别模型' (attempts are empty until the
+	//                           worker records them; the fallback is honest)
+	//   output_count         <- latest billing snapshot quantity clamped to
+	//                           1..4 (immutable quote fact; satisfies the
+	//                           task_stat_events output_count CHECK). Tasks
+	//                           without a snapshot backfill with 1.
+	//   latency_seconds      <- completed_at - created_at for completed tasks
+	//   cost_micros          <- 0 (no cost attribution in the workspace schema)
+	//
+	// Backfill stays idempotent: task_stat_events inserts use ON CONFLICT
+	// (task_id) DO NOTHING and daily deltas aggregate only newly inserted
+	// events, so re-running a day never double-counts. The
+	// task_daily_stat_backfills marker still gates rescans.
+	CountWorkspaceTasksByStatus(ctx context.Context, status string) (int64, error)
 	// Billing Account owner stub (#801). Full lifecycle belongs to #804.
 	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
 	CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error)
@@ -190,6 +235,14 @@ type Querier interface {
 	GetBoardRevisionByID(ctx context.Context, arg GetBoardRevisionByIDParams) (GetBoardRevisionByIDRow, error)
 	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
 	GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardShareTokenBySecretParams) (GetBoardShareTokenBySecretRow, error)
+	GetControlTaskBilling(ctx context.Context, taskID string) (GetControlTaskBillingRow, error)
+	// Control Plane global task read model (#809-close). Operators see every
+	// workspace (no membership gating at the repository; the control guard
+	// owns capability auth and every call is audited). Unknown ids read as
+	// zero rows (the adapter converges to ErrNotFound, never 403).
+	// Settlement joins stay LEFT: tasks without billing facts (free or
+	// pre-settlement rows) still list.
+	GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLibraryAssetByPublicID(ctx context.Context, arg GetLibraryAssetByPublicIDParams) (GetLibraryAssetByPublicIDRow, error)
 	GetLibraryAssetByWorkspaceSource(ctx context.Context, arg GetLibraryAssetByWorkspaceSourceParams) (GetLibraryAssetByWorkspaceSourceRow, error)
@@ -267,8 +320,11 @@ type Querier interface {
 	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
+	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]pgtype.Date, error)
 	ListBoardRevisions(ctx context.Context, arg ListBoardRevisionsParams) ([]ListBoardRevisionsRow, error)
 	ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error)
+	ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error)
+	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
 	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
@@ -283,16 +339,28 @@ type Querier interface {
 	// newest-first with limit/offset (the v1 layer converts cursor to
 	// offset and over-fetches by one for has_more).
 	ListMediaAssets(ctx context.Context, arg ListMediaAssetsParams) ([]MediaAsset, error)
+	// Monitor execution pressure: live pending tasks from the workspace table
+	// plus recent execution attempts. Attempt buckets stay empty until the
+	// worker records attempts; pending buckets are live immediately.
+	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOrganizationMembers(ctx context.Context, arg ListOrganizationMembersParams) ([]OrganizationMembership, error)
 	ListOrganizationsByUserID(ctx context.Context, arg ListOrganizationsByUserIDParams) ([]Organization, error)
 	ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error)
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
+	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
+	ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error)
 	ListStorageProfileSecretVersions(ctx context.Context, arg ListStorageProfileSecretVersionsParams) ([]StorageProfileSecretVersion, error)
 	ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error)
 	ListSystemConfigsByKeys(ctx context.Context, configKeys []string) ([]SystemConfig, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
+	// Execution attribution reads join on the workspace public id. Metrics
+	// rows only exist once the worker records them; until then every task
+	// groups under 'unknown', which the monitor renders as-is (no zero-fill
+	// fabrication here).
+	ListTaskExecutionBottleneckStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionBottleneckStatsByCreatedRangeParams) ([]ListTaskExecutionBottleneckStatsByCreatedRangeRow, error)
+	ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionFailureCategoryStatsByCreatedRangeParams) ([]ListTaskExecutionFailureCategoryStatsByCreatedRangeRow, error)
 	// ListTaskMediaAssets queries media by task: asset rows attached to a
 	// workspace-scoped task via task_outputs, ordered by output_index.
 	// Remote-URL outputs carry no asset and are excluded. The output role
@@ -347,6 +415,7 @@ type Querier interface {
 	// the outer statement shares the CTE snapshot, so re-scanning the
 	// target table would return the pre-update row version.
 	StartLibraryMaterialization(ctx context.Context, arg StartLibraryMaterializationParams) (StartLibraryMaterializationRow, error)
+	SumWorkspaceTaskBillingQuantity(ctx context.Context) (int64, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
 	TouchWorkspaceBoard(ctx context.Context, internalID int64) error
 	UpdateBoardDocument(ctx context.Context, arg UpdateBoardDocumentParams) (int64, error)

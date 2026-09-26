@@ -34,9 +34,10 @@ export function boardOperationIdempotencyKey(operation: string): string {
 
 // Workspace upload session key per operation (issue #803). The backend
 // idempotency scope is `upload:<operation>` bound to the principal; the
-// key carries the same operation prefix for debuggability. Retries of the
-// SAME attempt must reuse the returned value.
-export function workspaceUploadIdempotencyKey(operation: 'create' | 'complete'): string {
+// key carries the same operation prefix for debuggability. `bytes` covers
+// the raw-byte staging PUT (retryable); `complete` materializes the asset.
+// Retries of the SAME attempt must reuse the returned value.
+export function workspaceUploadIdempotencyKey(operation: 'create' | 'bytes' | 'complete'): string {
   return createIdempotencyKey(`upload:${operation}`)
 }
 
@@ -54,6 +55,16 @@ export function workspaceBillingCheckoutIdempotencyKey(): string {
   return createIdempotencyKey('billing:checkout')
 }
 
+// Workspace pending-order command key per attempt (issue #804,
+// `billing.pending.continue|abandon` backend scopes bound to principal +
+// workspace). Retries of the SAME attempt must reuse the returned value;
+// a new operator intent needs a fresh call.
+export function workspaceBillingPendingOrderIdempotencyKey(
+  operation: 'continue' | 'abandon',
+): string {
+  return createIdempotencyKey(`billing:pending-${operation}`)
+}
+
 // Workspace library write key per operation (issue #806, `library:<operation>`
 // backend scope bound to principal + workspace). Retries of the SAME
 // attempt must reuse the returned value so the server replays instead
@@ -69,6 +80,14 @@ export function workspaceLibraryIdempotencyKey(operation: string): string {
 // fresh call.
 export function workspaceVisionQueryIdempotencyKey(): string {
   return createIdempotencyKey('search:vision')
+}
+
+// Workspace reward-redeem key per attempt (issue #804, `rewards:redeem`
+// backend scope bound to principal + workspace). Retries of the SAME
+// attempt must reuse the returned value; a new redemption intent needs a
+// fresh call.
+export function workspaceRewardsRedeemIdempotencyKey(): string {
+  return createIdempotencyKey('rewards:redeem')
 }
 
 // Workspace task key per operation (issue #805, `task:<operation>`
@@ -92,7 +111,15 @@ export function controlUserIdempotencyKey(
 // Control Plane credit command key per operation (issue #808,
 // `control:credits.<operation>` backend scope bound to the operator).
 export function controlCreditIdempotencyKey(
-  operation: 'grant' | 'deduct' | 'refund' | 'correct',
+  operation:
+    | 'grant'
+    | 'deduct'
+    | 'refund'
+    | 'correct'
+    | 'reward-create'
+    | 'reward-update'
+    | 'reward-enabled'
+    | 'reward-delete',
 ): string {
   return createIdempotencyKey(`control:credits.${operation}`)
 }

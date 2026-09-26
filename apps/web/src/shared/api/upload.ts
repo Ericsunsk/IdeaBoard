@@ -1,20 +1,28 @@
-import { resolveApiData, type ApiResponseWithData } from './apiResponse'
-import { api } from './client'
+import {
+  archiveWorkspaceMediaAsset as archiveWorkspaceMediaAssetTransport,
+  completeWorkspaceUpload as completeWorkspaceUploadTransport,
+  createWorkspaceUpload as createWorkspaceUploadTransport,
+  getWorkspaceUpload as getWorkspaceUploadTransport,
+  stageWorkspaceUploadBytes as stageWorkspaceUploadBytesTransport,
+} from './generated-query/public/workspace-media/workspace-media'
+import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/me/me'
+import type {
+  CompleteUploadRequest,
+  CreateUploadRequest,
+} from './generated-query/public/model'
 import {
   buildContractRequestHeaders,
   isOpaqueId,
+  newRequestId,
   opaqueIdPrefix,
   requireContractData,
   type OpaqueIdPrefix,
 } from './contractKernel'
+import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../i18n'
 
 export const UPLOAD_OPERATION_TIMEOUT_MS = 5 * 60 * 1000
 
-// Legacy user upload endpoints (issue #809). The backend user plane still
-// serves board-asset and profile-avatar uploads with the shared
-// `{code, msg, data}` envelope, so this boundary posts FormData through the
-// central `api.request` instead of the deleted generated client.
 export type UploadImageMetadata = {
   url: string
   asset_id: string
@@ -32,69 +40,98 @@ export type UploadAvatarMetadata = {
   ext?: string
 }
 
-function getUploadBoardAssetUrl(boardId: string): string {
-  return `/user/boards/${encodeURIComponent(boardId)}/uploads`
-}
-
-function getUploadProfileAvatarUrl(): string {
-  return '/user/profile/avatar'
-}
-
-function toUploadFormData(file: File): FormData {
-  const formData = new FormData()
-  formData.append('file', file)
-  return formData
-}
-
-function getUploadRequestOptions(): RequestInit {
-  return { timeout: UPLOAD_OPERATION_TIMEOUT_MS } as RequestInit
+function avatarFileExtension(file: File): string | undefined {
+  const name = file.name.trim()
+  const dot = name.lastIndexOf('.')
+  if (dot < 0 || dot === name.length - 1) return undefined
+  const ext = name.slice(dot).toLowerCase()
+  return /^\.[a-z0-9]{1,8}$/.test(ext) ? ext : undefined
 }
 
 export const uploadApi = {
-  upload: async (file: File, boardId: string): Promise<UploadImageMetadata> => {
-    const normalizedBoardId = boardId.trim()
-    const data = await resolveApiData(
-      api.request<ApiResponseWithData<UploadImageMetadata>>(
-        getUploadBoardAssetUrl(normalizedBoardId),
-        {
-          method: 'POST',
-          body: toUploadFormData(file),
-          ...getUploadRequestOptions(),
-        },
-      ),
-      i18n.global.t('common.errors.uploadFailed'),
+  upload: async (file: File, workspaceId: string): Promise<UploadImageMetadata> => {
+    const workspace = workspaceId.trim()
+    if (!workspace) throw new Error(i18n.global.t('common.errors.uploadFailed'))
+    const bytes = await file.arrayBuffer()
+    const subtle = globalThis.crypto?.subtle
+    if (!subtle) throw new Error(i18n.global.t('common.errors.uploadFailed'))
+    const digest = await subtle.digest('SHA-256', bytes)
+    const checksumSha256 = [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+    const mimeType = file.type || 'application/octet-stream'
+    const session = await workspaceUploadApi.createSession(
+      workspace,
+      {
+        filename: file.name,
+        mimeType,
+        sizeBytes: file.size,
+        checksumSha256,
+        mediaKind: 'image',
+      },
+      { idempotencyKey: workspaceUploadIdempotencyKey('create') },
     )
-    if (!data.url?.trim()) throw new Error(i18n.global.t('common.errors.uploadFailed'))
-    if (!data.asset_id?.trim()) {
-      throw new Error(i18n.global.t('common.errors.uploadProcessingFailed'))
+    await workspaceUploadApi.stageBytes(workspace, session.id, file, {
+      contentType: mimeType,
+      idempotencyKey: workspaceUploadIdempotencyKey('bytes'),
+    })
+    const completed = await workspaceUploadApi.completeSession(
+      workspace,
+      session.id,
+      { checksumSha256, sizeBytes: file.size, mimeType, mediaKind: 'image' },
+      { idempotencyKey: workspaceUploadIdempotencyKey('complete') },
+    )
+    const asset = completed.asset
+    if (!asset.id?.trim()) throw new Error(i18n.global.t('common.errors.uploadProcessingFailed'))
+    return {
+      url: asset.contentUrl,
+      asset_id: asset.id,
+      width: asset.width,
+      height: asset.height,
+      mime: asset.mimeType,
     }
-    return data
   },
   uploadAvatar: async (file: File): Promise<UploadAvatarMetadata> => {
-    const data = await resolveApiData(
-      api.request<ApiResponseWithData<UploadAvatarMetadata>>(getUploadProfileAvatarUrl(), {
-        method: 'POST',
-        body: toUploadFormData(file),
-        ...getUploadRequestOptions(),
-      }),
+    // v1 avatar surface (`PUT /api/v1/me/avatar`, raw image bytes, never
+    // JSON/multipart). Requires the Idempotency-Key header (scope
+    // avatar:upload); each user action mints its own key.
+    const envelope = await uploadAvatarTransport(file, {
+      headers: {
+        ...buildContractRequestHeaders({
+          requestId: newRequestId(),
+          idempotencyKey: `avatar:upload:${newRequestId()}`,
+        }),
+        ...(file.type.trim() ? { 'Content-Type': file.type.trim() } : {}),
+      },
+      timeout: UPLOAD_OPERATION_TIMEOUT_MS,
+    })
+    const result = requireContractData<{ avatar_url: string }>(
+      envelope,
       i18n.global.t('common.errors.avatarUploadFailed'),
     )
-    if (!data.avatar?.trim()) throw new Error(i18n.global.t('common.errors.avatarUploadFailed'))
-    return data
+    if (!result.avatar_url?.trim()) {
+      throw new Error(i18n.global.t('common.errors.avatarUploadFailed'))
+    }
+    // The v1 result carries only the served URL; mime/ext ride from the
+    // staged File (client-known facts). Width/height stay absent (the v1
+    // surface does not return dimensions).
+    const metadata: UploadAvatarMetadata = { avatar: result.avatar_url }
+    if (file.type.trim()) metadata.mime = file.type.trim()
+    const ext = avatarFileExtension(file)
+    if (ext != null) metadata.ext = ext
+    return metadata
   },
 }
 
 // ---------------------------------------------------------------------------
 // Workspace upload sessions + media assets (issue #803, Public Data Plane).
 //
-// Canonical session URLs live under `/api/v1/workspaces/{workspace_id}`.
-// The builders below return transport suffixes WITHOUT the `/api` prefix
-// because `api.request` already mounts `API_BASE_URL` (`/api`); MSW and
-// browser assertions use the full `/api/v1/...` form.
-//
-// TODO(regenerate): move onto `generated-query/public` hooks now that
-// `openapi.public.yaml` carries the uploads/media paths (post #802-804
-// merger); `api.request` keeps the transport central until then.
+// Session declare/stage/complete and media archive ride the generated
+// `public/workspace-media` hooks (`/api/v1/...` via `publicMutator`);
+// metadata reads go through `mediaAssetDelivery` on the same hooks.
+// This module keeps the opaque-id asserts, slot guards, storage-leak
+// guards, and per-operation idempotency plumbing that have no generated
+// equivalent. Callers consume this module, never generated code directly.
 // Board/Task/Library adoption of these URLs (asset references by
 // `asset_...` only) is #805/#806.
 
@@ -147,25 +184,15 @@ function encodeId(value: string): string {
   return encodeURIComponent(value)
 }
 
-// Transport suffixes (no `/api` prefix; see module note).
-
-export function workspaceUploadsSuffix(workspaceId: string): string {
-  return `/v1/workspaces/${encodeId(assertWorkspaceId(workspaceId))}/uploads`
-}
-
-export function workspaceUploadSessionSuffix(workspaceId: string, uploadId: string): string {
-  return `${workspaceUploadsSuffix(workspaceId)}/${encodeId(assertUploadId(uploadId))}`
-}
-
-export function workspaceUploadCompleteSuffix(workspaceId: string, uploadId: string): string {
-  return `${workspaceUploadSessionSuffix(workspaceId, uploadId)}/complete`
-}
-
-export function workspaceMediaAssetsSuffix(workspaceId: string): string {
+// Route builders kept for readers that cannot take the generated hooks:
+// `mediaAssetDelivery` (out of scope) builds delivery URLs from these
+// suffixes. All other routes moved to the generated URL helpers
+// (`getCreateWorkspaceUploadUrl`, ...); see the contract spec.
+function workspaceMediaAssetsSuffix(workspaceId: string): string {
   return `/v1/workspaces/${encodeId(assertWorkspaceId(workspaceId))}/media-assets`
 }
 
-export function workspaceMediaAssetSuffix(workspaceId: string, assetId: string): string {
+function workspaceMediaAssetSuffix(workspaceId: string, assetId: string): string {
   return `${workspaceMediaAssetsSuffix(workspaceId)}/${encodeId(assertWorkspaceAssetId(assetId))}`
 }
 
@@ -185,10 +212,6 @@ export function workspaceMediaAssetDerivativeSuffix(
   variant: WorkspaceMediaDerivativeVariant,
 ): string {
   return `${workspaceMediaAssetSuffix(workspaceId, assetId)}/derivatives/${encodeId(variant)}`
-}
-
-export function workspaceMediaAssetArchiveSuffix(workspaceId: string, assetId: string): string {
-  return `${workspaceMediaAssetSuffix(workspaceId, assetId)}/archive`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -344,23 +367,26 @@ export const workspaceUploadApi = {
     input: WorkspaceUploadCreateInput,
     options: WorkspaceRequestOptions = {},
   ): Promise<WorkspaceUploadSession> => {
-    const response = await api.request<unknown>(workspaceUploadsSuffix(workspaceId), {
-      method: 'POST',
-      headers: workspaceRequestHeaders(options),
-      body: JSON.stringify({
-        data: {
-          filename: input.filename,
-          mime_type: input.mimeType,
-          size_bytes: input.sizeBytes,
-          checksum_sha256: input.checksumSha256,
-          media_kind: input.mediaKind ?? 'image',
-        },
-      }),
-      signal: options.signal,
-    })
+    const data: CreateUploadRequest['data'] = {
+      filename: input.filename,
+      mime_type: input.mimeType,
+      size_bytes: input.sizeBytes,
+      checksum_sha256: input.checksumSha256,
+    }
+    data.media_kind = (input.mediaKind ?? 'image') as NonNullable<
+      CreateUploadRequest['data']['media_kind']
+    >
+    const envelope = await createWorkspaceUploadTransport(
+      assertWorkspaceId(workspaceId),
+      { data },
+      {
+        headers: workspaceRequestHeaders(options),
+        ...(options.signal == null ? {} : { signal: options.signal }),
+      },
+    )
     return toWorkspaceUploadSession(
       requireContractData<Record<string, unknown>>(
-        response,
+        envelope,
         i18n.global.t('common.errors.uploadFailed'),
       ),
     )
@@ -371,17 +397,17 @@ export const workspaceUploadApi = {
     uploadId: string,
     options: WorkspaceRequestOptions = {},
   ): Promise<WorkspaceUploadSession> => {
-    const response = await api.request<unknown>(
-      workspaceUploadSessionSuffix(workspaceId, uploadId),
+    const envelope = await getWorkspaceUploadTransport(
+      assertWorkspaceId(workspaceId),
+      assertUploadId(uploadId),
       {
-        method: 'GET',
         headers: workspaceRequestHeaders(options),
-        signal: options.signal,
+        ...(options.signal == null ? {} : { signal: options.signal }),
       },
     )
     return toWorkspaceUploadSession(
       requireContractData<Record<string, unknown>>(
-        response,
+        envelope,
         i18n.global.t('common.errors.uploadFailed'),
       ),
     )
@@ -393,32 +419,66 @@ export const workspaceUploadApi = {
     input: WorkspaceUploadCompleteInput,
     options: WorkspaceRequestOptions = {},
   ): Promise<{ upload: WorkspaceUploadSession; asset: WorkspaceMediaAsset }> => {
-    const response = await api.request<unknown>(
-      workspaceUploadCompleteSuffix(workspaceId, uploadId),
+    const data: CompleteUploadRequest['data'] = {
+      checksum_sha256: input.checksumSha256,
+      size_bytes: input.sizeBytes,
+    }
+    if (input.mimeType != null) data.mime_type = input.mimeType
+    if (input.mediaKind != null) {
+      data.media_kind = input.mediaKind as NonNullable<CompleteUploadRequest['data']['media_kind']>
+    }
+    if (input.width != null) data.width = input.width
+    if (input.height != null) data.height = input.height
+    const envelope = await completeWorkspaceUploadTransport(
+      assertWorkspaceId(workspaceId),
+      assertUploadId(uploadId),
+      { data },
       {
-        method: 'POST',
         headers: workspaceRequestHeaders(options),
-        body: JSON.stringify({
-          data: {
-            checksum_sha256: input.checksumSha256,
-            size_bytes: input.sizeBytes,
-            ...(input.mimeType == null ? {} : { mime_type: input.mimeType }),
-            ...(input.mediaKind == null ? {} : { media_kind: input.mediaKind }),
-            ...(input.width == null ? {} : { width: input.width }),
-            ...(input.height == null ? {} : { height: input.height }),
-          },
-        }),
-        signal: options.signal,
+        ...(options.signal == null ? {} : { signal: options.signal }),
       },
     )
-    const data = requireContractData<Record<string, unknown>>(
-      response,
+    const result = requireContractData<Record<string, unknown>>(
+      envelope,
       i18n.global.t('common.errors.uploadFailed'),
     )
-    if (!isRecord(data.upload) || !isRecord(data.asset)) {
+    if (!isRecord(result.upload) || !isRecord(result.asset)) {
       throw new Error(i18n.global.t('common.errors.uploadFailed'))
     }
-    return { upload: toWorkspaceUploadSession(data.upload), asset: toWorkspaceMediaAsset(data.asset) }
+    return { upload: toWorkspaceUploadSession(result.upload), asset: toWorkspaceMediaAsset(result.asset) }
+  },
+
+  /**
+   * Stages the declared bytes at the session slot (`PUT .../uploads/{id}/bytes`).
+   * Raw bytes body (never JSON); the response stays the JSON session envelope.
+   * Retryable: 422 validation mismatches change no server state. The caller
+   * passes the declared MIME as `contentType` so the byte PUT echoes the
+   * declaration; per-operation idempotency uses the `upload:bytes` scope.
+   */
+  stageBytes: async (
+    workspaceId: string,
+    uploadId: string,
+    body: Blob,
+    options: WorkspaceRequestOptions & { contentType?: string | undefined } = {},
+  ): Promise<WorkspaceUploadSession> => {
+    const envelope = await stageWorkspaceUploadBytesTransport(
+      assertWorkspaceId(workspaceId),
+      assertUploadId(uploadId),
+      body,
+      {
+        headers: {
+          ...workspaceRequestHeaders(options),
+          ...(options.contentType?.trim() ? { 'Content-Type': options.contentType.trim() } : {}),
+        },
+        ...(options.signal == null ? {} : { signal: options.signal }),
+      },
+    )
+    return toWorkspaceUploadSession(
+      requireContractData<Record<string, unknown>>(
+        envelope,
+        i18n.global.t('common.errors.uploadFailed'),
+      ),
+    )
   },
 }
 
@@ -428,17 +488,17 @@ export const workspaceMediaApi = {
     assetId: string,
     options: WorkspaceRequestOptions = {},
   ): Promise<WorkspaceMediaAsset> => {
-    const response = await api.request<unknown>(
-      workspaceMediaAssetArchiveSuffix(workspaceId, assetId),
+    const envelope = await archiveWorkspaceMediaAssetTransport(
+      assertWorkspaceId(workspaceId),
+      assertWorkspaceAssetId(assetId),
       {
-        method: 'POST',
         headers: workspaceRequestHeaders(options),
-        signal: options.signal,
+        ...(options.signal == null ? {} : { signal: options.signal }),
       },
     )
     return toWorkspaceMediaAsset(
       requireContractData<Record<string, unknown>>(
-        response,
+        envelope,
         i18n.global.t('common.errors.requestIncomplete'),
       ),
     )

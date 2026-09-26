@@ -63,6 +63,7 @@ export type BoardSession = {
 export type UseBoardSessionOptions = {
   getBoardIdQuery: () => unknown
   getUserIdentity: () => BoardSessionIdentity
+  getWorkspaceId?: (() => string) | undefined
   repository?: BoardSessionRepository
   previewRenderer?: BoardSessionPreviewRenderer
   message: BoardSessionMessage
@@ -132,6 +133,7 @@ export function useBoardSession(options: BoardSessionTestOptions): BoardSession 
     const uploadLifecycle = createUploadLifecycle({
       userUid: identity.userUid,
       boardId,
+      workspaceId: options.getWorkspaceId?.(),
       warning: options.message.warning,
     })
     let stabilizedSnapshot: BoardSnapshot

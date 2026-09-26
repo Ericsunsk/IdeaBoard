@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildAdminAnomalyItems } from './anomalyRules'
-import type {
-  AdminStatistics,
-  MonitorData,
-  MonitorStats,
-} from '../../../../shared/api/generated-query/model'
+import type { AdminStatistics } from '../../statistics/resource'
+import type { MonitorData, MonitorStats } from '../../monitor/infrastructure/resource'
 import { ADMIN_STATISTICS_PATH, ADMIN_MONITOR_PATH } from '../../../../shared/constants/routePaths'
 
 type AdminAnomalyInput = Parameters<typeof buildAdminAnomalyItems>[0]

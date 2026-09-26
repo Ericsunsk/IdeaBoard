@@ -1,55 +1,56 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminModelEditDialog from './AdminModelEditDialog.vue'
 import type { AdminModelItem } from '../../domain/catalogData'
 
+const gatewayFakes = vi.hoisted(() => ({
+  previewRoute: vi.fn(),
+  listProviders: vi.fn(),
+  getReference: vi.fn(),
+}))
+
+vi.mock('../../infrastructure/adminGatewayResource', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../infrastructure/adminGatewayResource')>()
+  return {
+    ...actual,
+    createAdminGatewayResource: () => ({
+      catalog: {
+        previewRoute: gatewayFakes.previewRoute,
+        listProviders: gatewayFakes.listProviders,
+        getReference: gatewayFakes.getReference,
+      },
+    }),
+  }
+})
+
 describe('AdminModelEditDialog', () => {
   beforeEach(() => {
-    useMswHandlers(
-      http.post('/api/admin/settings/ai-gateway/route-preview', async ({ request }) => {
-        const body = (await request.json()) as { model_id?: string }
-        const modelId = body.model_id || ''
-        const provider = modelId.includes('/') ? modelId.split('/')[0] : ''
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            provider_slug: provider || '未指定',
-            is_first_party: provider === 'fal',
-            target_path: 'birefnet',
-            path_source: 'fal',
-            path_source_label: 'Fal.ai Media Pipeline (图像/抠图)',
-          },
-        })
-      }),
-      http.get('/api/control/v1/platform/ai-gateway/providers', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: [
-            { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
-            { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
-            { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
-          ],
-        })
-      }),
-      // 右侧参照价面板经后端透传查询：默认 miss 降级，不阻塞表单主流程。
-      http.get('/api/admin/settings/ai-gateway/models-reference', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            model_id: '',
-            source: 'models.dev',
-            note: '参照价，非结算依据',
-            found: false,
-            error_code: 'not_found',
-          },
-        })
-      }),
-    )
+    vi.clearAllMocks()
+    gatewayFakes.previewRoute.mockImplementation(async (input: { modelId: string }) => {
+      const modelId = input.modelId || ''
+      const provider = modelId.includes('/') ? modelId.split('/')[0] : ''
+      return {
+        provider_slug: provider || '未指定',
+        is_first_party: provider === 'fal',
+        target_path: 'birefnet',
+        path_source: 'fal',
+        path_source_label: 'Fal.ai Media Pipeline (图像/抠图)',
+      }
+    })
+    gatewayFakes.listProviders.mockResolvedValue([
+      { slug: 'fal', display_name: 'Fal AI', id_prefix: 'fal_ai/' },
+      { slug: 'openai', display_name: 'OpenAI', id_prefix: 'openai/' },
+      { slug: 'google-vertex-ai', display_name: 'Google Vertex AI', id_prefix: 'vertex_ai/' },
+    ])
+    // 右侧参照价面板：默认 miss 降级，不阻塞表单主流程。
+    gatewayFakes.getReference.mockResolvedValue({
+      modelId: '',
+      source: 'models.dev',
+      note: '参照价，非结算依据',
+      found: false,
+      errorCode: 'not_found',
+    })
   })
 
   const sampleModel: AdminModelItem = {

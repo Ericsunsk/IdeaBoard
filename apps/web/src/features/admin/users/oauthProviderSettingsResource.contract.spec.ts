@@ -1,76 +1,28 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createOAuthProviderSettingsResource } from './oauthProviderSettingsResource'
+import { ADMIN_CONTROL_UNAVAILABLE_CODE } from '../shared/lib/controlGuidance'
 
-const summaryEnvelope = {
-  code: 0,
-  msg: 'success',
-  data: {
-    provider: 'google' as const,
-    enabled: true,
-    configured: true,
-    available: true,
-    client_id: 'google-client.apps.googleusercontent.com',
-    client_secret_configured: true,
-    scopes: ['openid', 'email', 'profile'],
-    config_version: 2,
-    callback_url: 'https://example.com/api/auth/callback/google',
-    updated_at: '2026-08-06T00:00:00Z',
-  },
-}
-
+// OAuth providers have no Control Plane equivalent: get/save fail closed
+// with guidance instead of calling the deleted
+// `/api/admin/users/oauth-providers/*` routes.
 describe('OAuth Provider settings resource', () => {
-  it('normalizes provider settings through the generated API boundary', async () => {
-    const api = {
-      getSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-      updateSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-    }
-    const resource = createOAuthProviderSettingsResource(api)
+  it('fails the settings read closed with guidance', async () => {
+    const resource = createOAuthProviderSettingsResource()
 
-    await expect(resource.get('google')).resolves.toMatchObject({
-      clientId: 'google-client.apps.googleusercontent.com',
-      clientSecretConfigured: true,
-      callbackUrl: 'https://example.com/api/auth/callback/google',
-    })
-    expect(api.getSettings).toHaveBeenCalledWith('google')
-  })
-
-  it('omits a blank Secret and forwards a nonblank Secret', async () => {
-    const api = {
-      getSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-      updateSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-    }
-    const resource = createOAuthProviderSettingsResource(api)
-
-    await resource.save('google', {
-      enabled: true,
-      clientId: 'google-client.apps.googleusercontent.com',
-      clientSecret: '   ',
-    })
-    expect(api.updateSettings).toHaveBeenLastCalledWith('google', {
-      enabled: true,
-      client_id: 'google-client.apps.googleusercontent.com',
-    })
-
-    await resource.save('google', {
-      enabled: true,
-      clientId: 'google-client.apps.googleusercontent.com',
-      clientSecret: 'google-secret',
-    })
-    expect(api.updateSettings).toHaveBeenLastCalledWith('google', {
-      enabled: true,
-      client_id: 'google-client.apps.googleusercontent.com',
-      client_secret: 'google-secret',
+    await expect(resource.get('google')).rejects.toMatchObject({
+      code: ADMIN_CONTROL_UNAVAILABLE_CODE,
     })
   })
 
-  it('propagates API envelope errors with operation context', async () => {
-    const resource = createOAuthProviderSettingsResource({
-      getSettings: vi
-        .fn()
-        .mockResolvedValue({ code: 502, msg: 'auth unavailable', message_safe: true }),
-      updateSettings: vi.fn(),
-    })
+  it('fails the settings save closed with guidance', async () => {
+    const resource = createOAuthProviderSettingsResource()
 
-    await expect(resource.get('google')).rejects.toThrow('auth unavailable')
+    await expect(
+      resource.save('google', {
+        enabled: true,
+        clientId: 'google-client.apps.googleusercontent.com',
+        clientSecret: 'google-secret',
+      }),
+    ).rejects.toMatchObject({ code: ADMIN_CONTROL_UNAVAILABLE_CODE })
   })
 })

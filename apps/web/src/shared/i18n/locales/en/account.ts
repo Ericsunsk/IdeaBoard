@@ -246,5 +246,7 @@ export default {
     quantityIntegerRange: 'Enter a whole number between {min} and {max}.',
     quantityBelowMin: 'Minimum top-up is {min} Ideas.',
     quantityAboveMax: 'Maximum top-up is {max} Ideas.',
+    workspaceRequired: 'Select a workspace to view billing information.',
+    featureUnavailable: 'This feature is currently unavailable.',
   },
 } as const

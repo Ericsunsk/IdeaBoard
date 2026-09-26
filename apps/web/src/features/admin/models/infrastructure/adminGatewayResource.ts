@@ -1,33 +1,48 @@
-import { api } from '../../../../shared/api/client'
-import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
 import {
-  getGetControlAIGatewayUrl,
-  getListControlAIGatewayCatalogUrl,
-  getListControlAIGatewayModelsUrl,
-  getListControlAIGatewayProvidersUrl,
+  detectControlAIGatewayModels,
+  getControlAIGateway,
+  getControlAIGatewayModelReference,
+  listControlAIGatewayModelsObserved,
+  listControlAIGatewayCatalog,
+  listControlAIGatewayModels,
+  listControlAIGatewayProviders,
+  previewControlAIGatewayRoute,
+  saveControlAIGatewayCatalog,
+  saveControlAIGatewayModel,
+  testControlAIGatewayConnection,
+  updateControlAIGateway,
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import {
+  buildContractRequestHeaders,
+  newRequestId,
+} from '../../../../shared/api/contractKernel'
+import {
   resolveApiData,
-  resolveApiOk,
   type ApiResponseWithData,
 } from '../../../../shared/api/apiResponse'
 import type {
   AdminModelItem,
+  ModelObservedSkuMargin,
   ModelObservedSnapshot,
   ModelReferenceSnapshot,
 } from '../domain/catalogData'
 import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/catalogData'
 
-// Admin AI gateway boundary (final cut, partial). Reads with a Control
-// equivalent moved to the Control Plane (`GET
+// Admin AI gateway boundary (W2 transports). Reads with a Control
+// equivalent ride the Control Plane (`GET
 // /api/control/v1/platform/ai-gateway*`, guarded proxies keeping the legacy
-// envelope): catalog list, providers list, connection get, model mappings
-// list. Everything else stays on the legacy routes until follow-up: writes
-// need the operator reason the Control mutation guard requires, and the
-// read-only extras (`route-preview`, `detect-models`, `models-reference`,
-// `models-observed`, `test-connection`) have no Control operation — see the
-// blocked list. Callers keep importing these names, never generated code
-// directly.
+// envelope) through the generated hooks: catalog list, providers list,
+// connection get, model mappings list. The read-only extras moved to the
+// Control Plane the same way: route preview, model detection,
+// pricing-reference lookup, and the 7-day observation window. Writes moved
+// to the Control Plane with the same envelope (operator reason required):
+// catalog save, connection update, model mapping save, and the
+// server-side connection probe. Callers keep importing these names, never
+// generated code directly.
+export type GatewayMutationOptions = {
+  operatorReason: string
+  idempotencyKey?: string | undefined
+}
 export type GatewayConfigSummary = {
   base_url?: string
   account_id?: string
@@ -35,13 +50,6 @@ export type GatewayConfigSummary = {
   token_configured: boolean
   is_first_party?: boolean
   updated_at?: string | null
-}
-
-export type GatewayConnectionTest = {
-  reachable: boolean
-  status_code: number
-  latency_ms: number
-  message: string
 }
 
 export type GatewayModelCatalogItem = {
@@ -80,65 +88,6 @@ export type GatewayModelDetection = {
   configured_providers: number
 }
 
-export type GatewayModelSKUMargin = {
-  sku: string
-  display_name: string
-  feature: string
-  on_sale: boolean
-  unit_credits_by_variant: Record<string, number>
-  actual_cost_credits?: number | null
-  has_actual_cost: boolean
-  cost_source: string
-  cost_note: string
-  margin_credits?: number | null
-  margin_status: string
-}
-
-export type GatewayModelObserved = {
-  model: string
-  provider: string
-  window_days: number
-  window_since: string
-  attempts_total: number
-  completed: number
-  failed: number
-  cache_hits: number
-  success_rate?: number | null
-  cache_hit_rate?: number | null
-  top_failure_stage?: string
-  top_failure_category?: string
-  top_failure_count?: number
-  has_observations: boolean
-  has_sku_margin: boolean
-  sku_margins: GatewayModelSKUMargin[]
-}
-
-export type GatewayModelReference = {
-  model_id: string
-  provider?: string
-  name?: string
-  input_usd_per_mtok?: number
-  output_usd_per_mtok?: number
-  context_limit?: number
-  last_updated?: string
-  reasoning?: boolean
-  tool_call?: boolean
-  temperature?: boolean
-  attachment?: boolean
-  structured_output?: boolean
-  open_weights?: boolean
-  modalities?: { input?: string[]; output?: string[] }
-  knowledge?: string
-  release_date?: string
-  family?: string
-  status?: string
-  source: string
-  note: string
-  found: boolean
-  error_code?: string
-  message?: string
-}
-
 export type GatewayProviderOption = {
   slug: string
   display_name: string
@@ -174,7 +123,7 @@ export interface AdminGatewayModelMapping {
 
 export interface AdminGatewayCatalog {
   list: () => Promise<AdminModelItem[]>
-  save: (items: AdminModelItem[]) => Promise<void>
+  save: (items: AdminModelItem[], options: GatewayMutationOptions) => Promise<void>
   previewRoute: (input: {
     modelId: string
     customPath?: string | undefined
@@ -200,16 +149,19 @@ export interface AdminGatewayCatalog {
 
 export interface AdminGatewayConnection {
   get: () => Promise<GatewayConnectionSummary>
-  update: (input: UpdateGatewayConfigRequest) => Promise<void>
-  testConnection: (input: {
-    base_url: string
-    token?: string | undefined
-  }) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
+  update: (input: UpdateGatewayConfigRequest, options: GatewayMutationOptions) => Promise<void>
+  testConnection: (
+    input: {
+      base_url: string
+      token?: string | undefined
+    },
+    options: GatewayMutationOptions,
+  ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
 }
 
 export interface AdminGatewayMappings {
   list: () => Promise<AdminGatewayModelMapping[]>
-  save: (feature: string, model: string) => Promise<void>
+  save: (feature: string, model: string, options: GatewayMutationOptions) => Promise<void>
 }
 
 export interface AdminGatewayResource {
@@ -265,6 +217,223 @@ function toAdminModelItem(item: GatewayModelCatalogItem): AdminModelItem {
   }
 }
 
+function pickString(raw: Record<string, unknown>, key: string): string | undefined {
+  const value = raw[key]
+  return typeof value === 'string' && value ? value : undefined
+}
+
+function pickNumber(raw: Record<string, unknown>, key: string): number | undefined {
+  const value = raw[key]
+  return typeof value === 'number' ? value : undefined
+}
+
+function pickBoolean(raw: Record<string, unknown>, key: string): boolean | undefined {
+  const value = raw[key]
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function pickStringArray(raw: Record<string, unknown>, key: string): string[] | undefined {
+  const value = raw[key]
+  if (!Array.isArray(value)) return undefined
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+function pickModalities(raw: Record<string, unknown>): { input?: string[]; output?: string[] } | undefined {
+  const value = raw.modalities
+  if (!isRecord(value)) return undefined
+  const modalities: { input?: string[]; output?: string[] } = {}
+  const input = pickStringArray(value, 'input')
+  const output = pickStringArray(value, 'output')
+  if (input != null) modalities.input = input
+  if (output != null) modalities.output = output
+  return modalities
+}
+
+function toDetectedGatewayModel(raw: unknown): DetectedGatewayModel {
+  if (!isRecord(raw)) throw controlError('control_failed', '模型探测失败')
+  const id = pickString(raw, 'id')
+  const name = pickString(raw, 'name')
+  const provider = pickString(raw, 'provider')
+  if (!id || !name || !provider) throw controlError('control_failed', '模型探测失败')
+  const model: DetectedGatewayModel = { id, name, provider }
+  const mode = pickString(raw, 'mode')
+  if (mode != null) model.mode = mode
+  if (typeof raw.description === 'string') model.description = raw.description
+  const enriched = pickBoolean(raw, 'description_enriched')
+  if (enriched != null) model.description_enriched = enriched
+  const contextOrResolution = pickString(raw, 'context_or_resolution')
+  if (contextOrResolution != null) model.context_or_resolution = contextOrResolution
+  const contextLimit = pickNumber(raw, 'context_limit')
+  if (contextLimit != null) model.context_limit = contextLimit
+  const capabilities = pickStringArray(raw, 'capabilities')
+  if (capabilities != null) model.capabilities = capabilities
+  const modalities = pickModalities(raw)
+  if (modalities != null) model.modalities = modalities
+  const supportsPromptCaching = pickBoolean(raw, 'supports_prompt_caching')
+  if (supportsPromptCaching != null) model.supports_prompt_caching = supportsPromptCaching
+  return model
+}
+
+function toModelReferenceSnapshot(raw: Record<string, unknown>): ModelReferenceSnapshot {
+  const modelId = pickString(raw, 'model_id')
+  const source = pickString(raw, 'source')
+  const note = typeof raw.note === 'string' ? raw.note : ''
+  if (!modelId || !source) throw controlError('control_failed', '参照价查询失败')
+  const snapshot: ModelReferenceSnapshot = { modelId, source, note, found: raw.found === true }
+  assignOptionalText(
+    snapshot,
+    raw,
+    [
+      ['provider', 'provider'],
+      ['name', 'name'],
+      ['knowledge', 'knowledge'],
+      ['family', 'family'],
+      ['status', 'status'],
+      ['last_updated', 'lastUpdated'],
+      ['release_date', 'releaseDate'],
+      ['error_code', 'errorCode'],
+      ['message', 'message'],
+    ] as const,
+  )
+  assignOptionalNumbers(
+    snapshot,
+    raw,
+    [
+      ['input_usd_per_mtok', 'inputUsdPerMtok'],
+      ['output_usd_per_mtok', 'outputUsdPerMtok'],
+      ['context_limit', 'contextLimit'],
+    ] as const,
+  )
+  for (const [snake, camel] of [
+    ['reasoning', 'reasoning'],
+    ['tool_call', 'toolCall'],
+    ['temperature', 'temperature'],
+    ['attachment', 'attachment'],
+    ['structured_output', 'structuredOutput'],
+    ['open_weights', 'openWeights'],
+  ] as const) {
+    const flag = pickBoolean(raw, snake)
+    if (flag != null) {
+      ;(snapshot as unknown as Record<string, unknown>)[camel] = flag
+    }
+  }
+  const modalities = pickModalities(raw)
+  if (modalities != null) snapshot.modalities = modalities
+  return snapshot
+}
+
+function assignOptionalText<T extends object>(
+  target: T,
+  raw: Record<string, unknown>,
+  entries: ReadonlyArray<readonly [string, keyof T]>,
+): void {
+  for (const [snake, camel] of entries) {
+    const value = pickString(raw, snake)
+    if (value != null) target[camel] = value as T[keyof T]
+  }
+}
+
+function assignOptionalNumbers<T extends object>(
+  target: T,
+  raw: Record<string, unknown>,
+  entries: ReadonlyArray<readonly [string, keyof T]>,
+): void {
+  for (const [snake, camel] of entries) {
+    const value = pickNumber(raw, snake)
+    if (value != null) target[camel] = value as T[keyof T]
+  }
+}
+
+function toModelObservedSnapshot(raw: unknown): ModelObservedSnapshot {
+  if (!isRecord(raw)) throw controlError('control_failed', '观测数据加载失败')
+  const model = pickString(raw, 'model')
+  const provider = pickString(raw, 'provider')
+  if (!model || !provider) throw controlError('control_failed', '观测数据加载失败')
+  const snapshot: ModelObservedSnapshot = {
+    model,
+    provider,
+    windowDays: pickNumber(raw, 'window_days') ?? 0,
+    windowSince: pickString(raw, 'window_since') ?? '',
+    attemptsTotal: pickNumber(raw, 'attempts_total') ?? 0,
+    completed: pickNumber(raw, 'completed') ?? 0,
+    failed: pickNumber(raw, 'failed') ?? 0,
+    cacheHits: pickNumber(raw, 'cache_hits') ?? 0,
+    hasObservations: raw.has_observations === true,
+    hasSkuMargin: raw.has_sku_margin === true,
+    skuMargins: Array.isArray(raw.sku_margins)
+      ? raw.sku_margins.map(toObservedSkuMargin)
+      : [],
+  }
+  assignOptionalText(
+    snapshot,
+    raw,
+    [
+      ['top_failure_stage', 'topFailureStage'],
+      ['top_failure_category', 'topFailureCategory'],
+    ] as const,
+  )
+  assignOptionalNumbers(snapshot, raw, [['top_failure_count', 'topFailureCount']] as const)
+  assignNullableNumbers(
+    snapshot,
+    raw,
+    [
+      ['success_rate', 'successRate'],
+      ['cache_hit_rate', 'cacheHitRate'],
+    ] as const,
+  )
+  return snapshot
+}
+
+function assignNullableNumbers<T extends object>(
+  target: T,
+  raw: Record<string, unknown>,
+  entries: ReadonlyArray<readonly [string, keyof T]>,
+): void {
+  for (const [snake, camel] of entries) {
+    const value = raw[snake]
+    if (typeof value === 'number' || value === null) {
+      target[camel] = value as T[keyof T]
+    }
+  }
+}
+
+function toObservedSkuMargin(raw: unknown): ModelObservedSkuMargin {
+  if (!isRecord(raw)) throw controlError('control_failed', '观测数据加载失败')
+  const sku = pickString(raw, 'sku')
+  const feature = pickString(raw, 'feature')
+  if (!sku || !feature) throw controlError('control_failed', '观测数据加载失败')
+  const margin: ModelObservedSkuMargin = {
+    sku,
+    displayName: pickString(raw, 'display_name') ?? '',
+    feature,
+    onSale: raw.on_sale === true,
+    unitCreditsByVariant: pickNumberRecord(raw, 'unit_credits_by_variant'),
+    hasActualCost: raw.has_actual_cost === true,
+    costSource: pickString(raw, 'cost_source') ?? '',
+    costNote: pickString(raw, 'cost_note') ?? '',
+    marginStatus: pickString(raw, 'margin_status') ?? '',
+  }
+  assignNullableNumbers(
+    margin,
+    raw,
+    [
+      ['actual_cost_credits', 'actualCostCredits'],
+      ['margin_credits', 'marginCredits'],
+    ] as const,
+  )
+  return margin
+}
+
+function pickNumberRecord(raw: Record<string, unknown>, key: string): Record<string, number> {
+  const result: Record<string, number> = {}
+  const value = raw[key]
+  if (!isRecord(value)) return result
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (typeof entryValue === 'number') result[entryKey] = entryValue
+  }
+  return result
+}
+
 function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
   return {
     id: item.id,
@@ -288,24 +457,27 @@ function toGatewayCatalogItem(item: AdminModelItem): GatewayModelCatalogItem {
 
 async function listModelCatalog(): Promise<AdminModelItem[]> {
   const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayModelCatalogItem[]>>(
-      `${CONTROL_API_PREFIX}${getListControlAIGatewayCatalogUrl()}`,
-      { method: 'GET' },
-    ),
+    listControlAIGatewayCatalog() as Promise<ApiResponseWithData<GatewayModelCatalogItem[]>>,
     '加载模型库失败',
   )
   if (!Array.isArray(data)) throw new Error('加载模型库失败')
   return data.map(toAdminModelItem)
 }
 
-async function saveModelCatalog(items: AdminModelItem[]): Promise<void> {
-  await resolveApiOk(
-    api.request<{ code: number; msg: string }>('/admin/settings/ai-gateway/catalog', {
-      method: 'PUT',
-      body: { items: items.map(toGatewayCatalogItem) } as unknown as Record<string, unknown>,
-    }),
-    '保存模型库失败',
-  )
+async function saveModelCatalog(
+  items: AdminModelItem[],
+  options: GatewayMutationOptions,
+): Promise<void> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await saveControlAIGatewayCatalog(
+      { items: items.map(toGatewayCatalogItem) },
+      { headers: mutationHeaders(options, operatorReason) },
+    )
+    assertLegacyOk(body, '保存模型库失败')
+  } catch (error) {
+    throw withControlCopy(error, '保存模型库失败')
+  }
 }
 
 async function previewModelRoute(input: {
@@ -313,78 +485,39 @@ async function previewModelRoute(input: {
   customPath?: string | undefined
   customParams?: string | undefined
 }): Promise<GatewayRoutePreview> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayRoutePreview>>(
-      '/admin/settings/ai-gateway/route-preview',
-      {
-        method: 'POST',
-        body: {
-          model_id: input.modelId,
-          ...(input.customPath ? { custom_path: input.customPath } : {}),
-          ...(input.customParams ? { custom_params: input.customParams } : {}),
-        } as unknown as Record<string, unknown>,
-      },
-    ),
-    '路由透视失败',
-  )
-  if (!data) throw new Error('路由透视失败')
-  return data
+  const payload: { model_id: string; custom_path?: string; custom_params?: string } = {
+    model_id: input.modelId,
+  }
+  if (input.customPath != null) payload.custom_path = input.customPath
+  if (input.customParams != null) payload.custom_params = input.customParams
+  const body = await previewControlAIGatewayRoute(payload)
+  return readLegacyData<GatewayRoutePreview>(body, '路由透视失败')
 }
 
 async function detectGatewayModels(provider?: string): Promise<GatewayModelDetection> {
-  const query = provider?.trim() ? `?provider=${encodeURIComponent(provider.trim())}` : ''
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayModelDetection>>(
-      `/admin/settings/ai-gateway/detect-models${query}`,
-      { method: 'GET' },
-    ),
-    '探测网关模型失败',
+  const body = await detectControlAIGatewayModels(
+    provider?.trim() ? { provider: provider.trim() } : undefined,
   )
-  if (!data) throw new Error('探测网关模型失败')
-  return data
+  const result = readLegacyData<{ models: unknown; configured_providers: unknown }>(
+    body,
+    '模型探测失败',
+  )
+  if (!Array.isArray(result.models) || typeof result.configured_providers !== 'number') {
+    throw controlError('control_failed', '模型探测失败')
+  }
+  return {
+    models: result.models.map(toDetectedGatewayModel),
+    configured_providers: result.configured_providers,
+  }
 }
 
 async function listGatewayProviders(): Promise<GatewayProviderOption[]> {
   const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayProviderOption[]>>(
-      `${CONTROL_API_PREFIX}${getListControlAIGatewayProvidersUrl()}`,
-      { method: 'GET' },
-    ),
+    listControlAIGatewayProviders() as Promise<ApiResponseWithData<GatewayProviderOption[]>>,
     '加载供应商列表失败',
   )
   if (!Array.isArray(data)) throw new Error('加载供应商列表失败')
   return data
-}
-
-function toAdminModelReference(item: GatewayModelReference): ModelReferenceSnapshot {
-  return {
-    modelId: item.model_id,
-    provider: item.provider,
-    name: item.name,
-    inputUsdPerMtok: item.input_usd_per_mtok,
-    outputUsdPerMtok: item.output_usd_per_mtok,
-    contextLimit: item.context_limit,
-    lastUpdated: item.last_updated,
-    reasoning: item.reasoning,
-    toolCall: item.tool_call,
-    temperature: item.temperature,
-    attachment: item.attachment,
-    structuredOutput: item.structured_output,
-    openWeights: item.open_weights,
-    modalities:
-      item.modalities == null
-        ? undefined
-        : { input: item.modalities.input, output: item.modalities.output },
-    knowledge: item.knowledge,
-    releaseDate: item.release_date,
-    family: item.family,
-    status: item.status,
-    source: item.source,
-    note: item.note,
-    found: item.found,
-    errorCode: item.error_code,
-    message: item.message,
-  }
 }
 
 async function getModelReference(input: {
@@ -393,123 +526,85 @@ async function getModelReference(input: {
   model?: string | undefined
   refresh?: boolean | undefined
 }): Promise<ModelReferenceSnapshot> {
-  const search = new URLSearchParams()
-  if (input.modelId?.trim()) search.append('model_id', input.modelId.trim())
-  if (input.provider?.trim()) search.append('provider', input.provider.trim())
-  if (input.model?.trim()) search.append('model', input.model.trim())
-  if (input.refresh) search.append('refresh', 'true')
-  const query = search.toString()
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayModelReference>>(
-      query
-        ? `/admin/settings/ai-gateway/models-reference?${query}`
-        : '/admin/settings/ai-gateway/models-reference',
-      { method: 'GET' },
-    ),
-    '加载参照价失败',
-  )
-  if (!data) throw new Error('加载参照价失败')
-  return toAdminModelReference(data)
-}
-
-function toAdminModelObserved(item: GatewayModelObserved): ModelObservedSnapshot {
-  return {
-    model: item.model,
-    provider: item.provider,
-    windowDays: item.window_days,
-    windowSince: item.window_since,
-    attemptsTotal: item.attempts_total,
-    completed: item.completed,
-    failed: item.failed,
-    cacheHits: item.cache_hits,
-    // exactOptionalPropertyTypes：nullable 可选值直接透传（null 即未知，调用方暂无数据）。
-    successRate: item.success_rate,
-    cacheHitRate: item.cache_hit_rate,
-    topFailureStage: item.top_failure_stage,
-    topFailureCategory: item.top_failure_category,
-    topFailureCount: item.top_failure_count,
-    hasObservations: item.has_observations,
-    hasSkuMargin: item.has_sku_margin,
-    skuMargins: (item.sku_margins ?? []).map((margin) => ({
-      sku: margin.sku,
-      displayName: margin.display_name,
-      feature: margin.feature,
-      onSale: margin.on_sale,
-      unitCreditsByVariant: { ...margin.unit_credits_by_variant },
-      actualCostCredits: margin.actual_cost_credits,
-      hasActualCost: margin.has_actual_cost,
-      costSource: margin.cost_source,
-      costNote: margin.cost_note,
-      marginCredits: margin.margin_credits,
-      marginStatus: margin.margin_status,
-    })),
-  }
+  const params: { model_id?: string; provider?: string; model?: string; refresh?: string } = {}
+  if (input.modelId?.trim()) params.model_id = input.modelId.trim()
+  if (input.provider?.trim()) params.provider = input.provider.trim()
+  if (input.model?.trim()) params.model = input.model.trim()
+  if (input.refresh != null) params.refresh = String(input.refresh)
+  const body = await getControlAIGatewayModelReference(params)
+  return toModelReferenceSnapshot(readLegacyData<Record<string, unknown>>(body, '参照价查询失败'))
 }
 
 async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayModelObserved[]>>(
-      '/admin/settings/ai-gateway/models-observed',
-      { method: 'GET' },
-    ),
-    '加载观测数据失败',
-  )
-  if (!Array.isArray(data)) throw new Error('加载观测数据失败')
-  return data.map(toAdminModelObserved)
+  const body = await listControlAIGatewayModelsObserved()
+  const rows = readLegacyData<unknown>(body, '观测数据加载失败')
+  if (!Array.isArray(rows)) throw controlError('control_failed', '观测数据加载失败')
+  return rows.map(toModelObservedSnapshot)
 }
 
 async function getGatewayConnection(): Promise<GatewayConnectionSummary> {
-  const response = await api.request<ApiResponseWithData<GatewayConfigSummary>>(
-    `${CONTROL_API_PREFIX}${getGetControlAIGatewayUrl()}`,
-    { method: 'GET' },
-  )
+  const response = await getControlAIGateway() as ApiResponseWithData<GatewayConfigSummary>
   if (!response.data) throw new Error('AI 网关配置不存在')
   return response.data
 }
 
-async function updateGatewayConnection(input: UpdateGatewayConfigRequest): Promise<void> {
-  await resolveApiOk(
-    api.request<{ code: number; msg: string }>('/admin/settings/ai-gateway', {
-      method: 'PUT',
-      body: input as unknown as Record<string, unknown>,
-    }),
-    '保存 AI 网关配置失败',
-  )
+async function updateGatewayConnection(
+  input: UpdateGatewayConfigRequest,
+  options: GatewayMutationOptions,
+): Promise<void> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await updateControlAIGateway(
+      { ...input },
+      { headers: mutationHeaders(options, operatorReason) },
+    )
+    assertLegacyOk(body, '保存 AI 网关配置失败')
+  } catch (error) {
+    throw withControlCopy(error, '保存 AI 网关配置失败')
+  }
 }
 
-async function testGatewayConnection(input: {
-  base_url: string
-  token?: string | undefined
-}): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
-  // 服务端探活：浏览器读不到跨域状态码，fetch 恒报成功是误报。
-  // token 仅用于本次探测，不做任何持久化。
-  const data: GatewayConnectionTest | null | undefined = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayConnectionTest>>(
-      '/admin/settings/ai-gateway/test-connection',
-      {
-        method: 'POST',
-        body: {
-          base_url: input.base_url.trim(),
-          ...(input.token?.trim() ? { token: input.token.trim() } : {}),
-        } as unknown as Record<string, unknown>,
-      },
-    ),
-    '网关连接测试失败',
-  )
-  if (!data) throw new Error('网关连接测试失败')
-  return {
-    success: data.reachable,
-    latencyMs: data.latency_ms,
-    message: data.message,
+async function testGatewayConnection(
+  input: {
+    base_url: string
+    token?: string | undefined
+  },
+  options: GatewayMutationOptions,
+): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
+  // Server-side probe (browsers cannot read cross-origin status); the token
+  // is used for this probe only and never persisted. Mutation-guarded, so
+  // it needs an operator reason like any other control write.
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  const payload: { base_url: string; token?: string; reason: string } = {
+    base_url: input.base_url,
+    reason: operatorReason,
   }
+  if (input.token != null) payload.token = input.token
+  let body: unknown
+  try {
+    body = await testControlAIGatewayConnection(payload, {
+      headers: mutationHeaders(options, operatorReason),
+    })
+  } catch (error) {
+    throw withControlCopy(error, '网关连接测试失败')
+  }
+  const probe = readLegacyData<{
+    reachable: boolean
+    status_code: number
+    latency_ms?: number
+    message?: string
+  }>(body, '网关连接测试失败')
+  const result: { success: boolean; latencyMs?: number; message?: string } = {
+    success: probe.reachable === true,
+  }
+  if (typeof probe.latency_ms === 'number') result.latencyMs = probe.latency_ms
+  if (typeof probe.message === 'string' && probe.message) result.message = probe.message
+  return result
 }
 
 async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
   const data = await resolveApiData(
-    api.request<ApiResponseWithData<GatewayModelMapping[]>>(
-      `${CONTROL_API_PREFIX}${getListControlAIGatewayModelsUrl()}`,
-      { method: 'GET' },
-    ),
+    listControlAIGatewayModels() as Promise<ApiResponseWithData<GatewayModelMapping[]>>,
     '加载模型映射失败',
   )
   return (data ?? []).map((item) => ({
@@ -518,15 +613,95 @@ async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
   }))
 }
 
-async function saveGatewayModelMapping(feature: string, model: string): Promise<void> {
-  await resolveApiOk(
-    api.request<{ code: number; msg: string }>(
-      `/admin/settings/ai-gateway/models/${encodeURIComponent(feature)}`,
-      {
-        method: 'PUT',
-        body: { model } as unknown as Record<string, unknown>,
-      },
-    ),
-    '保存模型映射失败',
-  )
+async function saveGatewayModelMapping(
+  feature: string,
+  model: string,
+  options: GatewayMutationOptions,
+): Promise<void> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await saveControlAIGatewayModel(
+      feature,
+      { model },
+      { headers: mutationHeaders(options, operatorReason) },
+    )
+    assertLegacyOk(body, '保存模型映射失败')
+  } catch (error) {
+    throw withControlCopy(error, '保存模型映射失败')
+  }
+}
+
+function mutationHeaders(options: GatewayMutationOptions, operatorReason: string) {
+  return buildContractRequestHeaders({
+    requestId: newRequestId(),
+    idempotencyKey: options.idempotencyKey ?? newRequestId(),
+    operatorReason,
+  })
+}
+
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+  }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 409) return 409
+  }
+  return undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+// Control AI gateway routes keep the legacy `{ code, msg, data? }` shape:
+// a numeric `code` of 0 means success, anything else is a failure.
+function assertLegacyOk(body: unknown, fallback: string): void {
+  if (isRecord(body) && 'code' in body) {
+    if (body.code !== 0) {
+      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
+      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
+    }
+    return
+  }
+  if (!isRecord(body)) throw controlError('control_failed', fallback)
+}
+
+function readLegacyData<T>(body: unknown, fallback: string): T {
+  if (isRecord(body) && 'code' in body) {
+    if (body.code !== 0) {
+      const message = typeof body.msg === 'string' && body.msg ? body.msg : fallback
+      throw controlError(typeof body.code === 'string' ? body.code : 'control_failed', message)
+    }
+    if (body.data == null) throw controlError('control_failed', fallback)
+    return body.data as T
+  }
+  throw controlError('control_failed', fallback)
 }

@@ -158,6 +158,49 @@ func (q *Queries) CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspa
 	return i, err
 }
 
+const countControlTasks = `-- name: CountControlTasks :many
+SELECT t.status AS status, COUNT(*) AS count
+FROM tasks AS t
+WHERE ($1 = 0 OR t.submitter_user_id = $1)
+  AND ($2 = ''
+    OR t.public_id ILIKE '%' || $2 || '%'
+    OR t.workflow_type ILIKE '%' || $2 || '%'
+    OR t.error_message ILIKE '%' || $2 || '%')
+GROUP BY t.status
+`
+
+type CountControlTasksParams struct {
+	SubmitterUserID interface{} `json:"submitter_user_id"`
+	Keyword         interface{} `json:"keyword"`
+}
+
+type CountControlTasksRow struct {
+	Status string `json:"status"`
+	Count  int64  `json:"count"`
+}
+
+// Counts honor the user/keyword filters but never the status filter, so
+// the status pills keep their global breakdown while a status is active.
+func (q *Queries) CountControlTasks(ctx context.Context, arg CountControlTasksParams) ([]CountControlTasksRow, error) {
+	rows, err := q.db.Query(ctx, countControlTasks, arg.SubmitterUserID, arg.Keyword)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountControlTasksRow
+	for rows.Next() {
+		var i CountControlTasksRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countWorkspaceTasks = `-- name: CountWorkspaceTasks :one
 SELECT COUNT(*)
 FROM tasks AS t
@@ -300,6 +343,118 @@ func (q *Queries) FailWorkspaceTask(ctx context.Context, arg FailWorkspaceTaskPa
 	return i, err
 }
 
+const getControlTaskBilling = `-- name: GetControlTaskBilling :one
+SELECT s.sku, s.display_name, s.price_version_id, s.price_version, s.output_resolution, s.unit_credits, s.quantity, s.total_credits, s.quoted_at, s.hold_transaction_id,
+  st.state AS settlement_state, st.captured_credits AS settlement_captured_credits, st.settled_at AS settlement_settled_at
+FROM task_billing_snapshots AS s
+LEFT JOIN task_billing_settlements AS st ON st.task_id = s.task_id
+WHERE s.task_id = $1
+ORDER BY s.created_at DESC
+LIMIT 1
+`
+
+type GetControlTaskBillingRow struct {
+	Sku                       string             `json:"sku"`
+	DisplayName               string             `json:"display_name"`
+	PriceVersionID            int64              `json:"price_version_id"`
+	PriceVersion              int64              `json:"price_version"`
+	OutputResolution          string             `json:"output_resolution"`
+	UnitCredits               int64              `json:"unit_credits"`
+	Quantity                  int64              `json:"quantity"`
+	TotalCredits              int64              `json:"total_credits"`
+	QuotedAt                  pgtype.Timestamptz `json:"quoted_at"`
+	HoldTransactionID         pgtype.Text        `json:"hold_transaction_id"`
+	SettlementState           pgtype.Text        `json:"settlement_state"`
+	SettlementCapturedCredits pgtype.Int8        `json:"settlement_captured_credits"`
+	SettlementSettledAt       pgtype.Timestamptz `json:"settlement_settled_at"`
+}
+
+func (q *Queries) GetControlTaskBilling(ctx context.Context, taskID string) (GetControlTaskBillingRow, error) {
+	row := q.db.QueryRow(ctx, getControlTaskBilling, taskID)
+	var i GetControlTaskBillingRow
+	err := row.Scan(
+		&i.Sku,
+		&i.DisplayName,
+		&i.PriceVersionID,
+		&i.PriceVersion,
+		&i.OutputResolution,
+		&i.UnitCredits,
+		&i.Quantity,
+		&i.TotalCredits,
+		&i.QuotedAt,
+		&i.HoldTransactionID,
+		&i.SettlementState,
+		&i.SettlementCapturedCredits,
+		&i.SettlementSettledAt,
+	)
+	return i, err
+}
+
+const getControlTaskByPublicID = `-- name: GetControlTaskByPublicID :one
+
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+  w.public_id AS workspace_public_id
+FROM tasks AS t
+INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+WHERE t.public_id = $1
+LIMIT 1
+`
+
+type GetControlTaskByPublicIDRow struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspaceID       int64              `json:"workspace_id"`
+	SubmitterUserID   int64              `json:"submitter_user_id"`
+	BillingAccountID  int64              `json:"billing_account_id"`
+	WorkflowType      string             `json:"workflow_type"`
+	WorkflowInput     []byte             `json:"workflow_input"`
+	Status            string             `json:"status"`
+	Priority          int32              `json:"priority"`
+	RetryCount        int32              `json:"retry_count"`
+	LeaseToken        string             `json:"lease_token"`
+	ErrorMessage      string             `json:"error_message"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
+	CancelledAt       pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledByUserID pgtype.Int8        `json:"cancelled_by_user_id"`
+	WorkspacePublicID string             `json:"workspace_public_id"`
+}
+
+// Control Plane global task read model (#809-close). Operators see every
+// workspace (no membership gating at the repository; the control guard
+// owns capability auth and every call is audited). Unknown ids read as
+// zero rows (the adapter converges to ErrNotFound, never 403).
+// Settlement joins stay LEFT: tasks without billing facts (free or
+// pre-settlement rows) still list.
+func (q *Queries) GetControlTaskByPublicID(ctx context.Context, publicID string) (GetControlTaskByPublicIDRow, error) {
+	row := q.db.QueryRow(ctx, getControlTaskByPublicID, publicID)
+	var i GetControlTaskByPublicIDRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.SubmitterUserID,
+		&i.BillingAccountID,
+		&i.WorkflowType,
+		&i.WorkflowInput,
+		&i.Status,
+		&i.Priority,
+		&i.RetryCount,
+		&i.LeaseToken,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CancelledAt,
+		&i.CancelledByUserID,
+		&i.WorkspacePublicID,
+	)
+	return i, err
+}
+
 const getWorkspaceMediaAssetID = `-- name: GetWorkspaceMediaAssetID :one
 SELECT m.internal_id
 FROM media_assets AS m
@@ -406,6 +561,108 @@ func (q *Queries) InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorks
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listControlTasks = `-- name: ListControlTasks :many
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+  w.public_id AS workspace_public_id,
+  s.total_credits AS billing_total_credits,
+  st.state AS settlement_state,
+  st.captured_credits AS settlement_captured_credits
+FROM tasks AS t
+INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+LEFT JOIN task_billing_snapshots AS s ON s.task_id = t.public_id
+LEFT JOIN task_billing_settlements AS st ON st.task_id = t.public_id
+WHERE ($1 = '' OR t.status = $1)
+  AND ($2 = 0 OR t.submitter_user_id = $2)
+  AND ($3 = ''
+    OR t.public_id ILIKE '%' || $3 || '%'
+    OR t.workflow_type ILIKE '%' || $3 || '%'
+    OR t.error_message ILIKE '%' || $3 || '%')
+ORDER BY t.created_at DESC, t.internal_id DESC
+LIMIT $5 OFFSET $4
+`
+
+type ListControlTasksParams struct {
+	Status          interface{} `json:"status"`
+	SubmitterUserID interface{} `json:"submitter_user_id"`
+	Keyword         interface{} `json:"keyword"`
+	RowOffset       int32       `json:"row_offset"`
+	RowLimit        int32       `json:"row_limit"`
+}
+
+type ListControlTasksRow struct {
+	InternalID                int64              `json:"internal_id"`
+	PublicID                  string             `json:"public_id"`
+	WorkspaceID               int64              `json:"workspace_id"`
+	SubmitterUserID           int64              `json:"submitter_user_id"`
+	BillingAccountID          int64              `json:"billing_account_id"`
+	WorkflowType              string             `json:"workflow_type"`
+	WorkflowInput             []byte             `json:"workflow_input"`
+	Status                    string             `json:"status"`
+	Priority                  int32              `json:"priority"`
+	RetryCount                int32              `json:"retry_count"`
+	LeaseToken                string             `json:"lease_token"`
+	ErrorMessage              string             `json:"error_message"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	StartedAt                 pgtype.Timestamptz `json:"started_at"`
+	CompletedAt               pgtype.Timestamptz `json:"completed_at"`
+	CancelledAt               pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledByUserID         pgtype.Int8        `json:"cancelled_by_user_id"`
+	WorkspacePublicID         string             `json:"workspace_public_id"`
+	BillingTotalCredits       pgtype.Int8        `json:"billing_total_credits"`
+	SettlementState           pgtype.Text        `json:"settlement_state"`
+	SettlementCapturedCredits pgtype.Int8        `json:"settlement_captured_credits"`
+}
+
+func (q *Queries) ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error) {
+	rows, err := q.db.Query(ctx, listControlTasks,
+		arg.Status,
+		arg.SubmitterUserID,
+		arg.Keyword,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListControlTasksRow
+	for rows.Next() {
+		var i ListControlTasksRow
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.SubmitterUserID,
+			&i.BillingAccountID,
+			&i.WorkflowType,
+			&i.WorkflowInput,
+			&i.Status,
+			&i.Priority,
+			&i.RetryCount,
+			&i.LeaseToken,
+			&i.ErrorMessage,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CancelledAt,
+			&i.CancelledByUserID,
+			&i.WorkspacePublicID,
+			&i.BillingTotalCredits,
+			&i.SettlementState,
+			&i.SettlementCapturedCredits,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listWorkspaceTaskOutputs = `-- name: ListWorkspaceTaskOutputs :many

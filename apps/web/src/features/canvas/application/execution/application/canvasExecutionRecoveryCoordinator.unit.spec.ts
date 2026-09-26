@@ -1,4 +1,4 @@
-import { TaskCancelledError } from '../../../../../shared/api/taskEvents'
+import { TaskCancelledError } from '../task-runner/taskResultErrors'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'

@@ -27,10 +27,8 @@ describe('AdminOutboundPolicyCard', () => {
     updateRequests = []
     allowHosts = ['models.internal']
     useMswHandlers(
-      http.get('/api/admin/settings/outbound-policy', () =>
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { allow_hosts: allowHosts },
         }),
       ),

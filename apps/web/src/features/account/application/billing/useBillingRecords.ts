@@ -2,26 +2,28 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery } from '@tanstack/vue-query'
 import { useCreditsSync } from '../recharge/useCreditsSync'
 import { billingRecordsQueryKeys, fetchBillingRecords } from '../../infrastructure/billing/resource'
+import { useAccountWorkspace } from '../accountWorkspace'
 
 const pageSize = 20
-const initialPageParam = 0
 
 export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
+  const { workspaceId, selectionSettled } = useAccountWorkspace()
 
   const query = useInfiniteQuery({
-    queryKey: billingRecordsQueryKeys.all,
-    queryFn: ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }) =>
+    queryKey: computed(() => billingRecordsQueryKeys.list(workspaceId.value ?? '')),
+    queryFn: ({ pageParam, signal }: { pageParam: string; signal: AbortSignal }) =>
       fetchBillingRecords(
+        workspaceId.value ?? '',
         {
-          limit: pageSize,
-          ...(pageParam > 0 ? { before_sequence: pageParam } : {}),
+          page_size: pageSize,
+          ...(pageParam ? { cursor: pageParam } : {}),
         },
         signal,
       ),
-    initialPageParam,
-    getNextPageParam: (lastPage) => lastPage.next_before_sequence ?? undefined,
-    enabled: () => toValue(enabled),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
+    enabled: () => toValue(enabled) && selectionSettled.value,
     retry: false,
   })
 

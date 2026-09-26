@@ -12,7 +12,7 @@ import {
   WORKFLOW_FEATURE_SLUGS,
   type WorkflowFeature,
 } from '../../../../../shared/domain/workflowFeatures'
-import type { SubmitTaskReadinessData } from '../../../../../shared/api/task'
+import type { SubmitTaskReadinessData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../../shared/i18n'
 import { readinessErrorCopy } from '../../../../../shared/errors/errorCatalog'

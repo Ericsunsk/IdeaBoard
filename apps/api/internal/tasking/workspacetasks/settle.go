@@ -129,7 +129,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.verifyInputAssets(ctx, input.WorkspaceID, input.MediaAssetIDs); err != nil {
+	if err := s.verifyInputAssets(ctx, input.WorkspaceID, input.MediaAssetIDs, input.Params); err != nil {
 		return nil, err
 	}
 	if s.quoter == nil || s.holder == nil || s.queue == nil {
@@ -204,8 +204,8 @@ func cloneParams(in map[string]any) map[string]any {
 	return out
 }
 
-func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids []string) error {
-	if len(ids) == 0 || s.assets == nil {
+func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids []string, params map[string]any) error {
+	if s.assets == nil {
 		return nil
 	}
 	for i, id := range ids {
@@ -218,6 +218,22 @@ func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids
 		}
 		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
 			return fmt.Errorf("workspacetasks: input asset %d not ready: %w", i, ErrMediaNotReady)
+		}
+	}
+	// The v1 mask reference (params.mask_asset_id) gates on the same
+	// ready/archived semantics as image inputs: invisible, non-ready, or
+	// archived masks fail the submit (404/409/410), never a late worker
+	// failure.
+	if maskID, ok := MaskAssetIDFromParams(params); ok {
+		info, err := s.assets.GetAsset(ctx, workspaceID, maskID)
+		if err != nil {
+			return fmt.Errorf("workspacetasks: mask asset: %w", ErrMediaNotFound)
+		}
+		if info.Archived {
+			return fmt.Errorf("workspacetasks: mask asset archived: %w", ErrMediaArchived)
+		}
+		if strings.ToLower(strings.TrimSpace(info.Status)) != "ready" {
+			return fmt.Errorf("workspacetasks: mask asset not ready: %w", ErrMediaNotReady)
 		}
 	}
 	return nil

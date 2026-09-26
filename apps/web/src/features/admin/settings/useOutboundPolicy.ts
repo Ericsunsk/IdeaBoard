@@ -138,11 +138,7 @@ function isSameForm(left: OutboundPolicyForm, right: OutboundPolicyForm): boolea
 }
 
 function writeOutboundPolicyQueryCache(queryClient: QueryClient, setting: OutboundPolicySetting) {
-  queryClient.setQueryData(outboundPolicyQueryKey, {
-    code: 0,
-    msg: 'ok',
-    data: setting,
-  })
+  queryClient.setQueryData(outboundPolicyQueryKey, setting)
 }
 
 function cloneForm(form: OutboundPolicyForm): OutboundPolicyForm {

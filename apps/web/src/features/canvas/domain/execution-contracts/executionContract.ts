@@ -1,4 +1,7 @@
-import type { SubmitTaskData, SubmitTaskParams } from '../../../../shared/api/task'
+import type {
+  SubmitTaskData,
+  SubmitTaskParams,
+} from './canvasTaskRequest'
 import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeUrls'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
@@ -62,6 +65,8 @@ interface BuildExecutionTaskRequestOptions {
   imageUrls?: string[] | undefined
   imageAssetIds?: number[] | undefined
   referenceImageAssetIds?: number[] | undefined
+  /** Opaque `asset_...` ids; the only media refs the v1 transport sends. */
+  mediaAssetIds?: string[] | undefined
   params?: SubmitTaskParams | undefined
 }
 
@@ -104,6 +109,10 @@ export function buildExecutionTaskRequest(
   }
   if (options.referenceImageAssetIds && options.referenceImageAssetIds.length > 0) {
     request.reference_image_asset_ids = options.referenceImageAssetIds
+  }
+  const opaqueIds = (options.mediaAssetIds ?? []).map((id) => `${id ?? ''}`.trim()).filter(Boolean)
+  if (opaqueIds.length > 0) {
+    request.media_asset_ids = [...new Set(opaqueIds)]
   }
 
   return request

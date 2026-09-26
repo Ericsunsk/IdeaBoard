@@ -6,9 +6,11 @@ import {
   toWorkspaceSearchResult,
   toWorkspaceVisionQuery,
   workspaceSearchApi,
-  workspaceSearchSuffix,
-  workspaceVisionQueriesSuffix,
 } from './workspace'
+import {
+  getCreateWorkspaceVisionQueryUrl,
+  getSearchWorkspaceUrl,
+} from '../../../shared/api/generated-query/public/workspace-search/workspace-search'
 
 const WORKSPACE_ID = 'ws_abc123'
 const ASSET_ID = 'lasset_asset0001'
@@ -30,20 +32,22 @@ function resultFixture(overrides: Record<string, unknown> = {}): Record<string, 
 }
 
 describe('workspace search paths', () => {
-  it('builds canonical transport suffixes', () => {
-    expect(workspaceSearchSuffix(WORKSPACE_ID)).toBe('/v1/workspaces/ws_abc123/search')
-    expect(workspaceVisionQueriesSuffix(WORKSPACE_ID)).toBe(
-      '/v1/workspaces/ws_abc123/search/vision-queries',
+  it('builds canonical routes matching the generated hooks (publicMutator adds /v1)', () => {
+    expect(getSearchWorkspaceUrl(WORKSPACE_ID, { q: 'cafe' })).toBe(
+      '/workspaces/ws_abc123/search?q=cafe',
+    )
+    expect(getCreateWorkspaceVisionQueryUrl(WORKSPACE_ID)).toBe(
+      '/workspaces/ws_abc123/search/vision-queries',
     )
   })
 
-  it('rejects malformed ids before any network call', () => {
+  it('rejects malformed ids before any network call', async () => {
     expect(() => assertWorkspaceLibraryAssetId('42')).toThrow()
     expect(() => assertWorkspaceLibraryAssetId('lfolder_x')).toThrow()
     expect(() => assertWorkspaceLibraryAssetId('lfolder_x')).toThrow()
     expect(() => assertWorkspaceLibraryAssetId(ASSET_ID)).not.toThrow()
     expect(() => assertWorkspaceLibraryAssetId('lasset_asset0001')).not.toThrow()
-    expect(() => workspaceSearchSuffix('nope')).toThrow()
+    await expect(workspaceSearchApi.search({ workspaceId: 'nope', query: 'cafe' })).rejects.toThrow()
   })
 })
 
@@ -209,5 +213,50 @@ describe('workspace vision query replay headers', () => {
     )
     expect(query.operationId).toBe('visq_op0002')
     expect(seenBody).toMatchObject({ data: { library_asset_ids: ['lasset_asset0001'] } })
+  })
+
+  it('sends staged upload refs and allowlisted image urls in the vision query body', async () => {
+    let seenBody: unknown = null
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/search/vision-queries', async ({ request }) => {
+        seenBody = await request.json()
+        return HttpResponse.json(
+          {
+            data: {
+              operation_id: 'visq_op0003',
+              status: 'succeeded',
+              query: 'warm cafe',
+              created_at: '2026-09-23T00:00:00Z',
+            },
+          },
+          { status: 201 },
+        )
+      }),
+    )
+    const query = await workspaceSearchApi.createVisionQuery(
+      {
+        workspaceId: WORKSPACE_ID,
+        uploadIds: ['upload_up0001'],
+        imageUrls: ['https://images.unsplash.com/photo-test'],
+      },
+      { idempotencyKey: 'search:vision:4' },
+    )
+    expect(query.operationId).toBe('visq_op0003')
+    expect(seenBody).toMatchObject({
+      data: {
+        upload_ids: ['upload_up0001'],
+        image_urls: ['https://images.unsplash.com/photo-test'],
+      },
+    })
+  })
+
+  it('fails closed on multi-provider filters (generated URL gap, see module TODO)', async () => {
+    await expect(
+      workspaceSearchApi.search({
+        workspaceId: WORKSPACE_ID,
+        query: 'cafe',
+        providers: ['unsplash', 'pexels'],
+      }),
+    ).rejects.toThrow()
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SubmitTaskData } from '../../../../../shared/api/task'
+import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { IMAGE_NODE_ACTION } from '../../../../../shared/domain/imageActions'
 import {
   IMAGE_OUTPAINT_ACTION,
@@ -307,6 +307,26 @@ describe('imageTaskRequests', () => {
       use_mask: true,
     })
     expect(request.params).not.toHaveProperty('reference_image_urls')
+  })
+
+  it('emits mask_asset_id and drops mask_image_url once the mask is a workspace asset', () => {
+    const request = buildImageInpaintTaskRequest({
+      prompt: 'redraw the selected area',
+      originalImageUrl: source.url,
+      maskImageUrl: 'https://assets.example.com/mask.png',
+      maskAssetId: ' asset_mask1 ',
+      imageSize: { width: 1200, height: 800 },
+      originalImageMediaAssetId: 'asset_aaa1',
+    })
+
+    expect(request.feature).toBe(EXECUTION_FEATURE.inpaint)
+    expect(request.media_asset_ids).toEqual(['asset_aaa1'])
+    expect(request.params).toMatchObject({
+      output_count: 1,
+      mask_asset_id: 'asset_mask1',
+      use_mask: true,
+    })
+    expect(request.params).not.toHaveProperty('mask_image_url')
   })
 
   it('builds outpaint params under the nested outpaint contract', () => {

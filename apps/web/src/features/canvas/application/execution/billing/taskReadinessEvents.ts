@@ -1,4 +1,4 @@
-import type { SubmitTaskReadinessData } from '../../../../../shared/api/task'
+import type { SubmitTaskReadinessData } from '../../../domain/execution-contracts/canvasTaskRequest'
 
 export type CanvasTaskReadinessListener = (readiness: SubmitTaskReadinessData) => void
 

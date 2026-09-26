@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SubmitTaskData } from '../../../../../shared/api/task'
+import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createCanvasActivationId, withTaskClientActionId } from './taskClientActionIds'
 
 describe('taskClientActionIds', () => {

@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../../../shared/api/task'
+import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createUniqueId } from '../../../../../shared/utils/ids'
 
 export type ClientActionIdFactory = () => string

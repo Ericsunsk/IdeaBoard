@@ -47,14 +47,15 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  ConflictResponse,
   ControlAckEnvelope,
   ControlNotFoundResponse,
   ControlTaskEnvelope,
   ForbiddenResponse,
-  IdempotencyConflictResponse,
   ListControlTasksParams,
   PaginatedControlTasks,
   UnauthorizedResponse,
+  UnprocessableEntityResponse,
 } from '../model'
 
 import { controlMutator } from '../../../controlMutator'
@@ -227,6 +228,7 @@ export const getCancelControlTaskUrl = (taskId: string) => {
 }
 
 /**
+ * Cancelling a task in a non-cancellable state renders 409 conflict; unknown tasks render 404.
  * @summary Cancel a task with operator reason (no creation path exists on control)
  */
 export const cancelControlTask = async (
@@ -247,7 +249,8 @@ export const getCancelControlTaskMutationOptions = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | ControlNotFoundResponse
-    | IdempotencyConflictResponse,
+    | ConflictResponse
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -291,7 +294,8 @@ export type CancelControlTaskMutationError =
   | UnauthorizedResponse
   | ForbiddenResponse
   | ControlNotFoundResponse
-  | IdempotencyConflictResponse
+  | ConflictResponse
+  | UnprocessableEntityResponse
 export type CancelControlTaskMutationVariables = { taskId: string }
 
 /**
@@ -303,7 +307,8 @@ export const useCancelControlTask = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | ControlNotFoundResponse
-    | IdempotencyConflictResponse,
+    | ConflictResponse
+    | UnprocessableEntityResponse,
   TContext = unknown,
 >(
   options?: {

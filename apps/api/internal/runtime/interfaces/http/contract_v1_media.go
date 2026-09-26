@@ -2,14 +2,19 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
+	identityports "ideaboard/api/internal/identity/users/ports"
 	derivativedomain "ideaboard/api/internal/media/derivatives/domain"
+	"ideaboard/api/internal/media/imageformat"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
@@ -26,21 +31,30 @@ import (
 //
 //	POST /api/v1/workspaces/{workspace_id}/uploads (201)
 //	GET  /api/v1/workspaces/{workspace_id}/uploads/{upload_id}
-//	POST /api/v1/workspaces/{workspace_id}/uploads/{upload_id}/complete (200 + asset)
+//	PUT  /api/v1/workspaces/{workspace_id}/uploads/{upload_id}/bytes (200 + session; stages declared bytes)
+//	POST /api/v1/workspaces/{workspace_id}/uploads/{upload_id}/complete (200 + asset; requires staged bytes)
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets (cursor page_size)
+//	POST /api/v1/workspaces/{workspace_id}/media-assets/batch (200 + items; bounded asset_ids)
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/content (bytes)
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant} (bytes)
 //	POST /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/archive (owner/admin)
+//	PUT  /api/v1/me/avatar (200 + avatar_url; user-scoped profile avatar)
 //
-// Binary vs metadata separation: session/list/get/archive speak the
-// JSON envelope only; content/derivative serve bytes (never the
-// envelope, never storage keys). Errors on the binary endpoints are
-// plain non-JSON statuses for the same reason.
+// Binary vs metadata separation: session/list/get/batch/archive/avatar
+// speak JSON (avatar takes raw bytes in, never out); content/derivative
+// serve bytes (never the envelope, never storage keys). The byte PUT is
+// the single writer for upload slots: complete verifies the staged
+// object (size, checksum, sniffed MIME) and fails loudly without
+// materializing anything when bytes are missing or mismatched. Errors
+// on the binary endpoints are plain non-JSON statuses for the same
+// reason.
 //
 // Auth model: workspace membership, not per-owner scoping. Any member
-// reads and completes; archive needs owner/admin. Hidden workspaces
-// converge to 404 workspace_not_found, visible-but-forbidden to 403.
+// reads and completes; archive needs owner/admin. The avatar PUT is
+// user-scoped (any authenticated caller for their own avatar). Hidden
+// workspaces converge to 404 workspace_not_found, visible-but-forbidden
+// to 403.
 // Resource ids are upload_/asset_ opaque segments: malformed shapes,
 // unknown ids, and cross-workspace ids converge to the matching
 // *_not_found 404 (Baseline 4 anti-enumeration).
@@ -76,15 +90,70 @@ const maxCompleteDimension = int32(32768)
 // original-bytes path).
 const v1MediaBinaryMaxBytes = 100 * 1024 * 1024
 
+// maxV1MediaBatchAssets bounds one batch metadata read (bounded input:
+// the per-id lookups stay a single-digit-millisecond fan-out, never an
+// unbounded scan).
+const maxV1MediaBatchAssets = 50
+
+// v1AvatarMaxBytes bounds one avatar upload (5MiB: avatars are display
+// images, never originals).
+const v1AvatarMaxBytes = 5 * 1024 * 1024
+
+// V1AvatarUIDDirectory resolves a caller's storage UID for the
+// user-scoped avatar PUT. Production adapts the identity
+// UserRepository via NewV1AvatarDirectory; tests inject fakes.
+type V1AvatarUIDDirectory interface {
+	GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error)
+}
+
+// avatarUserDirectory adapts identityports.UserRepository to
+// V1AvatarUIDDirectory for composition wiring.
+type avatarUserDirectory struct {
+	repo identityports.UserRepository
+}
+
+// NewV1AvatarDirectory exposes the production V1AvatarUIDDirectory
+// adapter for composition wiring outside this package.
+func NewV1AvatarDirectory(repo identityports.UserRepository) V1AvatarUIDDirectory {
+	return avatarUserDirectory{repo: repo}
+}
+
+func (a avatarUserDirectory) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
+	if a.repo == nil || userID <= 0 {
+		return "", errV1AvatarUIDUnavailable
+	}
+	user, err := a.repo.GetByID(ctx, userID)
+	if err != nil || user == nil || strings.TrimSpace(user.StorageUID) == "" {
+		return "", errV1AvatarUIDUnavailable
+	}
+	return user.StorageUID, nil
+}
+
+// errV1AvatarUIDUnavailable reports avatar storage-UID resolution
+// failures (503, fail closed without leaking which half failed).
+var errV1AvatarUIDUnavailable = errors.New("v1 avatar uid unavailable")
+
+// errV1MediaBytesStoreUnavailable reports byte-PUT storage failures
+// (503: the bytes were valid but the backend did not persist them).
+var errV1MediaBytesStoreUnavailable = errors.New("v1 upload bytes store unavailable")
+
+// errV1MediaStagedReadUnavailable reports transient staged-byte read
+// failures at complete time (503: complete-after-bytes cannot be
+// proven, so no asset is materialized).
+var errV1MediaStagedReadUnavailable = errors.New("v1 staged upload bytes unavailable")
+
 func (h *contractV1Handler) registerMediaRoutes(group *gin.RouterGroup) {
 	group.POST("/workspaces/:workspace_id/uploads", h.createUploadSession)
 	group.GET("/workspaces/:workspace_id/uploads/:upload_id", h.getUploadSession)
+	group.PUT("/workspaces/:workspace_id/uploads/:upload_id/bytes", h.putUploadBytes)
 	group.POST("/workspaces/:workspace_id/uploads/:upload_id/complete", h.completeUploadSession)
 	group.GET("/workspaces/:workspace_id/media-assets", h.listMediaAssets)
+	group.POST("/workspaces/:workspace_id/media-assets/batch", h.batchGetMediaAssets)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id", h.getMediaAsset)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/content", h.contentMediaAsset)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", h.derivativeMediaAsset)
 	group.POST("/workspaces/:workspace_id/media-assets/:asset_id/archive", h.archiveMediaAsset)
+	group.PUT("/me/avatar", h.uploadAvatar)
 }
 
 // requireMediaStore fails closed with 501 when the v1 media store is
@@ -400,6 +469,140 @@ func (h *contractV1Handler) getUploadSession(c *gin.Context) {
 	contract.RenderSuccess(c, dto)
 }
 
+// putUploadBytes stages the declared bytes at the session slot. The
+// slot was reserved at create time (upload_target.slot carries only
+// the opaque upload_ id, never the key); this endpoint is the single
+// writer that materializes bytes there, so complete-after-bytes is
+// real. Request is raw bytes (Content-Type should echo the declared
+// MIME); the response stays the JSON session envelope (bytes never
+// ride JSON). Validation is retryable and changes no state: size must
+// equal the declaration, the sniffed format must equal the declared
+// MIME, and the sha256 must equal the declared checksum.
+func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok {
+		return
+	}
+	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
+	if !allowed {
+		return
+	}
+	uploadID := strings.TrimSpace(c.Param("upload_id"))
+	if !contract.IsUploadID(uploadID) {
+		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+		c.Abort()
+		return
+	}
+	key, err := contract.IdempotencyKeyFromHeader(c)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		c.Abort()
+		return
+	}
+	if h.deps.MediaObjects == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传字节服务暂不可用")
+		c.Abort()
+		return
+	}
+	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, workspacemedia.MaxUploadSizeBytes+1))
+	if readErr != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体非法")
+		c.Abort()
+		return
+	}
+	if len(data) == 0 {
+		renderUploadValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "missing"}})
+		return
+	}
+	if len(data) > int(workspacemedia.MaxUploadSizeBytes) {
+		renderUploadValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"size_bytes": "out_of_range"}})
+		return
+	}
+	session, err := h.deps.Media.GetSession(c.Request.Context(), workspacePublicID, uploadID)
+	if err != nil {
+		renderUploadStoreError(c, err)
+		return
+	}
+	if !session.IsLive() {
+		renderUploadStoreError(c, workspacemedia.ErrStateConflict)
+		return
+	}
+	if int64(len(data)) != session.SizeBytes {
+		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("size_bytes"))
+		return
+	}
+	if raw := strings.TrimSpace(c.GetHeader("Content-Type")); raw != "" {
+		if canonical, ok := imageformat.NormalizeImageMIME(raw); !ok || canonical != session.MIMEType {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("mime_type"))
+			return
+		}
+	}
+	if sniffed := v1SniffedImageMIME(data); sniffed != session.MIMEType {
+		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("mime_type"))
+		return
+	}
+	sum := sha256.Sum256(data)
+	bodyChecksum := hex.EncodeToString(sum[:])
+	if workspacemedia.NormalizeChecksum(bodyChecksum) != session.ChecksumSHA256 {
+		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("checksum_sha256"))
+		return
+	}
+	ctx := c.Request.Context()
+	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+	scope := contract.IdempotencyScope(externalUser, "upload:bytes")
+	hash := contract.HashIdempotencyRequest("upload:bytes", workspacePublicID, uploadID, bodyChecksum,
+		strconv.FormatInt(int64(len(data)), 10), session.MIMEType)
+	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, session.MIMEType); putErr != nil {
+			return nil, errV1MediaBytesStoreUnavailable
+		}
+		staged, getErr := h.deps.Media.GetSession(ctx, workspacePublicID, uploadID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		dto := toUploadSessionDTO(staged)
+		return &dto, nil
+	})
+	if doErr != nil {
+		if contract.IsIdempotencyConflict(doErr) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+			c.Abort()
+			return
+		}
+		if errors.Is(doErr, errV1MediaBytesStoreUnavailable) {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传字节服务暂不可用")
+			c.Abort()
+			return
+		}
+		renderUploadStoreError(c, doErr)
+		return
+	}
+	dto, ok := result.(*v1UploadSessionDTO)
+	if !ok || dto == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+		c.Abort()
+		return
+	}
+	contract.RenderSuccess(c, dto)
+}
+
+// v1SniffedImageMIME returns the registry-canonical MIME sniffed from
+// raw bytes, or "" when the bytes match no allowlisted image format.
+func v1SniffedImageMIME(data []byte) string {
+	ext := imageformat.DetectImageExtensionFromBytes(data)
+	if ext == "" {
+		return ""
+	}
+	return imageformat.ImageMIMEFromExtension(ext)
+}
+
+// v1StagedChecksum returns the normalized hex sha256 of staged bytes
+// for declaration comparison.
+func v1StagedChecksum(data []byte) string {
+	sum := sha256.Sum256(data)
+	return workspacemedia.NormalizeChecksum(hex.EncodeToString(sum[:]))
+}
+
 type v1CompleteUploadBody struct {
 	Data struct {
 		ChecksumSHA256 string `json:"checksum_sha256"`
@@ -480,6 +683,11 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 			c.Abort()
 			return
 		}
+		if errors.Is(doErr, errV1MediaStagedReadUnavailable) {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+			c.Abort()
+			return
+		}
 		renderUploadValidationError(c, doErr)
 		return
 	}
@@ -505,6 +713,20 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 	if err != nil {
 		return nil, err
 	}
+	// Complete-after-bytes: with a byte backend wired, the staged
+	// object must exist at the session slot and match the declaration
+	// before anything durable is written. Completion without staged
+	// bytes fails loudly here and never materializes a broken asset.
+	session, err := h.deps.Media.GetSession(ctx, workspacePublicID, uploadID)
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsLive() {
+		return nil, workspacemedia.ErrStateConflict
+	}
+	if gateErr := h.verifyStagedUploadBytes(ctx, session); gateErr != nil {
+		return nil, gateErr
+	}
 	completed, asset, err := h.deps.Media.CompleteSession(ctx, workspacePublicID, uploadID, facts, workspacemedia.CreateAssetParams{
 		WorkspaceID: workspacePublicID,
 		OwnerUserID: identityPrincipal.UserID(),
@@ -526,6 +748,42 @@ func (h *contractV1Handler) completeUploadOnce(ctx context.Context, workspacePub
 	uploadDTO := toUploadSessionDTO(completed)
 	dto := &v1CompleteUploadDTO{Upload: uploadDTO, Asset: toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(completed.UpdatedAt))}
 	return dto, nil
+}
+
+// verifyStagedUploadBytes enforces complete-after-bytes against the
+// staged slot object. Missing bytes report 422 (retryable: the session
+// stays live for a byte PUT); mismatched bytes fail the session —
+// mirroring completion-echo semantics — and report 422. Transient
+// backend failures report 503 without writing anything. Without a byte
+// backend the gate is skipped (degraded metadata mode); production
+// wiring always sets MediaObjects.
+func (h *contractV1Handler) verifyStagedUploadBytes(ctx context.Context, session *workspacemedia.Session) error {
+	if h == nil || h.deps.MediaObjects == nil || session == nil {
+		return nil
+	}
+	object, err := h.deps.MediaObjects.ReadObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, workspacemedia.MaxUploadSizeBytes)
+	if err != nil {
+		if errors.Is(err, storagedomain.ErrStoredObjectNotFound) {
+			return &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "missing"}}
+		}
+		return errV1MediaStagedReadUnavailable
+	}
+	if object == nil || len(object.Data) == 0 {
+		return &workspacemedia.ValidationError{Fields: map[string]string{"bytes": "missing"}}
+	}
+	if int64(len(object.Data)) != session.SizeBytes {
+		_, _ = h.deps.Media.FailSession(ctx, session.WorkspaceID, session.ID, "staged size mismatch")
+		return &workspacemedia.ValidationError{Fields: map[string]string{"size_bytes": "invalid"}}
+	}
+	if sniffed := v1SniffedImageMIME(object.Data); sniffed != session.MIMEType {
+		_, _ = h.deps.Media.FailSession(ctx, session.WorkspaceID, session.ID, "staged mime mismatch")
+		return &workspacemedia.ValidationError{Fields: map[string]string{"mime_type": "invalid"}}
+	}
+	if v1StagedChecksum(object.Data) != session.ChecksumSHA256 {
+		_, _ = h.deps.Media.FailSession(ctx, session.WorkspaceID, session.ID, "staged checksum mismatch")
+		return &workspacemedia.ValidationError{Fields: map[string]string{"checksum_sha256": "invalid"}}
+	}
+	return nil
 }
 
 // generateMediaDerivativesBestEffort runs sequential derivative
@@ -605,6 +863,55 @@ func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
 		return
 	}
 	contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
+}
+
+type v1BatchMediaAssetsBody struct {
+	Data struct {
+		AssetIDs []string `json:"asset_ids"`
+	} `json:"data"`
+}
+
+type v1BatchMediaAssetsDTO struct {
+	Items []v1MediaAssetDTO `json:"items"`
+}
+
+// batchGetMediaAssets reads up to maxV1MediaBatchAssets assets in one
+// call (bounded input). Auth, workspace scoping, and per-id 404
+// convergence match the single-read endpoint; the response wraps the
+// same asset DTOs in request order. Read-only, so no Idempotency-Key
+// (library asset-resolutions precedent).
+func (h *contractV1Handler) batchGetMediaAssets(c *gin.Context) {
+	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
+	if !allowed {
+		return
+	}
+	var body v1BatchMediaAssetsBody
+	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		c.Abort()
+		return
+	}
+	ids := body.Data.AssetIDs
+	if len(ids) < 1 || len(ids) > maxV1MediaBatchAssets {
+		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"asset_ids": "out_of_range"}})
+		return
+	}
+	items := make([]v1MediaAssetDTO, 0, len(ids))
+	for _, raw := range ids {
+		assetID := strings.TrimSpace(raw)
+		if !contract.IsAssetID(assetID) {
+			renderMediaStoreError(c, workspacemedia.ErrNotFound)
+			return
+		}
+		asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
+		if err != nil {
+			renderMediaStoreError(c, err)
+			return
+		}
+		items = append(items, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
+	}
+	contract.RenderSuccess(c, v1BatchMediaAssetsDTO{Items: items})
 }
 
 func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
@@ -805,6 +1112,111 @@ func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
 	renderV1BinaryError(c, http.StatusConflict)
 }
 
+type v1AvatarDTO struct {
+	AvatarURL string `json:"avatar_url"`
+}
+
+// uploadAvatar replaces the caller's profile avatar (user-scoped: the
+// v1 successor of the deleted legacy /api/user/profile/avatar). The
+// request is raw image bytes (never JSON, never multipart); the
+// response is the JSON envelope with the avatar URL served by the
+// existing static uploads handler (owner-only reads, unchanged). MIME
+// is sniffed from the bytes against the imageformat allowlist and size
+// is capped at v1AvatarMaxBytes; the object key reuses the static
+// profile-avatar namespace so serving needs no new endpoint.
+func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
+	identityPrincipal, ok := v1RequestPrincipal(c)
+	if !ok {
+		return
+	}
+	if h.deps.AvatarUID == nil {
+		contract.RenderError(c, http.StatusNotImplemented,
+			contract.CodeContractNotImplemented, "The v1 avatar surface is not implemented yet")
+		c.Abort()
+		return
+	}
+	if h.deps.MediaObjects == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		c.Abort()
+		return
+	}
+	key, err := contract.IdempotencyKeyFromHeader(c)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		c.Abort()
+		return
+	}
+	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, v1AvatarMaxBytes+1))
+	if readErr != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体非法")
+		c.Abort()
+		return
+	}
+	if len(data) == 0 {
+		renderMediaValidationError(c, workspacemedia.NewFieldValidationError("avatar"))
+		return
+	}
+	if len(data) > v1AvatarMaxBytes {
+		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"avatar": "out_of_range"}})
+		return
+	}
+	ext := imageformat.DetectImageExtensionFromBytes(data)
+	mime := imageformat.ImageMIMEFromExtension(ext)
+	if ext == "" || mime == "" {
+		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"avatar": "unsupported"}})
+		return
+	}
+	if raw := strings.TrimSpace(c.GetHeader("Content-Type")); raw != "" {
+		if canonical, ok := imageformat.NormalizeImageMIME(raw); !ok || canonical != mime {
+			renderMediaValidationError(c, workspacemedia.NewFieldValidationError("avatar"))
+			return
+		}
+	}
+	ctx := c.Request.Context()
+	storageUID, err := h.deps.AvatarUID.GetStorageUIDByUserID(ctx, identityPrincipal.UserID())
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		c.Abort()
+		return
+	}
+	prefix, err := storagedomain.ProfileAvatarUploadObjectPrefix(storageUID)
+	if err != nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		c.Abort()
+		return
+	}
+	objectKey := prefix + "avatar" + ext
+	sum := sha256.Sum256(data)
+	bodyChecksum := hex.EncodeToString(sum[:])
+	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+	scope := contract.IdempotencyScope(externalUser, "avatar:upload")
+	hash := contract.HashIdempotencyRequest("avatar:upload", externalUser, bodyChecksum,
+		strconv.FormatInt(int64(len(data)), 10), mime)
+	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, objectKey, data, mime); putErr != nil {
+			return nil, errV1MediaBytesStoreUnavailable
+		}
+		return &v1AvatarDTO{AvatarURL: "/" + objectKey}, nil
+	})
+	if doErr != nil {
+		if contract.IsIdempotencyConflict(doErr) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, "幂等请求与原请求不一致")
+			c.Abort()
+			return
+		}
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		c.Abort()
+		return
+	}
+	dto, ok := result.(*v1AvatarDTO)
+	if !ok || dto == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		c.Abort()
+		return
+	}
+	contract.RenderSuccess(c, dto)
+}
+
 // OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).
 // Add under paths (tags: WorkspaceMedia), reusing components parameters
 // Cursor/PageSize/WorkspaceId/UploadId/AssetId/IdempotencyKey/RequestId and responses
@@ -814,10 +1226,22 @@ func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
 //	  post: {operationId: createWorkspaceUpload, parameters: [WorkspaceId, IdempotencyKey]}
 //	/workspaces/{workspace_id}/uploads/{upload_id}:
 //	  get: {operationId: getWorkspaceUpload, parameters: [WorkspaceId, UploadId]}
+//	/workspaces/{workspace_id}/uploads/{upload_id}/bytes:
+//	  put: {operationId: stageWorkspaceUploadBytes, parameters: [WorkspaceId, UploadId, IdempotencyKey],
+//	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary}}},
+//	                     description: 'Raw image bytes matching the session declaration (size, checksum, MIME). Retryable 422s change no state.'}}
 //	/workspaces/{workspace_id}/uploads/{upload_id}/complete:
 //	  post: {operationId: completeWorkspaceUpload, parameters: [WorkspaceId, UploadId, IdempotencyKey]}
+//	        (complete-after-bytes: 422 upload_validation_failed details.bytes=missing when no bytes
+//	         were staged, details.size_bytes/checksum_sha256/mime_type on staged mismatch (session failed);
+//	         503 service_unavailable on transient staged-read failures)
 //	/workspaces/{workspace_id}/media-assets:
 //	  get: {operationId: listWorkspaceMediaAssets, parameters: [WorkspaceId, Cursor, PageSize]}
+//	/workspaces/{workspace_id}/media-assets/batch:
+//	  post: {operationId: batchGetWorkspaceMediaAssets, parameters: [WorkspaceId],
+//	        requestBody: {data: {asset_ids: {type: array, minItems: 1, maxItems: 50, items: {type: string, pattern: '^asset_'}}}}}
+//	        (read-only POST, no Idempotency-Key; any malformed/unknown/cross-workspace id converges
+//	         to 404 media_not_found; over-bound renders 422 media_validation_failed)
 //	/workspaces/{workspace_id}/media-assets/{asset_id}:
 //	  get: {operationId: getWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId]}
 //	/workspaces/{workspace_id}/media-assets/{asset_id}/content:
@@ -826,10 +1250,19 @@ func (h *contractV1Handler) derivativeMediaAsset(c *gin.Context) {
 //	  get: {operationId: derivativeWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, {name: variant, in: path, required: true, schema: {type: string, enum: [thumb, preview, large-preview]}}]}
 //	/workspaces/{workspace_id}/media-assets/{asset_id}/archive:
 //	  post: {operationId: archiveWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, IdempotencyKey]}
+//	/me/avatar:
+//	  put: {operationId: uploadAvatar, parameters: [IdempotencyKey],
+//	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary, maxLength: 5242880}}},
+//	                     description: 'Raw image bytes (allowlisted image MIME, 5MiB cap). Served back by the existing static /uploads/profile/{uid}/avatar reads.'}}
 //
 // Schemas (UploadSession/MediaAsset/UploadId/MediaAssetId and request
 // bodies) already exist in openapi.public.yaml from #803; the paths
 // above were removed with the surface in #813 and return here unchanged.
+// New schemas for the merger: BatchGetMediaAssetsRequest
+// ({data: {asset_ids: asset_[]}}), BatchGetMediaAssetsResult
+// ({items: MediaAsset[]}), AvatarUploadResult ({avatar_url: string,
+// pattern '^/uploads/profile/'}); the bytes PUT takes a binary body
+// (no JSON schema) and its success reuses the UploadSession envelope.
 //
 // Error codes frozen: upload_not_found (404), upload_expired (410),
 // upload_state_conflict (409), upload_idempotency_conflict (409),

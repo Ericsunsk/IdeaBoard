@@ -1,16 +1,40 @@
 import { inject, type InjectionKey } from 'vue'
-import { api } from '../../../../shared/api/client'
 import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
+  abandonWorkspacePendingOrder as abandonWorkspacePendingOrderTransport,
+  continueWorkspacePendingOrder as continueWorkspacePendingOrderTransport,
+  createWorkspaceCheckoutSession,
+  getWorkspaceCheckoutSession,
+  getWorkspacePurchaseOptions,
+  listWorkspacePendingOrders,
+  listWorkspaceRecharges,
+} from '../../../../shared/api/generated-query/public/workspace-billing/workspace-billing'
+import type {
+  WorkspaceCheckoutSession,
+  WorkspacePendingOrder,
+  WorkspacePendingOrderList,
+  WorkspacePurchaseOptions,
+  WorkspaceRechargeHistoryItem,
+} from '../../../../shared/api/generated-query/public/model'
+import { buildContractRequestHeaders, newRequestId } from '../../../../shared/api/contractKernel'
+import { workspaceBillingPendingOrderIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 import { i18n } from '../../../../shared/i18n'
+import { subscribeWorkspaceEvent } from '../../../../shared/api/workspaceEventStream'
+import {
+  readContractListBody,
+  requireAccountWorkspaceId,
+  resolveWorkspaceBillingData,
+  asWorkspaceBillingError,
+} from '../workspaceBilling'
 
-// User payments boundary (issue #809). The generated `user-payments` client
-// is gone but the backend user plane still serves `/api/user/payments/*`
-// with the shared envelope, so this boundary transports through the central
-// `api.request` with local view types. The event subscription still rides
-// the surviving `/api/user/events` stream.
+// User payments boundary (W2 transports). Checkout creation, return
+// status, purchase options, pending orders (list/continue/abandon), and
+// recharge history moved to the Public Data Plane (`/api/v1/workspaces/
+// {id}/...`): the v1 `session_id` is the legacy order `public_token`
+// (same value, same settlement source), and the v1 pending-order
+// `public_token` carries the same value, so view types keep their
+// `public_token` names. Settlement notification rides the workspace
+// `billing.settled` event. The deleted `/api/user/payments/*` routes
+// are gone; this module is the single transport.
 export type PaymentCheckoutRequest = {
   idempotency_key: string
   idea_quantity: number
@@ -107,17 +131,22 @@ export type PaymentEvent = {
 }
 
 export interface PaymentsResource {
-  getPurchaseOptions(signal?: AbortSignal): Promise<PaymentPurchaseOptions>
-  createCheckout(request: PaymentCheckoutRequest): Promise<PaymentCheckoutSession>
-  getReturnStatus(publicToken: string, signal?: AbortSignal): Promise<PaymentOrderReturnStatus>
-  listPendingOrders(signal?: AbortSignal): Promise<PendingPaymentOrderList>
-  continuePendingOrder(publicToken: string): Promise<PendingPaymentOrder>
-  abandonPendingOrder(publicToken: string): Promise<PendingPaymentOrder>
+  getPurchaseOptions(workspaceId: string, signal?: AbortSignal): Promise<PaymentPurchaseOptions>
+  createCheckout(workspaceId: string, request: PaymentCheckoutRequest): Promise<PaymentCheckoutSession>
+  getReturnStatus(
+    workspaceId: string,
+    publicToken: string,
+    signal?: AbortSignal,
+  ): Promise<PaymentOrderReturnStatus>
+  listPendingOrders(workspaceId: string, signal?: AbortSignal): Promise<PendingPaymentOrderList>
+  continuePendingOrder(workspaceId: string, publicToken: string): Promise<PendingPaymentOrder>
+  abandonPendingOrder(workspaceId: string, publicToken: string): Promise<PendingPaymentOrder>
   listRecharges(
+    workspaceId: string,
     params: { cursor?: string; limit: number },
     signal?: AbortSignal,
   ): Promise<RechargeHistoryPage>
-  subscribe(listener: (event: PaymentEvent) => void): () => void
+  subscribe(workspaceId: string, listener: (event: PaymentEvent) => void): () => void
 }
 
 export type PaymentsContext = {
@@ -125,99 +154,218 @@ export type PaymentsContext = {
   navigateToCheckout: (checkoutURL: string) => void
 }
 
-import { subscribeUserEvent } from '../../../../shared/api/userEventStream'
-
 export const paymentsContextKey: InjectionKey<PaymentsContext> = Symbol('payments-context')
 
-function paymentQueryString(params: Record<string, string | number | undefined>): string {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.append(key, String(value))
-  }
-  const query = search.toString()
-  return query ? `?${query}` : ''
-}
-
-const productionResource: PaymentsResource = {
-  getPurchaseOptions: (signal) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PaymentPurchaseOptions>>('/user/payments/purchase-options', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
+export const paymentsResource: PaymentsResource = {
+  getPurchaseOptions: async (workspaceId, signal) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const options = await resolveWorkspaceBillingData<WorkspacePurchaseOptions>(
+      getWorkspacePurchaseOptions(id, { ...(signal == null ? {} : { signal }) }),
       i18n.global.t('account.errors.optionsLoadFailed'),
-    ),
-  createCheckout: (request) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PaymentCheckoutSession>>(
-        '/user/payments/checkout-sessions',
+    )
+    return toPurchaseOptions(options)
+  },
+  createCheckout: async (workspaceId, request) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const session = await resolveWorkspaceBillingData<WorkspaceCheckoutSession>(
+      createWorkspaceCheckoutSession(
+        id,
         {
-          method: 'POST',
-          body: request as unknown as Record<string, unknown>,
+          data: {
+            idea_quantity: request.idea_quantity,
+            terms_accepted: true,
+            terms_version: request.terms_version,
+            refund_policy_version: request.refund_policy_version,
+          },
+        },
+        {
+          headers: buildContractRequestHeaders({
+            requestId: newRequestId(),
+            idempotencyKey: request.idempotency_key,
+          }),
         },
       ),
       i18n.global.t('account.errors.checkoutCreateFailed'),
-    ),
-  getReturnStatus: (publicToken, signal) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PaymentOrderReturnStatus>>(
-        `/user/payments/orders/${encodeURIComponent(publicToken)}`,
-        {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
-        },
-      ),
+    )
+    return requireCheckoutSession(session)
+  },
+  getReturnStatus: async (workspaceId, publicToken, signal) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const session = await resolveWorkspaceBillingData<WorkspaceCheckoutSession>(
+      getWorkspaceCheckoutSession(id, publicToken, { signal }),
       i18n.global.t('account.errors.orderStatusLoadFailed'),
-    ),
-  listPendingOrders: (signal) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PendingPaymentOrderList>>('/user/payments/pending-orders', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
+    )
+    return toReturnStatus(session)
+  },
+  listPendingOrders: async (workspaceId, signal) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const list = await resolveWorkspaceBillingData<WorkspacePendingOrderList>(
+      listWorkspacePendingOrders(id, { ...(signal == null ? {} : { signal }) }),
       i18n.global.t('account.errors.pendingOrdersLoadFailed'),
-    ),
-  continuePendingOrder: (publicToken) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PendingPaymentOrder>>(
-        `/user/payments/pending-orders/${encodeURIComponent(publicToken)}/continue`,
-        { method: 'POST' },
+    )
+    if (!Array.isArray(list?.items)) throw new Error(i18n.global.t('account.errors.pendingOrdersLoadFailed'))
+    return { items: list.items.map(toPendingOrder) }
+  },
+  continuePendingOrder: async (workspaceId, publicToken) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const order = await resolveWorkspaceBillingData<WorkspacePendingOrder>(
+      continueWorkspacePendingOrderTransport(
+        id,
+        publicToken.trim(),
+        {
+          headers: buildContractRequestHeaders({
+            requestId: newRequestId(),
+            idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('continue'),
+          }),
+        },
       ),
       i18n.global.t('account.errors.continuePaymentFailed'),
-    ),
-  abandonPendingOrder: (publicToken) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<PendingPaymentOrder>>(
-        `/user/payments/pending-orders/${encodeURIComponent(publicToken)}/abandon`,
-        { method: 'POST' },
-      ),
-      i18n.global.t('account.errors.abandonOrderFailed'),
-    ),
-  listRecharges: (params, signal) =>
-    resolveApiData(
-      api.request<ApiResponseWithData<RechargeHistoryPage>>(
-        `/user/payments/recharges${paymentQueryString({ cursor: params.cursor, limit: params.limit })}`,
+    )
+    return toPendingOrder(order)
+  },
+  abandonPendingOrder: async (workspaceId, publicToken) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const order = await resolveWorkspaceBillingData<WorkspacePendingOrder>(
+      abandonWorkspacePendingOrderTransport(
+        id,
+        publicToken.trim(),
         {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
+          headers: buildContractRequestHeaders({
+            requestId: newRequestId(),
+            idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('abandon'),
+          }),
         },
       ),
-      i18n.global.t('account.errors.historyLoadFailed'),
-    ),
-  subscribe: (listener) => subscribeToPaymentEvents(listener),
+      i18n.global.t('account.errors.abandonOrderFailed'),
+    )
+    return toPendingOrder(order)
+  },
+  listRecharges: async (workspaceId, params, signal) => {
+    const id = requireAccountWorkspaceId(workspaceId)
+    const fallback = i18n.global.t('account.errors.historyLoadFailed')
+    const query: { cursor?: string; page_size?: number } = {}
+    if (params.cursor?.trim()) query.cursor = params.cursor.trim()
+    if (params.limit != null) query.page_size = params.limit
+    let body: unknown
+    try {
+      body = await listWorkspaceRecharges(id, query, { ...(signal == null ? {} : { signal }) })
+    } catch (error) {
+      throw asWorkspaceBillingError(error, fallback)
+    }
+    const page = readContractListBody<{ data: WorkspaceRechargeHistoryItem[]; meta: { has_more: boolean; next_cursor?: string | null } }>(body, fallback)
+    if (!Array.isArray(page?.data) || page?.meta == null) throw new Error(fallback)
+    return {
+      items: page.data.map(toRechargeItem),
+      ...(page.meta.has_more && page.meta.next_cursor ? { next_cursor: page.meta.next_cursor } : {}),
+    }
+  },
+  subscribe: (workspaceId, listener) => subscribeToPaymentEvents(workspaceId, listener),
 }
 
 const defaultContext: PaymentsContext = {
-  resource: productionResource,
+  resource: paymentsResource,
   navigateToCheckout: (checkoutURL) => window.location.assign(checkoutURL),
 }
 
-export function subscribeToPaymentEvents(listener: (event: PaymentEvent) => void): () => void {
-  const handlePayment = (message: MessageEvent<string>) => {
-    const event = parsePaymentEvent(message.data)
-    if (event) listener(event)
+function requireCheckoutSession(session: WorkspaceCheckoutSession): PaymentCheckoutSession {
+  const fallback = i18n.global.t('account.errors.checkoutCreateFailed')
+  if (!session.session_id || !session.checkout_url || !session.expires_at) {
+    throw new Error(fallback)
   }
-  return subscribeUserEvent('payment.updated', handlePayment)
+  return {
+    checkout_url: session.checkout_url,
+    public_token: session.session_id,
+    expires_at: session.expires_at,
+    reused: session.reused === true,
+  }
+}
+
+function toPurchaseOptions(options: WorkspacePurchaseOptions): PaymentPurchaseOptions {
+  const result: PaymentPurchaseOptions = {
+    purchases_available: options.purchases_available,
+    quick_idea_quantities: [...options.quick_idea_quantities],
+    min_idea_quantity: options.min_idea_quantity,
+    max_idea_quantity: options.max_idea_quantity,
+    ideas_per_usd: options.ideas_per_usd,
+    terms: { version: options.terms.version, url: options.terms.url },
+    refund_policy: {
+      version: options.refund_policy.version,
+      url: options.refund_policy.url,
+    },
+  }
+  if (options.unavailable_reason != null) result.unavailable_reason = options.unavailable_reason
+  if (options.restriction_type != null) result.restriction_type = options.restriction_type
+  return result
+}
+
+function toPendingOrder(order: WorkspacePendingOrder): PendingPaymentOrder {
+  const result: PendingPaymentOrder = {
+    public_token: order.public_token,
+    idea_quantity: order.idea_quantity,
+    status: order.status,
+    expires_at: order.expires_at,
+    updated_at: order.updated_at,
+  }
+  if (order.checkout_url != null) result.checkout_url = order.checkout_url
+  return result
+}
+
+function toRechargeItem(item: WorkspaceRechargeHistoryItem): RechargeHistoryItem {
+  const result: RechargeHistoryItem = {
+    occurred_at: item.occurred_at,
+    idea_quantity: item.idea_quantity,
+    status: item.status,
+  }
+  if (item.paid_amount_minor != null) result.paid_amount_minor = item.paid_amount_minor
+  if (item.paid_currency != null) result.paid_currency = item.paid_currency
+  if (item.refunded_idea_quantity != null) result.refunded_idea_quantity = item.refunded_idea_quantity
+  if (item.refunded_amount_minor != null) result.refunded_amount_minor = item.refunded_amount_minor
+  if (item.receipt_url != null) result.receipt_url = item.receipt_url
+  return result
+}
+
+function toReturnStatus(session: WorkspaceCheckoutSession): PaymentOrderReturnStatus {
+  const fallback = i18n.global.t('account.errors.orderStatusLoadFailed')
+  if (
+    session.status !== PaymentOrderReturnStatusStatus.processing &&
+    session.status !== PaymentOrderReturnStatusStatus.credited &&
+    session.status !== PaymentOrderReturnStatusStatus.failed
+  ) {
+    throw new Error(fallback)
+  }
+  return {
+    idea_quantity: session.idea_quantity ?? 0,
+    status: session.status,
+    updated_at: session.expires_at ?? '',
+  }
+}
+
+export function subscribeToPaymentEvents(
+  workspaceId: string,
+  listener: (event: PaymentEvent) => void,
+): () => void {
+  // No selection means no stream: stay unsubscribed (the queries stay
+  // disabled with guidance) instead of guessing a workspace.
+  const trimmed = workspaceId?.trim() ?? ''
+  if (!trimmed) return () => {}
+  const id = requireAccountWorkspaceId(trimmed)
+  // The v1 stream reports settlement per checkout session; a cursor gap
+  // means state may have been missed, so refresh the same way.
+  const notifySettled = (sessionId?: string) =>
+    listener(sessionId ? { status: 'credited', public_token: sessionId } : { status: 'credited' })
+  return subscribeWorkspaceEvent(
+    id,
+    (envelope) => {
+      if (envelope.type !== 'billing.settled') return
+      const sessionId =
+        envelope.resource.type === 'checkout_session' ? envelope.resource.id : undefined
+      notifySettled(sessionId)
+    },
+    {
+      types: ['billing.settled'],
+      onGap: () => notifySettled(),
+    },
+  )
 }
 
 export function parsePaymentEvent(raw: string): PaymentEvent | null {
@@ -251,10 +399,10 @@ export function usePaymentsContext(): PaymentsContext {
 }
 
 export const paymentsQueryKeys = {
-  all: ['user', 'payments'] as const,
-  options: ['user', 'payments', 'purchase-options'] as const,
-  pending: ['user', 'payments', 'pending-orders'] as const,
-  history: ['user', 'payments', 'recharges'] as const,
-  returnStatus: (publicToken: string) =>
-    ['user', 'payments', 'orders', 'return', publicToken] as const,
+  all: ['workspace', 'payments'] as const,
+  options: (workspaceId: string) => ['workspace', 'payments', 'purchase-options', workspaceId] as const,
+  pending: (workspaceId: string) => ['workspace', 'payments', 'pending-orders', workspaceId] as const,
+  history: (workspaceId: string) => ['workspace', 'payments', 'recharges', workspaceId] as const,
+  returnStatus: (workspaceId: string, publicToken: string) =>
+    ['workspace', 'payments', 'orders', 'return', workspaceId, publicToken] as const,
 }

@@ -1,12 +1,12 @@
 import { ref } from 'vue'
 import { i18n } from '../../../../shared/i18n'
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/vue-query'
+import { useAccountWorkspace } from '../accountWorkspace'
 import {
   billingRecordsQueryKeys,
   creditsQueryKeys,
   redeemRewardCode,
   rewardRedemptionsQueryKeys,
-  type CreditWalletSummary,
   type RewardRedeemResult,
   type RewardRedemptionItem,
   type RewardRedemptionPageData,
@@ -49,9 +49,14 @@ export function createRewardRedemptionWorkflow(dependencies: RewardRedemptionDep
 }
 export function useRewardRedemption() {
   const queryClient = useQueryClient()
+  const { workspaceId } = useAccountWorkspace()
   return createRewardRedemptionWorkflow({
-    redeem: redeemRewardCode,
-    setAvailableBalance: (availableBalance) => updateWalletBalance(queryClient, availableBalance),
+    redeem: (code) => redeemRewardCode(workspaceId.value ?? '', code),
+    setAvailableBalance: () => {
+      // Wallet keys are workspace-scoped now; redemption invalidates the
+      // whole wallet root instead of patching one entry.
+      void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
+    },
     prependRedemption: (redemption) => prependRewardRedemption(queryClient, redemption),
     invalidateBillingRecords: () =>
       queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all }),
@@ -64,7 +69,7 @@ export function prependRewardRedemption(
   queryClient: QueryClient,
   redemption: RewardRedemptionItem,
 ): void {
-  queryClient.setQueryData<InfiniteData<RewardRedemptionPageData, number>>(
+  queryClient.setQueryData<InfiniteData<RewardRedemptionPageData, string>>(
     rewardRedemptionsQueryKeys.all,
     (cached) => {
       if (
@@ -75,7 +80,7 @@ export function prependRewardRedemption(
       if (!cached?.pages.length) {
         return {
           pages: [{ redemptions: [redemption] }],
-          pageParams: [0],
+          pageParams: [''],
         }
       }
 
@@ -91,11 +96,4 @@ export function prependRewardRedemption(
       }
     },
   )
-}
-
-function updateWalletBalance(queryClient: QueryClient, availableBalance: number) {
-  queryClient.setQueryData<CreditWalletSummary>(creditsQueryKeys.wallet, (wallet) => {
-    if (!wallet) return wallet
-    return { ...wallet, available_credits: availableBalance }
-  })
 }

@@ -1,10 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { resolveImageNodeLatestOutput, type ImageNodeItem } from '../../../board'
 import {
   DEFAULT_IMAGE_NODE_LAYOUT_WIDTH,
   resolveImageNodeDisplayPayload,
   resolveImageNodeLayoutAnchor,
 } from './flowImageNodeSelectors'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaWorkspaceScope'
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
+
+afterEach(() => {
+  resetMediaWorkspaceIdResolver()
+})
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {
@@ -44,7 +56,7 @@ describe('flowImageNodeSelectors', () => {
       mediaRef: { assetId: 'asset_latest', derivativeTier: 'preview' },
     })
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
-      url: '/api/user/media-assets/asset_latest/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_latest/derivatives/preview',
       ratio: 1.4,
       mediaRef: { assetId: 'asset_latest', derivativeTier: 'preview' },
       assetId: 'asset_latest',
@@ -61,7 +73,7 @@ describe('flowImageNodeSelectors', () => {
     })
 
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
-      url: '/api/user/media-assets/asset_source/derivatives/preview/content',
+      url: '/api/v1/workspaces/ws_test123/media-assets/asset_source/derivatives/preview',
       ratio: 0.5,
       mediaRef: { assetId: 'asset_source', derivativeTier: 'preview' },
       assetId: 'asset_source',

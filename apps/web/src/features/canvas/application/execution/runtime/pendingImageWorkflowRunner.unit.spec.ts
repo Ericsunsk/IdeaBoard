@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TaskCancelledError, TaskResultPendingError } from '../../../../../shared/api/taskEvents'
+import { TaskCancelledError, TaskResultPendingError } from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../../shared/i18n/userLocale'
 import { createEmptyBoardSnapshot, type ImageNodeItem } from '../../../../board'

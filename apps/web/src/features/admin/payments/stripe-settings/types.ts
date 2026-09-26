@@ -24,5 +24,8 @@ export type SaveStripeConfigurationInput = {
 
 export interface AdminStripeSettingsResource {
   get: () => Promise<StripeConfigurationSummary>
-  save: (input: SaveStripeConfigurationInput) => Promise<StripeConfigurationSummary>
+  save: (
+    input: SaveStripeConfigurationInput,
+    options: { operatorReason: string; idempotencyKey?: string | undefined },
+  ) => Promise<StripeConfigurationSummary>
 }

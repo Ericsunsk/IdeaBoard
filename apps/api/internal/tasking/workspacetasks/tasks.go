@@ -38,6 +38,13 @@ const MaxOutputsPerTask = 4
 // MaxMediaInputs bounds media_asset_ids per create.
 const MaxMediaInputs = 8
 
+// MaxWorkspaceTaskPromptBytes bounds the v1 data.prompt input in bytes.
+// It mirrors the legacy submit bound (maxSubmitTaskPromptBytes, 8KB):
+// generation/inpaint require a prompt, render/variations/fusion/outpaint
+// accept an optional prompt, cutout/upscale ignore it (dropped at
+// canonical compile, legacy parity).
+const MaxWorkspaceTaskPromptBytes = 8 * 1024
+
 var (
 	// ErrNotFound reports an invisible task (unknown id, malformed shape
 	// at lookup, or cross-workspace id). Handlers render it as 404
@@ -260,6 +267,39 @@ func ValidateCreate(kind string, mediaAssetIDs []string, params map[string]any) 
 	return canonical, nil
 }
 
+// ValidateWorkspacePrompt enforces the explicit v1 prompt input: an empty
+// (all-whitespace) prompt means "no prompt" and is valid here; feature
+// policy (required/optional/ignored) is enforced at canonical compile
+// time, where the execution plan is known. Over-long prompts fail closed.
+func ValidateWorkspacePrompt(prompt string) error {
+	if len([]byte(prompt)) > MaxWorkspaceTaskPromptBytes {
+		return newValidationError(FieldError{Field: "prompt", Message: "too_long"})
+	}
+	return nil
+}
+
+// MaskAssetIDFromParams extracts the v1 mask reference
+// (params.mask_asset_id, a workspace public asset_... id minted by the
+// existing upload-session flow). The second return reports presence; shape
+// validation stays in ValidateParams so direct callers fail closed too.
+func MaskAssetIDFromParams(params map[string]any) (string, bool) {
+	if len(params) == 0 {
+		return "", false
+	}
+	raw, ok := params[paramkeys.MaskAssetID]
+	if !ok {
+		return "", false
+	}
+	id, ok := raw.(string)
+	if !ok {
+		return "", false
+	}
+	if trimmed := strings.TrimSpace(id); trimmed != "" {
+		return trimmed, true
+	}
+	return "", false
+}
+
 // ValidateParams rejects unknown fields and raw storage URLs. Unknown
 // fields fail closed (422) per Baseline 5.1; storage URLs fail closed
 // because persisted task params must never contain media URLs (the
@@ -274,6 +314,18 @@ func ValidateParams(params map[string]any) error {
 		}
 		if paramkeys.IsLegacyPersistedMediaKey(key) {
 			return newValidationError(FieldError{Field: "params." + key, Message: "raw_media_url_forbidden"})
+		}
+		if key == paramkeys.MaskAssetID {
+			// Contract-typed mask reference: asset_... only. Data-URL and
+			// storage-URL masks cannot ride durable task params; the mask
+			// bytes must be uploaded through the existing upload-session
+			// flow first and linked here by asset id.
+			id, ok := value.(string)
+			if !ok || !contract.IsAssetID(strings.TrimSpace(id)) ||
+				!contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(id)) {
+				return newValidationError(FieldError{Field: "params." + key, Message: "invalid"})
+			}
+			continue
 		}
 		if containsStorageURL(value) {
 			return newValidationError(FieldError{Field: "params." + key, Message: "raw_storage_url_forbidden"})

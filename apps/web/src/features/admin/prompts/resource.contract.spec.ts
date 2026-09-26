@@ -18,7 +18,7 @@ describe('feature prompt resource', () => {
           },
         }),
       ),
-      http.put('/api/admin/feature-prompts/:slug', async ({ request }) => {
+      http.put('/api/control/v1/platform/feature-prompts/:slug', async ({ request }) => {
         const body = await readRequestJson(request)
         const url = new URL(request.url)
         requests.push({ method: request.method, path: url.pathname, body })
@@ -33,16 +33,19 @@ describe('feature prompt resource', () => {
 
     const resource = createAdminPromptConfigResource()
     const prompts = await resource.fetchPrompts()
-    const saved = await resource.savePrompt({
-      slug: featureSlug,
-      prompt: 'Saved prompt',
-    })
+    const saved = await resource.savePrompt(
+      {
+        slug: featureSlug,
+        prompt: 'Saved prompt',
+      },
+      { operatorReason: 'prompt review' },
+    )
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
     expect(requests).toEqual([
       {
         method: 'PUT',
-        path: `/api/admin/feature-prompts/${featureSlug}`,
+        path: `/api/control/v1/platform/feature-prompts/${featureSlug}`,
         body: { prompt: 'Saved prompt' },
       },
     ])

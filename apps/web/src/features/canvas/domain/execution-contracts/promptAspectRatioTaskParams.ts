@@ -1,4 +1,4 @@
-import type { SubmitTaskParams } from '../../../../shared/api/task'
+import type { SubmitTaskParams } from './canvasTaskRequest'
 import type { PromptAspectRatio } from '../../../board'
 
 export function buildPromptAspectRatioTaskParams(

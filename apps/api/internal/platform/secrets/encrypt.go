@@ -5,7 +5,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +47,19 @@ func LoadEncryptionKey() error {
 // IsEncryptionEnabled reports whether a master key has been configured.
 func IsEncryptionEnabled() bool {
 	return len(EncryptionKey) == 32
+}
+
+// KeyVersion identifies the active master key generation without exposing
+// key material: the first 16 hex chars of SHA-256 over the key. Stored
+// alongside each ciphertext so a rotation is detectable (a row whose
+// version differs from the active key fails closed with an actionable
+// error instead of silently falling back to another key).
+func KeyVersion() string {
+	if !IsEncryptionEnabled() {
+		return ""
+	}
+	sum := sha256.Sum256(EncryptionKey)
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 func RequireEncryptionEnabled() error {

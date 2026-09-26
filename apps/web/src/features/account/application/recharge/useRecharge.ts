@@ -1,4 +1,4 @@
-import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { PaymentReturnContext } from '../../domain'
 import { i18n } from '../../../../shared/i18n'
@@ -9,9 +9,12 @@ import {
   paymentsQueryKeys,
   usePaymentsContext,
   type PaymentCheckoutRequest,
+  type PaymentEvent,
+  type PaymentPurchaseOptions,
   type PendingPaymentOrder,
   type PendingPaymentOrderList,
 } from '../../infrastructure'
+import { useAccountWorkspace } from '../accountWorkspace'
 
 const historyPageSize = 20
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }
@@ -22,26 +25,194 @@ export function useRecharge(
 ) {
   const queryClient = useQueryClient()
   const { resource, navigateToCheckout } = usePaymentsContext()
-  let checkoutIntent: { fingerprint: string; idempotencyKey: string } | null = null
+  const { workspaceId, selectionSettled } = useAccountWorkspace()
+  const activeWorkspaceId = computed(() => workspaceId.value ?? '')
+  const transportReady = computed(() => toValue(active) && selectionSettled.value)
 
+  const returnToken = computed(() => toValue(paymentReturn)?.publicToken ?? '')
+  const { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery } = useRechargeQueries(
+    resource,
+    activeWorkspaceId,
+    transportReady,
+    returnToken,
+  )
+
+  const checkout = useCheckoutAction(resource, activeWorkspaceId, navigateToCheckout, optionsQuery)
+
+  const pendingOrders = createPendingOrderActions(
+    queryClient,
+    resource,
+    activeWorkspaceId,
+    navigateToCheckout,
+  )
+  const {
+    pendingActionTarget,
+    pendingActionError,
+    pendingActionMutation,
+    runPendingOrderAction,
+  } = pendingOrders
+
+  usePaymentEventSubscription({
+    queryClient,
+    resource,
+    active,
+    selectionSettled,
+    activeWorkspaceId,
+    updateCachedPendingOrder: pendingOrders.updateCachedPendingOrder,
+    removeCachedPendingOrder: pendingOrders.removeCachedPendingOrder,
+  })
+
+  const historyItems = computed(
+    () => historyQuery.data.value?.pages.flatMap((page) => page.items) ?? [],
+  )
+  const hasLoadedHistory = computed(() => historyQuery.data.value !== undefined)
+
+  return {
+    purchaseOptions: optionsQuery.data,
+    optionsPending: optionsQuery.isPending,
+    optionsError: optionsQuery.error,
+    retryOptions: optionsQuery.refetch,
+    createCheckout: checkout.createCheckout,
+    checkoutPending: checkout.checkoutPending,
+    checkoutError: checkout.checkoutError,
+    pendingOrders: computed(() => pendingOrdersQuery.data.value?.items ?? []),
+    pendingOrdersPending: pendingOrdersQuery.isPending,
+    pendingOrdersError: pendingOrdersQuery.error,
+    retryPendingOrders: pendingOrdersQuery.refetch,
+    continuePendingOrder: (publicToken: string) =>
+      runPendingOrderAction({ publicToken, kind: 'continue' }),
+    abandonPendingOrder: (publicToken: string) =>
+      runPendingOrderAction({ publicToken, kind: 'abandon' }),
+    pendingOrderActionPending: pendingActionMutation.isPending,
+    pendingOrderActionTarget: pendingActionTarget,
+    pendingOrderActionError: pendingActionError,
+    returnStatus: returnQuery.data,
+    returnPending: returnQuery.isPending,
+    returnError: returnQuery.error,
+    retryReturn: returnQuery.refetch,
+    historyItems,
+    historyInitialPending: computed(() => historyQuery.isPending.value && !hasLoadedHistory.value),
+    historyInitialError: computed(() => (hasLoadedHistory.value ? null : historyQuery.error.value)),
+    historyLoadMoreError: computed(() =>
+      historyQuery.isFetchNextPageError.value ? historyQuery.error.value : null,
+    ),
+    historyHasNextPage: historyQuery.hasNextPage,
+    historyFetchingNextPage: historyQuery.isFetchingNextPage,
+    retryHistory: historyQuery.refetch,
+    loadMoreHistory: historyQuery.fetchNextPage,
+  }
+}
+
+type PendingOrderActionContext = {
+  queryClient: ReturnType<typeof useQueryClient>
+  resource: ReturnType<typeof usePaymentsContext>['resource']
+  workspaceId: MaybeRefOrGetter<string>
+  navigateToCheckout: (checkoutURL: string) => void
+}
+
+function createPendingOrderActions(
+  queryClient: PendingOrderActionContext['queryClient'],
+  resource: PendingOrderActionContext['resource'],
+  workspaceId: PendingOrderActionContext['workspaceId'],
+  navigateToCheckout: PendingOrderActionContext['navigateToCheckout'],
+) {
+  const pendingActionTarget = ref<PendingOrderAction | null>(null)
+  const pendingActionError = ref<unknown>(null)
+
+  function updateCachedPendingOrder(
+    publicToken: string,
+    update: (order: PendingPaymentOrder) => PendingPaymentOrder,
+  ) {
+    queryClient.setQueryData<PendingPaymentOrderList>(
+      paymentsQueryKeys.pending(toValue(workspaceId) ?? ''),
+      (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          items: current.items.map((item) =>
+            item.public_token === publicToken ? update(item) : item,
+          ),
+        }
+      },
+    )
+  }
+
+  function removeCachedPendingOrder(publicToken: string) {
+    queryClient.setQueryData<PendingPaymentOrderList>(
+      paymentsQueryKeys.pending(toValue(workspaceId) ?? ''),
+      (current) =>
+        current
+          ? { ...current, items: current.items.filter((item) => item.public_token !== publicToken) }
+          : current,
+    )
+  }
+
+  const pendingActionMutation = useMutation({
+    mutationFn: (action: PendingOrderAction) =>
+      action.kind === 'continue'
+        ? resource.continuePendingOrder(toValue(workspaceId) ?? '', action.publicToken)
+        : resource.abandonPendingOrder(toValue(workspaceId) ?? '', action.publicToken),
+    onSuccess: (order, action) => {
+      if (isPendingPaymentOrderStatus(order.status)) {
+        updateCachedPendingOrder(order.public_token, () => order)
+      } else {
+        removeCachedPendingOrder(order.public_token)
+      }
+      void queryClient.invalidateQueries({
+        queryKey: paymentsQueryKeys.history(toValue(workspaceId) ?? ''),
+      })
+      void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
+      void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
+      if (action.kind === 'continue' && order.checkout_url) navigateToCheckout(order.checkout_url)
+    },
+  })
+
+  async function runPendingOrderAction(action: PendingOrderAction) {
+    pendingActionTarget.value = action
+    pendingActionError.value = null
+    try {
+      await pendingActionMutation.mutateAsync(action)
+    } catch (error) {
+      pendingActionError.value = error
+      throw error
+    }
+  }
+
+  return {
+    pendingActionTarget,
+    pendingActionError,
+    pendingActionMutation,
+    runPendingOrderAction,
+    updateCachedPendingOrder,
+    removeCachedPendingOrder,
+  }
+}
+
+function useRechargeQueries(
+  resource: PendingOrderActionContext['resource'],
+  workspaceId: PendingOrderActionContext['workspaceId'],
+  transportReady: MaybeRefOrGetter<boolean>,
+  returnToken: MaybeRefOrGetter<string>,
+) {
   const optionsQuery = useQuery({
-    queryKey: paymentsQueryKeys.options,
-    queryFn: ({ signal }) => resource.getPurchaseOptions(signal),
-    enabled: () => toValue(active),
+    queryKey: computed(() => paymentsQueryKeys.options(toValue(workspaceId) ?? '')),
+    queryFn: ({ signal }) => resource.getPurchaseOptions(toValue(workspaceId) ?? '', signal),
+    enabled: transportReady,
     retry: false,
   })
 
   const pendingOrdersQuery = useQuery({
-    queryKey: paymentsQueryKeys.pending,
-    queryFn: ({ signal }) => resource.listPendingOrders(signal),
-    enabled: () => toValue(active),
+    queryKey: computed(() => paymentsQueryKeys.pending(toValue(workspaceId) ?? '')),
+    queryFn: ({ signal }) => resource.listPendingOrders(toValue(workspaceId) ?? '', signal),
+    enabled: transportReady,
     retry: false,
   })
 
   const historyQuery = useInfiniteQuery({
-    queryKey: paymentsQueryKeys.history,
+    queryKey: computed(() => paymentsQueryKeys.history(toValue(workspaceId) ?? '')),
     queryFn: ({ pageParam, signal }: { pageParam: string; signal: AbortSignal }) =>
       resource.listRecharges(
+        toValue(workspaceId) ?? '',
         {
           limit: historyPageSize,
           ...(pageParam ? { cursor: pageParam } : {}),
@@ -50,67 +221,37 @@ export function useRecharge(
       ),
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor,
-    enabled: () => toValue(active),
+    enabled: transportReady,
     retry: false,
   })
 
-  const returnToken = computed(() => toValue(paymentReturn)?.publicToken ?? '')
   const returnQuery = useQuery({
-    queryKey: computed(() => paymentsQueryKeys.returnStatus(returnToken.value)),
-    queryFn: ({ signal }) => resource.getReturnStatus(returnToken.value, signal),
-    enabled: () => toValue(active) && returnToken.value.length > 0,
+    queryKey: computed(() =>
+      paymentsQueryKeys.returnStatus(toValue(workspaceId) ?? '', toValue(returnToken)),
+    ),
+    queryFn: ({ signal }) =>
+      resource.getReturnStatus(toValue(workspaceId) ?? '', toValue(returnToken), signal),
+    enabled: computed(() => toValue(transportReady) && toValue(returnToken).length > 0),
     retry: false,
   })
+
+  return { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery }
+}
+
+function useCheckoutAction(
+  resource: PendingOrderActionContext['resource'],
+  workspaceId: PendingOrderActionContext['workspaceId'],
+  navigateToCheckout: PendingOrderActionContext['navigateToCheckout'],
+  optionsQuery: { data: Ref<PaymentPurchaseOptions | undefined> },
+) {
+  let checkoutIntent: { fingerprint: string; idempotencyKey: string } | null = null
 
   const checkoutMutation = useMutation({
-    mutationFn: (request: PaymentCheckoutRequest) => resource.createCheckout(request),
+    mutationFn: (request: PaymentCheckoutRequest) =>
+      resource.createCheckout(toValue(workspaceId) ?? '', request),
     onSuccess: (checkout) => {
       checkoutIntent = null
       navigateToCheckout(checkout.checkout_url)
-    },
-  })
-
-  const pendingActionTarget = ref<PendingOrderAction | null>(null)
-  const pendingActionError = ref<unknown>(null)
-
-  function updateCachedPendingOrder(
-    publicToken: string,
-    update: (order: PendingPaymentOrder) => PendingPaymentOrder,
-  ) {
-    queryClient.setQueryData<PendingPaymentOrderList>(paymentsQueryKeys.pending, (current) => {
-      if (!current) return current
-      return {
-        ...current,
-        items: current.items.map((item) =>
-          item.public_token === publicToken ? update(item) : item,
-        ),
-      }
-    })
-  }
-
-  function removeCachedPendingOrder(publicToken: string) {
-    queryClient.setQueryData<PendingPaymentOrderList>(paymentsQueryKeys.pending, (current) =>
-      current
-        ? { ...current, items: current.items.filter((item) => item.public_token !== publicToken) }
-        : current,
-    )
-  }
-
-  const pendingActionMutation = useMutation({
-    mutationFn: (action: PendingOrderAction) =>
-      action.kind === 'continue'
-        ? resource.continuePendingOrder(action.publicToken)
-        : resource.abandonPendingOrder(action.publicToken),
-    onSuccess: (order, action) => {
-      if (isPendingPaymentOrderStatus(order.status)) {
-        updateCachedPendingOrder(order.public_token, () => order)
-      } else {
-        removeCachedPendingOrder(order.public_token)
-      }
-      void queryClient.invalidateQueries({ queryKey: paymentsQueryKeys.history })
-      void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-      void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
-      if (action.kind === 'continue' && order.checkout_url) navigateToCheckout(order.checkout_url)
     },
   })
 
@@ -145,83 +286,38 @@ export function useRecharge(
     }
   }
 
-  async function runPendingOrderAction(action: PendingOrderAction) {
-    pendingActionTarget.value = action
-    pendingActionError.value = null
-    try {
-      await pendingActionMutation.mutateAsync(action)
-    } catch (error) {
-      pendingActionError.value = error
-      throw error
-    }
+  return {
+    createCheckout,
+    checkoutPending: checkoutMutation.isPending,
+    checkoutError: checkoutMutation.error,
   }
+}
 
+function usePaymentEventSubscription(options: {
+  queryClient: PendingOrderActionContext['queryClient']
+  resource: PendingOrderActionContext['resource']
+  active: MaybeRefOrGetter<boolean>
+  selectionSettled: { value: boolean }
+  activeWorkspaceId: PendingOrderActionContext['workspaceId']
+  updateCachedPendingOrder: PendingOrderCache['updateCachedPendingOrder']
+  removeCachedPendingOrder: PendingOrderCache['removeCachedPendingOrder']
+}) {
+  const { queryClient, resource, active, selectionSettled, activeWorkspaceId } = options
   watch(
-    () => toValue(active),
-    (enabled, _previous, onCleanup) => {
-      if (!enabled) return
-      const unsubscribe = resource.subscribe((event) => {
-        if (event.status === 'failed' && event.public_token) {
-          updateCachedPendingOrder(event.public_token, (order) => {
-            const { checkout_url: _checkoutURL, ...withoutCheckoutURL } = order
-            return { ...withoutCheckoutURL, status: 'payment_failed' }
-          })
-        } else {
-          void queryClient.invalidateQueries({ queryKey: paymentsQueryKeys.pending })
-        }
-        void queryClient.invalidateQueries({ queryKey: paymentsQueryKeys.history })
-        void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-        void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
-        if (event.public_token) {
-          void queryClient.invalidateQueries({
-            queryKey: paymentsQueryKeys.returnStatus(event.public_token),
-          })
-        }
-      })
+    () =>
+      [toValue(active), selectionSettled.value, toValue(activeWorkspaceId) ?? ''] as const,
+    ([enabled, settled, settledWorkspaceId], _previous, onCleanup) => {
+      if (!enabled || !settled || !settledWorkspaceId) return
+      const unsubscribe = resource.subscribe(settledWorkspaceId, (event) =>
+        handlePaymentEvent(queryClient, settledWorkspaceId, event, {
+          updateCachedPendingOrder: options.updateCachedPendingOrder,
+          removeCachedPendingOrder: options.removeCachedPendingOrder,
+        }),
+      )
       onCleanup(unsubscribe)
     },
     { immediate: true },
   )
-
-  const historyItems = computed(
-    () => historyQuery.data.value?.pages.flatMap((page) => page.items) ?? [],
-  )
-  const hasLoadedHistory = computed(() => historyQuery.data.value !== undefined)
-
-  return {
-    purchaseOptions: optionsQuery.data,
-    optionsPending: optionsQuery.isPending,
-    optionsError: optionsQuery.error,
-    retryOptions: optionsQuery.refetch,
-    createCheckout,
-    checkoutPending: checkoutMutation.isPending,
-    checkoutError: checkoutMutation.error,
-    pendingOrders: computed(() => pendingOrdersQuery.data.value?.items ?? []),
-    pendingOrdersPending: pendingOrdersQuery.isPending,
-    pendingOrdersError: pendingOrdersQuery.error,
-    retryPendingOrders: pendingOrdersQuery.refetch,
-    continuePendingOrder: (publicToken: string) =>
-      runPendingOrderAction({ publicToken, kind: 'continue' }),
-    abandonPendingOrder: (publicToken: string) =>
-      runPendingOrderAction({ publicToken, kind: 'abandon' }),
-    pendingOrderActionPending: pendingActionMutation.isPending,
-    pendingOrderActionTarget: pendingActionTarget,
-    pendingOrderActionError: pendingActionError,
-    returnStatus: returnQuery.data,
-    returnPending: returnQuery.isPending,
-    returnError: returnQuery.error,
-    retryReturn: returnQuery.refetch,
-    historyItems,
-    historyInitialPending: computed(() => historyQuery.isPending.value && !hasLoadedHistory.value),
-    historyInitialError: computed(() => (hasLoadedHistory.value ? null : historyQuery.error.value)),
-    historyLoadMoreError: computed(() =>
-      historyQuery.isFetchNextPageError.value ? historyQuery.error.value : null,
-    ),
-    historyHasNextPage: historyQuery.hasNextPage,
-    historyFetchingNextPage: historyQuery.isFetchingNextPage,
-    retryHistory: historyQuery.refetch,
-    loadMoreHistory: historyQuery.fetchNextPage,
-  }
 }
 
 function isPendingPaymentOrderStatus(status: PendingPaymentOrder['status']): boolean {
@@ -232,13 +328,49 @@ function isPendingPaymentOrderStatus(status: PendingPaymentOrder['status']): boo
   )
 }
 
+type PendingOrderCache = {
+  updateCachedPendingOrder: (
+    publicToken: string,
+    update: (order: PendingPaymentOrder) => PendingPaymentOrder,
+  ) => void
+  removeCachedPendingOrder: (publicToken: string) => void
+}
+
+function handlePaymentEvent(
+  queryClient: ReturnType<typeof useQueryClient>,
+  workspaceId: string,
+  event: PaymentEvent,
+  cache: PendingOrderCache,
+) {
+  if (event.status === 'failed' && event.public_token) {
+    cache.updateCachedPendingOrder(event.public_token, (order) => {
+      const { checkout_url: _checkoutURL, ...withoutCheckoutURL } = order
+      return { ...withoutCheckoutURL, status: 'payment_failed' }
+    })
+  } else {
+    void queryClient.invalidateQueries({
+      queryKey: paymentsQueryKeys.pending(workspaceId),
+    })
+  }
+  void queryClient.invalidateQueries({
+    queryKey: paymentsQueryKeys.history(workspaceId),
+  })
+  void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
+  void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
+  if (event.public_token) {
+    void queryClient.invalidateQueries({
+      queryKey: paymentsQueryKeys.returnStatus(workspaceId, event.public_token),
+    })
+  }
+}
+
 function shouldRotateCheckoutIntent(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  const code = (error as { code?: unknown }).code
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error.code === 'checkout_request_rejected' ||
-      error.code === 'checkout_session_expired' ||
-      error.code === 'payment_already_completed')
+    code === 'checkout_request_rejected' ||
+    code === 'checkout_session_expired' ||
+    code === 'payment_already_completed' ||
+    code === 'billing_checkout_conflict'
   )
 }

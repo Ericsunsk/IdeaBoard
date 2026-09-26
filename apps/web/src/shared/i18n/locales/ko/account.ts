@@ -246,5 +246,7 @@ export default {
     quantityIntegerRange: '{min}에서 {max} 사이의 정수를 입력하세요.',
     quantityBelowMin: '최소 충전량은 {min} Ideas입니다.',
     quantityAboveMax: '최대 충전량은 {max} Ideas입니다.',
+    workspaceRequired: '결제 정보를 보려면 워크스페이스를 선택하세요.',
+    featureUnavailable: '이 기능을 현재 사용할 수 없습니다.',
   },
 } as const

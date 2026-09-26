@@ -51,10 +51,8 @@ vi.mock('../../storage/resource', () => ({
 describe('AdminSettingsStoragePage', () => {
   beforeEach(() => {
     useMswHandlers(
-      http.get('/api/admin/settings/media-upload', () =>
+      http.get('/api/control/v1/platform/settings/media-upload', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { upload_max_concurrent: 4 },
         }),
       ),

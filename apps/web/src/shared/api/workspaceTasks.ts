@@ -1,26 +1,34 @@
-// Workspace task lifecycle transport (issue #805, Public Data Plane).
+// Workspace task lifecycle resource (issue #805, Public Data Plane).
 //
-// Feature-neutral resource over `/api/v1/workspaces/{workspace_id}/tasks`
-// through the central `api.request` + `runtimeUrls` with thin snake_case
-// transport types only: snake_case -> camelCase mapping lives in canvas
-// task-runner adapters (keep this resource thin).
+// Feature-neutral resource over the generated `generated-query/public`
+// workspace-tasks hooks (prompt + mask_asset_id in the model). Thin
+// snake_case transport types only: snake_case -> camelCase mapping lives
+// in canvas task-runner adapters (keep this resource thin).
 //
-// TODO(#805-regen, 2026-09-25): move these calls onto `generated-query/public`
-// once the merger stream regenerates it from the task operations documented
-// in the #805 report. BLOCKED 2026-09-25: generated public fns use
-// The task adapter owns the versioned route and response contract.
-// while this module ships `/v1/...` suffixes (-> `/api/v1/...`); the correct
-// `publicMutator` exists but `orval.config.ts publicQuery` still points at
-// Generated wrappers remain behind the adapter boundary.
-// this transport until regen lands; do not force-fit (status convergence,
-// output storage-leak guards, and opaque-id asserts have no generated
-// equivalent). Never import `generated-query/admin|control` here, and route
-// pages must consume the canvas runner, never this module directly.
+// Transport rides `publicMutator` (`/api/v1/...`) through the generated
+// functions; this module keeps the opaque-id asserts, status convergence
+// (`cancelled_with_results` -> `cancelled`), storage-leak guards, and
+// terminal waiters (SSE with polling fallback) that have no generated
+// equivalent. Route pages must consume the canvas runner, never this
+// module directly.
 //
-// Legacy `/api/user` task behavior (submit/readiness/matrix/cancel) is owned
-// by `task.ts` + `taskEvents.ts` and untouched here (removal is #809).
+// Legacy `/api/user` task behavior (submit/readiness/matrix/cancel/wait) is
+// retired (W2 stream 1): canvas owns its workspace task adapter in
+// `features/canvas/application/execution/workspace/canvasWorkspaceTaskAdapter`.
 
-import { api } from './client'
+import {
+  cancelWorkspaceTask as cancelWorkspaceTaskTransport,
+  createWorkspaceTask as createWorkspaceTaskTransport,
+  getWorkspaceTask as getWorkspaceTaskTransport,
+  listWorkspaceTaskOutputs as listWorkspaceTaskOutputsTransport,
+  listWorkspaceTasks as listWorkspaceTasksTransport,
+  quoteWorkspaceTask as quoteWorkspaceTaskTransport,
+} from './generated-query/public/workspace-tasks/workspace-tasks'
+import type {
+  CreateWorkspaceTaskRequest,
+  PaginatedWorkspaceTasks,
+  QuoteWorkspaceTaskRequest,
+} from './generated-query/public/model'
 import {
   buildContractRequestHeaders,
   isOpaqueId,
@@ -29,7 +37,6 @@ import {
   requireContractData,
   type OpaqueIdPrefix,
 } from './contractKernel'
-import { resolveApiUrl } from '../config/runtimeUrls'
 import { createPollDelay, sleep } from '../utils/polling'
 import { subscribeWorkspaceEvent } from './workspaceEventStream'
 
@@ -79,33 +86,11 @@ export function assertWorkspaceTaskAssetId(value: string): string {
   return assertOpaqueId(value, 'asset', 'asset id')
 }
 
-function encodeId(value: string): string {
-  return encodeURIComponent(value)
-}
-
-export function workspaceTasksSuffix(workspaceId: string): string {
-  return `/v1/workspaces/${encodeId(assertWorkspaceTaskWorkspaceId(workspaceId))}/tasks`
-}
-
-export function workspaceTaskSuffix(workspaceId: string, taskId: string): string {
-  return `${workspaceTasksSuffix(workspaceId)}/${encodeId(assertWorkspaceTaskId(taskId))}`
-}
-
-export function workspaceTaskCancelSuffix(workspaceId: string, taskId: string): string {
-  return `${workspaceTaskSuffix(workspaceId, taskId)}/cancel`
-}
-
-export function workspaceTaskOutputsSuffix(workspaceId: string, taskId: string): string {
-  return `${workspaceTaskSuffix(workspaceId, taskId)}/outputs`
-}
-
-export function workspaceTaskQuotesSuffix(workspaceId: string): string {
-  return `/v1/workspaces/${encodeId(assertWorkspaceTaskWorkspaceId(workspaceId))}/task-quotes`
-}
-
 // Canonical browser URLs (full `/api/v1/...` form for Location handling
 // and link sharing). The server `Location` header on 202 carries the same
 // shape; clients derive it from the returned id when headers are opaque.
+// No generated equivalent (orval URL helpers return bare `/workspaces/...`
+// paths without the `/api/v1` prefix or Location semantics).
 export function workspaceTaskLocation(workspaceId: string, taskId: string): string {
   return `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/tasks/${encodeURIComponent(taskId)}`
 }
@@ -153,6 +138,12 @@ export type WorkspaceTaskItem = {
 export type CreateWorkspaceTaskInput = {
   workflow_kind: string
   media_asset_ids?: string[] | undefined
+  /**
+   * Free-text prompt (v1 `data.prompt`, max 8KB bytes). Required for
+   * generation/inpaint, optional for render/variations/fusion/outpaint,
+   * never sent for cutout/upscale (see the canvas adapter prompt policy).
+   */
+  prompt?: string | undefined
   params?: Record<string, unknown> | undefined
   quantity?: number | undefined
   resolution?: string | undefined
@@ -164,24 +155,17 @@ export type WorkspaceTasksRequestOptions = {
   idempotencyKey?: string | undefined
 }
 
-function toRequestConfig(options: WorkspaceTasksRequestOptions | undefined): {
-  signal?: AbortSignal | undefined
+function toGeneratedOptions(options: WorkspaceTasksRequestOptions | undefined): {
   headers: Record<string, string>
+  signal?: AbortSignal | undefined
 } {
   return {
-    ...(options?.signal == null ? {} : { signal: options.signal }),
     headers: buildContractRequestHeaders({
       requestId: options?.requestId?.trim() ? options.requestId.trim() : newRequestId(),
       ...(options?.idempotencyKey == null ? {} : { idempotencyKey: options.idempotencyKey }),
     }),
+    ...(options?.signal == null ? {} : { signal: options.signal }),
   }
-}
-
-function withCursorQuery(url: string, params?: { cursor?: string | null | undefined; pageSize?: number | undefined }): string {
-  const search = new URLSearchParams()
-  if (params?.cursor?.trim()) search.set('cursor', params.cursor.trim())
-  search.set('page_size', String(params?.pageSize ?? 20))
-  return `${url}?${search.toString()}`
 }
 
 export function toWorkspaceTask(raw: unknown): WorkspaceTaskItem {
@@ -215,20 +199,18 @@ export function toWorkspaceTaskOutputs(raw: unknown): { task_id: string; outputs
   return { task_id: data.task_id, outputs }
 }
 
-export const workspaceTasksApiUrls = {
-  collection: (workspaceId: string): string => resolveApiUrl(workspaceTasksSuffix(workspaceId)),
-  item: (workspaceId: string, taskId: string): string => resolveApiUrl(workspaceTaskSuffix(workspaceId, taskId)),
-  cancel: (workspaceId: string, taskId: string): string => resolveApiUrl(workspaceTaskCancelSuffix(workspaceId, taskId)),
-  outputs: (workspaceId: string, taskId: string): string => resolveApiUrl(workspaceTaskOutputsSuffix(workspaceId, taskId)),
-  quotes: (workspaceId: string): string => resolveApiUrl(workspaceTaskQuotesSuffix(workspaceId)),
-}
-
 export async function listWorkspaceTasks(
   workspaceId: string,
   params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
   options?: WorkspaceTasksRequestOptions,
-): Promise<unknown> {
-  return api.request<unknown>(withCursorQuery(resolveApiUrl(workspaceTasksSuffix(workspaceId)), params), toRequestConfig(options))
+): Promise<PaginatedWorkspaceTasks> {
+  const query: { cursor?: string; page_size?: number } = { page_size: params?.pageSize ?? 20 }
+  if (params?.cursor?.trim()) query.cursor = params.cursor.trim()
+  return listWorkspaceTasksTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    query,
+    toGeneratedOptions(options),
+  )
 }
 
 export async function createWorkspaceTask(
@@ -236,23 +218,24 @@ export async function createWorkspaceTask(
   input: CreateWorkspaceTaskInput,
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskItem> {
-  const body = {
-    data: {
-      workflow_kind: input.workflow_kind,
-      inputs: { media_asset_ids: input.media_asset_ids ?? [] },
-      ...(input.params == null ? {} : { params: input.params }),
-      ...(input.quantity == null ? {} : { quantity: input.quantity }),
-      ...(input.resolution == null ? {} : { resolution: input.resolution }),
-    },
+  const data: CreateWorkspaceTaskRequest['data'] = {
+    workflow_kind: input.workflow_kind as CreateWorkspaceTaskRequest['data']['workflow_kind'],
+    inputs: { media_asset_ids: input.media_asset_ids ?? [] },
   }
-  const raw = await api.request<unknown>(resolveApiUrl(workspaceTasksSuffix(workspaceId)), {
-    ...toRequestConfig(options),
-    method: 'POST',
-    body: body as never,
-  })
+  if (input.prompt != null) data.prompt = input.prompt
+  if (input.params != null) {
+    data.params = input.params as NonNullable<CreateWorkspaceTaskRequest['data']['params']>
+  }
+  if (input.quantity != null) data.quantity = input.quantity
+  if (input.resolution != null) data.resolution = input.resolution
+  const envelope = await createWorkspaceTaskTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    { data },
+    toGeneratedOptions(options),
+  )
   // 202 Accepted carries the same envelope as 200; the Location header
   // (`/api/v1/workspaces/{ws}/tasks/{id}`) is authoritative when exposed.
-  return toWorkspaceTask(raw)
+  return toWorkspaceTask(envelope)
 }
 
 export async function getWorkspaceTask(
@@ -260,8 +243,12 @@ export async function getWorkspaceTask(
   taskId: string,
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskItem> {
-  const raw = await api.request<unknown>(resolveApiUrl(workspaceTaskSuffix(workspaceId, taskId)), toRequestConfig(options))
-  return toWorkspaceTask(raw)
+  const envelope = await getWorkspaceTaskTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    assertWorkspaceTaskId(taskId),
+    toGeneratedOptions(options),
+  )
+  return toWorkspaceTask(envelope)
 }
 
 export async function cancelWorkspaceTask(
@@ -270,13 +257,13 @@ export async function cancelWorkspaceTask(
   input?: { reason?: string | undefined },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskItem> {
-  const body = input?.reason?.trim() ? { data: { reason: input.reason.trim() } } : undefined
-  const raw = await api.request<unknown>(resolveApiUrl(workspaceTaskCancelSuffix(workspaceId, taskId)), {
-    ...toRequestConfig(options),
-    method: 'POST',
-    ...(body == null ? {} : { body: body as never }),
-  })
-  return toWorkspaceTask(raw)
+  const envelope = await cancelWorkspaceTaskTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    assertWorkspaceTaskId(taskId),
+    input?.reason?.trim() ? { data: { reason: input.reason.trim() } } : undefined,
+    toGeneratedOptions(options),
+  )
+  return toWorkspaceTask(envelope)
 }
 
 export async function listWorkspaceTaskOutputs(
@@ -284,8 +271,12 @@ export async function listWorkspaceTaskOutputs(
   taskId: string,
   options?: WorkspaceTasksRequestOptions,
 ): Promise<{ task_id: string; outputs: WorkspaceTaskOutputRef[] }> {
-  const raw = await api.request<unknown>(resolveApiUrl(workspaceTaskOutputsSuffix(workspaceId, taskId)), toRequestConfig(options))
-  return toWorkspaceTaskOutputs(raw)
+  const envelope = await listWorkspaceTaskOutputsTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    assertWorkspaceTaskId(taskId),
+    toGeneratedOptions(options),
+  )
+  return toWorkspaceTaskOutputs(envelope)
 }
 
 export async function quoteWorkspaceTask(
@@ -293,27 +284,26 @@ export async function quoteWorkspaceTask(
   input: { workflow_kind: string; quantity?: number | undefined; resolution?: string | undefined },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskBillingSnapshot> {
-  const body = {
-    data: {
-      workflow_kind: input.workflow_kind,
-      ...(input.quantity == null ? {} : { quantity: input.quantity }),
-      ...(input.resolution == null ? {} : { resolution: input.resolution }),
-    },
+  const data: QuoteWorkspaceTaskRequest['data'] = {
+    workflow_kind: input.workflow_kind as QuoteWorkspaceTaskRequest['data']['workflow_kind'],
   }
-  const raw = await api.request<unknown>(resolveApiUrl(workspaceTaskQuotesSuffix(workspaceId)), {
-    ...toRequestConfig(options),
-    method: 'POST',
-    body: body as never,
-  })
-  return requireContractData<WorkspaceTaskBillingSnapshot>(raw, 'Quote failed')
+  if (input.quantity != null) data.quantity = input.quantity
+  if (input.resolution != null) data.resolution = input.resolution
+  const envelope = await quoteWorkspaceTaskTransport(
+    assertWorkspaceTaskWorkspaceId(workspaceId),
+    { data },
+    toGeneratedOptions(options),
+  )
+  return requireContractData<WorkspaceTaskBillingSnapshot>(envelope, 'Quote failed')
 }
 
 // ---------------------------------------------------------------------------
 // Workspace task waiters (issue #807).
 //
 // Terminal wait over the versioned workspace event stream with polling
-// fallback. Legacy `/api/user` task waiting (`taskEvents.ts`) is untouched
-// (removal is #809): this waiter only speaks workspace ids + the v1 stream.
+// fallback. Canvas image-result waiting composes this waiter in
+// `features/canvas/.../canvasWorkspaceTaskAdapter` (the legacy `/api/user`
+// task waiter is retired).
 
 const WORKSPACE_TASK_WAIT_TYPES = [
   'task.created',

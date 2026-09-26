@@ -2,6 +2,7 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { fetchCreditWallet, creditsQueryKeys } from '../../infrastructure'
 import { i18n } from '../../../../shared/i18n'
+import { useAccountWorkspace } from '../accountWorkspace'
 import { useCreditsSync } from './useCreditsSync'
 
 export type CreditWalletState =
@@ -11,10 +12,11 @@ export type CreditWalletState =
 
 export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
+  const { workspaceId, selectionSettled } = useAccountWorkspace()
   const query = useQuery({
-    queryKey: creditsQueryKeys.wallet,
-    queryFn: fetchCreditWallet,
-    enabled: () => toValue(enabled),
+    queryKey: computed(() => creditsQueryKeys.wallet(workspaceId.value ?? '')),
+    queryFn: ({ signal }) => fetchCreditWallet(workspaceId.value ?? '', signal),
+    enabled: () => toValue(enabled) && selectionSettled.value,
     staleTime: 15_000,
   })
   const state = computed<CreditWalletState>(() => {

@@ -47,9 +47,12 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  ConflictResponse,
   ControlAckEnvelope,
   ControlBanRequest,
   ControlNotFoundResponse,
+  ControlOAuthProviderEnvelope,
+  ControlOAuthProviderUpdateRequest,
   ControlSetRoleRequest,
   ControlUserEnvelope,
   ForbiddenResponse,
@@ -876,4 +879,217 @@ export const useImpersonateControlUser = <
   TContext
 > => {
   return useMutation(getImpersonateControlUserMutationOptions(options), queryClient)
+}
+export const getGetControlOAuthProviderUrl = (provider: string) => {
+  return `/users/oauth-providers/${encodeURIComponent(String(provider))}`
+}
+
+/**
+ * Reads the social login channel behind control:users through the Auth-owned social-provider seam. Client secrets never cross this boundary (only client_secret_configured). Unknown or malformed slugs fail closed with 404 (invisible, never 403).
+ * @summary Read one social OAuth provider channel
+ */
+export const getControlOAuthProvider = async (
+  provider: string,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlOAuthProviderEnvelope> => {
+  return controlMutator<ControlOAuthProviderEnvelope>(getGetControlOAuthProviderUrl(provider), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlOAuthProviderQueryKey = (provider: MaybeRefOrGetter<string>) => {
+  return ['users', 'oauth-providers', provider] as const
+}
+
+export const getGetControlOAuthProviderQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlOAuthProvider>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  provider: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlOAuthProvider>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlOAuthProviderQueryKey(provider)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlOAuthProvider>>> = ({
+    signal,
+  }) => getControlOAuthProvider(toValue(provider), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(provider) !== null && toValue(provider) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlOAuthProvider>>, TError, TData>
+}
+
+export type GetControlOAuthProviderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlOAuthProvider>>
+>
+export type GetControlOAuthProviderQueryError =
+  UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary Read one social OAuth provider channel
+ */
+
+export function useGetControlOAuthProvider<
+  TData = Awaited<ReturnType<typeof getControlOAuthProvider>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  provider: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlOAuthProvider>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlOAuthProviderQueryOptions(provider, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateControlOAuthProviderUrl = (provider: string) => {
+  return `/users/oauth-providers/${encodeURIComponent(String(provider))}`
+}
+
+/**
+ * Updates the social login channel (enabled, client_id, client_secret) through the Auth-owned social-provider seam. reason/operator_note body fields are tolerated so a body-carried operator note survives strict binding; the guard already enforced its presence.
+ * @summary Update one social OAuth provider channel (operator reason required)
+ */
+export const updateControlOAuthProvider = async (
+  provider: string,
+  controlOAuthProviderUpdateRequest: ControlOAuthProviderUpdateRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlOAuthProviderEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlOAuthProviderEnvelope>(getUpdateControlOAuthProviderUrl(provider), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlOAuthProviderUpdateRequest),
+  })
+}
+
+export const getUpdateControlOAuthProviderMutationKey = () =>
+  ['updateControlOAuthProvider'] as const
+
+export const getUpdateControlOAuthProviderMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateControlOAuthProvider>>,
+    TError,
+    UpdateControlOAuthProviderMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateControlOAuthProvider>>,
+  TError,
+  UpdateControlOAuthProviderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateControlOAuthProviderMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateControlOAuthProvider>>,
+    UpdateControlOAuthProviderMutationVariables
+  > = (props) => {
+    const { provider, data } = props ?? {}
+
+    return updateControlOAuthProvider(provider, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateControlOAuthProviderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateControlOAuthProvider>>
+>
+export type UpdateControlOAuthProviderMutationBody = ControlOAuthProviderUpdateRequest
+export type UpdateControlOAuthProviderMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | ConflictResponse
+export type UpdateControlOAuthProviderMutationVariables = {
+  provider: string
+  data: ControlOAuthProviderUpdateRequest
+}
+
+/**
+ * @summary Update one social OAuth provider channel (operator reason required)
+ */
+export const useUpdateControlOAuthProvider = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateControlOAuthProvider>>,
+      TError,
+      UpdateControlOAuthProviderMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateControlOAuthProvider>>,
+  TError,
+  UpdateControlOAuthProviderMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateControlOAuthProviderMutationOptions(options), queryClient)
 }

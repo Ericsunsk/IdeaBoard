@@ -1,27 +1,52 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { fetchVisionSearchPrice } from './visionBillingResource'
 
-const transport = vi.hoisted(() => ({ request: vi.fn() }))
+const WORKSPACE_ID = 'ws_abc123'
 
-vi.mock('../../../shared/api/client', () => ({
-  api: { request: transport.request },
-}))
+function quoteFixture(totalCredits: number): Record<string, unknown> {
+  return {
+    data: {
+      sku: 'ai-search:vision',
+      display_name: 'Vision search',
+      price_version_id: 1,
+      price_version: 1,
+      output_resolution: 'default',
+      unit_credits: totalCredits,
+      quantity: 1,
+      total_credits: totalCredits,
+      quoted_at: '2026-09-23T00:00:00Z',
+    },
+  }
+}
 
 describe('visionBillingResource', () => {
-  beforeEach(() => vi.clearAllMocks())
-
-  it('reads the configured default price for one vision search', async () => {
-    transport.request.mockResolvedValue({ code: 0, data: { total_credits: 12 } })
-    const controller = new AbortController()
-
-    await expect(fetchVisionSearchPrice(controller.signal)).resolves.toBe(12)
-    expect(transport.request).toHaveBeenCalledWith(
-      '/user/billing/quotes',
-      expect.objectContaining({
-        method: 'POST',
-        body: { sku: 'ai-search:vision', output_resolution: 'default', quantity: 1 },
-        signal: controller.signal,
+  it('reads the server-side quote for one vision search', async () => {
+    const seen: Array<{ path: string; body: unknown }> = []
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/billing-quotes', async ({ request }) => {
+        seen.push({ path: new URL(request.url).pathname, body: await request.json() })
+        return HttpResponse.json(quoteFixture(12))
       }),
     )
+    const controller = new AbortController()
+
+    await expect(fetchVisionSearchPrice(WORKSPACE_ID, controller.signal)).resolves.toBe(12)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.path).toBe('/api/v1/workspaces/ws_abc123/billing-quotes')
+    expect(seen[0]?.body).toEqual({ data: { sku: 'ai-search:vision' } })
+  })
+
+  it('fails closed without a workspace selection', async () => {
+    await expect(fetchVisionSearchPrice('  ')).rejects.toThrow()
+  })
+
+  it('rejects quote envelopes without a numeric total', async () => {
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/billing-quotes', () => {
+        return HttpResponse.json({ data: { sku: 'ai-search:vision' } })
+      }),
+    )
+    await expect(fetchVisionSearchPrice(WORKSPACE_ID)).rejects.toThrow()
   })
 })

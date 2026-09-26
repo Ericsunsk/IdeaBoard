@@ -1,23 +1,24 @@
 import { useQuery } from '@tanstack/vue-query'
-import { toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
-import { api } from '../../../../shared/api/client'
-import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
+import { type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import {
   createApiDataSelector,
-  resolveApiData,
   type ApiResponseWithData,
 } from '../../../../shared/api/apiResponse'
-import { getGetControlMonitorUrl } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
-import { taskCancellationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
+import { getControlMonitor } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
+import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
 import type { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
 
-// Admin monitor/task boundary (final cut, partial). The runtime snapshot
-// moved to the Control Plane (`GET /api/control/v1/platform/monitor`, a
-// guarded proxy keeping the legacy envelope), so `useAdminMonitorResource`
-// repoints at the generated Control path with view types untouched. The
-// `/api/admin/tasks*` list/detail/cancel transports below stay until the
-// native Control task dialect (cursor pagination, operator-reason cancel)
-// is adopted by the admin UI — see the blocked list.
+// Admin monitor/task boundary (W2 transports, partial fail-closed). The
+// runtime snapshot rides the Control Plane (`GET
+// /api/control/v1/platform/monitor`, a guarded proxy keeping the legacy
+// envelope) through the generated `getControlMonitor` hook, with view
+// types untouched. The task list/detail/cancel transports have no
+// equivalent Control read model (the control task dialect is a thin
+// `task_id/status/feature` projection and its routes fail closed
+// server-side until the workspace task read model lands), so they fail
+// closed with guidance instead of calling the deleted
+// `/api/admin/tasks*` routes. Backend gaps: control task read model +
+// global monitor stream (see the stream report).
 export type ListAdminTasksParams = {
   status?: ListAdminTasksStatus
   user_public_id?: string
@@ -222,15 +223,6 @@ export type AdminMonitorDetailModel = AdminMonitorDetail
 export type AdminMonitorListItemModel = AdminMonitorListItem
 export type AdminMonitorExecutionAttempt = AdminTaskExecutionAttempt
 
-function taskListUrl(params: ListAdminTasksParams): string {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined) search.append(key, String(value))
-  }
-  const query = search.toString()
-  return query ? `/admin/tasks?${query}` : '/admin/tasks'
-}
-
 export const ADMIN_TASK_LIST_QUERY_KEY = ['admin', 'tasks'] as const
 export const ADMIN_MONITOR_QUERY_KEY = ['admin', 'monitor'] as const
 
@@ -259,14 +251,7 @@ export function useAdminTaskListResource(
   >({
     ...(options?.query ?? {}),
     queryKey: [ADMIN_TASK_LIST_QUERY_KEY, params] as const,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<ApiResponseAdminTaskListData>>(
-        taskListUrl(toValue(params) ?? {}),
-        {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
-        },
-      ),
+    queryFn: () => Promise.reject(taskListUnavailable()),
     select: selectAdminTaskList,
   })
 }
@@ -280,14 +265,13 @@ export function getAdminTaskDetailQueryKey(taskID: string) {
 }
 
 export async function getAdminTaskList(
-  params: AdminTaskListQueryParams,
+  _params: AdminTaskListQueryParams,
 ): Promise<ApiResponseAdminTaskListData> {
-  return resolveApiData(
-    api.request<ApiResponseWithData<ApiResponseAdminTaskListData>>(taskListUrl(params), {
-      method: 'GET',
-    }),
-    '加载任务列表失败',
-  )
+  throw taskListUnavailable()
+}
+
+function taskListUnavailable() {
+  return adminControlUnavailable('task-list')
 }
 
 export function getAdminMonitorQueryKey() {
@@ -301,28 +285,15 @@ export function useAdminMonitorResource(
     ...(options?.query ?? {}),
     queryKey: ADMIN_MONITOR_QUERY_KEY,
     queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<MonitorResponse>>(
-        `${CONTROL_API_PREFIX}${getGetControlMonitorUrl()}`,
-        {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
-        },
-      ),
+      getControlMonitor({
+        ...(signal == null ? {} : { signal }),
+      }) as Promise<ApiResponseWithData<MonitorResponse>>,
     select: selectAdminMonitor,
   })
 }
 
-export async function cancelAdminTaskByID(taskID: string): Promise<void> {
-  await resolveApiData(
-    api.request<ApiResponseWithData<unknown>>(
-      `/admin/tasks/${encodeURIComponent(taskID)}/cancel`,
-      {
-        method: 'POST',
-        headers: { 'Idempotency-Key': taskCancellationIdempotencyKey(taskID) },
-      },
-    ),
-    '取消任务失败',
-  )
+export async function cancelAdminTaskByID(_taskID: string): Promise<void> {
+  throw adminControlUnavailable('task-cancel')
 }
 
 export function useAdminTaskDetailResource(
@@ -336,25 +307,11 @@ export function useAdminTaskDetailResource(
   >({
     ...(options?.query ?? {}),
     queryKey: [ADMIN_MONITOR_QUERY_KEY, 'detail', taskID] as const,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<ApiResponseAdminTaskData>>(
-        `/admin/tasks/${encodeURIComponent(toValue(taskID) ?? '')}`,
-        {
-          method: 'GET',
-          ...(signal == null ? {} : { signal }),
-        },
-      ),
+    queryFn: () => Promise.reject(adminControlUnavailable('task-detail')),
     select: selectAdminTaskDetail,
   })
 }
 
-export async function getAdminTaskDetail(taskID: string): Promise<AdminMonitorDetailModel> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<ApiResponseAdminTaskData>>(
-      `/admin/tasks/${encodeURIComponent(taskID)}`,
-      { method: 'GET' },
-    ),
-    '加载任务详情失败',
-  )
-  return data.task
+export async function getAdminTaskDetail(_taskID: string): Promise<AdminMonitorDetailModel> {
+  throw adminControlUnavailable('task-detail')
 }

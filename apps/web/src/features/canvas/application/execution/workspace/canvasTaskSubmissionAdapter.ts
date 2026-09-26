@@ -1,5 +1,9 @@
-import type { SubmitTaskData, SubmitTaskReadinessRequestData } from '../../../../../shared/api/task'
-import { assertTaskRequestReady, submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
+import type {
+  SubmitTaskData,
+  SubmitTaskReadinessRequestData,
+} from '../../../domain/execution-contracts/canvasTaskRequest'
+import { submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
+import { assertTaskSubmitReady } from '../task-runner/taskReadiness'
 
 export type CanvasTaskSubmission = {
   taskId: string
@@ -17,6 +21,7 @@ export type CanvasTaskSubmissionAdapter = {
 }
 
 export const defaultCanvasTaskSubmissionAdapter: CanvasTaskSubmissionAdapter = {
-  assertTaskRequestReady,
-  submitTaskRequest,
+  assertTaskRequestReady: (request, fallbackMessage) =>
+    assertTaskSubmitReady(request, fallbackMessage).then(() => undefined),
+  submitTaskRequest: (request, fallbackMessage) => submitTaskRequest(request, fallbackMessage),
 }

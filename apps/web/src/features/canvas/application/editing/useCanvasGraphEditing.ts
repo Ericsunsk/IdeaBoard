@@ -70,6 +70,7 @@ type UseCanvasGraphEditingOptions = {
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   browser: CanvasGraphEditingBrowserAdapter
   upload: CanvasGraphEditingUploadAdapter
+  getWorkspaceId?: (() => string) | undefined
   materializeLibraryAsset: LibraryAssetMaterializer
   readLibraryImportAttachment: () => BoardAttachment | null
   selectOnlyNode: (nodeId: string) => boolean
@@ -297,6 +298,7 @@ function useGraphEditingImageUploads(
     updateSnapshotNode,
     getImageNodeSnapshot,
     uploadApi: options.upload,
+    workspaceId: options.getWorkspaceId,
     onWarning: options.feedback.operationWarning,
     onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
     setLocalUploadState,

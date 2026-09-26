@@ -3,10 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { fireEvent } from '@testing-library/vue'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
-import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
-
 const resource = vi.hoisted(() => ({
   create: vi.fn(),
   delete: vi.fn(),
@@ -15,11 +13,23 @@ const resource = vi.hoisted(() => ({
   update: vi.fn(),
 }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-const confirm = vi.hoisted(() => ({ confirm: vi.fn().mockResolvedValue(true) }))
+const confirm = vi.hoisted(() => ({
+  confirm: vi.fn().mockResolvedValue(true),
+  readReason: vi.fn().mockReturnValue('运营复核'),
+}))
+const redemptionsResource = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+}))
 
 vi.mock('./resource', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./resource')>()),
   createAdminRewardCodeResource: () => resource,
+}))
+
+vi.mock('./rewardCodeRedemptionResource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./rewardCodeRedemptionResource')>()),
+  createRewardCodeRedemptionResource: () => redemptionsResource,
 }))
 
 vi.mock('../../../../shared/composables/useAppToast', () => ({
@@ -246,6 +256,7 @@ describe('AdminRewardCodesPage', () => {
         idempotencyKey: expect.any(String),
         code: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){2}$/),
       }),
+      { operatorReason: '运营复核' },
     )
     const submittedCode = resource.create.mock.calls[0]![0].code
     expect(await screen.findByText('ABCD12342026')).toBeVisible()
@@ -349,6 +360,7 @@ describe('AdminRewardCodesPage', () => {
         maxRedemptions: 100,
         code: 'NEWC-ODE1-WXYZ',
       }),
+      { operatorReason: '运营复核' },
     )
     expect(await screen.findByRole('dialog', { name: '保存新 Code' })).toBeVisible()
     expect(screen.getByText('NEWC-ODE1-WXYZ')).toBeVisible()
@@ -357,19 +369,8 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.queryByText('NEWC-ODE1-WXYZ')).not.toBeInTheDocument()
   })
 
-  it('opens and loads redemption records for the selected RewardCode through the HTTP seam', async () => {
-    let requestedRewardCodeId = ''
-    useMswHandlers(
-      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ params, request }) => {
-        requestedRewardCodeId = String(params.rewardCodeId)
-        expect(new URL(request.url).searchParams.get('limit')).toBe('20')
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { redemptions: [makeRedemptionSummary()] },
-        })
-      }),
-    )
+  it('shows the error state when redemption history fails to load', async () => {
+    redemptionsResource.list.mockRejectedValueOnce(new Error('control unavailable'))
     const { user } = renderPage()
     await screen.findByText('新用户奖励')
 
@@ -377,8 +378,8 @@ describe('AdminRewardCodesPage', () => {
     await user.click(await screen.findByRole('button', { name: '兑换记录' }))
 
     expect(screen.getByRole('dialog', { name: '新用户奖励 · 兑换记录' })).toBeVisible()
-    expect(await screen.findByText('用户 #23')).toBeVisible()
-    expect(requestedRewardCodeId).toBe('7')
+    expect(await screen.findByText('兑换记录加载失败，请重试。')).toBeVisible()
+    expect(screen.queryByText('用户 #23')).not.toBeInTheDocument()
   })
 
   it('omits a blank Code from rule-only updates and does not show plaintext', async () => {
@@ -391,12 +392,16 @@ describe('AdminRewardCodesPage', () => {
     await user.click(screen.getByRole('button', { name: '保存更改' }))
 
     await waitFor(() => expect(resource.update).toHaveBeenCalledTimes(1))
-    expect(resource.update).toHaveBeenCalledWith(7, {
-      displayName: '新用户奖励',
-      creditAmount: 80,
-      maxRedemptions: 100,
-      expiresAt: '',
-    })
+    expect(resource.update).toHaveBeenCalledWith(
+      7,
+      {
+        displayName: '新用户奖励',
+        creditAmount: 80,
+        maxRedemptions: 100,
+        expiresAt: '',
+      },
+      { operatorReason: '运营复核' },
+    )
     expect(screen.queryByRole('dialog', { name: '保存新 Code' })).not.toBeInTheDocument()
   })
 
@@ -459,7 +464,7 @@ describe('AdminRewardCodesPage', () => {
       }),
     )
 
-    await waitFor(() => expect(resource.delete).toHaveBeenCalledWith(7))
+    await waitFor(() => expect(resource.delete).toHaveBeenCalledWith(7, { operatorReason: '运营复核' }))
     expect(screen.getByText('新用户奖励')).toBeVisible()
     expect(toast.error).toHaveBeenCalledWith('已有兑换记录，只能停用')
   })
@@ -488,18 +493,6 @@ function makeRewardCode(overrides: Record<string, unknown> = {}) {
     status: 'enabled',
     createdAt: '2026-07-20T10:00:00Z',
     updatedAt: '2026-07-20T10:00:00Z',
-    ...overrides,
-  }
-}
-
-function makeRedemptionSummary(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 51,
-    reward_code_id: 7,
-    user_public_id: '00000000-0000-0000-0000-000000000023',
-    display_name: '用户 #23',
-    credited_amount: 80,
-    redeemed_at: '2026-07-22T03:04:05Z',
     ...overrides,
   }
 }

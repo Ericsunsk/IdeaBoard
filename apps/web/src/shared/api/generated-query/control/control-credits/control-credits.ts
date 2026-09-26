@@ -47,6 +47,7 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  ConflictResponse,
   ControlCreditCommandRequest,
   ControlCreditCorrectionRequest,
   ControlCreditRefundRequest,
@@ -55,14 +56,26 @@ import type {
   ControlNotFoundResponse,
   ControlObjectEnvelope,
   ControlReasonRequest,
+  ControlRewardCodeCreateRequest,
+  ControlRewardCodeEnabledRequest,
+  ControlRewardCodeSearchRequest,
+  ControlRewardCodeUpdateRequest,
+  CreateControlRewardCode200,
+  DeleteControlRewardCode200,
   ForbiddenResponse,
+  GetControlRewardRedemption200,
   IdempotencyConflictResponse,
   ListControlCreditLedgerParams,
   ListControlReconciliationFindingsParams,
   ListControlReconciliationRunsParams,
+  ListControlRewardRedemptions200,
+  ListControlRewardRedemptionsParams,
   PaginatedControlLedger,
+  SearchControlRewardCodes200,
+  SetControlRewardCodeEnabled200,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
+  UpdateControlRewardCode200,
 } from '../model'
 
 import { controlMutator } from '../../../controlMutator'
@@ -1219,6 +1232,794 @@ export function useListControlReconciliationFindings<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListControlReconciliationFindingsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSearchControlRewardCodesUrl = () => {
+  return `/rewards/codes/search`
+}
+
+/**
+ * Reward search is a POST-body read (fuzzy name / full-code HMAC lookup cannot ride a query string), so it registers as a POST read-guard without reason or idempotency requirements. Query strings are rejected (400). Data shape is ControlRewardCodePage inside the legacy admin envelope.
+ * @summary Search reward codes (fuzzy name / full-code lookup)
+ */
+export const searchControlRewardCodes = async (
+  controlRewardCodeSearchRequest?: ControlRewardCodeSearchRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<SearchControlRewardCodes200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<SearchControlRewardCodes200>(getSearchControlRewardCodesUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlRewardCodeSearchRequest),
+  })
+}
+
+export const getSearchControlRewardCodesMutationKey = () => ['searchControlRewardCodes'] as const
+
+export const getSearchControlRewardCodesMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof searchControlRewardCodes>>,
+    TError,
+    SearchControlRewardCodesMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof searchControlRewardCodes>>,
+  TError,
+  SearchControlRewardCodesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSearchControlRewardCodesMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof searchControlRewardCodes>>,
+    SearchControlRewardCodesMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return searchControlRewardCodes(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type SearchControlRewardCodesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof searchControlRewardCodes>>
+>
+export type SearchControlRewardCodesMutationBody = ControlRewardCodeSearchRequest | undefined
+export type SearchControlRewardCodesMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+export type SearchControlRewardCodesMutationVariables = { data?: ControlRewardCodeSearchRequest }
+
+/**
+ * @summary Search reward codes (fuzzy name / full-code lookup)
+ */
+export const useSearchControlRewardCodes = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof searchControlRewardCodes>>,
+      TError,
+      SearchControlRewardCodesMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof searchControlRewardCodes>>,
+  TError,
+  SearchControlRewardCodesMutationVariables,
+  TContext
+> => {
+  return useMutation(getSearchControlRewardCodesMutationOptions(options), queryClient)
+}
+export const getCreateControlRewardCodeUrl = () => {
+  return `/rewards/codes`
+}
+
+/**
+ * The Idempotency-Key header is canonical; the body idempotency_key stays accepted as fallback, and a mismatch conflicts (409 reward_code_idempotency_conflict) instead of forking codes. Data shape is ControlCreatedRewardCode (reward code plus one-time plaintext) inside the legacy admin envelope.
+ * @summary Create a reward code (operator reason required)
+ */
+export const createControlRewardCode = async (
+  controlRewardCodeCreateRequest: ControlRewardCodeCreateRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<CreateControlRewardCode200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<CreateControlRewardCode200>(getCreateControlRewardCodeUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlRewardCodeCreateRequest),
+  })
+}
+
+export const getCreateControlRewardCodeMutationKey = () => ['createControlRewardCode'] as const
+
+export const getCreateControlRewardCodeMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createControlRewardCode>>,
+    TError,
+    CreateControlRewardCodeMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createControlRewardCode>>,
+  TError,
+  CreateControlRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateControlRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createControlRewardCode>>,
+    CreateControlRewardCodeMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return createControlRewardCode(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type CreateControlRewardCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createControlRewardCode>>
+>
+export type CreateControlRewardCodeMutationBody = ControlRewardCodeCreateRequest
+export type CreateControlRewardCodeMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse
+export type CreateControlRewardCodeMutationVariables = { data: ControlRewardCodeCreateRequest }
+
+/**
+ * @summary Create a reward code (operator reason required)
+ */
+export const useCreateControlRewardCode = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createControlRewardCode>>,
+      TError,
+      CreateControlRewardCodeMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof createControlRewardCode>>,
+  TError,
+  CreateControlRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateControlRewardCodeMutationOptions(options), queryClient)
+}
+export const getUpdateControlRewardCodeUrl = (id: number) => {
+  return `/rewards/codes/${encodeURIComponent(String(id))}`
+}
+
+/**
+ * Data shape is ControlUpdatedRewardCode inside the legacy admin envelope. Lowering max_redemptions below redemption_count renders 409 reward_code_cap_invalid.
+ * @summary Update a reward code (operator reason required)
+ */
+export const updateControlRewardCode = async (
+  id: number,
+  controlRewardCodeUpdateRequest: ControlRewardCodeUpdateRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<UpdateControlRewardCode200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<UpdateControlRewardCode200>(getUpdateControlRewardCodeUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlRewardCodeUpdateRequest),
+  })
+}
+
+export const getUpdateControlRewardCodeMutationKey = () => ['updateControlRewardCode'] as const
+
+export const getUpdateControlRewardCodeMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateControlRewardCode>>,
+    TError,
+    UpdateControlRewardCodeMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateControlRewardCode>>,
+  TError,
+  UpdateControlRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateControlRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateControlRewardCode>>,
+    UpdateControlRewardCodeMutationVariables
+  > = (props) => {
+    const { id, data } = props ?? {}
+
+    return updateControlRewardCode(id, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateControlRewardCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateControlRewardCode>>
+>
+export type UpdateControlRewardCodeMutationBody = ControlRewardCodeUpdateRequest
+export type UpdateControlRewardCodeMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | ConflictResponse
+export type UpdateControlRewardCodeMutationVariables = {
+  id: number
+  data: ControlRewardCodeUpdateRequest
+}
+
+/**
+ * @summary Update a reward code (operator reason required)
+ */
+export const useUpdateControlRewardCode = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateControlRewardCode>>,
+      TError,
+      UpdateControlRewardCodeMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateControlRewardCode>>,
+  TError,
+  UpdateControlRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateControlRewardCodeMutationOptions(options), queryClient)
+}
+export const getDeleteControlRewardCodeUrl = (id: number) => {
+  return `/rewards/codes/${encodeURIComponent(String(id))}`
+}
+
+/**
+ * Codes with redemptions cannot be deleted (409 reward_code_redeemed: disable them instead). Data shape is ControlDeletedRewardCode inside the legacy admin envelope.
+ * @summary Delete a reward code (operator reason required)
+ */
+export const deleteControlRewardCode = async (
+  id: number,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<DeleteControlRewardCode200> => {
+  return controlMutator<DeleteControlRewardCode200>(getDeleteControlRewardCodeUrl(id), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getDeleteControlRewardCodeMutationKey = () => ['deleteControlRewardCode'] as const
+
+export const getDeleteControlRewardCodeMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteControlRewardCode>>,
+    TError,
+    DeleteControlRewardCodeMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteControlRewardCode>>,
+  TError,
+  DeleteControlRewardCodeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteControlRewardCodeMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteControlRewardCode>>,
+    DeleteControlRewardCodeMutationVariables
+  > = (props) => {
+    const { id } = props ?? {}
+
+    return deleteControlRewardCode(id, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeleteControlRewardCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteControlRewardCode>>
+>
+
+export type DeleteControlRewardCodeMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | ConflictResponse
+export type DeleteControlRewardCodeMutationVariables = { id: number }
+
+/**
+ * @summary Delete a reward code (operator reason required)
+ */
+export const useDeleteControlRewardCode = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteControlRewardCode>>,
+      TError,
+      DeleteControlRewardCodeMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteControlRewardCode>>,
+  TError,
+  DeleteControlRewardCodeMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteControlRewardCodeMutationOptions(options), queryClient)
+}
+export const getSetControlRewardCodeEnabledUrl = (id: number) => {
+  return `/rewards/codes/${encodeURIComponent(String(id))}/enabled`
+}
+
+/**
+ * Data shape is ControlRewardCode inside the legacy admin envelope.
+ * @summary Enable or disable a reward code (operator reason required)
+ */
+export const setControlRewardCodeEnabled = async (
+  id: number,
+  controlRewardCodeEnabledRequest: ControlRewardCodeEnabledRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<SetControlRewardCodeEnabled200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<SetControlRewardCodeEnabled200>(getSetControlRewardCodeEnabledUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(controlRewardCodeEnabledRequest),
+  })
+}
+
+export const getSetControlRewardCodeEnabledMutationKey = () =>
+  ['setControlRewardCodeEnabled'] as const
+
+export const getSetControlRewardCodeEnabledMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setControlRewardCodeEnabled>>,
+    TError,
+    SetControlRewardCodeEnabledMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setControlRewardCodeEnabled>>,
+  TError,
+  SetControlRewardCodeEnabledMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetControlRewardCodeEnabledMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setControlRewardCodeEnabled>>,
+    SetControlRewardCodeEnabledMutationVariables
+  > = (props) => {
+    const { id, data } = props ?? {}
+
+    return setControlRewardCodeEnabled(id, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type SetControlRewardCodeEnabledMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setControlRewardCodeEnabled>>
+>
+export type SetControlRewardCodeEnabledMutationBody = ControlRewardCodeEnabledRequest
+export type SetControlRewardCodeEnabledMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | ControlNotFoundResponse
+  | IdempotencyConflictResponse
+export type SetControlRewardCodeEnabledMutationVariables = {
+  id: number
+  data: ControlRewardCodeEnabledRequest
+}
+
+/**
+ * @summary Enable or disable a reward code (operator reason required)
+ */
+export const useSetControlRewardCodeEnabled = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | ControlNotFoundResponse
+    | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setControlRewardCodeEnabled>>,
+      TError,
+      SetControlRewardCodeEnabledMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setControlRewardCodeEnabled>>,
+  TError,
+  SetControlRewardCodeEnabledMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetControlRewardCodeEnabledMutationOptions(options), queryClient)
+}
+export const getListControlRewardRedemptionsUrl = (
+  id: number,
+  params?: ListControlRewardRedemptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/rewards/codes/${encodeURIComponent(String(id))}/redemptions?${stringifiedParams}`
+    : `/rewards/codes/${encodeURIComponent(String(id))}/redemptions`
+}
+
+/**
+ * Data shape is ControlAdminRedemptionPage (identity-enriched redemption summaries) inside the legacy admin envelope.
+ * @summary List admin redemption reads for one reward code
+ */
+export const listControlRewardRedemptions = async (
+  id: number,
+  params?: ListControlRewardRedemptionsParams,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ListControlRewardRedemptions200> => {
+  return controlMutator<ListControlRewardRedemptions200>(
+    getListControlRewardRedemptionsUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListControlRewardRedemptionsQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListControlRewardRedemptionsParams>,
+) => {
+  return ['rewards', 'codes', id, 'redemptions', ...(params ? [params] : [])] as const
+}
+
+export const getListControlRewardRedemptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listControlRewardRedemptions>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListControlRewardRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlRewardRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListControlRewardRedemptionsQueryKey(id, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listControlRewardRedemptions>>> = ({
+    signal,
+  }) => listControlRewardRedemptions(toValue(id), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listControlRewardRedemptions>>, TError, TData>
+}
+
+export type ListControlRewardRedemptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listControlRewardRedemptions>>
+>
+export type ListControlRewardRedemptionsQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary List admin redemption reads for one reward code
+ */
+
+export function useListControlRewardRedemptions<
+  TData = Awaited<ReturnType<typeof listControlRewardRedemptions>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListControlRewardRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlRewardRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListControlRewardRedemptionsQueryOptions(id, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetControlRewardRedemptionUrl = (id: number, redemptionId: number) => {
+  return `/rewards/codes/${encodeURIComponent(String(id))}/redemptions/${encodeURIComponent(String(redemptionId))}`
+}
+
+/**
+ * Data shape is ControlAdminRedemptionDetail (identity-enriched) inside the legacy admin envelope.
+ * @summary Read one admin redemption for one reward code
+ */
+export const getControlRewardRedemption = async (
+  id: number,
+  redemptionId: number,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<GetControlRewardRedemption200> => {
+  return controlMutator<GetControlRewardRedemption200>(
+    getGetControlRewardRedemptionUrl(id, redemptionId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetControlRewardRedemptionQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+) => {
+  return ['rewards', 'codes', id, 'redemptions', redemptionId] as const
+}
+
+export const getGetControlRewardRedemptionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlRewardRedemption>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlRewardRedemption>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlRewardRedemptionQueryKey(id, redemptionId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlRewardRedemption>>> = ({
+    signal,
+  }) =>
+    getControlRewardRedemption(toValue(id), toValue(redemptionId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(id) !== null &&
+        toValue(id) !== undefined &&
+        toValue(redemptionId) !== null &&
+        toValue(redemptionId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlRewardRedemption>>, TError, TData>
+}
+
+export type GetControlRewardRedemptionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlRewardRedemption>>
+>
+export type GetControlRewardRedemptionQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse
+
+/**
+ * @summary Read one admin redemption for one reward code
+ */
+
+export function useGetControlRewardRedemption<
+  TData = Awaited<ReturnType<typeof getControlRewardRedemption>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ControlNotFoundResponse,
+>(
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlRewardRedemption>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlRewardRedemptionQueryOptions(id, redemptionId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

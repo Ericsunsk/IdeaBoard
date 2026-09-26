@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { screen, waitFor } from '@testing-library/vue'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
 import { renderWithUser } from '../../../../test/render'
@@ -13,6 +13,13 @@ vi.mock('../../infrastructure/billing/resource', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../infrastructure/billing/resource')>()
   return { ...actual, fetchBillingRecords: fetchBillingRecordsMock }
 })
+
+vi.mock('../accountWorkspace', () => ({
+  useAccountWorkspace: () => ({
+    workspaceId: ref('ws_1'),
+    selectionSettled: ref(true),
+  }),
+}))
 
 const BillingHost = defineComponent({
   setup() {
@@ -30,14 +37,15 @@ describe('useBillingRecords', () => {
 
   it('loads 20-record cursor pages and appends the next page', async () => {
     fetchBillingRecordsMock
-      .mockResolvedValueOnce(buildPage('局部重绘', 91))
+      .mockResolvedValueOnce(buildPage('局部重绘', 'cursor-91'))
       .mockResolvedValueOnce(buildPage('活动奖励'))
     const { user } = renderBillingHost()
 
     await waitFor(() => expect(screen.getByTestId('record-titles')).toHaveTextContent('局部重绘'))
     expect(fetchBillingRecordsMock).toHaveBeenNthCalledWith(
       1,
-      { limit: 20 },
+      'ws_1',
+      { page_size: 20 },
       expect.any(AbortSignal),
     )
     expect(screen.getByTestId('has-more')).toHaveTextContent('true')
@@ -49,7 +57,8 @@ describe('useBillingRecords', () => {
     )
     expect(fetchBillingRecordsMock).toHaveBeenNthCalledWith(
       2,
-      { before_sequence: 91, limit: 20 },
+      'ws_1',
+      { page_size: 20, cursor: 'cursor-91' },
       expect.any(AbortSignal),
     )
   })
@@ -79,7 +88,7 @@ function renderBillingHost() {
   })
 }
 
-function buildPage(title: string, nextBeforeSequence?: number): BillingRecordPageData {
+function buildPage(title: string, nextCursor?: string): BillingRecordPageData {
   return {
     records: [
       {
@@ -91,6 +100,6 @@ function buildPage(title: string, nextBeforeSequence?: number): BillingRecordPag
         available_credits_after: 980,
       },
     ],
-    ...(nextBeforeSequence ? { next_before_sequence: nextBeforeSequence } : {}),
+    ...(nextCursor ? { next_cursor: nextCursor } : {}),
   }
 }

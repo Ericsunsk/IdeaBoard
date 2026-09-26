@@ -1,10 +1,14 @@
-import { api } from '../../../../shared/api/client'
-import { resolveApiData, type ApiResponseWithData } from '../../../../shared/api/apiResponse'
+import { getWorkspaceUsage } from '../../../../shared/api/generated-query/public/workspace-billing/workspace-billing'
+import type { WorkspaceUsage } from '../../../../shared/api/generated-query/public/model'
 import { i18n } from '../../../../shared/i18n'
+import {
+  requireAccountWorkspaceId,
+  resolveWorkspaceBillingData,
+} from '../workspaceBilling'
 
-// User usage boundary (issue #809). Transports through the central
-// `api.request` against the surviving `GET /api/user/usage` route with local
-// view types.
+// User usage boundary (W2 transports). Reads go through the Public Data
+// Plane (`GET /api/v1/workspaces/{id}/usage?range=`) with local view types;
+// the deleted `GET /api/user/usage` route is gone.
 export const UsageRange = {
   '7d': '7d',
   '30d': '30d',
@@ -35,17 +39,30 @@ export type UserUsage = {
 export const DEFAULT_USAGE_RANGE: UsageRange = '30d'
 
 export const usageQueryKeys = {
-  all: ['user', 'usage'] as const,
-  current: (range: UsageRange) => ['user', 'usage', 'current', range] as const,
+  all: ['workspace', 'usage'] as const,
+  current: (workspaceId: string, range: UsageRange) =>
+    ['workspace', 'usage', 'current', workspaceId, range] as const,
 }
 
-export async function fetchUsage(range: UsageRange, signal?: AbortSignal): Promise<AccountUsage> {
-  const search = new URLSearchParams({ range })
-  return resolveApiData(
-    api.request<ApiResponseWithData<AccountUsage>>(`/user/usage?${search.toString()}`, {
-      method: 'GET',
-      ...(signal == null ? {} : { signal }),
-    }),
+export async function fetchUsage(
+  workspaceId: string,
+  range: UsageRange,
+  signal?: AbortSignal,
+): Promise<AccountUsage> {
+  const id = requireAccountWorkspaceId(workspaceId)
+  const usage = await resolveWorkspaceBillingData<WorkspaceUsage>(
+    getWorkspaceUsage(id, { range }, { signal }),
     i18n.global.t('account.errors.usageLoadFailed'),
   )
+  return {
+    timezone: usage.timezone,
+    lifetime: {
+      total_credits: usage.lifetime.total_credits,
+      peak_daily_credits: usage.lifetime.peak_daily_credits,
+      average_daily_credits: usage.lifetime.average_daily_credits,
+      task_count: usage.lifetime.task_count,
+      active_days: usage.lifetime.active_days,
+    },
+    trend: usage.trend.map((point) => ({ date: point.date, credits: point.credits })),
+  }
 }

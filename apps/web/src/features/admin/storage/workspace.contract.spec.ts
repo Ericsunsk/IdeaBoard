@@ -116,8 +116,9 @@ describe('admin storage workspace facade', () => {
     const testRun = workspace.testStorage({ id: 'profile-1', name: '对象存储' })
     const applyRun = workspace.applyStorage({ id: 'profile-1', name: '对象存储' })
 
-    expect(mockResource.testProfile).toHaveBeenCalledOnce()
-    expect(mockResource.applyProfile).toHaveBeenCalledOnce()
+    // Operator-reason collection yields a microtask before the transport call.
+    await vi.waitFor(() => expect(mockResource.testProfile).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(mockResource.applyProfile).toHaveBeenCalledOnce())
     expect(workspace.testingId.value).toBe('profile-1')
     expect(workspace.applyingId.value).toBe('profile-1')
 
@@ -146,7 +147,10 @@ describe('admin storage workspace facade', () => {
       },
     })
 
-    expect(mockResource.saveProfile).toHaveBeenCalledWith({ payload: makePayload() })
+    expect(mockResource.saveProfile).toHaveBeenCalledWith(
+      { payload: makePayload() },
+      { operatorReason: 'storage review' },
+    )
     expect(feedback.refreshFailed).toHaveBeenCalledWith(refreshError)
     expect(workspace.storages.value[0]?.config.secret_access_key).toBe('')
   })
@@ -179,13 +183,16 @@ describe('admin storage workspace facade', () => {
     expect(confirm.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认删除存储',
-        message: '确定删除存储「对象存储」吗？此操作不可恢复。',
+        message: '确定删除存储「对象存储」吗？此操作不可恢复，且将记录操作人与原因。',
         confirmLabel: '确定删除',
         intent: 'danger',
+        reason: { required: true },
       }),
     )
 
-    expect(mockResource.deleteProfile).toHaveBeenCalledWith('profile-1')
+    expect(mockResource.deleteProfile).toHaveBeenCalledWith('profile-1', {
+      operatorReason: 'storage review',
+    })
     expect(feedback.profileDeleted).toHaveBeenCalledWith('deleted')
     expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(2)
   })
@@ -193,7 +200,10 @@ describe('admin storage workspace facade', () => {
 
 function createWorkspace() {
   const feedback = createStorageFeedback()
-  const confirm = { confirm: vi.fn().mockResolvedValue(true) }
+  const confirm = {
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: vi.fn().mockReturnValue('storage review'),
+  }
   const { runAsyncAction } = useAsyncAction()
   const workspace = createAdminStorageWorkspace({
     feedback,

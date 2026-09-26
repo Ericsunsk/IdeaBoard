@@ -23,8 +23,13 @@ export function insufficientCreditsPreflightError(): CanvasBillingPreflightError
 
 export function mapCanvasBillingRequestError(error: unknown): Error {
   const apiError = error as ApiClientError
-  if (apiError?.code === 'insufficient_credits') return insufficientCreditsPreflightError()
-  if (apiError?.code === 'pricing_unavailable') {
+  // Legacy user-plane codes (`insufficient_credits`, `pricing_unavailable`)
+  // plus workspace v1 codes (`task_insufficient_credits` 402,
+  // `billing_quote_unavailable` 503). Both transports converge here so the
+  // feedback boundary keeps one copy per kind.
+  if (apiError?.code === 'insufficient_credits' || apiError?.code === 'task_insufficient_credits')
+    return insufficientCreditsPreflightError()
+  if (apiError?.code === 'pricing_unavailable' || apiError?.code === 'billing_quote_unavailable') {
     return new CanvasBillingPreflightError(
       'pricing-unavailable',
       i18n.global.t('errorCodes.pricing_unavailable'),

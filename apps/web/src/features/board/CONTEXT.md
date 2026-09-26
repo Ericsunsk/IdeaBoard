@@ -25,7 +25,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `syncBoardToServer` — revision-gated save entry in `application/sync`.
 - `isBoardNameConflictError` — conflict classifier in `application/sync`.
 - `joinSharedBoardByToken` — share-join workflow entry in `application/collaboration`.
-- `boardsResource.ts` — sole generated-query boards adapter: `fetchUserBoards`, `saveUserBoard`, `removeUserBoard`, `joinUserBoardByShareToken` in `infrastructure/api`.
+- `boardsResource.ts` — sole generated-query `public/boards` adapter in `infrastructure/api`: `fetchWorkspaceBoards`, `fetchWorkspaceBoardDocument`, `createWorkspaceBoard`, `saveWorkspaceBoard` (PATCH rename + PUT document with `If-Match`), `archiveWorkspaceBoard` / `restoreWorkspaceBoard`, `joinWorkspaceBoardByShareToken`, plus fail-closed `requireBoardWorkspaceId` (selection store, personal default; no selection throws `BoardWorkspaceUnavailableError` before any network call).
 - `serializeBoardState` / `parseBoardState` — serialization and version-migration adapters (via `persistence/index.ts`) in `infrastructure/persistence`.
 - `renderBoardPreviewDataUrl` / `createBoardPreviewRefreshQueue` — preview generation and refresh queue in `infrastructure/preview`.
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `presentation/catalog`.
@@ -36,7 +36,9 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 
 - `domain` stays pure: no Vue reactivity, no browser DOM; pure functions only.
 - Exactly one repository/sync fact source: `application/catalog` plus `application/sync`; Canvas `board-session` does orchestration only.
-- Only `infrastructure/api/boardsResource.ts` may import the generated-query boards boundary; application/presentation consume via adapter.
+- Only `infrastructure/api/boardsResource.ts` may import the generated-query `public/boards` boundary; application/presentation consume via adapter.
+- Every board transport call resolves its workspace id per call from `features/workspace` selection (store or `useWorkspaceSelection`); Board never duplicates the selection store; missing workspace fails closed (sync returns `{ ok: false }`, saves/joins throw guidance) — never an inferred workspace.
+- Board ids/revisions are server-minted: create/duplicate POST first, register the minted identity locally, then PUT the document. There is no PUT-upsert and no hard delete (delete archives).
 - Canvas saves are transactionally consistent snapshots; image refs must first persist to `mediaAssetId`.
 - Sync writes must carry `revision`; conflicts follow domain rollback/reconcile policy, never silent last-write-wins.
 - Schema evolution keeps load-migration functions for historic versions (e.g. `latestBoardState.ts`); never break old board data in place.

@@ -35,10 +35,15 @@ package httpapi
 // no direct ledger writes here) against a server-side quote for the
 // ai-search:vision SKU. Vision inputs reference owned workspace
 // library assets by lasset_ id (resolved server-side; cross-workspace
-// refs converge to 404 library_asset_not_found); client bytes never
-// cross this boundary, so no multipart surface is introduced. Provider
-// image fetch for extraction stays #808-owned (Control provider
-// config); the extractor seam receives resolved references only.
+// refs converge to 404 library_asset_not_found), staged workspace
+// uploads by upload_ id (stage-then-reference through the
+// upload-session byte PUT; unknown ids 404, expired 410, failed 409,
+// unstaged 422 — client bytes never cross this boundary, so no
+// multipart surface is introduced), and external images by
+// allowlisted https URL (the tree CDN allowlist; anything else 422).
+// Provider image fetch for extraction stays #808-owned (Control
+// provider config); the extractor seam receives resolved references
+// only.
 //
 // Production wiring leaves ContractV1SearchDeps zero-valued until the
 // search/vision/billing adapters land (#807 wires provider fetch,
@@ -54,6 +59,7 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
+	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
 	searchapplication "ideaboard/api/internal/searchcatalog/application"
@@ -154,6 +160,9 @@ func renderSearchError(c *gin.Context, err error) {
 	case errors.Is(err, searchcatalog.ErrV1VisionInput):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			"视觉搜索输入非法", contract.FieldErrors{Fields: map[string]string{"vision": "invalid"}})
+	case errors.Is(err, errV1VisionUploadUnstaged):
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+			"视觉搜索输入非法", contract.FieldErrors{Fields: map[string]string{"upload_ids": "unstaged"}})
 	case errors.Is(err, errV1SearchUnavailable):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, "搜索服务暂不可用")
 	case errors.Is(err, errV1VisionProviderError):
@@ -357,6 +366,8 @@ type v1CreateVisionQueryBody struct {
 	Data struct {
 		UserText        string   `json:"user_text"`
 		LibraryAssetIDs []string `json:"library_asset_ids"`
+		UploadIDs       []string `json:"upload_ids"`
+		ImageURLs       []string `json:"image_urls"`
 	} `json:"data"`
 }
 
@@ -406,6 +417,7 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 	}
 	input, validateErr := searchcatalog.ValidateV1VisionQueryInput(searchcatalog.V1VisionQueryInput{
 		UserText: body.Data.UserText, LibraryAssetIDs: body.Data.LibraryAssetIDs,
+		UploadIDs: body.Data.UploadIDs, ImageURLs: body.Data.ImageURLs,
 	})
 	if validateErr != nil {
 		renderSearchError(c, validateErr)
@@ -415,8 +427,20 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 	if !ok {
 		return
 	}
+	uploadReferences, ok := h.resolveVisionUploads(c, workspace, input.UploadIDs)
+	if !ok {
+		return
+	}
+	references = append(references, uploadReferences...)
+	for _, raw := range input.ImageURLs {
+		references = append(references, searchcatalog.V1VisionReference{
+			Kind: searchcatalog.V1VisionReferenceExternal, ImageURL: raw,
+		})
+	}
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hashParts := append([]string{"search:vision", workspace.PublicID, input.UserText}, input.LibraryAssetIDs...)
+	hashParts = append(hashParts, input.UploadIDs...)
+	hashParts = append(hashParts, input.ImageURLs...)
 	hash := contract.HashIdempotencyRequest(hashParts...)
 	h.deps.Search.normalize()
 	scope := contract.IdempotencyScope(externalUser, "search:vision")
@@ -476,6 +500,74 @@ func (h *contractV1Handler) resolveVisionReferences(c *gin.Context, workspace *t
 		references = append(references, searchcatalog.V1VisionReference{
 			Provider: asset.Provider, SourceID: asset.SourceID,
 			SourceURL: asset.SourceURL, PreviewURL: asset.PreviewURL, Title: asset.Title,
+			Kind: searchcatalog.V1VisionReferenceLibrary,
+		})
+	}
+	return references, true
+}
+
+// errV1VisionUploadUnstaged reports a staged-upload vision ref whose
+// bytes were never PUT (422: the caller must stage first, then retry
+// the same vision call).
+var errV1VisionUploadUnstaged = errors.New("v1 vision upload has no staged bytes")
+
+// resolveVisionUploads resolves staged-upload vision refs (the
+// stage-then-reference half of the vision file-input gap). Unknown,
+// malformed, or cross-workspace ids converge to 404 upload_not_found;
+// expired sessions to 410 upload_expired; failed sessions to 409
+// upload_state_conflict. Completed sessions stay usable (their bytes
+// were verified at complete time). Live sessions must have staged
+// bytes readable through the byte seam, verified against the session
+// declaration (unstaged reads 422); the session itself is never
+// failed here — vision is a reader, not the transfer owner.
+func (h *contractV1Handler) resolveVisionUploads(c *gin.Context, workspace *tenancy.Workspace, uploadIDs []string) ([]searchcatalog.V1VisionReference, bool) {
+	if len(uploadIDs) == 0 {
+		return nil, true
+	}
+	if h.deps.Media == nil {
+		contract.RenderError(c, http.StatusNotImplemented,
+			contract.CodeContractNotImplemented, "The v1 vision-upload surface is not implemented yet")
+		c.Abort()
+		return nil, false
+	}
+	if h.deps.MediaObjects == nil {
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "视觉搜索暂不可用")
+		c.Abort()
+		return nil, false
+	}
+	ctx := c.Request.Context()
+	references := make([]searchcatalog.V1VisionReference, 0, len(uploadIDs))
+	for _, id := range uploadIDs {
+		session, err := h.deps.Media.GetSession(ctx, workspace.PublicID, id)
+		if err != nil {
+			switch {
+			case errors.Is(err, workspacemedia.ErrExpired):
+				contract.RenderError(c, contract.StatusOf(contract.CodeUploadExpired),
+					contract.CodeUploadExpired, "上传会话已过期，请重新创建")
+			case errors.Is(err, workspacemedia.ErrStateConflict):
+				contract.RenderError(c, contract.StatusOf(contract.CodeUploadStateConflict),
+					contract.CodeUploadStateConflict, "上传会话状态不允许此操作")
+			default:
+				contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+			}
+			c.Abort()
+			return nil, false
+		}
+		if session.Status == workspacemedia.StatusFailed {
+			contract.RenderError(c, contract.StatusOf(contract.CodeUploadStateConflict),
+				contract.CodeUploadStateConflict, "上传会话状态不允许此操作")
+			c.Abort()
+			return nil, false
+		}
+		object, err := h.deps.MediaObjects.ReadObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, workspacemedia.MaxUploadSizeBytes)
+		if err != nil || object == nil || len(object.Data) == 0 || int64(len(object.Data)) != session.SizeBytes ||
+			v1SniffedImageMIME(object.Data) != session.MIMEType || v1StagedChecksum(object.Data) != session.ChecksumSHA256 {
+			renderSearchError(c, errV1VisionUploadUnstaged)
+			return nil, false
+		}
+		references = append(references, searchcatalog.V1VisionReference{
+			Kind: searchcatalog.V1VisionReferenceUpload, UploadID: session.ID,
+			ObjectKey: session.StorageKey, MIMEType: session.MIMEType,
 		})
 	}
 	return references, true
@@ -542,7 +634,7 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // Schemas (results are provider URL + source metadata only, never bytes):
 //
 //	WorkspaceSearchResult: {provider: {enum: [unsplash, pexels]}, source_id, title?, author?, source_url: uri, preview_url: uri, original_url: uri, width: integer>=0, height: integer>=0}
-//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, maxItems: 4, items: {type: string, pattern: '^lasset_'}}}} (at least one of user_text/refs required; refs resolve against owned workspace library assets, no client bytes)
+//	CreateWorkspaceVisionQueryRequest: {data: {user_text?: string (maxLength 200), library_asset_ids?: {type: array, items: {type: string, pattern: '^lasset_'}}, upload_ids?: {type: array, items: {type: string, pattern: '^upload_'}}, image_urls?: {type: array, items: {type: string, format: uri}}}} (maxItems 4 across all three ref kinds combined; at least one of user_text/refs required; library refs resolve against owned workspace library assets, upload refs against live-or-completed sessions with staged bytes verified at resolve time (unknown 404 upload_not_found, expired 410, failed 409, unstaged 422), external refs must be allowlisted https CDN URLs (images.unsplash.com, plus.unsplash.com, images.pexels.com) or 422; no client bytes anywhere)
 //	WorkspaceVisionQuery: {operation_id: {pattern: '^visq_'}, status: {const: succeeded}, query: string, replayed?: boolean, created_at: date-time}
 //
 // Error codes frozen: search_provider_unavailable (503), search_vision_provider_error (502),

@@ -1,9 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
-import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminModelAddDialog from './AdminModelAddDialog.vue'
 import type { AdminModelItem } from '../../domain/catalogData'
+
+const gatewayFakes = vi.hoisted(() => ({
+  detect: vi.fn(),
+}))
+
+vi.mock('../../infrastructure/adminGatewayResource', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../infrastructure/adminGatewayResource')>()
+  return {
+    ...actual,
+    createAdminGatewayResource: () => ({
+      catalog: { detect: gatewayFakes.detect },
+    }),
+  }
+})
 
 describe('AdminModelAddDialog', () => {
   const mockDetectedModels = [
@@ -26,18 +39,11 @@ describe('AdminModelAddDialog', () => {
   ]
 
   beforeEach(() => {
-    useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/detect-models', () => {
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            models: mockDetectedModels,
-            configured_providers: 3,
-          },
-        })
-      }),
-    )
+    vi.clearAllMocks()
+    gatewayFakes.detect.mockResolvedValue({
+      models: mockDetectedModels,
+      configured_providers: 3,
+    })
   })
 
   const existingModels: AdminModelItem[] = [
@@ -93,12 +99,7 @@ describe('AdminModelAddDialog', () => {
   })
 
   it('shows a single detecting line while probing gateway models', async () => {
-    useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/detect-models', async () => {
-        await new Promise(() => {})
-        return HttpResponse.json({ code: 0, msg: 'ok', data: { models: [] } })
-      }),
-    )
+    gatewayFakes.detect.mockReturnValueOnce(new Promise(() => {}))
     renderDialog()
 
     const dialog = await screen.findByRole('dialog')
@@ -109,11 +110,7 @@ describe('AdminModelAddDialog', () => {
   })
 
   it('shows only the error alert without the empty state when detection fails', async () => {
-    useMswHandlers(
-      http.get('/api/admin/settings/ai-gateway/detect-models', () => {
-        return HttpResponse.json({ code: 503, msg: 'unavailable' }, { status: 503 })
-      }),
-    )
+    gatewayFakes.detect.mockRejectedValueOnce(new Error('unavailable'))
     renderDialog()
 
     const dialog = await screen.findByRole('dialog')
@@ -187,6 +184,18 @@ describe('AdminModelAddDialog', () => {
     expect(within(dialog).getByText('BiRefNet 高清抠图')).toBeInTheDocument()
     expect(within(dialog).queryByText('GPT-4o 旗舰多模态')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('FLUX.1 Schnell 快速生图')).not.toBeInTheDocument()
+  })
+
+  it('shows detection guidance when the control plane has no detection surface', async () => {
+    const unavailable = new Error('模型探测暂不可用。') as Error & { code?: string }
+    unavailable.code = 'gateway_unavailable'
+    gatewayFakes.detect.mockRejectedValueOnce(unavailable)
+    renderDialog()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('button', { name: '重试' })).toBeVisible()
+    expect(await within(dialog).findByText('模型探测暂不可用。')).toBeVisible()
+    expect(within(dialog).queryByText('未探测到可用的网关模型')).not.toBeInTheDocument()
   })
 
   it('filters models by provider selection', async () => {

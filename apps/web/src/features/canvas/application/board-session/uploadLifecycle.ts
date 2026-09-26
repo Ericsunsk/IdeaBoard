@@ -22,6 +22,7 @@ interface StableRef {
 interface BoardSessionUploadLifecycleOptions {
   userUid: string
   boardId: string
+  workspaceId?: string | undefined
   warning: (message: string) => void
 }
 
@@ -120,6 +121,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   const { userUid, boardId, warning } = options
   const normalizedBoardId = boardId.trim()
   const normalizedUserUid = userUid.trim()
+  const normalizedWorkspaceId = options.workspaceId?.trim() || ''
 
   function isStableCanvasUrl(raw: string): boolean {
     const trimmed = raw.trim()
@@ -139,7 +141,8 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     })
     const prepared = await prepareImageAssetForUpload(file)
     prepared.warnings.forEach((message) => warning(message))
-    const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
+    if (!normalizedWorkspaceId) throw new Error(t('canvas.session.uploadFailed'))
+    const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedWorkspaceId)
     const assetId = uploaded.asset_id?.trim()
     if (!assetId) {
       throw new Error(t('canvas.session.uploadMissingMediaAsset'))

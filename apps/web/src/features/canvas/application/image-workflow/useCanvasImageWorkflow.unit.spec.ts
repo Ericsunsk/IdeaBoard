@@ -1,10 +1,15 @@
 import { i18n } from '../../../../shared/i18n'
 import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../domain/nodes/imageActionRegistry.ts'
 import type { MediaInputImage } from '../editing/useFlowMediaInputImages.ts'
 import { createPendingImageExecutionCore } from '../execution/pending-execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
+import {
+  getWorkspaceSelectionStore,
+  resetWorkspaceSelectionStore,
+} from '../../../workspace/infrastructure/workspaceContext'
+import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
   const plan = {
@@ -118,6 +123,8 @@ describe('useCanvasImageWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.executionOptions = null
+    resetWorkspaceSelectionStore()
+    getWorkspaceSelectionStore().select('ws_test123')
     mocks.useCanvasImageTools.mockReturnValue({
       viewModel: {
         active: { nodeId: ref(null) },
@@ -142,6 +149,11 @@ describe('useCanvasImageWorkflow', () => {
         chrome: {},
       },
     })
+  })
+
+  afterEach(() => {
+    resetWorkspaceSelectionStore()
+    resetMediaWorkspaceIdResolver()
   })
 
   it('owns direct action planning and execution behind the workflow intent seam', async () => {

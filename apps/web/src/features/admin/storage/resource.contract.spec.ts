@@ -29,22 +29,23 @@ describe('createAdminStorageResource', () => {
     await expect(resource.fetchProfiles()).resolves.toEqual([
       makeGeneratedProfile('profile-listed'),
     ])
-    await expect(resource.saveProfile({ payload })).resolves.toMatchObject({
+    const reason = { operatorReason: 'storage review' }
+    await expect(resource.saveProfile({ payload }, reason)).resolves.toMatchObject({
       message: 'created',
       profile: {
         id: 'profile-created',
       },
     })
     await expect(
-      resource.saveProfile({ id: 'profile-1', payload, apply: true }),
+      resource.saveProfile({ id: 'profile-1', payload, apply: true }, reason),
     ).resolves.toMatchObject({
-      message: 'updated',
+      message: 'applied',
       profile: {
-        id: 'profile-updated',
+        id: 'profile-applied',
       },
     })
-    await expect(resource.testProfile('profile-1')).resolves.toEqual({ message: 'tested' })
-    await expect(resource.applyProfile('profile-1')).resolves.toMatchObject({
+    await expect(resource.testProfile('profile-1', reason)).resolves.toEqual({ message: 'tested' })
+    await expect(resource.applyProfile('profile-1', reason)).resolves.toMatchObject({
       message: 'applied',
       profile: {
         id: 'profile-applied',
@@ -54,29 +55,36 @@ describe('createAdminStorageResource', () => {
       'cdn.example.com',
       'assets.example.com',
     ])
-    await expect(resource.deleteProfile('profile-1')).resolves.toEqual({ message: 'deleted' })
+    await expect(resource.deleteProfile('profile-1', reason)).resolves.toEqual({
+      message: 'deleted',
+    })
 
     expect(receivedRequests).toEqual([
       {
         method: 'POST',
-        path: '/api/admin/storage/profiles',
+        path: '/api/control/v1/platform/storage/profiles',
         search: '',
         body: payload,
       },
       {
         method: 'PUT',
-        path: '/api/admin/storage/profiles/profile-1',
-        search: '?apply=true',
+        path: '/api/control/v1/platform/storage/profiles/profile-1',
+        search: '',
         body: payload,
       },
       {
         method: 'POST',
-        path: '/api/admin/storage/profiles/profile-1/test',
+        path: '/api/control/v1/platform/storage/profiles/profile-updated/apply',
         search: '',
       },
       {
         method: 'POST',
-        path: '/api/admin/storage/profiles/profile-1/apply',
+        path: '/api/control/v1/platform/storage/profiles/profile-1/test',
+        search: '',
+      },
+      {
+        method: 'POST',
+        path: '/api/control/v1/platform/storage/profiles/profile-1/apply',
         search: '',
       },
       {
@@ -86,7 +94,7 @@ describe('createAdminStorageResource', () => {
       },
       {
         method: 'DELETE',
-        path: '/api/admin/storage/profiles/profile-1',
+        path: '/api/control/v1/platform/storage/profiles/profile-1',
         search: '',
       },
     ])
@@ -95,15 +103,43 @@ describe('createAdminStorageResource', () => {
   it('surfaces storage API failures from the HTTP response body', async () => {
     useMswHandlers(
       ...storageQueryHandlers(),
-      http.post('/api/admin/storage/profiles', () => {
+      http.post('/api/control/v1/platform/storage/profiles', () => {
         return HttpResponse.json({ code: 409, msg: '存储名称已存在', message_safe: true })
       }),
     )
     const resource = createAdminStorageResource()
 
-    await expect(resource.saveProfile({ payload: makeStoragePayload() })).rejects.toThrow(
-      '存储名称已存在',
+    await expect(
+      resource.saveProfile(
+        { payload: makeStoragePayload() },
+        { operatorReason: 'storage review' },
+      ),
+    ).rejects.toThrow('存储名称已存在')
+  })
+
+  it('carries idempotency and operator reason headers on storage mutations', async () => {
+    let seenHeaders: Record<string, string | null> = {}
+    useMswHandlers(
+      http.post('/api/control/v1/platform/storage/profiles', ({ request }) => {
+        seenHeaders = {
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        }
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: { message: 'created', profile: makeGeneratedProfile('profile-created') },
+        })
+      }),
     )
+    const resource = createAdminStorageResource()
+
+    await resource.saveProfile(
+      { payload: makeStoragePayload() },
+      { operatorReason: 'storage review', idempotencyKey: 'storage-1' },
+    )
+
+    expect(seenHeaders).toEqual({ idempotencyKey: 'storage-1', operatorReason: 'storage review' })
   })
 
   it('uses the resource fallback when a successful response omits required data', async () => {
@@ -176,7 +212,7 @@ function storageQueryHandlers() {
 
 function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
   return [
-    http.post('/api/admin/storage/profiles', async ({ request }) => {
+    http.post('/api/control/v1/platform/storage/profiles', async ({ request }) => {
       recordRequest(receivedRequests, request, await readRequestJson(request))
 
       return HttpResponse.json({
@@ -188,7 +224,7 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
         },
       })
     }),
-    http.put('/api/admin/storage/profiles/:id', async ({ request }) => {
+    http.put('/api/control/v1/platform/storage/profiles/:id', async ({ request }) => {
       recordRequest(receivedRequests, request, await readRequestJson(request))
 
       return HttpResponse.json({
@@ -200,7 +236,7 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
         },
       })
     }),
-    http.post('/api/admin/storage/profiles/:id/test', ({ request }) => {
+    http.post('/api/control/v1/platform/storage/profiles/:id/test', ({ request }) => {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
@@ -211,7 +247,7 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
         },
       })
     }),
-    http.post('/api/admin/storage/profiles/:id/apply', ({ request }) => {
+    http.post('/api/control/v1/platform/storage/profiles/:id/apply', ({ request }) => {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({
@@ -236,7 +272,7 @@ function storageMutationHandlers(receivedRequests: StorageRequestLog[]) {
         },
       })
     }),
-    http.delete('/api/admin/storage/profiles/:id', ({ request }) => {
+    http.delete('/api/control/v1/platform/storage/profiles/:id', ({ request }) => {
       recordRequest(receivedRequests, request)
 
       return HttpResponse.json({

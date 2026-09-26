@@ -51,6 +51,8 @@ import type {
   BackfillControlStatisticsBody,
   BadRequestResponse,
   ControlAckEnvelope,
+  ControlBrandingLogoUploadEnvelope,
+  ControlErrorEnvelope,
   ControlMailConfigEnvelope,
   ControlMailConfigRequest,
   ControlMailTestRequest,
@@ -58,9 +60,15 @@ import type {
   ControlOutboundPolicyRequest,
   CreateControlStorageProfile200,
   CreateControlStorageProfileBody,
+  DeleteControlBrandLogoOverride200,
   DeleteControlStorageProfile200,
+  DetectControlAIGatewayModels200,
+  DetectControlAIGatewayModelsParams,
   ForbiddenResponse,
   GetControlAIGateway200,
+  GetControlAIGatewayBrandLogoParams,
+  GetControlAIGatewayModelReference200,
+  GetControlAIGatewayModelReferenceParams,
   GetControlFeaturePrompt200,
   GetControlMonitor200,
   GetControlStatistics200,
@@ -69,17 +77,26 @@ import type {
   IdempotencyConflictResponse,
   ListControlAIGatewayCatalog200,
   ListControlAIGatewayModels200,
+  ListControlAIGatewayModelsObserved200,
   ListControlAIGatewayProviders200,
+  ListControlBrandLogoOverrides200,
   ListControlFeaturePrompts200,
   ListControlSearchProviders200,
   ListControlStorageProfiles200,
   ListControlStorageProviders200,
+  PreviewControlAIGatewayRoute200,
+  PreviewControlAIGatewayRouteBody,
+  RateLimitedResponse,
   SaveControlAIGatewayCatalog200,
   SaveControlAIGatewayCatalogBody,
   SaveControlAIGatewayModel200,
   SaveControlAIGatewayModelBody,
+  SaveControlBrandLogoOverride200,
+  SaveControlBrandLogoOverrideBody,
   SaveControlFeaturePrompt200,
   SaveControlFeaturePromptBody,
+  TestControlAIGatewayConnection200,
+  TestControlAIGatewayConnectionBody,
   TestControlSearchProvider200,
   TestControlStorageProfile200,
   UnauthorizedResponse,
@@ -93,6 +110,7 @@ import type {
   UpdateControlSearchProviderBody,
   UpdateControlStorageProfile200,
   UpdateControlStorageProfileBody,
+  UploadControlBrandingLogoBody,
 } from '../model'
 
 import { controlMutator } from '../../../controlMutator'
@@ -668,6 +686,119 @@ export const useUpdateControlBrandingSetting = <
   TContext
 > => {
   return useMutation(getUpdateControlBrandingSettingMutationOptions(options), queryClient)
+}
+export const getUploadControlBrandingLogoUrl = () => {
+  return `/platform/settings/branding/logo`
+}
+
+/**
+ * Multipart site-asset upload behind control:platform. The file rides the Storage service into the site-assets prefix (the same delivery plane the public branding read serves), so the returned logo_url drops straight into the branding setting update. Validation mirrors the deleted legacy admin upload (50MB image cap, detected-format allowlist, never trust the filename). The control guard cannot buffer multipart bodies, so this route registers as a POST read-guard and enforces the mutation guarantees in-handler: X-Operator-Reason (or the multipart reason/operator_note field) and a header-only Idempotency-Key are both required (400 otherwise); the key replays the first stored response on content-identical reuse and conflicts (409) on divergent reuse; every call is audited.
+ * @summary Upload a branding logo file (multipart, operator reason required)
+ */
+export const uploadControlBrandingLogo = async (
+  uploadControlBrandingLogoBody: UploadControlBrandingLogoBody,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlBrandingLogoUploadEnvelope> => {
+  const formData = new FormData()
+  formData.append(`file`, uploadControlBrandingLogoBody.file)
+  if (uploadControlBrandingLogoBody.reason !== undefined) {
+    formData.append(`reason`, uploadControlBrandingLogoBody.reason)
+  }
+  if (uploadControlBrandingLogoBody.operator_note !== undefined) {
+    formData.append(`operator_note`, uploadControlBrandingLogoBody.operator_note)
+  }
+
+  return controlMutator<ControlBrandingLogoUploadEnvelope>(getUploadControlBrandingLogoUrl(), {
+    ...options,
+    method: 'POST',
+    body: formData,
+  })
+}
+
+export const getUploadControlBrandingLogoMutationKey = () => ['uploadControlBrandingLogo'] as const
+
+export const getUploadControlBrandingLogoMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | IdempotencyConflictResponse
+    | RateLimitedResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadControlBrandingLogo>>,
+    TError,
+    UploadControlBrandingLogoMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadControlBrandingLogo>>,
+  TError,
+  UploadControlBrandingLogoMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUploadControlBrandingLogoMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadControlBrandingLogo>>,
+    UploadControlBrandingLogoMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return uploadControlBrandingLogo(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UploadControlBrandingLogoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadControlBrandingLogo>>
+>
+export type UploadControlBrandingLogoMutationBody = UploadControlBrandingLogoBody
+export type UploadControlBrandingLogoMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | IdempotencyConflictResponse
+  | RateLimitedResponse
+export type UploadControlBrandingLogoMutationVariables = { data: UploadControlBrandingLogoBody }
+
+/**
+ * @summary Upload a branding logo file (multipart, operator reason required)
+ */
+export const useUploadControlBrandingLogo = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | IdempotencyConflictResponse
+    | RateLimitedResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof uploadControlBrandingLogo>>,
+      TError,
+      UploadControlBrandingLogoMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof uploadControlBrandingLogo>>,
+  TError,
+  UploadControlBrandingLogoMutationVariables,
+  TContext
+> => {
+  return useMutation(getUploadControlBrandingLogoMutationOptions(options), queryClient)
 }
 export const getGetControlMediaUploadSettingUrl = () => {
   return `/platform/settings/media-upload`
@@ -2065,6 +2196,612 @@ export function useListControlAIGatewayProviders<
   return query
 }
 
+export const getDetectControlAIGatewayModelsUrl = (params?: DetectControlAIGatewayModelsParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/platform/ai-gateway/detect-models?${stringifiedParams}`
+    : `/platform/ai-gateway/detect-models`
+}
+
+/**
+ * @summary Probe the gateway for available models
+ */
+export const detectControlAIGatewayModels = async (
+  params?: DetectControlAIGatewayModelsParams,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<DetectControlAIGatewayModels200> => {
+  return controlMutator<DetectControlAIGatewayModels200>(
+    getDetectControlAIGatewayModelsUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getDetectControlAIGatewayModelsQueryKey = (
+  params?: MaybeRefOrGetter<DetectControlAIGatewayModelsParams>,
+) => {
+  return ['platform', 'ai-gateway', 'detect-models', ...(params ? [params] : [])] as const
+}
+
+export const getDetectControlAIGatewayModelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof detectControlAIGatewayModels>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<DetectControlAIGatewayModelsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectControlAIGatewayModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDetectControlAIGatewayModelsQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof detectControlAIGatewayModels>>> = ({
+    signal,
+  }) => detectControlAIGatewayModels(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof detectControlAIGatewayModels>>,
+    TError,
+    TData
+  >
+}
+
+export type DetectControlAIGatewayModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof detectControlAIGatewayModels>>
+>
+export type DetectControlAIGatewayModelsQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Probe the gateway for available models
+ */
+
+export function useDetectControlAIGatewayModels<
+  TData = Awaited<ReturnType<typeof detectControlAIGatewayModels>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<DetectControlAIGatewayModelsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectControlAIGatewayModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDetectControlAIGatewayModelsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetControlAIGatewayModelReferenceUrl = (
+  params?: GetControlAIGatewayModelReferenceParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/platform/ai-gateway/models-reference?${stringifiedParams}`
+    : `/platform/ai-gateway/models-reference`
+}
+
+/**
+ * Degraded outcomes (allowlist gap, upstream failure, miss) return HTTP 200 with found=false and an explicit error_code inside the payload, never an HTTP error: reference display must not block catalog flows. Only invalid input (missing model identity) is a 400.
+ * @summary Read-only models.dev reference lookup for one model
+ */
+export const getControlAIGatewayModelReference = async (
+  params?: GetControlAIGatewayModelReferenceParams,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<GetControlAIGatewayModelReference200> => {
+  return controlMutator<GetControlAIGatewayModelReference200>(
+    getGetControlAIGatewayModelReferenceUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetControlAIGatewayModelReferenceQueryKey = (
+  params?: MaybeRefOrGetter<GetControlAIGatewayModelReferenceParams>,
+) => {
+  return ['platform', 'ai-gateway', 'models-reference', ...(params ? [params] : [])] as const
+}
+
+export const getGetControlAIGatewayModelReferenceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlAIGatewayModelReference>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<GetControlAIGatewayModelReferenceParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlAIGatewayModelReference>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlAIGatewayModelReferenceQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlAIGatewayModelReference>>> = ({
+    signal,
+  }) => getControlAIGatewayModelReference(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getControlAIGatewayModelReference>>,
+    TError,
+    TData
+  >
+}
+
+export type GetControlAIGatewayModelReferenceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlAIGatewayModelReference>>
+>
+export type GetControlAIGatewayModelReferenceQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Read-only models.dev reference lookup for one model
+ */
+
+export function useGetControlAIGatewayModelReference<
+  TData = Awaited<ReturnType<typeof getControlAIGatewayModelReference>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<GetControlAIGatewayModelReferenceParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlAIGatewayModelReference>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlAIGatewayModelReferenceQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetControlAIGatewayBrandLogoUrl = (params?: GetControlAIGatewayBrandLogoParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/platform/ai-gateway/brand-logo?${stringifiedParams}`
+    : `/platform/ai-gateway/brand-logo`
+}
+
+/**
+ * Serves the provider mark as image/svg+xml. Degraded outcomes (allowlist gap, upstream failure, upstream miss) still return HTTP 200 with the default mark and an X-Brand-Logo-Fallback marker header so admin cards never break; only invalid input (bad provider) is a 400. Binary response, never a JSON envelope.
+ * @summary Admin brand-logo passthrough (binary SVG)
+ */
+export const getControlAIGatewayBrandLogo = async (
+  params?: GetControlAIGatewayBrandLogoParams,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<Blob> => {
+  return controlMutator<Blob>(getGetControlAIGatewayBrandLogoUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlAIGatewayBrandLogoQueryKey = (
+  params?: MaybeRefOrGetter<GetControlAIGatewayBrandLogoParams>,
+) => {
+  return ['platform', 'ai-gateway', 'brand-logo', ...(params ? [params] : [])] as const
+}
+
+export const getGetControlAIGatewayBrandLogoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<GetControlAIGatewayBrandLogoParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlAIGatewayBrandLogoQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>> = ({
+    signal,
+  }) => getControlAIGatewayBrandLogo(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>,
+    TError,
+    TData
+  >
+}
+
+export type GetControlAIGatewayBrandLogoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>
+>
+export type GetControlAIGatewayBrandLogoQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Admin brand-logo passthrough (binary SVG)
+ */
+
+export function useGetControlAIGatewayBrandLogo<
+  TData = Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  params?: MaybeRefOrGetter<GetControlAIGatewayBrandLogoParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlAIGatewayBrandLogo>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlAIGatewayBrandLogoQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListControlAIGatewayModelsObservedUrl = () => {
+  return `/platform/ai-gateway/models-observed`
+}
+
+/**
+ * Per-model success rate, top failure stage/category, cache hit rate, plus on-sale SKU UnitCredits margin rows. Gateway actual cost has no receipt/log source, so every margin row carries an explicit unavailable marker instead of a fabricated number.
+ * @summary Read-only 7-day first-party model observations
+ */
+export const listControlAIGatewayModelsObserved = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ListControlAIGatewayModelsObserved200> => {
+  return controlMutator<ListControlAIGatewayModelsObserved200>(
+    getListControlAIGatewayModelsObservedUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListControlAIGatewayModelsObservedQueryKey = () => {
+  return ['platform', 'ai-gateway', 'models-observed'] as const
+}
+
+export const getListControlAIGatewayModelsObservedQueryOptions = <
+  TData = Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>, TError, TData>
+  >
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListControlAIGatewayModelsObservedQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>> = ({
+    signal,
+  }) => listControlAIGatewayModelsObserved({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>,
+    TError,
+    TData
+  >
+}
+
+export type ListControlAIGatewayModelsObservedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>
+>
+export type ListControlAIGatewayModelsObservedQueryError = UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Read-only 7-day first-party model observations
+ */
+
+export function useListControlAIGatewayModelsObserved<
+  TData = Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlAIGatewayModelsObserved>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListControlAIGatewayModelsObservedQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getPreviewControlAIGatewayRouteUrl = () => {
+  return `/platform/ai-gateway/route-preview`
+}
+
+/**
+ * Pure routing dry-run (no configuration read or write), so it registers as a POST read-guard without reason or idempotency requirements.
+ * @summary Dry-run gateway routing for a model identifier
+ */
+export const previewControlAIGatewayRoute = async (
+  previewControlAIGatewayRouteBody: PreviewControlAIGatewayRouteBody,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<PreviewControlAIGatewayRoute200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<PreviewControlAIGatewayRoute200>(getPreviewControlAIGatewayRouteUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(previewControlAIGatewayRouteBody),
+  })
+}
+
+export const getPreviewControlAIGatewayRouteMutationKey = () =>
+  ['previewControlAIGatewayRoute'] as const
+
+export const getPreviewControlAIGatewayRouteMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewControlAIGatewayRoute>>,
+    TError,
+    PreviewControlAIGatewayRouteMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewControlAIGatewayRoute>>,
+  TError,
+  PreviewControlAIGatewayRouteMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPreviewControlAIGatewayRouteMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewControlAIGatewayRoute>>,
+    PreviewControlAIGatewayRouteMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return previewControlAIGatewayRoute(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type PreviewControlAIGatewayRouteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewControlAIGatewayRoute>>
+>
+export type PreviewControlAIGatewayRouteMutationBody = PreviewControlAIGatewayRouteBody
+export type PreviewControlAIGatewayRouteMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+export type PreviewControlAIGatewayRouteMutationVariables = {
+  data: PreviewControlAIGatewayRouteBody
+}
+
+/**
+ * @summary Dry-run gateway routing for a model identifier
+ */
+export const usePreviewControlAIGatewayRoute = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof previewControlAIGatewayRoute>>,
+      TError,
+      PreviewControlAIGatewayRouteMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof previewControlAIGatewayRoute>>,
+  TError,
+  PreviewControlAIGatewayRouteMutationVariables,
+  TContext
+> => {
+  return useMutation(getPreviewControlAIGatewayRouteMutationOptions(options), queryClient)
+}
+export const getTestControlAIGatewayConnectionUrl = () => {
+  return `/platform/ai-gateway/test-connection`
+}
+
+/**
+ * The token is used for this probe only and never persisted. Pure diagnosis: no configuration is read or written.
+ * @summary Probe gateway reachability server-side (operator reason required)
+ */
+export const testControlAIGatewayConnection = async (
+  testControlAIGatewayConnectionBody: TestControlAIGatewayConnectionBody,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<TestControlAIGatewayConnection200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<TestControlAIGatewayConnection200>(getTestControlAIGatewayConnectionUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(testControlAIGatewayConnectionBody),
+  })
+}
+
+export const getTestControlAIGatewayConnectionMutationKey = () =>
+  ['testControlAIGatewayConnection'] as const
+
+export const getTestControlAIGatewayConnectionMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testControlAIGatewayConnection>>,
+    TError,
+    TestControlAIGatewayConnectionMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testControlAIGatewayConnection>>,
+  TError,
+  TestControlAIGatewayConnectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTestControlAIGatewayConnectionMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testControlAIGatewayConnection>>,
+    TestControlAIGatewayConnectionMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return testControlAIGatewayConnection(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type TestControlAIGatewayConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testControlAIGatewayConnection>>
+>
+export type TestControlAIGatewayConnectionMutationBody = TestControlAIGatewayConnectionBody
+export type TestControlAIGatewayConnectionMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type TestControlAIGatewayConnectionMutationVariables = {
+  data: TestControlAIGatewayConnectionBody
+}
+
+/**
+ * @summary Probe gateway reachability server-side (operator reason required)
+ */
+export const useTestControlAIGatewayConnection = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof testControlAIGatewayConnection>>,
+      TError,
+      TestControlAIGatewayConnectionMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof testControlAIGatewayConnection>>,
+  TError,
+  TestControlAIGatewayConnectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getTestControlAIGatewayConnectionMutationOptions(options), queryClient)
+}
 export const getListControlStorageProvidersUrl = () => {
   return `/platform/storage/providers`
 }
@@ -3429,6 +4166,81 @@ export function useGetControlMonitor<
   return query
 }
 
+export const getStreamControlMonitorUrl = () => {
+  return `/platform/monitor/stream`
+}
+
+/**
+ * Global monitor snapshot stream (snapshot every 10s, closes after the max connection period with a close event). Read-guard so the long-lived stream is never body-buffered; the audit record emits on disconnect with the terminal status. Setup failures render the legacy admin shape; the stream itself is text/event-stream, never a JSON envelope.
+ * @summary Stream the runtime monitor snapshot (SSE)
+ */
+export const streamControlMonitor = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<string> => {
+  return controlMutator<string>(getStreamControlMonitorUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getStreamControlMonitorQueryKey = () => {
+  return ['platform', 'monitor', 'stream'] as const
+}
+
+export const getStreamControlMonitorQueryOptions = <
+  TData = Awaited<ReturnType<typeof streamControlMonitor>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlErrorEnvelope,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof streamControlMonitor>>, TError, TData>>
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStreamControlMonitorQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof streamControlMonitor>>> = ({ signal }) =>
+    streamControlMonitor({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof streamControlMonitor>>,
+    TError,
+    TData
+  >
+}
+
+export type StreamControlMonitorQueryResult = NonNullable<
+  Awaited<ReturnType<typeof streamControlMonitor>>
+>
+export type StreamControlMonitorQueryError =
+  UnauthorizedResponse | ForbiddenResponse | ControlErrorEnvelope
+
+/**
+ * @summary Stream the runtime monitor snapshot (SSE)
+ */
+
+export function useStreamControlMonitor<
+  TData = Awaited<ReturnType<typeof streamControlMonitor>>,
+  TError = UnauthorizedResponse | ForbiddenResponse | ControlErrorEnvelope,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof streamControlMonitor>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStreamControlMonitorQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getGetControlStatisticsUrl = (params?: GetControlStatisticsParams) => {
   const normalizedParams = new URLSearchParams()
 
@@ -3633,4 +4445,307 @@ export const useBackfillControlStatistics = <
   TContext
 > => {
   return useMutation(getBackfillControlStatisticsMutationOptions(options), queryClient)
+}
+export const getListControlBrandLogoOverridesUrl = () => {
+  return `/platform/brand-logo-overrides`
+}
+
+/**
+ * Data shape is ControlBrandLogoOverrideList ({overrides: ControlBrandLogoOverride[]}) inside the legacy admin envelope.
+ * @summary List brand logo overrides
+ */
+export const listControlBrandLogoOverrides = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ListControlBrandLogoOverrides200> => {
+  return controlMutator<ListControlBrandLogoOverrides200>(getListControlBrandLogoOverridesUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListControlBrandLogoOverridesQueryKey = () => {
+  return ['platform', 'brand-logo-overrides'] as const
+}
+
+export const getListControlBrandLogoOverridesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listControlBrandLogoOverrides>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listControlBrandLogoOverrides>>, TError, TData>
+  >
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListControlBrandLogoOverridesQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listControlBrandLogoOverrides>>> = ({
+    signal,
+  }) => listControlBrandLogoOverrides({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listControlBrandLogoOverrides>>,
+    TError,
+    TData
+  >
+}
+
+export type ListControlBrandLogoOverridesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listControlBrandLogoOverrides>>
+>
+export type ListControlBrandLogoOverridesQueryError = UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary List brand logo overrides
+ */
+
+export function useListControlBrandLogoOverrides<
+  TData = Awaited<ReturnType<typeof listControlBrandLogoOverrides>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listControlBrandLogoOverrides>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListControlBrandLogoOverridesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSaveControlBrandLogoOverrideUrl = (
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
+  targetKey: string,
+) => {
+  return `/platform/brand-logo-overrides/${encodeURIComponent(String(scope))}/${encodeURIComponent(String(targetKey))}`
+}
+
+/**
+ * Body carries {logo_key}; the scope-qualified key (scope plus target_key) is the audited target. Data shape is ControlBrandLogoOverride inside the legacy admin envelope.
+ * @summary Upsert a brand logo override (operator reason required)
+ */
+export const saveControlBrandLogoOverride = async (
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
+  targetKey: string,
+  saveControlBrandLogoOverrideBody: SaveControlBrandLogoOverrideBody,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<SaveControlBrandLogoOverride200> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<SaveControlBrandLogoOverride200>(
+    getSaveControlBrandLogoOverrideUrl(scope, targetKey),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(saveControlBrandLogoOverrideBody),
+    },
+  )
+}
+
+export const getSaveControlBrandLogoOverrideMutationKey = () =>
+  ['saveControlBrandLogoOverride'] as const
+
+export const getSaveControlBrandLogoOverrideMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveControlBrandLogoOverride>>,
+    TError,
+    SaveControlBrandLogoOverrideMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveControlBrandLogoOverride>>,
+  TError,
+  SaveControlBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSaveControlBrandLogoOverrideMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveControlBrandLogoOverride>>,
+    SaveControlBrandLogoOverrideMutationVariables
+  > = (props) => {
+    const { scope, targetKey, data } = props ?? {}
+
+    return saveControlBrandLogoOverride(scope, targetKey, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type SaveControlBrandLogoOverrideMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveControlBrandLogoOverride>>
+>
+export type SaveControlBrandLogoOverrideMutationBody = SaveControlBrandLogoOverrideBody
+export type SaveControlBrandLogoOverrideMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type SaveControlBrandLogoOverrideMutationVariables = {
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
+  targetKey: string
+  data: SaveControlBrandLogoOverrideBody
+}
+
+/**
+ * @summary Upsert a brand logo override (operator reason required)
+ */
+export const useSaveControlBrandLogoOverride = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof saveControlBrandLogoOverride>>,
+      TError,
+      SaveControlBrandLogoOverrideMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof saveControlBrandLogoOverride>>,
+  TError,
+  SaveControlBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  return useMutation(getSaveControlBrandLogoOverrideMutationOptions(options), queryClient)
+}
+export const getDeleteControlBrandLogoOverrideUrl = (
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
+  targetKey: string,
+) => {
+  return `/platform/brand-logo-overrides/${encodeURIComponent(String(scope))}/${encodeURIComponent(String(targetKey))}`
+}
+
+/**
+ * @summary Delete a brand logo override (operator reason required)
+ */
+export const deleteControlBrandLogoOverride = async (
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider',
+  targetKey: string,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<DeleteControlBrandLogoOverride200> => {
+  return controlMutator<DeleteControlBrandLogoOverride200>(
+    getDeleteControlBrandLogoOverrideUrl(scope, targetKey),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  )
+}
+
+export const getDeleteControlBrandLogoOverrideMutationKey = () =>
+  ['deleteControlBrandLogoOverride'] as const
+
+export const getDeleteControlBrandLogoOverrideMutationOptions = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>,
+    TError,
+    DeleteControlBrandLogoOverrideMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>,
+  TError,
+  DeleteControlBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteControlBrandLogoOverrideMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>,
+    DeleteControlBrandLogoOverrideMutationVariables
+  > = (props) => {
+    const { scope, targetKey } = props ?? {}
+
+    return deleteControlBrandLogoOverride(scope, targetKey, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeleteControlBrandLogoOverrideMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>
+>
+
+export type DeleteControlBrandLogoOverrideMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse
+export type DeleteControlBrandLogoOverrideMutationVariables = {
+  scope: 'provider-endpoint' | 'storage-profile' | 'search-provider' | 'oauth-provider'
+  targetKey: string
+}
+
+/**
+ * @summary Delete a brand logo override (operator reason required)
+ */
+export const useDeleteControlBrandLogoOverride = <
+  TError =
+    BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | IdempotencyConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>,
+      TError,
+      DeleteControlBrandLogoOverrideMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteControlBrandLogoOverride>>,
+  TError,
+  DeleteControlBrandLogoOverrideMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteControlBrandLogoOverrideMutationOptions(options), queryClient)
 }

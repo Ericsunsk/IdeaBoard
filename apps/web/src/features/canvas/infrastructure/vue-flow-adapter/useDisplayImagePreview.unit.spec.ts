@@ -11,6 +11,17 @@ vi.mock('../../infrastructure/media/canvasMediaIo.ts', () => ({
   resolveFetchUrl: canvasMediaIOMocks.resolveFetchUrl,
 }))
 
+vi.mock('../../../../shared/api/workspaceEventStream', () => ({
+  subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),
+}))
+
+// Workspace selection for media delivery resolves through the IoC seam
+// (`setMediaWorkspaceIdResolver`), not the workspaceContext module.
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaWorkspaceScope'
+
 function createCanvasMock() {
   return {
     width: 0,
@@ -20,6 +31,18 @@ function createCanvasMock() {
       getImageData: vi.fn(() => ({ data: new Uint8ClampedArray([255, 255, 255, 255]) })),
     })),
   }
+}
+
+// `vi.resetModules()` in beforeEach gives every test fresh module
+// instances, so the media-workspace seam must be wired on the fresh copy
+// after each dynamic import — static wiring would hit a discarded instance.
+async function importPreviewModule() {
+  const [{ useDisplayImagePreview }, { setMediaWorkspaceIdResolver }] = await Promise.all([
+    import('./useDisplayImagePreview'),
+    import('../../../../shared/api/mediaWorkspaceScope'),
+  ])
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+  return { useDisplayImagePreview }
 }
 
 async function flushPreviewTasks() {
@@ -37,6 +60,7 @@ async function waitForPreviewWork() {
 
 describe('useDisplayImagePreview', () => {
   beforeEach(() => {
+    setMediaWorkspaceIdResolver(() => 'ws_test123')
     vi.resetModules()
     vi.stubGlobal('Image', class {})
     const createElement = document.createElement.bind(document)
@@ -48,25 +72,40 @@ describe('useDisplayImagePreview', () => {
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const url = typeof input === 'string' ? input : input.toString()
-        if (url.includes('/user/media-assets/asset-42')) {
+        if (url.includes('/v1/workspaces/ws_test123/media-assets/asset-42')) {
           return new Response(
             JSON.stringify({
-              code: 0,
-              msg: '',
               data: {
-                asset_id: 'asset-42',
+                id: 'asset-42',
+                workspace_id: 'ws_test123',
                 status: 'ready',
+                media_kind: 'image',
                 mime_type: 'image/jpeg',
                 width: 2048,
                 height: 1024,
                 size_bytes: 100,
-                original: { status: 'ready', url: '/api/user/media-assets/42/original/content' },
+                checksum_sha256:
+                  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
                 derivatives: {
-                  thumb: { status: 'ready', format: 'webp', url: '/api/thumb.webp' },
-                  preview: { status: 'ready', format: 'webp', url: '/api/preview.webp' },
-                  'large-preview': { status: 'ready', format: 'webp', url: '/api/large.webp' },
-                  processing: { status: 'ready', format: 'webp', url: '/api/processing.webp' },
+                  thumb: {
+                    status: 'ready',
+                    format: 'webp',
+                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb',
+                  },
+                  preview: {
+                    status: 'ready',
+                    format: 'webp',
+                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+                  },
+                  'large-preview': {
+                    status: 'ready',
+                    format: 'webp',
+                    url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/large-preview',
+                  },
                 },
+                created_at: '2026-09-25T00:00:00.000Z',
+                updated_at: '2026-09-25T00:00:00.000Z',
               },
             }),
             { headers: { 'content-type': 'application/json' } },
@@ -95,6 +134,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   afterEach(() => {
+    resetMediaWorkspaceIdResolver()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -102,7 +142,7 @@ describe('useDisplayImagePreview', () => {
   it('regenerates preview only when the resolved max side tier changes', async () => {
     const sourceUrl = ref('https://example.com/image.jpg')
     const maxSide = ref<number | null>(320)
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, {
@@ -135,7 +175,7 @@ describe('useDisplayImagePreview', () => {
     canvasMediaIOMocks.canvasToBlob.mockClear()
     vi.mocked(fetch).mockClear()
     const sourceUrl = ref('https://example.com/full.jpg')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, {
@@ -154,7 +194,7 @@ describe('useDisplayImagePreview', () => {
 
   it('resizes managed uploads in the browser when no media asset id is available', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, {
@@ -179,16 +219,16 @@ describe('useDisplayImagePreview', () => {
 
   it('uses the canonical media derivative and never falls back to the original asset', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42' }),
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
     expect(fetch).toHaveBeenCalledWith(
-      '/api/user/media-assets/asset-42',
+      '/api/v1/workspaces/ws_test123/media-assets/asset-42',
       expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
     )
     scope.stop()
@@ -197,20 +237,20 @@ describe('useDisplayImagePreview', () => {
   it('keeps the current media derivative visible while a zoom tier refreshes', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
     const maxSide = ref(256)
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, { maxSide, assetId: 'asset-42' }),
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/thumb.webp'))
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb'))
 
     maxSide.value = 640
     await nextTick()
-    expect(preview.displayUrl.value).toBe('/api/thumb.webp')
+    expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
     scope.stop()
   })
 
@@ -226,7 +266,7 @@ describe('useDisplayImagePreview', () => {
     vi.stubGlobal('Image', DeferredImage)
 
     const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, { maxSide: null, keepPreviousOnSourceChange: true }),
@@ -250,17 +290,17 @@ describe('useDisplayImagePreview', () => {
   it('keeps the decoded frame when the stage leaves the viewport', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
     const isVisible = ref(true)
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, { maxSide: 640, assetId: 'asset-42', isVisible }),
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
     isVisible.value = false
     await nextTick()
-    expect(preview.displayUrl.value).toBe('/api/preview.webp')
+    expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview')
     scope.stop()
   })
 
@@ -276,7 +316,7 @@ describe('useDisplayImagePreview', () => {
     vi.stubGlobal('Image', DeferredImage)
 
     const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: null }))
     if (!preview) throw new Error('preview composable was not created')
@@ -310,7 +350,7 @@ describe('useDisplayImagePreview', () => {
   it('falls back to the original managed upload when browser preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
     const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: 640 }))
     if (!preview) throw new Error('preview composable was not created')
@@ -324,7 +364,7 @@ describe('useDisplayImagePreview', () => {
 
   it('resolves upload refs before the first image render', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, {
@@ -343,7 +383,7 @@ describe('useDisplayImagePreview', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
     vi.resetModules()
     const sourceUrl = ref('/uploads/canvas/U123/board/content/local.png')
-    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
       useDisplayImagePreview(sourceUrl, {

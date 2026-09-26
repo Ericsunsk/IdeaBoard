@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiResponseAdminBrandLogoOverrideList } from './brandLogoResource'
 import { getAdminBrandLogoOverride, replaceAdminBrandLogoOverrides } from './brandLogos'
 import { createAdminBrandLogoResource, hydrateAdminBrandLogoOverrides } from './brandLogoResource'
+import { ADMIN_CONTROL_UNAVAILABLE_CODE } from '../lib/controlGuidance'
 
 const transport = vi.hoisted(() => ({
   request: vi.fn(),
@@ -11,23 +11,10 @@ vi.mock('../../../../shared/api/client', () => ({
   api: { request: transport.request },
 }))
 
-type QueryCache = {
-  cancelQueries: ReturnType<typeof vi.fn>
-  getQueryData: ReturnType<typeof vi.fn>
-  setQueryData: ReturnType<typeof vi.fn>
-  value?: ApiResponseAdminBrandLogoOverrideList | undefined
-}
-
-function createQueryCache(initial?: ApiResponseAdminBrandLogoOverrideList): QueryCache {
-  const cache: QueryCache = {
-    value: initial,
+function createQueryCache() {
+  return {
     cancelQueries: vi.fn().mockResolvedValue(undefined),
-    getQueryData: vi.fn(() => cache.value),
-    setQueryData: vi.fn((_key, value) => {
-      cache.value = value
-    }),
   }
-  return cache
 }
 
 function override(
@@ -44,6 +31,9 @@ function override(
   }
 }
 
+// Brand logo overrides have no Control Plane equivalent: save/remove fail
+// closed with guidance instead of calling the deleted
+// `/api/admin/brand-logo-overrides*` routes. Local hydration stays.
 describe('adminBrandLogoResource', () => {
   beforeEach(() => {
     transport.request.mockReset()
@@ -56,46 +46,26 @@ describe('adminBrandLogoResource', () => {
     expect(getAdminBrandLogoOverride('storage-profile', 'r2-main')).toBe('minio')
   })
 
-  it('updates the Vue Query list and shared cache after a save', async () => {
-    const initial = override('provider-endpoint', '1', 'flux')
-    const saved = override('provider-endpoint', '2', 'minio')
-    const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [initial] } })
-    transport.request.mockResolvedValue({ code: 0, msg: 'success', data: saved })
+  it('fails saves closed with guidance and no transport call', async () => {
+    const cache = createQueryCache()
 
-    await createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio')
+    await expect(
+      createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio'),
+    ).rejects.toMatchObject({ code: ADMIN_CONTROL_UNAVAILABLE_CODE })
 
     expect(cache.cancelQueries).toHaveBeenCalledWith({
       queryKey: ['admin', 'brand-logo-overrides'],
     })
-    expect(cache.value?.data?.overrides).toEqual([initial, saved])
-    expect(getAdminBrandLogoOverride('provider-endpoint', '1')).toBe('flux')
-    expect(getAdminBrandLogoOverride('provider-endpoint', '2')).toBe('minio')
+    expect(transport.request).not.toHaveBeenCalled()
   })
 
-  it('removes the override from the Vue Query list and shared cache on reset', async () => {
-    const existing = override('storage-profile', 'r2-main', 'minio')
-    const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [existing] } })
-    hydrateAdminBrandLogoOverrides([existing])
-    transport.request.mockResolvedValue({ code: 0, msg: 'success' })
-
-    await createAdminBrandLogoResource(cache as never).remove('storage-profile', 'r2-main')
-
-    expect(cache.value?.data?.overrides).toEqual([])
-    expect(getAdminBrandLogoOverride('storage-profile', 'r2-main')).toBeUndefined()
-  })
-
-  it('does not mutate either cache when the server mutation fails', async () => {
-    const existing = override('provider-endpoint', '1', 'flux')
-    const cache = createQueryCache({ code: 0, msg: 'success', data: { overrides: [existing] } })
-    hydrateAdminBrandLogoOverrides([existing])
-    transport.request.mockRejectedValue(new Error('offline'))
+  it('fails removes closed with guidance and no transport call', async () => {
+    const cache = createQueryCache()
 
     await expect(
-      createAdminBrandLogoResource(cache as never).save('provider-endpoint', '2', 'minio'),
-    ).rejects.toThrow('offline')
+      createAdminBrandLogoResource(cache as never).remove('storage-profile', 'r2-main'),
+    ).rejects.toMatchObject({ code: ADMIN_CONTROL_UNAVAILABLE_CODE })
 
-    expect(cache.value?.data?.overrides).toEqual([existing])
-    expect(getAdminBrandLogoOverride('provider-endpoint', '1')).toBe('flux')
-    expect(getAdminBrandLogoOverride('provider-endpoint', '2')).toBeUndefined()
+    expect(transport.request).not.toHaveBeenCalled()
   })
 })

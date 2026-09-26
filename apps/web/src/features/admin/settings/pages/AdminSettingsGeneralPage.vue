@@ -188,12 +188,16 @@ import {
   useAdminBrandingSettingsFeedback,
   useAdminUnsupportedLogoFileFeedback,
 } from '../useSettingsFeedback'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminLogoButtonClass, adminActionButtonClass } from '../../shared/lib/uiClasses'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 const brandingLogoButtonClass = [adminLogoButtonClass, 'size-28 relative'].join(' ')
 
-const branding = useBrandingSettings({ feedback: useAdminBrandingSettingsFeedback() })
+const branding = useBrandingSettings({
+  feedback: useAdminBrandingSettingsFeedback(),
+  confirm: useAdminConfirm(),
+})
 const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)

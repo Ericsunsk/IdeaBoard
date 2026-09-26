@@ -12,6 +12,13 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
   useAdminToast: () => toast,
 }))
 
+vi.mock('../../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => ({
+    confirm: vi.fn().mockResolvedValue(true),
+    readReason: () => 'prompt review',
+  }),
+}))
+
 describe('AdminPromptConfigPage', () => {
   let storedPrompts: Array<{ feature_slug: string; prompt: string; updated_at?: string }> = []
 
@@ -48,7 +55,7 @@ describe('AdminPromptConfigPage', () => {
           data: { prompts: storedPrompts },
         })
       }),
-      http.put('/api/admin/feature-prompts/:feature', async ({ params, request }) => {
+      http.put('/api/control/v1/platform/feature-prompts/:feature', async ({ params, request }) => {
         const slug = String(params.feature)
         const body = (await request.json()) as { prompt: string }
         const existing = storedPrompts.find((p) => p.feature_slug === slug)

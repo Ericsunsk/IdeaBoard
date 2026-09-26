@@ -4,6 +4,8 @@ import { createAdminGatewayResource } from '../../models/infrastructure/adminGat
 import { getAdminModelCatalogQueryKey } from '../../models/application/useAdminModelCatalogWorkspace'
 import type { AdminModelItem } from '../../models/domain/catalogData'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { pricingMappingFeature } from './groups'
 import type { AdminBillableItemCard } from './billableCatalogTypes'
 
@@ -11,6 +13,7 @@ import type { AdminBillableItemCard } from './billableCatalogTypes'
 // 映射读写、行状态派生。Page 只剩价格逻辑，Dialog 只收 props。
 export function usePricingModelAdapter() {
   const toast = useAdminToast()
+  const confirm = useAdminConfirm()
   const gateway = createAdminGatewayResource()
   const modelByFeature = reactive<Record<string, string>>({})
   const modelPending = reactive<Record<string, boolean>>({})
@@ -64,10 +67,18 @@ export function usePricingModelAdapter() {
 
   async function persistModelMapping(feature: string, model: string) {
     if (!feature || modelPending[feature]) return
+    // Control writes require an operator reason (audit); a cancelled
+    // dialog aborts silently.
+    const operatorReason = await confirmSettingsSave(confirm, {
+      title: '保存模型映射',
+      message: `确定将功能 ${feature} 映射到模型 ${model} 吗？该操作将记录操作人与原因。`,
+      confirmLabel: '保存映射',
+    })
+    if (!operatorReason) return
     modelPending[feature] = true
     modelErrors[feature] = ''
     try {
-      await gateway.mappings.save(feature, model)
+      await gateway.mappings.save(feature, model, { operatorReason })
       modelByFeature[feature] = model
       toast.success('模型映射已保存，价格不受影响')
     } catch (error) {

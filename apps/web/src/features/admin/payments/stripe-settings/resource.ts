@@ -1,19 +1,25 @@
-import { api } from '../../../../shared/api/client'
 import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
+  getControlStripeConfig,
+  updateControlStripeConfig,
+} from '../../../../shared/api/generated-query/control/control-payments/control-payments'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../../../../shared/api/contractKernel'
 import type {
   AdminStripeSettingsResource,
   SaveStripeConfigurationInput,
   StripeConfigurationSummary,
 } from './types'
 
-// Admin Stripe settings boundary (issue #809). The generated
-// `admin-payments` client is gone but the backend admin plane still serves
-// `/api/admin/payments/stripe-config` with the shared envelope, so this
-// boundary transports through the central `api.request` with local wire
-// types.
+// Admin Stripe settings boundary (W2 transports). Reads and writes go
+// through the Control Plane payment operations with the contract envelope
+// (`{data}` over the same configuration summary); writes carry a
+// header-only Idempotency-Key plus an operator reason (mirrored into the
+// body `reason` field) and emit a control audit record. The deleted
+// `/api/admin/payments/stripe-config` route is gone; this module is the
+// single transport.
 export type ApiStripeConfigurationSummary = {
   configured: boolean
   api_key_configured: boolean
@@ -36,6 +42,11 @@ export type UpdateStripeConfigurationRequest = {
   purchases_enabled: boolean
 }
 
+export type StripeSettingsMutationOptions = {
+  operatorReason: string
+  idempotencyKey?: string | undefined
+}
+
 export function createAdminStripeSettingsResource(): AdminStripeSettingsResource {
   return {
     get: getStripeConfiguration,
@@ -44,36 +55,42 @@ export function createAdminStripeSettingsResource(): AdminStripeSettingsResource
 }
 
 export async function getStripeConfiguration(): Promise<StripeConfigurationSummary> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<ApiStripeConfigurationSummary>>(
-      '/admin/payments/stripe-config',
-      { method: 'GET' },
-    ),
-    '加载 Stripe 设置失败',
-  )
-  return normalizeStripeConfiguration(data)
+  try {
+    const body = await getControlStripeConfig()
+    return normalizeStripeConfiguration(
+      requireContractData<ApiStripeConfigurationSummary>(body, '加载 Stripe 设置失败'),
+    )
+  } catch (error) {
+    throw withControlCopy(error, '加载 Stripe 设置失败')
+  }
 }
 
 export async function saveStripeConfiguration(
   input: SaveStripeConfigurationInput,
+  options: StripeSettingsMutationOptions,
 ): Promise<StripeConfigurationSummary> {
-  const body: UpdateStripeConfigurationRequest = {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  const body = {
     ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
     payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
     product_tax_code: input.productTaxCode.trim(),
     purchases_enabled: input.purchasesEnabled,
+    reason: operatorReason,
   }
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<ApiStripeConfigurationSummary>>(
-      '/admin/payments/stripe-config',
-      {
-        method: 'PUT',
-        body: body as unknown as Record<string, unknown>,
-      },
-    ),
-    '保存 Stripe 设置失败',
-  )
-  return normalizeStripeConfiguration(data)
+  try {
+    const response = await updateControlStripeConfig(body, {
+      headers: buildContractRequestHeaders({
+        requestId: newRequestId(),
+        idempotencyKey: options.idempotencyKey ?? newRequestId(),
+        operatorReason,
+      }),
+    })
+    return normalizeStripeConfiguration(
+      requireContractData<ApiStripeConfigurationSummary>(response, '保存 Stripe 设置失败'),
+    )
+  } catch (error) {
+    throw withControlCopy(error, '保存 Stripe 设置失败')
+  }
 }
 
 function normalizeStripeConfiguration(
@@ -93,4 +110,42 @@ function normalizeStripeConfiguration(
     purchasesEnabled: configuration.purchases_enabled,
     updatedAt: configuration.updated_at,
   }
+}
+
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+  }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 409) return 409
+  }
+  return undefined
 }

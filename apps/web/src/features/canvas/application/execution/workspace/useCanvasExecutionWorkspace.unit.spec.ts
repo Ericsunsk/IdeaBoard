@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { CanvasGraphSession } from '../../../domain/graph'
 import {
@@ -9,29 +9,51 @@ import {
 } from '../pending-execution'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
 import { http, HttpResponse, useMswHandlers } from '../../../../../test/msw'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../../shared/api/mediaAssetDelivery'
 
-const mediaAssetMetadataHandler = http.get('/api/user/media-assets/:assetId', ({ params }) =>
-  HttpResponse.json({
-    code: 0,
-    msg: 'ok',
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
+
+afterEach(() => {
+  resetMediaWorkspaceIdResolver()
+})
+
+const WORKSPACE_ID = 'ws_test123'
+
+function workspaceAssetEnvelope(assetId: string) {
+  return {
     data: {
-      asset_id: String(params.assetId),
+      id: assetId,
+      workspace_id: WORKSPACE_ID,
       status: 'ready',
+      media_kind: 'image',
       mime_type: 'image/webp',
       width: 400,
       height: 200,
       size_bytes: 1,
-      original: { status: 'ready', url: '/original.webp', width: 400, height: 200 },
+      checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${assetId}/content`,
       derivatives: {
         preview: {
           status: 'ready',
-          url: `/api/user/media-assets/${String(params.assetId)}/derivatives/preview/content`,
+          url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${assetId}/derivatives/preview`,
           width: 400,
           height: 200,
         },
       },
+      created_at: '2026-09-25T00:00:00.000Z',
+      updated_at: '2026-09-25T00:00:00.000Z',
     },
-  }),
+  }
+}
+
+const mediaAssetMetadataHandler = http.get(
+  '/api/v1/workspaces/:workspaceId/media-assets/:assetId',
+  ({ params }) => HttpResponse.json(workspaceAssetEnvelope(String(params.assetId))),
 )
 
 beforeEach(() => {

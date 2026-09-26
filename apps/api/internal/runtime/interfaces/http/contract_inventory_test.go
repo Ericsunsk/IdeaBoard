@@ -160,6 +160,24 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: getWorkspaceBillingAccount",
 			"operationId: getWorkspaceCreditsBalance",
 			"operationId: createWorkspaceCheckoutSession",
+			// Backend gap batch B (#809-close): purchase options,
+			// pending orders (continue/abandon), recharge history,
+			// billing quotes, and rewards redeem/history.
+			"operationId: getWorkspacePurchaseOptions",
+			"operationId: listWorkspacePendingOrders",
+			"operationId: continueWorkspacePendingOrder",
+			"operationId: abandonWorkspacePendingOrder",
+			"operationId: listWorkspaceRecharges",
+			"operationId: createWorkspaceBillingQuote",
+			"operationId: redeemWorkspaceReward",
+			"operationId: listWorkspaceRewardRedemptions",
+			// Media gap batch: staged-bytes PUT, bounded batch read,
+			// user-scoped avatar PUT (complete/vision branches covered
+			// by the pinned completeWorkspaceUpload /
+			// createWorkspaceVisionQuery operations).
+			"operationId: stageWorkspaceUploadBytes",
+			"operationId: batchGetWorkspaceMediaAssets",
+			"operationId: uploadAvatar",
 			"operationId: createWorkspaceTask",
 			"operationId: listWorkspaceTasks",
 			"operationId: getWorkspaceTask",
@@ -195,6 +213,32 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 			"operationId: getControlMonitor",
 			"operationId: getControlMailSetting",
 			"operationId: updateControlMailSetting",
+			// Control gap batch (#809-close): OAuth provider channels,
+			// branding logo upload, AI gateway extras (detect, model
+			// reference, brand logo, observed, route preview, test
+			// connection), brand-logo overrides, reward-code
+			// administration plus admin redemption reads, and the
+			// monitor SSE stream.
+			"operationId: getControlOAuthProvider",
+			"operationId: updateControlOAuthProvider",
+			"operationId: uploadControlBrandingLogo",
+			"operationId: detectControlAIGatewayModels",
+			"operationId: getControlAIGatewayModelReference",
+			"operationId: getControlAIGatewayBrandLogo",
+			"operationId: listControlAIGatewayModelsObserved",
+			"operationId: previewControlAIGatewayRoute",
+			"operationId: testControlAIGatewayConnection",
+			"operationId: listControlBrandLogoOverrides",
+			"operationId: saveControlBrandLogoOverride",
+			"operationId: deleteControlBrandLogoOverride",
+			"operationId: searchControlRewardCodes",
+			"operationId: createControlRewardCode",
+			"operationId: updateControlRewardCode",
+			"operationId: setControlRewardCodeEnabled",
+			"operationId: deleteControlRewardCode",
+			"operationId: listControlRewardRedemptions",
+			"operationId: getControlRewardRedemption",
+			"operationId: streamControlMonitor",
 		},
 		"openapi.events.yaml": {
 			"pattern: '^evt_",

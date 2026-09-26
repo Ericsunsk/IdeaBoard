@@ -1,7 +1,7 @@
 import { ref, shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
-import { TaskCancelledError } from '../../../../../shared/api/taskEvents'
+import { TaskCancelledError } from '../task-runner/taskResultErrors'
 import { createEmptyBoardSnapshot } from '../../../../board'
 import { useCanvasVueFlowGraphAdapter } from '../../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import {
@@ -20,7 +20,15 @@ vi.mock('../media/imageSize', () => ({
 }))
 vi.mock('../media/inpaintMask', () => ({
   prepareInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
+  prepareInpaintMaskAsset: vi.fn(async () => 'asset_mask1'),
 }))
+vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../workspace/canvasWorkspaceTaskAdapter')>()
+  return {
+    ...actual,
+    requireCanvasWorkspaceId: vi.fn(() => 'ws_test123'),
+  }
+})
 vi.mock('../../../../../shared/api/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
     async (assetId: number) =>
@@ -289,16 +297,18 @@ describe('useImageWorkflowExecution', () => {
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
       feature: 'inpaint',
+      prompt: 'remove the object',
       params: {
         output_count: 1,
         original_image_asset_id: 42,
-        mask_image_url: 'https://example.com/mask.png',
+        mask_asset_id: 'asset_mask1',
         original_image_width: 1200,
         original_image_height: 800,
         custom_width: 1200,
         custom_height: 800,
       },
     })
+    expect(readinessRequest?.params).not.toHaveProperty('mask_image_url')
     expect(readinessRequest?.params).not.toHaveProperty('reference_image_urls')
     expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
   })

@@ -4,24 +4,27 @@ import {
   fetchRewardRedemptions,
   rewardRedemptionsQueryKeys,
 } from '../../infrastructure/rewards/resource'
+import { useAccountWorkspace } from '../accountWorkspace'
 
 const pageSize = 20
-const initialPageParam = 0
 
 export function useRewardHistory(enabled: MaybeRefOrGetter<boolean> = true) {
+  const { workspaceId, selectionSettled } = useAccountWorkspace()
+
   const query = useInfiniteQuery({
-    queryKey: rewardRedemptionsQueryKeys.all,
-    queryFn: ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }) =>
+    queryKey: computed(() => rewardRedemptionsQueryKeys.list(workspaceId.value ?? '')),
+    queryFn: ({ pageParam, signal }: { pageParam: string; signal: AbortSignal }) =>
       fetchRewardRedemptions(
+        workspaceId.value ?? '',
         {
-          limit: pageSize,
-          ...(pageParam > 0 ? { before_id: pageParam } : {}),
+          page_size: pageSize,
+          ...(pageParam ? { cursor: pageParam } : {}),
         },
         signal,
       ),
-    initialPageParam,
-    getNextPageParam: (lastPage) => lastPage.next_before_id ?? undefined,
-    enabled: () => toValue(enabled),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
+    enabled: () => toValue(enabled) && selectionSettled.value,
     retry: false,
   })
 

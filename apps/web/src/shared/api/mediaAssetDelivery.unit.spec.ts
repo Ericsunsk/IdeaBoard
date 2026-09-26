@@ -1,166 +1,199 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
+import {
+  MediaWorkspaceUnavailableError,
+  getMediaAssetMetadata,
+  getWorkspaceMediaAssetMetadata,
+  invalidateMediaAssetMetadata,
+  resetMediaWorkspaceIdResolver,
+  resolveMediaAssetDerivativeURL,
+  resolveMediaAssetOriginalURL,
+  resolveMediaAssetProcessingURL,
+  setMediaWorkspaceIdResolver,
+  useMediaAssetDelivery,
+} from './mediaAssetDelivery'
+
+const WORKSPACE_ID = 'ws_test123'
+const ASSET_ID = 'asset_uid42'
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
-  subscribe: vi.fn(),
+  subscribeInvalidation: vi.fn(),
+  selectedWorkspaceId: { current: 'ws_test123' as string | null },
 }))
 
 vi.mock('./client', () => ({
   api: { request: mocks.request },
 }))
 
-vi.mock('./userEventStream', () => ({
-  subscribeUserEvent: mocks.subscribe,
+vi.mock('./workspaceEventStream', () => ({
+  subscribeWorkspaceMediaInvalidation: mocks.subscribeInvalidation,
 }))
 
-function metadata(status: string, url = '/api/preview.webp') {
+function assetEnvelope(status: string, derivativeUrl = '/api/v1/preview.webp') {
   return {
-    code: 0,
-    msg: '',
     data: {
-      asset_id: 'asset-42',
+      id: ASSET_ID,
+      workspace_id: WORKSPACE_ID,
       status: 'ready',
+      media_kind: 'image',
       mime_type: 'image/jpeg',
       width: 2048,
       height: 1024,
       size_bytes: 100,
-      original: { status: 'ready', url: '/api/original.jpg' },
+      checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
       derivatives: {
-        thumb: { status, url },
-        preview: { status, url },
-        'large-preview': { status, url: '/api/large.webp' },
-        processing: { status, url: '/api/processing.webp' },
-        'processing-input': { status, url: '/api/processing-input.webp' },
+        thumb: { status, url: derivativeUrl },
+        preview: { status, url: derivativeUrl },
+        'large-preview': { status, url: '/api/v1/large.webp' },
       },
+      created_at: '2026-09-25T00:00:00.000Z',
+      updated_at: '2026-09-25T00:00:00.000Z',
     },
   }
 }
 
-describe('useMediaAssetDelivery', () => {
+describe('workspace mediaAssetDelivery', () => {
   beforeEach(() => {
-    vi.resetModules()
     vi.clearAllMocks()
-    mocks.subscribe.mockReturnValue(vi.fn())
-  })
-
-  it('resolves a stable API content URL for an asset', async () => {
-    const { resolveMediaAssetOriginalURL } = await import('./mediaAssetDelivery')
-    expect(resolveMediaAssetOriginalURL('asset-42')).toBe(
-      '/api/user/media-assets/asset-42/original/content',
-    )
-  })
-
-  it('resolves a format-agnostic derivative URL', async () => {
-    const { resolveMediaAssetDerivativeURL } = await import('./mediaAssetDelivery')
-    expect(resolveMediaAssetDerivativeURL('asset-42', 'preview')).toBe(
-      '/api/user/media-assets/asset-42/derivatives/preview/content',
-    )
-  })
-
-  it('loads the selected tier and refreshes it from a media derivative event', async () => {
-    mocks.request
-      .mockResolvedValueOnce(metadata('pending'))
-      .mockResolvedValueOnce(metadata('ready'))
-    const { useMediaAssetDelivery, invalidateMediaAssetMetadata } =
-      await import('./mediaAssetDelivery')
+    mocks.selectedWorkspaceId.current = WORKSPACE_ID
+    mocks.subscribeInvalidation.mockReturnValue(vi.fn())
     invalidateMediaAssetMetadata()
-    const assetId = ref('asset-42')
-    const tier = ref<'preview'>('preview')
+    setMediaWorkspaceIdResolver(() => mocks.selectedWorkspaceId.current)
+  })
+
+  afterEach(() => {
+    resetMediaWorkspaceIdResolver()
+  })
+
+  it('resolves a stable v1 content URL for an asset', () => {
+    expect(resolveMediaAssetOriginalURL(ASSET_ID)).toBe(
+      `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
+    )
+  })
+
+  it('resolves a format-agnostic v1 derivative URL', () => {
+    expect(resolveMediaAssetDerivativeURL(ASSET_ID, 'preview')).toBe(
+      `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/derivatives/preview`,
+    )
+  })
+
+  it('fails URL builders closed without a workspace selection', () => {
+    mocks.selectedWorkspaceId.current = null
+    expect(() => resolveMediaAssetOriginalURL(ASSET_ID)).toThrow(MediaWorkspaceUnavailableError)
+    expect(() => resolveMediaAssetDerivativeURL(ASSET_ID)).toThrow(MediaWorkspaceUnavailableError)
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('loads the selected tier through the workspace asset endpoint', async () => {
+    mocks.request.mockResolvedValue(assetEnvelope('ready'))
     const scope = effectScope()
-    const delivery = scope.run(() => useMediaAssetDelivery(assetId, tier))
+    const delivery = scope.run(() =>
+      useMediaAssetDelivery(ref(ASSET_ID), ref<'large-preview'>('large-preview')),
+    )
+    if (!delivery) throw new Error('delivery composable was not created')
+
+    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/v1/large.webp'))
+    expect(mocks.request).toHaveBeenCalledWith(
+      `/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}`,
+      expect.objectContaining({ method: 'GET' }),
+    )
+    scope.stop()
+  })
+
+  it('refreshes the tier from a workspace media invalidation event', async () => {
+    mocks.request
+      .mockResolvedValueOnce(assetEnvelope('pending'))
+      .mockResolvedValueOnce(assetEnvelope('ready'))
+    const scope = effectScope()
+    const delivery = scope.run(() =>
+      useMediaAssetDelivery(ref(ASSET_ID), ref<'preview'>('preview')),
+    )
     if (!delivery) throw new Error('delivery composable was not created')
 
     await vi.waitFor(() => expect(delivery.status.value).toBe('pending'))
     expect(delivery.url.value).toBe('')
-    const listener = mocks.subscribe.mock.calls[0]?.[1] as (event: MessageEvent<string>) => void
-    listener(
-      new MessageEvent('media.derivative.updated', {
-        data: JSON.stringify({ media_asset_id: 'asset-42' }),
-      }),
-    )
+    const onInvalidated = mocks.subscribeInvalidation.mock.calls[0]?.[1] as (
+      assetId: string,
+    ) => void
+    onInvalidated(ASSET_ID)
 
-    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/preview.webp'))
+    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/v1/preview.webp'))
     expect(mocks.request).toHaveBeenCalledTimes(2)
     scope.stop()
   })
 
   it('cancels delivery while the asset is not visible', async () => {
     const visibility = ref(false)
-    mocks.request.mockResolvedValue(metadata('ready'))
-    const { useMediaAssetDelivery } = await import('./mediaAssetDelivery')
+    mocks.request.mockResolvedValue(assetEnvelope('ready'))
     const scope = effectScope()
     const delivery = scope.run(() =>
-      useMediaAssetDelivery(ref('asset-42'), ref<'thumb'>('thumb'), { enabled: visibility }),
+      useMediaAssetDelivery(ref(ASSET_ID), ref<'thumb'>('thumb'), { enabled: visibility }),
     )
     if (!delivery) throw new Error('delivery composable was not created')
     await Promise.resolve()
     expect(mocks.request).not.toHaveBeenCalled()
 
     visibility.value = true
-    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/preview.webp'))
+    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/v1/preview.webp'))
     scope.stop()
   })
 
-  it('reads metadata once for the selected tier without an ensure_tier hint', async () => {
-    mocks.request.mockResolvedValue(metadata('ready'))
-    const { useMediaAssetDelivery, invalidateMediaAssetMetadata } =
-      await import('./mediaAssetDelivery')
-    invalidateMediaAssetMetadata()
-    const scope = effectScope()
-    const delivery = scope.run(() =>
-      useMediaAssetDelivery(ref('asset-42'), ref<'large-preview'>('large-preview')),
-    )
-    if (!delivery) throw new Error('delivery composable was not created')
+  it('reads workspace metadata once and serves repeats from cache', async () => {
+    mocks.request.mockResolvedValueOnce(assetEnvelope('ready'))
 
-    await vi.waitFor(() => expect(delivery.url.value).toBe('/api/large.webp'))
-    expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/asset-42',
-      expect.objectContaining({ method: 'GET' }),
-    )
-    scope.stop()
+    const first = await getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
+    const second = await getMediaAssetMetadata(ASSET_ID)
+    expect(second).toBe(first)
+    expect(first.original.url).toContain(`/media-assets/${ASSET_ID}/content`)
+    expect(mocks.request).toHaveBeenCalledTimes(1)
   })
 
-  it('resolves processing input in a single read and never falls back to the original', async () => {
-    mocks.request.mockResolvedValueOnce(metadata('ready'))
-    const { resolveMediaAssetProcessingURL, invalidateMediaAssetMetadata } =
-      await import('./mediaAssetDelivery')
-    invalidateMediaAssetMetadata()
+  it('fails metadata reads closed without a workspace selection', async () => {
+    mocks.selectedWorkspaceId.current = null
 
-    await expect(resolveMediaAssetProcessingURL('asset-42')).resolves.toBe(
-      '/api/processing-input.webp',
+    await expect(getMediaAssetMetadata(ASSET_ID)).rejects.toBeInstanceOf(
+      MediaWorkspaceUnavailableError,
+    )
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
+  it('resolves the original content as the processing source', async () => {
+    mocks.request.mockResolvedValueOnce(assetEnvelope('ready'))
+
+    await expect(resolveMediaAssetProcessingURL(ASSET_ID)).resolves.toContain(
+      `/media-assets/${ASSET_ID}/content`,
     )
     expect(mocks.request).toHaveBeenCalledTimes(1)
     expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/asset-42',
+      `/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}`,
       expect.objectContaining({ method: 'GET' }),
     )
   })
 
-  it('loads metadata for multiple assets in one request and hydrates cache', async () => {
+  it('fails processing resolution closed while the asset is not ready', async () => {
     mocks.request.mockResolvedValueOnce({
-      code: 0,
-      msg: '',
       data: {
-        items: [
-          { ...metadata('ready').data, asset_id: 'asset-42' },
-          { ...metadata('ready').data, asset_id: 'asset-43' },
-        ],
+        id: ASSET_ID,
+        workspace_id: WORKSPACE_ID,
+        status: 'processing',
+        media_kind: 'image',
+        mime_type: 'image/jpeg',
+        width: 0,
+        height: 0,
+        size_bytes: 0,
+        checksum_sha256:
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
+        derivatives: {},
+        created_at: '2026-09-25T00:00:00.000Z',
+        updated_at: '2026-09-25T00:00:00.000Z',
       },
     })
-    const { getMediaAssetMetadataBatch, getMediaAssetMetadata, invalidateMediaAssetMetadata } =
-      await import('./mediaAssetDelivery')
-    invalidateMediaAssetMetadata()
-    const result = await getMediaAssetMetadataBatch(['asset-43', 'asset-42', 'asset-42'])
-    expect([...result.keys()]).toEqual(['asset-42', 'asset-43'])
-    expect(mocks.request).toHaveBeenCalledWith(
-      '/user/media-assets/delivery/batch',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ asset_ids: ['asset-42', 'asset-43'] }),
-      }),
-    )
-    await getMediaAssetMetadata('asset-42')
-    expect(mocks.request).toHaveBeenCalledTimes(1)
+
+    await expect(resolveMediaAssetProcessingURL(ASSET_ID)).rejects.toMatchObject({
+      name: 'MediaAssetDerivativeNotReadyError',
+    })
   })
 })

@@ -3,6 +3,10 @@ import type { ImageNodeItem } from '../../../board'
 import type { CanvasGraphNodeIdForKind } from '../../domain/graph'
 import { unsupportedUploadImageMessage } from '../../../../shared/utils/imageUploadSupport'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
@@ -63,10 +67,12 @@ describe('useFlowImageUploadActions', () => {
       warnings: [],
       compressed: false,
     }))
+    setMediaWorkspaceIdResolver(() => 'ws_test123')
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    resetMediaWorkspaceIdResolver()
   })
 
   it('keeps the latest image upload result for the same node', async () => {
@@ -91,6 +97,7 @@ describe('useFlowImageUploadActions', () => {
     const warnings: string[] = []
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: (nodeId, patcher) => {
         const current = snapshots.get(nodeId)
@@ -115,13 +122,13 @@ describe('useFlowImageUploadActions', () => {
     await expect(firstUpload).resolves.toBe(false)
 
     expect(snapshots.get('node-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/asset_22/derivatives/preview/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview',
     )
     expect(snapshots.get('node-1')?.sourceMediaRef).toEqual({
       assetId: 'asset_22',
       derivativeTier: 'preview',
     })
-    expect(updates).toEqual(['/api/user/media-assets/asset_22/derivatives/preview/content'])
+    expect(updates).toEqual(['/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview'])
     expect(warnings).toEqual([])
   })
 
@@ -137,6 +144,7 @@ describe('useFlowImageUploadActions', () => {
     const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: (nodeId, patcher) => {
         const current = snapshots.get(nodeId)
@@ -170,6 +178,7 @@ describe('useFlowImageUploadActions', () => {
     const unsupportedWarnings: string[] = []
     const unsupportedActions = useFlowImageUploadActions({
       currentBoardId: { value: 'board-a' },
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: () => makeImageNode(),
@@ -196,6 +205,7 @@ describe('useFlowImageUploadActions', () => {
     const missingBoardWarnings: string[] = []
     const missingBoardActions = useFlowImageUploadActions({
       currentBoardId: { value: null },
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: () => makeImageNode(),
@@ -222,6 +232,7 @@ describe('useFlowImageUploadActions', () => {
     const updateSnapshotNode = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode,
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
@@ -250,6 +261,7 @@ describe('useFlowImageUploadActions', () => {
     const createNodeAtPosition = vi.fn().mockReturnValue('node-new')
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition,
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
@@ -289,6 +301,7 @@ describe('useFlowImageUploadActions', () => {
     }
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         createdUrls.push(patch?.sourceImageUrl ?? '')
         const nodeId = `image-${createdUrls.length}` as CanvasGraphNodeIdForKind<'image'>
@@ -332,6 +345,7 @@ describe('useFlowImageUploadActions', () => {
     const revokeObjectUrl = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         snapshots.set('image-1', { ...makeImageNode(), ...patch })
         return 'image-1' as CanvasGraphNodeIdForKind<'image'>
@@ -363,7 +377,7 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(task).resolves.toEqual({ kind: 'ready', nodeId: 'image-1' })
     expect(snapshots.get('image-1')).toMatchObject({
-      sourceImageUrl: '/api/user/media-assets/asset_61/derivatives/preview/content',
+      sourceImageUrl: '/api/v1/workspaces/ws_test123/media-assets/asset_61/derivatives/preview',
       sourceMediaRef: {
         assetId: 'asset_61',
         derivativeTier: 'preview',
@@ -390,6 +404,7 @@ describe('useFlowImageUploadActions', () => {
     })
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition,
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
@@ -426,6 +441,7 @@ describe('useFlowImageUploadActions', () => {
     const onWarning = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         snapshots.set('image-1', { ...makeImageNode(), ...patch })
         return 'image-1' as CanvasGraphNodeIdForKind<'image'>
@@ -468,7 +484,7 @@ describe('useFlowImageUploadActions', () => {
 
     await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
     expect(snapshots.get('image-1')?.sourceImageUrl).toBe(
-      '/api/user/media-assets/asset_62/derivatives/preview/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_62/derivatives/preview',
     )
     expect(runtimeStates).toEqual([
       { previewUrl: 'blob:retry-image' },
@@ -492,6 +508,7 @@ describe('useFlowImageUploadActions', () => {
     const updateSnapshotNode = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         snapshots.set('image-1', { ...makeImageNode(), ...patch })
         return 'image-1' as CanvasGraphNodeIdForKind<'image'>
@@ -530,6 +547,7 @@ describe('useFlowImageUploadActions', () => {
     const createObjectUrl = vi.fn(() => 'blob:stale-image')
     const actions = useFlowImageUploadActions({
       currentBoardId: { value: 'board-a' },
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition,
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
@@ -558,6 +576,7 @@ describe('useFlowImageUploadActions', () => {
     }>()
     const actions = useFlowImageUploadActions({
       currentBoardId,
+      workspaceId: () => 'ws_test123',
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),

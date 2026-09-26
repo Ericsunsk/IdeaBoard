@@ -6,7 +6,7 @@ import {
 import type {
   SubmitTaskReadinessData,
   SubmitTaskReadinessRequestData,
-} from '../../../../../shared/api/task'
+} from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createCanvasBillingReadinessStore } from './readiness.ts'
 
 function makeReadiness(

@@ -159,6 +159,37 @@ export function createBoard(name = 'Untitled'): BoardMeta {
   return board
 }
 
+/**
+ * Registers a server-minted board identity locally (v1 create flow: the
+ * server owns id/revision). Replaces any same-id entry; never mints.
+ */
+export function registerBoardMeta(input: {
+  id: string
+  name: string
+  createdAt?: number
+  updatedAt?: number
+  revision?: number
+}): BoardMeta | null {
+  const id = input.id.trim()
+  const name = normalizeBoardName(input.name)
+  if (!id || !name) return null
+  const now = Date.now()
+  const board: BoardMeta = {
+    id,
+    name,
+    createdAt: Number.isFinite(input.createdAt) ? Number(input.createdAt) : now,
+    updatedAt: Number.isFinite(input.updatedAt) ? Number(input.updatedAt) : now,
+    ...(input.revision === undefined ? {} : { revision: input.revision }),
+  }
+  const valid = toValidBoardMeta(board)
+  if (!valid) return null
+  const boards = readRawBoards().filter((item) => item.id !== id)
+  boards.unshift(valid)
+  writeRawBoards(boards)
+  publishCatalogChange()
+  return valid
+}
+
 export function renameBoard(boardId: string, nextName: string): BoardMeta | null {
   const id = boardId.trim()
   const name = normalizeBoardName(nextName)

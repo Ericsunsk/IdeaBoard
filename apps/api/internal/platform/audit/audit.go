@@ -29,6 +29,10 @@ type RecordParams struct {
 	Capability     string
 	TargetType     string
 	TargetID       string
+	// AuthUserID is the Auth-service identity the attempt targeted (admin
+	// impersonation). Empty for operations without an Auth target; when
+	// set it is persisted inside metadata (never in error text).
+	AuthUserID     string
 	Reason         string
 	Outcome        string
 	ErrorMessage   string
@@ -90,9 +94,10 @@ func (s *Store) AppendRecord(ctx context.Context, params RecordParams) error {
 		return err
 	}
 	metadata, err := json.Marshal(map[string]any{
-		"route":    params.Route,
-		"status":   params.Status,
-		"replayed": params.Replayed,
+		"route":        params.Route,
+		"status":       params.Status,
+		"replayed":     params.Replayed,
+		"auth_user_id": params.AuthUserID,
 	})
 	if err != nil {
 		return err
@@ -100,18 +105,18 @@ func (s *Store) AppendRecord(ctx context.Context, params RecordParams) error {
 	query := s.dbWithContext(ctx)
 	return dbutil.WithTx(query.ctx, query.db, func(q *dbsqlc.Queries) error {
 		_, err := q.InsertControlAuditRecord(query.ctx, dbsqlc.InsertControlAuditRecordParams{
-			PublicID:            publicID,
-			OperatorUserID:      params.OperatorUserID,
-			OperationType:       params.Operation,
-			Capability:          params.Capability,
-			TargetType:          params.TargetType,
-			TargetID:            params.TargetID,
-			Reason:              params.Reason,
-			Outcome:             MapOutcome(params.Outcome),
-			ErrorMessage:        params.ErrorMessage,
+			PublicID:             publicID,
+			OperatorUserID:       params.OperatorUserID,
+			OperationType:        params.Operation,
+			Capability:           params.Capability,
+			TargetType:           params.TargetType,
+			TargetID:             params.TargetID,
+			Reason:               params.Reason,
+			Outcome:              MapOutcome(params.Outcome),
+			ErrorMessage:         params.ErrorMessage,
 			RequestCorrelationID: params.RequestID,
-			IdempotencyKey:      params.IdempotencyKey,
-			Metadata:            metadata,
+			IdempotencyKey:       params.IdempotencyKey,
+			Metadata:             metadata,
 		})
 		return err
 	})

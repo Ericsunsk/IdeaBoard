@@ -160,6 +160,7 @@ import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialo
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { useStripeSettingsFeedback } from '../useStripeSettingsFeedback'
+import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
@@ -178,6 +179,7 @@ const emit = defineEmits<{
 
 const defaultResource = createAdminStripeSettingsResource()
 const feedback = useStripeSettingsFeedback()
+const adminConfirm = useAdminConfirm()
 const summary = ref<StripeConfigurationSummary | null>(null)
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -251,15 +253,30 @@ function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productT
 
 const submit = form.handleSubmit(async (values) => {
   if (isBusy.value) return
+  // Control writes require an operator reason (audit); a cancelled dialog
+  // aborts the save silently.
+  const confirmed = await adminConfirm.confirm({
+    title: '保存 Stripe 设置',
+    message: '确定保存 Stripe 密钥与税务配置吗？该操作将记录操作人与原因。',
+    confirmLabel: '保存设置',
+    intent: 'warn',
+    reason: { required: true },
+  })
+  if (!confirmed) return
+  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+  if (!operatorReason) return
   isSaving.value = true
   saveError.value = ''
   try {
-    const nextSummary = await activeResource().save({
-      ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
-      paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
-      productTaxCode: values.productTaxCode.trim(),
-      purchasesEnabled: values.purchasesEnabled,
-    })
+    const nextSummary = await activeResource().save(
+      {
+        ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
+        paymentMethodConfigurationId: values.paymentMethodConfigurationId.trim(),
+        productTaxCode: values.productTaxCode.trim(),
+        purchasesEnabled: values.purchasesEnabled,
+      },
+      { operatorReason },
+    )
     summary.value = nextSummary
     form.resetForm({
       apiKey: '',

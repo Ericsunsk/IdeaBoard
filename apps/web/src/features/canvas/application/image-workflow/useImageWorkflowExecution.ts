@@ -17,6 +17,8 @@ import type { CanvasRendererMetricsPort } from '../../infrastructure/vue-flow-ad
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import { waitExistingOrLiveTaskImageResults } from '../execution/task-runner/imageDirectActionExecutor'
+import { CANVAS_WORKSPACE_REQUIRED_MESSAGE } from '../execution/workspace/canvasWorkspaceTaskAdapter'
+import { getWorkspaceSelectionStore } from '../../../workspace'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -32,6 +34,8 @@ export type UseImageWorkflowExecutionOptions = {
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
+  /** Workspace gate: canvas task actions stay disabled without a selection. */
+  isWorkspaceAvailable?: (() => boolean) | undefined
 }
 
 export type ImageWorkflowExecution = ImageWorkflowCommands & {
@@ -74,8 +78,21 @@ export function useImageWorkflowExecution(
   // #676). Test doubles inject through the same option on both seams.
   const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
 
+  // Workspace gate (fail-closed): without a selected workspace every canvas
+  // task action stays disabled with guidance; the adapter throws the same
+  // guidance when execution is attempted directly. Defaults to the shared
+  // selection store; tests inject a stub.
+  const isWorkspaceAvailable =
+    options.isWorkspaceAvailable ?? (() => getWorkspaceSelectionStore().getSelectedId() != null)
+
   function isGenerationAvailable(): boolean {
+    if (!isWorkspaceAvailable()) return false
     return Date.now() >= generationUnavailableUntilMs.value
+  }
+
+  function resolveUnavailableMessage(): string {
+    if (!isWorkspaceAvailable()) return CANVAS_WORKSPACE_REQUIRED_MESSAGE
+    return generationUnavailableMessage.value
   }
 
   function refreshGenerationAvailabilityAfter(delayMs: number) {
@@ -140,7 +157,7 @@ export function useImageWorkflowExecution(
     planner,
     workflow,
     isGenerationAvailable,
-    generationUnavailableMessage: () => generationUnavailableMessage.value,
+    generationUnavailableMessage: resolveUnavailableMessage,
     onWarning: handleWorkflowWarning,
   })
   return {

@@ -1,8 +1,14 @@
-import { api } from '../../../../shared/api/client'
 import {
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../../shared/api/apiResponse'
+  deleteControlCatalogItem,
+  listControlBillingCatalog,
+  publishControlCatalogPrices,
+  setControlCatalogAvailability,
+} from '../../../../shared/api/generated-query/control/control-billing/control-billing'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import type {
   AdminBillableItemAvailability,
@@ -12,10 +18,13 @@ import type {
   PricingVariant,
 } from './billableCatalogTypes'
 
-// Admin billing catalog boundary (issue #809). The generated
-// `admin-billing` client is gone but the backend admin plane still serves
-// `/api/admin/billing/catalog/*` with the shared envelope, so this boundary
-// transports through the central `api.request` with local wire types.
+// Admin billing catalog boundary (W2 transports). Reads and writes go
+// through the Control Plane billing operations with the contract envelope
+// (`{data}` over the same catalog service projections); every mutation
+// carries a header-only Idempotency-Key plus an operator reason (mirrored
+// into the body `reason` field where the schema accepts it) and emits a
+// control audit record. The deleted `/api/admin/billing/catalog/*` routes
+// are gone; this module is the single transport.
 export type BillableItemCatalogCard = {
   sku: string
   namespace: string
@@ -43,14 +52,24 @@ export type BillableItemAvailability = {
   updated_at: string
 }
 
+export type BillableCatalogMutationOptions = {
+  operatorReason: string
+  idempotencyKey?: string | undefined
+}
+
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
   publishPrices: (
     sku: string,
     prices: Partial<Record<PricingVariant, number | undefined>>,
+    options: BillableCatalogMutationOptions,
   ) => Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>>
-  setAvailability: (sku: string, enabled: boolean) => Promise<AdminBillableItemAvailability>
-  deleteArchived: (sku: string) => Promise<string>
+  setAvailability: (
+    sku: string,
+    enabled: boolean,
+    options: BillableCatalogMutationOptions,
+  ) => Promise<AdminBillableItemAvailability>
+  deleteArchived: (sku: string, options: BillableCatalogMutationOptions) => Promise<string>
 }
 
 export function createAdminBillableCatalogResource(): AdminBillableCatalogResource {
@@ -62,63 +81,132 @@ export function createAdminBillableCatalogResource(): AdminBillableCatalogResour
   }
 }
 
-export async function deleteArchivedBillableItem(sku: string): Promise<string> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<{ sku: string }>>(
-      `/admin/billing/catalog/${encodeURIComponent(sku)}`,
-      { method: 'DELETE' },
-    ),
-    '删除已归档功能失败',
-  )
-  return data.sku
+export async function deleteArchivedBillableItem(
+  sku: string,
+  options: BillableCatalogMutationOptions,
+): Promise<string> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await deleteControlCatalogItem(sku, {
+      headers: mutationHeaders(options, operatorReason),
+    })
+    const data = requireContractData<{ sku: string }>(body, '删除已归档功能失败')
+    return data.sku
+  } catch (error) {
+    throw withControlCopy(error, '删除已归档功能失败')
+  }
 }
 
 export async function setBillableItemAvailability(
   sku: string,
   enabled: boolean,
+  options: BillableCatalogMutationOptions,
 ): Promise<AdminBillableItemAvailability> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<BillableItemAvailability>>(
-      `/admin/billing/catalog/${encodeURIComponent(sku)}/availability`,
-      {
-        method: 'PUT',
-        body: { enabled } as unknown as Record<string, unknown>,
-      },
-    ),
-    enabled ? '启用功能失败' : '停用功能失败',
-  )
-  return normalizeAvailability(data)
+  const operatorReason = requireOperatorReason(options.operatorReason)
+  try {
+    const body = await setControlCatalogAvailability(
+      sku,
+      { enabled, reason: operatorReason },
+      { headers: mutationHeaders(options, operatorReason) },
+    )
+    return normalizeAvailability(
+      requireContractData<BillableItemAvailability>(
+        body,
+        enabled ? '启用功能失败' : '停用功能失败',
+      ),
+    )
+  } catch (error) {
+    throw withControlCopy(error, enabled ? '启用功能失败' : '停用功能失败')
+  }
 }
 
 export async function publishBillableItemPrices(
   sku: string,
   prices: Partial<Record<PricingVariant, number | undefined>>,
+  options: BillableCatalogMutationOptions,
 ): Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>> {
+  const operatorReason = requireOperatorReason(options.operatorReason)
   const requestPrices = stripUndefined(prices) as Record<PricingVariant, number>
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<{ prices: Partial<Record<PricingVariant, BillingPrice>> }>>(
-      `/admin/billing/catalog/${encodeURIComponent(sku)}/prices`,
-      {
-        method: 'POST',
-        body: { prices: requestPrices } as unknown as Record<string, unknown>,
-      },
-    ),
-    '发布价格失败',
-  )
-  return Object.fromEntries(
-    Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
-  ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
+  try {
+    const body = await publishControlCatalogPrices(
+      sku,
+      { prices: requestPrices, reason: operatorReason },
+      { headers: mutationHeaders(options, operatorReason) },
+    )
+    const data = requireContractData<{
+      prices: Partial<Record<PricingVariant, BillingPrice>>
+    }>(body, '发布价格失败')
+    return Object.fromEntries(
+      Object.entries(data.prices).map(([resolution, price]) => [
+        resolution,
+        normalizePrice(price),
+      ]),
+    ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
+  } catch (error) {
+    throw withControlCopy(error, '发布价格失败')
+  }
 }
 
 async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
-  const data = await resolveApiData(
-    api.request<ApiResponseWithData<{ items: BillableItemCatalogCard[] }>>(
-      '/admin/billing/catalog',
-      { method: 'GET' },
-    ),
-    '加载功能定价失败',
-  )
-  return data.items.map(normalizeBillableItem)
+  try {
+    const body = await listControlBillingCatalog()
+    const data = requireContractData<{ items: BillableItemCatalogCard[] }>(
+      body,
+      '加载功能定价失败',
+    )
+    return data.items.map(normalizeBillableItem)
+  } catch (error) {
+    throw withControlCopy(error, '加载功能定价失败')
+  }
+}
+
+function mutationHeaders(options: BillableCatalogMutationOptions, operatorReason: string) {
+  return buildContractRequestHeaders({
+    requestId: newRequestId(),
+    idempotencyKey: options.idempotencyKey ?? newRequestId(),
+    operatorReason,
+  })
+}
+
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+  }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
+    return controlError('control_not_found', '功能不存在')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 404 || status === 409) return status
+  }
+  return undefined
 }
 
 function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItemCard {

@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildMediaBrowserURL, isMediaRef, mediaRefEquals, type MediaRef } from './mediaRef'
+import {
+  resetMediaWorkspaceIdResolver,
+  setMediaWorkspaceIdResolver,
+} from '../api/mediaAssetDelivery'
+
+beforeEach(() => {
+  setMediaWorkspaceIdResolver(() => 'ws_test123')
+})
+
+afterEach(() => {
+  resetMediaWorkspaceIdResolver()
+})
 
 describe('MediaRef', () => {
   const preview: MediaRef = {
@@ -9,7 +21,7 @@ describe('MediaRef', () => {
 
   it('uses the canonical format-agnostic derivative delivery route', () => {
     expect(buildMediaBrowserURL(preview)).toBe(
-      '/api/user/media-assets/asset_42/derivatives/preview/content',
+      '/api/v1/workspaces/ws_test123/media-assets/asset_42/derivatives/preview',
     )
   })
 

@@ -11,24 +11,18 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 describe('AdminSettingsSecurityPage', () => {
   beforeEach(() => {
     useMswHandlers(
-      http.get('/api/admin/settings/registration', () =>
+      http.get('/api/control/v1/platform/settings/registration', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { enabled: true },
         }),
       ),
-      http.get('/api/admin/settings/rate-limit', () =>
+      http.get('/api/control/v1/platform/settings/rate-limit', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { window_seconds: 60, max_requests: 100 },
         }),
       ),
-      http.get('/api/admin/settings/outbound-policy', () =>
+      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
         HttpResponse.json({
-          code: 0,
-          msg: 'ok',
           data: { allow_hosts: ['models.internal'] },
         }),
       ),

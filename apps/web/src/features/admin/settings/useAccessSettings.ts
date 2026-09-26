@@ -1,21 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
-import { api } from '../../../shared/api/client'
 import {
-  createApiDataSelector,
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../../../shared/api/apiResponse'
+  getControlRateLimitSetting,
+  getControlRegistrationSetting,
+  updateControlRateLimitSetting,
+  updateControlRegistrationSetting,
+} from '../../../shared/api/generated-query/control/control-platform/control-platform'
+import {
+  buildContractRequestHeaders,
+  newRequestId,
+  requireContractData,
+} from '../../../shared/api/contractKernel'
 import type { AdminAccessSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 
-// Admin access (rate limit + registration) boundary (issue #809). The
-// generated `admin-settings` client is gone but the backend admin plane
-// still serves `/api/admin/settings/rate-limit` and
-// `/api/admin/settings/registration` with the shared envelope, so this
-// composable transports through the central `api.request` with local view
-// types. Control-plane mutations with operator reasons stay a residual.
+// Admin access (rate limit + registration) boundary (W2 transports). Reads
+// and writes go through the Control Plane with the contract envelope
+// (`{data}`); every mutation carries a header-only Idempotency-Key plus an
+// operator reason collected through the shared confirm dialog, and emits a
+// control audit record. The deleted `/api/admin/settings/*` routes are
+// gone; this module is the single transport.
 export type RateLimitSetting = {
   window_seconds: number
   max_requests: number
@@ -25,7 +32,6 @@ export type RegistrationSettingData = {
   enabled: boolean
 }
 
-export type ApiResponseRegistrationSetting = ApiResponseWithData<RegistrationSettingData>
 export type ApiResponseRegistrationSettingData = RegistrationSettingData
 
 const ADMIN_RATE_LIMIT_QUERY_KEY = ['admin', 'settings', 'rate-limit'] as const
@@ -47,37 +53,19 @@ const DEFAULT_RATE_LIMIT_FORM: AdminAccessRateLimitForm = {
   ...DEFAULT_RATE_LIMIT_SETTING,
 }
 const DEFAULT_REGISTRATION_ENABLED = false
-const selectRateLimitSetting = createApiDataSelector<RateLimitSetting>('加载访问限流失败')
-const selectRegistrationSetting =
-  createApiDataSelector<ApiResponseRegistrationSettingData>('加载注册设置失败')
 
-export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedback }) {
+export function useAccessSettings(options: {
+  feedback: AdminAccessSettingsFeedback
+  confirm: AdminConfirmPort
+}) {
   const queryClient = useQueryClient()
-  const registrationSettingQuery = useQuery<
-    ApiResponseRegistrationSetting,
-    Error,
-    ApiResponseRegistrationSettingData
-  >({
+  const registrationSettingQuery = useQuery<RegistrationSettingData, Error>({
     queryKey: ADMIN_REGISTRATION_QUERY_KEY,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseRegistrationSetting>('/admin/settings/registration', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
-    select: selectRegistrationSetting,
+    queryFn: ({ signal }) => fetchRegistrationSetting(signal),
   })
-  const rateLimitSettingsQuery = useQuery<
-    ApiResponseWithData<RateLimitSetting>,
-    Error,
-    RateLimitSetting
-  >({
+  const rateLimitSettingsQuery = useQuery<RateLimitSetting, Error>({
     queryKey: ADMIN_RATE_LIMIT_QUERY_KEY,
-    queryFn: ({ signal }) =>
-      api.request<ApiResponseWithData<RateLimitSetting>>('/admin/settings/rate-limit', {
-        method: 'GET',
-        ...(signal == null ? {} : { signal }),
-      }),
-    select: selectRateLimitSetting,
+    queryFn: ({ signal }) => fetchRateLimitSetting(signal),
   })
   const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
   const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value)
@@ -86,26 +74,13 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
     return queryClient.invalidateQueries({ queryKey: ADMIN_REGISTRATION_QUERY_KEY })
   }
 
-  function writeRegistrationSettingQueryCache(setting: ApiResponseRegistrationSettingData) {
-    queryClient.setQueryData<ApiResponseRegistrationSetting>(
-      ADMIN_REGISTRATION_QUERY_KEY,
-      (previous) => ({
-        code: previous?.code ?? 0,
-        msg: previous?.msg ?? 'ok',
-        data: setting,
-      }),
-    )
+  function writeRegistrationSettingQueryCache(setting: RegistrationSettingData) {
+    queryClient.setQueryData<RegistrationSettingData>(ADMIN_REGISTRATION_QUERY_KEY, setting)
   }
 
   const updateRegistrationSettingMutation = useMutation({
-    mutationFn: (enabled: boolean) =>
-      resolveApiData(
-        api.request<ApiResponseRegistrationSetting>('/admin/settings/registration', {
-          method: 'PUT',
-          body: { enabled } as unknown as Record<string, unknown>,
-        }),
-        '更新注册状态失败',
-      ),
+    mutationFn: (input: { enabled: boolean; operatorReason: string }) =>
+      saveRegistrationSetting(input.enabled, input.operatorReason),
     onSuccess: async (setting) => {
       registrationEnabled.value = setting.enabled
       writeRegistrationSettingQueryCache(setting)
@@ -118,17 +93,18 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
       registrationSettingQuery.isFetching.value ||
       updateRegistrationSettingMutation.isPending.value,
   )
+  // The lifecycle save runs inside saveRateLimit below with the reason
+  // collected first; the ref bridges the two without changing the
+  // lifecycle contract.
+  const pendingRateLimitReason = ref<string | null>(null)
   const saveRateLimitMutation = useMutation({
     mutationFn: (draft: AdminAccessRateLimitForm) =>
-      resolveApiData(
-        api.request<ApiResponseWithData<RateLimitSetting>>('/admin/settings/rate-limit', {
-          method: 'PUT',
-          body: {
-            window_seconds: Number(draft.window_seconds),
-            max_requests: Number(draft.max_requests),
-          } as unknown as Record<string, unknown>,
-        }),
-        '保存访问限流失败',
+      saveRateLimitSetting(
+        {
+          window_seconds: Number(draft.window_seconds),
+          max_requests: Number(draft.max_requests),
+        },
+        pendingRateLimitReason.value ?? '',
       ),
   })
   const rateLimitSaving = computed(() => saveRateLimitMutation.isPending.value)
@@ -166,6 +142,21 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
     },
   })
 
+  async function saveRateLimit(): Promise<boolean> {
+    const operatorReason = await confirmSettingsSave(options.confirm, {
+      title: '保存访问限流',
+      message: '确定保存 API 访问限流配置吗？该操作将记录操作人与原因。',
+      confirmLabel: '保存',
+    })
+    if (!operatorReason) return false
+    pendingRateLimitReason.value = operatorReason
+    try {
+      return await rateLimitLifecycle.save()
+    } finally {
+      pendingRateLimitReason.value = null
+    }
+  }
+
   watch(
     () => registrationSettingQuery.error.value,
     (error) => {
@@ -186,8 +177,22 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
 
   async function handleToggleRegistration(newValue: boolean) {
     const fallbackEnabled = registrationSettingQuery.data.value?.enabled ?? !newValue
+    const operatorReason = await confirmSettingsSave(options.confirm, {
+      title: newValue ? '开放注册' : '关闭注册',
+      message: newValue
+        ? '确定允许新用户自行注册账号吗？该操作将记录操作人与原因。'
+        : '确定关闭开放注册吗？关闭后仅系统管理员可创建用户。该操作将记录操作人与原因。',
+      confirmLabel: newValue ? '开放注册' : '关闭注册',
+    })
+    if (!operatorReason) {
+      registrationEnabled.value = fallbackEnabled
+      return
+    }
     try {
-      await updateRegistrationSettingMutation.mutateAsync(newValue)
+      await updateRegistrationSettingMutation.mutateAsync({
+        enabled: newValue,
+        operatorReason,
+      })
       options.feedback.registrationUpdated(newValue)
     } catch (error) {
       registrationEnabled.value = fallbackEnabled
@@ -205,23 +210,104 @@ export function useAccessSettings(options: { feedback: AdminAccessSettingsFeedba
     registrationSettingLoading,
     handleToggleRegistration,
     resetRateLimit: rateLimitLifecycle.reset,
-    saveRateLimit: rateLimitLifecycle.save,
+    saveRateLimit,
   }
 }
 
-function normalizeRateLimitSetting(
-  setting: Partial<AdminAccessRateLimitForm> | null | undefined,
-): AdminAccessRateLimitForm {
-  return {
-    window_seconds:
-      typeof setting?.window_seconds === 'number' && Number.isFinite(setting.window_seconds)
-        ? setting.window_seconds
-        : DEFAULT_RATE_LIMIT_SETTING.window_seconds,
-    max_requests:
-      typeof setting?.max_requests === 'number' && Number.isFinite(setting.max_requests)
-        ? setting.max_requests
-        : DEFAULT_RATE_LIMIT_SETTING.max_requests,
+async function fetchRegistrationSetting(signal?: AbortSignal): Promise<RegistrationSettingData> {
+  try {
+    const body = await getControlRegistrationSetting({ signal })
+    return requireContractData<RegistrationSettingData>(body, '加载注册设置失败')
+  } catch (error) {
+    throw withControlCopy(error, '加载注册设置失败')
   }
+}
+
+async function fetchRateLimitSetting(signal?: AbortSignal): Promise<RateLimitSetting> {
+  try {
+    const body = await getControlRateLimitSetting({ signal })
+    return requireContractData<RateLimitSetting>(body, '加载访问限流失败')
+  } catch (error) {
+    throw withControlCopy(error, '加载访问限流失败')
+  }
+}
+
+async function saveRegistrationSetting(
+  enabled: boolean,
+  operatorReason: string,
+): Promise<RegistrationSettingData> {
+  const reason = requireOperatorReason(operatorReason)
+  try {
+    const body = await updateControlRegistrationSetting(
+      { enabled },
+      { headers: mutationHeaders(reason) },
+    )
+    return requireContractData<RegistrationSettingData>(body, '更新注册状态失败')
+  } catch (error) {
+    throw withControlCopy(error, '更新注册状态失败')
+  }
+}
+
+async function saveRateLimitSetting(
+  draft: RateLimitSetting,
+  operatorReason: string,
+): Promise<RateLimitSetting> {
+  const reason = requireOperatorReason(operatorReason)
+  try {
+    const body = await updateControlRateLimitSetting(
+      { window_seconds: draft.window_seconds, max_requests: draft.max_requests },
+      { headers: mutationHeaders(reason) },
+    )
+    return requireContractData<RateLimitSetting>(body, '保存访问限流失败')
+  } catch (error) {
+    throw withControlCopy(error, '保存访问限流失败')
+  }
+}
+
+function mutationHeaders(operatorReason: string) {
+  return buildContractRequestHeaders({
+    requestId: newRequestId(),
+    idempotencyKey: newRequestId(),
+    operatorReason,
+  })
+}
+
+function requireOperatorReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
+  return trimmed
+}
+
+function controlError(code: string, message: string): Error & { code?: string | undefined } {
+  const error = new Error(message) as Error & { code?: string | undefined }
+  error.code = code
+  return error
+}
+
+// withControlCopy maps control error codes to operator-facing copy.
+// Branch on code, never on message text.
+function withControlCopy(error: unknown, fallback: string): Error {
+  const code = readErrorCode(error)
+  if (code === 'idempotency_conflict' || code === 409) {
+    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
+  }
+  if (code === 'control_reason_required') {
+    return controlError(code, '需要填写操作原因')
+  }
+  if (error instanceof Error) return error
+  return controlError('control_failed', fallback)
+}
+
+function readErrorCode(error: unknown): string | number | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code
+    if (typeof code === 'string' || typeof code === 'number') return code
+  }
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status?: unknown }).status
+    if (status === 409) return 409
+  }
+  return undefined
 }
 
 export function validateRateLimitSettings(settings: AdminAccessRateLimitForm) {
@@ -242,6 +328,21 @@ export function validateRateLimitSettings(settings: AdminAccessRateLimitForm) {
   return ''
 }
 
+function normalizeRateLimitSetting(
+  setting: Partial<AdminAccessRateLimitForm> | null | undefined,
+): AdminAccessRateLimitForm {
+  return {
+    window_seconds:
+      typeof setting?.window_seconds === 'number' && Number.isFinite(setting.window_seconds)
+        ? setting.window_seconds
+        : DEFAULT_RATE_LIMIT_SETTING.window_seconds,
+    max_requests:
+      typeof setting?.max_requests === 'number' && Number.isFinite(setting.max_requests)
+        ? setting.max_requests
+        : DEFAULT_RATE_LIMIT_SETTING.max_requests,
+  }
+}
+
 function isSameRateLimitSetting(
   current: AdminAccessRateLimitForm,
   synced: AdminAccessRateLimitForm,
@@ -252,9 +353,5 @@ function isSameRateLimitSetting(
 }
 
 function writeRateLimitSettingQueryCache(queryClient: QueryClient, setting: RateLimitSetting) {
-  queryClient.setQueryData(ADMIN_RATE_LIMIT_QUERY_KEY, {
-    code: 0,
-    msg: 'ok',
-    data: setting,
-  })
+  queryClient.setQueryData(ADMIN_RATE_LIMIT_QUERY_KEY, setting)
 }

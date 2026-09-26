@@ -14,6 +14,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LibraryAssetId } from './libraryAssetId'
+import type { UploadId } from './uploadId'
 
 export type CreateWorkspaceVisionQueryRequestData = {
   /**
@@ -26,4 +27,14 @@ export type CreateWorkspaceVisionQueryRequestData = {
    * @maxItems 4
    */
   library_asset_ids?: LibraryAssetId[]
+  /**
+   * Staged workspace upload references (stage-then-reference; no client bytes). At most 4 refs combined across library_asset_ids, upload_ids, and image_urls.
+   * @maxItems 4
+   */
+  upload_ids?: UploadId[]
+  /**
+   * Allowlisted https image URLs (images.unsplash.com, plus.unsplash.com, images.pexels.com). At most 4 refs combined across library_asset_ids, upload_ids, and image_urls.
+   * @maxItems 4
+   */
+  image_urls?: string[]
 }

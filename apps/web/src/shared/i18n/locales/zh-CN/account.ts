@@ -243,5 +243,7 @@ export default {
     quantityIntegerRange: '请输入 {min} 到 {max} 之间的整数。',
     quantityBelowMin: '最低充值额度为 {min} Ideas。',
     quantityAboveMax: '最高充值额度为 {max} Ideas。',
+    workspaceRequired: '请选择工作区后查看账单信息。',
+    featureUnavailable: '该功能暂不可用。',
   },
 } as const

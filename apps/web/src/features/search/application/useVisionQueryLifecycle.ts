@@ -3,7 +3,7 @@ import {
   MAX_REFERENCE_COUNT,
   createRequestFingerprint,
 } from '../domain/visionReferencePolicy'
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRouter, type Router } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 import { formatIdeaAmount } from '../../../shared/i18n/userIdeaCurrency'
@@ -11,6 +11,7 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
 import { createUniqueId } from '../../../shared/utils/ids'
+import { workspaceUploadApi } from '../../../shared/api/upload'
 import type { LibraryAssetView } from '../../library'
 import type { SearchAuthAction } from '../domain/authAction'
 import {
@@ -25,7 +26,7 @@ import {
 } from '../infrastructure/libraryBridge'
 import { type SearchResult, type VisionReference } from '../domain/models'
 import { isSearchQueryWithinLimit, normalizeSearchQuery } from '../domain/queryPolicy'
-import { extractVisionSearch } from '../infrastructure/resource'
+import { workspaceSearchApi } from '../infrastructure/workspace'
 import { createVisionReferenceCollection } from './visionReferenceCollection'
 import { fetchVisionSearchPrice } from '../infrastructure/visionBillingResource'
 
@@ -39,6 +40,7 @@ type VisionQueryLifecycleOptions = {
   requireLogin: (action: SearchAuthAction) => void
   cacheScope?: string | undefined
   initialReferences?: VisionReference[] | undefined
+  workspaceId?: MaybeRefOrGetter<string | null | undefined>
   router?: Router | undefined
   toast?: ReturnType<typeof useAppToast> | undefined
 }
@@ -85,6 +87,66 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
   let idempotencyFingerprint: string | null = null
   let activeExtraction: { fingerprint: string; promise: Promise<void> } | null = null
 
+  async function stageVisionFiles(
+    workspaceId: string,
+    files: File[],
+    key: string,
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    const uploadIds: string[] = []
+    for (const [index, file] of files.entries()) {
+      const subtle = globalThis.crypto?.subtle
+      if (!subtle) throw new Error(i18n.global.t('search.visionSearchFailed'))
+      const digest = await subtle.digest('SHA-256', await file.arrayBuffer())
+      const checksumSha256 = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+      const mimeType = file.type || 'application/octet-stream'
+      const session = await workspaceUploadApi.createSession(
+        workspaceId,
+        { filename: file.name, mimeType, sizeBytes: file.size, checksumSha256, mediaKind: 'image' },
+        { idempotencyKey: `${key}:upload:create:${index}`, signal },
+      )
+      await workspaceUploadApi.stageBytes(workspaceId, session.id, file, {
+        contentType: mimeType,
+        idempotencyKey: `${key}:upload:bytes:${index}`, signal,
+      })
+      await workspaceUploadApi.completeSession(
+        workspaceId,
+        session.id,
+        { checksumSha256, sizeBytes: file.size, mimeType, mediaKind: 'image' },
+        { idempotencyKey: `${key}:upload:complete:${index}`, signal },
+      )
+      uploadIds.push(session.id)
+    }
+    return uploadIds
+  }
+
+  async function createVisionQuery(
+    workspaceId: string,
+    query: string,
+    key: string,
+    signal: AbortSignal,
+  ) {
+    const uploadIds = await stageVisionFiles(
+      workspaceId,
+      references.value.flatMap((reference) => (reference.file ? [reference.file] : [])),
+      key,
+      signal,
+    )
+    const libraryAssetIds = references.value.flatMap((reference) =>
+      reference.libraryAssetID ? [reference.libraryAssetID] : [],
+    )
+    const imageUrls = references.value.flatMap((reference) => {
+      const url = reference.externalReference?.preview_url?.trim() ?? ''
+      return url ? [url] : []
+    })
+    return workspaceSearchApi.createVisionQuery(
+      { workspaceId, userText: query, libraryAssetIds, uploadIds, imageUrls },
+      { idempotencyKey: key, signal },
+    )
+  }
+
   function resetExtraction() {
     cancelExtraction()
     idempotencyKey = null
@@ -129,12 +191,9 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     error.value = ''
     const promise = (async () => {
       try {
-        const extraction = await extractVisionSearch({
-          references: references.value,
-          userText: query,
-          idempotencyKey,
-          signal: controller.signal,
-        })
+        const workspaceId = (toValue(options.workspaceId) ?? '').trim()
+        if (!workspaceId) throw new Error(i18n.global.t('search.visionSearchFailed'))
+        const extraction = await createVisionQuery(workspaceId, query, idempotencyKey, controller.signal)
         if (generation !== extractionGeneration) return
         if (extraction.status !== 'succeeded') {
           state.value = 'idle'
@@ -269,9 +328,13 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     priceController = null
     price.value = null
     if (!options.isAuthenticated() || references.value.length === 0) return
+    // Workspace-scoped quote: without a selection the price stays
+    // unavailable (same outcome as the old failing request, minus the 404).
+    const workspaceId = (toValue(options.workspaceId) ?? '').trim()
+    if (!workspaceId) return
     const controller = new AbortController()
     priceController = controller
-    void fetchVisionSearchPrice(controller.signal)
+    void fetchVisionSearchPrice(workspaceId, controller.signal)
       .then((nextPrice) => {
         if (!controller.signal.aborted) price.value = nextPrice
       })

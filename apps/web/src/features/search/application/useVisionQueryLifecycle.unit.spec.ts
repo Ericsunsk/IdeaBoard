@@ -8,7 +8,7 @@ import { useVisionQueryLifecycle } from './useVisionQueryLifecycle'
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(async () => undefined),
-  extractVisionSearch: vi.fn(),
+  createVisionQuery: vi.fn(),
   fetchPrice: vi.fn(),
   requireLogin: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
@@ -19,8 +19,11 @@ vi.mock('../../../shared/composables/useAppToast', () => ({ useAppToast: () => m
 vi.mock('../infrastructure/visionBillingResource', () => ({
   fetchVisionSearchPrice: mocks.fetchPrice,
 }))
-vi.mock('../infrastructure/resource', () => ({
-  extractVisionSearch: mocks.extractVisionSearch,
+vi.mock('../infrastructure/workspace', () => ({
+  workspaceSearchApi: { createVisionQuery: mocks.createVisionQuery },
+}))
+vi.mock('../../../shared/api/upload', () => ({
+  workspaceUploadApi: {},
 }))
 vi.mock('../../library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../library')>()
@@ -45,6 +48,7 @@ function createLifecycle(options: { authenticated?: boolean; scope?: string } = 
     isAuthenticated: () => authenticated.value,
     requireLogin: mocks.requireLogin,
     cacheScope: options.scope,
+    workspaceId: 'ws_1',
   })
   return { lifecycle, authenticated, draftQuery, submittedQuery, queryError, loadResults }
 }
@@ -80,7 +84,7 @@ describe('useVisionQueryLifecycle', () => {
     expect(lifecycle.references.value.map((reference) => reference.key)).toEqual([
       'unsplash:cached',
     ])
-    expect(mocks.extractVisionSearch).not.toHaveBeenCalled()
+    expect(mocks.createVisionQuery).not.toHaveBeenCalled()
     lifecycle.dispose()
     clearCachedVisionReferences('user-a')
   })
@@ -123,18 +127,18 @@ describe('useVisionQueryLifecycle', () => {
     await lifecycle.submit()
 
     expect(mocks.requireLogin).toHaveBeenCalledWith({ kind: 'vision-search', query: 'warm cafe' })
-    expect(mocks.extractVisionSearch).not.toHaveBeenCalled()
+    expect(mocks.createVisionQuery).not.toHaveBeenCalled()
     authenticated.value = true
-    mocks.extractVisionSearch.mockResolvedValue({ status: 'succeeded', query: 'warm cafe' })
+    mocks.createVisionQuery.mockResolvedValue({ status: 'succeeded', query: 'warm cafe' })
     await lifecycle.resumeAfterAuthentication()
-    expect(mocks.extractVisionSearch).toHaveBeenCalledOnce()
+    expect(mocks.createVisionQuery).toHaveBeenCalledOnce()
     lifecycle.dispose()
   })
 
   it('owns quote feedback, idempotent paid extraction, and feed handoff', async () => {
     const { lifecycle, submittedQuery, loadResults } = createLifecycle()
     lifecycle.addLibraryAsset(libraryAsset as never)
-    mocks.extractVisionSearch.mockResolvedValue({
+    mocks.createVisionQuery.mockResolvedValue({
       status: 'succeeded',
       query: 'warm editorial cafe',
     })
@@ -142,8 +146,13 @@ describe('useVisionQueryLifecycle', () => {
     await lifecycle.submit()
 
     expect(lifecycle.buttonTitle.value).toBe('Search · 12 Ideas')
-    expect(mocks.extractVisionSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ userText: 'warm cafe', references: lifecycle.references.value }),
+    expect(mocks.createVisionQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: 'ws_1',
+        userText: 'warm cafe',
+        libraryAssetIds: ['lasset_asset0007'],
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
     expect(submittedQuery.value).toBe('warm editorial cafe')
     expect(loadResults).toHaveBeenCalledOnce()
@@ -154,23 +163,23 @@ describe('useVisionQueryLifecycle', () => {
   it('uses a new idempotency key after the text or reference request facts change', async () => {
     const { lifecycle, draftQuery } = createLifecycle()
     lifecycle.addLibraryAsset(libraryAsset as never)
-    mocks.extractVisionSearch.mockResolvedValue({ status: 'succeeded', query: 'warm cafe' })
+    mocks.createVisionQuery.mockResolvedValue({ status: 'succeeded', query: 'warm cafe' })
 
     await lifecycle.submit()
-    const firstKey = mocks.extractVisionSearch.mock.calls[0]?.[0].idempotencyKey
+    const firstKey = mocks.createVisionQuery.mock.calls[0]?.[1].idempotencyKey
     draftQuery.value = 'warm brutalist cafe'
     await lifecycle.submit()
-    const textChangedKey = mocks.extractVisionSearch.mock.calls[1]?.[0].idempotencyKey
+    const textChangedKey = mocks.createVisionQuery.mock.calls[1]?.[1].idempotencyKey
     expect(textChangedKey).not.toBe(firstKey)
     lifecycle.addLibraryAsset({ ...libraryAsset, id: 'lasset_asset0008', sourceId: 'photo-2' } as never)
     await lifecycle.submit()
-    expect(mocks.extractVisionSearch.mock.calls[2]?.[0].idempotencyKey).not.toBe(textChangedKey)
+    expect(mocks.createVisionQuery.mock.calls[2]?.[1].idempotencyKey).not.toBe(textChangedKey)
     lifecycle.dispose()
   })
 
   it('shares an in-flight logical request and reuses its idempotency key on retry', async () => {
     let resolveExtraction!: (value: { status: string; query: string }) => void
-    mocks.extractVisionSearch.mockImplementation(
+    mocks.createVisionQuery.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveExtraction = resolve
@@ -182,15 +191,16 @@ describe('useVisionQueryLifecycle', () => {
     const first = lifecycle.submit()
     const second = lifecycle.submit()
     expect(second).toBe(first)
-    expect(mocks.extractVisionSearch).toHaveBeenCalledOnce()
+    await Promise.resolve()
+    expect(mocks.createVisionQuery).toHaveBeenCalledOnce()
     resolveExtraction({ status: 'succeeded', query: 'warm cafe' })
     await first
 
-    mocks.extractVisionSearch.mockResolvedValueOnce({ status: 'succeeded', query: 'warm cafe' })
+    mocks.createVisionQuery.mockResolvedValueOnce({ status: 'succeeded', query: 'warm cafe' })
     await lifecycle.submit()
-    expect(mocks.extractVisionSearch).toHaveBeenCalledTimes(2)
-    expect(mocks.extractVisionSearch.mock.calls[1]?.[0].idempotencyKey).toBe(
-      mocks.extractVisionSearch.mock.calls[0]?.[0].idempotencyKey,
+    expect(mocks.createVisionQuery).toHaveBeenCalledTimes(2)
+    expect(mocks.createVisionQuery.mock.calls[1]?.[1].idempotencyKey).toBe(
+      mocks.createVisionQuery.mock.calls[0]?.[1].idempotencyKey,
     )
     lifecycle.dispose()
   })

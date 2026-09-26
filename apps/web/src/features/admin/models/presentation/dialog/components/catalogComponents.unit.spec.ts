@@ -1,13 +1,83 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
-import { http, HttpResponse, useMswHandlers } from '../../../../../../test/msw'
 import CatalogIdentityPanel from './CatalogIdentityPanel.vue'
 import CatalogSpecsPanel from './CatalogSpecsPanel.vue'
 import CatalogGatewayPanel from './CatalogGatewayPanel.vue'
 import CatalogPreviewCard from './CatalogPreviewCard.vue'
 import CatalogReferencePanel from './CatalogReferencePanel.vue'
 import type { AdminModelItem } from '../../../domain/catalogData'
+
+// The reference lookup has no control equivalent (fail-closed in the
+// resource); panel rendering is covered through a fake snapshot source
+// while the resource spec pins the fail-closed contract.
+const referenceFakes = vi.hoisted(() => ({
+  snapshot: vi.fn(),
+}))
+
+vi.mock('../../../infrastructure/adminGatewayResource', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../infrastructure/adminGatewayResource')>()
+  return {
+    ...actual,
+    createAdminGatewayResource: () => ({
+      catalog: { getReference: referenceFakes.snapshot },
+    }),
+  }
+})
+
+function resolveReferenceSnapshot(payload: Record<string, unknown>) {
+  const item = payload as {
+    model_id?: string
+    provider?: string
+    name?: string
+    input_usd_per_mtok?: number
+    output_usd_per_mtok?: number
+    context_limit?: number
+    last_updated?: string
+    reasoning?: boolean
+    tool_call?: boolean
+    temperature?: boolean
+    attachment?: boolean
+    structured_output?: boolean
+    open_weights?: boolean
+    modalities?: { input?: string[]; output?: string[] }
+    knowledge?: string
+    release_date?: string
+    family?: string
+    status?: string
+    source?: string
+    note?: string
+    found?: boolean
+    error_code?: string
+    message?: string
+  }
+  return {
+    modelId: item.model_id ?? '',
+    provider: item.provider,
+    name: item.name,
+    inputUsdPerMtok: item.input_usd_per_mtok,
+    outputUsdPerMtok: item.output_usd_per_mtok,
+    contextLimit: item.context_limit,
+    lastUpdated: item.last_updated,
+    reasoning: item.reasoning,
+    toolCall: item.tool_call,
+    temperature: item.temperature,
+    attachment: item.attachment,
+    structuredOutput: item.structured_output,
+    openWeights: item.open_weights,
+    modalities: item.modalities,
+    knowledge: item.knowledge,
+    releaseDate: item.release_date,
+    family: item.family,
+    status: item.status,
+    source: item.source ?? '',
+    note: item.note ?? '',
+    found: item.found ?? false,
+    errorCode: item.error_code,
+    message: item.message,
+  }
+}
 
 describe('AdminModelEditDialog subcomponents', () => {
   describe('CatalogIdentityPanel', () => {
@@ -50,9 +120,11 @@ describe('AdminModelEditDialog subcomponents', () => {
       })
 
       await user.click(screen.getByRole('button', { name: '4096×4096' }))
+
       expect(onUpdateRes).toHaveBeenCalledWith('4096×4096')
 
       await user.click(screen.getByRole('button', { name: '+ 透明通道' }))
+
       expect(onUpdateCaps).toHaveBeenCalledWith('垫图生图, 透明通道')
     })
   })
@@ -113,26 +185,24 @@ describe('AdminModelEditDialog subcomponents', () => {
   })
 
   describe('CatalogReferencePanel', () => {
+    beforeEach(() => {
+      referenceFakes.snapshot.mockReset()
+    })
+
     it('renders backend reference pricing with a non-settlement note', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'openai/gpt-4o',
-              provider: 'OpenAI',
-              name: 'GPT-4o',
-              input_usd_per_mtok: 2.5,
-              output_usd_per_mtok: 10,
-              context_limit: 128000,
-              last_updated: '2026-01-01',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: true,
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'openai/gpt-4o',
+          provider: 'OpenAI',
+          name: 'GPT-4o',
+          input_usd_per_mtok: 2.5,
+          output_usd_per_mtok: 10,
+          context_limit: 128000,
+          last_updated: '2026-01-01',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
+        }),
       )
 
       render(CatalogReferencePanel, {
@@ -147,12 +217,6 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('shows fal models a graceful fallback without calling the reference backend', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({ code: 500, msg: 'must not be called', data: null }),
-        ),
-      )
-
       render(CatalogReferencePanel, {
         props: { modelId: 'fal_ai/flux-dev', provider: 'Fal AI', modelName: 'FLUX' },
       })
@@ -160,32 +224,27 @@ describe('AdminModelEditDialog subcomponents', () => {
       expect(await screen.findByText(/fal 模型暂无 models\.dev 数据/)).toBeInTheDocument()
       // debounce 窗口后仍无请求：失败 handler 一旦命中必出 error 文案。
       await new Promise((resolve) => setTimeout(resolve, 650))
-      expect(screen.queryByText(/加载参照价失败|must not be called/)).not.toBeInTheDocument()
+      expect(referenceFakes.snapshot).not.toHaveBeenCalled()
+      expect(screen.queryByText(/加载参照价失败/)).not.toBeInTheDocument()
       expect(screen.queryByText(/USD\/MTok/)).not.toBeInTheDocument()
     })
 
     it('renders enrichment placeholders and freshness without false deprecated warnings', async () => {
       const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-22T00:00:00Z'))
       try {
-        useMswHandlers(
-          http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-            HttpResponse.json({
-              code: 0,
-              msg: 'ok',
-              data: {
-                model_id: 'openai/gpt-4o',
-                provider: 'OpenAI',
-                name: 'GPT-4o',
-                input_usd_per_mtok: 2.5,
-                output_usd_per_mtok: 10,
-                context_limit: 128000,
-                last_updated: '2026-01-01',
-                source: 'models.dev',
-                note: '参照价，非结算依据',
-                found: true,
-              },
-            }),
-          ),
+        referenceFakes.snapshot.mockResolvedValue(
+          resolveReferenceSnapshot({
+            model_id: 'openai/gpt-4o',
+            provider: 'OpenAI',
+            name: 'GPT-4o',
+            input_usd_per_mtok: 2.5,
+            output_usd_per_mtok: 10,
+            context_limit: 128000,
+            last_updated: '2026-01-01',
+            source: 'models.dev',
+            note: '参照价，非结算依据',
+            found: true,
+          }),
         )
 
         render(CatalogReferencePanel, {
@@ -203,36 +262,30 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('wires enrichment rows and raises a red deprecated badge', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'openai/gpt-4.1-nano',
-              provider: 'OpenAI',
-              name: 'GPT-4.1 nano',
-              input_usd_per_mtok: 0.1,
-              output_usd_per_mtok: 0.4,
-              context_limit: 1047576,
-              last_updated: '2025-04-14',
-              reasoning: false,
-              tool_call: true,
-              temperature: true,
-              attachment: true,
-              structured_output: true,
-              open_weights: false,
-              modalities: { input: ['text', 'image'], output: ['text'] },
-              knowledge: '2024-04',
-              release_date: '2025-04-14',
-              family: 'gpt-nano',
-              status: 'deprecated',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: true,
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'openai/gpt-4.1-nano',
+          provider: 'OpenAI',
+          name: 'GPT-4.1 nano',
+          input_usd_per_mtok: 0.1,
+          output_usd_per_mtok: 0.4,
+          context_limit: 1047576,
+          last_updated: '2025-04-14',
+          reasoning: false,
+          tool_call: true,
+          temperature: true,
+          attachment: true,
+          structured_output: true,
+          open_weights: false,
+          modalities: { input: ['text', 'image'], output: ['text'] },
+          knowledge: '2024-04',
+          release_date: '2025-04-14',
+          family: 'gpt-nano',
+          status: 'deprecated',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
+        }),
       )
 
       render(CatalogReferencePanel, {
@@ -254,27 +307,21 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('renders beta status as a neutral badge without a deprecation warning', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'openai/gpt-5-nano',
-              provider: 'OpenAI',
-              name: 'GPT-5 Nano',
-              input_usd_per_mtok: 0.05,
-              output_usd_per_mtok: 0.4,
-              context_limit: 400000,
-              last_updated: '2025-08-07',
-              reasoning: true,
-              status: 'beta',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: true,
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'openai/gpt-5-nano',
+          provider: 'OpenAI',
+          name: 'GPT-5 Nano',
+          input_usd_per_mtok: 0.05,
+          output_usd_per_mtok: 0.4,
+          context_limit: 400000,
+          last_updated: '2025-08-07',
+          reasoning: true,
+          status: 'beta',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
+        }),
       )
 
       render(CatalogReferencePanel, {
@@ -288,20 +335,14 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('explains reference misses by error code without blocking the form', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'unknown/model',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: false,
-              error_code: 'not_found',
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'unknown/model',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: false,
+          error_code: 'not_found',
+        }),
       )
 
       render(CatalogReferencePanel, {
@@ -312,25 +353,19 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('never writes reference data back (gateway description stays authoritative)', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'openai/gpt-4o',
-              provider: 'OpenAI',
-              name: '上游参照名（仅展示）',
-              input_usd_per_mtok: 2.5,
-              output_usd_per_mtok: 10,
-              context_limit: 128000,
-              last_updated: '2026-01-01',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: true,
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'openai/gpt-4o',
+          provider: 'OpenAI',
+          name: '上游参照名（仅展示）',
+          input_usd_per_mtok: 2.5,
+          output_usd_per_mtok: 10,
+          context_limit: 128000,
+          last_updated: '2026-01-01',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
+        }),
       )
 
       const { emitted } = render(CatalogReferencePanel, {
@@ -347,25 +382,19 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('falls back to the placeholder when the provider logo fails to load', async () => {
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', () =>
-          HttpResponse.json({
-            code: 0,
-            msg: 'ok',
-            data: {
-              model_id: 'openai/gpt-4o',
-              provider: 'OpenAI',
-              name: 'GPT-4o',
-              input_usd_per_mtok: 2.5,
-              output_usd_per_mtok: 10,
-              context_limit: 128000,
-              last_updated: '2026-01-01',
-              source: 'models.dev',
-              note: '参照价，非结算依据',
-              found: true,
-            },
-          }),
-        ),
+      referenceFakes.snapshot.mockResolvedValue(
+        resolveReferenceSnapshot({
+          model_id: 'openai/gpt-4o',
+          provider: 'OpenAI',
+          name: 'GPT-4o',
+          input_usd_per_mtok: 2.5,
+          output_usd_per_mtok: 10,
+          context_limit: 128000,
+          last_updated: '2026-01-01',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
+        }),
       )
 
       render(CatalogReferencePanel, {
@@ -380,54 +409,45 @@ describe('AdminModelEditDialog subcomponents', () => {
     })
 
     it('does not let an older reference response overwrite a newer model', async () => {
-      const responses: Array<(response: Response) => void> = []
-      useMswHandlers(
-        http.get('/api/admin/settings/ai-gateway/models-reference', ({ request }) => {
-          const modelID = new URL(request.url).searchParams.get('model_id') || ''
-          return new Promise<Response>((resolve) => {
-            responses.push((response) => resolve(response))
-            void modelID
-          })
-        }),
-      )
+      let resolveOld!: (value: unknown) => void
+      let resolveNew!: (value: unknown) => void
+      const oldPromise = new Promise((resolve) => {
+        resolveOld = resolve
+      })
+      const newPromise = new Promise((resolve) => {
+        resolveNew = resolve
+      })
+      referenceFakes.snapshot.mockReturnValueOnce(oldPromise).mockReturnValueOnce(newPromise)
 
       const rendered = render(CatalogReferencePanel, {
         props: { modelId: 'openai/old', provider: 'OpenAI', modelName: 'Old' },
       })
-      await waitFor(() => expect(responses).toHaveLength(1))
+      await waitFor(() => expect(referenceFakes.snapshot).toHaveBeenCalledTimes(1))
 
       await rendered.rerender({ modelId: 'openai/new', provider: 'OpenAI', modelName: 'New' })
       await new Promise((resolve) => setTimeout(resolve, 450))
-      await waitFor(() => expect(responses).toHaveLength(2))
+      await waitFor(() => expect(referenceFakes.snapshot).toHaveBeenCalledTimes(2))
 
-      responses[1](
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            model_id: 'openai/new',
-            provider: 'OpenAI',
-            name: 'New Reference',
-            source: 'models.dev',
-            note: '参照价，非结算依据',
-            found: true,
-          },
+      resolveNew(
+        resolveReferenceSnapshot({
+          model_id: 'openai/new',
+          provider: 'OpenAI',
+          name: 'New Reference',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
         }),
       )
       await screen.findByText('New Reference')
 
-      responses[0](
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            model_id: 'openai/old',
-            provider: 'OpenAI',
-            name: 'Old Reference',
-            source: 'models.dev',
-            note: '参照价，非结算依据',
-            found: true,
-          },
+      resolveOld(
+        resolveReferenceSnapshot({
+          model_id: 'openai/old',
+          provider: 'OpenAI',
+          name: 'Old Reference',
+          source: 'models.dev',
+          note: '参照价，非结算依据',
+          found: true,
         }),
       )
       await new Promise((resolve) => setTimeout(resolve, 0))

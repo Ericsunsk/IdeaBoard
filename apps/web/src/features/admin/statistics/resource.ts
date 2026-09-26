@@ -102,6 +102,13 @@ export type AdminStatisticsFailureCategoriesItem = {
   avg_latency_ms: number
 }
 
+export type AdminStatisticsBackfillStatus = {
+  range_start: string
+  range_end: string
+  missing_days: number
+  backfilled_days: number
+}
+
 export type AdminStatistics = {
   summary: AdminStatisticsSummary
   trend: AdminStatisticsTrendItem[]
@@ -110,7 +117,7 @@ export type AdminStatistics = {
   slow_models: AdminStatisticsSlowModelsItem[]
   bottleneck_sources: AdminStatisticsBottleneckSourcesItem[]
   failure_categories: AdminStatisticsFailureCategoriesItem[]
-  backfill_status: string
+  backfill_status: AdminStatisticsBackfillStatus
 }
 
 export type ApiResponseAdminStatistics = ApiResponseWithData<AdminStatistics>
