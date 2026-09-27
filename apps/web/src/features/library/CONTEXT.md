@@ -11,7 +11,7 @@ It does NOT own Canvas graph state, Search feed state, or gallery rendering in c
 | Asset | `WorkspaceLibraryAsset` (opaque `lasset_` id, `provider: unsplash\|pexels`, `sourceId`, camelCase `source` / `preview` / `originalUrl`, `title` / `author` / `w` / `h`, optional `folderId`); URLs are display-only. Saving without a folder leaves the asset unfiled (visible under `all`). |
 | Asset Key | `provider:sourceId`; identity across Feed, floating island, and bridging. |
 | Search Reference | Same-origin reference state as Asset for passing between vision/search and Canvas; not a persisted asset. |
-| Materialize | Async job (`pending -> running -> completed\|failed`, opaque `lmat_` id) converting a URL asset into a managed Media asset (`asset_...`) for Canvas; the sole materialization path from Library to Canvas. `materializeLibraryAssetForCanvas` polls the job and resolves display media; no numeric media link is recorded (board media-identity migration is a Phase 4 residual). |
+| Materialize | Internal-only backend fetcher turning a URL asset into a managed Media asset (`asset_...`) for Canvas; the public create/poll job API (`lmat_` routes, `library.materialization_*` events) is cut, so the frontend never creates or polls jobs. `materializeLibraryAssetForCanvas` is a poll-free single attempt over the workspace media read path: a readable managed asset resolves to display media, anything else rejects and the Canvas pending-fact retry loop (`fail` / `retry` / `resumePending`) owns the retry. No numeric media link is recorded (board media-identity migration is a Phase 4 residual). |
 | Folder Facts | Workspace-scoped folder collection snapshot (`folders` / `loading` / `load` / `refresh` / `reset` / `dispose` plus revision dedup: `current` / `stale` / `disposed` / `error`); shared by multiple islands. The fetch closes over the caller's workspace id. |
 | Mutation Publisher | Broadcasts `save` / `remove` to all subscribers (`asset-saved` / `removed`); drives each surface `galleryEffect` (`none` / `reload-current` / `selection-will-reload`). |
 | Transfer | Drag MIME (`application/x-ideaboard-{search-reference,library-folder-move,canvas-library-import}`) with `copy` / `move` / `none` semantics; asset ids are opaque (`lasset_...`). |
@@ -19,7 +19,7 @@ It does NOT own Canvas graph state, Search feed state, or gallery rendering in c
 ## Public Seams
 
 - `features/library` (`index.ts`) — sole public entry: `workspace`, `transfer`, `folderFacts`, `confirmations`, `useLibraryWorkspace`, floating-island lazy loader; external features never deep-import internals.
-- `workspace.ts` — sole transport boundary: folders/assets pagination, folder create/rename/delete, asset save/move/remove, resolve lookup, async materialize, save/remove reference use-cases; talks to `/api/v1/workspaces/{id}/library` through the generated `public/workspace-library` hooks; snake_case maps to camelCase here; malformed ids throw before any network call.
+- `workspace.ts` — sole transport boundary: folders/assets pagination, folder create/rename/delete, asset save/move/remove, resolve lookup, poll-free Canvas media resolve, save/remove reference use-cases; talks to `/api/v1/workspaces/{id}/library` through the generated `public/workspace-library` hooks; snake_case maps to camelCase here; malformed ids throw before any network call.
 - `createLibraryFolderFacts` plus `createLibraryMutationPublisher` — folder facts and mutation broadcast in `folderFacts.ts`; multiple surfaces share one instance; callers only see `galleryEffect` plus `affectedFolderKeys`. Facts require an explicit workspace-scoped fetch.
 - `useLibraryWorkspace.ts` — asset-browsing use case: tabs/pagination/selection/lightbox/delete/edit/move/retry; in `{workspaceId/syncRoute/autoLoad/initialFolder/folderFacts/mutationPublisher}`, out `{workspaceId/folders/assets/selectedFolder/... + commands/resetWorkspace}`; normalizes `?folder=` (`all` / `<lfolder_ id>`).
 - `write` / `read` / `getLibraryDropEffect` / `toCanvasLibraryImportDescriptor` — DnD read/write and effect resolution plus Canvas import descriptors in `transfer.ts`.
@@ -39,7 +39,7 @@ It does NOT own Canvas graph state, Search feed state, or gallery rendering in c
 ## Non-goals
 
 - No owned media assets; no provider-less assets.
-- No numeric id or URL as identity; identity is `provider:sourceId`, durable ids are opaque (`lfolder_` / `lasset_` / `lmat_`).
+- No numeric id or URL as identity; identity is `provider:sourceId`, durable ids are opaque (`lfolder_` / `lasset_`).
 - No reference as saved asset; no saved asset as reference.
 - No canvas-direct provider URLs; no unmaterialized imports.
 - No per-island folder fetch; no stale-facts render.

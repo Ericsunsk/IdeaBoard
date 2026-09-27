@@ -303,8 +303,8 @@ function toDeliveryMetadata(asset: MediaAsset): MediaAssetDeliveryMetadata {
 
 /**
  * Reads one workspace media asset and projects it onto the delivery
- * metadata shape shared delivery consumers (cache, composable, library
- * materialization) read. Results hydrate the same cache the
+ * metadata shape shared delivery consumers (cache, composable, the
+ * poll-free Library Canvas resolve) read. Results hydrate the same cache the
  * workspace-stream invalidation feeds.
  */
 export async function getWorkspaceMediaAssetMetadata(

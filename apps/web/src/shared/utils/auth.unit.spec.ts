@@ -5,6 +5,7 @@ import {
   getRecoverableAuthStorageUserScope,
   getStoredUser,
   handleAuthFailure,
+  handleSilentAuthFailure,
   setStoredAuth,
 } from './auth'
 import type { User } from '../api/sessionUserType'
@@ -57,11 +58,41 @@ describe('handleAuthFailure', () => {
 
     const handled = handleAuthFailure({
       status: 401,
-      requestUrl: '/api/user/info',
+      requestUrl: '/api/v1/user',
     })
 
     expect(handled).toBe(false)
     expect(getStoredUser()).toBeNull()
     expect(window.location.pathname).toBe('/admin/monitor')
+  })
+})
+
+describe('handleSilentAuthFailure', () => {
+  it('clears stored auth without navigating after a supplementary 401', () => {
+    setStoredAuth(adminUser)
+    window.history.pushState({}, '', '/user/boards')
+
+    const handled = handleSilentAuthFailure({
+      status: 401,
+      requestUrl: '/api/v1/workspaces/ws_abc123/billing-quotes',
+    })
+
+    expect(handled).toBe(false)
+    expect(getStoredUser()).toBeNull()
+    expect(window.location.pathname).toBe('/user/boards')
+  })
+
+  it('leaves stored auth untouched when the policy ignores the failure', () => {
+    setStoredAuth(adminUser)
+    window.history.pushState({}, '', '/user/boards')
+
+    const handled = handleSilentAuthFailure({
+      status: 401,
+      requestUrl: '/api/auth/sign-in/email',
+    })
+
+    expect(handled).toBe(false)
+    expect(getStoredUser()).not.toBeNull()
+    expect(window.location.pathname).toBe('/user/boards')
   })
 })

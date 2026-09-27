@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchCurrentUserInfo, toSessionUser } from './userSession'
 
 const mocks = vi.hoisted(() => ({
-  getMe: vi.fn(),
+  getUser: vi.fn(),
 }))
 
-vi.mock('./generated-query/public/me/me', () => ({
-  getMe: mocks.getMe,
+vi.mock('./generated-query/public/user/user', () => ({
+  getUser: mocks.getUser,
 }))
 
 describe('user session API boundary', () => {
@@ -22,7 +22,7 @@ describe('user session API boundary', () => {
       avatar: '',
       role: 'user',
     }
-    mocks.getMe.mockResolvedValue({ data: me })
+    mocks.getUser.mockResolvedValue({ data: me })
 
     await expect(fetchCurrentUserInfo()).resolves.toEqual({
       user: {
@@ -34,7 +34,7 @@ describe('user session API boundary', () => {
   })
 
   it('rejects when the principal request fails', async () => {
-    mocks.getMe.mockRejectedValue(
+    mocks.getUser.mockRejectedValue(
       Object.assign(new Error('Could not load your session. Please sign in again.'), {
         status: 503,
       }),
@@ -46,7 +46,7 @@ describe('user session API boundary', () => {
   })
 
   it('rejects a malformed successful response without a principal', async () => {
-    mocks.getMe.mockResolvedValue({ data: {} })
+    mocks.getUser.mockResolvedValue({ data: {} })
 
     await expect(fetchCurrentUserInfo()).rejects.toThrow(
       'Could not load your session. Please sign in again.',

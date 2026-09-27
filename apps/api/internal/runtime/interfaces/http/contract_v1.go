@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
+	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -84,6 +85,17 @@ type ContractV1Deps struct {
 	// not a queue). Nil disables cross-instance fanout (single-process
 	// tests); production wires the shared bus.
 	EventBus *events.NATSJetStreamEventBus
+	// libraryMaterializer is the internal remote-fetch seam for the
+	// library read-through (media/assets.LibraryMaterializer fetch
+	// contract). Nil normalizes to the production remote fetcher
+	// (shared outbound downloader: SSRF allowlist, timeout, size cap);
+	// tests inject stubs. Unexported: production never overrides it.
+	libraryMaterializer materializerassets.LibrarySourceFetcher
+	// libraryMaterializeSpawn runs the read-through fetch off the
+	// request path. Nil normalizes to a fire-and-forget goroutine;
+	// tests inject an inline runner for determinism. Unexported:
+	// production never overrides it.
+	libraryMaterializeSpawn func(func())
 }
 
 // V1UserDirectory translates between internal numeric user ids and the
@@ -138,6 +150,12 @@ func (d *ContractV1Deps) normalize() {
 	if d.Webhooks == nil {
 		d.Webhooks = events.NewWebhookStore(events.NewHTTPSender(), nil)
 	}
+	if d.libraryMaterializer == nil {
+		d.libraryMaterializer = materializerassets.RemoteLibrarySourceFetcher{}
+	}
+	if d.libraryMaterializeSpawn == nil {
+		d.libraryMaterializeSpawn = func(fn func()) { go fn() }
+	}
 }
 
 // v1AuthMiddleware keeps the cookie-session path working in production by
@@ -165,7 +183,7 @@ func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps Co
 	deps.normalize()
 	handler := &contractV1Handler{deps: deps}
 	group.Use(v1AuthMiddleware(authDeps), ResolvePrincipal())
-	group.GET("/me", handler.getMe)
+	group.GET("/user", handler.getUser)
 	group.GET("/workspaces", handler.listWorkspaces)
 	group.POST("/workspaces", handler.createWorkspace)
 	group.GET("/workspaces/:workspace_id", handler.getWorkspace)
@@ -287,25 +305,25 @@ func v1FormatTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-type v1MeDTO struct {
+type v1UserDTO struct {
 	ID                  string  `json:"id"`
 	DisplayName         string  `json:"display_name"`
 	Role                string  `json:"role"`
 	PersonalWorkspaceID *string `json:"personal_workspace_id,omitempty"`
 }
 
-func (h *contractV1Handler) getMe(c *gin.Context) {
+func (h *contractV1Handler) getUser(c *gin.Context) {
 	identityPrincipal, ok := v1RequestPrincipal(c)
 	if !ok {
 		return
 	}
-	dto := v1MeDTO{
+	dto := v1UserDTO{
 		ID:          tenancy.FormatUserPublicID(identityPrincipal.PublicID()),
 		DisplayName: identityPrincipal.DisplayName(),
 		Role:        identityPrincipal.Role().String(),
 	}
 	// Personal workspace auto-provision hook: idempotent and
-	// concurrent-safe; a provision failure never fails /me itself.
+	// concurrent-safe; a provision failure never fails /user itself.
 	if h.deps.Store != nil {
 		if personal, err := h.deps.Store.EnsurePersonalWorkspace(c.Request.Context(), identityPrincipal.UserID()); err == nil && personal != nil {
 			id := personal.PublicID

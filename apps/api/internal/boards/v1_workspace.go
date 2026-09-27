@@ -18,8 +18,10 @@ package boards
 //   - Revisions are INSERT-only: ReplaceDocument appends a new immutable
 //     revision entry; entries are never mutated and are addressable by
 //     revision number or entry id.
-//   - Workspace membership does NOT grant board access: every board read
-//     requires an explicit board role (creator/owner row counts as owner).
+//   - Workspace members with visible membership default to viewer
+//     (workspace owners default to owner); explicit board rows override
+//     the default. Callers with no visible workspace membership and no
+//     explicit grant stay invisible (404 at the handler edge).
 //   - The last owner cannot be removed or demoted (ErrV1LastOwner).
 
 import (
@@ -138,11 +140,11 @@ type WorkspaceBoardStore interface {
 	ReplaceDocument(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, expectedRevision int64, schemaVersion int32, snapshot json.RawMessage) (*V1Board, error)
 	ListRevisions(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1Revision, error)
 	GetRevision(ctx context.Context, workspacePublicID, boardPublicID string, revisionOrID int64) (*V1Revision, error)
-	GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64) (AccessRole, bool, error)
+	GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error)
 	ListBoardMembers(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1BoardMember, error)
-	AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole) (*V1BoardMember, error)
-	UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole) (*V1BoardMember, error)
-	RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64) error
+	AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error)
+	UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error)
+	RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error
 	CreateShareToken(ctx context.Context, workspacePublicID, boardPublicID string, creatorUserID int64, role AccessRole, tokenID, tokenHash, bearer string) (*V1ShareToken, error)
 	ListShareTokens(ctx context.Context, workspacePublicID, boardPublicID string) ([]*V1ShareToken, error)
 	RevokeShareToken(ctx context.Context, workspacePublicID, boardPublicID, tokenID string, revokedBy int64) error
@@ -196,6 +198,22 @@ func ValidateV1BoardRole(role AccessRole) error {
 		return nil
 	default:
 		return ErrMemberInvalidRole
+	}
+}
+
+// DefaultBoardRoleForWorkspaceRole maps a visible workspace membership role
+// to the default board role: workspace owners default to board owner,
+// admins/members default to viewer. Unknown/empty roles report ok=false so
+// callers stay fail-closed. Explicit board rows always override this
+// default (check explicit first, then fall back).
+func DefaultBoardRoleForWorkspaceRole(workspaceRole string) (AccessRole, bool) {
+	switch strings.TrimSpace(workspaceRole) {
+	case "owner":
+		return RoleOwner, true
+	case "admin", "member":
+		return RoleViewer, true
+	default:
+		return "", false
 	}
 }
 
@@ -363,14 +381,19 @@ func (s *InMemoryWorkspaceBoardStore) getBoardLocked(key, boardPublicID string) 
 	return board, nil
 }
 
-// boardRoleLocked reports the explicit board role: the creator/owner row is
-// an implicit owner; member rows grant editor/viewer/owner.
-func (s *InMemoryWorkspaceBoardStore) boardRoleLocked(key string, board *V1Board, userID int64) (AccessRole, bool) {
+// boardRoleLocked reports the effective board role: the creator/owner row is
+// an implicit owner; explicit member rows override; visible workspace
+// members fall back to viewer (owners to owner). Unknown/empty workspace
+// roles stay fail-closed (no default).
+func (s *InMemoryWorkspaceBoardStore) boardRoleLocked(key string, board *V1Board, userID int64, workspaceRole string) (AccessRole, bool) {
 	if board.OwnerUserID == userID {
 		return RoleOwner, true
 	}
 	if member, ok := s.members[key][userID]; ok {
 		return member.Role, true
+	}
+	if role, ok := DefaultBoardRoleForWorkspaceRole(workspaceRole); ok {
+		return role, true
 	}
 	return "", false
 }
@@ -625,8 +648,10 @@ func (s *InMemoryWorkspaceBoardStore) GetRevision(ctx context.Context, workspace
 	return nil, ErrNotFound
 }
 
-// GetBoardRole reports the explicit board role (creator counts as owner).
-func (s *InMemoryWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64) (AccessRole, bool, error) {
+// GetBoardRole reports the effective board role (creator counts as owner;
+// explicit rows override; visible workspace members fall back to viewer,
+// workspace owners to owner; unknown/empty workspace roles stay denied).
+func (s *InMemoryWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return "", false, err
 	}
@@ -636,7 +661,7 @@ func (s *InMemoryWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspac
 	if err != nil {
 		return "", false, err
 	}
-	role, ok := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID)
+	role, ok := s.boardRoleLocked(v1BoardKey(workspacePublicID, board.PublicID), board, userID, workspaceRole)
 	return role, ok, nil
 }
 
@@ -664,7 +689,9 @@ func (s *InMemoryWorkspaceBoardStore) ListBoardMembers(ctx context.Context, work
 
 // AddBoardMember grants a role idempotently: re-adding keeps the existing
 // role. Only board owners may grant; only owners may grant owner.
-func (s *InMemoryWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole) (*V1BoardMember, error) {
+// The actor's effective role includes the workspace default (workspace
+// owners count as board owners); explicit rows still override.
+func (s *InMemoryWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -681,7 +708,7 @@ func (s *InMemoryWorkspaceBoardStore) AddBoardMember(ctx context.Context, worksp
 		return nil, err
 	}
 	key := v1BoardKey(workspacePublicID, board.PublicID)
-	actorRole, ok := s.boardRoleLocked(key, board, actorUserID)
+	actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
 	if !ok || actorRole != RoleOwner {
 		return nil, ErrPermissionDenied
 	}
@@ -706,8 +733,8 @@ func (s *InMemoryWorkspaceBoardStore) AddBoardMember(ctx context.Context, worksp
 }
 
 // UpdateBoardMemberRole applies owner-only transitions with last-owner
-// protection.
-func (s *InMemoryWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole) (*V1BoardMember, error) {
+// protection. The actor's effective role includes the workspace default.
+func (s *InMemoryWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -724,7 +751,7 @@ func (s *InMemoryWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context,
 		return nil, err
 	}
 	key := v1BoardKey(workspacePublicID, board.PublicID)
-	actorRole, ok := s.boardRoleLocked(key, board, actorUserID)
+	actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
 	if !ok || actorRole != RoleOwner {
 		return nil, ErrPermissionDenied
 	}
@@ -750,8 +777,9 @@ func (s *InMemoryWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context,
 }
 
 // RemoveBoardMember removes a grant: owners may remove anyone, anyone may
-// remove themselves. The last owner is protected.
-func (s *InMemoryWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64) error {
+// remove themselves. The last owner is protected. The actor's effective
+// role includes the workspace default.
+func (s *InMemoryWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -776,7 +804,7 @@ func (s *InMemoryWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, wor
 		return ErrV1LastOwner
 	}
 	if actorUserID != targetUserID {
-		actorRole, ok := s.boardRoleLocked(key, board, actorUserID)
+		actorRole, ok := s.boardRoleLocked(key, board, actorUserID, actorWorkspaceRole)
 		if !ok || actorRole != RoleOwner {
 			return ErrPermissionDenied
 		}
@@ -943,7 +971,7 @@ func (s *InMemoryWorkspaceBoardStore) JoinByToken(ctx context.Context, workspace
 		Reason:         "share_join",
 		Outcome:        outcome,
 	})
-	role, _ := s.boardRoleLocked(key, board, userID)
+	role, _ := s.boardRoleLocked(key, board, userID, "")
 	return copyV1Board(board), role, nil
 }
 

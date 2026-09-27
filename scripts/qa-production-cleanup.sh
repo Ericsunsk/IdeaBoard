@@ -38,7 +38,7 @@ done
 (( ${#board_ids[@]} + ${#library_asset_ids[@]} > 0 )) || die "at least one explicit resource ID is required"
 
 curl_api() { curl --fail-with-body --silent --show-error --cookie "$cookie_file" -H 'Accept: application/json' "$@"; }
-me_json="$(curl_api "$api_base_url/api/v1/me")"
+me_json="$(curl_api "$api_base_url/api/v1/user")"
 actual_owner="$(jq -r '.data.id // empty' <<<"$me_json")"
 [[ "$actual_owner" == "$owner_user_id" ]] || die "owner guard failed (session is $actual_owner)"
 boards_json="$(curl_api "$api_base_url/api/v1/workspaces/$workspace_id/boards?page_size=100")"

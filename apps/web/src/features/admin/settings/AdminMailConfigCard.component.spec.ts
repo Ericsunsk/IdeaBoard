@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import AdminMailConfigCard from './AdminMailConfigCard.vue'
+import { ADMIN_PROBE_OPERATOR_REASON } from '../shared/lib/confirmSettingsSave'
 import type { AdminMailConfigResource } from './mailConfigResource'
 import type { MailConfigSummary } from './mailConfigTypes'
 
@@ -118,7 +119,7 @@ describe('AdminMailConfigCard', () => {
     expect(resource.update).not.toHaveBeenCalled()
   })
 
-  it('sends a Test Email and reloads the readiness metadata', async () => {
+  it('sends a Test Email without a confirm dialog and reloads the readiness metadata', async () => {
     const { user } = renderCard()
     await screen.findByText('Ready')
 
@@ -127,9 +128,10 @@ describe('AdminMailConfigCard', () => {
 
     await waitFor(() =>
       expect(resource.test).toHaveBeenCalledWith('ops@example.com', {
-        operatorReason: 'test reason',
+        operatorReason: ADMIN_PROBE_OPERATOR_REASON,
       }),
     )
+    expect(confirmMock).not.toHaveBeenCalled()
     await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
     expect(toast.success).toHaveBeenCalledWith('Test Email 已发送')
   })

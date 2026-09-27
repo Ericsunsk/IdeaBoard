@@ -329,6 +329,27 @@ func TestControlMailSettingTest(t *testing.T) {
 		}
 	})
 
+	t.Run("test skips the reason and key ceremony", func(t *testing.T) {
+		mail := newFakeControlMail()
+		h := newMailHarness(t, mail)
+		status, _, payload := h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test",
+			body:   `{"recipient":"ops@example.com"}`,
+			userID: controlOperatorID, role: "admin",
+		})
+		if status != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (%v)", status, payload)
+		}
+		if ok := controlData(t, payload).(map[string]any); ok["sent"] != true {
+			t.Fatalf("test ack = %v", payload)
+		}
+		mail.mu.Lock()
+		defer mail.mu.Unlock()
+		if len(mail.recipients) != 1 || mail.recipients[0] != "ops@example.com" {
+			t.Fatalf("recipients = %v", mail.recipients)
+		}
+	})
+
 	t.Run("blank recipient is 400 before the seam", func(t *testing.T) {
 		mail := newFakeControlMail()
 		h := newMailHarness(t, mail)

@@ -56,11 +56,16 @@ function toLocalMeta(board: WorkspaceBoardMeta): BoardMeta | null {
   const name = normalizeBoardName(board.name || '')
   if (!boardId || !name) return null
   const revision = Number(board.revision)
+  // Fail closed on broken timestamps: skip the entry so a corrupt remote row
+  // can never masquerade as "just now" via a fabricated Date.now().
+  const createdAt = Number(board.createdAt)
+  const updatedAt = Number(board.updatedAt)
+  if (!Number.isFinite(createdAt) || !Number.isFinite(updatedAt)) return null
   return {
     id: boardId,
     name,
-    createdAt: Number(board.createdAt) || Date.now(),
-    updatedAt: Number(board.updatedAt) || Date.now(),
+    createdAt,
+    updatedAt,
     ...(Number.isFinite(revision) && revision >= 0 ? { revision } : {}),
   }
 }
@@ -71,11 +76,19 @@ function toLocalState(
 ): BoardState | null {
   // v1 splits the envelope: `schema_version` rides beside `payload`, while
   // the domain validator expects one `{ schemaVersion, ...nodes }` snapshot.
-  // Recomposition stays here (validation boundary), never in the transport.
-  const payload =
+  // The write path (`saveWorkspaceBoard`) nests nodes under `payload`, so
+  // the read path must unwrap it — otherwise every saved board fails
+  // validation and hydration rejects the whole catalog. Recomposition stays
+  // here (validation boundary), never in the transport.
+  const snapshot =
     document.document && typeof document.document === 'object' && !Array.isArray(document.document)
-      ? { ...(document.document as Record<string, unknown>), schemaVersion: document.schemaVersion }
-      : document.document
+      ? (document.document as Record<string, unknown>)
+      : null
+  const nested =
+    snapshot && typeof snapshot.payload === 'object' && snapshot.payload !== null && !Array.isArray(snapshot.payload)
+      ? (snapshot.payload as Record<string, unknown>)
+      : null
+  const payload = { ...(nested ?? snapshot ?? {}), schemaVersion: document.schemaVersion }
   const result = normalizeBoardState(payload, {
     mode: 'result',
     boundary: 'server-hydration',

@@ -32,70 +32,75 @@ import type {
   AvatarUploadResultEnvelope,
   BadRequestResponse,
   ErrorEnvelope,
-  MeEnvelope,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
+  UserEnvelope,
 } from '../model'
 
 import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-export const getGetMeUrl = () => {
-  return `/me`
+export const getGetUserUrl = () => {
+  return `/user`
 }
 
 /**
  * Returns the session principal with the external usr_ identifier. Provisions the personal workspace idempotently on first call.
  * @summary Get the current principal profile
  */
-export const getMe = async (options?: Parameters<typeof publicMutator>[1]): Promise<MeEnvelope> => {
-  return publicMutator<MeEnvelope>(getGetMeUrl(), {
+export const getUser = async (
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<UserEnvelope> => {
+  return publicMutator<UserEnvelope>(getGetUserUrl(), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetMeQueryKey = () => {
-  return ['me'] as const
+export const getGetUserQueryKey = () => {
+  return ['user'] as const
 }
 
-export const getGetMeQueryOptions = <
-  TData = Awaited<ReturnType<typeof getMe>>,
+export const getGetUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUser>>,
   TError = UnauthorizedResponse,
 >(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>>
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUser>>, TError, TData>>
   request?: SecondParameter<typeof publicMutator>
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetMeQueryKey()
+  const queryKey = getGetUserQueryKey()
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMe>>> = ({ signal }) =>
-    getMe({ signal, ...requestOptions })
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUser>>> = ({ signal }) =>
+    getUser({ signal, ...requestOptions })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getMe>>,
+    Awaited<ReturnType<typeof getUser>>,
     TError,
     TData
   >
 }
 
-export type GetMeQueryResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
-export type GetMeQueryError = UnauthorizedResponse
+export type GetUserQueryResult = NonNullable<Awaited<ReturnType<typeof getUser>>>
+export type GetUserQueryError = UnauthorizedResponse
 
 /**
  * @summary Get the current principal profile
  */
 
-export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = UnauthorizedResponse>(
+export function useGetUser<
+  TData = Awaited<ReturnType<typeof getUser>>,
+  TError = UnauthorizedResponse,
+>(
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getMe>>, TError, TData>>
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUser>>, TError, TData>>
     request?: SecondParameter<typeof publicMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetMeQueryOptions(options)
+  const queryOptions = getGetUserQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -107,7 +112,7 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Una
 }
 
 export const getUploadAvatarUrl = () => {
-  return `/me/avatar`
+  return `/user/avatar`
 }
 
 /**

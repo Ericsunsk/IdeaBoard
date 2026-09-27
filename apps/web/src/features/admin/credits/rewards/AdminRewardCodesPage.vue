@@ -237,7 +237,8 @@ import {
 } from './resource'
 import { useRewardCodeList } from './useRewardCodeList'
 import { useRewardCodeRowActions } from './useRewardCodeRowActions'
-import { readConfirmReason, useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 
 const resource = createAdminRewardCodeResource()
 const confirm = useAdminConfirm()
@@ -295,19 +296,16 @@ function openCreateDialog() {
 }
 
 async function confirmRewardCodeSave(editing: RewardCode | null, displayName: string) {
-  // Control mutations require an operator reason: collect it through the
-  // shared confirm shell before touching the transport.
-  const confirmed = await confirm.confirm({
+  // Reward code create/update is reversible config: the note is optional
+  // and an empty field falls back to a default so one click proceeds.
+  // Returns null only when the operator cancels.
+  return confirmSettingsSave(confirm, {
     title: editing ? '确认更新兑换码' : '确认创建兑换码',
     message: editing
       ? `确定更新“${editing.displayName}”吗？该操作将记录审计。`
       : `确定创建兑换码“${displayName}”吗？该操作将记录审计。`,
     confirmLabel: editing ? '确认更新' : '确认创建',
-    intent: 'warn',
-    reason: { required: true },
   })
-  if (!confirmed) return null
-  return (confirm.readReason?.() ?? readConfirmReason()).trim()
 }
 
 async function persistRewardCode(

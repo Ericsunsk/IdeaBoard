@@ -13,13 +13,10 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { MeRole } from './meRole'
-import type { UserId } from './userId'
-import type { WorkspaceId } from './workspaceId'
 
-export interface Me {
-  id: UserId
-  display_name?: string
-  role?: MeRole
-  personal_workspace_id?: WorkspaceId
-}
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+
+export const UserRole = {
+  user: 'user',
+  admin: 'admin',
+} as const

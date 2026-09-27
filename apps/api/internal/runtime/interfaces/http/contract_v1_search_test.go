@@ -395,14 +395,63 @@ func TestV1VisionQueryFailureBranches(t *testing.T) {
 		t.Fatalf("quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
 	}
 
-	// Unpriced/unregistered SKUs are deterministic 422s (no retry),
-	// whether the quoter surfaces ErrPricingUnavailable (the production
-	// catalog normalizes unknown SKUs to it) or ErrSKUNotFound.
-	for i, quoteErr := range []error{billing.ErrPricingUnavailable, billing.ErrSKUNotFound} {
-		fx = build(&fakeLibraryQuoter{err: quoteErr}, &fakeLibraryBilling{}, &fakeVisionExtractor{query: "x"})
+	// Unpriced/unregistered SKUs degrade to free (no retry, no 422):
+	// the quoter surfacing ErrPricingUnavailable or ErrSKUNotFound
+	// proceeds at amount 0 with ledger skipped and a billing_deferred
+	// metric emitted. The sentinels stay distinct via the reason label.
+	deferred := []struct {
+		err    error
+		reason string
+	}{
+		{billing.ErrPricingUnavailable, "pricing_unavailable"},
+		{billing.ErrSKUNotFound, "sku_not_found"},
+	}
+	for i, tc := range deferred {
+		var got []struct{ sku, reason, operationID string }
+		prev := v1VisionBillingDeferredObserve
+		v1VisionBillingDeferredObserve = func(sku, reason, operationID string) {
+			got = append(got, struct{ sku, reason, operationID string }{sku, reason, operationID})
+		}
+		settler := &fakeLibraryBilling{}
+		fx = build(&fakeLibraryQuoter{err: tc.err}, settler, &fakeVisionExtractor{query: "x"})
 		status, payload = post(fx, fmt.Sprintf("vf-p-%d", i), `{"data":{"user_text":"cafe"}}`)
-		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
-			t.Fatalf("pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
+		v1VisionBillingDeferredObserve = prev
+		if status != http.StatusCreated {
+			t.Fatalf("deferred pricing (%v) = %d %v, want 201", tc.err, status, payload)
+		}
+		if payload["data"].(map[string]any)["query"] != "x" {
+			t.Fatalf("deferred query = %v, want x", payload)
+		}
+		if len(got) != 1 || got[0].sku != V1VisionSKU || got[0].reason != tc.reason || got[0].operationID == "" {
+			t.Fatalf("deferred metric = %+v, want one billing_deferred with reason %q", got, tc.reason)
+		}
+		if settler.captures != 0 || settler.releases != 0 {
+			t.Fatalf("deferred ledger captures=%d releases=%d, want 0/0 (amount 0 skipped)", settler.captures, settler.releases)
+		}
+	}
+
+	// Quoted zero without an error degrades the same way (free-marker).
+	{
+		var got int
+		prev := v1VisionBillingDeferredObserve
+		v1VisionBillingDeferredObserve = func(sku, reason, operationID string) {
+			got++
+			if reason != "unpriced_zero" {
+				t.Fatalf("zero metric reason = %q, want unpriced_zero", reason)
+			}
+		}
+		settler := &fakeLibraryBilling{}
+		fx = build(&fakeLibraryQuoter{amount: 0}, settler, &fakeVisionExtractor{query: "x"})
+		status, payload = post(fx, "vf-zero", `{"data":{"user_text":"cafe"}}`)
+		v1VisionBillingDeferredObserve = prev
+		if status != http.StatusCreated {
+			t.Fatalf("zero quote = %d %v, want 201", status, payload)
+		}
+		if got != 1 {
+			t.Fatalf("zero metric calls = %d, want 1", got)
+		}
+		if settler.captures != 0 || settler.releases != 0 {
+			t.Fatalf("zero ledger captures=%d releases=%d, want 0/0", settler.captures, settler.releases)
 		}
 	}
 

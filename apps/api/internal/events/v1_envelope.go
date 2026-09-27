@@ -10,7 +10,7 @@ package events
 // a new versioned data schema; existing (type, version) pairs never
 // change shape. Internal DB rows and task structs are NEVER exposed:
 // producers map domain facts to opaque public ids (task_, board_,
-// asset_, lmat_, lasset_, ws_, usr_) before minting.
+// asset_, lasset_, ws_, usr_) before minting.
 //
 // Publishing rule (exactly-once-from-domain-boundary): domain services
 // stage facts during settlement and emit envelopes ONLY after the commit
@@ -35,36 +35,32 @@ import (
 
 // Frozen workspace event types (type -> data schema version).
 const (
-	EventV1TaskCreated                 = "task.created"
-	EventV1TaskRunning                 = "task.running"
-	EventV1TaskCompleted               = "task.completed"
-	EventV1TaskFailed                  = "task.failed"
-	EventV1TaskCancelled               = "task.cancelled"
-	EventV1MediaAssetReady             = "media.asset_ready"
-	EventV1MediaAssetArchived          = "media.asset_archived"
-	EventV1BoardDocumentReplaced       = "board.document_replaced"
-	EventV1BoardMemberChanged          = "board.member_changed"
-	EventV1BoardShareRevoked           = "board.share_revoked"
-	EventV1BillingSettled              = "billing.settled"
-	EventV1LibraryMaterializedComplete = "library.materialization_completed"
-	EventV1LibraryMaterializedFailed   = "library.materialization_failed"
+	EventV1TaskCreated           = "task.created"
+	EventV1TaskRunning           = "task.running"
+	EventV1TaskCompleted         = "task.completed"
+	EventV1TaskFailed            = "task.failed"
+	EventV1TaskCancelled         = "task.cancelled"
+	EventV1MediaAssetReady       = "media.asset_ready"
+	EventV1MediaAssetArchived    = "media.asset_archived"
+	EventV1BoardDocumentReplaced = "board.document_replaced"
+	EventV1BoardMemberChanged    = "board.member_changed"
+	EventV1BoardShareRevoked     = "board.share_revoked"
+	EventV1BillingSettled        = "billing.settled"
 )
 
 // v1EventVersions freezes the data schema version per event type.
 var v1EventVersions = map[string]int{
-	EventV1TaskCreated:                 1,
-	EventV1TaskRunning:                 1,
-	EventV1TaskCompleted:               1,
-	EventV1TaskFailed:                  1,
-	EventV1TaskCancelled:               1,
-	EventV1MediaAssetReady:             1,
-	EventV1MediaAssetArchived:          1,
-	EventV1BoardDocumentReplaced:       1,
-	EventV1BoardMemberChanged:          1,
-	EventV1BoardShareRevoked:           1,
-	EventV1BillingSettled:              1,
-	EventV1LibraryMaterializedComplete: 1,
-	EventV1LibraryMaterializedFailed:   1,
+	EventV1TaskCreated:           1,
+	EventV1TaskRunning:           1,
+	EventV1TaskCompleted:         1,
+	EventV1TaskFailed:            1,
+	EventV1TaskCancelled:         1,
+	EventV1MediaAssetReady:       1,
+	EventV1MediaAssetArchived:    1,
+	EventV1BoardDocumentReplaced: 1,
+	EventV1BoardMemberChanged:    1,
+	EventV1BoardShareRevoked:     1,
+	EventV1BillingSettled:        1,
 }
 
 // V1EventVersion reports the frozen data schema version for typ.
@@ -87,7 +83,6 @@ func V1EventTypes() []string {
 		EventV1MediaAssetReady, EventV1MediaAssetArchived,
 		EventV1BoardDocumentReplaced, EventV1BoardMemberChanged, EventV1BoardShareRevoked,
 		EventV1BillingSettled,
-		EventV1LibraryMaterializedComplete, EventV1LibraryMaterializedFailed,
 	}
 }
 
@@ -100,16 +95,15 @@ const (
 )
 
 // Resource types carried by the envelope. billing.settled rides on the
-// settled entity (task / library_materialization); checkout_session is
+// settled entity (task); checkout_session is
 // reserved for the #809 Stripe-convergence mapping and is never emitted
 // today (Stripe inbound webhooks stay distinct integrations that emit
 // internal user events only).
 const (
-	V1ResourceTask                   = "task"
-	V1ResourceBoard                  = "board"
-	V1ResourceMediaAsset             = "media_asset"
-	V1ResourceLibraryMaterialization = "library_materialization"
-	V1ResourceCheckoutSession        = "checkout_session"
+	V1ResourceTask            = "task"
+	V1ResourceBoard           = "board"
+	V1ResourceMediaAsset      = "media_asset"
+	V1ResourceCheckoutSession = "checkout_session"
 )
 
 // V1Actor identifies who caused the event. User ids are usr_ opaque
@@ -196,18 +190,6 @@ type V1BillingSettledData struct {
 	HoldTransactionID string `json:"hold_transaction_id,omitempty"`
 }
 
-type V1LibraryMaterializedCompletedData struct {
-	MaterializationID string `json:"materialization_id"`
-	LibraryAssetID    string `json:"library_asset_id"`
-	MediaAssetID      string `json:"media_asset_id"`
-}
-
-type V1LibraryMaterializedFailedData struct {
-	MaterializationID string `json:"materialization_id"`
-	LibraryAssetID    string `json:"library_asset_id"`
-	ErrorCode         string `json:"error_code"`
-}
-
 // MintV1Envelope mints an envelope with an evt_ id (via
 // contract.MintPublicID), UTC occurred_at, and the frozen version for
 // typ. Unknown types fail closed.
@@ -269,7 +251,7 @@ func ValidateV1Envelope(envelope V1Envelope) error {
 	}
 	switch strings.TrimSpace(envelope.Resource.Type) {
 	case V1ResourceTask, V1ResourceBoard, V1ResourceMediaAsset,
-		V1ResourceLibraryMaterialization, V1ResourceCheckoutSession:
+		V1ResourceCheckoutSession:
 	default:
 		return fmt.Errorf("events: unknown resource type %q", envelope.Resource.Type)
 	}
@@ -306,27 +288,12 @@ func validateV1ResourceID(resourceType, id string) error {
 		if !contract.IsValidPublicID(contract.PrefixAsset, id) {
 			return fmt.Errorf("events: media_asset resource id must be asset_ opaque")
 		}
-	case V1ResourceLibraryMaterialization:
-		if !isV1MaterializationID(id) {
-			return fmt.Errorf("events: library_materialization resource id must be lmat_ opaque")
-		}
 	case V1ResourceCheckoutSession:
 		if id == "" {
 			return fmt.Errorf("events: checkout_session resource id is required")
 		}
 	}
 	return nil
-}
-
-// isV1MaterializationID validates the lmat_ shape without importing the
-// library context (platform must not depend on business contexts).
-func isV1MaterializationID(id string) bool {
-	return contract.IsValidPublicID(contract.PrefixLibraryMaterialization, id)
-}
-
-// IsV1LibraryAssetID validates the lasset_ shape (same layering note).
-func IsV1LibraryAssetID(id string) bool {
-	return contract.IsValidPublicID(contract.PrefixLibraryAsset, id)
 }
 
 func validateV1Data(typ string, raw json.RawMessage) error {
@@ -419,37 +386,14 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 			return err
 		}
 		switch stringField("reference_type") {
-		case V1ResourceTask, V1ResourceLibraryMaterialization, V1ResourceCheckoutSession:
+		case V1ResourceTask, V1ResourceCheckoutSession:
 		default:
-			return fmt.Errorf("events: billing.settled reference_type must be task|library_materialization|checkout_session")
+			return fmt.Errorf("events: billing.settled reference_type must be task|checkout_session")
 		}
 		switch stringField("settlement_state") {
 		case "quoted", "free", "held", "captured", "released":
 		default:
 			return fmt.Errorf("events: billing.settled settlement_state must be quoted|free|held|captured|released")
-		}
-	case EventV1LibraryMaterializedComplete:
-		if err := require(fields, "materialization_id", "library_asset_id", "media_asset_id"); err != nil {
-			return err
-		}
-		if !isV1MaterializationID(stringField("materialization_id")) {
-			return fmt.Errorf("events: materialization id must be lmat_ opaque")
-		}
-		if !IsV1LibraryAssetID(stringField("library_asset_id")) {
-			return fmt.Errorf("events: library asset id must be lasset_ opaque")
-		}
-		if !contract.IsValidPublicID(contract.PrefixAsset, stringField("media_asset_id")) {
-			return fmt.Errorf("events: media asset id must be asset_ opaque")
-		}
-	case EventV1LibraryMaterializedFailed:
-		if err := require(fields, "materialization_id", "library_asset_id", "error_code"); err != nil {
-			return err
-		}
-		if !isV1MaterializationID(stringField("materialization_id")) {
-			return fmt.Errorf("events: materialization id must be lmat_ opaque")
-		}
-		if !IsV1LibraryAssetID(stringField("library_asset_id")) {
-			return fmt.Errorf("events: library asset id must be lasset_ opaque")
 		}
 	}
 	return nil

@@ -6,18 +6,24 @@
 // (never duplicated here). Display media for materialized assets resolves
 // through the shared workspace media delivery boundary with the caller's
 // explicit workspace.
+//
+// Materialization runs internal-only on the backend: the public
+// create/poll job routes are cut, so there is no job to create or poll
+// here. `materializeLibraryAssetForCanvas` is a poll-free single attempt
+// over the media read path; when the managed asset is not readable yet it
+// rejects and the Canvas pending-fact retry loop (`failLibraryImport` /
+// `retryLibraryImport` / `resumePending`) owns the retry.
 
 import { getWorkspaceMediaAssetMetadata } from '../../../shared/api/mediaAssetDelivery'
 import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import { i18n } from '../../../shared/i18n'
-import { createPollDelay } from '../../../shared/utils/polling'
 import {
+  assertLibraryAssetId,
   libraryAssetKey,
   toWorkspaceLibraryAssetInput,
   type LibrarySearchReference,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryFolder,
-  type WorkspaceLibraryMaterialization,
 } from '../domain/validators'
 import {
   WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
@@ -127,82 +133,39 @@ export type LibraryMaterializedMedia = {
 
 export type LibraryAssetMaterializer = (assetId: string) => Promise<LibraryMaterializedMedia>
 
-export type LibraryMaterializeOptions = WorkspaceLibraryRequestOptions & {
-  pollAttempts?: number | undefined
-  pollDelayMs?: number | undefined
-}
-
-function materializeDelay(ms: number, signal?: AbortSignal | null): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('The request was aborted.', 'AbortError'))
-      return
-    }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort)
-      resolve()
-    }, ms)
-    function onAbort() {
-      clearTimeout(timer)
-      reject(new DOMException('The request was aborted.', 'AbortError'))
-    }
-    signal?.addEventListener('abort', onAbort, { once: true })
-  })
-}
+export type LibraryMaterializeOptions = WorkspaceLibraryRequestOptions
 
 /**
- * Turns an owned workspace Library asset into a managed Media asset for
- * Canvas: creates the materialization job, polls it to a terminal state,
- * then resolves display media through the shared delivery boundary.
+ * Resolves an owned workspace Library asset to managed Media for Canvas:
+ * a poll-free single attempt through the shared delivery boundary. The
+ * public materialization job API is cut (backend fetcher internal-only,
+ * no status route), so when the managed asset is not readable yet this
+ * rejects with the import failure and the Canvas pending-fact retry loop
+ * surfaces the retry.
  */
 export async function materializeLibraryAssetForCanvas(
   workspaceId: string,
   assetId: string,
   options: LibraryMaterializeOptions = {},
 ): Promise<LibraryMaterializedMedia> {
-  const fallback = i18n.global.t('library.errors.importAssetFailed')
-  const job = await workspaceLibraryApi.createMaterialization(workspaceId, assetId, options)
-  const snapshot = await pollLibraryMaterialization(workspaceId, job.id, options)
-  if (snapshot.status === 'failed') {
-    throw new Error(snapshot.errorMessage?.trim() || fallback)
-  }
-  if (snapshot.status !== 'completed') throw new Error(fallback)
-  return resolveMaterializedMedia(workspaceId, snapshot.mediaAssetId, options)
+  return resolveMaterializedMedia(workspaceId, assertLibraryAssetId(assetId), options)
 }
 
-async function pollLibraryMaterialization(
-  workspaceId: string,
-  materializationId: string,
-  options: LibraryMaterializeOptions,
-): Promise<WorkspaceLibraryMaterialization> {
-  const fallback = i18n.global.t('library.errors.importAssetFailed')
-  const attempts = options.pollAttempts ?? 20
-  const delayMs = options.pollDelayMs ?? 1000
-  // Fixed-cadence polling rides the shared delay primitive; the
-  // terminal-state predicate stays local to this module.
-  const retryDelay = createPollDelay({ initialDelayMs: delayMs, maxDelayMs: delayMs })
-  let snapshot = await workspaceLibraryApi.getMaterialization(
-    workspaceId,
-    materializationId,
-    options,
-  )
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    if (snapshot.status === 'completed' || snapshot.status === 'failed') return snapshot
-    await materializeDelay(retryDelay.next(), options.signal)
-    snapshot = await workspaceLibraryApi.getMaterialization(workspaceId, materializationId, options)
-  }
-  if (snapshot.status === 'completed' || snapshot.status === 'failed') return snapshot
-  throw new Error(fallback)
-}
-
+/**
+ * Single managed-media read through the shared delivery boundary. With the
+ * public job API cut, the resolved id doubles as the media lookup key: a
+ * readable managed asset resolves to display media, anything else (unknown
+ * id, not-yet-materialized asset) rejects and the Canvas pending-fact
+ * retry loop owns the retry.
+ */
 async function resolveMaterializedMedia(
   workspaceId: string,
-  mediaAssetId: string | undefined,
+  assetId: string | undefined,
   options: LibraryMaterializeOptions,
 ): Promise<LibraryMaterializedMedia> {
   const fallback = i18n.global.t('library.errors.importAssetFailed')
-  if (!mediaAssetId) throw new Error(fallback)
-  const metadata = await getWorkspaceMediaAssetMetadata(workspaceId, mediaAssetId, {
+  if (!assetId) throw new Error(fallback)
+  const metadata = await getWorkspaceMediaAssetMetadata(workspaceId, assetId, {
     ...(options.signal == null ? {} : { signal: options.signal }),
   })
   const originalUrl = metadata.original?.url?.trim() ? metadata.original.url.trim() : ''
@@ -215,7 +178,7 @@ async function resolveMaterializedMedia(
     throw new Error(fallback)
   }
   return {
-    mediaAssetId,
+    mediaAssetId: assetId,
     url: resolveAssetUrl(deliveryUrl),
     width: metadata.width,
     height: metadata.height,

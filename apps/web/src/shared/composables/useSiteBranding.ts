@@ -41,7 +41,12 @@ export type SiteBrandingOptions = {
 export async function fetchSiteBranding(fallback: string): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
     await resolveContractData<BrandingSetting>(
-      api.request<ApiResponseBrandingSetting>('/settings/branding', { method: 'GET' }),
+      // Supplementary public read: a 401 (e.g. expired session cookie on a
+      // public page) must degrade locally, never reload to login.
+      api.request<ApiResponseBrandingSetting>('/settings/branding', {
+        method: 'GET',
+        authFailure: 'silent',
+      }),
       fallback,
     ),
   )
@@ -52,6 +57,7 @@ async function fetchSiteBrandingEnvelope(
 ): Promise<ApiResponseBrandingSetting> {
   return api.request<ApiResponseBrandingSetting>('/settings/branding', {
     method: 'GET',
+    authFailure: 'silent',
     ...(signal == null ? {} : { signal }),
   })
 }

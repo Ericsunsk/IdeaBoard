@@ -115,7 +115,12 @@ function isAuthRequest(requestUrl: string) {
 }
 
 function isSessionProbeRequest(requestUrl: string) {
-  return requestUrl.includes('/user/info')
+  // The boot-time session probe (`main.ts` → `fetchUserInfo` → `GET
+  // /api/v1/user`): a 401 here must clear auth without redirecting,
+  // otherwise the probe reload-loops the login page.
+  // Boundary-aware: sub-resources (`/api/v1/user/avatar`) keep the normal
+  // redirect-login behavior.
+  return /\/api\/v1\/user([?#]|$)/.test(requestUrl)
 }
 
 function isAdminApiRequest(requestUrl: string) {

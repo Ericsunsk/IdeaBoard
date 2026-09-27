@@ -17,7 +17,7 @@ Better Auth 客户端（`AUTH_BASE_URL`）不受影响。Canvas 仍是产品主�
    - 前端确认所有 admin 面经 resource/adapter 走 control client、account 面走 public client，
      page 层不直引 generated（`lint:import-boundaries` / `lint:dependencies` 变绿）。
 2. Auth（鉴权面）
-   - Better Auth 保持 `AUTH_BASE_URL` 同源；`sessionPolicy` 会话探针只认 `GET /api/v1/me`，
+   - Better Auth 保持 `AUTH_BASE_URL` 同源；`sessionPolicy` 会话探针只认 `GET /api/v1/user`，
      admin 403-homeless 只认 `/control/` 前缀。换句话说：浏览器里再出现 `/api/user/info`、`/api/admin/*`
      请求一律视为 bug，直接按 P0 处理。
    - 按 [auth-operations.md](./auth-operations.md) 轮换 operator key / control key，确认 capability

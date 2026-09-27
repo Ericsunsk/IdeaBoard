@@ -57,7 +57,9 @@ func (h *FeaturePromptHandler) List(c *gin.Context) {
 }
 
 func (h *FeaturePromptHandler) Save(c *gin.Context) {
-	identityPrincipal, ok := principal.RequireAdmin(c)
+	// Authorization rides the outer Control Plane guard (controlProxy +
+	// guard); the actor is resolved from the request principal.
+	identityPrincipal, ok := principal.Require(c)
 	if !ok {
 		return
 	}

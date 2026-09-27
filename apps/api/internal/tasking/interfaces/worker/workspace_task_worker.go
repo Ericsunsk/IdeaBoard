@@ -173,6 +173,11 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 		return fmt.Errorf("workspace task load: %w", err)
 	}
 	if task.IsTerminal() {
+		if task.Status == workspacetasks.StatusCompleted {
+			// Complete commits before auto-materialization. A redelivery in
+			// this gap replays the idempotent trigger and repairs the link.
+			w.materializeCompletedTask(ctx, task)
+		}
 		slog.Info("workspace task already terminal; dropping dirty job", "task_id", taskID, "status", task.Status)
 		return nil
 	}

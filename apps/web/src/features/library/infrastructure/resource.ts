@@ -16,16 +16,14 @@
 //   `all` aggregate client-side; saving without a folder leaves the asset
 //   unfiled (visible under `all`). Deleting a folder unfiles its assets.
 // - Asset save is idempotent on `(workspace, provider, source_id)`.
-// - Materialization is an async job (`pending -> running ->
-//   completed|failed`); use-case polling lives in
-//   `../application/libraryUseCases`.
+// - Materialization runs internal-only on the backend (no public job
+//   routes); Canvas resolves managed media through the shared workspace
+//   media delivery boundary (see `../application/libraryUseCases`).
 
 import {
   createWorkspaceLibraryFolder as createWorkspaceLibraryFolderTransport,
-  createWorkspaceLibraryMaterialization as createWorkspaceLibraryMaterializationTransport,
   deleteWorkspaceLibraryAsset as deleteWorkspaceLibraryAssetTransport,
   deleteWorkspaceLibraryFolder as deleteWorkspaceLibraryFolderTransport,
-  getWorkspaceLibraryMaterialization as getWorkspaceLibraryMaterializationTransport,
   listWorkspaceLibraryAssets as listWorkspaceLibraryAssetsTransport,
   listWorkspaceLibraryFolders as listWorkspaceLibraryFoldersTransport,
   moveWorkspaceLibraryAsset as moveWorkspaceLibraryAssetTransport,
@@ -37,22 +35,20 @@ import {
   buildContractRequestHeaders,
   requireContractData,
 } from '../../../shared/api/contractKernel'
+import type { AuthFailureMode } from '../../../shared/api/client'
 import { createUniqueId } from '../../../shared/utils/ids'
 import { i18n } from '../../../shared/i18n'
 import {
   assertLibraryAssetId,
   assertLibraryFolderId,
-  assertLibraryMaterializationId,
   assertWorkspaceId,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryFolder,
-  toWorkspaceLibraryMaterialization,
   toWorkspaceLibraryPage,
   toWorkspaceLibraryResolveResult,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryAssetInput,
   type WorkspaceLibraryFolder,
-  type WorkspaceLibraryMaterialization,
   type WorkspaceLibraryPage,
   type WorkspaceLibraryResolveResult,
 } from '../domain/validators'
@@ -61,6 +57,11 @@ export type WorkspaceLibraryRequestOptions = {
   requestId?: string | undefined
   idempotencyKey?: string | undefined
   signal?: AbortSignal | null | undefined
+  // Per-request 401 policy, forwarded to the generated transport:
+  // supplementary reads (saved-keys backfill) pass `silent` so a dead
+  // session degrades locally instead of reloading the page. Writes keep
+  // the default redirect.
+  authFailure?: AuthFailureMode | undefined
 }
 
 function workspaceLibraryHeaders(
@@ -86,10 +87,12 @@ function withLibraryIdempotency(
 function toGeneratedOptions(options: WorkspaceLibraryRequestOptions): {
   headers: Record<string, string>
   signal?: AbortSignal | undefined
+  authFailure?: AuthFailureMode | undefined
 } {
   return {
     headers: workspaceLibraryHeaders(options),
     ...(options.signal == null ? {} : { signal: options.signal }),
+    ...(options.authFailure == null ? {} : { authFailure: options.authFailure }),
   }
 }
 
@@ -278,42 +281,5 @@ export const workspaceLibraryApi = {
     )
     if (!Array.isArray(result.items)) throw new Error(i18n.global.t('library.errors.lookupStatusFailed'))
     return result.items.map(toWorkspaceLibraryResolveResult)
-  },
-
-  createMaterialization: async (
-    workspaceId: string,
-    libraryAssetId: string,
-    options: WorkspaceLibraryRequestOptions = {},
-  ): Promise<WorkspaceLibraryMaterialization> => {
-    const effective = withLibraryIdempotency(options, 'library:materialize')
-    const envelope = await createWorkspaceLibraryMaterializationTransport(
-      assertWorkspaceId(workspaceId),
-      { data: { library_asset_id: assertLibraryAssetId(libraryAssetId) } },
-      toGeneratedOptions(effective),
-    )
-    return toWorkspaceLibraryMaterialization(
-      requireContractData<Record<string, unknown>>(
-        envelope,
-        i18n.global.t('library.errors.importAssetFailed'),
-      ),
-    )
-  },
-
-  getMaterialization: async (
-    workspaceId: string,
-    materializationId: string,
-    options: WorkspaceLibraryRequestOptions = {},
-  ): Promise<WorkspaceLibraryMaterialization> => {
-    const envelope = await getWorkspaceLibraryMaterializationTransport(
-      assertWorkspaceId(workspaceId),
-      assertLibraryMaterializationId(materializationId),
-      toGeneratedOptions(options),
-    )
-    return toWorkspaceLibraryMaterialization(
-      requireContractData<Record<string, unknown>>(
-        envelope,
-        i18n.global.t('library.errors.importAssetFailed'),
-      ),
-    )
   },
 }

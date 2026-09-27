@@ -186,33 +186,53 @@ func v1WorkspaceFixture(t *testing.T, ctx context.Context, store *tenancy.InMemo
 	return ws
 }
 
-func TestV1MeProvisionsPersonalWorkspace(t *testing.T) {
+func TestV1UserProvisionsPersonalWorkspace(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
 
-	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me", userID: 42})
+	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: 42})
 	if status != http.StatusOK {
-		t.Fatalf("GET /me status = %d, body=%v", status, payload)
+		t.Fatalf("GET /user status = %d, body=%v", status, payload)
 	}
 	data := v1Data(t, payload).(map[string]any)
 	if data["id"] != tenancy.FormatUserPublicID(testUUIDForUser(42)) {
-		t.Fatalf("me.id = %v", data["id"])
+		t.Fatalf("user.id = %v", data["id"])
 	}
 	personal, _ := data["personal_workspace_id"].(string)
 	if !strings.HasPrefix(personal, "ws_") {
 		t.Fatalf("personal_workspace_id = %v, want ws_...", data["personal_workspace_id"])
 	}
 	// Second call converges to the same personal workspace.
-	_, _, second := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me", userID: 42})
+	_, _, second := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: 42})
 	if second["data"].(map[string]any)["personal_workspace_id"] != personal {
 		t.Fatal("personal workspace not stable across calls")
 	}
 
 	// Anonymous callers fail closed with 401 + contract error code.
-	status, _, anon := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me"})
+	status, _, anon := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user"})
 	if status != http.StatusUnauthorized || v1ErrorCode(t, anon) != string(contract.CodeUnauthorized) {
-		t.Fatalf("anon /me = %d %v, want 401 unauthorized", status, anon)
+		t.Fatalf("anon /user = %d %v, want 401 unauthorized", status, anon)
+	}
+}
+
+// TestV1LegacyMePathsStayDeleted pins the /me → /user hard cut: the old
+// singleton paths must 404 (no dual routes, no compat shims), even for
+// authenticated callers.
+func TestV1LegacyMePathsStayDeleted(t *testing.T) {
+	store := tenancy.NewInMemoryStoreForTests()
+	engine := newV1TestEngine(store, newStaticUserDirectory())
+	for _, call := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/me"},
+		{http.MethodPut, "/api/v1/me/avatar"},
+	} {
+		req := httptest.NewRequest(call.method, call.path, nil)
+		req.Header.Set("X-Test-User", "1")
+		recorder := httptest.NewRecorder()
+		engine.ServeHTTP(recorder, req)
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf("%s %s = %d, want 404 (legacy /me path must stay deleted)", call.method, call.path, recorder.Code)
+		}
 	}
 }
 
@@ -431,7 +451,7 @@ func TestV1WorkspaceIdempotency(t *testing.T) {
 	}
 }
 
-func TestV1MeConcurrentProvision(t *testing.T) {
+func TestV1UserConcurrentProvision(t *testing.T) {
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	engine := newV1TestEngine(store, dir)
@@ -443,9 +463,9 @@ func TestV1MeConcurrentProvision(t *testing.T) {
 		wg.Add(1)
 		go func(slot int) {
 			defer wg.Done()
-			status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me", userID: 77})
+			status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: 77})
 			if status != http.StatusOK {
-				t.Errorf("GET /me status = %d", status)
+				t.Errorf("GET /user status = %d", status)
 				return
 			}
 			ids[slot], _ = payload["data"].(map[string]any)["personal_workspace_id"].(string)
@@ -479,10 +499,10 @@ func TestV1WorkspacePagination(t *testing.T) {
 		return status, payload
 	}
 	// Provision the personal workspace first. The 3 fixtures are already
-	// personal (no organization), so /me converges onto the first one and
+	// personal (no organization), so /user converges onto the first one and
 	// the list stays at 3: pages of 2 + 1.
-	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me", userID: userID}); status != 200 {
-		t.Fatalf("GET /me = %d", status)
+	if status, _, _ := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: userID}); status != 200 {
+		t.Fatalf("GET /user = %d", status)
 	}
 	status, first := get("?page_size=2")
 	if status != 200 {
@@ -656,7 +676,7 @@ func TestResolvePrincipalTenantScope(t *testing.T) {
 	t.Run("missing principal fails closed", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
-		c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/user", nil)
 		ResolvePrincipal()(c)
 		if !c.IsAborted() || recorder.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want 401", recorder.Code)
@@ -666,9 +686,9 @@ func TestResolvePrincipalTenantScope(t *testing.T) {
 
 func TestV1NilStoreFailsClosed(t *testing.T) {
 	engine := newV1TestEngine(nil, newStaticUserDirectory())
-	status, _, me := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/me", userID: 1})
+	status, _, me := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/user", userID: 1})
 	if status != 200 {
-		t.Fatalf("GET /me without store = %d %v, want 200 (no DB needed)", status, me)
+		t.Fatalf("GET /user without store = %d %v, want 200 (no DB needed)", status, me)
 	}
 	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces", userID: 1})
 	if status != 501 || v1ErrorCode(t, payload) != string(contract.CodeContractNotImplemented) {

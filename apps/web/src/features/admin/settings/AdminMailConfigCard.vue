@@ -147,7 +147,10 @@ import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { secretField } from '../shared/lib/secretSchema'
-import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import {
+  ADMIN_PROBE_OPERATOR_REASON,
+  confirmSettingsSave,
+} from '../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import { useAdminMailSettingsFeedback } from './useSettingsFeedback'
@@ -288,6 +291,7 @@ async function clear() {
     title: '删除邮件配置',
     message: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人与原因。',
     confirmLabel: '删除配置',
+    risk: 'destructive',
   })
   if (!operatorReason) return
   saving.value = true
@@ -308,16 +312,12 @@ async function sendTest() {
     testError.value = '请输入有效的测试收件地址'
     return
   }
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: '发送 Test Email',
-    message: `将向 ${target} 发送一封真实 Test Email。该操作将记录操作人与原因。`,
-    confirmLabel: '发送 Test Email',
-  })
-  if (!operatorReason) return
+  // Connectivity probes skip the confirm dialog (backend POST read-guard:
+  // no reason ceremony); the fixed probe note still lands on the audit record.
   testError.value = ''
   testing.value = true
   try {
-    await resource.value.test(target, { operatorReason })
+    await resource.value.test(target, { operatorReason: ADMIN_PROBE_OPERATOR_REASON })
     await load()
     feedback.testSent()
   } catch (err) {

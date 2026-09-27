@@ -1,8 +1,12 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
-import { readConfirmReason } from '../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import {
+  ADMIN_PROBE_OPERATOR_REASON,
+  confirmSettingsSave,
+  requireDestructiveReason,
+  type AdminConfirmRisk,
+} from '../shared/lib/confirmSettingsSave'
 import {
   createAdminStorageResource,
   type AdminStorageResource,
@@ -146,21 +150,21 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   }
 
   async function testStorageById(id: string) {
-    const operatorReason = await confirmStorageWrite({
-      title: '测试存储连接',
-      message: '将使用已保存的配置发起一次真实连接测试。该操作将记录操作人与原因。',
-      confirmLabel: '测试连接',
-    })
-    if (!operatorReason) return null
-    return resource.testProfile(id, { operatorReason })
+    // Connectivity probes skip the confirm dialog (backend POST
+    // read-guard: no reason ceremony); the fixed probe note still lands on
+    // the audit record.
+    return resource.testProfile(id, { operatorReason: ADMIN_PROBE_OPERATOR_REASON })
   }
 
   async function deleteProfile(id: string) {
-    const operatorReason = await confirmStorageWrite({
-      title: '确认删除存储',
-      message: '确定删除该存储配置吗？此操作不可恢复，且将记录操作人与原因。',
-      confirmLabel: '确定删除',
-    })
+    const operatorReason = await confirmStorageWrite(
+      {
+        title: '确认删除存储',
+        message: '确定删除该存储配置吗？此操作不可恢复，且将记录操作人与原因。',
+        confirmLabel: '确定删除',
+      },
+      'destructive',
+    )
     if (!operatorReason) return null
     const response = await resource.deleteProfile(id, { operatorReason })
     await refreshAfterCommand()
@@ -232,7 +236,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
       reason: { required: true },
     })
     if (!confirmed) return
-    const operatorReason = (options.confirm.readReason?.() ?? readConfirmReason()).trim()
+    const operatorReason = requireDestructiveReason(options.confirm)
     if (!operatorReason) return
     try {
       const response = await resource.deleteProfile(storage.id, { operatorReason })
@@ -250,13 +254,17 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   // Control storage mutations require an operator reason (audit). Collect
   // it through the shared confirm dialog; a cancelled dialog aborts
-  // silently (null) so no failure feedback fires.
-  function confirmStorageWrite(dialog: {
-    title: string
-    message: string
-    confirmLabel: string
-  }): Promise<string | null> {
-    return confirmSettingsSave(options.confirm, dialog)
+  // silently (null) so no failure feedback fires. Reversible writes default
+  // to the optional-note tier; destructive deletes pass risk explicitly.
+  function confirmStorageWrite(
+    dialog: {
+      title: string
+      message: string
+      confirmLabel: string
+    },
+    risk: AdminConfirmRisk = 'reversible',
+  ): Promise<string | null> {
+    return confirmSettingsSave(options.confirm, { ...dialog, risk })
   }
 
   function providerLabel(provider: string) {

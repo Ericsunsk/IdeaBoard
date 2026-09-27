@@ -13,8 +13,8 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { LibraryAssetId } from './libraryAssetId'
+import type { User } from './user'
 
-export type CreateLibraryMaterializationRequestData = {
-  library_asset_id: LibraryAssetId
+export interface UserEnvelope {
+  data: User
 }

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -181,11 +180,8 @@ func isBrandLogoSVG(body []byte) bool {
 // Degraded outcomes (allowlist gap, upstream failure, upstream miss) still
 // return HTTP 200 with the default mark and a fallback marker header so
 // admin cards never break; only invalid input (bad provider) is a 400.
+// Authorization rides the outer Control Plane guard (controlProxyRaw + guard).
 func (h *Handler) GetBrandLogo(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
-		return
-	}
 	body, fallback, err := loadBrandLogo(c.Request.Context(), c.Query("provider"))
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())

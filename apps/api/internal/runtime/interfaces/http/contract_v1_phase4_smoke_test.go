@@ -8,7 +8,8 @@ package httpapi
 // Covers: every surface answers non-501; the cross-module composition
 // (upload -> asset -> task input -> task output); the 404-vs-403 matrix
 // spot-check (outsiders converge to 404, member-without-capability to
-// 403, unwired materialization/billing seams to 503); and a light
+// 403, unwired binary-read seam to 503, deleted materialization route to
+// 404); and a light
 // store-level concurrency sanity with reported timings (no p95 gate).
 
 import (
@@ -289,12 +290,21 @@ func TestPhase4AccessMatrix(t *testing.T) {
 		t.Fatalf("member archive = %d (%v), want 403", status, body)
 	}
 
-	// Unwired seams fail closed with 503 (never 501/500): materialization
-	// needs Quoter/Billing/Materializer; binary reads need MediaObjects.
-	if status, body := phase4Call(t, fx, http.MethodPost,
+	// Deleted materialization route stays gone (404, never 503): the
+	// former POST /library/materializations surface was cut
+	// owner-approved (unregistered paths serve Gin's plain-text 404,
+	// not a JSON envelope, so assert via the raw recorder). Unwired
+	// binary reads still fail closed with 503 (never 501/500,
+	// MediaObjects nil in this fixture).
+	matReq := httptest.NewRequest(http.MethodPost,
 		ContractV1GroupPath+"/workspaces/"+ws+"/library/materializations",
-		`{"data":{"library_asset_id":"lasset_missing00000001"}}`, 1); status != http.StatusServiceUnavailable {
-		t.Fatalf("materialization without adapters = %d (%v), want 503", status, body)
+		strings.NewReader(`{"data":{"library_asset_id":"lasset_missing00000001"}}`))
+	matReq.Header.Set("X-Test-User", "1")
+	matReq.Header.Set("Idempotency-Key", "phase4-deleted-mat-1")
+	matRecorder := httptest.NewRecorder()
+	fx.engine.ServeHTTP(matRecorder, matReq)
+	if matRecorder.Code != http.StatusNotFound {
+		t.Fatalf("deleted materialization route = %d, want 404", matRecorder.Code)
 	}
 	req := httptest.NewRequest(http.MethodGet,
 		ContractV1GroupPath+"/workspaces/"+ws+"/media-assets/"+assetID+"/content", nil)

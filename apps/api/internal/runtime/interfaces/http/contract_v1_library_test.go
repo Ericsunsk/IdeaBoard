@@ -1,17 +1,15 @@
 package httpapi
 
-// Workspace-scoped library + materialization contract tests (issue #806).
+// Workspace-scoped library contract tests (issue #806).
 //
 // Reuses the v1 envelope helpers from contract_v1_test.go (doV1 asserts
 // the Request-Id echo and JSON envelope shapes; v1ErrorCode asserts
 // error.request_id). Covers folder/asset CRUD + move/delete,
-// duplicate-save idempotency, bounded resolve rejection,
-// materialization replay + asset link + billing branches, the
+// duplicate-save idempotency, bounded resolve rejection, the
 // 404-vs-403 matrix, and fail-closed behavior without a store.
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -19,7 +17,6 @@ import (
 	"sync"
 	"testing"
 
-	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/contract"
@@ -106,10 +103,6 @@ func (f *v1LibraryFixture) assetsPath() string {
 	return "/api/v1/workspaces/" + f.ws.PublicID + "/library/assets"
 }
 
-func (f *v1LibraryFixture) materializationsPath() string {
-	return "/api/v1/workspaces/" + f.ws.PublicID + "/library/materializations"
-}
-
 const v1TestAssetURL = "https://images.unsplash.com/photo-test"
 
 func v1SaveAssetBody(sourceID, folderID string) string {
@@ -121,24 +114,10 @@ func v1SaveAssetBody(sourceID, folderID string) string {
 		sourceID, v1TestAssetURL, v1TestAssetURL, v1TestAssetURL, folder)
 }
 
-type fakeLibraryMaterializer struct {
-	mu      sync.Mutex
-	mediaID string
-	err     error
-	calls   int
-	last    *library.V1Asset
-}
-
-func (f *fakeLibraryMaterializer) MaterializeWorkspaceAsset(ctx context.Context, workspacePublicID string, asset *library.V1Asset) (string, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls++
-	f.last = asset
-	if f.err != nil {
-		return "", f.err
-	}
-	return f.mediaID, nil
-}
+// fakeLibraryBilling and fakeLibraryQuoter implement the shared
+// V1CreditSettler/V1BillingQuoter seams. The library surface no longer
+// wires them (permanent free tier); the search surface tests in
+// contract_v1_search_test.go still consume them — keep both types.
 
 type fakeLibraryBilling struct {
 	mu       sync.Mutex
@@ -421,133 +400,6 @@ func TestV1LibraryResolveBounded(t *testing.T) {
 	status, over := resolve(big)
 	if status != http.StatusBadRequest || v1ErrorCode(t, over) != string(contract.CodeBadRequest) {
 		t.Fatalf("oversize batch = %d %v, want 400 bad_request", status, over)
-	}
-}
-
-func TestV1LibraryMaterialization(t *testing.T) {
-	materializer := &fakeLibraryMaterializer{mediaID: "asset_abc123def456"}
-	billing := &fakeLibraryBilling{}
-	quoter := &fakeLibraryQuoter{amount: 5}
-	fx := newV1LibraryFixture(t, ContractV1LibraryDeps{Materializer: materializer, Billing: billing, Quoter: quoter})
-
-	status, _, saved := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.assetsPath(), userID: fx.owner,
-		body: v1SaveAssetBody("m1", ""), headers: map[string]string{contract.IdempotencyKeyHeader: "mat-save-1"}})
-	if status != http.StatusCreated {
-		t.Fatalf("save = %d %v", status, saved)
-	}
-	assetID := saved["data"].(map[string]any)["id"].(string)
-
-	post := func(key, body string) (int, map[string]any) {
-		call := v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.member, body: body}
-		if key != "" {
-			call.headers = map[string]string{contract.IdempotencyKeyHeader: key}
-		}
-		status, _, payload := doV1(t, fx.engine, call)
-		return status, payload
-	}
-	status, created := post("mat-key-1", fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID))
-	if status != http.StatusAccepted {
-		t.Fatalf("materialize = %d %v, want 202", status, created)
-	}
-	data := created["data"].(map[string]any)
-	if !strings.HasPrefix(data["id"].(string), "lmat_") {
-		t.Fatalf("materialization id = %v, want lmat_...", data["id"])
-	}
-	if data["status"] != "completed" || data["media_asset_id"] != "asset_abc123def456" {
-		t.Fatalf("materialization = %v, want completed + asset_ link", data)
-	}
-	if billing.captures != 1 || billing.releases != 0 {
-		t.Fatalf("billing captures=%d releases=%d, want 1/0", billing.captures, billing.releases)
-	}
-
-	// Replay converges on the same job.
-	status, replay := post("mat-key-1", fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID))
-	if status != http.StatusAccepted || replay["data"].(map[string]any)["id"] != data["id"] {
-		t.Fatalf("replay = %d %v, want same job %v", status, replay, data["id"])
-	}
-	if materializer.calls != 1 {
-		t.Fatalf("materializer calls = %d, want 1 (replay must not re-run)", materializer.calls)
-	}
-
-	// Status-addressable GET.
-	status, _, got := doV1(t, fx.engine, v1Call{method: http.MethodGet,
-		path: fx.materializationsPath() + "/" + data["id"].(string), userID: fx.owner})
-	if status != http.StatusOK || got["data"].(map[string]any)["status"] != "completed" {
-		t.Fatalf("get = %d %v, want completed", status, got)
-	}
-	status, _, unknown := doV1(t, fx.engine, v1Call{method: http.MethodGet,
-		path: fx.materializationsPath() + "/lmat_doesnotexist0000000", userID: fx.owner})
-	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(contract.CodeLibraryMaterializationNotFound) {
-		t.Fatalf("unknown job = %d %v, want 404", status, unknown)
-	}
-
-	// Materializer failure folds into a failed job record (202) and
-	// releases the hold.
-	materializer.err = errors.New("provider fetch exploded")
-	status, failed := post("mat-key-2", fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID))
-	if status != http.StatusAccepted || failed["data"].(map[string]any)["status"] != "failed" {
-		t.Fatalf("failed job = %d %v, want 202 failed", status, failed)
-	}
-	if billing.releases != 1 {
-		t.Fatalf("releases = %d, want 1 after failure", billing.releases)
-	}
-	materializer.err = nil
-}
-
-func TestV1LibraryMaterializationBillingBranches(t *testing.T) {
-	newBillingFixture := func(quoter *fakeLibraryQuoter, billing *fakeLibraryBilling, materializer *fakeLibraryMaterializer) *v1LibraryFixture {
-		return newV1LibraryFixture(t, ContractV1LibraryDeps{Materializer: materializer, Billing: billing, Quoter: quoter})
-	}
-	saveOne := func(fx *v1LibraryFixture) string {
-		status, _, saved := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.assetsPath(), userID: fx.owner,
-			body: v1SaveAssetBody("b1", ""), headers: map[string]string{contract.IdempotencyKeyHeader: "billsave"}})
-		if status != http.StatusCreated {
-			t.Fatalf("save = %d %v", status, saved)
-		}
-		return saved["data"].(map[string]any)["id"].(string)
-	}
-
-	fx := newBillingFixture(&fakeLibraryQuoter{err: errors.New("catalog down")}, &fakeLibraryBilling{}, &fakeLibraryMaterializer{mediaID: "asset_x"})
-	assetID := saveOne(fx)
-	status, _, payload := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.owner,
-		body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-		headers: map[string]string{contract.IdempotencyKeyHeader: "bill-q"}})
-	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeBillingQuoteUnavailable) {
-		t.Fatalf("quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
-	}
-
-	// Unpriced/unregistered SKUs are deterministic 422s (no retry),
-	// whether the quoter surfaces ErrPricingUnavailable (the production
-	// catalog normalizes unknown SKUs to it) or ErrSKUNotFound.
-	for i, quoteErr := range []error{billing.ErrPricingUnavailable, billing.ErrSKUNotFound} {
-		fx = newBillingFixture(&fakeLibraryQuoter{err: quoteErr}, &fakeLibraryBilling{}, &fakeLibraryMaterializer{mediaID: "asset_x"})
-		assetID = saveOne(fx)
-		status, _, payload = doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.owner,
-			body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-			headers: map[string]string{contract.IdempotencyKeyHeader: fmt.Sprintf("bill-p-%d", i)}})
-		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
-			t.Fatalf("pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
-		}
-	}
-
-	fx = newBillingFixture(&fakeLibraryQuoter{amount: 5},
-		&fakeLibraryBilling{holdErr: errV1BillingRestricted}, &fakeLibraryMaterializer{mediaID: "asset_x"})
-	assetID = saveOne(fx)
-	status, _, payload = doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.owner,
-		body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-		headers: map[string]string{contract.IdempotencyKeyHeader: "bill-h"}})
-	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingWalletRestricted) {
-		t.Fatalf("hold rejection = %d %v, want 403 billing_wallet_restricted", status, payload)
-	}
-
-	// Missing seams fail closed without touching billing.
-	fx = newV1LibraryFixture(t, ContractV1LibraryDeps{})
-	assetID = saveOne(fx)
-	status, _, payload = doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.owner,
-		body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-		headers: map[string]string{contract.IdempotencyKeyHeader: "bill-nil"}})
-	if status != http.StatusServiceUnavailable {
-		t.Fatalf("nil seams = %d %v, want 503", status, payload)
 	}
 }
 

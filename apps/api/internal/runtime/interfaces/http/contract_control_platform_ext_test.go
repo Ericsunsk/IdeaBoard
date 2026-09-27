@@ -244,8 +244,10 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("least privilege family grant is scoped", func(t *testing.T) {
-		// control:platform only: gateway read allowed, rewards + oauth denied.
+	t.Run("admin-only grant ignores family scoping", func(t *testing.T) {
+		// Admin-only convergence: family strings are audit labels, so a
+		// scoped-cap admin passes every family (nil deps fail closed past
+		// the guard with 501/503, proving the guard itself passed).
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models",
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityPlatform},
@@ -259,21 +261,26 @@ func TestControlExtendedAuthMatrix(t *testing.T) {
 			{method: http.MethodGet, path: "/api/control/v1/users/oauth-providers/google",
 				userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityPlatform}},
 		} {
-			status, _, payload := h.serve(call)
-			if status != http.StatusForbidden {
-				t.Fatalf("%s %s scoped status = %d, want 403", call.method, call.path, status)
-			}
-			if code := controlErrorCode(t, payload); code != string(contract.CodeForbidden) {
-				t.Fatalf("scoped code = %q, want forbidden", code)
+			status, _, _ := h.serve(call)
+			if status == http.StatusForbidden || status == http.StatusUnauthorized {
+				t.Fatalf("%s %s scoped status = %d, want guard-passed (501/503, admin-only)", call.method, call.path, status)
 			}
 		}
-		// control:credits only: rewards search allowed (nil dep -> 501), gateway denied.
+		// control:credits only: rewards search passes the guard (nil dep
+		// -> 501), gateway likewise passes the guard now.
 		status, _, _ = h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/rewards/codes/search", body: `{}`,
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
 		})
 		if status != http.StatusNotImplemented {
 			t.Fatalf("scoped rewards status = %d, want 501 (nil dep, guard passed)", status)
+		}
+		status, _, _ = h.serve(controlCall{
+			method: http.MethodGet, path: "/api/control/v1/platform/ai-gateway/detect-models",
+			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
+		})
+		if status != http.StatusNotImplemented {
+			t.Fatalf("cross-family gateway status = %d, want 501 (admin-only, caps ignored)", status)
 		}
 	})
 }
@@ -324,8 +331,6 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 
 	t.Run("mutations require reason", func(t *testing.T) {
 		cases := []controlCall{
-			{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`,
-				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-1"}},
 			{method: http.MethodPut, path: "/api/control/v1/users/oauth-providers/google", body: `{"enabled":true}`,
 				headers: map[string]string{contract.IdempotencyKeyHeader: "ext-reason-2"}},
 			{method: http.MethodPost, path: "/api/control/v1/rewards/codes", body: `{}`,
@@ -345,6 +350,41 @@ func TestControlExtendedReasonAndIdempotency(t *testing.T) {
 			if code := controlErrorCode(t, payload); code != string(contract.CodeControlReasonRequired) {
 				t.Fatalf("code = %q, want control_reason_required", code)
 			}
+		}
+	})
+
+	t.Run("probes skip the reason and key ceremony", func(t *testing.T) {
+		// Connectivity dry-runs (ai-gateway test-connection, search
+		// provider test, mail test) are POST read-guards: no reason or
+		// Idempotency-Key is required, and a supplied reason is logged to
+		// the audit record. Nil deps fail closed past the guard (501/503),
+		// proving the guard itself no longer 400s.
+		probes := []controlCall{
+			{method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`},
+			{method: http.MethodPost, path: "/api/control/v1/platform/search/providers/openai/test", body: `{}`},
+			{method: http.MethodPost, path: "/api/control/v1/platform/settings/mail/test", body: `{"recipient":"ops@example.com"}`},
+		}
+		for _, call := range probes {
+			call.userID = admin.userID
+			call.role = admin.role
+			status, _, payload := h.serve(call)
+			if code := controlErrorCode(t, payload); code == string(contract.CodeControlReasonRequired) ||
+				code == string(contract.CodeIdempotencyKeyRequired) {
+				t.Fatalf("%s %s status = %d code = %q, want no reason/key ceremony", call.method, call.path, status, code)
+			}
+		}
+		// A supplied reason is still captured on the audit record.
+		reasoned := controlCall{
+			method: http.MethodPost, path: "/api/control/v1/platform/ai-gateway/test-connection", body: `{}`,
+			userID: admin.userID, role: admin.role,
+			headers: map[string]string{OperatorReasonHeader: "pre-deploy probe"},
+		}
+		if status, _, _ := h.serve(reasoned); status != http.StatusNotImplemented {
+			t.Fatalf("reasoned probe status = %d, want 501 (nil dep, guard passed)", status)
+		}
+		last := h.sink.Records()[len(h.sink.Records())-1]
+		if last.Reason != "pre-deploy probe" || last.Operation != "platform.test_ai_gateway_connection" {
+			t.Fatalf("probe audit = %+v, want logged reason + operation", last)
 		}
 	})
 

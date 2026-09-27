@@ -1,6 +1,6 @@
 export * from './boards/boards'
-export * from './me/me'
 export * from './organizations/organizations'
+export * from './user/user'
 export * from './workspace-billing/workspace-billing'
 export * from './workspace-library/workspace-library'
 export * from './workspace-media/workspace-media'

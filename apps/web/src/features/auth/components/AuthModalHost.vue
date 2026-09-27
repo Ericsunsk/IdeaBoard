@@ -11,6 +11,9 @@
         @pointer-down-outside="blockOutsideDismiss"
       >
         <div class="min-h-0 overflow-y-auto">
+          <DialogTitle class="sr-only">
+            {{ props.ariaLabel ?? t('auth.signIn') }}
+          </DialogTitle>
           <DialogDescription v-if="props.description" class="sr-only">
             {{ props.description }}
           </DialogDescription>
@@ -28,9 +31,11 @@ import {
   DialogOverlay,
   DialogPortal,
   DialogRoot,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
+import { useI18n } from 'vue-i18n'
 import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
 import { useOverlayInteractionLifecycle } from '../../../shared/composables/useOverlayInteractionLifecycle'
 import { authDialogContentClass } from './modalUi'
@@ -47,6 +52,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   close: []
 }>()
+
+const { t } = useI18n()
 
 const { canDismiss, handleVisibilityChange } = useOverlayInteractionLifecycle({
   visible: () => true,

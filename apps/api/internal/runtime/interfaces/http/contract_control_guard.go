@@ -24,6 +24,7 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
@@ -249,26 +250,17 @@ func ControlRateLimitMiddleware(limiter *ControlRateLimiter) gin.HandlerFunc {
 	}
 }
 
-// hasAnyControlCapability reports whether p already holds a control
-// capability (family grant or wildcard), so the operator middleware can
-// preserve least-privilege grants instead of widening them.
-func hasAnyControlCapability(p principal.Principal) bool {
-	if p.HasCapability(principal.ControlWildcardStar) {
-		return true
-	}
-	for _, capability := range principal.ControlCapabilities() {
-		if p.HasCapability(capability) {
-			return true
-		}
-	}
-	return false
-}
-
 // controlOperatorMiddleware resolves the operator grant AFTER session
 // auth (v1AuthMiddleware) and tenant scope (ResolvePrincipal): admin-role
-// human sessions receive the explicit control capability grant;
-// internal workers pass through with their construction-time
-// capabilities; everyone else fails closed with 403 and a denied audit.
+// operators pass through; everyone else fails closed with 403 and a denied
+// audit. There is no capability grant here by design: production sessions
+// mint no control capabilities at login (identity/auth/middleware.go builds
+// principals via principal.New with an empty capability set, and
+// principal.NewExtended has no non-test callers), so the guard enforces
+// admin-only directly and the family capability strings survive only as
+// audit labels. Internal workers pass through only with the admin business
+// role; service accounts, API keys, and OAuth apps never pass even with an
+// admin role.
 func controlOperatorMiddleware(sink ControlAuditSink) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		p, ok := principal.From(c)
@@ -277,39 +269,13 @@ func controlOperatorMiddleware(sink ControlAuditSink) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		switch p.SubjectType() {
-		case principal.SubjectInternalWorker:
-			c.Next()
-			return
-		case principal.SubjectHumanSession:
-			if hasAnyControlCapability(p) {
-				// Least-privilege operators minted with explicit family
-				// capabilities keep them as-is; the role grant only fills
-				// the gap for operators holding no control capability yet
-				// (the production session path mints none).
-				c.Next()
-				return
-			}
-			granted, err := principal.WithControlGrant(p)
-			if err != nil {
-				emitControlAudit(c.Request.Context(), sink, deniedControlAudit(c, p, "", "operator.grant", "operator grant"))
-				contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "权限不足")
-				c.Abort()
-				return
-			}
-			if err := principal.Set(c, granted); err != nil {
-				contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "权限不足")
-				c.Abort()
-				return
-			}
-			c.Next()
-			return
-		default:
+		if !isControlOperator(p) {
 			emitControlAudit(c.Request.Context(), sink, deniedControlAudit(c, p, "", "operator.grant", "operator grant"))
 			contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "权限不足")
 			c.Abort()
 			return
 		}
+		c.Next()
 	}
 }
 
@@ -328,6 +294,21 @@ func deniedControlAudit(c *gin.Context, p principal.Principal, capability, opera
 	}
 }
 
+// isControlOperator reports whether p may call the Control Plane: the
+// admin business role on a human session or an internal worker. Service
+// accounts, API keys, and OAuth apps never pass, even with an admin role.
+func isControlOperator(p principal.Principal) bool {
+	if !p.IsAdmin() {
+		return false
+	}
+	switch p.SubjectType() {
+	case principal.SubjectHumanSession, principal.SubjectInternalWorker:
+		return true
+	default:
+		return false
+	}
+}
+
 // controlHandler is the guarded endpoint implementation.
 type controlHandler func(c *gin.Context, ctx controlContext)
 
@@ -339,9 +320,12 @@ type controlContext struct {
 	Body     []byte
 }
 
-// guard wraps a handler with capability auth, reason + idempotency
+// guard wraps a handler with admin-only auth, reason + idempotency
 // enforcement (mutations), idempotent execution, and the mandatory
-// audit record. It returns a gin handler.
+// audit record. It returns a gin handler. The capability argument is the
+// audit label only (family strings survive for the audit record and the
+// openapi x-capabilities mirror); authorization is the admin business
+// role plus the human/worker subject gate, never a family grant.
 func (d *ContractControlDeps) guard(capability string, route controlRoute, handler controlHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		p, ok := principal.From(c)
@@ -364,7 +348,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			emitControlAudit(c.Request.Context(), d.sink(), record)
 			contract.RenderError(c, status, code, message)
 		}
-		if !principal.HasControlCapability(p, capability) {
+		if !isControlOperator(p) {
 			fail(http.StatusForbidden, contract.CodeForbidden, "权限不足", ControlAuditDenied)
 			c.Abort()
 			return
@@ -380,7 +364,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			}
 			body = raw
 			record.Reason = extractControlReason(c, body)
-			if !validControlReason(record.Reason) {
+			if _, err := adminaction.New(p.UserID(), record.Reason); err != nil {
 				record.Status = http.StatusBadRequest
 				record.Outcome = ControlAuditDenied
 				emitControlAudit(c.Request.Context(), d.sink(), record)
@@ -398,8 +382,10 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 				return
 			}
 			record.IdempotencyKey = key
-		} else if reason := extractControlReason(c, nil); validControlReason(reason) {
-			record.Reason = reason
+		} else if reason := extractControlReason(c, nil); reason != "" {
+			if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
+				record.Reason = reason
+			}
 		}
 		if route.Target != nil {
 			record.TargetType, record.TargetID = route.Target(c, body)
@@ -418,8 +404,10 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			return
 		}
 		handler(c, controlContext{Operator: p, Reason: record.Reason, Body: body})
-		if reason := controlReasonFromContext(c); validControlReason(reason) {
-			record.Reason = reason
+		if reason := controlReasonFromContext(c); reason != "" {
+			if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
+				record.Reason = reason
+			}
 		}
 		outcome = controlOutcomeFromStatus(c.Writer.Status())
 		record.Status = c.Writer.Status()
@@ -496,8 +484,10 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 	c.Writer = capture
 	handler(c, ctx)
 	c.Writer = original
-	if reason := controlReasonFromContext(c); validControlReason(reason) {
-		record.Reason = reason
+	if reason := controlReasonFromContext(c); reason != "" {
+		if _, reasonErr := adminaction.New(p.UserID(), reason); reasonErr == nil {
+			record.Reason = reason
+		}
 	}
 	status := capture.status
 	if status == 0 {

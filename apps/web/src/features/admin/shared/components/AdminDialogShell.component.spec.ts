@@ -107,14 +107,20 @@ describe('AdminDialogShell', () => {
     expect(buttons.at(-1)).toHaveFocus()
   })
 
-  it('closes through Escape while preventing mask dismissal', async () => {
-    const { user, onVisibleUpdate } = renderShell()
+  it('closes through mask click like AuthModalHost and BoardsPage', async () => {
+    const { user, onVisibleUpdate, onClose } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
     const mask = dialog.parentElement!.querySelector('[data-admin-dialog-mask]')!
 
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     await user.click(mask)
-    expect(onVisibleUpdate).not.toHaveBeenCalled()
+    expect(onVisibleUpdate).toHaveBeenCalledWith(false)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes through Escape', async () => {
+    const { user, onVisibleUpdate } = renderShell()
+    const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
 
     dialog.focus()
     await user.keyboard('{Escape}')

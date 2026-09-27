@@ -82,7 +82,7 @@ describe('uploadApi', () => {
     }> = []
 
     useMswHandlers(
-      http.put('/api/v1/me/avatar', async ({ request }) => {
+      http.put('/api/v1/user/avatar', async ({ request }) => {
         receivedRequests.push({
           method: request.method,
           path: new URL(request.url).pathname,
@@ -91,18 +91,18 @@ describe('uploadApi', () => {
           bodyText: await request.text(),
         })
 
-        return HttpResponse.json({ data: { avatar_url: '/uploads/profile/me/avatar' } })
+        return HttpResponse.json({ data: { avatar_url: '/uploads/profile/user/avatar' } })
       }),
     )
 
     await expect(uploadApi.uploadAvatar(file)).resolves.toEqual({
-      avatar: '/uploads/profile/me/avatar',
+      avatar: '/uploads/profile/user/avatar',
       mime: 'image/jpeg',
       ext: '.jpg',
     })
     expect(receivedRequests).toHaveLength(1)
     expect(receivedRequests[0]?.method).toBe('PUT')
-    expect(receivedRequests[0]?.path).toBe('/api/v1/me/avatar')
+    expect(receivedRequests[0]?.path).toBe('/api/v1/user/avatar')
     expect(receivedRequests[0]?.contentType).toBe('image/jpeg')
     expect(receivedRequests[0]?.idempotencyKey).toMatch(/^avatar:upload:/)
     expect(receivedRequests[0]?.bodyText).toBe('avatar')
@@ -120,7 +120,7 @@ describe('uploadApi', () => {
       })
 
       useMswHandlers(
-        http.put('/api/v1/me/avatar', async ({ request }) => {
+        http.put('/api/v1/user/avatar', async ({ request }) => {
           await request.arrayBuffer()
           resolveUploadStarted()
           await new Promise((resolve) => setTimeout(resolve, slowResponseDelayMs))
@@ -211,7 +211,7 @@ describe('uploadApi', () => {
 
   it('rejects avatar responses without a usable URL', async () => {
     useMswHandlers(
-      http.put('/api/v1/me/avatar', () => {
+      http.put('/api/v1/user/avatar', () => {
         return HttpResponse.json({ data: { avatar_url: '   ' } })
       }),
     )

@@ -3,16 +3,13 @@ import { http, HttpResponse, useMswHandlers } from '../../test/msw'
 import {
   assertLibraryAssetId,
   assertLibraryFolderId,
-  assertLibraryMaterializationId,
   assertWorkspaceId,
   libraryAssetKey,
-  mapWorkspaceLibraryMaterializationStatus,
   mapWorkspaceLibraryProvider,
   resolveLibraryAssetCardURL,
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
-  toWorkspaceLibraryMaterialization,
   toWorkspaceLibraryResolveResult,
 } from './domain/validators'
 import {
@@ -26,10 +23,8 @@ import {
   saveWorkspaceSearchReference,
 } from './application/libraryUseCases'
 import {
-  getCreateWorkspaceLibraryMaterializationUrl,
   getDeleteWorkspaceLibraryAssetUrl,
   getDeleteWorkspaceLibraryFolderUrl,
-  getGetWorkspaceLibraryMaterializationUrl,
   getListWorkspaceLibraryAssetsUrl,
   getListWorkspaceLibraryFoldersUrl,
   getMoveWorkspaceLibraryAssetUrl,
@@ -37,6 +32,7 @@ import {
   getResolveWorkspaceLibraryAssetsUrl,
   getSaveWorkspaceLibraryAssetUrl,
 } from '../../shared/api/generated-query/public/workspace-library/workspace-library'
+import { getWorkspaceMediaAssetMetadata } from '../../shared/api/mediaAssetDelivery'
 
 vi.mock('../../shared/api/mediaAssetDelivery', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../shared/api/mediaAssetDelivery')>()
@@ -58,10 +54,11 @@ vi.mock('../../shared/api/mediaAssetDelivery', async (importOriginal) => {
   }
 })
 
+const mediaMetadataMock = vi.mocked(getWorkspaceMediaAssetMetadata)
+
 const WORKSPACE_ID = 'ws_abc123'
 const FOLDER_ID = 'lfolder_folder0001'
 const ASSET_ID = 'lasset_asset0001'
-const MATERIALIZATION_ID = 'lmat_job0001'
 const PREVIEW_URL = 'https://images.unsplash.com/photo-test'
 
 function folderFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -95,21 +92,6 @@ function assetFixture(overrides: Record<string, unknown> = {}): Record<string, u
   }
 }
 
-function materializationFixture(
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> {
-  return {
-    id: MATERIALIZATION_ID,
-    workspace_id: WORKSPACE_ID,
-    library_asset_id: ASSET_ID,
-    status: 'completed',
-    media_asset_id: 'asset_abc123',
-    created_at: '2026-09-23T00:00:00Z',
-    updated_at: '2026-09-23T00:00:00Z',
-    ...overrides,
-  }
-}
-
 describe('workspace library paths', () => {
   it('builds canonical routes matching the generated hooks (publicMutator adds /v1)', () => {
     expect(getListWorkspaceLibraryFoldersUrl(WORKSPACE_ID)).toBe(
@@ -136,12 +118,6 @@ describe('workspace library paths', () => {
     expect(getResolveWorkspaceLibraryAssetsUrl(WORKSPACE_ID)).toBe(
       '/workspaces/ws_abc123/library/asset-resolutions',
     )
-    expect(getCreateWorkspaceLibraryMaterializationUrl(WORKSPACE_ID)).toBe(
-      '/workspaces/ws_abc123/library/materializations',
-    )
-    expect(getGetWorkspaceLibraryMaterializationUrl(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
-      '/workspaces/ws_abc123/library/materializations/lmat_job0001',
-    )
   })
 
   it('rejects malformed ids before any network call (integer ids included)', async () => {
@@ -149,7 +125,6 @@ describe('workspace library paths', () => {
     expect(() => assertLibraryFolderId('42')).toThrow()
     expect(() => assertLibraryFolderId('lasset_asset0001')).toThrow()
     expect(() => assertLibraryAssetId('42')).toThrow()
-    expect(() => assertLibraryMaterializationId('nope')).toThrow()
     expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()
     await expect(
       workspaceLibraryApi.moveAsset(WORKSPACE_ID, 'asset with space', null),
@@ -174,21 +149,6 @@ describe('workspace library mapping', () => {
     })
     expect(toWorkspaceLibraryAsset(assetFixture({ folder_id: '' })).folderId).toBeUndefined()
     expect(() => mapWorkspaceLibraryProvider('tumblr')).toThrow()
-  })
-
-  it('maps every materialization status and gates the asset_ result link', () => {
-    for (const status of ['pending', 'running', 'completed', 'failed']) {
-      expect(mapWorkspaceLibraryMaterializationStatus(status)).toBe(status)
-    }
-    expect(() => mapWorkspaceLibraryMaterializationStatus('done')).toThrow()
-    expect(toWorkspaceLibraryMaterialization(materializationFixture())).toMatchObject({
-      status: 'completed',
-      mediaAssetId: 'asset_abc123',
-    })
-    expect(() =>
-      toWorkspaceLibraryMaterialization(materializationFixture({ media_asset_id: '42' })),
-    ).toThrow()
-    expect(() => toWorkspaceLibraryMaterialization(materializationFixture({ id: '42' }))).toThrow()
   })
 
   it('maps resolve outcomes and rejects unknown statuses', () => {
@@ -244,25 +204,6 @@ describe('workspace library pagination and replay headers', () => {
     const page = await workspaceLibraryApi.listAssets(WORKSPACE_ID)
     expect(page.nextCursor).toBe('')
     expect(page.hasMore).toBe(false)
-  })
-
-  it('replays materialization creation with the same idempotency key', async () => {
-    const seenKeys: Array<string | null> = []
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', ({ request }) => {
-        seenKeys.push(request.headers.get('Idempotency-Key'))
-        return HttpResponse.json({ data: materializationFixture() }, { status: 202 })
-      }),
-    )
-    const first = await workspaceLibraryApi.createMaterialization(WORKSPACE_ID, ASSET_ID, {
-      idempotencyKey: 'library:materialize:1',
-    })
-    const replay = await workspaceLibraryApi.createMaterialization(WORKSPACE_ID, ASSET_ID, {
-      idempotencyKey: 'library:materialize:1',
-    })
-    expect(first.id).toBe(MATERIALIZATION_ID)
-    expect(replay.id).toBe(MATERIALIZATION_ID)
-    expect(seenKeys).toEqual(['library:materialize:1', 'library:materialize:1'])
   })
 })
 
@@ -477,70 +418,40 @@ describe('workspace library use cases', () => {
     expect(keys).toEqual(new Set(['unsplash:u1']))
   })
 
-  it('materializes by polling the job, then resolves display media', async () => {
-    let polls = 0
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          polls += 1
-          return HttpResponse.json({
-            data: materializationFixture({
-              status: polls > 1 ? 'completed' : 'running',
-            }),
-          })
-        },
-      ),
-    )
-    const media = await materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-      pollDelayMs: 1,
-      pollAttempts: 5,
-    })
-    expect(polls).toBeGreaterThan(1)
+  it('resolves managed media in one poll-free attempt through the media read path', async () => {
+    mediaMetadataMock.mockClear()
+    const media = await materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID)
+    expect(mediaMetadataMock).toHaveBeenCalledTimes(1)
+    expect(mediaMetadataMock.mock.calls[0]?.slice(0, 2)).toEqual([WORKSPACE_ID, ASSET_ID])
     expect(media).toMatchObject({
-      mediaAssetId: 'asset_abc123',
+      mediaAssetId: ASSET_ID,
       url: '/api/v1/workspaces/ws_abc123/media-assets/asset_media0001/content',
       width: 400,
       height: 200,
     })
   })
 
-  it('surfaces a failed materialization job instead of media', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          return HttpResponse.json({
-            data: materializationFixture({ status: 'failed', error_message: 'quote broke' }),
-          })
-        },
-      ),
+  it('rejects when the managed asset is not readable yet so the Canvas retry loop owns the retry', async () => {
+    mediaMetadataMock.mockClear()
+    mediaMetadataMock.mockRejectedValueOnce(
+      Object.assign(new Error('media_not_found'), { code: 'media_not_found' }),
     )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 3,
-      }),
-    ).rejects.toThrow('quote broke')
+    await expect(materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID)).rejects.toMatchObject({
+      code: 'media_not_found',
+    })
+    expect(mediaMetadataMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed on malformed asset ids before any media read', async () => {
+    mediaMetadataMock.mockClear()
+    await expect(materializeLibraryAssetForCanvas(WORKSPACE_ID, 'nope')).rejects.toThrow()
+    expect(mediaMetadataMock).not.toHaveBeenCalled()
   })
 })
 
-describe('workspace library canonical ids (lfolder_/lasset_/lmat_)', () => {
+describe('workspace library canonical ids (lfolder_/lasset_)', () => {
   const FOLDER_ID = 'lfolder_folder0001'
   const ASSET_ID = 'lasset_asset0001'
-  const MATERIALIZATION_ID = 'lmat_job0001'
 
   it('accepts canonical ids in routes, asserts, and mapping', () => {
     expect(getRenameWorkspaceLibraryFolderUrl(WORKSPACE_ID, FOLDER_ID)).toBe(
@@ -549,199 +460,15 @@ describe('workspace library canonical ids (lfolder_/lasset_/lmat_)', () => {
     expect(getMoveWorkspaceLibraryAssetUrl(WORKSPACE_ID, ASSET_ID)).toBe(
       '/workspaces/ws_abc123/library/assets/lasset_asset0001',
     )
-    expect(getGetWorkspaceLibraryMaterializationUrl(WORKSPACE_ID, MATERIALIZATION_ID)).toBe(
-      '/workspaces/ws_abc123/library/materializations/lmat_job0001',
-    )
     expect(() => assertLibraryFolderId(FOLDER_ID)).not.toThrow()
     expect(() => assertLibraryAssetId(ASSET_ID)).not.toThrow()
-    expect(() => assertLibraryMaterializationId(MATERIALIZATION_ID)).not.toThrow()
     expect(toWorkspaceLibraryFolder(folderFixture({ id: FOLDER_ID })).id).toBe(FOLDER_ID)
     expect(toWorkspaceLibraryAsset(assetFixture({ id: ASSET_ID, folder_id: FOLDER_ID })).id).toBe(
       ASSET_ID,
     )
-    expect(
-      toWorkspaceLibraryMaterialization(
-        materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID }),
-      ).id,
-    ).toBe(MATERIALIZATION_ID)
     // Cross-kind and legacy-integer shapes still fail closed before any network call.
     expect(() => assertLibraryFolderId(ASSET_ID)).toThrow()
     expect(() => assertLibraryAssetId(FOLDER_ID)).toThrow()
-    expect(() => assertLibraryMaterializationId(ASSET_ID)).toThrow()
     expect(() => assertLibraryAssetId('42')).toThrow()
-  })
-
-  it('materializes canonical ids end to end: create, poll, then resolve display media', async () => {
-    let polls = 0
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          polls += 1
-          return HttpResponse.json({
-            data: materializationFixture({
-              id: MATERIALIZATION_ID,
-              library_asset_id: ASSET_ID,
-              status: polls > 1 ? 'completed' : 'running',
-            }),
-          })
-        },
-      ),
-    )
-    const media = await materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-      pollDelayMs: 1,
-      pollAttempts: 5,
-    })
-    expect(polls).toBeGreaterThan(1)
-    expect(media).toMatchObject({
-      mediaAssetId: 'asset_abc123',
-      width: 400,
-      height: 200,
-    })
-  })
-
-  it('degrades gracefully when creation renders 503 billing_quote_unavailable', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 'billing_quote_unavailable',
-              message: '价格服务暂不可用',
-              request_id: 'req-503',
-            },
-          },
-          { status: 503 },
-        )
-      }),
-    )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 3,
-      }),
-    ).rejects.toMatchObject({ code: 'billing_quote_unavailable' })
-  })
-
-  it('degrades gracefully when the materializer seam is down (503 service_unavailable)', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 'service_unavailable',
-              message: '转存服务暂不可用',
-              request_id: 'req-503',
-            },
-          },
-          { status: 503 },
-        )
-      }),
-    )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 3,
-      }),
-    ).rejects.toMatchObject({ code: 'service_unavailable' })
-  })
-
-  it('degrades gracefully when polling renders 503 instead of a snapshot', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 'service_unavailable',
-                message: '素材库服务暂不可用',
-                request_id: 'req-503',
-              },
-            },
-            { status: 503 },
-          )
-        },
-      ),
-    )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 3,
-      }),
-    ).rejects.toMatchObject({ code: 'service_unavailable' })
-  })
-
-  it('degrades gracefully when the polled job is unknown (404 library_materialization_not_found)', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          return HttpResponse.json(
-            {
-              error: {
-                code: 'library_materialization_not_found',
-                message: '转存任务不存在',
-                request_id: 'req-404',
-              },
-            },
-            { status: 404 },
-          )
-        },
-      ),
-    )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 3,
-      }),
-    ).rejects.toMatchObject({ code: 'library_materialization_not_found' })
-  })
-
-  it('fails closed instead of hanging when the job never reaches a terminal state', async () => {
-    useMswHandlers(
-      http.post('/api/v1/workspaces/:workspaceId/library/materializations', async () => {
-        return HttpResponse.json(
-          { data: materializationFixture({ id: MATERIALIZATION_ID, library_asset_id: ASSET_ID, status: 'pending' }) },
-          { status: 202 },
-        )
-      }),
-      http.get(
-        '/api/v1/workspaces/:workspaceId/library/materializations/:materializationId',
-        async () => {
-          return HttpResponse.json({
-            data: materializationFixture({
-              id: MATERIALIZATION_ID,
-              library_asset_id: ASSET_ID,
-              status: 'running',
-            }),
-          })
-        },
-      ),
-    )
-    await expect(
-      materializeLibraryAssetForCanvas(WORKSPACE_ID, ASSET_ID, {
-        pollDelayMs: 1,
-        pollAttempts: 2,
-      }),
-    ).rejects.toThrow()
   })
 })

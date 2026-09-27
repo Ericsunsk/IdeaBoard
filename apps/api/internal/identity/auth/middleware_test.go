@@ -211,7 +211,7 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 			router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 				BaseURL: authServer.URL, TimeoutSeconds: 1,
 			}), userRepo, nil))
-			router.GET("/me", func(c *gin.Context) {
+			router.GET("/profile", func(c *gin.Context) {
 				var ok bool
 				got, ok = principal.From(c)
 				if !ok {
@@ -225,7 +225,7 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 				c.Status(http.StatusOK)
 			})
 
-			req := httptest.NewRequest(http.MethodGet, "/me", nil)
+			req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 			req.Header.Set("Cookie", "better-auth.session_token=test")
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, req)
@@ -249,12 +249,12 @@ func TestAuthMiddlewareRejectsRequestWithoutSession(t *testing.T) {
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 		BaseURL: authServer.URL, TimeoutSeconds: 1,
 	}), identitypostgres.NewRepository(testdb.Open(t)), nil))
-	router.GET("/me", func(*gin.Context) {
+	router.GET("/profile", func(*gin.Context) {
 		t.Fatal("unauthenticated request reached handler")
 	})
 
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/me", nil))
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/profile", nil))
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
 	}
@@ -289,12 +289,12 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 		BaseURL: authServer.URL, TimeoutSeconds: 1,
 	}), userRepo, nil))
-	router.GET("/me", func(*gin.Context) {
+	router.GET("/profile", func(*gin.Context) {
 		handlerRan = true
 	})
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/profile", nil)
 	req.Header.Set("Cookie", "better-auth.session_token=test")
 	router.ServeHTTP(recorder, req)
 

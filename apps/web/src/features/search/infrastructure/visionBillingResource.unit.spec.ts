@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { fetchVisionSearchPrice } from './visionBillingResource'
 
@@ -21,6 +21,11 @@ function quoteFixture(totalCredits: number): Record<string, unknown> {
 }
 
 describe('visionBillingResource', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    window.history.pushState({}, '', '/user/search')
+  })
+
   it('reads the server-side quote for one vision search', async () => {
     const seen: Array<{ path: string; body: unknown }> = []
     useMswHandlers(
@@ -48,5 +53,22 @@ describe('visionBillingResource', () => {
       }),
     )
     await expect(fetchVisionSearchPrice(WORKSPACE_ID)).rejects.toThrow()
+  })
+
+  it('surfaces a 401 quote denial without reloading the page', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({ public_id: '00000000-0000-0000-0000-000000000001' }),
+    )
+    useMswHandlers(
+      http.post('/api/v1/workspaces/:workspaceId/billing-quotes', () => {
+        return HttpResponse.json({ code: 401, msg: '' }, { status: 401 })
+      }),
+    )
+
+    await expect(fetchVisionSearchPrice(WORKSPACE_ID)).rejects.toThrow()
+
+    expect(window.location.pathname).toBe('/user/search')
+    expect(localStorage.getItem('user')).toBeNull()
   })
 })

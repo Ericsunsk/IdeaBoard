@@ -241,15 +241,9 @@ func serveModelsObserved(t *testing.T, role principal.Role, handler *Handler) *h
 }
 
 func TestObservedHandlerGatingAndEnvelope(t *testing.T) {
-	t.Run("rejects non-admin", func(t *testing.T) {
-		handler := NewHandler(&fakeGatewayStore{})
-		handler.SetObservedService(NewObservedService(&fakeAttemptStore{}, &fakeGatewayStore{}, &fakeSKUCatalog{}))
-		rec := serveModelsObserved(t, principal.RoleUser, handler)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
-		}
-	})
-
+	// Non-admin gating rides the outer Control Plane guard (controlProxy +
+	// guard); the handler performs no role check. Guard-level denial is
+	// covered by TestControlAuthMatrix in runtime/interfaces/http.
 	t.Run("fails closed without service", func(t *testing.T) {
 		rec := serveModelsObserved(t, principal.RoleAdmin, NewHandler(&fakeGatewayStore{}))
 		if rec.Code != http.StatusServiceUnavailable {

@@ -4,11 +4,10 @@ package runtime
 //
 // When a workspace task completes, its settled outputs (post-#827
 // renderer: asset-kind media refs) are auto-materialized into the
-// workspace library Quick Saves folder: one library:materialize
-// settlement per output (server-side quote -> credits hold -> durable
-// job record -> capture -> media link, release only before capture), with the
-// task_id -> materialization link carried in the billing idempotency
-// keys and ledger BusinessReference (no schema change).
+// workspace library Quick Saves folder: one durable job record per
+// output (pending -> running -> completed link), with no billing —
+// materialization is a permanent free tier (owner decision), so no
+// quote, hold, capture, or release crosses this trigger.
 //
 // Placement: post-Complete step in WorkspaceTaskWorker.Work, AFTER
 // settler.Complete returns. Rationale against the candidates:
@@ -25,39 +24,31 @@ package runtime
 //     this would need new NATS fanout wiring for a trigger that must
 //     stay synchronous and best-effort.
 //   - Renderer hook (rejected): the renderer runs BEFORE the atomic
-//     Complete; materializing there would put library/billing writes
+//     Complete; materializing there would put library writes
 //     ahead of the settlement commit and break the after-commit rule.
 //
 // Failure posture: the task is already complete when the trigger runs,
 // so trigger errors NEVER fail the task and NEVER return River-retryable
 // errors. Every per-output failure folds into a failed materialization
-// record (same shape as the manual surface: billing_settle_failed on
-// capture failure) with the hold released, so there are no ledger
-// orphans. Billing failures (quote/hold) create no job and hold nothing.
+// record (same shape as the manual surface).
 //
 // Idempotency (same task completing twice -> one materialization):
 //   - Worker level: terminal-task and state-conflict drops mean only the
 //     first successful Complete reaches the trigger.
-//   - Billing level: keys are deterministic per (task, output index)
-//     (task-materialize:<taskID>:<index>:{hold,capture,release}), so
-//     credits idempotency replays the same hold instead of double-holding.
 //   - Store level: the Quick Saves save dedups (SaveAsset converges on
-//     the existing asset with created=false), and the trigger skips job
-//     creation on a dedup hit; terminal job records are immutable, so
-//     repeat SetMaterializationResult calls converge instead of
-//     resurrecting jobs.
+//     the existing asset), while ClaimMaterialization atomically creates
+//     or reuses the job. Terminal records are immutable, so repeat
+//     SetMaterializationResult calls converge instead of resurrecting jobs.
 //
 // Sibling-A seam: task-output media assets are not provider references,
 // so the existing SaveAsset gate cannot persist them. Ensuring the
 // Quick Saves library asset for a settled output is delegated to
-// TaskOutputLibrarySaver, whose production implementation lands with
-// the materialization store (sibling A, #828-A: workspace_library.sql +
-// library/service.go are theirs). Until then the saver is nil and the
-// trigger degrades to a logged no-op; the task still completes. The
-// contract the saver must honor: deterministic per (task, output) with
-// created=false on repeats, FolderPublicID "" targeting Quick Saves
-// (postgres resolves "" to the Quick Saves system folder), and never
-// bytes (library assets stay references).
+// TaskOutputLibrarySaver. A nil saver degrades the trigger to a logged
+// no-op; the task still completes. The contract the saver must honor:
+// deterministic per (task, output) with created=false on repeats,
+// FolderPublicID "" targeting Quick Saves (postgres resolves "" to the
+// Quick Saves system folder), and never bytes (library assets stay
+// references).
 
 import (
 	"context"
@@ -66,7 +57,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/library"
-	httpapi "ideaboard/api/internal/runtime/interfaces/http"
+	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
 
@@ -87,48 +78,38 @@ type WorkspaceTaskAutoMaterializer interface {
 	MaterializeCompletedTask(ctx context.Context, task *workspacetasks.WorkspaceTask) error
 }
 
-// WorkspaceTaskAutoMaterializerDeps wires the trigger. Store, Quoter,
-// and Billing are required; Saver nil degrades to a logged no-op until
-// sibling A lands the task-originated save path.
+// WorkspaceTaskAutoMaterializerDeps wires the trigger. Store is required;
+// Saver nil degrades to a logged no-op until the task-originated save
+// path is available.
 type WorkspaceTaskAutoMaterializerDeps struct {
-	Store   library.WorkspaceLibraryStore
-	Quoter  httpapi.V1BillingQuoter
-	Billing httpapi.V1CreditSettler
-	Saver   TaskOutputLibrarySaver
+	Store library.WorkspaceLibraryStore
+	Saver TaskOutputLibrarySaver
 }
 
 type workspaceTaskAutoMaterializer struct {
-	store   library.WorkspaceLibraryStore
-	quoter  httpapi.V1BillingQuoter
-	billing httpapi.V1CreditSettler
-	saver   TaskOutputLibrarySaver
+	store library.WorkspaceLibraryStore
+	saver TaskOutputLibrarySaver
 }
 
 var _ WorkspaceTaskAutoMaterializer = (*workspaceTaskAutoMaterializer)(nil)
 
-// NewWorkspaceTaskAutoMaterializer builds the trigger. Nil store, quoter,
-// or billing fails fast: a trigger that cannot settle must never run.
+// NewWorkspaceTaskAutoMaterializer builds the trigger. Nil store fails
+// fast: a trigger that cannot persist must never run.
 func NewWorkspaceTaskAutoMaterializer(deps WorkspaceTaskAutoMaterializerDeps) (WorkspaceTaskAutoMaterializer, error) {
 	if deps.Store == nil {
 		return nil, fmt.Errorf("task auto-materializer: library store is required")
 	}
-	if deps.Quoter == nil {
-		return nil, fmt.Errorf("task auto-materializer: billing quoter is required")
-	}
-	if deps.Billing == nil {
-		return nil, fmt.Errorf("task auto-materializer: billing settler is required")
-	}
 	return &workspaceTaskAutoMaterializer{
-		store: deps.Store, quoter: deps.Quoter, billing: deps.Billing, saver: deps.Saver,
+		store: deps.Store, saver: deps.Saver,
 	}, nil
 }
 
-// MaterializeCompletedTask settles one library:materialize job per
-// asset-kind output. Remote-kind outputs have no managed media to link
-// and are skipped deterministically. Per-output failures are absorbed
-// (failed job record + released hold); only wiring misuse errors.
+// MaterializeCompletedTask records one unbilled library job per asset-kind
+// output. Remote-kind outputs have no managed media to link and are
+// skipped deterministically. Per-output failures are absorbed (failed
+// job record); only wiring misuse errors.
 func (m *workspaceTaskAutoMaterializer) MaterializeCompletedTask(ctx context.Context, task *workspacetasks.WorkspaceTask) error {
-	if m == nil || m.store == nil || m.quoter == nil || m.billing == nil {
+	if m == nil || m.store == nil {
 		return fmt.Errorf("task auto-materializer is not configured")
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
@@ -153,24 +134,11 @@ func (m *workspaceTaskAutoMaterializer) MaterializeCompletedTask(ctx context.Con
 func (m *workspaceTaskAutoMaterializer) materializeOne(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef) {
 	workspaceID := strings.TrimSpace(task.WorkspaceID)
 	mediaAssetID := strings.TrimSpace(ref.AssetID)
-	base := fmt.Sprintf("task-materialize:%s:%d", strings.TrimSpace(task.ID), ref.ResultIndex)
 
-	saved, created, err := m.saver.SaveTaskOutputAsset(ctx, workspaceID, task.ID, ref.ResultIndex, mediaAssetID)
+	saved, _, err := m.saver.SaveTaskOutputAsset(ctx, workspaceID, task.ID, ref.ResultIndex, mediaAssetID)
 	if err != nil || saved == nil {
-		slog.Warn("task auto-materialize: Quick Saves save failed; no billing touched",
+		slog.Warn("task auto-materialize: Quick Saves save failed; no job created",
 			"task_id", task.ID, "result_index", ref.ResultIndex, "err", err)
-		return
-	}
-	if !created {
-		slog.Info("task auto-materialize converges: output already saved, skipping duplicate job",
-			"task_id", task.ID, "result_index", ref.ResultIndex, "asset", saved.PublicID)
-		return
-	}
-
-	amount, quoteErr := m.quoter.Quote(ctx, workspaceID, httpapi.V1MaterializeSKU)
-	if quoteErr != nil || amount < 0 {
-		slog.Warn("task auto-materialize: quote unavailable; task stays complete, no job, no hold",
-			"task_id", task.ID, "result_index", ref.ResultIndex, "err", quoteErr)
 		return
 	}
 	matID, mintErr := library.NewV1MaterializationPublicID()
@@ -178,41 +146,34 @@ func (m *workspaceTaskAutoMaterializer) materializeOne(ctx context.Context, task
 		slog.Warn("task auto-materialize: mint failed", "task_id", task.ID, "err", mintErr)
 		return
 	}
-	reason := fmt.Sprintf("task auto-materialize %s output %d", matID, ref.ResultIndex)
-	holdID, holdErr := m.billing.Hold(ctx, task.OwnerUserID, amount, base+":hold", reason)
-	if holdErr != nil {
-		slog.Warn("task auto-materialize: hold failed; task stays complete, no job",
-			"task_id", task.ID, "materialization", matID, "err", holdErr)
+	claimer, ok := m.store.(libraryports.MaterializationClaimer)
+	if !ok {
+		slog.Warn("task auto-materialize: library store cannot claim materialization job",
+			"task_id", task.ID, "materialization", matID)
 		return
 	}
-	if _, createErr := m.store.CreateMaterialization(ctx, workspaceID, saved.PublicID, matID); createErr != nil {
-		_ = m.billing.Release(ctx, task.OwnerUserID, holdID, amount, base+":release")
-		slog.Warn("task auto-materialize: job create failed; hold released, no orphan",
-			"task_id", task.ID, "materialization", matID, "err", createErr)
+	job, _, claimErr := claimer.ClaimMaterialization(ctx, workspaceID, saved.PublicID, matID)
+	if claimErr != nil || job == nil {
+		slog.Warn("task auto-materialize: job claim failed",
+			"task_id", task.ID, "materialization", matID, "err", claimErr)
+		return
+	}
+	matID = job.PublicID
+	if job.Status == library.V1MaterializationCompleted {
+		slog.Info("task auto-materialize converges: materialization already completed",
+			"task_id", task.ID, "materialization", matID, "asset", saved.PublicID)
 		return
 	}
 	if _, runningErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationRunning, "", "", ""); runningErr != nil {
-		_ = m.billing.Release(ctx, task.OwnerUserID, holdID, amount, base+":release")
 		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
-		slog.Warn("task auto-materialize: job start failed; hold released",
+		slog.Warn("task auto-materialize: job start failed",
 			"task_id", task.ID, "materialization", matID, "err", runningErr)
 		return
 	}
 	// The output media already exists as a managed asset (post-renderer),
 	// so linking is immediate: no byte fetch, no second media write.
-	// Capture precedes the completed link. A capture failure can therefore
-	// release the still-open hold and mark the non-terminal job failed.
-	// Once capture succeeds, a link failure is left running for repair: a
-	// captured ledger entry must never be released as compensation.
-	if captureErr := m.billing.Capture(ctx, task.OwnerUserID, holdID, amount, base+":capture"); captureErr != nil {
-		_ = m.billing.Release(ctx, task.OwnerUserID, holdID, amount, base+":release")
-		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationFailed, "", "billing_settle_failed", "结算失败，请稍后重试")
-		slog.Warn("task auto-materialize: capture failed; job marked failed, hold released",
-			"task_id", task.ID, "materialization", matID, "err", captureErr)
-		return
-	}
 	if _, linkErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationCompleted, mediaAssetID, "", ""); linkErr != nil {
-		slog.Error("task auto-materialize: media link failed after capture; repair required",
+		slog.Error("task auto-materialize: media link failed; repair required",
 			"task_id", task.ID, "materialization", matID, "err", linkErr)
 		return
 	}

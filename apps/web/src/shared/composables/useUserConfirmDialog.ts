@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, ref, type Ref } from 'vue'
 
 export type UserConfirmRequest = {
   title: string
@@ -18,6 +18,7 @@ export function useUserConfirmDialog(): {
   confirmAsync: (request: UserConfirmRequest) => Promise<boolean>
   confirm: () => Promise<void>
   close: () => void
+  dispose: () => void
 } {
   const visible = ref(false)
   const title = ref('')
@@ -77,6 +78,19 @@ export function useUserConfirmDialog(): {
     }
   }
 
+  // A parent unmount must never orphan a pending confirmAsync: settle it as
+  // dismissed so awaiters always resolve.
+  function dispose() {
+    visible.value = false
+    if (pendingCancel) {
+      pendingCancel()
+      pendingCancel = null
+    }
+    pendingAction = null
+  }
+
+  if (getCurrentScope()) onScopeDispose(dispose)
+
   return {
     visible,
     title,
@@ -88,5 +102,6 @@ export function useUserConfirmDialog(): {
     confirmAsync,
     confirm,
     close,
+    dispose,
   }
 }

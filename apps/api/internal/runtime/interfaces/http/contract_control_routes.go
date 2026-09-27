@@ -219,8 +219,11 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 		controlRoute{Operation: "platform.update_mail_setting", Route: "PUT /platform/settings/mail", Mutation: true}, d.updateControlMailSetting))
 	control.DELETE("/platform/settings/mail", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.delete_mail_setting", Route: "DELETE /platform/settings/mail", Mutation: true}, d.deleteControlMailSetting))
+	// Mail test is a delivery dry-run (sends one probe message, writes no
+	// configuration), so it registers as a POST read-guard without reason
+	// or idempotency requirements.
 	control.POST("/platform/settings/mail/test", d.guard(ControlCapabilityPlatform,
-		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test", Mutation: true}, d.testControlMailSetting))
+		controlRoute{Operation: "platform.test_mail_setting", Route: "POST /platform/settings/mail/test"}, d.testControlMailSetting))
 }
 
 // registerControlProxiedRoutes mounts the platform-config families that
@@ -261,13 +264,13 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.get_ai_gateway_brand_logo", Route: "GET /platform/ai-gateway/brand-logo"}, ControlCapabilityPlatform, gatewayAvailable, h.GetBrandLogo))
 		control.GET("/platform/ai-gateway/models-observed", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_models_observed", Route: "GET /platform/ai-gateway/models-observed"}, ControlCapabilityPlatform, gatewayAvailable, h.ListModelsObserved))
-		// Route preview is a pure routing dry-run (no configuration read
-		// or write), so it registers as a POST read-guard without reason
-		// or idempotency requirements.
+		// Route preview and connection test are pure routing/connectivity
+		// dry-runs (no configuration read or write), so they register as
+		// POST read-guards without reason or idempotency requirements.
 		control.POST("/platform/ai-gateway/route-preview", d.controlProxy(
 			controlRoute{Operation: "platform.preview_ai_gateway_route", Route: "POST /platform/ai-gateway/route-preview"}, ControlCapabilityPlatform, gatewayAvailable, h.PreviewGatewayRoute))
 		control.POST("/platform/ai-gateway/test-connection", d.controlProxy(
-			controlRoute{Operation: "platform.test_ai_gateway_connection", Route: "POST /platform/ai-gateway/test-connection", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.TestConnection))
+			controlRoute{Operation: "platform.test_ai_gateway_connection", Route: "POST /platform/ai-gateway/test-connection"}, ControlCapabilityPlatform, gatewayAvailable, h.TestConnection))
 	}
 	{
 		h := d.Storage
@@ -284,7 +287,10 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.POST("/platform/storage/profiles/:id/apply", d.controlProxy(
 			controlRoute{Operation: "platform.apply_storage_profile", Route: "POST /platform/storage/profiles/{id}/apply", Mutation: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.ApplyProfile))
 		control.POST("/platform/storage/profiles/:id/test", d.controlProxy(
-			controlRoute{Operation: "platform.test_storage_profile", Route: "POST /platform/storage/profiles/{id}/test", Mutation: true, Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.TestProfile))
+			// Profile test is a connectivity dry-run (no config write), so
+			// it registers as a POST read-guard without reason or
+			// idempotency requirements.
+			controlRoute{Operation: "platform.test_storage_profile", Route: "POST /platform/storage/profiles/{id}/test", Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.TestProfile))
 		control.GET("/platform/storage/profiles/:id/bucket-info", d.controlProxy(
 			controlRoute{Operation: "platform.get_storage_bucket_info", Route: "GET /platform/storage/profiles/{id}/bucket-info", Target: controlTargetParam("id", "storage_profile")}, ControlCapabilityPlatform, storageAvailable, h.GetBucketInfo))
 	}
@@ -295,7 +301,11 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 		control.PUT("/platform/search/providers/:provider", d.controlProxy(
 			controlRoute{Operation: "platform.update_search_provider", Route: "PUT /platform/search/providers/{provider}", Mutation: true, Target: controlTargetParam("provider", "search_provider")}, ControlCapabilityPlatform, searchAvailable, h.Update))
 		control.POST("/platform/search/providers/:provider/test", d.controlProxy(
-			controlRoute{Operation: "platform.test_search_provider", Route: "POST /platform/search/providers/{provider}/test", Mutation: true, Target: controlTargetParam("provider", "search_provider")}, ControlCapabilityPlatform, searchAvailable, h.Test))
+			// Provider test is a connectivity dry-run (the recorded test
+			// outcome is the probe result itself, not a config write), so
+			// it registers as a POST read-guard without reason or
+			// idempotency requirements.
+			controlRoute{Operation: "platform.test_search_provider", Route: "POST /platform/search/providers/{provider}/test", Target: controlTargetParam("provider", "search_provider")}, ControlCapabilityPlatform, searchAvailable, h.Test))
 	}
 	{
 		h := d.FeaturePrompts

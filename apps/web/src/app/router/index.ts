@@ -55,9 +55,10 @@ router.onError((error) => {
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   const isAdminRoute = isPathUnderRoute(to.path, ADMIN_ROOT_PATH)
-  // Only force-refresh session when >25 s have elapsed since last validation;
-  // this honours the 30 s TTL instead of bypassing it on every navigation.
-  const SESSION_FRESH_THRESHOLD_MS = 25_000
+  // Admin routes revalidate at most every 5 min: single-team surface with
+  // no role-flip threat, so a recently validated session is trusted between
+  // navigations instead of reprobing on every admin navigation.
+  const SESSION_FRESH_THRESHOLD_MS = 300_000
   const needsFreshSession =
     isAdminRoute && Date.now() - userStore.sessionValidatedAt > SESSION_FRESH_THRESHOLD_MS
   const shouldRefreshSession = needsFreshSession || !!to.meta.requiresAuth || !!to.meta.guest

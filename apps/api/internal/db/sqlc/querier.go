@@ -95,25 +95,6 @@ type Querier interface {
 	CreateBillingAccountStub(ctx context.Context, arg CreateBillingAccountStubParams) (BillingAccount, error)
 	CreateLibraryAsset(ctx context.Context, arg CreateLibraryAssetParams) (LibraryAsset, error)
 	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
-	// Materialization durable jobs (#828 slice A, Phase 4 of #809).
-	//
-	// Status words: the public API exposes pending/running/completed/failed
-	// while the durable CHECK stores pending/processing/completed/failed
-	// (chk_library_materializations_status). The store maps running <->
-	// processing at the boundary; SQL below uses the durable words.
-	// Terminal states (completed/failed) are immutable: transition
-	// statements guard on status IN ('pending','processing') so concurrent
-	// settlers converge on the winner; a guarded miss reads back the stored
-	// snapshot so idempotent replays converge instead of resurrecting jobs.
-	// Completion CHECK: completed needs media_asset_id + completed_at,
-	// failed needs completed_at. The result link resolves the caller's
-	// asset_... public id to media_assets.internal_id workspace-scoped
-	// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
-	// durable column: failures persist error_message only and reads report
-	// an empty code (follow-up migration if the taxonomy must persist).
-	// Rows carry no updated_at: reads report COALESCE(completed_at,
-	// created_at) as updated_at. No dedup key: one asset may back many
-	// jobs; request idempotency stays handler-side (library:materialize).
 	CreateLibraryMaterialization(ctx context.Context, arg CreateLibraryMaterializationParams) (LibraryMaterialization, error)
 	// Workspace-scoped library queries (#818, Phase 4-01 of #809).
 	//
@@ -229,6 +210,7 @@ type Querier interface {
 	// (chk_tasks_terminal_consistency requires a non-blank error_message) and
 	// releases the lease.
 	FailWorkspaceTask(ctx context.Context, arg FailWorkspaceTaskParams) (Task, error)
+	GetActiveLibraryMaterializationByAsset(ctx context.Context, arg GetActiveLibraryMaterializationByAssetParams) (GetActiveLibraryMaterializationByAssetRow, error)
 	GetActiveStorageProfileSecretVersion(ctx context.Context, arg GetActiveStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error)
 	GetBillingAccountByWorkspaceID(ctx context.Context, workspaceID pgtype.Int8) (BillingAccount, error)
@@ -382,6 +364,26 @@ type Querier interface {
 	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
 	LockAIGatewayModelMappingWrite(ctx context.Context) error
+	// Materialization durable jobs (#828 slice A, Phase 4 of #809).
+	//
+	// Status words: the public API exposes pending/running/completed/failed
+	// while the durable CHECK stores pending/processing/completed/failed
+	// (chk_library_materializations_status). The store maps running <->
+	// processing at the boundary; SQL below uses the durable words.
+	// Terminal states (completed/failed) are immutable: transition
+	// statements guard on status IN ('pending','processing') so concurrent
+	// settlers converge on the winner; a guarded miss reads back the stored
+	// snapshot so idempotent replays converge instead of resurrecting jobs.
+	// Completion CHECK: completed needs media_asset_id + completed_at,
+	// failed needs completed_at. The result link resolves the caller's
+	// asset_... public id to media_assets.internal_id workspace-scoped
+	// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
+	// durable column: failures persist error_message only and reads report
+	// an empty code (follow-up migration if the taxonomy must persist).
+	// Rows carry no updated_at: reads report COALESCE(completed_at,
+	// created_at) as updated_at. No dedup key: one asset may back many
+	// jobs; request idempotency stays handler-side (library:materialize).
+	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoardParams) (LockWorkspaceBoardRow, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)

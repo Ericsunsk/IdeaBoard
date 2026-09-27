@@ -82,3 +82,33 @@ func TestLocalStorageDriverReadWriteDelete(t *testing.T) {
 		t.Fatalf("expected ErrStoredObjectNotFound after delete, got %v", err)
 	}
 }
+
+func TestLocalStorageDriverListPrefixNormalization(t *testing.T) {
+	root := t.TempDir()
+	driver := NewLocalStorageDriverWithRoot("", root)
+	profile := &domain.StorageProfile{Provider: domain.StorageProviderLocal}
+	ctx := context.Background()
+
+	if err := driver.PutObject(ctx, profile, "uploads/test/sample.bin", []byte("payload"), "application/octet-stream"); err != nil {
+		t.Fatalf("put object error: %v", err)
+	}
+
+	// Traversal outside the uploads roots is rejected by the normalizer.
+	for _, prefix := range []string{"", "/", "uploads/../secret", "../secret", "other-root/test"} {
+		if _, err := driver.ListObjectKeysByPrefix(ctx, profile, prefix); err == nil {
+			t.Fatalf("prefix %q must fail", prefix)
+		}
+	}
+
+	// Normal prefixes (with or without trailing slash, interior dots
+	// resolving inside the root) keep listing.
+	for _, prefix := range []string{"uploads/test", "uploads/test/", "uploads/test/../test"} {
+		keys, err := driver.ListObjectKeysByPrefix(ctx, profile, prefix)
+		if err != nil {
+			t.Fatalf("prefix %q error: %v", prefix, err)
+		}
+		if len(keys) != 1 || filepath.ToSlash(keys[0]) != "uploads/test/sample.bin" {
+			t.Fatalf("prefix %q keys = %#v, want [uploads/test/sample.bin]", prefix, keys)
+		}
+	}
+}

@@ -309,10 +309,10 @@ func isValidPrincipal(principal Principal) bool {
 		}
 		// Control capabilities are valid on internal_worker subjects, and
 		// on human_session subjects with the admin business role holding
-		// the explicit operator role grant (issue #808:
-		// principal.WithControlGrant). Every other subject holding a
-		// control capability is invalid, so public capabilities never
-		// imply control.
+		// them explicitly via NewExtended (production sessions mint none;
+		// the Control Plane guard enforces admin-only). Every other
+		// subject holding a control capability is invalid, so public
+		// capabilities never imply control.
 		if IsControlCapability(trimmed) && !isControlCapableSubject(principal) {
 			return false
 		}
@@ -322,8 +322,8 @@ func isValidPrincipal(principal Principal) bool {
 
 // isControlCapableSubject reports whether the principal may validly carry
 // control:* capabilities: internal workers (construction-time minting) or
-// admin-role human sessions (explicit operator role grant via
-// WithControlGrant or NewExtended).
+// admin-role human sessions (explicit NewExtended grant; production
+// sessions mint none and the Control Plane guard enforces admin-only).
 func isControlCapableSubject(principal Principal) bool {
 	return isControlCapableSubjectType(principal.subjectType, principal.role)
 }

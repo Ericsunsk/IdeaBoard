@@ -14,6 +14,11 @@ package boards
 //   - The board creator is the implicit owner via boards.owner_user_id and
 //     never needs a board_memberships row. Rows predating the owner column
 //     read as not found (fail-closed).
+//   - Visible workspace members default to viewer (workspace owners to
+//     owner); explicit board_memberships rows override the default.
+//     Callers with no visible workspace membership and no explicit grant
+//     stay invisible (404 at the handler edge). Unknown/empty workspace
+//     roles stay fail-closed.
 //   - Revisions are INSERT-only: ReplaceDocument appends a board_revisions
 //     row and advances board_documents under SELECT ... FOR UPDATE plus a
 //     version-guarded UPDATE, so stale writers get ErrRevisionConflict.
@@ -21,8 +26,10 @@ package boards
 //   - Only the share-token hash is stored (token_secret); the bearer is
 //     returned once at create and never persisted, so share secrets need
 //     no reversible encryption at rest.
-//   - Workspace membership does NOT grant board access: every board read
-//     requires an explicit board role (creator counts as owner).
+//   - Workspace membership does NOT grant board access by itself: every
+//     board read requires an explicit board role OR a visible workspace
+//     membership default (creator counts as owner; workspace owners default
+//     to owner, other visible members to viewer; explicit rows override).
 //   - The last owner cannot be removed or demoted (ErrV1LastOwner).
 //
 // Divergences from the in-memory store (documented residuals):
@@ -154,9 +161,12 @@ func (s *PostgresWorkspaceBoardStore) getBoard(ctx context.Context, workspacePub
 	return getPostgresBoard(ctx, s.dbWithContext(ctx).q, workspacePublicID, boardPublicID)
 }
 
-// boardRoleTx reports the explicit board role: the owner_user_id counts as
-// owner; member rows grant editor/viewer/owner.
-func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID int64) (AccessRole, bool, error) {
+// boardRoleTx reports the effective board role: the owner_user_id counts as
+// owner; explicit member rows grant editor/viewer/owner and override the
+// workspace default; visible workspace members fall back to viewer
+// (workspace owners to owner). Unknown/empty workspace roles stay denied
+// (fail-closed); unknown member rows stay denied.
+func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID int64, workspaceRole string) (AccessRole, bool, error) {
 	if board.OwnerUserID == userID {
 		return RoleOwner, true, nil
 	}
@@ -167,6 +177,9 @@ func boardRoleTx(ctx context.Context, q *dbsqlc.Queries, board *V1Board, userID 
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
+			if role, ok := DefaultBoardRoleForWorkspaceRole(workspaceRole); ok {
+				return role, true, nil
+			}
 			return "", false, nil
 		}
 		return "", false, err
@@ -534,8 +547,10 @@ func mapPostgresRevision(boardPublicID string, id int64, revision, schemaVersion
 	}
 }
 
-// GetBoardRole reports the explicit board role (creator counts as owner).
-func (s *PostgresWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64) (AccessRole, bool, error) {
+// GetBoardRole reports the effective board role (creator counts as owner;
+// explicit rows override; visible workspace members fall back to viewer,
+// workspace owners to owner).
+func (s *PostgresWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspacePublicID, boardPublicID string, userID int64, workspaceRole string) (AccessRole, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return "", false, err
 	}
@@ -543,7 +558,7 @@ func (s *PostgresWorkspaceBoardStore) GetBoardRole(ctx context.Context, workspac
 	if err != nil {
 		return "", false, err
 	}
-	return boardRoleTx(ctx, s.dbWithContext(ctx).q, board, userID)
+	return boardRoleTx(ctx, s.dbWithContext(ctx).q, board, userID, workspaceRole)
 }
 
 // ListBoardMembers lists explicit grants ordered by user id (the implicit
@@ -582,8 +597,9 @@ func (s *PostgresWorkspaceBoardStore) ListBoardMembers(ctx context.Context, work
 }
 
 // AddBoardMember grants a role idempotently: re-adding keeps the existing
-// role. Only board owners may grant.
-func (s *PostgresWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole) (*V1BoardMember, error) {
+// role. Only board owners may grant (the actor's effective role includes
+// the workspace default).
+func (s *PostgresWorkspaceBoardStore) AddBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, role AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -601,7 +617,7 @@ func (s *PostgresWorkspaceBoardStore) AddBoardMember(ctx context.Context, worksp
 		if err != nil {
 			return err
 		}
-		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID)
+		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
 		if err != nil {
 			return err
 		}
@@ -659,8 +675,8 @@ func (s *PostgresWorkspaceBoardStore) AddBoardMember(ctx context.Context, worksp
 }
 
 // UpdateBoardMemberRole applies owner-only transitions with last-owner
-// protection.
-func (s *PostgresWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole) (*V1BoardMember, error) {
+// protection. The actor's effective role includes the workspace default.
+func (s *PostgresWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, newRole AccessRole, actorWorkspaceRole string) (*V1BoardMember, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -678,7 +694,7 @@ func (s *PostgresWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID)
+		actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
 		if err != nil {
 			return err
 		}
@@ -745,8 +761,9 @@ func (s *PostgresWorkspaceBoardStore) UpdateBoardMemberRole(ctx context.Context,
 }
 
 // RemoveBoardMember removes a grant: owners may remove anyone, anyone may
-// remove themselves. The last owner is protected.
-func (s *PostgresWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64) error {
+// remove themselves. The last owner is protected. The actor's effective
+// role includes the workspace default.
+func (s *PostgresWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, workspacePublicID, boardPublicID string, actorUserID, targetUserID int64, actorWorkspaceRole string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -788,7 +805,7 @@ func (s *PostgresWorkspaceBoardStore) RemoveBoardMember(ctx context.Context, wor
 			}
 		}
 		if actorUserID != targetUserID {
-			actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID)
+			actorRole, ok, err := boardRoleTx(ctx, q, board, actorUserID, actorWorkspaceRole)
 			if err != nil {
 				return err
 			}

@@ -98,14 +98,14 @@ func newV1BoardsFixture(t *testing.T) *v1BoardsFixture {
 	if _, err := boardsStore.CreateBoard(ctx, ws.PublicID, owner, "Launch", boardID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, editor, boards.RoleEditor); err != nil {
+	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, editor, boards.RoleEditor, tenancy.RoleOwner); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, viewer, boards.RoleViewer); err != nil {
+	if _, err := boardsStore.AddBoardMember(ctx, ws.PublicID, boardID, owner, viewer, boards.RoleViewer, tenancy.RoleOwner); err != nil {
 		t.Fatal(err)
 	}
-	// wsMember holds workspace membership but no board grant: board access
-	// must stay invisible (404 board_not_found).
+	// wsMember holds workspace membership with no explicit board grant:
+	// with the viewer default they read as viewer (owners read as owner).
 	store.SeedWorkspaceMember(ws.PublicID, editor, tenancy.RoleMember)
 	store.SeedWorkspaceMember(ws.PublicID, viewer, tenancy.RoleMember)
 	store.SeedWorkspaceMember(ws.PublicID, wsMember, tenancy.RoleMember)
@@ -297,14 +297,19 @@ func TestV1BoardsACLMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("workspace member without board grant is invisible", func(t *testing.T) {
+	t.Run("workspace member without explicit grant defaults to viewer", func(t *testing.T) {
 		status, _, payload := doV1(t, f.engine, v1Call{method: http.MethodGet, path: detailPath, userID: f.wsMember})
-		if status != 404 || v1ErrorCode(t, payload) != string(contract.CodeBoardNotFound) {
-			t.Fatalf("grantless member = %d %v, want 404 board_not_found", status, payload)
+		if status != 200 {
+			t.Fatalf("default viewer read = %d %v, want 200", status, payload)
 		}
 		status, _, listed := doV1(t, f.engine, v1Call{method: http.MethodGet, path: f.boardsPath(""), userID: f.wsMember})
-		if status != 200 || len(listed["data"].([]any)) != 0 {
-			t.Fatalf("grantless list = %d %v, want empty 200", status, listed)
+		if status != 200 || len(listed["data"].([]any)) != 1 {
+			t.Fatalf("default viewer list = %d %v, want 1 board", status, listed)
+		}
+		// Viewers read but cannot write.
+		status, forbidden := boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.wsMember, "", `{"data":{"name":"Nope"}}`)
+		if status != 403 || v1ErrorCode(t, forbidden) != string(contract.CodeBoardForbidden) {
+			t.Fatalf("default viewer rename = %d %v, want 403 board_forbidden", status, forbidden)
 		}
 	})
 

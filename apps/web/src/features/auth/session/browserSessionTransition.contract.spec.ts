@@ -85,18 +85,93 @@ describe('browser session transition', () => {
     expect(mocks.clearAuthScopedQueryCache).toHaveBeenCalledOnce()
   })
 
-  it('fails closed and clears local state when a fresh user projection fails', async () => {
+  it('clears local state when a fresh user projection is rejected as unauthorized', async () => {
     const harness = createHarness({ user: makeUser('user-1'), loaded: true })
-    harness.loadUser.mockRejectedValue(new Error('upstream unavailable'))
+    harness.loadUser.mockRejectedValue({ status: 401 })
 
-    await expect(
-      harness.transition.fetchUserInfo(true, { failClosedOnError: true }),
-    ).resolves.toBeNull()
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toBeNull()
 
     expect(harness.getUser()).toBeNull()
     expect(harness.state.clear).toHaveBeenCalledOnce()
     expect(mocks.clearPersistedSession).toHaveBeenCalledOnce()
     expect(mocks.clearAuthScopedQueryCache).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the stale user and marks unloaded on 500 so the next nav retries', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    harness.loadUser.mockRejectedValue({ status: 500 })
+
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(makeUser('user-1'))
+
+    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.state.clear).not.toHaveBeenCalled()
+    expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
+    expect(mocks.clearPersistedSession).not.toHaveBeenCalled()
+    expect(mocks.clearAuthScopedQueryCache).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stale user and marks unloaded on timeouts without a status', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    harness.loadUser.mockRejectedValue(new Error('upstream unavailable'))
+
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(makeUser('user-1'))
+
+    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.state.clear).not.toHaveBeenCalled()
+    expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the stale user for fresh ensureSession probes on server errors', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true, validatedAt: 0 })
+    harness.loadUser.mockRejectedValue({ status: 503 })
+
+    await expect(harness.transition.ensureSession({ fresh: true })).resolves.toEqual(
+      makeUser('user-1'),
+    )
+
+    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.state.clear).not.toHaveBeenCalled()
+    expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
+  })
+
+  it('retries a transient projection failure once when requested, then commits', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    harness.loadUser
+      .mockRejectedValueOnce({ status: 500 })
+      .mockResolvedValueOnce({ user: makeUser('user-2') })
+
+    await expect(
+      harness.transition.fetchUserInfo(true, { retryTransient: true }),
+    ).resolves.toEqual(makeUser('user-2'))
+
+    expect(harness.loadUser).toHaveBeenCalledTimes(2)
+    expect(harness.state.commit).toHaveBeenCalledWith(makeUser('user-2'))
+  })
+
+  it('clears the stale identity after a post-auth retry is exhausted', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    harness.loadUser.mockRejectedValue({ status: 500 })
+
+    await expect(
+      harness.transition.fetchUserInfo(true, { retryTransient: true }),
+    ).resolves.toBeNull()
+
+    expect(harness.loadUser).toHaveBeenCalledTimes(2)
+    expect(harness.getUser()).toBeNull()
+    expect(harness.state.clear).toHaveBeenCalledOnce()
+    expect(harness.state.markUnloaded).not.toHaveBeenCalled()
+  })
+
+  it('does not retry when the projection is rejected as unauthorized', async () => {
+    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    harness.loadUser.mockRejectedValue({ status: 403 })
+
+    await expect(
+      harness.transition.fetchUserInfo(true, { retryTransient: true }),
+    ).resolves.toBeNull()
+
+    expect(harness.loadUser).toHaveBeenCalledTimes(1)
+    expect(harness.getUser()).toBeNull()
   })
 
   it('normalizes unsafe OAuth redirects and clears state on callback failure', async () => {

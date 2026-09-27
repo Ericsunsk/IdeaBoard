@@ -24,7 +24,7 @@ export type UserSessionStore = {
   logout: () => Promise<boolean>
   fetchUserInfo: (
     force?: boolean,
-    options?: { failClosedOnError?: boolean },
+    options?: { retryTransient?: boolean },
   ) => Promise<User | null>
   ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
   completeOAuthCallback: (input: {
@@ -89,7 +89,7 @@ function createUserSessionStore(): UserSessionStore {
   async function login(identifier: string, password: string) {
     await authTransport.login(identifier, password)
     setEmail(identifier)
-    await transition.fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { retryTransient: true })
     if (!user.value) {
       throw new Error(i18n.global.t('auth.errors.sessionRestoreFailed'))
     }
@@ -103,7 +103,7 @@ function createUserSessionStore(): UserSessionStore {
 
   async function verifyRegistrationOTP(email: string, otp: string) {
     await authTransport.verifyRegistrationOTP(email, otp)
-    await transition.fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { retryTransient: true })
     if (!user.value) throw new Error(i18n.global.t('auth.errors.sessionRestoreAfterVerifyFailed'))
     return true
   }
@@ -132,7 +132,8 @@ function createUserSessionStore(): UserSessionStore {
   async function changeEmailWithOTP(newEmail: string, otp: string) {
     await authTransport.changeEmailWithOTP(newEmail, otp)
     setEmail(newEmail)
-    await transition.fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { retryTransient: true })
+    if (!user.value) throw new Error(i18n.global.t('auth.errors.sessionRestoreFailed'))
     return true
   }
 

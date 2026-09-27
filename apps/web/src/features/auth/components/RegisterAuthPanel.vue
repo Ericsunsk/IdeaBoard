@@ -388,10 +388,14 @@ function validateField(field: RegisterField) {
     return !errors.value.email
   }
 
+  // The confirmation field only checks presence + mismatch: minimum length
+  // is owned by the password field (and the server), so a short-but-matching
+  // confirmation must not raise its own length error.
   const confirmPassword = formValue.value.confirmPassword
-  errors.value.confirmPassword =
-    getRequiredError(confirmPassword, t('auth.fields.confirmPassword')) ||
-    getPasswordLengthError(confirmPassword)
+  errors.value.confirmPassword = getRequiredError(
+    confirmPassword,
+    t('auth.fields.confirmPassword'),
+  )
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
     errors.value.confirmPassword = t('auth.errors.passwordMismatch')

@@ -10,7 +10,7 @@ cat >"$fake_bin/curl" <<'EOF'
 set -euo pipefail
 printf '%s\n' "$*" >>"${QA_TEST_REQUESTS}"
 case "$*" in
-  *'/api/v1/me'*) printf '%s\n' '{"data":{"id":"usr_test0001"}}' ;;
+  *'/api/v1/user'*) printf '%s\n' '{"data":{"id":"usr_test0001"}}' ;;
   *'/api/v1/workspaces/ws_test0001/boards'*) printf '%s\n' '{"data":[{"id":"board_qa1","name":"QA qa-20260831-abc123"}],"meta":{"next_cursor":null}}' ;;
   *'/api/v1/workspaces/ws_test0001/library/assets'*) printf '%s\n' '{"data":[{"id":"asset_qa7","title":"QA qa-20260831-abc123 source"}],"meta":{"next_cursor":null}}' ;;
   *) printf '%s\n' '{"data":{"archived":true}}' ;;
@@ -44,5 +44,5 @@ if QA_TEST_RUN_ID='production-test' run_cleanup --board-id board_qa1 >/dev/null 
 if QA_WORKSPACE_ID='not-a-workspace' run_cleanup --board-id board_qa1 >/dev/null 2>&1; then echo 'workspace validation failed' >&2; exit 1; fi
 : >"$requests"
 run_cleanup_with_public_origin --board-id board_qa1 >/dev/null
-grep -Fq 'https://ideaboard.test/api/v1/me' "$requests"
+grep -Fq 'https://ideaboard.test/api/v1/user' "$requests"
 echo 'QA production cleanup contract tests passed'

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, within } from '@testing-library/vue'
 import { renderWithUser, screen } from '../../../../../test/render'
 import AdminGatewayConfigDialog from './AdminGatewayConfigDialog.vue'
+import { ADMIN_PROBE_OPERATOR_REASON } from '../../../shared/lib/confirmSettingsSave'
 import type {
   AdminGatewayConnection,
   GatewayConnectionSummary,
@@ -207,7 +208,7 @@ describe('AdminGatewayConfigDialog', () => {
     expect(onUpdateVisible).toHaveBeenCalledWith(false)
   })
 
-  it('supports testing gateway connection from the modal', async () => {
+  it('supports testing gateway connection from the modal without a confirm dialog', async () => {
     vi.mocked(mockResource.testConnection).mockResolvedValue({
       success: true,
       latencyMs: 38,
@@ -224,7 +225,7 @@ describe('AdminGatewayConfigDialog', () => {
         base_url:
           'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
       }),
-      { operatorReason: 'gateway review' },
+      { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )
     expect(toast.success).toHaveBeenCalledWith('网关连接正常 (38ms)')
   })

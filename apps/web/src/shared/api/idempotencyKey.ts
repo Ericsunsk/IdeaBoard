@@ -68,7 +68,7 @@ export function workspaceBillingPendingOrderIdempotencyKey(
 // Workspace library write key per operation (issue #806, `library:<operation>`
 // backend scope bound to principal + workspace). Retries of the SAME
 // attempt must reuse the returned value so the server replays instead
-// of duplicating folders, assets, or materializations.
+// of duplicating folders or assets.
 export function workspaceLibraryIdempotencyKey(operation: string): string {
   const normalized = operation.trim() || 'write'
   return createIdempotencyKey(`library:${normalized}`)

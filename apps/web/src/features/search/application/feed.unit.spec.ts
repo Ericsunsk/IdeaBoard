@@ -86,9 +86,12 @@ describe('createSearchFeed interface', () => {
     expect(deps.restoreScroll).toHaveBeenCalledWith(420)
     expect(feed.results.value).toEqual([fresh])
     expect(lookupSavedKeys).toHaveBeenCalledOnce()
-    expect(lookupSavedKeys).toHaveBeenCalledWith('ws_test123', [
-      { provider: 'unsplash', sourceId: 'fresh' },
-    ])
+    expect(lookupSavedKeys).toHaveBeenCalledWith(
+      'ws_test123',
+      [{ provider: 'unsplash', sourceId: 'fresh' }],
+      // Supplementary backfill: silent 401s degrade locally, never reload.
+      { authFailure: 'silent' },
+    )
     expect(feed.savedKeys.value).toEqual(new Set(['unsplash:fresh']))
     expect(storage.write).toHaveBeenCalledWith(
       {
@@ -129,9 +132,11 @@ describe('createSearchFeed interface', () => {
     expect(feed.results.value).toEqual([cached])
     expect(feed.hasError.value).toBe(true)
     expect(feed.hasMore.value).toBe(true)
-    expect(lookupSavedKeys).toHaveBeenCalledWith('ws_test123', [
-      { provider: 'unsplash', sourceId: 'cached' },
-    ])
+    expect(lookupSavedKeys).toHaveBeenCalledWith(
+      'ws_test123',
+      [{ provider: 'unsplash', sourceId: 'cached' }],
+      { authFailure: 'silent' },
+    )
 
     await feed.load(false)
 

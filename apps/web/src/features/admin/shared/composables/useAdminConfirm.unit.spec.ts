@@ -83,4 +83,48 @@ describe('useAdminConfirm', () => {
     await expect(activeAdminConfirm.value?.confirm()).rejects.toThrow('operation failed')
     await expect(promise).rejects.toThrow('operation failed')
   })
+
+  it('confirms with an empty note when the reason is optional', async () => {
+    const adminConfirm = useAdminConfirm()
+    const promise = adminConfirm.confirm({
+      title: '启用功能',
+      message: '确定启用吗？',
+      confirmLabel: '启用',
+      intent: 'warn',
+      reason: { required: false },
+    })
+
+    expect(activeAdminConfirm.value?.reasonEnabled).toBe(true)
+    expect(activeAdminConfirm.value?.reasonRequired).toBe(false)
+    await activeAdminConfirm.value?.confirm()
+
+    await expect(promise).resolves.toBe(true)
+    expect(activeAdminConfirm.value).toBeNull()
+  })
+
+  it('blocks confirmation on an empty required note without resolving', async () => {
+    const adminConfirm = useAdminConfirm()
+    let resolved = false
+    const promise = adminConfirm
+      .confirm({
+        title: '删除功能',
+        message: '确定删除吗？',
+        confirmLabel: '删除',
+        intent: 'danger',
+        reason: { required: true },
+      })
+      .then((value) => {
+        resolved = true
+        return value
+      })
+
+    await activeAdminConfirm.value?.confirm()
+    await Promise.resolve()
+
+    expect(resolved).toBe(false)
+    expect(activeAdminConfirm.value?.open).toBe(true)
+    activeAdminConfirm.value?.setReason('audit note')
+    await activeAdminConfirm.value?.confirm()
+    await expect(promise).resolves.toBe(true)
+  })
 })

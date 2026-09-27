@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import AdminSearchProviderCard from './AdminSearchProviderCard.vue'
+import {
+  ADMIN_PROBE_OPERATOR_REASON,
+  ADMIN_REVERSIBLE_DEFAULT_REASON,
+} from '../shared/lib/confirmSettingsSave'
 import type { AdminSearchProviderResource } from './searchProviderResource'
 import type { SearchProviderConfig } from './searchProviderTypes'
 
@@ -113,14 +117,17 @@ describe('AdminSearchProviderCard', () => {
     expect(resource.update).not.toHaveBeenCalled()
   })
 
-  it('runs the connection test against the saved key', async () => {
+  it('runs the connection test against the saved key without a confirm dialog', async () => {
     const { user } = renderCard(createConfig({ test_state: 'never' }), resource)
 
     await user.click(screen.getByRole('button', { name: '测试连接' }))
 
     await waitFor(() =>
-      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: 'test reason' }),
+      expect(resource.test).toHaveBeenCalledWith('unsplash', {
+        operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+      }),
     )
+    expect(confirmMock).not.toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('Unsplash 连接测试通过')
   })
 
@@ -146,6 +153,20 @@ describe('AdminSearchProviderCard', () => {
     )
   })
 
+  it('lets toggles proceed with the default note when the reason is left empty', async () => {
+    readReasonMock.mockReturnValueOnce('')
+    const { user } = renderCard(createConfig({ test_state: 'passed' }), resource)
+
+    await user.click(screen.getByRole('button', { name: '启用' }))
+    await waitFor(() =>
+      expect(resource.update).toHaveBeenCalledWith(
+        'unsplash',
+        { enabled: true },
+        { operatorReason: ADMIN_REVERSIBLE_DEFAULT_REASON },
+      ),
+    )
+  })
+
   it('surfaces test failure state for retry', async () => {
     vi.mocked(resource.test).mockRejectedValueOnce(new Error('connection refused'))
     const { user } = renderCard(
@@ -162,7 +183,10 @@ describe('AdminSearchProviderCard', () => {
 
     await user.click(screen.getByRole('button', { name: '测试连接' }))
     await waitFor(() =>
-      expect(resource.test).toHaveBeenCalledWith('unsplash', { operatorReason: 'test reason' }),
+      expect(resource.test).toHaveBeenCalledWith('unsplash', {
+        operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+      }),
     )
+    expect(confirmMock).not.toHaveBeenCalled()
   })
 })

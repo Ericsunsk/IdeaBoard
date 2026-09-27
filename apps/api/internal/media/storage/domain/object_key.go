@@ -19,20 +19,18 @@ func BuildObjectKey(dirPrefix string, ext string) (string, error) {
 	baseDir := UploadObjectRoot
 	if strings.TrimSpace(dirPrefix) != "" {
 		rawPrefix := strings.TrimSpace(dirPrefix)
-		if HasParentDirectorySegment(rawPrefix) {
-			return "", fmt.Errorf("上传目录前缀无效")
-		}
 		prefix := path.Clean(rawPrefix)
 		prefix = strings.TrimPrefix(prefix, "/")
-		if HasParentDirectorySegment(prefix) {
-			return "", fmt.Errorf("上传目录前缀无效")
-		}
 		if prefix != "." && prefix != "" {
 			baseDir = path.Join(baseDir, prefix)
 		}
 	}
 	now := time.Now()
-	return fmt.Sprintf("%s/%s/%d%s", baseDir, now.Format("2006/01/02"), now.UnixNano(), cleanExt), nil
+	// Single-source traversal defense: the returned key is anchored by
+	// NormalizeUploadObjectKey (lexical Clean + uploads/ws-uploads root
+	// check), so interior ".." segments that resolve inside the root
+	// normalize instead of failing, while escapes still error.
+	return NormalizeUploadObjectKey(fmt.Sprintf("%s/%s/%d%s", baseDir, now.Format("2006/01/02"), now.UnixNano(), cleanExt))
 }
 
 func StableUploadObjectKey(dirPrefix, filename string) (string, error) {
@@ -42,24 +40,12 @@ func StableUploadObjectKey(dirPrefix, filename string) (string, error) {
 	}
 	baseDir := UploadObjectRoot
 	if strings.TrimSpace(dirPrefix) != "" {
-		if HasParentDirectorySegment(dirPrefix) {
-			return "", fmt.Errorf("上传目录前缀无效")
-		}
 		prefix := strings.Trim(path.Clean(strings.TrimSpace(dirPrefix)), "/")
 		if prefix != "" && prefix != "." {
 			baseDir = path.Join(baseDir, prefix)
 		}
 	}
 	return NormalizeUploadObjectKey(path.Join(baseDir, base))
-}
-
-func HasParentDirectorySegment(value string) bool {
-	for _, part := range strings.Split(strings.ReplaceAll(value, "\\", "/"), "/") {
-		if part == ".." {
-			return true
-		}
-	}
-	return false
 }
 
 func CanonicalObjectKeyExtension(objectKey, ext string) string {

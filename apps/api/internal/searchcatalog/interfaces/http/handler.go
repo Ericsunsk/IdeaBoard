@@ -70,7 +70,9 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	admin, ok := principal.RequireAdmin(c)
+	// Authorization rides the outer Control Plane guard (controlProxy +
+	// guard); the actor is resolved from the request principal.
+	admin, ok := principal.Require(c)
 	if !ok {
 		return
 	}
@@ -105,7 +107,9 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Test(c *gin.Context) {
-	admin, ok := principal.RequireAdmin(c)
+	// Authorization rides the outer Control Plane guard (controlProxy +
+	// guard); the actor is resolved from the request principal.
+	admin, ok := principal.Require(c)
 	if !ok {
 		return
 	}

@@ -13,8 +13,13 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateLibraryMaterializationRequestData } from './createLibraryMaterializationRequestData'
+import type { UserId } from './userId'
+import type { UserRole } from './userRole'
+import type { WorkspaceId } from './workspaceId'
 
-export interface CreateLibraryMaterializationRequest {
-  data: CreateLibraryMaterializationRequestData
+export interface User {
+  id: UserId
+  display_name?: string
+  role?: UserRole
+  personal_workspace_id?: WorkspaceId
 }

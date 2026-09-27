@@ -8,6 +8,11 @@ import (
 
 const (
 	UploadObjectRoot = "uploads"
+	// WorkspaceUploadObjectRoot scopes workspace upload sessions, media
+	// assets and derivatives (see workspacemedia key builders). Both roots
+	// stay anchored under the storage root; traversal outside them is
+	// still rejected below.
+	WorkspaceUploadObjectRoot = "ws-uploads"
 )
 
 type UploadResourceKind string
@@ -289,8 +294,9 @@ func NormalizeUploadObjectKey(raw string) (string, error) {
 		return "", fmt.Errorf("文件路径不能为空")
 	}
 	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
-	if !strings.HasPrefix(cleaned, "/"+UploadObjectRoot+"/") {
-		return "", fmt.Errorf("仅允许删除 uploads 目录下的文件")
+	if !strings.HasPrefix(cleaned, "/"+UploadObjectRoot+"/") &&
+		!strings.HasPrefix(cleaned, "/"+WorkspaceUploadObjectRoot+"/") {
+		return "", fmt.Errorf("仅允许操作 uploads 或 ws-uploads 目录下的文件")
 	}
 	return strings.TrimPrefix(cleaned, "/"), nil
 }

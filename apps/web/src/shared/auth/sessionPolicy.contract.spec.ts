@@ -71,11 +71,36 @@ describe('resolveAuthFailureAction', () => {
     expect(
       resolveAuthFailureAction({
         status: 401,
-        requestUrl: '/api/user/info',
+        requestUrl: '/api/v1/user',
         currentPathname: '/admin/monitor',
         currentFullPath: '/admin/monitor',
       }),
     ).toEqual({ kind: 'clear-only' })
+  })
+
+  it('clears auth without redirecting for a boot-time probe 401 on the login page', () => {
+    expect(
+      resolveAuthFailureAction({
+        status: 401,
+        requestUrl: 'http://localhost:6000/api/v1/user',
+        currentPathname: '/user/login',
+        currentFullPath: '/user/login?redirect=%2Fuser%2Fboards',
+      }),
+    ).toEqual({ kind: 'clear-only' })
+  })
+
+  it('keeps redirect-login for session sub-resource 401', () => {
+    expect(
+      resolveAuthFailureAction({
+        status: 401,
+        requestUrl: 'http://localhost:6000/api/v1/user/avatar',
+        currentPathname: '/user/boards',
+        currentFullPath: '/user/boards',
+      }),
+    ).toEqual({
+      kind: 'redirect-login',
+      targetPath: '/user/login?redirect=%2Fuser%2Fboards',
+    })
   })
 
   it('ignores auth endpoint 401 responses', () => {

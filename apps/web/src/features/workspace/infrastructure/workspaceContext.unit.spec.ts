@@ -28,7 +28,10 @@ const resourceMocks = vi.hoisted(() => ({
   provisionWorkspace: vi.fn(),
 }))
 
-vi.mock('@tanstack/vue-query', () => ({ useQuery: queryMocks.useQuery }))
+vi.mock('@tanstack/vue-query', async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
+  useQuery: queryMocks.useQuery,
+}))
 vi.mock('vue-router', () => ({
   useRoute: routerMocks.useRoute,
   useRouter: routerMocks.useRouter,
@@ -240,14 +243,19 @@ describe('useWorkspaceSelection', () => {
     routerMocks.replace.mockReset()
   })
 
-  it('auto-selects the personal workspace and reports ready', () => {
+  it('auto-selects the personal workspace, persists it, and reports ready', () => {
     mockQuery({ items: [TEAM, PERSONAL] })
     mockRoute()
 
-    const selection = useWorkspaceSelection({ store: freshStore() })
+    const store = freshStore()
+    const selection = useWorkspaceSelection({ store })
 
     expect(selection.selectedId.value).toBe('ws_personal1')
-    expect(selection.selectionSource.value).toBe('auto-personal')
+    // Auto-resolution is persisted so cross-layer readers
+    // (`getSelectedId()`) see the same workspace; the source then
+    // reports 'stored' on re-evaluation.
+    expect(store.getSelectedId()).toBe('ws_personal1')
+    expect(selection.selectionSource.value).toBe('stored')
     expect(selection.status.value).toBe('ready')
   })
 
@@ -279,5 +287,48 @@ describe('useWorkspaceSelection', () => {
     mockRoute()
     const empty = useWorkspaceSelection({ store: freshStore(), enabled: false })
     expect(empty.status.value).toBe('disabled')
+  })
+
+  it('fetches the list silently when anonymous, redirect by default when authed', async () => {
+    mockQuery({ items: [] })
+    mockRoute()
+    resourceMocks.fetchWorkspacePage.mockReset()
+
+    localStorage.clear()
+    useWorkspaceSelection({ store: freshStore() })
+    const anonymousQueryFn = queryMocks.useQuery.mock.calls[0]?.[0]?.queryFn
+    await anonymousQueryFn({ signal: undefined })
+    expect(resourceMocks.fetchWorkspacePage).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ authFailure: 'silent' }),
+    )
+
+    localStorage.setItem('user', JSON.stringify({ public_id: 'usr_anonymous1' }))
+    resourceMocks.fetchWorkspacePage.mockClear()
+    useWorkspaceSelection({ store: freshStore() })
+    const authedQueryFn = queryMocks.useQuery.mock.calls[1]?.[0]?.queryFn
+    await authedQueryFn({ signal: undefined })
+    expect(resourceMocks.fetchWorkspacePage).toHaveBeenCalledWith(
+      undefined,
+      expect.not.objectContaining({ authFailure: 'silent' }),
+    )
+    localStorage.clear()
+  })
+
+  it('honors an explicit silent override for authed readers', async () => {
+    mockQuery({ items: [] })
+    mockRoute()
+    resourceMocks.fetchWorkspacePage.mockReset()
+    localStorage.setItem('user', JSON.stringify({ public_id: 'usr_explicit1' }))
+
+    useWorkspaceSelection({ store: freshStore(), authFailure: 'silent' })
+    const queryFn = queryMocks.useQuery.mock.calls[0]?.[0]?.queryFn
+    await queryFn({ signal: undefined })
+
+    expect(resourceMocks.fetchWorkspacePage).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ authFailure: 'silent' }),
+    )
+    localStorage.clear()
   })
 })

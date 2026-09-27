@@ -2,7 +2,7 @@
 //
 // This type lives in its own leaf module (zero imports) on purpose: the
 // dependency-cruiser `no-circular` rule counts even type-only edges, and
-// `shared/api/userSession` (runtime: generated `getMe` transport) sits
+// `shared/api/userSession` (runtime: generated `getUser` transport) sits
 // downstream of `shared/api/client`. Importing this type from `userSession`
 // would close a client → utils/auth → userSession → orvalMutator → client
 // cycle. Feature code keeps importing this `User` view type (never generated

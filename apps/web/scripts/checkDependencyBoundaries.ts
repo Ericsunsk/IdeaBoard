@@ -75,7 +75,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
     name: 'prohibits admin features from importing the public generated client',
     expectedRule: 'features-admin-no-public-client',
     fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-admin-public.fixture.ts'),
-    content: `import { getMe } from '../../shared/api/generated-query/public/me/me'; console.log(getMe);`,
+    content: `import { getUser } from '../../shared/api/generated-query/public/user/user'; console.log(getUser);`,
   },
   {
     name: 'prohibits non-admin features from importing the control generated client',

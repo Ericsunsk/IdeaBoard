@@ -343,11 +343,14 @@ func (d *LocalStorageDriver) ListObjectKeysByPrefix(ctx context.Context, profile
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
-	if prefix == "" {
-		return nil, fmt.Errorf("文件前缀不能为空")
+	// Single-source traversal defense: the domain normalizer anchors the
+	// prefix under uploads/ or ws-uploads/ (mirroring DeleteByPrefix); the
+	// driver-local localPath root check stays as defense in depth.
+	normalizedPrefix, err := domain.NormalizeUploadObjectPrefix(objectKeyPrefix)
+	if err != nil {
+		return nil, err
 	}
-	root, err := d.localPath(prefix)
+	root, err := d.localPath(strings.TrimSuffix(normalizedPrefix, "/"))
 	if err != nil {
 		return nil, err
 	}

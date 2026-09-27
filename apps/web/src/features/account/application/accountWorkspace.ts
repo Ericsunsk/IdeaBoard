@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, type MaybeRefOrGetter } from 'vue'
 // Workspace selection for the account surface (W2 transports).
 //
 // Deep import (not the workspace entrypoint): the entrypoint re-exports the
@@ -8,8 +8,12 @@ import { computed } from 'vue'
 // account, matching the existing board precedent.
 import { useWorkspaceSelection } from '../../workspace/infrastructure/workspaceContext'
 
-export function useAccountWorkspace() {
-  const selection = useWorkspaceSelection()
+export function useAccountWorkspace(options?: { enabled?: MaybeRefOrGetter<boolean> }) {
+  // Thread the caller's gate into the selection query: a bare call fires the
+  // workspace list on mount, and an anonymous 401 reloads the whole page to
+  // login via the shared auth-failure handler. Defaults to true so existing
+  // authed account surfaces behave unchanged.
+  const selection = useWorkspaceSelection({ enabled: options?.enabled })
   const workspaceId = computed(() => selection.selectedId.value)
   const selectionPending = computed(() => selection.status.value === 'loading')
   // Settled covers ready/empty/error/hidden/forbidden: anything past

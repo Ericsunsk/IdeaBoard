@@ -127,3 +127,19 @@ export function handleAuthFailure(params: {
 }): boolean {
   return applyAuthFailureAction(resolveAuthFailureAction(getCurrentAuthFailureContext(params)))
 }
+
+export function handleSilentAuthFailure(params: {
+  status?: number
+  payload?: unknown
+  requestUrl: string
+}): boolean {
+  // Supplementary/background 401 policy: a dead session still clears local
+  // auth state (so the next foreground request re-authenticates), but the
+  // page is never navigated — the caller owns local error handling.
+  // Always returns false (no navigation performed). Session-policy kinds
+  // are reused as-is; no new kind is introduced.
+  const action = resolveAuthFailureAction(getCurrentAuthFailureContext(params))
+  if (action.kind === 'ignore') return false
+  clearStoredAuthState()
+  return false
+}

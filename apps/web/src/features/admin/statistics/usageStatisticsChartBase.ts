@@ -75,12 +75,19 @@ export function formatPercentValue(value: number, total: number) {
 }
 
 export function toNonNegativeNumber(value: number | null | undefined): number {
-  const parsed = Number(value) || 0
+  // Fail closed: non-finite input propagates as NaN (chart gap / `—` tooltip)
+  // instead of a fabricated 0; only finite values are clamped to >= 0.
+  if (value === null || value === undefined) return NaN
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return NaN
   return Math.max(0, parsed)
 }
 
 export function normalizePercent(value: number | null | undefined): number {
   // 后端一律 0-100；错量级必须可见（仅 clamp），不得静默 *100 猜测修复。
-  const parsed = Number(value) || 0
+  // 非法输入透出 NaN（不断言为 0），由 tooltip 渲染为 `—`。
+  if (value === null || value === undefined) return NaN
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return NaN
   return Math.max(0, Math.min(100, parsed))
 }

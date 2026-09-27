@@ -78,6 +78,21 @@ func validateAssetURLs(input AssetInput) error {
 	return nil
 }
 
+// ProviderFetchHosts returns the code-owned fetch hosts for a provider:
+// the same closed world IsAllowedProviderURL enforces. Callers pass these
+// as the transport allowlist so provider fetches need no operator policy;
+// the egress gate stays closed-world (exact hosts, DNS-filtered transport).
+func ProviderFetchHosts(provider string) []string {
+	switch provider {
+	case ProviderUnsplash:
+		return []string{"unsplash.com", "images.unsplash.com", "plus.unsplash.com", "source.unsplash.com", "www.unsplash.com"}
+	case ProviderPexels:
+		return []string{"pexels.com", "images.pexels.com", "videos.pexels.com", "www.pexels.com"}
+	default:
+		return nil
+	}
+}
+
 // IsAllowedProviderURL reports whether raw is an https URL on the
 // provider's allowlisted hosts (no userinfo, no lookalike suffixes).
 func IsAllowedProviderURL(provider, raw string) bool {
@@ -86,14 +101,7 @@ func IsAllowedProviderURL(provider, raw string) bool {
 		return false
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	allowed := []string(nil)
-	switch provider {
-	case ProviderUnsplash:
-		allowed = []string{"unsplash.com", "images.unsplash.com", "plus.unsplash.com", "source.unsplash.com", "www.unsplash.com"}
-	case ProviderPexels:
-		allowed = []string{"pexels.com", "images.pexels.com", "videos.pexels.com", "www.pexels.com"}
-	}
-	for _, domain := range allowed {
+	for _, domain := range ProviderFetchHosts(provider) {
 		if host == domain || strings.HasSuffix(host, "."+domain) {
 			return true
 		}

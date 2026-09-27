@@ -5,7 +5,7 @@ import {
   getWorkspaceUpload as getWorkspaceUploadTransport,
   stageWorkspaceUploadBytes as stageWorkspaceUploadBytesTransport,
 } from './generated-query/public/workspace-media/workspace-media'
-import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/me/me'
+import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/user/user'
 import type {
   CompleteUploadRequest,
   CreateUploadRequest,
@@ -92,7 +92,7 @@ export const uploadApi = {
     }
   },
   uploadAvatar: async (file: File): Promise<UploadAvatarMetadata> => {
-    // v1 avatar surface (`PUT /api/v1/me/avatar`, raw image bytes, never
+    // v1 avatar surface (`PUT /api/v1/user/avatar`, raw image bytes, never
     // JSON/multipart). Requires the Idempotency-Key header (scope
     // avatar:upload); each user action mints its own key.
     const envelope = await uploadAvatarTransport(file, {

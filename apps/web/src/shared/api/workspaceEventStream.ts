@@ -33,8 +33,6 @@ export const WORKSPACE_EVENT_TYPES = [
   'board.member_changed',
   'board.share_revoked',
   'billing.settled',
-  'library.materialization_completed',
-  'library.materialization_failed',
 ] as const
 
 export type WorkspaceEventType = (typeof WORKSPACE_EVENT_TYPES)[number]
@@ -51,7 +49,7 @@ export type WorkspaceEventActor = {
 }
 
 export type WorkspaceEventResource = {
-  type: 'task' | 'board' | 'media_asset' | 'library_materialization' | 'checkout_session'
+  type: 'task' | 'board' | 'media_asset' | 'checkout_session'
   id: string
 }
 

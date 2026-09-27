@@ -166,7 +166,6 @@ func (q *Queries) CreateLibraryFolder(ctx context.Context, arg CreateLibraryFold
 }
 
 const createLibraryMaterialization = `-- name: CreateLibraryMaterialization :one
-
 INSERT INTO library_materializations (public_id, workspace_id, library_asset_id, status)
 VALUES ($1, $2, $3, 'pending')
 RETURNING internal_id, public_id, workspace_id, library_asset_id, status, media_asset_id, error_message, created_at, completed_at
@@ -178,25 +177,6 @@ type CreateLibraryMaterializationParams struct {
 	LibraryAssetID int64  `json:"library_asset_id"`
 }
 
-// Materialization durable jobs (#828 slice A, Phase 4 of #809).
-//
-// Status words: the public API exposes pending/running/completed/failed
-// while the durable CHECK stores pending/processing/completed/failed
-// (chk_library_materializations_status). The store maps running <->
-// processing at the boundary; SQL below uses the durable words.
-// Terminal states (completed/failed) are immutable: transition
-// statements guard on status IN ('pending','processing') so concurrent
-// settlers converge on the winner; a guarded miss reads back the stored
-// snapshot so idempotent replays converge instead of resurrecting jobs.
-// Completion CHECK: completed needs media_asset_id + completed_at,
-// failed needs completed_at. The result link resolves the caller's
-// asset_... public id to media_assets.internal_id workspace-scoped
-// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
-// durable column: failures persist error_message only and reads report
-// an empty code (follow-up migration if the taxonomy must persist).
-// Rows carry no updated_at: reads report COALESCE(completed_at,
-// created_at) as updated_at. No dedup key: one asset may back many
-// jobs; request idempotency stays handler-side (library:materialize).
 func (q *Queries) CreateLibraryMaterialization(ctx context.Context, arg CreateLibraryMaterializationParams) (LibraryMaterialization, error) {
 	row := q.db.QueryRow(ctx, createLibraryMaterialization, arg.PublicID, arg.WorkspaceID, arg.LibraryAssetID)
 	var i LibraryMaterialization
@@ -389,6 +369,60 @@ type FailLibraryMaterializationRow struct {
 func (q *Queries) FailLibraryMaterialization(ctx context.Context, arg FailLibraryMaterializationParams) (FailLibraryMaterializationRow, error) {
 	row := q.db.QueryRow(ctx, failLibraryMaterialization, arg.ErrorMessage, arg.WorkspaceID, arg.PublicID)
 	var i FailLibraryMaterializationRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.LibraryAssetID,
+		&i.AssetPublicID,
+		&i.Status,
+		&i.MediaAssetID,
+		&i.MediaAssetPublicID,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const getActiveLibraryMaterializationByAsset = `-- name: GetActiveLibraryMaterializationByAsset :one
+SELECT m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+  a.public_id AS asset_public_id,
+  m.status, m.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  m.error_message, m.created_at, m.completed_at
+FROM library_materializations AS m
+INNER JOIN library_assets AS a ON a.internal_id = m.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
+WHERE m.workspace_id = $1
+  AND m.library_asset_id = $2
+  AND m.status IN ('pending', 'processing', 'completed')
+ORDER BY m.created_at DESC, m.internal_id DESC
+LIMIT 1
+`
+
+type GetActiveLibraryMaterializationByAssetParams struct {
+	WorkspaceID    int64 `json:"workspace_id"`
+	LibraryAssetID int64 `json:"library_asset_id"`
+}
+
+type GetActiveLibraryMaterializationByAssetRow struct {
+	InternalID         int64              `json:"internal_id"`
+	PublicID           string             `json:"public_id"`
+	WorkspaceID        int64              `json:"workspace_id"`
+	LibraryAssetID     int64              `json:"library_asset_id"`
+	AssetPublicID      string             `json:"asset_public_id"`
+	Status             string             `json:"status"`
+	MediaAssetID       pgtype.Int8        `json:"media_asset_id"`
+	MediaAssetPublicID pgtype.Text        `json:"media_asset_public_id"`
+	ErrorMessage       string             `json:"error_message"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) GetActiveLibraryMaterializationByAsset(ctx context.Context, arg GetActiveLibraryMaterializationByAssetParams) (GetActiveLibraryMaterializationByAssetRow, error) {
+	row := q.db.QueryRow(ctx, getActiveLibraryMaterializationByAsset, arg.WorkspaceID, arg.LibraryAssetID)
+	var i GetActiveLibraryMaterializationByAssetRow
 	err := row.Scan(
 		&i.InternalID,
 		&i.PublicID,
@@ -981,6 +1015,43 @@ func (q *Queries) ListLibraryMaterializations(ctx context.Context, arg ListLibra
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockLibraryMaterializationAsset = `-- name: LockLibraryMaterializationAsset :exec
+
+SELECT pg_advisory_xact_lock(hashtextextended(
+  $1::bigint::text || ':' || $2::bigint::text,
+  0
+))
+`
+
+type LockLibraryMaterializationAssetParams struct {
+	WorkspaceID    int64 `json:"workspace_id"`
+	LibraryAssetID int64 `json:"library_asset_id"`
+}
+
+// Materialization durable jobs (#828 slice A, Phase 4 of #809).
+//
+// Status words: the public API exposes pending/running/completed/failed
+// while the durable CHECK stores pending/processing/completed/failed
+// (chk_library_materializations_status). The store maps running <->
+// processing at the boundary; SQL below uses the durable words.
+// Terminal states (completed/failed) are immutable: transition
+// statements guard on status IN ('pending','processing') so concurrent
+// settlers converge on the winner; a guarded miss reads back the stored
+// snapshot so idempotent replays converge instead of resurrecting jobs.
+// Completion CHECK: completed needs media_asset_id + completed_at,
+// failed needs completed_at. The result link resolves the caller's
+// asset_... public id to media_assets.internal_id workspace-scoped
+// (GetMediaAssetByPublicID in workspace_media.sql). error_code has no
+// durable column: failures persist error_message only and reads report
+// an empty code (follow-up migration if the taxonomy must persist).
+// Rows carry no updated_at: reads report COALESCE(completed_at,
+// created_at) as updated_at. No dedup key: one asset may back many
+// jobs; request idempotency stays handler-side (library:materialize).
+func (q *Queries) LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error {
+	_, err := q.db.Exec(ctx, lockLibraryMaterializationAsset, arg.WorkspaceID, arg.LibraryAssetID)
+	return err
 }
 
 const moveLibraryAsset = `-- name: MoveLibraryAsset :one

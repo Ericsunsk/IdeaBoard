@@ -3,7 +3,7 @@ package httpapi
 // Workspace event streams + webhook delivery contract tests (issue #807).
 //
 // Reuses the shared doV1 helper (envelope + Request-Id) and the
-// cross-file fakes (tasks, library, uploads). Covers envelope emission
+// cross-file fakes (tasks, uploads). Covers envelope emission
 // per domain producer, SSE Last-Event-ID replay (gap + live + filter),
 // subscription CRUD with secret masking, signature verification of
 // dispatched webhooks, the 404-vs-403 matrix, idempotent replay/conflict
@@ -98,20 +98,19 @@ func (m *inlineEventEnqueuer) Insert(ctx context.Context, args river.JobArgs, _ 
 }
 
 type v1EventsFixture struct {
-	engine       *gin.Engine
-	store        *tenancy.InMemoryStore
-	dir          *staticUserDirectory
-	ws           *tenancy.Workspace
-	tasks        *workspacetasks.InMemoryStore
-	boards       *boards.InMemoryWorkspaceBoardStore
-	boardID      string
-	lib          *library.InMemoryWorkspaceLibraryStore
-	eventLog     *events.WorkspaceEventLog
-	webhooks     *events.WebhookStore
-	sender       *fakeEventSender
-	enqueuer     *inlineEventEnqueuer
-	holder       *fakeTaskHolder
-	materializer *fakeLibraryMaterializer
+	engine   *gin.Engine
+	store    *tenancy.InMemoryStore
+	dir      *staticUserDirectory
+	ws       *tenancy.Workspace
+	tasks    *workspacetasks.InMemoryStore
+	boards   *boards.InMemoryWorkspaceBoardStore
+	boardID  string
+	lib      *library.InMemoryWorkspaceLibraryStore
+	eventLog *events.WorkspaceEventLog
+	webhooks *events.WebhookStore
+	sender   *fakeEventSender
+	enqueuer *inlineEventEnqueuer
+	holder   *fakeTaskHolder
 }
 
 func newV1EventsFixture(t *testing.T) *v1EventsFixture {
@@ -127,7 +126,6 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	holder := newFakeTaskHolder()
 	queue := &fakeTaskQueue{}
 	taskAssets := &fakeTaskAssets{assets: map[string]*workspacetasks.AssetInfo{}}
-	materializer := &fakeLibraryMaterializer{mediaID: "asset_abc123def456"}
 	eventLog := events.NewWorkspaceEventLog()
 	sender := &fakeEventSender{status: 200}
 	webhooks := events.NewWebhookStore(sender, nil)
@@ -165,7 +163,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 		Store: store, Users: dir,
 		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets, TaskModelResolver: &eventTaskModelResolver{},
 		Boards:   boardsStore,
-		Library:  ContractV1LibraryDeps{Store: libStore, Materializer: materializer, Billing: &fakeLibraryBilling{}, Quoter: &fakeLibraryQuoter{amount: 5}},
+		Library:  ContractV1LibraryDeps{Store: libStore},
 		Events:   eventLog,
 		Webhooks: webhooks,
 	})
@@ -190,7 +188,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 		engine: router, store: store, dir: dir, ws: ws, tasks: tasks,
 		boards: boardsStore, boardID: boardID,
 		lib: lib, eventLog: eventLog, webhooks: webhooks, sender: sender,
-		enqueuer: enqueuer, holder: holder, materializer: materializer,
+		enqueuer: enqueuer, holder: holder,
 	}
 }
 
@@ -379,49 +377,6 @@ func TestV1BoardProducersEmit(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestV1LibraryProducersEmit(t *testing.T) {
-	fx := newV1EventsFixture(t)
-	assetsPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/library/assets"
-	status, _, saved := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: assetsPath, userID: 1,
-		body: v1SaveAssetBody("evt-lib-1", ""), headers: map[string]string{contract.IdempotencyKeyHeader: "evt-lib-save-1"}})
-	if status != http.StatusCreated {
-		t.Fatalf("save = %d %v, want 201", status, saved)
-	}
-	assetID := saved["data"].(map[string]any)["id"].(string)
-	matPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/library/materializations"
-	status, _, created := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: matPath, userID: 3,
-		body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-		headers: map[string]string{contract.IdempotencyKeyHeader: "evt-lib-mat-1"}})
-	if status != http.StatusAccepted {
-		t.Fatalf("materialize = %d %v, want 202", status, created)
-	}
-	types := fx.logTypes()
-	counts := map[string]int{}
-	for _, typ := range types {
-		counts[typ]++
-	}
-	if counts[events.EventV1LibraryMaterializedComplete] != 1 || counts[events.EventV1BillingSettled] != 1 {
-		t.Fatalf("library emission=%v, want 1x completed + 1x settled", counts)
-	}
-	// Failed materialization emits failed + released.
-	fx.materializer.err = fmt.Errorf("provider fetch exploded")
-	status, _, failed := doV1(t, fx.engine, v1Call{method: http.MethodPost, path: matPath, userID: 3,
-		body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
-		headers: map[string]string{contract.IdempotencyKeyHeader: "evt-lib-mat-2"}})
-	if status != http.StatusAccepted || failed["data"].(map[string]any)["status"] != "failed" {
-		t.Fatalf("failed job = %d %v, want 202 failed", status, failed)
-	}
-	types = fx.logTypes()
-	counts = map[string]int{}
-	for _, typ := range types {
-		counts[typ]++
-	}
-	if counts[events.EventV1LibraryMaterializedFailed] != 1 || counts[events.EventV1BillingSettled] != 2 {
-		t.Fatalf("library failure emission=%v, want 1x failed + 2x settled total", counts)
-	}
-	fx.materializer.err = nil
 }
 
 func TestV1EventVisibilityMatrix(t *testing.T) {

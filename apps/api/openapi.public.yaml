@@ -17,7 +17,7 @@ security:
   - publicSession: []
   - publicApiKey: []
 tags:
-  - name: Me
+  - name: User
     description: Identity-owned profile and preferences of the current principal.
   - name: Workspaces
     description: Workspace lifecycle and membership.
@@ -34,16 +34,16 @@ tags:
   - name: WorkspaceTasks
     description: Workspace-scoped async task lifecycle (submit, read, cancel, outputs, quotes).
   - name: WorkspaceLibrary
-    description: Workspace-scoped library folders, saved provider references, and materializations.
+    description: Workspace-scoped library folders and saved provider references.
   - name: WorkspaceMedia
     description: Workspace-scoped upload sessions, media assets, and derivatives.
   - name: WorkspaceSearch
     description: Workspace-scoped provider search and vision queries.
 paths:
-  /me:
+  /user:
     get:
-      tags: [Me]
-      operationId: getMe
+      tags: [User]
+      operationId: getUser
       summary: Get the current principal profile
       description: >-
         Returns the session principal with the external usr_ identifier.
@@ -57,12 +57,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MeEnvelope'
+                $ref: '#/components/schemas/UserEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /me/avatar:
+  /user/avatar:
     put:
-      tags: [Me]
+      tags: [User]
       operationId: uploadAvatar
       summary: Replace the caller profile avatar (user-scoped, raw bytes)
       description: >-
@@ -2877,102 +2877,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-  /workspaces/{workspace_id}/library/materializations:
-    post:
-      tags: [WorkspaceLibrary]
-      operationId: createWorkspaceLibraryMaterialization
-      summary: Materialize an owned library reference into a managed media asset (members only, 202)
-      description: >-
-        Runs server-side quote (SKU library:materialize), credit hold
-        through credits.Commands, job record (pending -> running), media
-        settle, then capture (completed with the asset_ link) or release
-        (failed record). Materializer failures fold into a failed job
-        record so the job stays status-addressable; only billing
-        failures abort with an error response (billing_quote_unavailable
-        503 transient, billing_pricing_unavailable 422 unpriced SKU,
-        billing_wallet_restricted 403). Requires the
-        Idempotency-Key header (scope library:materialize).
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateLibraryMaterializationRequest'
-      responses:
-        '202':
-          description: Materialization accepted.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LibraryMaterializationEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Restricted wallet (billing_wallet_restricted).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          description: SKU unpriced or unregistered (billing_pricing_unavailable, deterministic, do not retry).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Quote or materialization service unavailable (billing_quote_unavailable, service_unavailable).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /workspaces/{workspace_id}/library/materializations/{materialization_id}:
-    get:
-      tags: [WorkspaceLibrary]
-      operationId: getWorkspaceLibraryMaterialization
-      summary: Get a library materialization job snapshot (members only)
-      description: >-
-        Status-addressable job record (pending -> running ->
-        completed|failed); terminal states are immutable. Malformed
-        lmat_ shapes and unknown ids converge to 404
-        library_materialization_not_found.
-      parameters:
-        - $ref: '#/components/parameters/WorkspaceId'
-        - $ref: '#/components/parameters/MaterializationId'
-      responses:
-        '200':
-          description: Materialization snapshot.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LibraryMaterializationEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
   /workspaces/{workspace_id}/search:
     get:
       tags: [WorkspaceSearch]
@@ -3274,13 +3178,6 @@ components:
       description: Opaque lasset_ library asset identifier (malformed shapes, including legacy integer ids, converge to 404 library_asset_not_found).
       schema:
         $ref: '#/components/schemas/LibraryAssetId'
-    MaterializationId:
-      name: materialization_id
-      in: path
-      required: true
-      description: Opaque lmat_ materialization job identifier (malformed shapes converge to 404 library_materialization_not_found).
-      schema:
-        $ref: '#/components/schemas/LibraryMaterializationId'
   headers:
     RequestId:
       description: Server-assigned request correlation ID, present on every response.
@@ -3385,13 +3282,13 @@ components:
           properties:
             deleted:
               type: boolean
-    MeEnvelope:
+    UserEnvelope:
       type: object
       required: [data]
       additionalProperties: false
       properties:
         data:
-          $ref: '#/components/schemas/Me'
+          $ref: '#/components/schemas/User'
     WorkspaceEnvelope:
       type: object
       required: [data]
@@ -3501,7 +3398,7 @@ components:
       type: string
       enum: [owner, admin, member]
       description: Workspace/organization membership role.
-    Me:
+    User:
       type: object
       required: [id]
       additionalProperties: false
@@ -4848,10 +4745,6 @@ components:
       type: string
       pattern: '^lasset_[A-Za-z0-9]+$'
       description: Opaque public library asset identifier.
-    LibraryMaterializationId:
-      type: string
-      pattern: '^lmat_[A-Za-z0-9]+$'
-      description: Opaque public library materialization job identifier.
     VisionQueryId:
       type: string
       pattern: '^visq_[A-Za-z0-9]+$'
@@ -5367,60 +5260,6 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/ResolveLibraryAssetsResult'
-    LibraryMaterializationStatus:
-      type: string
-      enum: [pending, running, completed, failed]
-      description: Durable materialization job status (terminal states immutable).
-    LibraryMaterialization:
-      type: object
-      required: [id, workspace_id, library_asset_id, status, created_at, updated_at]
-      additionalProperties: false
-      properties:
-        id:
-          $ref: '#/components/schemas/LibraryMaterializationId'
-        workspace_id:
-          $ref: '#/components/schemas/WorkspaceId'
-        library_asset_id:
-          $ref: '#/components/schemas/LibraryAssetId'
-        status:
-          $ref: '#/components/schemas/LibraryMaterializationStatus'
-        media_asset_id:
-          $ref: '#/components/schemas/MediaAssetId'
-          description: Set on completed (managed media asset link).
-        error_code:
-          type: string
-          description: Set on failed.
-        error_message:
-          type: string
-          description: Set on failed.
-        replayed:
-          type: boolean
-          description: True when an idempotent replay returned the first job.
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    LibraryMaterializationEnvelope:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          $ref: '#/components/schemas/LibraryMaterialization'
-    CreateLibraryMaterializationRequest:
-      type: object
-      required: [data]
-      additionalProperties: false
-      properties:
-        data:
-          type: object
-          required: [library_asset_id]
-          additionalProperties: false
-          properties:
-            library_asset_id:
-              $ref: '#/components/schemas/LibraryAssetId'
     WorkspaceSearchResult:
       type: object
       required: [provider, source_id, source_url, preview_url, original_url, width, height]

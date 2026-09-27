@@ -22,7 +22,7 @@
 | billing_accounts | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（需 S,I） |
 | upload_sessions | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（需 S,I,U） |
 | media_asset_derivatives | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（需 S,I,U upsert） |
-| library_materializations | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（暂无 runtime DML，materialization 仍 503，latent） |
+| library_materializations | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（materialization 为 internal-only，无 HTTP 运行时 DML，latent） |
 | workspace_events / event_subscriptions / event_deliveries | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（暂无 runtime 引用，latent） |
 | board_documents / board_revisions | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（Phase 4 follow-up，未接线，latent） |
 | task_billing_snapshots | ❌ | ❌ | ❌ | ❌ | ❌ | MISSING（需 S,I；UPDATE/DELETE 由 trigger 挡） |
@@ -156,8 +156,8 @@ FROM "<RUNTIME_ROLE>";
 1. `task_billing_settlements` 的 release 路径：runtime 非测试代码中只有 INSERT
    （`service.go:217`），状态流转疑似走 `SECURITY DEFINER` credit 函数；若某条 release
    路径实际以 runtime 身份直接 UPDATE settlements，补授 SIUD 已覆盖，但建议实现方确认。
-2. `board_revisions` / `board_documents`、`library_materializations`、
-   `workspace_events*` 当前无 runtime 查询（latent 缺口）：本次一并授权可避免接线时再踩；
+2. `board_revisions` / `board_documents`、`library_materializations`（HTTP materialization surface 已 owner-approved 删除，internal-only job 记录仍在）、
+   `workspace_events*` 当前无 HTTP 运行时查询（latent 缺口）：本次一并授权可避免接线时再踩；
    若坚持最小权限，可先只授 §1 标“需”的 10 张表 + 2 memberships，latent 表在接线变更中补 policy。
 3. 建议在 `database_wiring_db_test.go` 的 `assert*Access` 模式上追加 workspace 表断言，
    否则下次加表仍会静默遗漏（本次 audit 的对照实验即用此模式复现）。

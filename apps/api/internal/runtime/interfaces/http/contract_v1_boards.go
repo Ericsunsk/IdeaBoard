@@ -8,18 +8,21 @@ package httpapi
 // /api/user|/api/admin board routes were removed in #809.
 //
 // Auth model: ResolvePrincipal + RequireWorkspaceCapability for the explicit
-// workspace context, then an explicit board ACL (roles owner|editor|viewer).
-// The board creator/implicit owner row counts as owner; workspace membership
-// alone never grants board access. Outsiders (no board role) converge to 404
-// board_not_found; visible-but-forbidden callers get 403 board_forbidden.
+// workspace context, then the board ACL (roles owner|editor|viewer).
+// The board creator/implicit owner row counts as owner; visible workspace
+// members default to viewer (workspace owners to owner) and explicit board
+// rows override the default. Outsiders (no workspace membership and no
+// board role) converge to 404 board_not_found; visible-but-forbidden
+// callers get 403 board_forbidden.
 //
 // Envelope: contract.RenderSuccess/RenderPaginated/RenderError; cursor
 // pagination cursor/page_size; POST/PUT/DELETE require the Idempotency-Key
 // header-only scope board:<op>; concurrency via ETag/If-Match over the
 // revision counter (stale -> 409 board_revision_conflict).
 //
-// Production wiring leaves ContractV1Deps.Boards nil until the postgres
-// workspace-board mapping lands (#809); handlers fail closed with 501.
+// Production boards surface: the postgres workspace-board mapping
+// (board_documents/board_revisions) is live since the #809 follow-up;
+// ContractV1Deps.Boards is wired in composition/http_wiring.go.
 // Tests inject boards.NewInMemoryWorkspaceBoardStoreForTests().
 
 import (
@@ -75,22 +78,25 @@ func (h *contractV1Handler) requireBoardsStore(c *gin.Context) bool {
 
 // boardWorkspaceContext resolves the explicit workspace context and enforces
 // workspace membership: hidden workspaces converge to 404
-// workspace_not_found, non-members to the same 404.
-func (h *contractV1Handler) boardWorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, bool) {
-	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
+// workspace_not_found, non-members to the same 404. Visible members return
+// their workspace role so board role resolution can apply the viewer/owner
+// default without extra queries.
+func (h *contractV1Handler) boardWorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
+	workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
-		return nil, false
+		return nil, "", false
 	}
 	if !RequireWorkspaceCapability(c, visible, visible) {
-		return nil, false
+		return nil, "", false
 	}
-	return workspace, true
+	return workspace, role, true
 }
 
 // boardAccess resolves a board within a visible workspace and enforces the
-// explicit board ACL: malformed ids, unknown boards, and callers holding no
-// board role converge to 404 board_not_found (Baseline 4).
-func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Workspace, userID int64) (*boards.V1Board, boards.AccessRole, bool) {
+// board ACL: malformed ids, unknown boards, and callers holding no
+// effective board role (no explicit grant and no visible workspace default)
+// converge to 404 board_not_found (Baseline 4).
+func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Workspace, workspaceRole string, userID int64) (*boards.V1Board, boards.AccessRole, bool) {
 	raw := strings.TrimSpace(c.Param("board_id"))
 	if !contract.IsBoardID(raw) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
@@ -104,7 +110,7 @@ func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Works
 		c.Abort()
 		return nil, "", false
 	}
-	role, ok, err := h.deps.Boards.GetBoardRole(ctx, workspace.PublicID, board.PublicID, userID)
+	role, ok, err := h.deps.Boards.GetBoardRole(ctx, workspace.PublicID, board.PublicID, userID, workspaceRole)
 	if err != nil || !ok {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
 		c.Abort()
@@ -319,7 +325,7 @@ func (h *contractV1Handler) listBoards(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
@@ -328,11 +334,12 @@ func (h *contractV1Handler) listBoards(c *gin.Context) {
 		renderBoardError(c, err)
 		return
 	}
-	// Workspace membership never auto-grants board access: only boards with
-	// an explicit board role are enumerable.
+	// Visible workspace members default to viewer (owners to owner);
+	// explicit board rows override: only boards with an effective role
+	// are enumerable.
 	page := make([]v1BoardDTO, 0, len(all))
 	for _, board := range all {
-		if _, ok, roleErr := h.deps.Boards.GetBoardRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID()); roleErr != nil || !ok {
+		if _, ok, roleErr := h.deps.Boards.GetBoardRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), workspaceRole); roleErr != nil || !ok {
 			continue
 		}
 		page = append(page, toBoardDTO(board))
@@ -355,7 +362,7 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, _, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
@@ -408,11 +415,11 @@ func (h *contractV1Handler) getBoard(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, _, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -431,11 +438,11 @@ func (h *contractV1Handler) renameBoard(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -470,11 +477,11 @@ func (h *contractV1Handler) archiveBoard(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -511,11 +518,11 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -574,11 +581,11 @@ func (h *contractV1Handler) getBoardDocument(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, _, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -598,11 +605,11 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -708,11 +715,11 @@ func (h *contractV1Handler) listBoardRevisions(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, _, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -742,11 +749,11 @@ func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, _, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -827,11 +834,11 @@ func (h *contractV1Handler) listBoardMembers(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, _, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -870,11 +877,11 @@ func (h *contractV1Handler) addBoardMember(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -906,7 +913,7 @@ func (h *contractV1Handler) addBoardMember(c *gin.Context) {
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hash := contract.HashIdempotencyRequest("board:member-add", workspace.PublicID, board.PublicID, body.Data.UserID, string(targetRole))
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-add", key, hash, func() (any, error) {
-		added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole)
+		added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole, workspaceRole)
 		if addErr != nil {
 			return nil, addErr
 		}
@@ -954,11 +961,11 @@ func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -983,7 +990,7 @@ func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
 	if !ok {
 		return
 	}
-	updated, err := h.deps.Boards.UpdateBoardMemberRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, newRole)
+	updated, err := h.deps.Boards.UpdateBoardMemberRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, newRole, workspaceRole)
 	if err != nil {
 		renderBoardError(c, err)
 		return
@@ -1013,11 +1020,11 @@ func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -1038,7 +1045,7 @@ func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
 	targetExternal, _ := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID)
 	hash := contract.HashIdempotencyRequest("board:member-remove", workspace.PublicID, board.PublicID, tenancy.FormatUserPublicID(targetExternal))
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-remove", key, hash, func() (any, error) {
-		if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID); removeErr != nil {
+		if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, workspaceRole); removeErr != nil {
 			return nil, removeErr
 		}
 		// #807: board.member_changed AFTER the roster commit.
@@ -1100,11 +1107,11 @@ func (h *contractV1Handler) listShareTokens(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -1134,11 +1141,11 @@ func (h *contractV1Handler) createShareToken(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -1199,11 +1206,11 @@ func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
 	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
 		return
 	}
-	workspace, _ := h.boardWorkspaceContext(c, identityPrincipal)
+	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
 	if workspace == nil {
 		return
 	}
-	board, role, ok := h.boardAccess(c, workspace, identityPrincipal.UserID())
+	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 	if !ok {
 		return
 	}
@@ -1271,8 +1278,9 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	// stay 404 workspace_not_found) but the joiner needs no workspace
 	// membership yet. A successful join grants workspace membership
 	// (member) alongside the board grant, so the collaborator can reach
-	// the workspace-rooted board surface afterwards. Workspace membership
-	// alone still never grants board access.
+	// the workspace-rooted board surface afterwards. Workspace members
+	// without an explicit board grant default to viewer (owners to owner);
+	// explicit board rows still override.
 	rawWorkspace := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(rawWorkspace) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
@@ -1308,8 +1316,8 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hash := contract.HashIdempotencyRequest("board:join", workspace.PublicID, bearer)
 	// Grant workspace membership first: without it the new collaborator
-	// could not reach the workspace-rooted surface. The grant is harmless
-	// on join failure (membership alone grants no board access).
+	// could not reach the workspace-rooted surface. On join failure the
+	// grant only confers the workspace viewer default (owners get owner).
 	if _, memberErr := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), tenancy.RoleMember); memberErr != nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
 		c.Abort()

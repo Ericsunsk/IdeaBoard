@@ -64,6 +64,9 @@ func (h *Handler) Get(c *gin.Context) {
 
 // Update rotates the gateway token and identity. A missing token keeps the
 // stored secret; base URL or account and gateway IDs are required.
+// Authorization rides the outer Control Plane guard (controlProxy + guard
+// enforces the operator capability); the handler resolves the actor from
+// the request principal without re-checking the admin role.
 func (h *Handler) Update(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
@@ -74,9 +77,8 @@ func (h *Handler) Update(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	identity, ok := principal.RequireAdmin(c)
+	identity, ok := principal.Require(c)
 	if !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	err := h.store.Update(c.Request.Context(), UpdateInput{
@@ -122,7 +124,8 @@ type saveModelMappingRequest struct {
 
 // SaveMapping validates and persists one feature's model mapping.
 // Pricing lives in Billing and never reads this mapping: changing models
-// cannot move prices by construction.
+// cannot move prices by construction. Authorization rides the outer
+// Control Plane guard; the actor is resolved from the request principal.
 func (h *Handler) SaveMapping(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
@@ -134,9 +137,8 @@ func (h *Handler) SaveMapping(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	identity, ok := principal.RequireAdmin(c)
+	identity, ok := principal.Require(c)
 	if !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	if err := h.store.SaveModelMapping(c.Request.Context(), feature, req.Model, identity.UserID()); err != nil {
@@ -154,14 +156,11 @@ type previewGatewayRouteRequest struct {
 
 // PreviewGatewayRoute resolves routing facts for a model identifier without
 // touching configuration. Pure function of the request; no store access.
+// Authorization rides the outer Control Plane guard (controlProxy + guard).
 func (h *Handler) PreviewGatewayRoute(c *gin.Context) {
 	var req previewGatewayRouteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	if strings.TrimSpace(req.ModelID) == "" {
@@ -183,6 +182,7 @@ type testGatewayConnectionRequest struct {
 // TestConnection probes gateway reachability server-side (browsers cannot
 // read cross-origin status). The token is used for this probe only and never
 // persisted. Pure diagnosis: no configuration is read or written.
+// Authorization rides the outer Control Plane guard.
 func (h *Handler) TestConnection(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
@@ -191,10 +191,6 @@ func (h *Handler) TestConnection(c *gin.Context) {
 	var req testGatewayConnectionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.TrimSpace(req.Path)
@@ -249,6 +245,8 @@ type saveCatalogRequest struct {
 // Decoding is strict: unknown fields (including the removed per-token
 // price fields) are rejected instead of silently ignored, so legacy
 // writers fail loudly and migrate to the models.dev reference seam.
+// Authorization rides the outer Control Plane guard; the actor is resolved
+// from the request principal.
 func (h *Handler) SaveCatalog(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
@@ -265,9 +263,8 @@ func (h *Handler) SaveCatalog(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	identity, ok := principal.RequireAdmin(c)
+	identity, ok := principal.Require(c)
 	if !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	if err := h.store.SaveCatalog(c.Request.Context(), req.Items, identity.UserID()); err != nil {
@@ -286,12 +283,8 @@ type ProviderOption struct {
 }
 
 // ListProviders serves the registry without touching configuration. Pure
-// metadata read; admin-gated like every other gateway surface.
+// metadata read; authorization rides the outer Control Plane guard.
 func (h *Handler) ListProviders(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
-		return
-	}
 	entries := workflow.ListProviders()
 	options := make([]ProviderOption, 0, len(entries))
 	for _, entry := range entries {
@@ -305,13 +298,10 @@ func (h *Handler) ListProviders(c *gin.Context) {
 }
 
 // DetectModels probes the gateway for available models.
+// Authorization rides the outer Control Plane guard.
 func (h *Handler) DetectModels(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
-		return
-	}
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	provider := strings.TrimSpace(c.Query("provider"))
@@ -328,13 +318,10 @@ func (h *Handler) DetectModels(c *gin.Context) {
 // return HTTP 200 with Found=false and an explicit error_code inside the
 // payload, never an HTTP error: reference display must not block catalog
 // flows. Only invalid input (missing model identity) is a 400.
+// Authorization rides the outer Control Plane guard.
 func (h *Handler) GetModelReference(c *gin.Context) {
 	if h == nil || h.store == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
-		return
-	}
-	if _, ok := principal.RequireAdmin(c); !ok {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
 		return
 	}
 	reference, err := h.store.GetModelReference(

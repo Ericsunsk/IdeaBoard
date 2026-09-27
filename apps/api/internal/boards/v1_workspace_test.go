@@ -126,31 +126,44 @@ func TestV1BoardACLAndLastOwner(t *testing.T) {
 	if _, err := store.CreateBoard(ctx, "ws_acl", 1, "ACL", boardID); err != nil {
 		t.Fatal(err)
 	}
-	// Creator is the implicit owner; workspace membership alone grants nothing.
-	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 1); !ok || role != RoleOwner {
+	// Creator is the implicit owner; visible workspace members default to
+	// viewer (workspace owners to owner); outsiders with no workspace role
+	// stay denied. Explicit board rows override the default.
+	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 1, "owner"); !ok || role != RoleOwner {
 		t.Fatalf("creator role = %q, %v; want owner", role, ok)
 	}
-	if _, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 2); ok {
-		t.Fatal("workspace membership must not auto-grant board access")
+	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 2, "member"); !ok || role != RoleViewer {
+		t.Fatalf("workspace member role = %q, %v; want viewer default", role, ok)
+	}
+	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 3, "owner"); !ok || role != RoleOwner {
+		t.Fatalf("workspace owner role = %q, %v; want owner default", role, ok)
+	}
+	if _, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 4, ""); ok {
+		t.Fatal("outsider with no workspace role must stay denied")
 	}
 	// Only owners may grant; editor grant works.
-	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 2, 2, RoleEditor); err != ErrPermissionDenied {
+	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 2, 2, RoleEditor, "member"); err != ErrPermissionDenied {
 		t.Fatalf("non-owner add = %v, want ErrPermissionDenied", err)
 	}
-	member, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleEditor)
+	member, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleEditor, "owner")
 	if err != nil || member.Role != RoleEditor {
 		t.Fatalf("add = %v, %v", member, err)
 	}
 	// Re-add is idempotent (keeps existing role).
-	member, err = store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleViewer)
+	member, err = store.AddBoardMember(ctx, "ws_acl", boardID, 1, 2, RoleViewer, "owner")
 	if err != nil || member.Role != RoleEditor {
 		t.Fatalf("re-add = %v, %v; want existing editor role", member, err)
 	}
+	// Explicit rows override the workspace default: user 2 stays editor
+	// even though the workspace default would be viewer.
+	if role, ok, _ := store.GetBoardRole(ctx, "ws_acl", boardID, 2, "member"); !ok || role != RoleEditor {
+		t.Fatalf("explicit override role = %q, %v; want editor", role, ok)
+	}
 	// Second owner unlocks demotion of the implicit owner row path.
-	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 3, RoleOwner); err != nil {
+	if _, err := store.AddBoardMember(ctx, "ws_acl", boardID, 1, 3, RoleOwner, "owner"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", boardID, 1, 2, RoleViewer); err != nil {
+	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", boardID, 1, 2, RoleViewer, "owner"); err != nil {
 		t.Fatalf("demote with backup owner = %v", err)
 	}
 	// The implicit creator row cannot be demoted while it is the last owner.
@@ -158,16 +171,36 @@ func TestV1BoardACLAndLastOwner(t *testing.T) {
 	if _, err := store.CreateBoard(ctx, "ws_acl", 9, "Solo", soloID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", soloID, 9, 9, RoleViewer); err != ErrV1LastOwner {
+	if _, err := store.UpdateBoardMemberRole(ctx, "ws_acl", soloID, 9, 9, RoleViewer, "owner"); err != ErrV1LastOwner {
 		t.Fatalf("demote last owner = %v, want ErrV1LastOwner", err)
 	}
 	// Removing an explicit owner succeeds while the creator remains owner.
-	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 1, 3); err != nil {
+	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 1, 3, "owner"); err != nil {
 		t.Fatalf("remove explicit owner with creator remaining = %v", err)
 	}
 	// Self-leave works for non-owners.
-	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 2, 2); err != nil {
+	if err := store.RemoveBoardMember(ctx, "ws_acl", boardID, 2, 2, "member"); err != nil {
 		t.Fatalf("self leave = %v", err)
+	}
+}
+
+func TestDefaultBoardRoleForWorkspaceRole(t *testing.T) {
+	cases := []struct {
+		workspace string
+		want      AccessRole
+		ok        bool
+	}{
+		{"owner", RoleOwner, true},
+		{"admin", RoleViewer, true},
+		{"member", RoleViewer, true},
+		{"", "", false},
+		{"bogus", "", false},
+	}
+	for _, tc := range cases {
+		got, ok := DefaultBoardRoleForWorkspaceRole(tc.workspace)
+		if got != tc.want || ok != tc.ok {
+			t.Fatalf("DefaultBoardRoleForWorkspaceRole(%q) = %q, %v; want %q, %v", tc.workspace, got, ok, tc.want, tc.ok)
+		}
 	}
 }
 

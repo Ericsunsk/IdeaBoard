@@ -167,6 +167,7 @@ function renderAuthHost(busy = false) {
         DialogOverlay: DialogOverlayStub,
         DialogContent: DialogContentStub,
         DialogDescription: PassthroughStub,
+        DialogTitle: PassthroughStub,
       },
     },
   })

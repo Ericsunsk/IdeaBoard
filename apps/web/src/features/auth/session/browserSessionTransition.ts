@@ -10,7 +10,10 @@ import {
   readStoredSessionUser,
 } from './sessionPersistence'
 
-const SESSION_CACHE_TTL_MS = 30_000
+// Session trust window shared with the router's admin revalidation
+// threshold (`app/router`): a recently validated session is trusted
+// between navigations instead of reprobing on every navigation.
+const SESSION_CACHE_TTL_MS = 300_000
 
 type SessionState = {
   getUser: () => User | null
@@ -30,7 +33,7 @@ export type BrowserSessionTransition = {
   clearLocal: () => void
   fetchUserInfo: (
     force?: boolean,
-    options?: { failClosedOnError?: boolean | undefined },
+    options?: { retryTransient?: boolean | undefined },
   ) => Promise<User | null>
   ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
   logout: () => Promise<boolean>
@@ -46,6 +49,12 @@ function getErrorStatusCode(error: unknown): number {
   const errorRecord =
     error && typeof error === 'object' ? (error as { status?: unknown; code?: unknown }) : null
   return Number(errorRecord?.status ?? errorRecord?.code)
+}
+
+// Only 401/403 prove the session is dead. Network errors, timeouts, and 5xx
+// are transient: the stale identity is kept so the next navigation can retry.
+function isSessionExpiredStatus(status: number): boolean {
+  return status === 401 || status === 403
 }
 
 function getRedirectPath(redirectPath: unknown): string {
@@ -87,7 +96,7 @@ export function createBrowserSessionTransition(
 
   async function fetchUserInfo(
     force = false,
-    options: { failClosedOnError?: boolean | undefined } = {},
+    options: { retryTransient?: boolean | undefined } = {},
   ): Promise<User | null> {
     if (state.isLoaded() && !force) return state.getUser()
     try {
@@ -95,8 +104,24 @@ export function createBrowserSessionTransition(
       commitUser(session.user)
       return session.user
     } catch (error) {
-      const status = getErrorStatusCode(error)
-      if (status === 401 || status === 403 || options.failClosedOnError) {
+      if (isSessionExpiredStatus(getErrorStatusCode(error))) {
+        clearSession()
+        return null
+      }
+      // Post-auth flows (login / OTP verify / email change) just proved the
+      // credential, so a transient projection failure retries once before the
+      // caller decides; navigation flows fail open and retry on the next nav.
+      if (options.retryTransient) {
+        try {
+          const session = await loadUser()
+          commitUser(session.user)
+          return session.user
+        } catch (retryError) {
+          if (isSessionExpiredStatus(getErrorStatusCode(retryError))) {
+            clearSession()
+            return null
+          }
+        }
         clearSession()
         return null
       }
@@ -113,7 +138,7 @@ export function createBrowserSessionTransition(
       clearSession()
       return null
     }
-    return fetchUserInfo(true, { failClosedOnError: options.fresh })
+    return fetchUserInfo(true)
   }
 
   async function logout(): Promise<boolean> {

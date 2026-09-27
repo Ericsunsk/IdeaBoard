@@ -30,3 +30,9 @@ type WorkspaceLibraryStore interface {
 	GetMaterialization(ctx context.Context, workspacePublicID, materializationPublicID string) (*domain.V1Materialization, error)
 	SetMaterializationResult(ctx context.Context, workspacePublicID, materializationPublicID string, status domain.V1MaterializationStatus, mediaAssetID, errorCode, errorMessage string) (*domain.V1Materialization, error)
 }
+
+// MaterializationClaimer atomically converges concurrent internal triggers
+// for one workspace asset onto one pending/running/completed job.
+type MaterializationClaimer interface {
+	ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, bool, error)
+}

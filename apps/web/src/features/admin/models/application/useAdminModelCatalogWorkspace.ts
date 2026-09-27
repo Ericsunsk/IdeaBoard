@@ -1,8 +1,8 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
-import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { useAdminModelCatalogFeedback } from './useAdminModelCatalogFeedback'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import {
@@ -249,7 +249,7 @@ export function useAdminModelCatalogWorkspace(
       reason: { required: true },
     })
     if (!confirmed) return
-    const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+    const operatorReason = requireDestructiveReason(adminConfirm)
     if (!operatorReason) return
     const nextList = allModels.value.filter((m) => m.id !== model.id)
     try {

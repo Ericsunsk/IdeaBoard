@@ -154,7 +154,7 @@ const contentLayoutClasses: Record<AdminDialogContentLayout, string> = {
 }
 const contentClass = computed(() => contentLayoutClasses[props.contentLayout])
 const adminDialogSurfaceIntent = {
-  dismissibleBy: ['close-control', 'escape'],
+  dismissibleBy: ['close-control', 'escape', 'mask'],
   restoreFocus: true,
 } as const
 const { ariaBusy, canDismiss, completeClose, handleVisibilityChange, requestClose } =

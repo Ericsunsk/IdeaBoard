@@ -7,25 +7,23 @@
 //
 // This module is the SOLE library transport surface: the legacy user-scoped
 // `resource.ts` (integer ids, `/user/library/*`) is deleted. Ids are
-// opaque (`ws_` + canonical `lfolder_` / `lasset_` / `lmat_`);
+// opaque (`ws_` + canonical `lfolder_` / `lasset_`);
 // malformed ids throw before any network call, matching the backend 404
 // posture. Payloads map snake_case to camelCase at this boundary;
 // callers only see camelCase.
 //
 // Layout (issue #844): pure id asserts + mappers live in
 // `domain/validators` (no i18n/network), transport in
-// `infrastructure/resource`, save/lookup/materialize orchestration +
-// polling in `application/libraryUseCases`. This file only re-exports those
-// modules so the `features/library` barrel names — and every `./workspace`
+// `infrastructure/resource`, save/lookup/resolve orchestration plus the
+// poll-free Canvas media resolve in `application/libraryUseCases`. This
+// file only re-exports those modules so the `features/library` barrel names — and every `./workspace`
 // deep import — stay stable with zero call-site churn.
 
 export {
   assertLibraryAssetId,
   assertLibraryFolderId,
-  assertLibraryMaterializationId,
   assertWorkspaceId,
   libraryAssetKey,
-  mapWorkspaceLibraryMaterializationStatus,
   mapWorkspaceLibraryProvider,
   mapWorkspaceLibraryResolveStatus,
   requireWorkspaceId,
@@ -33,15 +31,12 @@ export {
   toWorkspaceLibraryAsset,
   toWorkspaceLibraryAssetInput,
   toWorkspaceLibraryFolder,
-  toWorkspaceLibraryMaterialization,
   toWorkspaceLibraryResolveResult,
   type LibrarySearchReference,
   type WorkspaceLibraryAsset,
   type WorkspaceLibraryAssetInput,
   type WorkspaceLibraryAssetProvider,
   type WorkspaceLibraryFolder,
-  type WorkspaceLibraryMaterialization,
-  type WorkspaceLibraryMaterializationStatus,
   type WorkspaceLibraryPage,
   type WorkspaceLibraryResolveResult,
   type WorkspaceLibraryResolveStatus,

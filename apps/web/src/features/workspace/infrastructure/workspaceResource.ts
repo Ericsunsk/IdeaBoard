@@ -8,7 +8,7 @@
 //
 // The module codes against the AGREED contract (backend sibling implements
 // the real `/api/v1/*` endpoints in parallel):
-// - `GET /api/v1/me` -> `{ data: { public_id, display_name, avatar? } }`
+// - `GET /api/v1/user` -> `{ data: { public_id, display_name, avatar? } }`
 // - `GET /api/v1/workspaces?cursor=&page_size=` -> `{ data: [...], meta }`
 // - `POST /api/v1/workspaces` with a required `Idempotency-Key` header
 // - Errors as `{ error: { code, message, details, request_id } }`
@@ -27,9 +27,9 @@ import {
   listWorkspaces,
 } from '../../../shared/api/generated-query/public/workspaces/workspaces'
 import {
-  getGetMeQueryKey,
-  getMe,
-} from '../../../shared/api/generated-query/public/me/me'
+  getGetUserQueryKey,
+  getUser,
+} from '../../../shared/api/generated-query/public/user/user'
 import type { ListWorkspacesParams } from '../../../shared/api/generated-query/public/model'
 import {
   buildContractRequestHeaders,
@@ -39,6 +39,7 @@ import {
   parseContractEnvelope,
 } from '../../../shared/api/contractKernel'
 import { workspaceCreationIdempotencyKey } from '../../../shared/api/idempotencyKey'
+import type { AuthFailureMode } from '../../../shared/api/client'
 import { resolveApiUrl } from '../../../shared/config/runtimeUrls'
 
 export type WorkspaceSummary = {
@@ -145,7 +146,7 @@ export function parsePrincipal(payload: unknown): PrincipalSummary {
     throw error
   }
   if (!isRecord(parsed.data)) throw new Error('Invalid principal response')
-  // Agreed shape carries `public_id`/`display_name`; the kernel stub `Me`
+  // Agreed shape carries `public_id`/`display_name`; the kernel stub `User`
   // only has `id` so far.
   const publicId = requireOpaqueId(parsed.data.public_id ?? parsed.data.id, 'usr', 'principal')
   const displayName = typeof parsed.data.display_name === 'string' ? parsed.data.display_name : ''
@@ -215,17 +216,23 @@ export function classifyWorkspaceAccessError(error: unknown): WorkspaceAccessKin
 export type WorkspaceRequestOptions = {
   signal?: AbortSignal | null | undefined
   requestId?: string | undefined
+  // Per-request 401 policy, forwarded to the generated transport. Reads on
+  // public/guest surfaces pass `silent`; writes and authed-surface reads
+  // keep the default redirect.
+  authFailure?: AuthFailureMode | undefined
 }
 
 function toRequestConfig(options: WorkspaceRequestOptions | undefined): {
   signal?: AbortSignal | undefined
   headers: Record<string, string>
+  authFailure?: AuthFailureMode | undefined
 } {
   return {
     ...(options?.signal == null ? {} : { signal: options.signal }),
     headers: buildContractRequestHeaders({
       requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
     }),
+    ...(options?.authFailure == null ? {} : { authFailure: options.authFailure }),
   }
 }
 
@@ -261,7 +268,7 @@ export async function fetchAllWorkspaces(
 }
 
 export async function fetchPrincipal(options?: WorkspaceRequestOptions): Promise<PrincipalSummary> {
-  const response = await getMe(toRequestConfig(options))
+  const response = await getUser(toRequestConfig(options))
   return parsePrincipal(response)
 }
 
@@ -317,7 +324,7 @@ function withCursorQuery(base: string, params?: { cursor?: string | null | undef
 }
 
 export const workspaceApiUrls = {
-  me: (): string => resolveApiUrl('/api/v1/me'),
+  user: (): string => resolveApiUrl('/api/v1/user'),
   workspaces: (params?: { cursor?: string | null | undefined; pageSize?: number | undefined }): string =>
     withCursorQuery(resolveApiUrl('/api/v1/workspaces'), params),
   workspaceDetail: (workspaceId: string): string =>
@@ -337,5 +344,5 @@ export const workspaceApiUrls = {
 export const workspaceQueryKeys = {
   all: ['workspaces'] as const,
   list: getListWorkspacesQueryKey(),
-  principal: getGetMeQueryKey(),
+  principal: getGetUserQueryKey(),
 }

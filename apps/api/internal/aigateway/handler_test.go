@@ -125,25 +125,11 @@ func TestGatewayHandlerGetMasksSecrets(t *testing.T) {
 func TestGatewayHandlerUpdate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("rejects non-admin", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleUser)
-			NewHandler(store).Update(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway", strings.NewReader(`{"account_id":"a","gateway_id":"g"}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
-		}
-		if len(store.updated) != 0 {
-			t.Fatal("store updated by non-admin")
-		}
-	})
-
+	// Non-admin gating rides the outer Control Plane guard (controlProxy +
+	// guard enforces the operator capability); the handler resolves the
+	// actor from the request principal without re-checking the role, so
+	// there is no in-handler 403 case to pin here. Guard-level denial is
+	// covered by TestControlAuthMatrix in runtime/interfaces/http.
 	t.Run("rejects bad JSON", func(t *testing.T) {
 		store := &fakeGatewayStore{}
 		router := gin.New()
@@ -214,25 +200,6 @@ func TestGatewayHandlerMappings(t *testing.T) {
 		}
 	})
 
-	t.Run("save rejects non-admin", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway/models/:feature", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleUser)
-			NewHandler(store).SaveMapping(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/models/generation", strings.NewReader(`{"model":"openai/gpt-image-1"}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
-		}
-		if len(store.saved) != 0 {
-			t.Fatal("store saved by non-admin")
-		}
-	})
-
 	t.Run("save forwards actor and mapping", func(t *testing.T) {
 		store := &fakeGatewayStore{}
 		router := gin.New()
@@ -270,22 +237,6 @@ func TestGatewayHandlerCatalog(t *testing.T) {
 		}
 		if !strings.Contains(rec.Body.String(), "test/model-1") {
 			t.Fatalf("body = %s", rec.Body.String())
-		}
-	})
-
-	t.Run("save catalog rejects non-admin", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway/catalog", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 5, principal.RoleUser)
-			NewHandler(store).SaveCatalog(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/catalog", strings.NewReader(`{"items":[{"id":"m1"}]}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 		}
 	})
 
@@ -345,13 +296,6 @@ func TestGatewayHandlerRoutePreview(t *testing.T) {
 		return rec
 	}
 
-	t.Run("preview rejects non-admin", func(t *testing.T) {
-		rec := servePreview(t, principal.RoleUser, `{"model_id":"openai/gpt-image-1"}`)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
-		}
-	})
-
 	t.Run("preview resolves first-party namespace and default path", func(t *testing.T) {
 		rec := servePreview(t, principal.RoleAdmin, `{"model_id":"openai/gpt-image-1"}`)
 		if rec.Code != http.StatusOK {
@@ -401,9 +345,8 @@ func TestGatewayHandlerListProviders(t *testing.T) {
 		return rec
 	}
 
-	if rec := serve(t, principal.RoleUser); rec.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-	}
+	// Non-admin gating rides the outer Control Plane guard; see
+	// TestControlAuthMatrix for the guard-level 403 matrix.
 	rec := serve(t, principal.RoleAdmin)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
@@ -419,21 +362,8 @@ func TestGatewayHandlerListProviders(t *testing.T) {
 
 func TestGatewayHandlerDetectModels(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	t.Run("rejects non-admin", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.GET("/settings/ai-gateway/detect-models", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 1, principal.RoleUser)
-			NewHandler(store).DetectModels(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/settings/ai-gateway/detect-models", nil)
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-		}
-	})
-
+	// Non-admin gating rides the outer Control Plane guard (see
+	// TestControlAuthMatrix); the handler performs no role check.
 	t.Run("returns detected models for admin", func(t *testing.T) {
 		store := &fakeGatewayStore{
 			detected: []DetectedModel{
@@ -489,13 +419,6 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
-		}
-	})
-
-	t.Run("test rejects non-admin", func(t *testing.T) {
-		rec := serveTest(t, principal.RoleUser, `{"base_url":"http://127.0.0.1:9"}`)
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusForbidden, rec.Body.String())
 		}
 	})
 
@@ -558,12 +481,6 @@ func TestGatewayHandlerModelReference(t *testing.T) {
 		router.ServeHTTP(rec, req)
 		return rec
 	}
-
-	t.Run("rejects non-admin", func(t *testing.T) {
-		if rec := serve(t, principal.RoleUser, "?model_id=openai/gpt-5"); rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-		}
-	})
 
 	t.Run("returns reference for admin", func(t *testing.T) {
 		rec := serve(t, principal.RoleAdmin, "?model_id=openai/gpt-5")

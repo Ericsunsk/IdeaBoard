@@ -374,7 +374,10 @@ async function handleStartCreating() {
 const searchScreen = useSearchScreenRuntime({
   userPublicID,
   scrollContainer: pageScrollRef,
-  isAuthenticated: () => Boolean(userStore.user),
+  // Validated session only: a restored localStorage snapshot is not proof of
+  // a live cookie. Auto-firing queries on a stale identity 401 and the shared
+  // handler reloads the page to login.
+  isAuthenticated: () => Boolean(userStore.user) && userStore.sessionValidatedAt > 0,
 })
 const { search, results: searchResults, library, selection, preview } = searchScreen.view
 const {

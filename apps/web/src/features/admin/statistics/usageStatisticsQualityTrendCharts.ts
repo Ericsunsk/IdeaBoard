@@ -47,11 +47,18 @@ export function useUsageStatisticsQualityTrendCharts(options: {
 
     return buildAdminTimeRangeBuckets(options.timeRange.value).map((bucket) => {
       const item = trendMap.get(bucket.date)
+      if (item == null) {
+        // Sparse backend series: a missing day means no activity, not broken
+        // data — render an explicit zero day (failureRate 0, not 100%).
+        // Present-but-invalid values below propagate NaN instead (no fake 0).
+        return { label: bucket.label, total: 0, success: 0, fail: 0, successRate: 0, failureRate: 0 }
+      }
       const total = toNonNegativeNumber(item?.total)
       const success = toNonNegativeNumber(item?.success)
       const fail = toNonNegativeNumber(item?.fail)
       // success_rate 后端已是 0-100（分母 success+fail）；失败率同分母，只能 100 - success_rate，不能用 fail/total 重算。
       const successRate = normalizePercent(item?.success_rate)
+      const attempted = success + fail
       return {
         label: item?.label || bucket.label,
         total,
@@ -59,8 +66,13 @@ export function useUsageStatisticsQualityTrendCharts(options: {
         fail,
         successRate,
         // 后端分母是 success+fail（total 还含 cancelled）：只看 attempted，
-        // 全取消的天显示双零而非 100% 失败。
-        failureRate: success + fail > 0 ? 100 - successRate : 0,
+        // 全取消的天显示双零而非 100% 失败。非法输入透出 NaN，不断言为 0。
+        failureRate:
+          !Number.isFinite(attempted) || !Number.isFinite(successRate)
+            ? NaN
+            : attempted > 0
+              ? 100 - successRate
+              : 0,
       }
     })
   })

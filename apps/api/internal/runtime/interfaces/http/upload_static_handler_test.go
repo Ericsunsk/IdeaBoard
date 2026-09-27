@@ -251,7 +251,11 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	if _, err := boardStore.CreateBoard(ctx, workspace.PublicID, owner.ID, "Demo", boardID); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if _, err := boardStore.AddBoardMember(ctx, workspace.PublicID, boardID, owner.ID, member.ID, boards.RoleViewer); err != nil {
+	ownerWsRole, _, err := tenancyStore.GetWorkspaceRole(ctx, workspace.PublicID, owner.ID)
+	if err != nil {
+		t.Fatalf("owner workspace role failed: %v", err)
+	}
+	if _, err := boardStore.AddBoardMember(ctx, workspace.PublicID, boardID, owner.ID, member.ID, boards.RoleViewer, ownerWsRole); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
@@ -269,7 +273,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 		},
 	}
 	deps.ReadAccess = authorization.NewReadableUploadAccess(
-		staticUploadWorkspaceBoardAccessResolver{store: boardStore, workspacePublicID: workspace.PublicID},
+		staticUploadWorkspaceBoardAccessResolver{store: boardStore, tenancyStore: tenancyStore, workspacePublicID: workspace.PublicID},
 		staticUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
 	handler := uploadStaticHandler(deps)
@@ -281,14 +285,16 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 
 // staticUploadWorkspaceBoardAccessResolver resolves canvas board access
 // through the workspace-scoped boards store. The fixture closes over the
-// workspace it created; callers without a board grant converge to
-// boards.ErrNotFound (404 board_not_found semantics at the handler edge).
+// workspace it created; callers with no effective board role (no explicit
+// grant and no visible workspace default) converge to boards.ErrNotFound
+// (404 board_not_found semantics at the handler edge).
 // Production static uploads keep the legacy BoardService fallback in
 // resolveStaticUploadReadAccess: legacy board ids carry no workspace
 // context, so that path stays fail-closed until a workspace-aware canvas
 // URL exists.
 type staticUploadWorkspaceBoardAccessResolver struct {
 	store             boards.WorkspaceBoardStore
+	tenancyStore      tenancy.Store
 	workspacePublicID string
 }
 
@@ -296,7 +302,18 @@ func (r staticUploadWorkspaceBoardAccessResolver) ResolveUploadBoardAccess(ctx c
 	if r.store == nil || strings.TrimSpace(r.workspacePublicID) == "" {
 		return 0, storagedomain.ErrUploadAccessDependencyMissing
 	}
-	_, ok, err := r.store.GetBoardRole(ctx, r.workspacePublicID, boardID, userID)
+	workspaceRole := ""
+	if r.tenancyStore != nil {
+		role, member, err := r.tenancyStore.GetWorkspaceRole(ctx, r.workspacePublicID, userID)
+		if err != nil {
+			// Fail closed without leaking existence.
+			return 0, boards.ErrNotFound
+		}
+		if member {
+			workspaceRole = role
+		}
+	}
+	_, ok, err := r.store.GetBoardRole(ctx, r.workspacePublicID, boardID, userID, workspaceRole)
 	if err != nil {
 		return 0, err
 	}

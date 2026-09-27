@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -43,6 +44,30 @@ type VisionBillingResult struct {
 	OperationID string `json:"operation_id"`
 	Status      string `json:"status"`
 	Replayed    bool   `json:"replayed,omitempty"`
+}
+
+// visionBillingDeferredReason preserves the catalog miss distinction (do
+// NOT merge the sentinels): pricing_unavailable vs sku_not_found stay
+// distinct reasons in the deferred metric.
+func visionBillingDeferredReason(err error) (string, bool) {
+	if errors.Is(err, billing.ErrSKUNotFound) {
+		return "sku_not_found", true
+	}
+	if errors.Is(err, billing.ErrPricingUnavailable) {
+		return "pricing_unavailable", true
+	}
+	return "", false
+}
+
+// visionBillingDeferredObserve emits the billing_deferred metric + backfill
+// note via the existing slog observability pattern (closed labels only:
+// sku, reason; no user IDs in metric fields). It is a package-level hook
+// so tests can stub metric emission without scraping Prometheus;
+// production uses slog.
+var visionBillingDeferredObserve = func(sku, reason, operationID string) {
+	slog.Warn("vision search billing deferred: catalog lacks price; proceeding free with backfill note",
+		"sku", sku, "reason", reason, "operation_id", operationID,
+		"backfill", "ai_search_operations row omitted; needs backfill for unpriced vision SKU")
 }
 
 type VisionOperationFailure struct {
@@ -100,6 +125,12 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 
 	extraction, providerErr := s.vision.Extract(ctx, input)
 	if providerErr != nil {
+		if reserved.deferred {
+			// Deferred free path has no ledger row: skip release/
+			// reconciliation and fail directly (no settlement uncertainty).
+			code, message, status := visionFailureDetails(providerErr)
+			return VisionBillingResult{}, &VisionOperationFailure{Code: code, Message: message, HTTPStatus: status}
+		}
 		if isVisionUncertain(providerErr) {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
 			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, &VisionBillingPending{OperationID: reserved.result.OperationID}
@@ -112,6 +143,10 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 		return VisionBillingResult{}, &VisionOperationFailure{Code: code, Message: message, HTTPStatus: status}
 	}
 
+	if reserved.deferred {
+		// Deferred free path skips ledger capture: amount 0 free-marker.
+		return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: "succeeded"}, nil
+	}
 	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, userID, extraction.Query); err != nil {
 		_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
 		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: capture: %w", ErrVisionSettlement, err)
@@ -120,9 +155,10 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 }
 
 type visionReservation struct {
-	result  VisionBillingResult
-	failure error
-	execute bool
+	result   VisionBillingResult
+	failure  error
+	execute  bool
+	deferred bool
 }
 
 func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, requestHash string) (visionReservation, error) {
@@ -161,12 +197,24 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 	quote, err := s.catalog.QuoteAtResolutionInTx(ctx, tx, visionSearchSKU, billing.OutputResolutionDefault, 1)
 	if err != nil || quote.TotalCredits <= 0 {
 		if err != nil {
-			if errors.Is(err, billing.ErrPricingUnavailable) || errors.Is(err, billing.ErrSKUNotFound) {
-				return visionReservation{}, ErrVisionPricingUnavailable
+			if reason, ok := visionBillingDeferredReason(err); ok {
+				// Catalog lacks a price: allow the user-facing read with
+				// a billing_deferred metric + backfill note, proceeding
+				// at amount 0 (free-marker: skip ledger + omit the
+				// ai_search_operations row which requires unit_credits > 0).
+				// 403 wallet-restricted and transient 503 paths below
+				// stay fail-closed. The two sentinels stay distinct via
+				// the reason label (not merged).
+				operationID := uuid.NewString()
+				visionBillingDeferredObserve(visionSearchSKU, reason, operationID)
+				return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: "pending"}, execute: true, deferred: true}, nil
 			}
 			return visionReservation{}, fmt.Errorf("quote vision search: %w", err)
 		}
-		return visionReservation{}, ErrVisionPricingUnavailable
+		// Quoted zero/negative: same free-marker degrade (no ledger, no row).
+		operationID := uuid.NewString()
+		visionBillingDeferredObserve(visionSearchSKU, "unpriced_zero", operationID)
+		return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: "pending"}, execute: true, deferred: true}, nil
 	}
 	amount, err := domain.NewCreditAmount(quote.TotalCredits)
 	if err != nil {

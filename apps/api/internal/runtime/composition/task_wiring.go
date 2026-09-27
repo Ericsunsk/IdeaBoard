@@ -207,15 +207,13 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task renderer: %w", err)
 	}
 	// #828: post-Complete auto-materialize into the workspace library Quick
-	// Saves folder. Managed task output refs are represented explicitly by
-	// library.Service (workspace_media + media_asset_id), so no provider URL
-	// is fabricated for internal media.
+	// Saves folder. The trigger is unbilled (permanent free tier): the
+	// saver ensures the Quick Saves asset and the trigger records the
+	// durable job directly, with no quote, hold, capture, or release.
 	workspaceLibraryStore := library.NewService(repos.db)
 	workspaceAutoMaterializer, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
-		Store:   workspaceLibraryStore,
-		Quoter:  taskruntime.NewLibraryMaterializeQuoter(services.billingCatalog),
-		Billing: taskruntime.NewLibraryMaterializeSettler(services.creditService),
-		Saver:   taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore),
+		Store: workspaceLibraryStore,
+		Saver: taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore),
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task auto-materializer: %w", err)

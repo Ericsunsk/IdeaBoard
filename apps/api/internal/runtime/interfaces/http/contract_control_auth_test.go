@@ -157,8 +157,11 @@ func TestControlAuthMatrix(t *testing.T) {
 		}
 	})
 
-	t.Run("least privilege family grant is scoped", func(t *testing.T) {
-		// control:credits only: grant allowed, users list denied.
+	t.Run("admin-only grant ignores family scoping", func(t *testing.T) {
+		// Admin-only convergence: production sessions mint no family
+		// capabilities, so the guard enforces the admin role directly and
+		// family strings are audit labels only. A scoped-cap admin passes
+		// every family.
 		status, _, _ := h.serve(controlCall{
 			method: http.MethodPost, path: "/api/control/v1/credits/grants", body: grantBody,
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
@@ -167,15 +170,12 @@ func TestControlAuthMatrix(t *testing.T) {
 		if status != http.StatusOK {
 			t.Fatalf("scoped grant status = %d, want 200", status)
 		}
-		status, _, payload := h.serve(controlCall{
+		status, _, _ = h.serve(controlCall{
 			method: http.MethodGet, path: "/api/control/v1/users",
 			userID: controlOperatorID, role: "admin", caps: []string{ControlCapabilityCredits},
 		})
-		if status != http.StatusForbidden {
-			t.Fatalf("scoped users list status = %d, want 403", status)
-		}
-		if code := controlErrorCode(t, payload); code != string(contract.CodeForbidden) {
-			t.Fatalf("scoped code = %q, want forbidden", code)
+		if status != http.StatusOK {
+			t.Fatalf("scoped users list status = %d, want 200 (admin-only, caps ignored)", status)
 		}
 	})
 }
@@ -686,6 +686,18 @@ func TestControlBillingAndPayments(t *testing.T) {
 		}
 		if h.catalog.publishActor != controlOperatorID {
 			t.Fatalf("publish actor = %d", h.catalog.publishActor)
+		}
+	})
+
+	t.Run("catalog publish accepts body reason alongside header", func(t *testing.T) {
+		status, _, _ := h.serve(controlCall{
+			method: http.MethodPost, path: "/api/control/v1/billing/catalog/ai-image/prices",
+			body:   `{"prices":{"1k":10},"reason":"price update"}`,
+			userID: controlOperatorID, role: "admin",
+			headers: controlMutationHeaders("cat-key-2", "price update"),
+		})
+		if status != http.StatusOK {
+			t.Fatalf("status = %d", status)
 		}
 	})
 

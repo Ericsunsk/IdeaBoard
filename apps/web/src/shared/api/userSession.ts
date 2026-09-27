@@ -1,11 +1,11 @@
-import { getMe } from './generated-query/public/me/me'
+import { getUser } from './generated-query/public/user/user'
 import { i18n } from '../i18n'
 import type { User } from './sessionUserType'
 
 // Session principal owned by the shared API boundary (issue #809).
 //
 // The legacy `generated-query/user` + `apiResponse` transport is gone; the
-// Public Data Plane serves the principal at `GET /api/v1/me` (`MeEnvelope`).
+// Public Data Plane serves the principal at `GET /api/v1/user` (`UserEnvelope`).
 // The `User` view type lives in `./sessionUserType` (import it from there, never
 // from here: this module's runtime transport sits downstream of the shared
 // API client and a type edge back would close an import cycle); unknown
@@ -45,7 +45,7 @@ export function toSessionUser(raw: unknown): User | null {
 
 export async function fetchCurrentUserInfo(): Promise<{ user: User }> {
   const fallback = i18n.global.t('common.errors.sessionLoadFailed')
-  const envelope = await getMe()
+  const envelope = await getUser()
   const data = (envelope as { data?: unknown } | null | undefined)?.data
   const user = toSessionUser(data)
   if (!user) throw new Error(fallback)

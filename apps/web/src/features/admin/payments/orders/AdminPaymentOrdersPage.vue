@@ -237,7 +237,8 @@ import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { usePaymentOrdersFeedback } from '../useStripeSettingsFeedback'
 import {
@@ -413,7 +414,7 @@ async function requestRefund(ideaQuantity: number) {
     reason: { required: true },
   })
   if (!confirmed) return
-  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
+  const operatorReason = requireDestructiveReason(adminConfirm)
   if (!operatorReason) return
   await executeRefund(publicOrderNumber, ideaQuantity, operatorReason)
 }

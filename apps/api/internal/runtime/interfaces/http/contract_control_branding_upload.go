@@ -34,6 +34,7 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage/domain"
 	"ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 
@@ -118,7 +119,7 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 			reason = raw
 		}
 	}
-	if !validControlReason(reason) {
+	if _, err := adminaction.New(ctx.Operator.UserID(), reason); err != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, "需要填写操作原因")
 		return
 	}

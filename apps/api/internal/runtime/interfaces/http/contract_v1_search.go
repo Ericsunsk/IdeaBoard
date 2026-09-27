@@ -28,8 +28,10 @@ package httpapi
 // renders search_vision_not_configured (503); key reuse with a
 // different request renders search_idempotency_conflict (409). Vision
 // billing failures reuse the #804 codes (billing_quote_unavailable
-// 503 transient, billing_pricing_unavailable 422 unpriced SKU,
-// billing_wallet_restricted 403).
+// 503 transient, billing_wallet_restricted 403); unpriced vision SKUs
+// (catalog lacks a price) degrade to free with a billing_deferred
+// metric + backfill note instead of 422, proceeding at amount 0 with
+// ledger Hold/Capture/Release skipped.
 //
 // Vision queries settle billing through the credits.Commands path
 // (V1CreditSettler Hold/Capture/Release with caller idempotency keys;
@@ -55,10 +57,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/workspacemedia"
@@ -69,6 +73,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// v1VisionBillingDeferredObserve emits the billing_deferred metric +
+// backfill note for unpriced vision SKUs via the existing slog
+// observability pattern (closed labels only: sku, reason). It is a
+// package-level hook so tests can stub metric emission; production uses
+// slog. The two catalog sentinels stay distinct via the reason label.
+var v1VisionBillingDeferredObserve = func(sku, reason, operationID string) {
+	slog.Warn("vision search billing deferred: catalog lacks price; proceeding free with backfill note",
+		"sku", sku, "reason", reason, "operation_id", operationID,
+		"backfill", "vision query needs backfill for unpriced SKU")
+}
+
+// v1VisionBillingDeferredReason preserves the catalog miss distinction
+// (do NOT merge the sentinels).
+func v1VisionBillingDeferredReason(err error) (string, bool) {
+	if errors.Is(err, billing.ErrSKUNotFound) {
+		return "sku_not_found", true
+	}
+	if errors.Is(err, billing.ErrPricingUnavailable) {
+		return "pricing_unavailable", true
+	}
+	return "", false
+}
 
 // V1SearchBackend serves one normalized workspace search page. The
 // providers filter is honored by the backend (post-filter fill stays
@@ -587,22 +614,61 @@ func (h *contractV1Handler) resolveVisionUploads(c *gin.Context, workspace *tena
 func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Workspace, identityPrincipal principal.Principal, input searchcatalog.V1VisionQueryInput, references []searchcatalog.V1VisionReference) (any, error) {
 	ctx := c.Request.Context()
 	amount, quoteErr := h.deps.Search.Quoter.Quote(ctx, workspace.PublicID, V1VisionSKU)
+	deferredFree := false
+	deferredReason := ""
 	if quoteErr != nil {
-		// Preserve the underlying billing cause alongside the
-		// quote-unavailable identity (multi-%w): pricing failures
-		// (ErrPricingUnavailable/ErrSKUNotFound) render 422 via the
-		// first branch of renderSearchBillingError, while transient
-		// failures keep the 503 billing_quote_unavailable branch. The
-		// createVisionQuery gate still matches
-		// errV1BillingQuoteUnavailable, so routing is unchanged.
-		return nil, fmt.Errorf("search vision quote: %w: %w", quoteErr, errV1BillingQuoteUnavailable)
+		if reason, ok := v1VisionBillingDeferredReason(quoteErr); ok {
+			// Catalog lacks a price: allow the user-facing read with a
+			// billing_deferred metric + backfill note, proceeding at
+			// amount 0 (free-marker: ledger Hold/Capture/Release skipped).
+			// 403 wallet-restricted and transient 503 paths below stay
+			// fail-closed. The sentinels stay distinct via reason.
+			amount, deferredFree, deferredReason = 0, true, reason
+		} else {
+			// Preserve the underlying billing cause alongside the
+			// quote-unavailable identity (multi-%w): transient failures
+			// keep the 503 billing_quote_unavailable branch. The
+			// createVisionQuery gate still matches
+			// errV1BillingQuoteUnavailable, so routing is unchanged.
+			return nil, fmt.Errorf("search vision quote: %w: %w", quoteErr, errV1BillingQuoteUnavailable)
+		}
 	}
 	if amount < 0 {
 		return nil, errV1BillingQuoteUnavailable
 	}
+	if amount == 0 {
+		deferredFree = true
+	}
 	operationID, mintErr := searchcatalog.NewV1VisionQueryPublicID()
 	if mintErr != nil {
 		return nil, mintErr
+	}
+	if deferredReason != "" {
+		v1VisionBillingDeferredObserve(V1VisionSKU, deferredReason, operationID)
+	} else if deferredFree {
+		// Quoted zero without a catalog error: same free-marker degrade
+		// with a backfill note so unpriced reads stay attributable.
+		v1VisionBillingDeferredObserve(V1VisionSKU, "unpriced_zero", operationID)
+	}
+	if deferredFree {
+		// Free-marker: skip ledger Hold/Capture/Release entirely.
+		extracted, extractErr := h.deps.Search.Extractor.ExtractVisionQuery(ctx, V1VisionExtractInput{
+			WorkspacePublicID: workspace.PublicID, UserText: input.UserText, References: references,
+		})
+		if extractErr != nil {
+			if errors.Is(extractErr, errV1VisionNotConfigured) {
+				return nil, errV1VisionNotConfigured
+			}
+			return nil, errV1VisionProviderError
+		}
+		normalized, normalizeErr := searchcatalog.NormalizeV1SearchQuery(extracted)
+		if normalizeErr != nil {
+			return nil, errV1VisionProviderError
+		}
+		return v1VisionQueryDTO{
+			OperationID: operationID, Status: "succeeded", Query: normalized,
+			CreatedAt: v1FormatTime(time.Now().UTC()),
+		}, nil
 	}
 	holdKey := "search-vision:" + operationID + ":hold"
 	holdID, holdErr := h.deps.Search.Settler.Hold(ctx, identityPrincipal.UserID(), amount, holdKey, "search vision query")
@@ -658,8 +724,9 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // workspace_not_found/library_asset_not_found (404), validation_failed (422),
 // pagination_cursor_invalid (400), bad_request (400), idempotency_key_required (400),
 // service_unavailable (503) plus #804 billing_quote_unavailable (503
-// transient)/billing_pricing_unavailable (422 unpriced SKU)/
-// billing_wallet_restricted (403).
+// transient)/billing_wallet_restricted (403). Unpriced vision SKUs never
+// surface billing_pricing_unavailable (422): they degrade to free with a
+// billing_deferred metric + backfill note (amount 0, ledger skipped).
 //
 // Events note for #807: search/vision lifecycle events (vision query
 // settled, materialization completed) are NOT emitted here; #807 owns

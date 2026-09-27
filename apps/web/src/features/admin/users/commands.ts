@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import type { AdminUsersFeedback } from './useUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
+import { requireDestructiveReason } from '../shared/lib/confirmSettingsSave'
 import {
   banAdminUser,
   deleteAdminUser,
@@ -165,7 +166,8 @@ export function useAdminUserCommands(
   }
 
   // confirmWithReason runs the confirm dialog with a required operator
-  // reason and returns the trimmed reason, or null when cancelled.
+  // reason and returns the trimmed reason, or null when cancelled. An empty
+  // reason toasts and aborts instead of vanishing silently.
   async function confirmWithReason(request: {
     title: string
     message: string
@@ -177,8 +179,7 @@ export function useAdminUserCommands(
       reason: { ...OPERATOR_REASON_SPEC },
     })
     if (!confirmed) return null
-    const reason = (options.confirm.readReason?.() ?? '').trim()
-    return reason ? reason : null
+    return requireDestructiveReason(options.confirm)
   }
 
   async function handleAction(key: UserActionKey, row: AdminUserCommandTarget) {

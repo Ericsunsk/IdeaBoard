@@ -1,6 +1,6 @@
 # Auth Context
 Auth owns the Better Auth session facts, login/register/OTP/OAuth/logout and impersonation exit, auth overlay chrome, and post-auth redirect intent.
-It caches the server session as a 30s client snapshot via a single store.
+It caches the server session as a 5-minute client snapshot via a single store.
 It does NOT own workspace layout, account management UI, or per-page login modals.
 
 ## Domain Language
@@ -9,7 +9,7 @@ It does NOT own workspace layout, account management UI, or per-page login modal
 | ---- | ------- |
 | User Session | Client session facts (`user` / `isAdmin` / `sessionValidatedAt`); single `useUserStore()`; server session belongs to Better Auth. |
 | Auth Transport | Sole Better Auth adapter (`session/transport.ts`): signIn/signUp/signOut/getSession plus `/api/auth/*` fetch. |
-| Session Cache | In-memory session snapshot with 30s TTL (`browserSessionTransition.ts`); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
+| Session Cache | In-memory session snapshot with 5-minute TTL (`browserSessionTransition.ts`, shared with the router admin threshold); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
 | Post-Auth Path | Post-login redirect intent; stored only in `sessionStorage` (`ideaboard:auth:post-auth-path`), consume-once, must pass internal-path validation. |
 | Auth Overlay | Global login/register modal (`mode: login\|register\|null`); installed in `WorkspaceLayout` via `createAuthOverlay` / `provideAuthOverlay`, opened per surface. |
 | OTP | Two-step form state for forgot-password and register verification (`otpPending`); authenticated only on success, failure toasts without state change. |
@@ -32,7 +32,7 @@ It does NOT own workspace layout, account management UI, or per-page login modal
 - Identity changes (login, identity switch, logout, 401/403) must update refs, write/clear the `localStorage` snapshot, and clear all auth-scoped Query cache (`clearAuthScopedQueryCache`).
 - `?redirect=` and post-auth path must pass `isSafeInternalRedirectPath` / `normalizeSafeInternalRedirectPath`; illegal values fall back to `USER_BOARDS_PATH`.
 - `localStorage` holds only session snapshots and scope-restore keys; redirect intent lives only in `sessionStorage`; `File`/`blob` previews are never persisted.
-- Session: `unauthenticated` to `restoring` (memory restore) to `authenticated` (login/verifyOTP plus `fetchUserInfo(force, failClosed)`) to `session-expired` (401/403/failClosed clears refs, storage, Query); `ensureSession` returns directly when cache is under 30s.
+- Session: `unauthenticated` to `restoring` (memory restore) to `authenticated` (login/verifyOTP plus `fetchUserInfo(force, { retryTransient })`) to `session-expired` (401/403 clears refs, storage, Query; network/5xx keeps stale refs and retries next nav); `ensureSession` returns directly when cache is under 5 minutes.
 - OAuth callback: `loading` to `ensureSession(fresh)` plus `replace(redirect)`; provider error or session failure to `logout/clear` plus `replace` to param-free callback to `failed` (shows back-to-login button).
 - Overlay: `closed` to `open(mode, postAuthPath?)` to `login|register` to `close` / `overlay-success` (consumes post-auth path and `router.push`); overlay close also clears pending search auth action.
 - Panel submit: `idle` to submitting (`runAsyncAction.pending`, submit disabled, mask/esc cannot close) to `success` (emit) / `error` (toast); register adds `form` to `otpPending` to `success`.

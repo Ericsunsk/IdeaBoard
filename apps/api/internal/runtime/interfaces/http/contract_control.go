@@ -8,10 +8,10 @@ package httpapi
 //
 // Separation guarantees (Baseline 2.2):
 //   - Auth: same session transport as Public, but authorization is
-//     capability-based (RequireControlCapability), never the legacy
-//     IsAdmin role check. Operators hold explicit control capabilities
-//     via the role grant (principal.WithControlGrant); public
-//     capabilities never imply control.
+//     admin-only (admin business role on a human session or an internal
+//     worker; service accounts, API keys, and OAuth apps never pass).
+//     Production sessions mint no control capabilities at login, so the
+//     family capability strings below are audit labels only.
 //   - Rate limits: a dedicated fixed-window bucket per operator, separate
 //     from Public limits, rendered via contract.SetRateLimit.
 //   - Audit: EVERY guarded route emits a ControlAuditRecord (operator,
@@ -54,14 +54,13 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/contract"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Control family capabilities (frozen; mirrored in openapi.control.yaml
-// x-capabilities and granted to operators via principal.WithControlGrant).
+// Control family capabilities (frozen audit labels; mirrored in
+// openapi.control.yaml x-capabilities).
 const (
 	ControlCapabilityUsers      = principal.ControlCapabilityUsers
 	ControlCapabilityWorkspaces = principal.ControlCapabilityWorkspaces
@@ -70,7 +69,6 @@ const (
 	ControlCapabilityPayments   = principal.ControlCapabilityPayments
 	ControlCapabilityPlatform   = principal.ControlCapabilityPlatform
 	ControlCapabilityTasks      = principal.ControlCapabilityTasks
-	ControlCapabilityWildcard   = principal.ControlWildcardStar
 )
 
 // ControlAuditOutcome classifies a guarded control call for the audit
@@ -232,23 +230,6 @@ func extractControlReason(c *gin.Context, body []byte) string {
 		}
 	}
 	return ""
-}
-
-// validControlReason bounds the operator note (same rune budget as the
-// shared adminaction invariant).
-func validControlReason(reason string) bool {
-	trimmed := strings.TrimSpace(reason)
-	if trimmed == "" {
-		return false
-	}
-	runes := 0
-	for range trimmed {
-		runes++
-		if runes > adminaction.MaxReasonRunes {
-			return false
-		}
-	}
-	return true
 }
 
 // bufferControlBody reads and restores the request body (mutations only)

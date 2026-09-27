@@ -199,6 +199,27 @@ WHERE a.workspace_id = sqlc.arg(workspace_id)
 -- created_at) as updated_at. No dedup key: one asset may back many
 -- jobs; request idempotency stays handler-side (library:materialize).
 
+-- name: LockLibraryMaterializationAsset :exec
+SELECT pg_advisory_xact_lock(hashtextextended(
+  sqlc.arg(workspace_id)::bigint::text || ':' || sqlc.arg(library_asset_id)::bigint::text,
+  0
+));
+
+-- name: GetActiveLibraryMaterializationByAsset :one
+SELECT m.internal_id, m.public_id, m.workspace_id, m.library_asset_id,
+  a.public_id AS asset_public_id,
+  m.status, m.media_asset_id,
+  ma.public_id AS media_asset_public_id,
+  m.error_message, m.created_at, m.completed_at
+FROM library_materializations AS m
+INNER JOIN library_assets AS a ON a.internal_id = m.library_asset_id
+LEFT JOIN media_assets AS ma ON ma.internal_id = m.media_asset_id
+WHERE m.workspace_id = sqlc.arg(workspace_id)
+  AND m.library_asset_id = sqlc.arg(library_asset_id)
+  AND m.status IN ('pending', 'processing', 'completed')
+ORDER BY m.created_at DESC, m.internal_id DESC
+LIMIT 1;
+
 -- name: CreateLibraryMaterialization :one
 INSERT INTO library_materializations (public_id, workspace_id, library_asset_id, status)
 VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(library_asset_id), 'pending')

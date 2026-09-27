@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { createDeferred } from '../../../test/deferred'
 import { createAdminStorageWorkspace } from './workspace'
+import { ADMIN_PROBE_OPERATOR_REASON } from '../shared/lib/confirmSettingsSave'
 import type { AdminStorageResource } from './resource'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
 
@@ -172,6 +173,18 @@ describe('admin storage workspace facade', () => {
     expect(feedback.applyCurrentFailed).toHaveBeenCalledWith(error)
     expect(feedback.applyCurrentSucceeded).not.toHaveBeenCalled()
     expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs storage connection probes without a confirm dialog', async () => {
+    const { workspace, confirm } = createWorkspace()
+
+    await workspace.loadData()
+    await workspace.testStorage({ id: 'profile-1', name: '对象存储' })
+
+    expect(confirm.confirm).not.toHaveBeenCalled()
+    expect(mockResource.testProfile).toHaveBeenCalledWith('profile-1', {
+      operatorReason: ADMIN_PROBE_OPERATOR_REASON,
+    })
   })
 
   it('keeps delete confirmation and refresh sequencing inside the workspace', async () => {

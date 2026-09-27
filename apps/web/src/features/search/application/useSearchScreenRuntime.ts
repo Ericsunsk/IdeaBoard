@@ -195,7 +195,12 @@ export function useSearchScreenRuntime(options: SearchScreenRuntimeOptions) {
   const route = useRoute()
   const router = useRouter()
   const toast = useAppToast()
-  const { selectedId: selectedWorkspaceId } = useWorkspaceSelection()
+  // Public-for-anonymous page: never fire the workspace list without a
+  // session — an anonymous 401 would reload the whole page to login via
+  // the shared auth-failure handler. The getter re-enables after login.
+  const { selectedId: selectedWorkspaceId } = useWorkspaceSelection({
+    enabled: () => options.isAuthenticated(),
+  })
   const workspaceIdSource = () => selectedWorkspaceId.value
   const libraryCoordinator = createSearchLibraryCoordinator({ workspaceId: workspaceIdSource })
   provideSearchLibraryCoordinator(libraryCoordinator)

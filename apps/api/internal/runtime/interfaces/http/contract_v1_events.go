@@ -39,9 +39,9 @@ import (
 //	                        settlement commit (running/completed/failed flush
 //	                        at the worker settle via the same staged seam;
 //	                        wiring lands with the #809 worker flush).
-//	billing.settled         same task once-fns (held/free on create,
-//	                        released on cancel) + library materialization
-//	                        (captured/released). Refs only, no amounts.
+//	billing.settled         same task once-fns only (held/free on create,
+//	                        released on cancel). Refs only, no amounts.
+//	                        Materialization never crossed billing.settled.
 //	                        Stripe inbound webhooks stay distinct: they emit
 //	                        internal user events, never workspace envelopes
 //	                        (orders are user-scoped, no workspace mapping).
@@ -55,9 +55,9 @@ import (
 //	                        roster commit; member role update emits after its
 //	                        direct store commit (no idempotency wrapper there).
 //	board.share_revoked     share-revoke once-fn after RevokeShareToken.
-//	library.materialization_* createLibraryMaterialization after the
-//	                        terminal record commit, fresh executions only
-//	                        (idempotent replays never re-emit).
+//	library.materialization_* REMOVED with the HTTP materialization
+//	                        surface (internal-only now: no HTTP emitter,
+//	                        types dropped from the v1 registry).
 //
 // Retention/replay: NATS JetStream MaxAge (7 days per DESIGN) is the
 // authoritative retention; the process-local hot log

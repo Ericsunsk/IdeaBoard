@@ -128,7 +128,10 @@ import AdminButton from '../shared/components/AdminButton.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
-import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import {
+  ADMIN_PROBE_OPERATOR_REASON,
+  confirmSettingsSave,
+} from '../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import SettingEditorCard from './SettingEditorCard.vue'
@@ -246,16 +249,12 @@ const saveKey = form.handleSubmit(async (values) => {
 })
 
 async function runTest() {
-  const operatorReason = await confirmSettingsSave(confirm, {
-    title: `测试${providerLabel.value}连接`,
-    message: '将使用已保存的 Key 发起一次真实连接测试。该操作将记录操作人与原因。',
-    confirmLabel: '测试连接',
-  })
-  if (!operatorReason) return
+  // Connectivity probes skip the confirm dialog (backend POST read-guard:
+  // no reason ceremony); the fixed probe note still lands on the audit record.
   testing.value = true
   operationError.value = ''
   try {
-    await resource.value.test(props.provider, { operatorReason })
+    await resource.value.test(props.provider, { operatorReason: ADMIN_PROBE_OPERATOR_REASON })
     emit('change')
     feedback.testPassed(providerLabel.value)
   } catch (err) {

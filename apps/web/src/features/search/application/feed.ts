@@ -123,9 +123,12 @@ export function createSearchFeed(
     if (!workspaceId) return
     const lookupStartedAtRevision = savedMutationRevision
     try {
+      // Supplementary backfill: a 401 (expired session) degrades to an
+      // empty saved projection locally, never a login reload.
       const saved = await dependencies.lookupSavedKeys(
         workspaceId,
         items.map((result) => ({ provider: result.provider, sourceId: result.id })),
+        { authFailure: 'silent' },
       )
       if (generation !== loadGeneration) return
       const nextKeys = new Set(savedKeys.value)

@@ -114,7 +114,7 @@ func TestPostgresWorkspaceBoardStoreRejectsLegacyIDs(t *testing.T) {
 	if _, err := store.CreateBoard(ctx, ws.PublicID, postgresStoreOwner, "Legacy", "board-1"); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("create legacy id err = %v, want ErrInvalidInput", err)
 	}
-	if _, _, err := store.GetBoardRole(ctx, ws.PublicID, "board-1", postgresStoreOwner); !errors.Is(err, ErrNotFound) {
+	if _, _, err := store.GetBoardRole(ctx, ws.PublicID, "board-1", postgresStoreOwner, "owner"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("legacy role err = %v, want ErrNotFound", err)
 	}
 }
@@ -173,26 +173,60 @@ func TestPostgresWorkspaceBoardStoreMembers(t *testing.T) {
 	ctx, store, ws := newPostgresWorkspaceBoardFixture(t)
 	boardID := mustCreatePostgresBoard(t, ctx, store, ws, "Members")
 
-	if _, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOutsider); err != nil || ok {
-		t.Fatalf("outsider role = %v err %v, want not-ok", ok, err)
+	// Seed visible workspace memberships: member defaults to viewer,
+	// a second workspace owner defaults to owner; outsiders stay denied.
+	db := store.db
+	tenancyStore := tenancypg.NewStore(db)
+	wsOwnerRole, wsOwnerMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, postgresStoreOwner)
+	if err != nil || !wsOwnerMember {
+		t.Fatalf("fixture owner workspace role = %q member=%v err=%v, want owner member", wsOwnerRole, wsOwnerMember, err)
 	}
-	if _, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOwner); err != nil || !ok {
-		t.Fatalf("owner role = %v err %v, want ok", ok, err)
+	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, postgresStoreMember, tenancy.RoleMember); err != nil {
+		t.Fatalf("seed workspace member failed: %v", err)
+	}
+	wsMemberRole, wsMemberMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, postgresStoreMember)
+	if err != nil || !wsMemberMember {
+		t.Fatalf("seeded member workspace role = %q member=%v err=%v", wsMemberRole, wsMemberMember, err)
+	}
+	wsExtraOwner := postgresStoreExtra
+	if _, err := tenancyStore.AddWorkspaceMember(ctx, ws.PublicID, wsExtraOwner, tenancy.RoleOwner); err != nil {
+		t.Fatalf("seed workspace owner failed: %v", err)
+	}
+	wsExtraRole, wsExtraMember, err := tenancyStore.GetWorkspaceRole(ctx, ws.PublicID, wsExtraOwner)
+	if err != nil || !wsExtraMember {
+		t.Fatalf("seeded owner workspace role = %q member=%v err=%v", wsExtraRole, wsExtraMember, err)
 	}
 
-	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOutsider, postgresStoreMember, RoleViewer); !errors.Is(err, ErrPermissionDenied) {
+	if _, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOutsider, ""); err != nil || ok {
+		t.Fatalf("outsider role = %v err %v, want not-ok", ok, err)
+	}
+	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreOwner, wsOwnerRole); err != nil || !ok || role != RoleOwner {
+		t.Fatalf("owner role = %v %v err %v, want owner", role, ok, err)
+	}
+	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, wsMemberRole); err != nil || !ok || role != RoleViewer {
+		t.Fatalf("member default role = %v %v err %v, want viewer", role, ok, err)
+	}
+	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, wsExtraOwner, wsExtraRole); err != nil || !ok || role != RoleOwner {
+		t.Fatalf("workspace owner default role = %v %v err %v, want owner", role, ok, err)
+	}
+
+	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOutsider, postgresStoreMember, RoleViewer, ""); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("outsider grant err = %v, want ErrPermissionDenied", err)
 	}
-	added, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleViewer)
+	added, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleViewer, wsOwnerRole)
 	if err != nil || added.Role != RoleViewer {
 		t.Fatalf("add member err = %v role = %v", err, added)
 	}
 	// Re-adding keeps the existing role (idempotent).
-	replayed, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor)
+	replayed, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor, wsOwnerRole)
 	if err != nil || replayed.Role != RoleViewer {
 		t.Fatalf("re-add err = %v role = %v, want viewer", err, replayed)
 	}
-	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleViewer); !errors.Is(err, ErrMemberInviteSelf) {
+	// Explicit rows override the workspace default.
+	if role, ok, err := store.GetBoardRole(ctx, ws.PublicID, boardID, postgresStoreMember, wsMemberRole); err != nil || !ok || role != RoleViewer {
+		t.Fatalf("explicit override role = %v %v err %v, want viewer", role, ok, err)
+	}
+	if _, err := store.AddBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleViewer, wsOwnerRole); !errors.Is(err, ErrMemberInviteSelf) {
 		t.Fatalf("add owner err = %v, want ErrMemberInviteSelf", err)
 	}
 
@@ -201,19 +235,19 @@ func TestPostgresWorkspaceBoardStoreMembers(t *testing.T) {
 		t.Fatalf("members = %+v err %v, want 1 viewer", members, err)
 	}
 
-	promoted, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor)
+	promoted, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreMember, RoleEditor, wsOwnerRole)
 	if err != nil || promoted.Role != RoleEditor {
 		t.Fatalf("promote err = %v", err)
 	}
-	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreMember, postgresStoreMember); err != nil {
+	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreMember, postgresStoreMember, wsMemberRole); err != nil {
 		t.Fatalf("self-remove failed: %v", err)
 	}
 
 	// Sole owner cannot be demoted or removed.
-	if _, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleEditor); !errors.Is(err, ErrV1LastOwner) {
+	if _, err := store.UpdateBoardMemberRole(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, RoleEditor, wsOwnerRole); !errors.Is(err, ErrV1LastOwner) {
 		t.Fatalf("demote sole owner err = %v, want ErrV1LastOwner", err)
 	}
-	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner); !errors.Is(err, ErrMemberInviteSelf) {
+	if err := store.RemoveBoardMember(ctx, ws.PublicID, boardID, postgresStoreOwner, postgresStoreOwner, wsOwnerRole); !errors.Is(err, ErrMemberInviteSelf) {
 		t.Fatalf("remove owner err = %v, want ErrMemberInviteSelf", err)
 	}
 }
@@ -293,7 +327,7 @@ func TestPostgresWorkspaceBoardStoreCrossWorkspaceInvisible(t *testing.T) {
 	if _, err := store.GetBoard(ctx, other.PublicID, boardID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("foreign get err = %v, want ErrNotFound", err)
 	}
-	if _, _, err := store.GetBoardRole(ctx, other.PublicID, boardID, postgresStoreOwner); err == nil {
+	if _, _, err := store.GetBoardRole(ctx, other.PublicID, boardID, postgresStoreOwner, "owner"); err == nil {
 		t.Fatal("foreign role succeeded, want error")
 	} else if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("foreign role err = %v, want ErrNotFound", err)

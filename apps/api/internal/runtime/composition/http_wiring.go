@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/aigateway"
+	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
@@ -26,7 +27,6 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -86,15 +86,15 @@ func newAppRouter(
 		ContractV1: httpapi.ContractV1Deps{
 			Store: tenancypg.NewStore(repos.db),
 			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			// Workspace board store is live (postgres mapping over
+			// board_documents/board_revisions, #809 follow-up landed).
+			Boards: boards.NewPostgresWorkspaceBoardStore(repos.db),
 			// Workspace library and media stores are live. Library
-			// materialization has server-side billing adapters, but the
-			// HTTP path intentionally leaves remote media Materializer nil
-			// until that fetch/storage adapter is available; the endpoint
-			// then fails closed before creating a billable job.
+			// materialization is internal-only (owner hard cut): no
+			// public materialization route or emitter is wired here;
+			// only the library Store is supplied.
 			Library: httpapi.ContractV1LibraryDeps{
-				Store:   library.NewService(repos.db),
-				Quoter:  taskruntime.NewLibraryMaterializeQuoter(services.billingCatalog),
-				Billing: taskruntime.NewLibraryMaterializeSettler(services.creditService),
+				Store: library.NewService(repos.db),
 			},
 			Media: taskServices.workspaceTaskMedia,
 			// Binary reads ride the storage service. Derivative rendering

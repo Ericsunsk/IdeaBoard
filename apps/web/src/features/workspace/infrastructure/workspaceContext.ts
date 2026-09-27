@@ -25,6 +25,8 @@ import {
   writeLocalStorageItem,
 } from '../../../shared/utils/storage'
 import { isOpaqueId, opaqueIdPrefix } from '../../../shared/api/contractKernel'
+import type { AuthFailureMode } from '../../../shared/api/client'
+import { getStoredUser } from '../../../shared/utils/auth'
 import { setMediaWorkspaceIdResolver } from '../../../shared/api/mediaWorkspaceScope'
 
 export const WORKSPACE_URL_PARAM = 'workspace'
@@ -210,6 +212,12 @@ export type UseWorkspaceSelectionOptions = {
   enabled?: MaybeRefOrGetter<boolean> | undefined
   routeWorkspaceId?: MaybeRefOrGetter<string | null | undefined> | undefined
   store?: WorkspaceSelectionStore | undefined
+  // Explicit 401 policy override for the list query. When omitted, an
+  // anonymous reader (no stored session — public/guest surfaces) fetches
+  // silently so a 401 degrades to error/empty state instead of reloading
+  // to login; an authed reader keeps the redirect so a revoked session
+  // re-authenticates with its destination preserved.
+  authFailure?: AuthFailureMode | undefined
 }
 
 // Shell-level selection: query owns server data, URL owns nav state, the
@@ -222,7 +230,11 @@ export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
 
   const query = useQuery({
     queryKey: workspaceQueryKeys.list,
-    queryFn: ({ signal }) => fetchWorkspacePage(undefined, { signal }),
+    queryFn: ({ signal }) =>
+      fetchWorkspacePage(undefined, {
+        signal,
+        authFailure: options?.authFailure ?? (getStoredUser() == null ? 'silent' : undefined),
+      }),
     enabled: () => toValue(options?.enabled ?? true),
     staleTime: 15_000,
   })
@@ -233,9 +245,13 @@ export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
       : asWorkspaceId(route.query[WORKSPACE_URL_PARAM]),
   )
 
-  // Keep an explicit shared choice sticky across refetches without ever
+  // Keep the shared choice sticky across refetches without ever
   // copying server items into the store. Auto derivations stay pure so the
   // personal-first rule re-evaluates deterministically on every load.
+  // Persist every resolved id (url, stored, auto-personal, auto-first):
+  // resource layers read the store directly (`getSelectedId()`), so an
+  // unpersisted auto-resolution leaves boards/library fail-closed with
+  // "select a workspace" errors on fresh profiles that have no picker UI.
   watch(
     () => query.data.value,
     (page) => {
@@ -244,7 +260,7 @@ export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
         urlId: urlId.value,
         storedId: store.getSelectedId(),
       })
-      if (resolved.selectedId && resolved.source === 'url') {
+      if (resolved.selectedId && resolved.source !== 'none') {
         store.select(resolved.selectedId)
       }
     },

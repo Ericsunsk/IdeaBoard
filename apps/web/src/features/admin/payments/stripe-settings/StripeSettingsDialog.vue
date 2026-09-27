@@ -160,7 +160,8 @@ import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialo
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { useStripeSettingsFeedback } from '../useStripeSettingsFeedback'
-import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
@@ -253,17 +254,14 @@ function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productT
 
 const submit = form.handleSubmit(async (values) => {
   if (isBusy.value) return
-  // Control writes require an operator reason (audit); a cancelled dialog
-  // aborts the save silently.
-  const confirmed = await adminConfirm.confirm({
+  // Control writes collect the operator reason through the shared confirm
+  // shell (reversible tier: note optional, empty falls back to a default);
+  // a cancelled dialog aborts the save silently.
+  const operatorReason = await confirmSettingsSave(adminConfirm, {
     title: '保存 Stripe 设置',
     message: '确定保存 Stripe 密钥与税务配置吗？该操作将记录操作人与原因。',
     confirmLabel: '保存设置',
-    intent: 'warn',
-    reason: { required: true },
   })
-  if (!confirmed) return
-  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
   if (!operatorReason) return
   isSaving.value = true
   saveError.value = ''

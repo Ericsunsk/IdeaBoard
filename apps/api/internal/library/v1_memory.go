@@ -17,17 +17,22 @@ type InMemoryWorkspaceLibraryStore struct {
 	assets           map[string]map[string]*V1Asset
 	assetIndex       map[string]string
 	materializations map[string]map[string]*V1Materialization
-	now              func() time.Time
+	// materializationOrder keeps per-workspace job ids in creation
+	// order (postgres parity for ListMaterializations; map iteration
+	// alone cannot reproduce it when CreatedAt ties).
+	materializationOrder map[string][]string
+	now                  func() time.Time
 }
 
 // NewInMemoryWorkspaceLibraryStoreForTests builds an empty test-only store.
 func NewInMemoryWorkspaceLibraryStoreForTests() *InMemoryWorkspaceLibraryStore {
 	return &InMemoryWorkspaceLibraryStore{
-		folders:          make(map[string]map[string]*V1Folder),
-		assets:           make(map[string]map[string]*V1Asset),
-		assetIndex:       make(map[string]string),
-		materializations: make(map[string]map[string]*V1Materialization),
-		now:              time.Now,
+		folders:              make(map[string]map[string]*V1Folder),
+		assets:               make(map[string]map[string]*V1Asset),
+		assetIndex:           make(map[string]string),
+		materializations:     make(map[string]map[string]*V1Materialization),
+		materializationOrder: make(map[string][]string),
+		now:                  time.Now,
 	}
 }
 
@@ -364,7 +369,41 @@ func (s *InMemoryWorkspaceLibraryStore) CreateMaterialization(ctx context.Contex
 		s.materializations[workspacePublicID] = make(map[string]*V1Materialization)
 	}
 	s.materializations[workspacePublicID][publicID] = record
+	s.materializationOrder[workspacePublicID] = append(s.materializationOrder[workspacePublicID], publicID)
 	return copyV1Materialization(record), nil
+}
+
+// ClaimMaterialization atomically converges internal triggers in the test
+// store, matching the postgres advisory-lock implementation.
+func (s *InMemoryWorkspaceLibraryStore) ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*V1Materialization, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	if !IsV1MaterializationID(publicID) {
+		return nil, false, ErrV1MaterializationNotFound
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.assets[workspacePublicID][assetPublicID] == nil {
+		return nil, false, ErrV1AssetNotFound
+	}
+	for _, id := range s.materializationOrder[workspacePublicID] {
+		record := s.materializations[workspacePublicID][id]
+		if record == nil || record.AssetPublicID != assetPublicID {
+			continue
+		}
+		if record.Status == V1MaterializationPending || record.Status == V1MaterializationRunning || record.Status == V1MaterializationCompleted {
+			return copyV1Materialization(record), false, nil
+		}
+	}
+	now := s.clock()
+	record := &V1Materialization{WorkspacePublicID: workspacePublicID, PublicID: publicID, AssetPublicID: assetPublicID, Status: V1MaterializationPending, CreatedAt: now, UpdatedAt: now}
+	if s.materializations[workspacePublicID] == nil {
+		s.materializations[workspacePublicID] = make(map[string]*V1Materialization)
+	}
+	s.materializations[workspacePublicID][publicID] = record
+	s.materializationOrder[workspacePublicID] = append(s.materializationOrder[workspacePublicID], publicID)
+	return copyV1Materialization(record), true, nil
 }
 
 // GetMaterialization returns the status-addressable job snapshot.
@@ -379,6 +418,25 @@ func (s *InMemoryWorkspaceLibraryStore) GetMaterialization(ctx context.Context, 
 		return nil, ErrV1MaterializationNotFound
 	}
 	return copyV1Materialization(record), nil
+}
+
+// ListMaterializations returns every workspace job in creation order
+// (concrete-store parity for the read-through completed-job scan and
+// trigger dedup; unknown workspaces list empty).
+func (s *InMemoryWorkspaceLibraryStore) ListMaterializations(ctx context.Context, workspacePublicID string) ([]*V1Materialization, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	order := s.materializationOrder[workspacePublicID]
+	all := make([]*V1Materialization, 0, len(order))
+	for _, publicID := range order {
+		if record := s.materializations[workspacePublicID][publicID]; record != nil {
+			all = append(all, copyV1Materialization(record))
+		}
+	}
+	return all, nil
 }
 
 // SetMaterializationResult advances pending|running jobs. Terminal

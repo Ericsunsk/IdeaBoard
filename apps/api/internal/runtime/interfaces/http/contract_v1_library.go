@@ -1,6 +1,6 @@
 package httpapi
 
-// Workspace-scoped library + materialization handlers (issue #806).
+// Workspace-scoped library handlers (issue #806).
 //
 // Additive only: all routes mount under
 // /api/v1/workspaces/{workspace_id}/library via the existing
@@ -14,8 +14,11 @@ package httpapi
 //	GET/POST    /workspaces/{workspace_id}/library/assets
 //	PATCH/DELETE /workspaces/{workspace_id}/library/assets/{asset_id}
 //	POST        /workspaces/{workspace_id}/library/asset-resolutions
-//	POST        /workspaces/{workspace_id}/library/materializations
-//	GET         /workspaces/{workspace_id}/library/materializations/{materialization_id}
+//
+// Materialization has no HTTP surface: the former
+// POST/GET .../library/materializations routes, the lmat_ job DTO,
+// and the library.materialization_* emitters were deleted (owner hard
+// cut); materialization runs internal-only.
 //
 // Auth model: ResolvePrincipal + RequireWorkspaceCapability for the
 // explicit workspace context. Any workspace member reads and writes;
@@ -39,29 +42,20 @@ package httpapi
 // assets only — NOT a general proxy; unknown references report
 // unresolved per item.
 //
-// Materialization is a separate durable job record (status-addressable
-// pending -> running -> completed|failed; terminal states immutable,
-// result links asset_... on success). Billing settles through the
-// credits.Commands path (V1CreditSettler: Hold/Capture/Release with
-// caller idempotency keys; no direct ledger writes here). Billing
-// failures reuse the #804 codes (billing_quote_unavailable 503 for
-// transient quote failures, billing_pricing_unavailable 422 for
-// unpriced/unregistered SKUs, billing_wallet_restricted 403).
+// Store-level lmat_ job records, the library.ErrV1MaterializationNotFound
+// sentinel, and the library_materialization_not_found code stay frozen
+// for internal tooling; this surface renders no materialization 404.
 //
-// Production wiring supplies the postgres mapping and credits/billing
-// adapters. The remote media Materializer remains optional and fails closed
-// with 503 until its fetch/storage adapter is available. Tests inject the
+// Production wiring supplies the postgres mapping. Tests inject the
 // in-memory store plus fakes.
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/contract"
@@ -70,22 +64,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// V1LibraryMaterializer turns an owned workspace library reference
-// into a managed Media Asset. It owns remote fetch, storage, and Media
-// registration (Media boundary); the handler only passes owned facts.
-// The returned id must carry the asset_ shape; anything else fails the
-// job closed. Production adapts the media librarymaterialization seam;
-// tests inject fakes. Nil fails closed with 503.
-type V1LibraryMaterializer interface {
-	MaterializeWorkspaceAsset(ctx context.Context, workspacePublicID string, asset *library.V1Asset) (string, error)
-}
-
 // V1CreditSettler settles metered workspace operations through the
 // credits.Commands path: Hold reserves, Capture consumes on success,
 // Release refunds on failure. Every command carries a caller-owned
 // idempotency key so retries converge. Only Credits owns ledger writes;
 // this seam performs none. Production adapts *credits.Service;
-// tests inject fakes. Nil fails closed with 503.
+// tests inject fakes. The library surface no longer settles (permanent
+// free tier); the search surface still does.
 type V1CreditSettler interface {
 	Hold(ctx context.Context, userID int64, amountCredits int64, idempotencyKey, reason string) (string, error)
 	Capture(ctx context.Context, userID int64, holdID string, amountCredits int64, idempotencyKey string) error
@@ -95,19 +80,19 @@ type V1CreditSettler interface {
 // V1BillingQuoter mints server-side price snapshots for metered
 // workspace operations. No client price input is accepted on any route.
 // Production adapts the billing catalog QuoteAtResolution seam;
-// tests inject fakes. Nil fails closed with 503.
+// tests inject fakes. The library surface no longer quotes (permanent
+// free tier); the search surface still does.
 type V1BillingQuoter interface {
 	Quote(ctx context.Context, workspacePublicID, sku string) (int64, error)
 }
 
 // ContractV1LibraryDeps wires the workspace library handlers. Zero values
-// fail closed; production supplies the store and billing seams.
+// fail closed; production supplies the store. The V1BillingQuoter/
+// V1CreditSettler interfaces below stay defined here because the search
+// surface still settles through them.
 type ContractV1LibraryDeps struct {
-	Store        library.WorkspaceLibraryStore
-	Materializer V1LibraryMaterializer
-	Billing      V1CreditSettler
-	Quoter       V1BillingQuoter
-	Idempotency  *contract.IdempotencyStore
+	Store       library.WorkspaceLibraryStore
+	Idempotency *contract.IdempotencyStore
 }
 
 func (d *ContractV1LibraryDeps) normalize() {
@@ -116,36 +101,17 @@ func (d *ContractV1LibraryDeps) normalize() {
 	}
 }
 
-// V1MaterializeSKU is the metered SKU quoted for library
-// materialization. An unpriced/unregistered SKU renders 422
-// billing_pricing_unavailable (deterministic, no retry); only transient
-// quoter failures render 503 billing_quote_unavailable. Tests stub the
-// quoter.
-const V1MaterializeSKU = "library:materialize"
-
 var (
 	// errV1BillingQuoteUnavailable marks transient quoter failures for
-	// the 503 billing_quote_unavailable branch. Pricing failures wrap
-	// this identity AND the underlying billing cause (multi-%w), so
-	// renderLibraryBillingError can separate the deterministic 422
-	// pricing branch first. Seams return it (or wrap it) instead
-	// of leaking provider errors.
+	// the 503 billing_quote_unavailable branch. Defined here, consumed
+	// by the search surface (contract_v1_search.go); the library
+	// surface no longer quotes.
 	errV1BillingQuoteUnavailable = errors.New("v1 billing quote unavailable")
 	// errV1BillingRestricted maps hold rejections (frozen/restricted/
-	// insufficient wallets) to 403 billing_wallet_restricted.
+	// insufficient wallets) to 403 billing_wallet_restricted. Defined
+	// here, consumed by the search surface; the library surface no
+	// longer holds.
 	errV1BillingRestricted = errors.New("v1 billing wallet restricted")
-)
-
-// ErrV1BillingQuoteUnavailable and ErrV1BillingRestricted expose the
-// #804 billing failure identities to production adapters outside this
-// package (composition wires credits.Commands-backed settlers that must
-// report these identities without leaking provider errors). They alias
-// the unexported sentinels above, so errors.Is matches the branches in
-// runLibraryMaterialization/renderLibraryBillingError. Additive only:
-// no handler behavior changes.
-var (
-	ErrV1BillingQuoteUnavailable = errV1BillingQuoteUnavailable
-	ErrV1BillingRestricted       = errV1BillingRestricted
 )
 
 func (h *contractV1Handler) registerLibraryRoutes(group *gin.RouterGroup) {
@@ -158,8 +124,6 @@ func (h *contractV1Handler) registerLibraryRoutes(group *gin.RouterGroup) {
 	group.PATCH("/workspaces/:workspace_id/library/assets/:asset_id", h.moveLibraryAsset)
 	group.DELETE("/workspaces/:workspace_id/library/assets/:asset_id", h.deleteLibraryAsset)
 	group.POST("/workspaces/:workspace_id/library/asset-resolutions", h.resolveLibraryAssets)
-	group.POST("/workspaces/:workspace_id/library/materializations", h.createLibraryMaterialization)
-	group.GET("/workspaces/:workspace_id/library/materializations/:materialization_id", h.getLibraryMaterialization)
 }
 
 func (h *contractV1Handler) requireLibraryStore(c *gin.Context) bool {
@@ -192,8 +156,6 @@ func renderLibraryError(c *gin.Context, err error) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
 	case errors.Is(err, library.ErrV1AssetNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
-	case errors.Is(err, library.ErrV1MaterializationNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryMaterializationNotFound, "转存任务不存在")
 	case errors.Is(err, library.ErrV1ResolveTooMany):
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
 			"单次最多解析 20 条", contract.FieldErrors{Fields: map[string]string{"items": "too_many"}})
@@ -210,22 +172,6 @@ func renderLibraryError(c *gin.Context, err error) {
 	case errors.Is(err, library.ErrInvalidSource):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			"素材引用非法", contract.FieldErrors{Fields: map[string]string{"asset": "invalid"}})
-	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "素材库服务暂不可用")
-	}
-	c.Abort()
-}
-
-func renderLibraryBillingError(c *gin.Context, err error) {
-	if renderBillingPricingUnavailable(c, err) {
-		c.Abort()
-		return
-	}
-	switch {
-	case errors.Is(err, errV1BillingRestricted):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
-	case errors.Is(err, errV1BillingQuoteUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
 	default:
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "素材库服务暂不可用")
 	}
@@ -803,258 +749,6 @@ func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 	contract.RenderSuccess(c, dto)
 }
 
-type v1CreateLibraryMaterializationBody struct {
-	Data struct {
-		LibraryAssetID string `json:"library_asset_id"`
-	} `json:"data"`
-}
-
-type v1LibraryMaterializationDTO struct {
-	ID             string `json:"id"`
-	WorkspaceID    string `json:"workspace_id"`
-	LibraryAssetID string `json:"library_asset_id"`
-	Status         string `json:"status"`
-	MediaAssetID   string `json:"media_asset_id,omitempty"`
-	ErrorCode      string `json:"error_code,omitempty"`
-	ErrorMessage   string `json:"error_message,omitempty"`
-	Replayed       bool   `json:"replayed,omitempty"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
-}
-
-func toLibraryMaterializationDTO(workspacePublicID string, record *library.V1Materialization, replayed bool) v1LibraryMaterializationDTO {
-	return v1LibraryMaterializationDTO{
-		ID: record.PublicID, WorkspaceID: workspacePublicID, LibraryAssetID: record.AssetPublicID,
-		Status: string(record.Status), MediaAssetID: record.MediaAssetID,
-		ErrorCode: record.ErrorCode, ErrorMessage: record.ErrorMessage, Replayed: replayed,
-		CreatedAt: v1FormatTime(record.CreatedAt), UpdatedAt: v1FormatTime(record.UpdatedAt),
-	}
-}
-
-func (h *contractV1Handler) createLibraryMaterialization(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if h.deps.Library.Quoter == nil || h.deps.Library.Billing == nil {
-		renderLibraryBillingError(c, errV1BillingQuoteUnavailable)
-		return
-	}
-	if h.deps.Library.Materializer == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "转存服务暂不可用")
-		c.Abort()
-		return
-	}
-	key, ok := requireLibraryIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1CreateLibraryMaterializationBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	asset, ok := h.libraryAssetByID(c, workspace, body.Data.LibraryAssetID)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("library:materialize", workspace.PublicID, asset.PublicID)
-	result, replayed, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "materialize", key, hash, func() (any, error) {
-		return h.runLibraryMaterialization(c, workspace, identityPrincipal, asset)
-	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		// Billing failures surface as error responses (no job record is
-		// created before the hold succeeds); materializer failures are
-		// already folded into a failed job record below and never reach
-		// here.
-		if errors.Is(fnErr, errV1BillingRestricted) || errors.Is(fnErr, errV1BillingQuoteUnavailable) {
-			renderLibraryBillingError(c, fnErr)
-			return
-		}
-		renderLibraryError(c, fnErr)
-		return
-	}
-	record, ok := result.(*library.V1Materialization)
-	if !ok || record == nil {
-		renderLibraryError(c, errors.New("library: materialize type mismatch"))
-		return
-	}
-	logLibraryAudit("library_materialize", identityPrincipal.UserID(),
-		workspace.PublicID+"/"+record.PublicID, "materialize:"+asset.PublicID, string(record.Status))
-	// #807: materialization + billing.settled AFTER the terminal record
-	// commit, fresh executions only (idempotent replays never re-emit).
-	if !replayed {
-		h.emitLibraryMaterialization(c.Request.Context(), identityPrincipal, workspace.PublicID, asset.PublicID, record)
-	}
-	contract.RenderAccepted(c, toLibraryMaterializationDTO(workspace.PublicID, record, replayed))
-}
-
-func (h *contractV1Handler) libraryAssetByID(c *gin.Context, workspace *tenancy.Workspace, raw string) (*library.V1Asset, bool) {
-	trimmed := strings.TrimSpace(raw)
-	if !library.IsV1AssetID(trimmed) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
-		c.Abort()
-		return nil, false
-	}
-	asset, err := h.deps.Library.Store.GetAsset(c.Request.Context(), workspace.PublicID, trimmed)
-	if err != nil {
-		renderLibraryError(c, err)
-		return nil, false
-	}
-	return asset, true
-}
-
-// runLibraryMaterialization executes one materialization inside the
-// library:materialize idempotency scope: server-side quote, credit
-// hold through credits.Commands, job record (pending -> running),
-// media settle, then capture (completed, asset_ link) or release
-// (failed record). Materializer failures fold into the failed record
-// so the job stays status-addressable; only billing failures abort
-// with an error response.
-func (h *contractV1Handler) runLibraryMaterialization(c *gin.Context, workspace *tenancy.Workspace, identityPrincipal principal.Principal, asset *library.V1Asset) (any, error) {
-	ctx := c.Request.Context()
-	amount, quoteErr := h.deps.Library.Quoter.Quote(ctx, workspace.PublicID, V1MaterializeSKU)
-	if quoteErr != nil {
-		// Preserve the underlying billing cause alongside the
-		// quote-unavailable identity (multi-%w): pricing failures
-		// (ErrPricingUnavailable/ErrSKUNotFound) render 422 via the
-		// first branch of renderLibraryBillingError, while transient
-		// failures keep the 503 billing_quote_unavailable branch. The
-		// createLibraryMaterialization gate still matches
-		// errV1BillingQuoteUnavailable, so routing is unchanged.
-		return nil, fmt.Errorf("library materialize quote: %w: %w", quoteErr, errV1BillingQuoteUnavailable)
-	}
-	if amount < 0 {
-		return nil, errV1BillingQuoteUnavailable
-	}
-	publicID, mintErr := library.NewV1MaterializationPublicID()
-	if mintErr != nil {
-		return nil, mintErr
-	}
-	holdKey := "library-materialize:" + publicID + ":hold"
-	holdID, holdErr := h.deps.Library.Billing.Hold(ctx, identityPrincipal.UserID(), amount, holdKey, "library materialize")
-	if holdErr != nil {
-		if errors.Is(holdErr, errV1BillingRestricted) {
-			return nil, errV1BillingRestricted
-		}
-		return nil, holdErr
-	}
-	if _, createErr := h.deps.Library.Store.CreateMaterialization(ctx, workspace.PublicID, asset.PublicID, publicID); createErr != nil {
-		_ = h.deps.Library.Billing.Release(ctx, identityPrincipal.UserID(), holdID, amount, "library-materialize:"+publicID+":release")
-		return nil, createErr
-	}
-	_, _ = h.deps.Library.Store.SetMaterializationResult(ctx, workspace.PublicID, publicID, library.V1MaterializationRunning, "", "", "")
-	mediaAssetID, materializeErr := h.deps.Library.Materializer.MaterializeWorkspaceAsset(ctx, workspace.PublicID, asset)
-	if materializeErr != nil {
-		_ = h.deps.Library.Billing.Release(ctx, identityPrincipal.UserID(), holdID, amount, "library-materialize:"+publicID+":release")
-		slog.Warn("library v1 materialize failed", "workspace", workspace.PublicID, "materialization", publicID, "error", materializeErr)
-		failed, setErr := h.deps.Library.Store.SetMaterializationResult(ctx, workspace.PublicID, publicID,
-			library.V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
-		if setErr != nil {
-			return nil, setErr
-		}
-		return failed, nil
-	}
-	if !contract.IsAssetID(strings.TrimSpace(mediaAssetID)) {
-		_ = h.deps.Library.Billing.Release(ctx, identityPrincipal.UserID(), holdID, amount, "library-materialize:"+publicID+":release")
-		slog.Warn("library v1 materialize returned non-asset id", "workspace", workspace.PublicID, "materialization", publicID)
-		failed, setErr := h.deps.Library.Store.SetMaterializationResult(ctx, workspace.PublicID, publicID,
-			library.V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
-		if setErr != nil {
-			return nil, setErr
-		}
-		return failed, nil
-	}
-	if captureErr := h.deps.Library.Billing.Capture(ctx, identityPrincipal.UserID(), holdID, amount, "library-materialize:"+publicID+":capture"); captureErr != nil {
-		_ = h.deps.Library.Billing.Release(ctx, identityPrincipal.UserID(), holdID, amount, "library-materialize:"+publicID+":release")
-		failed, setErr := h.deps.Library.Store.SetMaterializationResult(ctx, workspace.PublicID, publicID,
-			library.V1MaterializationFailed, "", "billing_settle_failed", "结算失败，请稍后重试")
-		if setErr != nil {
-			return nil, setErr
-		}
-		return failed, nil
-	}
-	completed, setErr := h.deps.Library.Store.SetMaterializationResult(ctx, workspace.PublicID, publicID,
-		library.V1MaterializationCompleted, strings.TrimSpace(mediaAssetID), "", "")
-	if setErr != nil {
-		return nil, setErr
-	}
-	return completed, nil
-}
-
-// emitLibraryMaterialization emits library.materialization_completed /
-// _failed plus the billing.settled capture/release ref for a terminal
-// record. Non-terminal records emit nothing.
-func (h *contractV1Handler) emitLibraryMaterialization(ctx context.Context, identityPrincipal principal.Principal, workspacePublicID, libraryAssetID string, record *library.V1Materialization) {
-	if record == nil {
-		return
-	}
-	resource := events.V1Resource{Type: events.V1ResourceLibraryMaterialization, ID: record.PublicID}
-	switch record.Status {
-	case library.V1MaterializationCompleted:
-		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID,
-			events.EventV1LibraryMaterializedComplete, resource,
-			events.V1LibraryMaterializedCompletedData{
-				MaterializationID: record.PublicID, LibraryAssetID: libraryAssetID,
-				MediaAssetID: record.MediaAssetID,
-			})
-		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1BillingSettled,
-			resource, events.V1BillingSettledData{
-				ReferenceType: events.V1ResourceLibraryMaterialization,
-				ReferenceID:   record.PublicID, SettlementState: "captured",
-			})
-	case library.V1MaterializationFailed:
-		errorCode := strings.TrimSpace(record.ErrorCode)
-		if errorCode == "" {
-			errorCode = "library_materialization_failed"
-		}
-		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID,
-			events.EventV1LibraryMaterializedFailed, resource,
-			events.V1LibraryMaterializedFailedData{
-				MaterializationID: record.PublicID, LibraryAssetID: libraryAssetID,
-				ErrorCode: errorCode,
-			})
-		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1BillingSettled,
-			resource, events.V1BillingSettledData{
-				ReferenceType: events.V1ResourceLibraryMaterialization,
-				ReferenceID:   record.PublicID, SettlementState: "released",
-			})
-	}
-}
-
-func (h *contractV1Handler) getLibraryMaterialization(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	raw := strings.TrimSpace(c.Param("materialization_id"))
-	if !library.IsV1MaterializationID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryMaterializationNotFound, "转存任务不存在")
-		c.Abort()
-		return
-	}
-	record, err := h.deps.Library.Store.GetMaterialization(c.Request.Context(), workspace.PublicID, raw)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, toLibraryMaterializationDTO(workspace.PublicID, record, false))
-}
-
 // OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).
 // Add under paths (tags: WorkspaceLibrary), reusing components parameters
 // Cursor/PageSize/WorkspaceId/IdempotencyKey/RequestId and responses
@@ -1074,10 +768,13 @@ func (h *contractV1Handler) getLibraryMaterialization(c *gin.Context) {
 //	  delete: {operationId: deleteWorkspaceLibraryAsset, parameters: [WorkspaceId, {asset_id path}, IdempotencyKey]}
 //	/workspaces/{workspace_id}/library/asset-resolutions:
 //	  post: {operationId: resolveWorkspaceLibraryAssets, parameters: [WorkspaceId]}
-//	/workspaces/{workspace_id}/library/materializations:
-//	  post: {operationId: createWorkspaceLibraryMaterialization, parameters: [WorkspaceId, IdempotencyKey]}
-//	/workspaces/{workspace_id}/library/materializations/{materialization_id}:
-//	  get: {operationId: getWorkspaceLibraryMaterialization, parameters: [WorkspaceId, {name: materialization_id, in: path, required: true, schema: {type: string, pattern: '^lmat_'}}]}
+//
+// Materialization paths REMOVED (owner hard cut, internal-only now):
+// former POST /workspaces/{workspace_id}/library/materializations
+// (createWorkspaceLibraryMaterialization) and GET
+// /workspaces/{workspace_id}/library/materializations/{materialization_id}
+// (getWorkspaceLibraryMaterialization) are deleted; the merger must
+// drop them (and the LibraryMaterialization schema) from openapi YAMLs.
 //
 // Schemas (assets are provider URL + source metadata only, never bytes):
 //
@@ -1085,14 +782,15 @@ func (h *contractV1Handler) getLibraryMaterialization(c *gin.Context) {
 //	LibraryAsset: {id: {pattern: '^lasset_'}, workspace_id, folder_id?: {pattern: '^lfolder_'}, provider: {enum: [unsplash, pexels]}, source_id, source_url: uri, preview_url: uri, original_url: uri, title?, author?, width: int32>=0, height: int32>=0, created_at, updated_at}
 //	SaveLibraryAssetRequest: {data: {provider, source_id, source_url?: uri, preview_url?: uri, original_url?: uri, title?, author?, width?, height?, folder_id?}} (dedup on provider+source_id: 200 existing vs 201 created)
 //	ResolveLibraryAssetsRequest: {data: {items: {type: array, maxItems: 20, items: {provider, source_id?, source_url?}}}}; ResolveLibraryAssetsResponse: {items: [{provider, source_id?, status: {enum: [resolved, unresolved]}, asset?: LibraryAsset}]}
-//	LibraryMaterialization: {id: {pattern: '^lmat_'}, workspace_id, library_asset_id: {pattern: '^lasset_'}, status: {enum: [pending, running, completed, failed]}, media_asset_id?: {pattern: '^asset_'}, error_code?, error_message?, replayed?: boolean, created_at, updated_at}
+//	LibraryMaterialization schema REMOVED with the HTTP materialization
+//	surface (internal-only now; lmat_ records stay store-level only).
 //
 // Error codes frozen: library_folder_not_found (404), library_asset_not_found (404),
-// library_materialization_not_found (404), library_idempotency_conflict (409); reused kernel codes
+// library_idempotency_conflict (409); reused kernel codes
 // workspace_not_found/workspace_forbidden/pagination_cursor_invalid/bad_request/conflict/
-// validation_failed/idempotency_key_required/service_unavailable plus #804
-// billing_quote_unavailable (503 transient)/billing_pricing_unavailable
-// (422 unpriced SKU)/billing_wallet_restricted (403).
+// validation_failed/idempotency_key_required/service_unavailable.
+// (library_materialization_not_found stays frozen in the kernel error-code
+// registry for internal tooling; this surface no longer renders it.)
 //
 // Integer-ID note for #809: v1 rejects legacy integer ids as malformed 404;
 // integer-ID tolerance removal from the legacy handlers is NOT executed here.

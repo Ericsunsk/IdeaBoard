@@ -43,8 +43,6 @@ vi.mock('./workspace', async (importOriginal) => {
       moveAsset: mocks.moveAsset,
       deleteAsset: mocks.removeAsset,
       resolveAssets: vi.fn(),
-      createMaterialization: vi.fn(),
-      getMaterialization: vi.fn(),
     },
   }
 })

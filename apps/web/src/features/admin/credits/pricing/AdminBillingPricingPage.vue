@@ -147,8 +147,8 @@ import { adminDashboardRootClass, adminEmptyStateClass } from '../../shared/lib/
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
-import { useAdminConfirm, readConfirmReason } from '../../shared/composables/useAdminConfirm'
-import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
 import { usePricingModelAdapter } from './usePricingModelAdapter'
 import {
@@ -312,7 +312,7 @@ async function confirmArchivedDelete(item: AdminBillableItemCard) {
     reason: { required: true },
   })
   if (!confirmed) return
-  const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
+  const operatorReason = requireDestructiveReason(confirm)
   if (!operatorReason) return
   await deleteArchived(item, operatorReason)
 }

@@ -25,6 +25,11 @@ describe('fetchSiteBranding fallback', () => {
       project_name: 'Acme',
       logo_url: '',
     })
+    // Supplementary public read: silent 401s degrade locally, never reload.
+    expect(vi.mocked(api.request)).toHaveBeenCalledWith(
+      '/settings/branding',
+      expect.objectContaining({ authFailure: 'silent' }),
+    )
   })
 
   it('surfaces the contract error message when the envelope carries one', async () => {

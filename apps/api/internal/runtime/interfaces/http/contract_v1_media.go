@@ -39,7 +39,7 @@ import (
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/content (bytes)
 //	GET  /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/derivatives/{variant} (bytes)
 //	POST /api/v1/workspaces/{workspace_id}/media-assets/{asset_id}/archive (owner/admin)
-//	PUT  /api/v1/me/avatar (200 + avatar_url; user-scoped profile avatar)
+//	PUT  /api/v1/user/avatar (200 + avatar_url; user-scoped profile avatar)
 //
 // Binary vs metadata separation: session/list/get/batch/archive/avatar
 // speak JSON (avatar takes raw bytes in, never out); content/derivative
@@ -63,7 +63,10 @@ import (
 // RenderError; cursor pagination via cursor/page_size; create/complete/
 // archive require the Idempotency-Key header (scope upload:<op> /
 // media:<op>; reuse with a different request hash renders 409
-// upload_idempotency_conflict / media_idempotency_conflict).
+// upload_idempotency_conflict / media_idempotency_conflict). The byte
+// PUT and avatar upload accept the key optionally: when absent the
+// server mints a deterministic key from the content hash in the same
+// scope, so replay protection holds without client friction.
 //
 // Production wiring fills ContractV1Deps.Media (+ MediaObjects for
 // bytes) when the postgres store lands; nil store fails closed with
@@ -153,7 +156,7 @@ func (h *contractV1Handler) registerMediaRoutes(group *gin.RouterGroup) {
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/content", h.contentMediaAsset)
 	group.GET("/workspaces/:workspace_id/media-assets/:asset_id/derivatives/:variant", h.derivativeMediaAsset)
 	group.POST("/workspaces/:workspace_id/media-assets/:asset_id/archive", h.archiveMediaAsset)
-	group.PUT("/me/avatar", h.uploadAvatar)
+	group.PUT("/user/avatar", h.uploadAvatar)
 }
 
 // requireMediaStore fails closed with 501 when the v1 media store is
@@ -469,6 +472,27 @@ func (h *contractV1Handler) getUploadSession(c *gin.Context) {
 	contract.RenderSuccess(c, dto)
 }
 
+// v1OptionalIdempotencyKey resolves the idempotency key for
+// naturally-idempotent byte uploads (upload byte PUT, avatar upload):
+// a client key is still honored for cross-request dedup, but when
+// absent the server mints a deterministic key from the content hash in
+// the same scope, so replay protection holds without client friction.
+// A present-but-malformed key fails closed with 400
+// idempotency_key_required.
+func v1OptionalIdempotencyKey(c *gin.Context, hash string) (string, bool) {
+	key := strings.TrimSpace(c.GetHeader(contract.IdempotencyKeyHeader))
+	if key == "" {
+		return "auto-" + hash, true
+	}
+	parsed, err := contract.ParseIdempotencyKey(key)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		c.Abort()
+		return "", false
+	}
+	return parsed, true
+}
+
 // putUploadBytes stages the declared bytes at the session slot. The
 // slot was reserved at create time (upload_target.slot carries only
 // the opaque upload_ id, never the key); this endpoint is the single
@@ -490,12 +514,6 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 	uploadID := strings.TrimSpace(c.Param("upload_id"))
 	if !contract.IsUploadID(uploadID) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
-		c.Abort()
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
 		c.Abort()
 		return
 	}
@@ -552,6 +570,12 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 	scope := contract.IdempotencyScope(externalUser, "upload:bytes")
 	hash := contract.HashIdempotencyRequest("upload:bytes", workspacePublicID, uploadID, bodyChecksum,
 		strconv.FormatInt(int64(len(data)), 10), session.MIMEType)
+	// The byte PUT is naturally idempotent (validated size/checksum/MIME
+	// echo): see v1OptionalIdempotencyKey.
+	key, ok := v1OptionalIdempotencyKey(c, hash)
+	if !ok {
+		return
+	}
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, session.MIMEType); putErr != nil {
 			return nil, errV1MediaBytesStoreUnavailable
@@ -852,6 +876,15 @@ func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
 		return
 	}
 	assetID := strings.TrimSpace(c.Param("asset_id"))
+	// Library read-through: the Canvas import path reads managed media
+	// through this endpoint with the owned lasset_ id (poll-free single
+	// attempt; the Canvas pending-fact loop owns the retry). A
+	// completed materialization link serves the managed asset; a miss
+	// triggers one best-effort async fetch and 404s now.
+	if contract.IsLibraryAssetID(assetID) {
+		h.getLibraryMaterializedMediaAsset(c, workspacePublicID, assetID)
+		return
+	}
 	if !contract.IsAssetID(assetID) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
 		c.Abort()
@@ -1140,12 +1173,6 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
 	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, v1AvatarMaxBytes+1))
 	if readErr != nil {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体非法")
@@ -1192,6 +1219,12 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 	scope := contract.IdempotencyScope(externalUser, "avatar:upload")
 	hash := contract.HashIdempotencyRequest("avatar:upload", externalUser, bodyChecksum,
 		strconv.FormatInt(int64(len(data)), 10), mime)
+	// Avatar bytes are naturally idempotent (sniffed format + content
+	// hash dedup): same optional-key contract as the upload byte PUT.
+	key, ok := v1OptionalIdempotencyKey(c, hash)
+	if !ok {
+		return
+	}
 	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 		if putErr := h.deps.MediaObjects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, objectKey, data, mime); putErr != nil {
 			return nil, errV1MediaBytesStoreUnavailable
@@ -1227,9 +1260,9 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 //	/workspaces/{workspace_id}/uploads/{upload_id}:
 //	  get: {operationId: getWorkspaceUpload, parameters: [WorkspaceId, UploadId]}
 //	/workspaces/{workspace_id}/uploads/{upload_id}/bytes:
-//	  put: {operationId: stageWorkspaceUploadBytes, parameters: [WorkspaceId, UploadId, IdempotencyKey],
+//	  put: {operationId: stageWorkspaceUploadBytes, parameters: [WorkspaceId, UploadId, IdempotencyKey(optional)],
 //	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary}}},
-//	                     description: 'Raw image bytes matching the session declaration (size, checksum, MIME). Retryable 422s change no state.'}}
+//	                     description: 'Raw image bytes matching the session declaration (size, checksum, MIME). Retryable 422s change no state. Idempotency-Key optional: absent keys are minted server-side from the content hash.'}}
 //	/workspaces/{workspace_id}/uploads/{upload_id}/complete:
 //	  post: {operationId: completeWorkspaceUpload, parameters: [WorkspaceId, UploadId, IdempotencyKey]}
 //	        (complete-after-bytes: 422 upload_validation_failed details.bytes=missing when no bytes
@@ -1250,10 +1283,10 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 //	  get: {operationId: derivativeWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, {name: variant, in: path, required: true, schema: {type: string, enum: [thumb, preview, large-preview]}}]}
 //	/workspaces/{workspace_id}/media-assets/{asset_id}/archive:
 //	  post: {operationId: archiveWorkspaceMediaAsset, parameters: [WorkspaceId, AssetId, IdempotencyKey]}
-//	/me/avatar:
-//	  put: {operationId: uploadAvatar, parameters: [IdempotencyKey],
+//	/user/avatar:
+//	  put: {operationId: uploadAvatar, parameters: [IdempotencyKey(optional)],
 //	        requestBody: {content: {'application/octet-stream': {schema: {type: string, format: binary, maxLength: 5242880}}},
-//	                     description: 'Raw image bytes (allowlisted image MIME, 5MiB cap). Served back by the existing static /uploads/profile/{uid}/avatar reads.'}}
+//	                     description: 'Raw image bytes (allowlisted image MIME, 5MiB cap). Idempotency-Key optional: absent keys are minted server-side from the content hash. Served back by the existing static /uploads/profile/{uid}/avatar reads.'}}
 //
 // Schemas (UploadSession/MediaAsset/UploadId/MediaAssetId and request
 // bodies) already exist in openapi.public.yaml from #803; the paths

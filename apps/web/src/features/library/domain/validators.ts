@@ -2,22 +2,24 @@
 //
 // Pure opaque-id asserts, snake_case -> camelCase mappers, and save-input
 // shaping. No i18n, no network, no generated code. Transport lives in
-// `../infrastructure/resource`; save/lookup/materialize orchestration in
+// `../infrastructure/resource`; save/lookup/resolve orchestration in
 // `../application/libraryUseCases`. `../workspace` re-exports this module so the
 // `features/library` barrel and `./workspace` deep imports stay stable.
 //
 // Id decision (tree truth wins): canonical `l*` everywhere. Backend
-// `contract.MintPublicID` mints `lfolder_` / `lasset_` / `lmat_`
+// `contract.MintPublicID` mints `lfolder_` / `lasset_`
 // (`identifiers.go`, `openapi.public.yaml`, generated `LibraryFolderId` /
-// `LibraryAssetId` / `LibraryMaterializationId` models); zero `lib*`
-// shapes exist anywhere in the tree. `lib*` spellings are rejected here.
+// `LibraryAssetId` models); zero `lib*` shapes exist anywhere in the tree.
+// `lib*` spellings are rejected here. (The retired `lmat_`
+// materialization job id is gone with the cut public job API; only
+// `lfolder_` / `lasset_` remain.)
 
 import {
   assertWorkspaceId as assertSharedWorkspaceId,
   requireWorkspaceId as requireSharedWorkspaceId,
 } from '../../../shared/utils/workspaceId'
 
-const LIBRARY_ID_RE = /^(?:lfolder|lasset|lmat)_[A-Za-z0-9_-]+$/
+const LIBRARY_ID_RE = /^(?:lfolder|lasset)_[A-Za-z0-9_-]+$/
 
 function isLibraryId(value: unknown): value is string {
   return typeof value === 'string' && LIBRARY_ID_RE.test(value)
@@ -29,7 +31,6 @@ function libraryIdPrefix(value: string): string {
 
 const LIBRARY_FOLDER_PREFIXES = ['lfolder'] as const
 const LIBRARY_ASSET_PREFIXES = ['lasset'] as const
-const LIBRARY_MATERIALIZATION_PREFIXES = ['lmat'] as const
 
 function assertLibraryId(
   value: string,
@@ -54,10 +55,6 @@ export function assertLibraryFolderId(value: string): string {
 
 export function assertLibraryAssetId(value: string): string {
   return assertLibraryId(value, LIBRARY_ASSET_PREFIXES, 'library asset id', 'lasset')
-}
-
-export function assertLibraryMaterializationId(value: string): string {
-  return assertLibraryId(value, LIBRARY_MATERIALIZATION_PREFIXES, 'library materialization id', 'lmat')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -167,54 +164,6 @@ export function toWorkspaceLibraryResolveResult(raw: unknown): WorkspaceLibraryR
     sourceId: optionalString(raw.source_id),
     status: mapWorkspaceLibraryResolveStatus(raw.status),
     asset,
-  }
-}
-
-export type WorkspaceLibraryMaterializationStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'failed'
-
-export function mapWorkspaceLibraryMaterializationStatus(
-  value: unknown,
-): WorkspaceLibraryMaterializationStatus {
-  if (value === 'pending' || value === 'running' || value === 'completed' || value === 'failed') {
-    return value
-  }
-  throw new Error('Invalid library materialization payload: status')
-}
-
-export type WorkspaceLibraryMaterialization = {
-  id: string
-  workspaceId: string
-  libraryAssetId: string
-  status: WorkspaceLibraryMaterializationStatus
-  mediaAssetId?: string | undefined
-  errorCode?: string | undefined
-  errorMessage?: string | undefined
-  replayed?: boolean | undefined
-  createdAt: string
-  updatedAt: string
-}
-
-export function toWorkspaceLibraryMaterialization(raw: unknown): WorkspaceLibraryMaterialization {
-  if (!isRecord(raw)) throw new Error('Invalid library materialization payload')
-  const mediaAssetId = optionalString(raw.media_asset_id)
-  if (mediaAssetId != null && !/^asset_[A-Za-z0-9_-]+$/.test(mediaAssetId)) {
-    throw new Error('Invalid library materialization payload: media_asset_id')
-  }
-  return {
-    id: assertLibraryMaterializationId(requiredString(raw.id, 'id')),
-    workspaceId: assertWorkspaceId(requiredString(raw.workspace_id, 'workspace_id')),
-    libraryAssetId: assertLibraryAssetId(requiredString(raw.library_asset_id, 'library_asset_id')),
-    status: mapWorkspaceLibraryMaterializationStatus(raw.status),
-    mediaAssetId,
-    errorCode: optionalString(raw.error_code),
-    errorMessage: optionalString(raw.error_message),
-    replayed: raw.replayed === true ? true : undefined,
-    createdAt: requiredString(raw.created_at, 'created_at'),
-    updatedAt: requiredString(raw.updated_at, 'updated_at'),
   }
 }
 

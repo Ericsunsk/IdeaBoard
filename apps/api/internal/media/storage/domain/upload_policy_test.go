@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"path"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/media/storage/domain"
@@ -184,10 +185,20 @@ func TestParseUploadResourceRejectsTraversalOutsideUploads(t *testing.T) {
 }
 
 func TestBuildObjectKeyRejectsTraversalDirPrefix(t *testing.T) {
+	// Escaping prefixes still fail (anchored by NormalizeUploadObjectKey).
 	if _, err := domain.BuildObjectKey("../private", ".png"); err == nil {
-		t.Fatalf("expected traversal dir prefix to fail")
+		t.Fatalf("expected escaping dir prefix to fail")
 	}
-	if _, err := domain.BuildObjectKey("canvas/OWNER/../../private", ".png"); err == nil {
-		t.Fatalf("expected nested traversal dir prefix to fail")
+	if _, err := domain.BuildObjectKey("../../private", ".png"); err == nil {
+		t.Fatalf("expected escaping dir prefix to fail")
+	}
+	// Interior ".." that resolves inside the root normalizes instead of
+	// failing (single-source traversal defense lives in Normalize*).
+	key, err := domain.BuildObjectKey("canvas/OWNER/../../private", ".png")
+	if err != nil {
+		t.Fatalf("expected contained traversal to normalize, got %v", err)
+	}
+	if !strings.HasPrefix(key, "uploads/private/") {
+		t.Fatalf("normalized key = %q, want uploads/private/ containment", key)
 	}
 }

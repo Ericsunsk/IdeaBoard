@@ -187,12 +187,6 @@ func TestGatewayHandlerBrandLogo(t *testing.T) {
 		return rec
 	}
 
-	t.Run("rejects non-admin", func(t *testing.T) {
-		if rec := serve(t, principal.RoleUser, "?provider=openai"); rec.Code != http.StatusForbidden {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
-		}
-	})
-
 	t.Run("rejects invalid provider", func(t *testing.T) {
 		if rec := serve(t, principal.RoleAdmin, "?provider=../../x"); rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)

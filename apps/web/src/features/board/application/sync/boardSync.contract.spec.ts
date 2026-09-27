@@ -12,7 +12,7 @@ import {
   getWorkspaceSelectionStore,
   resetWorkspaceSelectionStore,
 } from '../../../workspace'
-import { BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
+import { BoardPayloadError, BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
 import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persistence'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {
@@ -83,12 +83,14 @@ function boardDto(params: {
 }
 
 function documentData(params: { id: string; revision?: number; state: BoardState }) {
+  // Backend wire shape: the stored snapshot nests nodes under `payload`
+  // beside `schema_version` (see `saveWorkspaceBoard` + `V1InitialDocument`).
   const { schemaVersion, ...payload } = params.state
   return {
     board_id: params.id,
     revision: params.revision ?? 1,
     schema_version: schemaVersion,
-    document: payload,
+    document: { schema_version: schemaVersion, payload },
     updated_at: new Date(params.state.updatedAt).toISOString(),
   }
 }
@@ -336,6 +338,19 @@ describe('boardSync', () => {
     const result = await hydrateBoardsFromServer()
 
     expect(result).toMatchObject({ ok: false, error: expect.anything() })
+  })
+
+  it('rejects a remote board with a broken timestamp instead of fabricating now()', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
+    apiState.boardsResponse.data.push({
+      ...boardDto({ id: 'board-broken', name: 'Broken Remote', createdAt: 100, updatedAt: 1_500 }),
+      updated_at: 'not-a-timestamp',
+    })
+
+    const result = await hydrateBoardsFromServer()
+
+    expect(result).toMatchObject({ ok: false, error: expect.any(BoardPayloadError) })
+    expect(listBoards().map((board) => board.id)).toEqual(['board-1'])
   })
 
   it('rejects a board save with the v1 revision conflict', async () => {

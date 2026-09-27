@@ -20,7 +20,8 @@ import (
 // miss the same map); malformed job ids report
 // ErrV1MaterializationNotFound. No dedup key exists: one asset may
 // back many jobs and request idempotency stays handler-side
-// (library:materialize scope).
+// (library:materialize scope). Internal triggers that need atomic
+// workspace-asset deduplication use ClaimMaterialization below.
 func (s *Service) CreateMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -72,6 +73,77 @@ func (s *Service) CreateMaterialization(ctx context.Context, workspacePublicID, 
 			row.Status, pgtype.Text{}, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
 	}
 	return nil, errors.New("library: materialization public id mint collision, retry the request")
+}
+
+// ClaimMaterialization atomically returns an active/completed job for the
+// asset, or creates one when no such job exists. The advisory lock is held
+// for the transaction, closing the list-then-create race between concurrent
+// read-through and task-completion triggers. Failed jobs remain retryable.
+func (s *Service) ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*domain.V1Materialization, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	db := s.dbWithContext(ctx)
+	q, err := db.queries()
+	if err != nil {
+		return nil, false, err
+	}
+	if !domain.IsV1MaterializationID(strings.TrimSpace(publicID)) {
+		return nil, false, domain.ErrV1MaterializationNotFound
+	}
+	if !domain.IsV1AssetID(strings.TrimSpace(assetPublicID)) {
+		return nil, false, domain.ErrV1AssetNotFound
+	}
+	workspaceInternalID, err := resolveWorkspaceInternal(ctx, q, workspacePublicID)
+	if err != nil {
+		if errors.Is(err, errWorkspaceNotFound) {
+			return nil, false, domain.ErrV1AssetNotFound
+		}
+		return nil, false, err
+	}
+	asset, err := q.GetLibraryAssetByPublicID(ctx, dbsqlc.GetLibraryAssetByPublicIDParams{
+		WorkspaceID: workspaceInternalID, PublicID: strings.TrimSpace(assetPublicID),
+	})
+	if database.IsNotFound(err) {
+		return nil, false, domain.ErrV1AssetNotFound
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var result *domain.V1Materialization
+	created := false
+	err = db.withTx(func(txq *dbsqlc.Queries) error {
+		if err := txq.LockLibraryMaterializationAsset(ctx, dbsqlc.LockLibraryMaterializationAssetParams{
+			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+		}); err != nil {
+			return err
+		}
+		existing, err := txq.GetActiveLibraryMaterializationByAsset(ctx, dbsqlc.GetActiveLibraryMaterializationByAssetParams{
+			WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+		})
+		if err == nil {
+			result, err = materializationFromDetail(strings.TrimSpace(workspacePublicID), existing.PublicID, existing.AssetPublicID,
+				existing.Status, existing.MediaAssetPublicID, existing.ErrorMessage, existing.CreatedAt, existing.CompletedAt)
+			return err
+		}
+		if !database.IsNotFound(err) {
+			return err
+		}
+		row, err := txq.CreateLibraryMaterialization(ctx, dbsqlc.CreateLibraryMaterializationParams{
+			PublicID: strings.TrimSpace(publicID), WorkspaceID: workspaceInternalID, LibraryAssetID: asset.InternalID,
+		})
+		if err != nil {
+			return fmt.Errorf("create library materialization: %w", err)
+		}
+		result, err = materializationFromDetail(strings.TrimSpace(workspacePublicID), row.PublicID, asset.PublicID,
+			row.Status, pgtype.Text{}, row.ErrorMessage, row.CreatedAt, row.CompletedAt)
+		created = err == nil
+		return err
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return result, created, nil
 }
 
 // GetMaterialization returns the status-addressable job snapshot.

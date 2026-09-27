@@ -12,7 +12,7 @@ info:
     versions the event data payload for (`type`) only. The frozen registry
     (all version 1) is: task.created/running/completed/failed/cancelled,
     media.asset_ready/archived, board.document_replaced/member_changed/
-    share_revoked, billing.settled, library.materialization_completed/failed.
+    share_revoked, billing.settled.
     Registry changes are additive only; existing (type, version) pairs never
     change shape. Internal DB rows, numeric ids, storage URLs, bearers, and
     amounts are never exposed (public ids + API URIs + refs only). Control
@@ -20,8 +20,7 @@ info:
 
     Producer maturity: HTTP-path producers (task.created/cancelled,
     media.asset_ready/archived, board.document_replaced/member_changed/
-    share_revoked, billing.settled refs, library.materialization_completed/
-    failed) emit after their store commit. task.running/completed/failed
+    share_revoked, billing.settled refs) emit after their store commit. task.running/completed/failed
     validate here but have no live HTTP producer yet: worker-side terminal
     settle flushes through the same staged seam with the #809 worker.
 
@@ -82,7 +81,7 @@ info:
     the process-local hot log (1000 envelopes/workspace) is the live
     replay window. Durable outbox persistence lands with #809.
   x-event-transports: [sse, webhook]
-  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled, library.materialization_completed, library.materialization_failed]
+  x-event-types: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled]
 servers:
   - url: /api/v1
 paths:
@@ -335,7 +334,7 @@ components:
           description: Opaque event identifier, also used for SSE Last-Event-ID replay.
         type:
           type: string
-          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled, library.materialization_completed, library.materialization_failed]
+          enum: [task.created, task.running, task.completed, task.failed, task.cancelled, media.asset_ready, media.asset_archived, board.document_replaced, board.member_changed, board.share_revoked, billing.settled]
           description: Stable event type with independent schema versioning.
         version:
           type: integer
@@ -374,11 +373,11 @@ components:
       properties:
         type:
           type: string
-          enum: [task, board, media_asset, library_materialization, checkout_session]
+          enum: [task, board, media_asset, checkout_session]
           description: checkout_session is reserved for the #809 Stripe-convergence mapping and is never emitted today.
         id:
           type: string
-          description: Opaque resource identifier (task_*, board_*, asset_*, lmat_*).
+          description: Opaque resource identifier (task_*, board_*, asset_*).
     TaskCreatedData:
       type: object
       required: [task_id, workflow_kind]
@@ -485,7 +484,7 @@ components:
       properties:
         reference_type:
           type: string
-          enum: [task, library_materialization, checkout_session]
+          enum: [task, checkout_session]
         reference_id:
           type: string
         settlement_state:
@@ -494,33 +493,6 @@ components:
         hold_transaction_id:
           type: string
           description: Ledger hold reference only; amounts never appear in events.
-    LibraryMaterializationCompletedData:
-      type: object
-      required: [materialization_id, library_asset_id, media_asset_id]
-      additionalProperties: false
-      properties:
-        materialization_id:
-          type: string
-          pattern: '^lmat_[A-Za-z0-9]+$'
-        library_asset_id:
-          type: string
-          pattern: '^lasset_[A-Za-z0-9]+$'
-        media_asset_id:
-          type: string
-          pattern: '^asset_[A-Za-z0-9]+$'
-    LibraryMaterializationFailedData:
-      type: object
-      required: [materialization_id, library_asset_id, error_code]
-      additionalProperties: false
-      properties:
-        materialization_id:
-          type: string
-          pattern: '^lmat_[A-Za-z0-9]+$'
-        library_asset_id:
-          type: string
-          pattern: '^lasset_[A-Za-z0-9]+$'
-        error_code:
-          type: string
     EventSubscription:
       type: object
       required: [id, workspace_id, url, event_types, has_secret, status, created_at, updated_at]

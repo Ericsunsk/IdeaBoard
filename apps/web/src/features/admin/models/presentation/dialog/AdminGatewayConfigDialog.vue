@@ -143,7 +143,11 @@ import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
 import { formatAdminDisplayError } from '../../../shared/lib/toast'
 import { useAdminGatewayConfigFeedback } from '../../application/useAdminModelCatalogFeedback'
-import { useAdminConfirm, readConfirmReason } from '../../../shared/composables/useAdminConfirm'
+import { useAdminConfirm } from '../../../shared/composables/useAdminConfirm'
+import {
+  ADMIN_PROBE_OPERATOR_REASON,
+  confirmSettingsSave,
+} from '../../../shared/lib/confirmSettingsSave'
 import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import {
   createAdminGatewayResource,
@@ -218,18 +222,8 @@ async function loadGatewayConfig() {
 }
 
 const handleTestConnection = form.handleSubmit(async (values) => {
-  // The server-side probe is mutation-guarded: collect the operator
-  // reason through the shared confirm shell first.
-  const confirmed = await adminConfirm.confirm({
-    title: '测试网关连接',
-    message: '确定使用当前表单配置探测网关连通性吗？该操作将记录操作人与原因。',
-    confirmLabel: '开始测试',
-    intent: 'warn',
-    reason: { required: true },
-  })
-  if (!confirmed) return
-  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
-  if (!operatorReason) return
+  // Server-side probes skip the confirm dialog (backend POST read-guard:
+  // no reason ceremony); the fixed probe note still lands on the audit record.
   testing.value = true
   error.value = ''
 
@@ -242,7 +236,7 @@ const handleTestConnection = form.handleSubmit(async (values) => {
         base_url: finalBaseUrl,
         token: values.token.trim() || undefined,
       },
-      { operatorReason },
+      { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )
     if (res.success) {
       feedback.testPassed(res.message)
@@ -260,17 +254,14 @@ const handleTestConnection = form.handleSubmit(async (values) => {
 })
 
 const handleSave = form.handleSubmit(async (values) => {
-  // Control writes require an operator reason (audit); a cancelled dialog
-  // aborts the save silently.
-  const confirmed = await adminConfirm.confirm({
+  // Control writes collect the operator reason through the shared confirm
+  // shell (reversible tier: note optional, empty falls back to a default);
+  // a cancelled dialog aborts the save silently.
+  const operatorReason = await confirmSettingsSave(adminConfirm, {
     title: '保存 AI 网关配置',
     message: '确定保存 AI 网关连接配置吗？该操作将记录操作人与原因。',
     confirmLabel: '保存配置',
-    intent: 'warn',
-    reason: { required: true },
   })
-  if (!confirmed) return
-  const operatorReason = (adminConfirm.readReason?.() ?? readConfirmReason()).trim()
   if (!operatorReason) return
   saving.value = true
   error.value = ''

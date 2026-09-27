@@ -1,14 +1,12 @@
 package worker
 
 // Fixture-DB contract test for the #828 slice B trigger: the worker
-// completes a task on fixture PostgreSQL while the trigger settles
-// against the REAL postgres library store (sibling A landed) with
-// mocked billing (fake quoter/settler) and the fake saver. SKIPs
+// completes a task on fixture PostgreSQL while the trigger records
+// against the REAL postgres library store with the fake saver. SKIPs
 // gracefully without API_TEST_DATABASE_DSN.
 //
 // What this proves end to end: task completes -> one completed
-// materialization job -> media link -> asset in Quick Saves, with the
-// hold captured and the task_id link in the billing keys. The fixture
+// materialization job -> media link -> asset in Quick Saves. The fixture
 // DDL intentionally excludes library_materializations, so this file
 // applies that table from the canonical baseline migration in the
 // isolated test schema (no shared-file edits, no conflicts).
@@ -73,10 +71,9 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 		t.Fatalf("settlement Create: %v", err)
 	}
 
-	settler := newFakeTriggerSettler()
 	store := &countingLibraryStore{WorkspaceLibraryStore: env.lib}
 	trigger, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
-		Store: store, Quoter: &fakeTriggerQuoter{amount: 5}, Billing: settler,
+		Store: store,
 		Saver: &fakeTaskOutputSaver{store: env.lib},
 	})
 	if err != nil {
@@ -107,24 +104,6 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	if stored.Status != workspacetasks.StatusCompleted {
 		t.Fatalf("status = %q, want completed", stored.Status)
 	}
-	// Billing: one hold captured, nothing released, keys link the task.
-	settler.mu.Lock()
-	releases, captures := len(settler.releases), len(settler.captures)
-	settler.mu.Unlock()
-	if captures != 1 || releases != 0 {
-		t.Fatalf("captures = %d releases = %d, want 1/0", captures, releases)
-	}
-	if open := settler.openHoldCount(); open != 0 {
-		t.Fatalf("open holds = %d, want 0", open)
-	}
-	settler.mu.Lock()
-	for key := range settler.holds {
-		if !strings.Contains(key, created.ID) {
-			settler.mu.Unlock()
-			t.Fatalf("hold key %q misses task_id traceability link", key)
-		}
-	}
-	settler.mu.Unlock()
 	// Job: exactly one, completed, media linked to the task output.
 	if got := store.jobCount(); got != 1 {
 		t.Fatalf("jobs = %d, want 1", got)

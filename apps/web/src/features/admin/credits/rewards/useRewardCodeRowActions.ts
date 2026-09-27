@@ -1,5 +1,9 @@
 import { reactive } from 'vue'
-import { readConfirmReason, useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import {
+  confirmSettingsSave,
+  requireDestructiveReason,
+} from '../../shared/lib/confirmSettingsSave'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
   createAdminRewardCodeResource,
@@ -30,15 +34,14 @@ export function useRewardCodeRowActions(options: {
 
   async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
     if (enabledPending[rewardCode.id]) return
-    const confirmed = await confirm.confirm({
+    // Enable/disable toggles are reversible: the note is optional and an
+    // empty field falls back to a default so one click proceeds.
+    const operatorReason = await confirmSettingsSave(confirm, {
       title: enabled ? '启用兑换码' : '停用兑换码',
       message: `确定${enabled ? '启用' : '停用'}“${rewardCode.displayName}”吗？该操作将记录审计。`,
       confirmLabel: enabled ? '确认启用' : '确认停用',
-      intent: 'warn',
-      reason: { required: true },
     })
-    if (!confirmed) return
-    const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
+    if (!operatorReason) return
     enabledPending[rewardCode.id] = true
     try {
       replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled, { operatorReason }))
@@ -79,7 +82,8 @@ export function useRewardCodeRowActions(options: {
       reason: { required: true },
     })
     if (!confirmed) return
-    const operatorReason = (confirm.readReason?.() ?? readConfirmReason()).trim()
+    const operatorReason = requireDestructiveReason(confirm)
+    if (!operatorReason) return
     await deleteRewardCode(rewardCode, operatorReason)
   }
 

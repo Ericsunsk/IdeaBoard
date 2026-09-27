@@ -141,6 +141,38 @@ describe('workspace list envelope', () => {
     expect(classifyWorkspaceAccessError({ status: 500 })).toBeNull()
     expect(classifyWorkspaceAccessError(new Error('boom'))).toBeNull()
   })
+
+  it('redirects to login by default on a list 401', async () => {
+    localStorage.setItem('user', JSON.stringify({ public_id: 'ws_owner1' }))
+    window.history.pushState({}, '', '/user/boards')
+    useMswHandlers(
+      http.get('/api/v1/workspaces', () =>
+        HttpResponse.json({ code: 401, msg: '' }, { status: 401 }),
+      ),
+    )
+
+    await expect(fetchWorkspacePage()).rejects.toThrow()
+
+    expect(localStorage.getItem('user')).toBeNull()
+    expect(window.location.pathname).toBe('/user/login')
+    window.history.pushState({}, '', '/')
+  })
+
+  it('returns a silent list 401 without navigating', async () => {
+    localStorage.setItem('user', JSON.stringify({ public_id: 'ws_owner1' }))
+    window.history.pushState({}, '', '/user/boards')
+    useMswHandlers(
+      http.get('/api/v1/workspaces', () =>
+        HttpResponse.json({ code: 401, msg: '' }, { status: 401 }),
+      ),
+    )
+
+    await expect(fetchWorkspacePage(undefined, { authFailure: 'silent' })).rejects.toThrow()
+
+    expect(localStorage.getItem('user')).toBeNull()
+    expect(window.location.pathname).toBe('/user/boards')
+    window.history.pushState({}, '', '/')
+  })
 })
 
 describe('workspace creation', () => {
@@ -194,7 +226,7 @@ describe('workspace creation', () => {
 describe('principal envelope', () => {
   it('maps the agreed principal shape to camelCase', async () => {
     useMswHandlers(
-      http.get('/api/v1/me', () =>
+      http.get('/api/v1/user', () =>
         HttpResponse.json({
           data: { public_id: 'usr_u1', display_name: 'Ada', avatar: 'https://cdn.example/a.png' },
         }),
@@ -208,7 +240,7 @@ describe('principal envelope', () => {
     })
   })
 
-  it('tolerates the stub Me shape and rejects non-user IDs', () => {
+  it('tolerates the stub User shape and rejects non-user IDs', () => {
     expect(parsePrincipal({ data: { id: 'usr_stub9' } })).toEqual({
       publicId: 'usr_stub9',
       displayName: '',
@@ -221,7 +253,7 @@ describe('principal envelope', () => {
 describe('workspace URLs', () => {
   it('builds canonical agreed-contract URLs without legacy user routes', () => {
     const urls = [
-      workspaceApiUrls.me(),
+      workspaceApiUrls.user(),
       workspaceApiUrls.workspaces(),
       workspaceApiUrls.workspaces({ cursor: 'c 1', pageSize: 50 }),
       workspaceApiUrls.workspaceDetail('ws_a1'),
@@ -234,6 +266,7 @@ describe('workspace URLs', () => {
     for (const url of urls) {
       expect(url).toContain('/api/v1/')
       expect(url).not.toContain('/api/user')
+      expect(url).not.toContain('/api/v1/me')
     }
     expect(workspaceApiUrls.workspaces({ cursor: 'c 1', pageSize: 50 })).toContain(
       'cursor=c+1&page_size=50',

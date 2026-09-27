@@ -139,11 +139,16 @@ function mockReplaceDocument(
   const body = parseBody(config?.body) as {
     data?: { schema_version?: number; payload?: Record<string, unknown> }
   }
+  // The backend stores the full `{schema_version, payload}` snapshot
+  // verbatim; keep the mock faithful so save→read round-trips honestly.
   const next = {
     board_id: boardId,
     revision: Number((previous?.revision as number | undefined) ?? 1) + 1,
     schema_version: body?.data?.schema_version ?? 4,
-    document: body?.data?.payload ?? {},
+    document: {
+      schema_version: body?.data?.schema_version ?? 4,
+      payload: body?.data?.payload ?? {},
+    },
     updated_at: '2026-09-25T00:00:01.000Z',
   }
   state.documentById[boardId] = next

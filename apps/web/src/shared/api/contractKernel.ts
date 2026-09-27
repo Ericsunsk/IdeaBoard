@@ -2,9 +2,8 @@
 //
 // New-envelope (`{ data, meta }` / `{ error: { code, message, details, request_id } }`)
 // parsing plus Request-Id / RateLimit / ETag / Last-Event-ID passthrough helpers.
-// This is the sole response boundary: the legacy `{code, msg, data}`
-// `apiResponse.ts` boundary is deleted (frontend audit T2), and every
-// transport (hand-rolled `api.request` calls included) parses through it.
+// This is the sole response boundary: every transport (hand-rolled
+// `api.request` calls included) parses through it.
 // Surviving Public success bodies still carry legacy `code`/`msg` keys
 // alongside `data`; the parser ignores them. Legacy numeric error bodies
 // never reach the parser (non-2xx throws in the shared client first).

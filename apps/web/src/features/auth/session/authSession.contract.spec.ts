@@ -103,15 +103,46 @@ describe('useUserStore auth cache handling', () => {
     expect(authClient.signIn).not.toHaveProperty('username')
   })
 
-  it('fails closed after login when the business identity projection cannot refresh', async () => {
+  it('clears the stale session when login projection remains transiently unavailable', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ ordinal: 9, role: 'admin' }))
+    const staleUser = makeUser({ ordinal: 9, role: 'admin' })
+    store.setAuth(staleUser)
     vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
 
     await expect(store.login('alice@example.com', 'secret-password')).rejects.toThrow(
       'You are signed in, but we could not load your account.',
     )
+
+    expect(vi.mocked(getUserInfo)).toHaveBeenCalledTimes(2)
+    expect(store.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
+  })
+
+  it('throws sessionRestoreFailed after the login retry is exhausted with no cached user', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
+    vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
+
+    await expect(store.login('alice@example.com', 'secret-password')).rejects.toThrow(
+      'You are signed in, but we could not load your account.',
+    )
+
+    expect(vi.mocked(getUserInfo)).toHaveBeenCalledTimes(2)
+    expect(store.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
+  })
+
+  it('throws sessionRestoreFailed without retry when login projection is unauthorized', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
+    vi.mocked(getUserInfo).mockRejectedValue({ status: 401 })
+
+    await expect(store.login('alice@example.com', 'secret-password')).rejects.toThrow(
+      'You are signed in, but we could not load your account.',
+    )
+
+    expect(vi.mocked(getUserInfo)).toHaveBeenCalledTimes(1)
     expect(store.user).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
   })
@@ -176,20 +207,21 @@ describe('useUserStore auth cache handling', () => {
     expect(getUserInfo).not.toHaveBeenCalled()
   })
 
-  it('fails closed for fresh session probes when user info returns a server error', async () => {
+  it('keeps the stale session for fresh probes on server error (fail open, retry next nav)', async () => {
     const { store, queryClient, getUserInfo, authClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ ordinal: 1, role: 'admin' }))
+    const staleUser = makeUser({ ordinal: 1, role: 'admin' })
+    store.setAuth(staleUser)
     queryClient.setQueryData(['admin', 'users'], [{ count: 1 }])
     vi.mocked(authClient.getSession).mockResolvedValue({
       data: { session: { id: 'session-1' } },
     } as never)
     vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
 
-    await expect(store.ensureSession({ fresh: true })).resolves.toBeNull()
+    await expect(store.ensureSession({ fresh: true })).resolves.toEqual(staleUser)
 
-    expect(store.user).toBeNull()
-    expect(localStorage.getItem('user')).toBeNull()
-    expect(queryClient.getQueryData(['admin', 'users'])).toBeUndefined()
+    expect(store.user).toEqual(staleUser)
+    expect(localStorage.getItem('user')).toBe(JSON.stringify(staleUser))
+    expect(queryClient.getQueryData(['admin', 'users'])).toEqual([{ count: 1 }])
   })
 
   it('registers and stores the created session user', async () => {

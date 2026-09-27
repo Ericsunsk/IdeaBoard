@@ -370,9 +370,16 @@ func TestV1PutUploadBytesValidation(t *testing.T) {
 	// Missing key, malformed id, outsider, and terminal-state PUT.
 	noKeyCall := v1Call{method: "PUT", path: bytesPath(uploadID), body: string(staged),
 		userID: f.owner, headers: map[string]string{"Content-Type": "image/png"}}
-	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusBadRequest ||
+	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
+		t.Fatalf("keyless PUT = %d %v, want 200 (server-minted content-hash key)", status, payload)
+	}
+	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
+		t.Fatalf("keyless PUT replay = %d %v, want 200", status, payload)
+	}
+	// A present-but-malformed (overlong) key still fails closed with 400.
+	if status, payload := put(uploadID, staged, f.owner, strings.Repeat("k", contract.IdempotencyMaxKeyLength+1), "image/png"); status != http.StatusBadRequest ||
 		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
-		t.Fatalf("missing key PUT = %d %v, want 400 idempotency_key_required", status, payload)
+		t.Fatalf("overlong key PUT = %d %v, want 400 idempotency_key_required", status, payload)
 	}
 	if status, payload := put("nope", staged, f.owner, "gaps-put-malformed", "image/png"); status != http.StatusNotFound ||
 		v1ErrorCode(t, payload) != string(contract.CodeUploadNotFound) {
@@ -400,7 +407,7 @@ func TestV1AvatarUpload(t *testing.T) {
 		if contentType != "" {
 			headers["Content-Type"] = contentType
 		}
-		status, _, payload := doV1(t, f.engine, v1Call{method: "PUT", path: "/api/v1/me/avatar",
+		status, _, payload := doV1(t, f.engine, v1Call{method: "PUT", path: "/api/v1/user/avatar",
 			body: string(body), userID: userID, headers: headers})
 		return status, payload
 	}
@@ -438,16 +445,24 @@ func TestV1AvatarUpload(t *testing.T) {
 		v1ErrorCode(t, payload) != string(contract.CodeMediaValidationFailed) {
 		t.Fatalf("oversize avatar = %d %v, want 422 media_validation_failed", status, payload)
 	}
-	anonCall := v1Call{method: "PUT", path: "/api/v1/me/avatar", body: string(avatar),
+	anonCall := v1Call{method: "PUT", path: "/api/v1/user/avatar", body: string(avatar),
 		headers: map[string]string{"Content-Type": "image/png", "Idempotency-Key": "avatar-anon"}}
 	if status, _, _ := doV1(t, f.engine, anonCall); status != http.StatusUnauthorized {
 		t.Fatalf("anonymous avatar = %d, want 401", status)
 	}
-	noKeyCall := v1Call{method: "PUT", path: "/api/v1/me/avatar", body: string(avatar),
+	noKeyCall := v1Call{method: "PUT", path: "/api/v1/user/avatar", body: string(avatar),
 		userID: f.owner, headers: map[string]string{"Content-Type": "image/png"}}
-	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusBadRequest ||
+	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
+		t.Fatalf("keyless avatar = %d %v, want 200 (server-minted content-hash key)", status, payload)
+	} else if url, _ := v1Data(t, payload).(map[string]any)["avatar_url"].(string); url != "/uploads/profile/AVTR01/avatar/avatar.png" {
+		t.Fatalf("keyless avatar_url = %q, want the static profile-avatar namespace", url)
+	}
+	if status, _, payload := doV1(t, f.engine, noKeyCall); status != http.StatusOK {
+		t.Fatalf("keyless avatar replay = %d %v, want 200", status, payload)
+	}
+	if status, payload := put(avatar, f.owner, strings.Repeat("k", contract.IdempotencyMaxKeyLength+1), "image/png"); status != http.StatusBadRequest ||
 		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
-		t.Fatalf("missing key avatar = %d %v, want 400 idempotency_key_required", status, payload)
+		t.Fatalf("overlong key avatar = %d %v, want 400 idempotency_key_required", status, payload)
 	}
 }
 
@@ -457,7 +472,7 @@ func TestV1AvatarUpload(t *testing.T) {
 func TestV1AvatarFailClosed(t *testing.T) {
 	f := newV1MediaGapsFixture(t, false, nil)
 	avatar := v1GapsPNGBytes(512)
-	call := v1Call{method: "PUT", path: "/api/v1/me/avatar", body: string(avatar), userID: f.owner,
+	call := v1Call{method: "PUT", path: "/api/v1/user/avatar", body: string(avatar), userID: f.owner,
 		headers: map[string]string{"Content-Type": "image/png", "Idempotency-Key": "avatar-closed-1"}}
 	if status, _, payload := doV1(t, f.engine, call); status != http.StatusNotImplemented ||
 		v1ErrorCode(t, payload) != string(contract.CodeContractNotImplemented) {

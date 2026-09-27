@@ -1,5 +1,5 @@
 import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
-import { handleAuthFailure } from '../utils/auth'
+import { handleAuthFailure, handleSilentAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
 import { i18n } from '../i18n'
 
@@ -16,10 +16,20 @@ export type ApiClientError = Error & {
   details?: unknown
 }
 
+export type AuthFailureMode = 'redirect' | 'silent'
+
 export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'baseURL' | 'params' | 'signal'> & {
   // Callers forward optional AbortSignals; undefined is equivalent to absent
   // (ofetch/fetch ignore it) and is never read back as defined here.
   signal?: AbortSignal | null | undefined
+  // Per-request 401 policy. Default `redirect` preserves the global
+  // redirect-login behavior. `silent` clears local auth state when the
+  // session policy says the session is dead, but never navigates — for
+  // supplementary/background reads (branding, price hints, saved-keys
+  // backfill, anonymous workspace list) that must not nuke the page.
+  // Writes (mutations, paid queries, the session probe itself) keep the
+  // default.
+  authFailure?: AuthFailureMode | undefined
 }
 
 function toObject(value: unknown): Record<string, unknown> | null {
@@ -99,6 +109,22 @@ function requestURL(request: unknown): string {
   return ''
 }
 
+type AuthFailureReport = {
+  status?: number
+  payload?: unknown
+  requestUrl: string
+}
+
+function resolveAuthFailureMode(option: unknown): AuthFailureMode {
+  return (option as ApiRequestConfig | undefined)?.authFailure === 'silent'
+    ? 'silent'
+    : 'redirect'
+}
+
+function reportAuthFailure(report: AuthFailureReport, mode: AuthFailureMode): boolean {
+  return mode === 'silent' ? handleSilentAuthFailure(report) : handleAuthFailure(report)
+}
+
 const apiFetch = ofetch.create({
   baseURL: API_BASE_URL,
   credentials: 'include',
@@ -107,10 +133,10 @@ const apiFetch = ofetch.create({
   onResponse({ response }) {
     response._data = normalizeRuntimeMediaRefs(response._data)
   },
-  onResponseError({ request, response }) {
+  onResponseError({ request, response, options }) {
     const payload = response._data
     const requestUrl = response.url || requestURL(request)
-    handleAuthFailure({ status: response.status, payload, requestUrl })
+    reportAuthFailure({ status: response.status, payload, requestUrl }, resolveAuthFailureMode(options))
     throw createApiError(payload, response.status)
   },
 })
@@ -118,10 +144,11 @@ const apiFetch = ofetch.create({
 async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T> {
   // Normalize here so every caller can forward optional signals: fetch
   // treats undefined identically to absent.
-  const { signal, ...rest } = config ?? {}
+  const { signal, authFailure, ...rest } = config ?? {}
   const normalizedConfig = {
     ...rest,
     ...(signal == null ? {} : { signal }),
+    ...(authFailure == null ? {} : { authFailure }),
   }
   try {
     return await apiFetch<T>(url, normalizedConfig)
@@ -133,7 +160,10 @@ async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T>
     if (fetchError?.response) {
       const payload = fetchError.data ?? fetchError.response._data
       const requestUrl = fetchError.response.url || requestURL(fetchError.request)
-      handleAuthFailure({ status: fetchError.response.status, payload, requestUrl })
+      reportAuthFailure(
+        { status: fetchError.response.status, payload, requestUrl },
+        resolveAuthFailureMode(config),
+      )
       throw createApiError(payload, fetchError.response.status)
     }
     throw createApiError(error)
