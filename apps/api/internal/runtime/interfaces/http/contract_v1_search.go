@@ -28,7 +28,8 @@ package httpapi
 // renders search_vision_not_configured (503); key reuse with a
 // different request renders search_idempotency_conflict (409). Vision
 // billing failures reuse the #804 codes (billing_quote_unavailable
-// 503, billing_wallet_restricted 403).
+// 503 transient, billing_pricing_unavailable 422 unpriced SKU,
+// billing_wallet_restricted 403).
 //
 // Vision queries settle billing through the credits.Commands path
 // (V1CreditSettler Hold/Capture/Release with caller idempotency keys;
@@ -53,6 +54,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -474,6 +476,10 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 }
 
 func renderSearchBillingError(c *gin.Context, err error) {
+	if renderBillingPricingUnavailable(c, err) {
+		c.Abort()
+		return
+	}
 	switch {
 	case errors.Is(err, errV1BillingRestricted):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
@@ -581,7 +587,17 @@ func (h *contractV1Handler) resolveVisionUploads(c *gin.Context, workspace *tena
 func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Workspace, identityPrincipal principal.Principal, input searchcatalog.V1VisionQueryInput, references []searchcatalog.V1VisionReference) (any, error) {
 	ctx := c.Request.Context()
 	amount, quoteErr := h.deps.Search.Quoter.Quote(ctx, workspace.PublicID, V1VisionSKU)
-	if quoteErr != nil || amount < 0 {
+	if quoteErr != nil {
+		// Preserve the underlying billing cause alongside the
+		// quote-unavailable identity (multi-%w): pricing failures
+		// (ErrPricingUnavailable/ErrSKUNotFound) render 422 via the
+		// first branch of renderSearchBillingError, while transient
+		// failures keep the 503 billing_quote_unavailable branch. The
+		// createVisionQuery gate still matches
+		// errV1BillingQuoteUnavailable, so routing is unchanged.
+		return nil, fmt.Errorf("search vision quote: %w: %w", quoteErr, errV1BillingQuoteUnavailable)
+	}
+	if amount < 0 {
 		return nil, errV1BillingQuoteUnavailable
 	}
 	operationID, mintErr := searchcatalog.NewV1VisionQueryPublicID()
@@ -641,7 +657,9 @@ func (h *contractV1Handler) runVisionQuery(c *gin.Context, workspace *tenancy.Wo
 // search_vision_not_configured (503), search_idempotency_conflict (409); reused kernel codes
 // workspace_not_found/library_asset_not_found (404), validation_failed (422),
 // pagination_cursor_invalid (400), bad_request (400), idempotency_key_required (400),
-// service_unavailable (503) plus #804 billing_quote_unavailable (503)/billing_wallet_restricted (403).
+// service_unavailable (503) plus #804 billing_quote_unavailable (503
+// transient)/billing_pricing_unavailable (422 unpriced SKU)/
+// billing_wallet_restricted (403).
 //
 // Events note for #807: search/vision lifecycle events (vision query
 // settled, materialization completed) are NOT emitted here; #807 owns

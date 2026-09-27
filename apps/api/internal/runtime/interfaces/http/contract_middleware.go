@@ -14,9 +14,9 @@ import (
 // Contract kernel HTTP seam (issue #800; full authZ, per-surface rate
 // limits, and audit land in #808).
 //
-// Additive only: these groups and middleware never replace the global
-// middleware chain or the legacy /api/user, /api/admin, /api/health
-// routes (removal is #809).
+// Additive only: these groups and middleware never replaced the global
+// middleware chain; the legacy /api/user, /api/admin, /api/health
+// routes were removed in #809.
 
 const (
 	// ContractV1GroupPath is the Public Data Plane prefix (Baseline 2.1).
@@ -166,8 +166,8 @@ func ControlContractChain(limiter *ControlRateLimiter) []gin.HandlerFunc {
 // boards + collaboration (#802), uploads + media (#803) with the shared
 // PublicContractChain. Workspace billing (#804) mounts on its own group
 // via RegisterContractV1BillingRoutesOnEngine, and the Control Plane
-// (#808) via RegisterContractControlRoutesOnEngine. Legacy routes are
-// untouched.
+// (#808) via RegisterContractControlRoutesOnEngine. Legacy routes were
+// removed in #809.
 func registerContractV1RoutesOnEngine(r *gin.Engine, authDeps AuthDeps, deps ContractV1Deps) {
 	v1 := r.Group(ContractV1GroupPath)
 	v1.Use(PublicContractChain()...)

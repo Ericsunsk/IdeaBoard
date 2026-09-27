@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../../shared/api/sessionUser'
+import type { User } from '../../../shared/api/sessionUserType'
 
 type TestUserOverrides = Partial<User> & {
   ordinal?: number

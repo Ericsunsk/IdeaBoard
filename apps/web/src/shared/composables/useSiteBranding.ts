@@ -3,22 +3,24 @@ import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 import { api } from '../api/client'
 import {
-  createApiDataSelector,
-  resolveApiData,
-  type ApiResponseWithData,
-} from '../api/apiResponse'
+  createContractDataSelector,
+  resolveContractData,
+  type ContractSuccessEnvelope,
+} from '../api/contractKernel'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 
-// Public site branding (issue #809). The backend still serves
-// `GET /api/settings/branding` with the shared `{code, msg, data}` envelope,
-// so this composable keeps its query key and helper surface and transports
-// through the central `api.request` instead of the deleted generated client.
+// Public site branding (issue #809). `GET /api/settings/branding` rides the
+// central `api.request` and parses through `contractKernel` (`{ data }` /
+// `{ error: ... }`); this composable keeps its query key and helper surface.
+// The backend success body still carries legacy `code`/`msg` keys alongside
+// `data`, which the kernel ignores; numeric error bodies never reach the
+// parser (non-2xx throws in the shared client first).
 export type BrandingSetting = {
   project_name: string
   logo_url: string
 }
 
-export type ApiResponseBrandingSetting = ApiResponseWithData<BrandingSetting>
+export type ApiResponseBrandingSetting = ContractSuccessEnvelope<BrandingSetting>
 
 export const SITE_BRANDING_QUERY_KEY = ['settings', 'branding'] as const
 
@@ -38,7 +40,7 @@ export type SiteBrandingOptions = {
 
 export async function fetchSiteBranding(fallback: string): Promise<BrandingSetting> {
   return normalizeSiteBrandingSetting(
-    await resolveApiData(
+    await resolveContractData<BrandingSetting>(
       api.request<ApiResponseBrandingSetting>('/settings/branding', { method: 'GET' }),
       fallback,
     ),
@@ -58,7 +60,7 @@ export function useSiteBranding(options: SiteBrandingOptions) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
-  const selectSiteBranding = createApiDataSelector<BrandingSetting>(options.fallback)
+  const selectSiteBranding = createContractDataSelector<BrandingSetting>(options.fallback)
   const brandingQuery = useQuery<
     ApiResponseBrandingSetting,
     Error,
@@ -89,11 +91,9 @@ export function writeSiteBrandingQueryCache(
   setting: Partial<BrandingSetting> | null | undefined,
 ) {
   const normalizedSetting = normalizeSiteBrandingSetting(setting)
-  queryClient.setQueryData<ApiResponseBrandingSetting>(SITE_BRANDING_QUERY_KEY, (previous) => ({
-    code: previous?.code ?? 0,
-    msg: previous?.msg ?? 'ok',
+  queryClient.setQueryData<ApiResponseBrandingSetting>(SITE_BRANDING_QUERY_KEY, {
     data: normalizedSetting,
-  }))
+  })
 }
 
 export function normalizeSiteBrandingSetting(

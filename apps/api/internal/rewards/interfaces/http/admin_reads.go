@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/gin-gonic/gin"
@@ -66,7 +66,7 @@ func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, page)
+	contract.RenderSuccess(c, page)
 }
 
 func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
@@ -110,7 +110,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, page)
+	contract.RenderSuccess(c, page)
 }
 
 func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
@@ -143,7 +143,7 @@ func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, detail)
+	contract.RenderSuccess(c, detail)
 }
 
 func (h *AdminReadHandler) enrichAdminRedemptionPage(ctx context.Context, page *ports.AdminRedemptionPage) error {

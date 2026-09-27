@@ -68,18 +68,30 @@ import (
 //   - billing_session_not_found (404): unknown checkout session within a
 //     visible workspace (anti-enumeration still 404s hidden workspaces
 //     as workspace_not_found first).
-//   - billing_quote_unavailable (503): server-side price snapshot failed.
+//   - billing_quote_unavailable (503): server-side price snapshot failed
+//     (transient).
+//   - billing_pricing_unavailable (422): unpriced or unregistered SKU
+//     (deterministic, do not retry).
 //
 // Kernel codes reused as-is: workspace_not_found (404 hidden),
 // workspace_forbidden (403 visible-but-forbidden), pagination_cursor_invalid,
 // bad_request, validation_failed (422), idempotency_key_required (400),
 // service_unavailable.
 const (
-	CodeBillingWalletRestricted contract.Code = contract.CodeBillingWalletRestricted
-	CodeBillingCheckoutConflict contract.Code = contract.CodeBillingCheckoutConflict
-	CodeBillingSessionNotFound  contract.Code = contract.CodeBillingSessionNotFound
-	CodeBillingQuoteUnavailable contract.Code = contract.CodeBillingQuoteUnavailable
+	CodeBillingWalletRestricted   contract.Code = contract.CodeBillingWalletRestricted
+	CodeBillingCheckoutConflict   contract.Code = contract.CodeBillingCheckoutConflict
+	CodeBillingSessionNotFound    contract.Code = contract.CodeBillingSessionNotFound
+	CodeBillingQuoteUnavailable   contract.Code = contract.CodeBillingQuoteUnavailable
+	CodeBillingPricingUnavailable contract.Code = contract.CodeBillingPricingUnavailable
 )
+
+func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
+	if !errors.Is(err, billing.ErrPricingUnavailable) && !errors.Is(err, billing.ErrSKUNotFound) {
+		return false
+	}
+	contract.RenderError(c, http.StatusUnprocessableEntity, CodeBillingPricingUnavailable, "当前功能暂未定价，暂不可用")
+	return true
+}
 
 // billingAccountStore provisions the implicit per-workspace billing account.
 // Production uses tenancypg.BillingAccountStore; tests stub this interface.

@@ -5,7 +5,7 @@ package httpapi
 // Additive only: all routes mount under
 // /api/v1/workspaces/{workspace_id}/library via the existing
 // ContractV1GroupPath + PublicContractChain pattern. Legacy
-// /api/user library routes are untouched (removal is #809).
+// /api/user library routes were removed in #809.
 //
 // Agreed surface:
 //
@@ -44,8 +44,9 @@ package httpapi
 // result links asset_... on success). Billing settles through the
 // credits.Commands path (V1CreditSettler: Hold/Capture/Release with
 // caller idempotency keys; no direct ledger writes here). Billing
-// failures reuse the #804 codes (billing_quote_unavailable 503,
-// billing_wallet_restricted 403).
+// failures reuse the #804 codes (billing_quote_unavailable 503 for
+// transient quote failures, billing_pricing_unavailable 422 for
+// unpriced/unregistered SKUs, billing_wallet_restricted 403).
 //
 // Production wiring supplies the postgres mapping and credits/billing
 // adapters. The remote media Materializer remains optional and fails closed
@@ -55,6 +56,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -115,14 +117,18 @@ func (d *ContractV1LibraryDeps) normalize() {
 }
 
 // V1MaterializeSKU is the metered SKU quoted for library
-// materialization. It has no registry entry yet: the production quoter
-// reports billing_quote_unavailable until the SKU is registered
-// (#805 follow-up); tests stub the quoter.
+// materialization. An unpriced/unregistered SKU renders 422
+// billing_pricing_unavailable (deterministic, no retry); only transient
+// quoter failures render 503 billing_quote_unavailable. Tests stub the
+// quoter.
 const V1MaterializeSKU = "library:materialize"
 
 var (
-	// errV1BillingQuoteUnavailable maps quoter failures to 503
-	// billing_quote_unavailable. Seams return it (or wrap it) instead
+	// errV1BillingQuoteUnavailable marks transient quoter failures for
+	// the 503 billing_quote_unavailable branch. Pricing failures wrap
+	// this identity AND the underlying billing cause (multi-%w), so
+	// renderLibraryBillingError can separate the deterministic 422
+	// pricing branch first. Seams return it (or wrap it) instead
 	// of leaking provider errors.
 	errV1BillingQuoteUnavailable = errors.New("v1 billing quote unavailable")
 	// errV1BillingRestricted maps hold rejections (frozen/restricted/
@@ -211,6 +217,10 @@ func renderLibraryError(c *gin.Context, err error) {
 }
 
 func renderLibraryBillingError(c *gin.Context, err error) {
+	if renderBillingPricingUnavailable(c, err) {
+		c.Abort()
+		return
+	}
 	switch {
 	case errors.Is(err, errV1BillingRestricted):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
@@ -914,7 +924,17 @@ func (h *contractV1Handler) libraryAssetByID(c *gin.Context, workspace *tenancy.
 func (h *contractV1Handler) runLibraryMaterialization(c *gin.Context, workspace *tenancy.Workspace, identityPrincipal principal.Principal, asset *library.V1Asset) (any, error) {
 	ctx := c.Request.Context()
 	amount, quoteErr := h.deps.Library.Quoter.Quote(ctx, workspace.PublicID, V1MaterializeSKU)
-	if quoteErr != nil || amount < 0 {
+	if quoteErr != nil {
+		// Preserve the underlying billing cause alongside the
+		// quote-unavailable identity (multi-%w): pricing failures
+		// (ErrPricingUnavailable/ErrSKUNotFound) render 422 via the
+		// first branch of renderLibraryBillingError, while transient
+		// failures keep the 503 billing_quote_unavailable branch. The
+		// createLibraryMaterialization gate still matches
+		// errV1BillingQuoteUnavailable, so routing is unchanged.
+		return nil, fmt.Errorf("library materialize quote: %w: %w", quoteErr, errV1BillingQuoteUnavailable)
+	}
+	if amount < 0 {
 		return nil, errV1BillingQuoteUnavailable
 	}
 	publicID, mintErr := library.NewV1MaterializationPublicID()
@@ -1071,7 +1091,8 @@ func (h *contractV1Handler) getLibraryMaterialization(c *gin.Context) {
 // library_materialization_not_found (404), library_idempotency_conflict (409); reused kernel codes
 // workspace_not_found/workspace_forbidden/pagination_cursor_invalid/bad_request/conflict/
 // validation_failed/idempotency_key_required/service_unavailable plus #804
-// billing_quote_unavailable (503)/billing_wallet_restricted (403).
+// billing_quote_unavailable (503 transient)/billing_pricing_unavailable
+// (422 unpriced SKU)/billing_wallet_restricted (403).
 //
 // Integer-ID note for #809: v1 rejects legacy integer ids as malformed 404;
 // integer-ID tolerance removal from the legacy handlers is NOT executed here.

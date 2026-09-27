@@ -29,7 +29,7 @@ type (
 )
 
 // Workspace task lifecycle (issue #805). Additive only: legacy
-// /api/user task routes are untouched (removal is #809).
+// /api/user task routes were removed in #809.
 //
 // Agreed surface (ContractV1GroupPath + PublicContractChain):
 //
@@ -129,6 +129,10 @@ func renderTaskError(c *gin.Context, err error) {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
 			contract.CodeValidationFailed, err.Error(),
 			contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		c.Abort()
+		return
+	}
+	if renderBillingPricingUnavailable(c, err) {
 		c.Abort()
 		return
 	}
@@ -674,5 +678,6 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 // task_idempotency_conflict (409, kernel); reused kernel codes
 // workspace_not_found/workspace_forbidden/pagination_cursor_invalid/bad_request/
 // validation_failed/idempotency_key_required/service_unavailable plus
-// billing_quote_unavailable (503), billing_wallet_restricted (403),
+// billing_quote_unavailable (503 transient), billing_pricing_unavailable
+// (422 unpriced SKU), billing_wallet_restricted (403),
 // media_not_found (404), media_not_ready (409), media_archived (410).

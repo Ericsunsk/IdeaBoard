@@ -9,7 +9,6 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/jsonlimit"
-	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/gin-gonic/gin"
@@ -83,7 +82,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, created)
+	contract.RenderSuccess(c, created)
 }
 
 func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
@@ -114,7 +113,7 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, updated)
+	contract.RenderSuccess(c, updated)
 }
 
 func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
@@ -141,7 +140,7 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, updated)
+	contract.RenderSuccess(c, updated)
 }
 
 func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
@@ -162,7 +161,7 @@ func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, deleted)
+	contract.RenderSuccess(c, deleted)
 }
 
 func requireAdmin(c *gin.Context) (int64, bool) {

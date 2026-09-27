@@ -1,4 +1,4 @@
-package reward_codes
+package rewardcodes
 
 import (
 	"ideaboard/api/internal/rewards/domain"

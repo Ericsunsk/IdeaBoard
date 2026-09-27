@@ -8,16 +8,20 @@ import (
 	"context"
 	"encoding/json"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
+	"strings"
 	"testing"
 	"time"
 
 	platformevents "ideaboard/api/internal/events"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testsupport/secretstest"
+
+	"github.com/google/uuid"
 )
 
 func mustNewCheckoutWorkflow(t *testing.T, deps payments.CheckoutWorkflowDependencies) *payments.CheckoutWorkflow {
@@ -129,6 +133,24 @@ func activeTestStripeConfiguration(t *testing.T, repo *paymentpostgres.Repositor
 		t.Fatalf("load active test Stripe configuration: %v", err)
 	}
 	return configuration
+}
+
+func createAdminPaymentOrder(t *testing.T, repo *paymentpostgres.Repository, userID int64, publicOrderNumber string, quantity int64) paymentsdomain.PaymentOrder {
+	t.Helper()
+	configuration := activeTestStripeConfiguration(t, repo)
+	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), paymentsdomain.CreatePaymentOrderIntentInput{
+		ID: uuid.NewString(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(), UserID: userID,
+		ClientIdempotencyKey: "admin-read-" + strings.ToLower(publicOrderNumber[len(publicOrderNumber)-12:]),
+		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
+		StripeCredentialID:   configuration.CredentialID,
+		StripeAccountID:      "acct_admin_read", StripeProductID: "prod_admin_read", IdeaQuantity: quantity,
+		TermsVersion: paymentsdomain.CurrentTermsVersion, RefundPolicyVersion: paymentsdomain.CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentOrderIntent(%s) error = %v", publicOrderNumber, err)
+	}
+	return order
 }
 
 type testStripeGateway struct{}

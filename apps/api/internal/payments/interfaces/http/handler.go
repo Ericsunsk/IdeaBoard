@@ -26,14 +26,6 @@ type WebhookHandler struct {
 	service paymentcontracts.WebhookService
 }
 
-func NewUserCheckoutHandler(service paymentcontracts.UserCheckoutService, publicOrigins config.PublicOriginsConfig) *UserCheckoutHandler {
-	return &UserCheckoutHandler{service: service, publicOrigins: publicOrigins}
-}
-
-func NewAdminHandler(service paymentcontracts.AdminService, publicOrigins config.PublicOriginsConfig) *AdminHandler {
-	return &AdminHandler{service: service, publicOrigins: publicOrigins}
-}
-
 func NewWebhookHandler(service paymentcontracts.WebhookService) *WebhookHandler {
 	return &WebhookHandler{service: service}
 }

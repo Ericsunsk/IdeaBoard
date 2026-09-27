@@ -11,7 +11,7 @@
 | Node.js    | `22.23.2` |
 | Go         | `1.26.6+` |
 | PostgreSQL | `17+`     |
-| Atlas CLI  | `1.3.0`   |
+| Atlas CLI  | `1.3.2`   |
 
 启动本地依赖：
 
@@ -134,8 +134,8 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | API build                        | `cd apps/api && go build ./...`                                                                                               |
 | Production dead-code scan        | `cd apps/api && deadcode ./...`                                                                                               |
 | Test reachability dead-code scan | `cd apps/api && deadcode -test ./...`                                                                                         |
-| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schema-release --write-artifact`                |
-| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release` |
+| Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                |
+| Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease` |
 | sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                        |
 | Auth build                       | `cd apps/auth && npm run build`                                                                                               |
 | Credits million dataset          | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v`      |
@@ -212,7 +212,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | 入口                                                                          | 用途                          |
 | ----------------------------------------------------------------------------- | ----------------------------- |
 | [service.go](./apps/api/internal/tasking/application/task/service.go)              | Task service                  |
-| [store.go](./apps/api/internal/tasking/application/submission/store.go)               | Transactional task submission |
+| [commands.go](./apps/api/internal/tasking/application/task/commands.go)               | Task submission commands |
 | [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)        | River enqueue adapter         |
 | [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)         | River worker adapter          |
 | [processor.go](./apps/api/internal/runtime/interfaces/worker/execution/processor.go)     | Worker task processing        |

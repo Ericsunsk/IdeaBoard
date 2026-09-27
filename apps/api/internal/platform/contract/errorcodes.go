@@ -102,11 +102,13 @@ const (
 	// state leak); checkout key reuse renders billing_checkout_conflict
 	// (409); unknown sessions render billing_session_not_found (404);
 	// server-side price snapshot failures render
-	// billing_quote_unavailable (503).
-	CodeBillingWalletRestricted Code = "billing_wallet_restricted"
-	CodeBillingCheckoutConflict Code = "billing_checkout_conflict"
-	CodeBillingSessionNotFound  Code = "billing_session_not_found"
-	CodeBillingQuoteUnavailable Code = "billing_quote_unavailable"
+	// billing_quote_unavailable (503, transient) and unpriced SKUs
+	// render billing_pricing_unavailable (422, deterministic).
+	CodeBillingWalletRestricted   Code = "billing_wallet_restricted"
+	CodeBillingCheckoutConflict   Code = "billing_checkout_conflict"
+	CodeBillingSessionNotFound    Code = "billing_session_not_found"
+	CodeBillingQuoteUnavailable   Code = "billing_quote_unavailable"
+	CodeBillingPricingUnavailable Code = "billing_pricing_unavailable"
 
 	// Workspace task lifecycle codes (issue #805). Wire-stable: do not
 	// rename without coordinating the OpenAPI contract and callers.
@@ -131,8 +133,9 @@ const (
 	// *_not_found codes (404) per Baseline 4 anti-enumeration.
 	// Idempotency-Key reuse with a different request renders
 	// library_idempotency_conflict (409). Billing failures reuse the
-	// #804 codes (billing_quote_unavailable 503,
-	// billing_wallet_restricted 403); no new billing codes here.
+	// #804 codes (billing_quote_unavailable 503 transient,
+	// billing_pricing_unavailable 422 unpriced SKU,
+	// billing_wallet_restricted 403).
 	CodeLibraryFolderNotFound          Code = "library_folder_not_found"
 	CodeLibraryAssetNotFound           Code = "library_asset_not_found"
 	CodeLibraryMaterializationNotFound Code = "library_materialization_not_found"
@@ -212,7 +215,8 @@ func StatusOf(code Code) int {
 		CodeLibraryIdempotencyConflict, CodeSearchIdempotencyConflict,
 		CodeTaskStateConflict, CodeEventSubscriptionConflict:
 		return http.StatusConflict
-	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed:
+	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed,
+		CodeBillingPricingUnavailable:
 		return http.StatusUnprocessableEntity
 	case CodeRateLimited:
 		return http.StatusTooManyRequests

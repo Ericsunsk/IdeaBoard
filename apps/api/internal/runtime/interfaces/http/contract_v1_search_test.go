@@ -18,6 +18,7 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/contract"
@@ -392,6 +393,17 @@ func TestV1VisionQueryFailureBranches(t *testing.T) {
 	status, payload := post(fx, "vf-q", `{"data":{"user_text":"cafe"}}`)
 	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeBillingQuoteUnavailable) {
 		t.Fatalf("quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
+	}
+
+	// Unpriced/unregistered SKUs are deterministic 422s (no retry),
+	// whether the quoter surfaces ErrPricingUnavailable (the production
+	// catalog normalizes unknown SKUs to it) or ErrSKUNotFound.
+	for i, quoteErr := range []error{billing.ErrPricingUnavailable, billing.ErrSKUNotFound} {
+		fx = build(&fakeLibraryQuoter{err: quoteErr}, &fakeLibraryBilling{}, &fakeVisionExtractor{query: "x"})
+		status, payload = post(fx, fmt.Sprintf("vf-p-%d", i), `{"data":{"user_text":"cafe"}}`)
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
+			t.Fatalf("pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
+		}
 	}
 
 	billing := &fakeLibraryBilling{holdErr: errV1BillingRestricted}

@@ -589,15 +589,31 @@ func TestV1GapsBillingQuote(t *testing.T) {
 		t.Fatalf("quantity quote = %d %v, want total 6", status, sized)
 	}
 
-	// Unknown SKUs converge to 503 (no oracle); client price input is
-	// strictly rejected; bad quantities are 422.
-	status, _, unknown := doV1(t, engine, v1Call{
-		method: http.MethodPost, path: base,
-		body: `{"data":{"sku":"zzz:unknown-thing"}}`, userID: 11,
-	})
-	if status != http.StatusServiceUnavailable || v1ErrorCode(t, unknown) != string(CodeBillingQuoteUnavailable) {
-		t.Fatalf("unknown sku = %d %v, want 503 billing_quote_unavailable", status, unknown)
+	// Unpriced/unregistered SKUs are deterministic 422s (no retry, no
+	// oracle), whether the catalog surfaces ErrPricingUnavailable or
+	// ErrSKUNotFound; client price input is strictly rejected; bad
+	// quantities are 422.
+	fx.quoter.errFor["zzz:unpriced-thing"] = billing.ErrPricingUnavailable
+	for _, sku := range []string{"zzz:unknown-thing", "zzz:unpriced-thing"} {
+		status, _, priced := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: base,
+			body: fmt.Sprintf(`{"data":{"sku":%q}}`, sku), userID: 11,
+		})
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, priced) != string(CodeBillingPricingUnavailable) {
+			t.Fatalf("unpriced sku %s = %d %v, want 422 billing_pricing_unavailable", sku, status, priced)
+		}
 	}
+
+	// Transient quoter failures stay 503 (retryable).
+	fx.quoter.errFor["ai-search:vision"] = billing.ErrServiceUnavailable
+	status, _, transient := doV1(t, engine, v1Call{
+		method: http.MethodPost, path: base,
+		body: `{"data":{"sku":"ai-search:vision"}}`, userID: 11,
+	})
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, transient) != string(CodeBillingQuoteUnavailable) {
+		t.Fatalf("transient quote = %d %v, want 503 billing_quote_unavailable", status, transient)
+	}
+	delete(fx.quoter.errFor, "ai-search:vision")
 	status, _, priced := doV1(t, engine, v1Call{
 		method: http.MethodPost, path: base,
 		body: `{"data":{"sku":"ai-search:vision","unit_price":5}}`, userID: 11,

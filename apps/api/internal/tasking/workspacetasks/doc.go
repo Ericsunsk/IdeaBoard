@@ -2,8 +2,8 @@
 // (issue #805): Task as the single typed async job resource for workspace
 // AI workflows.
 //
-// Additive only: legacy submit/readiness/matrix/admin-duplicate routes are
-// untouched (removal is #809). This package never writes the Credits ledger
+// Historical note: legacy submit/readiness/matrix/admin-duplicate routes were
+// removed in #809. This package never writes the Credits ledger
 // directly (only via injected Holder seam), never enqueues outside the
 // injected Enqueuer seam (River in production, fake in tests), and never
 // publishes events inside the settlement transaction (staged, flushed only

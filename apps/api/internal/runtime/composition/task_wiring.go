@@ -260,10 +260,10 @@ func newAppTaskRuntime(
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
 	// #809 hard cut: the legacy River task worker (old job kinds) is
-	// unregistered with the stub (nil worker below). Stray old-kind jobs
+	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
 	// fail loudly as unknown kinds; the workspace_task_execute consumer
 	// and all periodic workers ride this same client.
-	riverClient, err := workerriver.NewRiverClient(dbs.riverPool, nil, workerriver.RiverServerOptions{
+	riverClient, err := workerriver.NewRiverClient(dbs.riverPool, workerriver.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
 		AdditionalQueues: map[string]river.QueueConfig{

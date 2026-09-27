@@ -73,10 +73,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   public.upload_sessions, public.media_asset_derivatives,
   public.library_materializations,
   public.workspace_events, public.event_subscriptions, public.event_deliveries,
+  public.event_delivery_attempts,
   public.board_documents, public.board_revisions,
-  public.task_billing_snapshots, public.task_billing_settlements,
-  public.control_audit_records
+  public.task_billing_snapshots, public.task_billing_settlements
 TO "<RUNTIME_ROLE>";
+GRANT SELECT, INSERT ON TABLE public.control_audit_records TO "<RUNTIME_ROLE>";
+REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.control_audit_records FROM "<RUNTIME_ROLE>";
 GRANT USAGE, SELECT, UPDATE ON SEQUENCE
   public.organizations_internal_id_seq,
   public.workspaces_internal_id_seq,
@@ -87,39 +89,45 @@ GRANT USAGE, SELECT, UPDATE ON SEQUENCE
   public.workspace_events_internal_id_seq,
   public.event_subscriptions_internal_id_seq,
   public.event_deliveries_internal_id_seq,
-  public.board_documents_internal_id_seq,
+  public.event_delivery_attempts_internal_id_seq,
   public.board_revisions_internal_id_seq,
-  public.task_billing_snapshots_internal_id_seq,
-  public.task_billing_settlements_internal_id_seq,
   public.control_audit_records_internal_id_seq
 TO "<RUNTIME_ROLE>";
 COMMIT;
 ```
 
 > [!NOTE]
+> `organization_memberships` / `workspace_memberships` / `board_documents` /
+> `task_billing_snapshots` / `task_billing_settlements` 无身份列，故无序列授权
+> （之前版本误列了并不存在的 `*_internal_id_seq`，已修正）。
 > `REVOKE` 方向无需处理：`Configure` 只对已列出对象做 `REVOKE ... FROM PUBLIC` /
 > forbidden-privilege 回收，从不触碰未列出表；手工 GRANT 在后续 `finalize-migrate`
-> 重跑后依然保留。但这只是止血—— durable fix 仍需把上述表/序列补进
-> `database.RuntimePrivilegePolicy()`（`apiOwnedTableNames` /
-> `apiOwnedSequenceNames`），改 Go policy 文件（本次 audit 未改，需 owner 另起变更），
-> 再重跑一次 `finalize-migrate` 使 policy-as-code 与实际一致。
+> 重跑后依然保留。但这只是止血—— durable fix 已落地
+> （`runtime_privileges.go` 的 policy + 启动断言），合并后重跑一次
+> `finalize-migrate` 使 policy-as-code 与实际一致。
 
 ## 4. 验证 SQL（补授前后均可跑）
 
 ```sql
--- 期望：补授前 16 张表全 f；补授后全 t
+-- 期望：补授前 17 张表全 f；补授后全 t（control_audit_records 仅 S,I 为 t）
 SELECT t AS table_name,
   has_table_privilege('<RUNTIME_ROLE>', t, 'SELECT,INSERT,UPDATE,DELETE') AS siud,
   has_sequence_privilege('<RUNTIME_ROLE>', t || '_internal_id_seq', 'USAGE') AS seq_usage
 FROM unnest(ARRAY[
   'organizations','workspaces','billing_accounts','upload_sessions',
   'media_asset_derivatives','library_materializations','workspace_events',
-  'event_subscriptions','event_deliveries','board_documents','board_revisions',
-  'task_billing_snapshots','task_billing_settlements','control_audit_records'
+  'event_subscriptions','event_deliveries','event_delivery_attempts',
+  'board_revisions','control_audit_records'
 ]) AS t ORDER BY 1;
--- memberships 表无序列，单独查：
+-- 无身份列的表（无序列）+ control 只读断言，单独查：
 SELECT has_table_privilege('<RUNTIME_ROLE>', 'workspace_memberships', 'SELECT,INSERT,UPDATE,DELETE') AS ws_members_siud,
-       has_table_privilege('<RUNTIME_ROLE>', 'organization_memberships', 'SELECT,INSERT,UPDATE,DELETE') AS org_members_siud;
+       has_table_privilege('<RUNTIME_ROLE>', 'organization_memberships', 'SELECT,INSERT,UPDATE,DELETE') AS org_members_siud,
+       has_table_privilege('<RUNTIME_ROLE>', 'board_documents', 'SELECT,INSERT,UPDATE,DELETE') AS board_docs_siud,
+       has_table_privilege('<RUNTIME_ROLE>', 'task_billing_snapshots', 'SELECT,INSERT') AS snapshots_si,
+       has_table_privilege('<RUNTIME_ROLE>', 'task_billing_settlements', 'SELECT,INSERT') AS settlements_si,
+       has_table_privilege('<RUNTIME_ROLE>', 'control_audit_records', 'SELECT,INSERT') AS audit_si,
+       NOT has_table_privilege('<RUNTIME_ROLE>', 'control_audit_records', 'UPDATE') AS audit_no_update,
+       NOT has_table_privilege('<RUNTIME_ROLE>', 'control_audit_records', 'DELETE') AS audit_no_delete;
 -- 负例冒烟（补授前应报 permission denied，补授后成功；写后回滚）：
 BEGIN;
 SET LOCAL ROLE "<RUNTIME_ROLE>";

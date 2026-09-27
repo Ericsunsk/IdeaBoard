@@ -30,7 +30,9 @@ package httpapi
 //     seam, and redeem composes the existing internal/rewards seam (which
 //     Grants through credits.Commands inside its own transaction).
 //   - Billing ONLY mints immutable PriceSnapshots/Quotes (server-side, no
-//     client price input). Unknown SKUs converge to billing_quote_unavailable
+//     client price input). Unpriced/unregistered SKUs converge to
+//     billing_pricing_unavailable (422, deterministic, no retry); only
+//     transient quote failures converge to billing_quote_unavailable
 //     (503, no SKU oracle).
 //   - Payments ONLY owns order intents + provider convergence + webhook
 //     inbox (existing seam, reused via narrow interfaces below). No new
@@ -522,6 +524,10 @@ func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 	}
 	quote, err := h.deps.Quoter.QuoteAtResolution(c.Request.Context(), sku, resolution, quantity)
 	if err != nil {
+		if renderBillingPricingUnavailable(c, err) {
+			c.Abort()
+			return
+		}
 		switch {
 		case errors.Is(err, billing.ErrInvalidSKU),
 			errors.Is(err, billing.ErrInvalidCatalogEntry),
@@ -534,9 +540,6 @@ func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 		case errors.Is(err, billing.ErrQuoteTotalExceeded):
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 				"报价超过允许上限", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
-		case errors.Is(err, billing.ErrSKUNotFound),
-			errors.Is(err, billing.ErrPricingUnavailable):
-			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
 		case errors.Is(err, billing.ErrServiceUnavailable):
 			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
 		default:
@@ -774,7 +777,7 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 //	WorkspacePendingOrderList: {items: WorkspacePendingOrder[]}
 //	WorkspacePendingOrder: {public_token: {format: uuid}, idea_quantity: int64, checkout_url?: uri, status: {enum: [checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed]}, expires_at: date-time, updated_at: date-time}
 //	WorkspaceRechargeHistoryItem: {occurred_at: date-time, idea_quantity: int64, paid_amount_minor?: int64, paid_currency?: string, status: {enum: [credited, refunded, cancelled]}, refunded_idea_quantity?: int64, refunded_amount_minor?: int64, receipt_url?: uri}
-//	CreateWorkspaceBillingQuoteRequest: {data: {sku: string (pattern ^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$), output_resolution?: {enum: [default, 1k, 2k, 4k], default: default}, quantity?: {type: integer, minimum: 1, default: 1}}} (no price fields; unknown SKUs converge to billing_quote_unavailable 503, no oracle)
+//	CreateWorkspaceBillingQuoteRequest: {data: {sku: string (pattern ^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$), output_resolution?: {enum: [default, 1k, 2k, 4k], default: default}, quantity?: {type: integer, minimum: 1, default: 1}}} (no price fields; unpriced/unregistered SKUs converge to billing_pricing_unavailable 422 deterministic, transient quote failures to billing_quote_unavailable 503, no oracle)
 //	WorkspaceBillingQuote: {sku, display_name, price_version_id: int64, price_version: int64, output_resolution, unit_credits: int64>=0, quantity: int64>=1, total_credits: int64>=0, quoted_at: date-time}
 //	RedeemWorkspaceRewardRequest: {data: {code: {type: string, minLength: 1}}}
 //	WorkspaceRewardRedemption: {id: int64, reward_code_id: int64, user_public_id: {format: uuid}, display_name, credit_amount: int64, credit_transaction_id, available_balance_after: int64, redeemed_at: date-time}
@@ -789,7 +792,8 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 // (400)/service_unavailable (503) plus billing_session_not_found (404
 // unknown/malformed order token), billing_checkout_conflict (409
 // continue/abandon key reuse), billing_wallet_restricted (403 continue
-// wallet gate), billing_quote_unavailable (503 quote/pricing).
+// wallet gate), billing_quote_unavailable (503 transient quote failure),
+// billing_pricing_unavailable (422 unpriced/unregistered SKU).
 //
 // Frontend migration notes (account + search surfaces):
 //   - getPurchaseOptions/listPendingOrders/continue/abandon/listRecharges
@@ -801,7 +805,8 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 //     next_cursor/next_before_id fields.
 //   - fetchVisionSearchPrice posts {data:{sku:"ai-search:vision"}} to
 //     billing-quotes (output_resolution defaults to default, quantity to
-//     1) and reads total_credits; unknown SKUs stay 503.
+//     1) and reads total_credits; unpriced/unregistered SKUs stay 422
+//     billing_pricing_unavailable, transient failures 503.
 //   - redeemRewardCode posts {data:{code}} with Idempotency-Key and reads
 //     the RedeemWorkspaceRewardResult shape 1:1.
 //

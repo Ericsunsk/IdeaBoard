@@ -17,7 +17,7 @@ import type { CreateWorkspaceBillingQuoteRequestDataOutputResolution } from './c
 
 export type CreateWorkspaceBillingQuoteRequestData = {
   /**
-   * Billable SKU (no price fields accepted; unknown SKUs converge to billing_quote_unavailable 503, no oracle).
+   * Billable SKU (no price fields accepted; unpriced or unregistered SKUs converge to billing_pricing_unavailable 422, transient failures to billing_quote_unavailable 503, no oracle).
    * @pattern ^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$
    */
   sku: string

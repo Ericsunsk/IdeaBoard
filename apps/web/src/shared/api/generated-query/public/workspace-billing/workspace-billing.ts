@@ -1261,7 +1261,7 @@ export const getCreateWorkspaceBillingQuoteUrl = (workspaceId: string) => {
 }
 
 /**
- * Mints an immutable price snapshot with no persistence (preflight, like task-quotes): the quote path is the only place a price is ever shown, and settlement re-quotes authoritatively. Covers the ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and read total_credits). No price fields are accepted (unknown fields rejected with 400); unknown SKUs converge to billing_quote_unavailable (503, no SKU oracle). No Idempotency-Key: pure read, safe to retry.
+ * Mints an immutable price snapshot with no persistence (preflight, like task-quotes): the quote path is the only place a price is ever shown, and settlement re-quotes authoritatively. Covers the ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and read total_credits). No price fields are accepted (unknown fields rejected with 400); unpriced or unregistered SKUs converge to billing_pricing_unavailable (422, deterministic, no SKU oracle), transient quote failures to billing_quote_unavailable (503). No Idempotency-Key: pure read, safe to retry.
  * @summary Mint a server-side billing quote (members only, no persistence)
  */
 export const createWorkspaceBillingQuote = async (
@@ -1303,12 +1303,7 @@ export const getCreateWorkspaceBillingQuoteMutationKey = () =>
   ['createWorkspaceBillingQuote'] as const
 
 export const getCreateWorkspaceBillingQuoteMutationOptions = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | NotFoundResponse
-    | UnprocessableEntityResponse
-    | ErrorEnvelope,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1348,11 +1343,7 @@ export type CreateWorkspaceBillingQuoteMutationResult = NonNullable<
 >
 export type CreateWorkspaceBillingQuoteMutationBody = CreateWorkspaceBillingQuoteRequest
 export type CreateWorkspaceBillingQuoteMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | NotFoundResponse
-  | UnprocessableEntityResponse
-  | ErrorEnvelope
+  BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope
 export type CreateWorkspaceBillingQuoteMutationVariables = {
   workspaceId: string
   data: CreateWorkspaceBillingQuoteRequest
@@ -1362,12 +1353,7 @@ export type CreateWorkspaceBillingQuoteMutationVariables = {
  * @summary Mint a server-side billing quote (members only, no persistence)
  */
 export const useCreateWorkspaceBillingQuote = <
-  TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | NotFoundResponse
-    | UnprocessableEntityResponse
-    | ErrorEnvelope,
+  TError = BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ErrorEnvelope,
   TContext = unknown,
 >(
   options?: {

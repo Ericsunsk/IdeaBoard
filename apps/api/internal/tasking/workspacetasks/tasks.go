@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	creditsdomain "ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
@@ -58,18 +59,20 @@ var (
 	ErrStateConflict = errors.New("workspacetasks: illegal state transition")
 	// ErrValidation reports a 422-class failure (kind/assets/params).
 	ErrValidation = errors.New("workspacetasks: validation failed")
-	// ErrInsufficientCredits reports a hold failure for lack of Ideas
-	// (402 task_insufficient_credits).
-	ErrInsufficientCredits = errors.New("workspacetasks: insufficient credits")
+	// ErrInsufficientCredits is the canonical credits hold failure
+	// (402 task_insufficient_credits). Alias, not a copy: the holder
+	// pairs it with the underlying credits cause via multi-%w.
+	ErrInsufficientCredits = creditsdomain.ErrInsufficientCredits
 	// ErrQuoteUnavailable reports a server-side price snapshot failure
-	// (503 billing_quote_unavailable).
+	// (503 billing_quote_unavailable). It stays a distinct routing
+	// marker (never a canonical alias): adapters pair it with the
+	// underlying billing cause via multi-%w, and the 422-vs-503 split in
+	// renderTaskError depends on that pairing.
 	ErrQuoteUnavailable = errors.New("workspacetasks: quote unavailable")
-	// ErrWalletRestricted reports a frozen/restricted wallet (403
-	// billing_wallet_restricted).
-	ErrWalletRestricted = errors.New("workspacetasks: wallet restricted")
-	// ErrIdempotencyConflict reports key reuse with a different request
-	// (409 task_idempotency_conflict).
-	ErrIdempotencyConflict = errors.New("workspacetasks: idempotency conflict")
+	// ErrWalletRestricted is the canonical credits restriction failure
+	// (403 billing_wallet_restricted). Alias, not a copy: see
+	// ErrInsufficientCredits for the multi-%w pairing.
+	ErrWalletRestricted = creditsdomain.ErrWalletRestricted
 	// ErrMediaNotFound wraps an invisible input/output asset.
 	ErrMediaNotFound = errors.New("workspacetasks: media not found")
 	// ErrMediaNotReady wraps a non-ready asset (409 media_not_ready).

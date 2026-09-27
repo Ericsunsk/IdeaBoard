@@ -48,7 +48,7 @@ import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
 import RetouchLayerActions from './LayerActions.vue'
 import RetouchLayersPanel from './LayersPanel.vue'
 import RetouchPropertiesPanel from './PropertiesPanel.vue'
-import { hasRenderableRetouchLayerStack } from '../services/renderer'
+import { hasRenderableRetouchLayerStack } from '../rendering/renderer'
 
 const props = defineProps<{
   anchorRect: {

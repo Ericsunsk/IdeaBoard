@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	RiverJobKindDrawingGenerate     = "drawing_generate"
-	RiverJobKindDrawingFinalFailure = "drawing_final_failure"
-	RiverQueueDefault               = "drawing_default"
-	RiverMaxAttemptsDefault         = 25
+	RiverQueueDefault       = "drawing_default"
+	RiverMaxAttemptsDefault = 25
 	// RiverQueueWebhookDeliver carries signed webhook deliveries
 	// (issue #833). The events package owns the worker; this package
 	// owns the budget constants so RiverRetryMatrix stays the single
@@ -26,49 +24,8 @@ const (
 	RiverQueueWebhookDeliver = "webhook_deliver"
 )
 
-type DrawingTaskArgs struct {
-	Task tasks.TaskPayload `json:"task"`
-}
-
-func (DrawingTaskArgs) Kind() string {
-	return RiverJobKindDrawingGenerate
-}
-
-// DrawingFinalFailureArgs is a settlement-only retry. Its worker must never
-// dispatch to an AI Provider.
-type DrawingFinalFailureArgs struct {
-	TaskID     string `json:"task_id" river:"unique"`
-	RiverJobID int64  `json:"river_job_id" river:"unique"`
-	Reason     string `json:"reason"`
-}
-
-func (DrawingFinalFailureArgs) Kind() string {
-	return RiverJobKindDrawingFinalFailure
-}
-
 type riverClient interface {
 	Insert(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
-}
-
-type RiverTxClient interface {
-	InsertTx(ctx context.Context, tx pgx.Tx, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
-}
-
-type TransactionalEnqueuer struct {
-	client    RiverTxClient
-	queueName string
-	maxRetry  int
-}
-
-func NewTransactionalEnqueuer(client RiverTxClient, queueName string, maxRetry int) *TransactionalEnqueuer {
-	return &TransactionalEnqueuer{client: client, queueName: queueName, maxRetry: maxRetry}
-}
-
-func (e *TransactionalEnqueuer) EnqueueTx(ctx context.Context, tx pgx.Tx, task *tasks.TaskPayload) error {
-	if e == nil {
-		return fmt.Errorf("river enqueue tx: enqueuer not configured")
-	}
-	return InsertDrawingTaskTx(ctx, e.client, tx, task, e.queueName, e.maxRetry)
 }
 
 type RiverQueue struct {
@@ -107,30 +64,6 @@ func (q *RiverQueue) SetClient(client riverClient) {
 	q.client = client
 }
 
-func (q *RiverQueue) Enqueue(ctx context.Context, task *tasks.TaskPayload) error {
-	if task == nil {
-		return fmt.Errorf("river enqueue: task is nil")
-	}
-	if strings.TrimSpace(task.TaskID) == "" {
-		return fmt.Errorf("river enqueue: empty task_id")
-	}
-	correlationID := task.EnsureCorrelationID()
-	priority := tasks.EffectiveTaskPriority(task.Priority)
-	if !tasks.IsValidTaskPriority(priority) {
-		return fmt.Errorf("river enqueue: invalid priority %d", task.Priority)
-	}
-	task.Priority = priority
-	client := q.getClient()
-	if client == nil {
-		return fmt.Errorf("river enqueue: client not configured")
-	}
-	_, err := client.Insert(ctx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, q.queueName, q.maxRetry))
-	if err != nil {
-		return fmt.Errorf("river enqueue: correlation_id=%s: %w", correlationID, err)
-	}
-	return nil
-}
-
 func (q *RiverQueue) getClient() riverClient {
 	if q == nil {
 		return nil
@@ -138,54 +71,6 @@ func (q *RiverQueue) getClient() riverClient {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 	return q.client
-}
-
-func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, task *tasks.TaskPayload, queueName string, maxRetry int) error {
-	if task == nil {
-		return fmt.Errorf("river enqueue tx: task is nil")
-	}
-	if strings.TrimSpace(task.TaskID) == "" {
-		return fmt.Errorf("river enqueue tx: empty task_id")
-	}
-	correlationID := task.EnsureCorrelationID()
-	if client == nil {
-		return fmt.Errorf("river enqueue tx: client not configured")
-	}
-	if tx == nil {
-		return fmt.Errorf("river enqueue tx: tx is nil")
-	}
-	priority := tasks.EffectiveTaskPriority(task.Priority)
-	if !tasks.IsValidTaskPriority(priority) {
-		return fmt.Errorf("river enqueue tx: invalid priority %d", task.Priority)
-	}
-	task.Priority = priority
-	_, err := client.InsertTx(ctx, tx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, queueName, maxRetry))
-	if err != nil {
-		return fmt.Errorf("river enqueue tx: correlation_id=%s: %w", correlationID, err)
-	}
-	return nil
-}
-
-func drawingTaskInsertOpts(task *tasks.TaskPayload, queueName string, maxRetry int) *river.InsertOpts {
-	if strings.TrimSpace(queueName) == "" {
-		queueName = RiverQueueDefault
-	}
-	if maxRetry <= 0 {
-		maxRetry = RiverMaxAttemptsDefault
-	}
-	taskID := ""
-	priority := tasks.TaskPriorityDefault
-	if task != nil {
-		taskID = task.TaskID
-		task.EnsureCorrelationID()
-		priority = tasks.EffectiveTaskPriority(task.Priority)
-	}
-	return &river.InsertOpts{
-		Queue:       queueName,
-		MaxAttempts: maxRetry,
-		Priority:    priority,
-		Tags:        []string{taskID},
-	}
 }
 
 func (q *RiverQueue) QueueLengths(ctx context.Context) (int64, int64, error) {

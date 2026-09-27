@@ -5,8 +5,9 @@ import (
 	"testing"
 )
 
-// Temporary R4 reproduction: live insert via the ensure path.
-func TestTempR4EnsureBillingAccountRepro(t *testing.T) {
+// Live-insert coverage for billing-account provisioning: the ensure path
+// must mint and persist a valid public_id (ba_ CHECK), not just read.
+func TestEnsureBillingAccountForWorkspace(t *testing.T) {
 	db := newTenancyTestDB(t)
 	store := NewStore(db)
 	userID := createTenancyTestUser(t, db)
@@ -21,7 +22,7 @@ func TestTempR4EnsureBillingAccountRepro(t *testing.T) {
 	baStore := NewBillingAccountStore(db)
 	account, err := baStore.EnsureBillingAccountForWorkspace(ctx, workspace.InternalID, workspace.PublicID)
 	if err != nil {
-		t.Fatalf("R4 REPRODUCED: EnsureBillingAccountForWorkspace failed: %v", err)
+		t.Fatalf("EnsureBillingAccountForWorkspace failed: %v", err)
 	}
-	t.Logf("R4 OK: billing account created: %+v", account)
+	t.Logf("billing account created: %+v", account)
 }

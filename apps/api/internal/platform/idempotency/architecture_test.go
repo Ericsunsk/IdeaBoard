@@ -9,13 +9,11 @@ import (
 	"testing"
 )
 
-// Write-side idempotency (#771) must not regress silently: the board, task,
-// and reward write interfaces keep enforcing Idempotency-Key through this
-// package. Each consumer package must retain at least one production import.
+// Write-side idempotency (#771) must not regress silently: the reward write
+// interfaces keep enforcing Idempotency-Key through this package. Each
+// consumer package must retain at least one production import.
 func TestWriteInterfacesEnforceIdempotencyKey(t *testing.T) {
 	consumers := []string{
-		"../../boards",
-		"../../tasking/interfaces/http/task",
 		"../../rewards/interfaces/http",
 	}
 	for _, dir := range consumers {

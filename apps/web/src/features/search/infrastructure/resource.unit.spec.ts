@@ -33,7 +33,6 @@ describe('searchResource', () => {
     expect(transport.request).toHaveBeenCalledOnce()
 
     resolveRequest?.({
-      code: 0,
       data: {
         query: 'warm shadows',
         results: [],
@@ -41,6 +40,14 @@ describe('searchResource', () => {
       },
     })
     await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+  })
+
+  it('surfaces the contract error message when the envelope carries one', async () => {
+    transport.request.mockResolvedValue({
+      error: { code: 'search_failed', message: 'Search down' },
+    })
+
+    await expect(searchInspiration({ query: 'failing query' })).rejects.toThrow('Search down')
   })
 
   it('rejects an already-aborted request before touching the API', async () => {
@@ -57,7 +64,6 @@ describe('searchResource', () => {
 
   it('passes the normalized query through the feature adapter', async () => {
     transport.request.mockResolvedValue({
-      code: 0,
       data: { query: 'warm cafe', results: [], has_more: false },
     })
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/response"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
@@ -117,7 +118,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 	}
 	result.Redemption.UserPublicID = identityPrincipal.PublicID()
 	result.Redemption.DisplayName = identityPrincipal.DisplayName()
-	response.SuccessDTO(c, result)
+	contract.RenderSuccess(c, result)
 }
 
 func redemptionOutcomeForError(err error) redemptionOutcome {
@@ -163,5 +164,5 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	response.SuccessDTO(c, page)
+	contract.RenderSuccess(c, page)
 }

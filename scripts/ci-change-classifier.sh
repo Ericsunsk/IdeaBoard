@@ -14,14 +14,13 @@ while IFS= read -r changed_path; do
     .github/workflows/migration-integration.yml) migration_integration=true; ops=true; has_non_docs_change=true ;;
     .github/workflows/docker-images.yml | .github/workflows/deploy-production.yml) ops=true; has_non_docs_change=true ;;
     scripts/ci-migration-integration* | scripts/atlas-migration-check*) api=true; auth=true; migration_integration=true; ops=true; has_non_docs_change=true ;;
-    apps/api/openapi.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/openapi.public.yaml | apps/api/openapi.control.yaml | apps/api/openapi.events.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/atlas.hcl) api=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/internal/db/queries/*) api=true; schema=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/* | apps/api/internal/db/schema/*) api=true; schema=true; migration_integration=true; has_non_docs_change=true ;;
-    apps/api/cmd/schema-release/* | apps/api/internal/db/schemarelease/* | apps/api/internal/db/schemaassembly/*) api=true; schema=true; has_non_docs_change=true ;;
-    apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*migration* | apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; has_non_docs_change=true ;;
-    docker/postgres/* | docker/compose*.yml | docker/migration.env.example) ops=true; migration_integration=true; has_non_docs_change=true ;;
+    apps/api/cmd/schemarelease/* | apps/api/internal/db/schemarelease/* | apps/api/internal/db/schemaassembly/*) api=true; schema=true; has_non_docs_change=true ;;
+    apps/auth/src/migrate.ts | apps/auth/src/infrastructure/*[mM]igration* | apps/auth/Dockerfile) auth=true; docker=true; migration_integration=true; has_non_docs_change=true ;;
+    docker/postgres/* | docker/compose*.yml | docker/.env.example | docker/migration.env.example) ops=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/Dockerfile) api=true; docker=true; has_non_docs_change=true ;;
     apps/web/package.json | apps/web/package-lock.json) web=true; web_audit=true; has_non_docs_change=true ;;
     apps/auth/package.json | apps/auth/package-lock.json) auth=true; auth_audit=true; docker=true; has_non_docs_change=true ;;

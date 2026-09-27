@@ -278,7 +278,11 @@ function checkGenericName(
   isDir: boolean,
 ): Violation | null {
   const name = isDir ? fileName : (fileName.split('.')[0] ?? '')
-  if (!GENERIC_NAMES.has(name.toLowerCase())) return null
+  const lowered = name.toLowerCase()
+  // The list mixes forms (`utils`, `helpers` vs `service`, `manager`), so
+  // match the trailing-s inflection too (`services/`, `managers/`).
+  const singular = lowered.endsWith('s') ? lowered.slice(0, -1) : lowered
+  if (!GENERIC_NAMES.has(lowered) && !GENERIC_NAMES.has(singular)) return null
   if (relativePath.includes('/locales/')) return null
   if (Object.hasOwn(keptGenericOwnership, relativePath)) return null
   return {

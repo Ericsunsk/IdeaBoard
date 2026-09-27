@@ -11,7 +11,6 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
-	"ideaboard/api/internal/platform/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -56,7 +55,7 @@ func serveAdminRefund(t *testing.T, service paymentcontracts.AdminService, body 
 	if err := principal.Set(c, identity); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewAdminHandler(service, config.PublicOriginsConfig{})
+	handler := &AdminHandler{service: service}
 	handler.CreateAdminPaymentRefund(c)
 	return recorder
 }

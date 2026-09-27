@@ -3,8 +3,8 @@ package domain
 // Workspace-scoped library for the Public API v1 (issue #806).
 //
 // Additive only: the legacy user-scoped tables (library_folders,
-// library_assets keyed by integer ids + owner_user_id) are untouched
-// (removal is #809). This file owns the V1 value types, public-id
+// library_assets keyed by integer ids + owner_user_id) were removed
+// in #809. This file owns the V1 value types, public-id
 // helpers, and lifecycle words. Persistence lives behind ports
 // (WorkspaceLibraryStore); the postgres sibling lives in
 // infrastructure/postgres and the test-only in-memory sibling stays in

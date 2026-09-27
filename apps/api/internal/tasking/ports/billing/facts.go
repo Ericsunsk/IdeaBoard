@@ -1,13 +1,13 @@
 package billing
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
-	ErrSettlementConflict  = errors.New("task billing settlement conflict")
-	ErrIntegrity           = errors.New("task billing integrity error")
-	ErrIdempotencyConflict = errors.New("task billing idempotency conflict")
+	// ErrSettlementConflict and ErrIntegrity stay local: they describe
+	// task-billing settlement-state facts with no canonical counterpart
+	// in billing or credits.
+	ErrSettlementConflict = errors.New("task billing settlement conflict")
+	ErrIntegrity          = errors.New("task billing integrity error")
 )
 
 type SettlementState string

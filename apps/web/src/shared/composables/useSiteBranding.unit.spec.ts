@@ -19,14 +19,19 @@ describe('fetchSiteBranding fallback', () => {
 
   it('resolves branding data without touching feature copy', async () => {
     vi.mocked(api.request).mockResolvedValueOnce({
-      code: 0,
-      msg: 'ok',
       data: { project_name: 'Acme', logo_url: '' },
     })
     await expect(fetchSiteBranding('Caller fallback')).resolves.toEqual({
       project_name: 'Acme',
       logo_url: '',
     })
+  })
+
+  it('surfaces the contract error message when the envelope carries one', async () => {
+    vi.mocked(api.request).mockResolvedValueOnce({
+      error: { code: 'branding_unavailable', message: 'Brand unavailable' },
+    })
+    await expect(fetchSiteBranding('Caller fallback')).rejects.toThrow('Brand unavailable')
   })
 
   it('surfaces the caller-supplied fallback when the transport error is unsafe', async () => {

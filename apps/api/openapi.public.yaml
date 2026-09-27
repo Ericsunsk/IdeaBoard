@@ -1724,8 +1724,9 @@ paths:
         ever shown, and settlement re-quotes authoritatively. Covers the
         ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and
         read total_credits). No price fields are accepted (unknown fields
-        rejected with 400); unknown SKUs converge to
-        billing_quote_unavailable (503, no SKU oracle). No
+        rejected with 400); unpriced or unregistered SKUs converge to
+        billing_pricing_unavailable (422, deterministic, no SKU oracle),
+        transient quote failures to billing_quote_unavailable (503). No
         Idempotency-Key: pure read, safe to retry.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -1752,9 +1753,16 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: SKU unpriced or unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '503':
-          description: Pricing unavailable (billing_quote_unavailable, no SKU oracle).
+          description: Transient quote failure (billing_quote_unavailable, no SKU oracle).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -1913,7 +1921,11 @@ paths:
         (scope task:create): same key+hash replays the first task, key
         reuse with a different request renders 409
         task_idempotency_conflict. Insufficient Ideas render 402
-        task_insufficient_credits.
+        task_insufficient_credits. Billing settles against a server-side
+        quote for the ai-image:<feature> SKU (unpriced or unregistered SKU
+        renders billing_pricing_unavailable 422 deterministic, transient
+        quote failures billing_quote_unavailable 503,
+        billing_wallet_restricted 403).
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1964,7 +1976,14 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Validation failure (validation_failed) or SKU unpriced/unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           description: Quote or task service unavailable (billing_quote_unavailable, service_unavailable).
           headers:
@@ -2077,6 +2096,9 @@ paths:
       description: >-
         Returns an immutable price snapshot with no persistence (separate
         from the authoritative create). No Idempotency-Key is required.
+        Unpriced or unregistered SKU renders billing_pricing_unavailable
+        422 deterministic; transient quote failures render
+        billing_quote_unavailable 503.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -2867,7 +2889,8 @@ paths:
         (failed record). Materializer failures fold into a failed job
         record so the job stays status-addressable; only billing
         failures abort with an error response (billing_quote_unavailable
-        503, billing_wallet_restricted 403). Requires the
+        503 transient, billing_pricing_unavailable 422 unpriced SKU,
+        billing_wallet_restricted 403). Requires the
         Idempotency-Key header (scope library:materialize).
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -2905,6 +2928,15 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          description: SKU unpriced or unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           description: Quote or materialization service unavailable (billing_quote_unavailable, service_unavailable).
           headers:
@@ -3020,8 +3052,10 @@ paths:
         images.pexels.com; anything else 422); client bytes never cross
         this boundary, so there is no multipart surface.
         Billing settles through credits.Commands against a server-side
-        quote for the ai-search:vision SKU (billing_quote_unavailable
-        503, billing_wallet_restricted 403). Provider extraction
+        quote for the ai-search:vision SKU (unpriced or unregistered SKU
+        renders billing_pricing_unavailable 422 deterministic, transient
+        quote failures billing_quote_unavailable 503,
+        billing_wallet_restricted 403). Provider extraction
         failures render 502 search_vision_provider_error (hold
         refunded); unconfigured vision renders 503
         search_vision_not_configured. Requires the Idempotency-Key
@@ -3073,7 +3107,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Validation failure (validation_failed) or SKU unpriced/unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '502':
           description: Vision provider failure (search_vision_provider_error, hold refunded).
           headers:
@@ -3084,7 +3125,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
-          description: Vision unconfigured or quote unavailable (search_vision_not_configured, billing_quote_unavailable).
+          description: Vision unconfigured or transient quote failure (search_vision_not_configured, billing_quote_unavailable).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -4649,7 +4690,7 @@ components:
             sku:
               type: string
               pattern: '^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$'
-              description: Billable SKU (no price fields accepted; unknown SKUs converge to billing_quote_unavailable 503, no oracle).
+              description: Billable SKU (no price fields accepted; unpriced or unregistered SKUs converge to billing_pricing_unavailable 422, transient failures to billing_quote_unavailable 503, no oracle).
             output_resolution:
               type: string
               enum: [default, 1k, 2k, 4k]

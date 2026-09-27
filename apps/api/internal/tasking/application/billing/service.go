@@ -20,10 +20,17 @@ import (
 )
 
 var (
-	ErrUnsupportedProduct  = errors.New("task product is not billable")
-	ErrPricingUnavailable  = errors.New("task pricing is unavailable")
-	ErrInsufficientCredits = errors.New("insufficient credits for task")
-	ErrWalletRestricted    = errors.New("task wallet is restricted")
+	// ErrUnsupportedProduct reports a feature slug with no billable SKU
+	// mapping. It stays local: unlike billing.ErrSKUNotFound (a catalog
+	// lookup miss for a known product), it fires before any SKU exists,
+	// when the feature itself is not a billable task product.
+	ErrUnsupportedProduct = errors.New("task product is not billable")
+	// Canonical pricing/credit aliases (T4 convergence): these sentinels
+	// are the shared billing/credits identities, so handler errors.Is
+	// branches keep matching with zero handler edits.
+	ErrPricingUnavailable  = billing.ErrPricingUnavailable
+	ErrInsufficientCredits = domain.ErrInsufficientCredits
+	ErrWalletRestricted    = domain.ErrWalletRestricted
 )
 
 type Quoter interface {

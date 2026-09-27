@@ -38,9 +38,12 @@ jobs:
       - name: Check shell syntax
         shell: bash
         run: |
+          # scripts/ci-workflow-contract-check.go is Go, not bash — checked by `go vet`/build in CI Gate.
           bash -n scripts/render-nginx-template.sh
+          bash -n scripts/render-nginx-template-test.sh
           bash -n scripts/render-cloudflare-real-ip-conf.sh
           bash -n scripts/uninstall-vps.sh
+          bash -n scripts/bootstrap-vps.sh
           bash -n scripts/deploy-stack.sh
           bash -n scripts/deploy-stack-test.sh
           bash -n scripts/production-deploy-entrypoint.sh
@@ -50,6 +53,20 @@ jobs:
           bash -n scripts/ci-change-classifier-test.sh
           bash -n scripts/ci-gate.sh
           bash -n scripts/ci-gate-test.sh
+          bash -n scripts/ci-parity.sh
+          bash -n scripts/ci-parity-test.sh
+          bash -n scripts/ci-migration-integration.sh
+          bash -n scripts/ci-migration-integration-test.sh
+          bash -n scripts/atlas-migration-check.sh
+          bash -n scripts/atlas-migration-check-test.sh
+          bash -n scripts/openapi-breaking-check.sh
+          bash -n scripts/csp-policy.sh
+          bash -n scripts/csp-policy-test.sh
+          bash -n scripts/qa-production-cleanup.sh
+          bash -n scripts/qa-production-cleanup-test.sh
+          bash -n scripts/secrets-init.sh
+          bash -n scripts/secrets-render.sh
+          bash -n scripts/secrets-validate.sh
           bash -n scripts/ci-media-package-boundary.sh
           bash -n scripts/ci-media-package-boundary-test.sh
           bash -n scripts/ci-legacy-media-zero-scan.sh
@@ -68,10 +85,13 @@ jobs:
       - name: ShellCheck deployment scripts
         shell: bash
         run: |
+          # scripts/ci-workflow-contract-check.go is Go, not bash — excluded from shellcheck.
           shellcheck \
             scripts/render-nginx-template.sh \
+            scripts/render-nginx-template-test.sh \
             scripts/render-cloudflare-real-ip-conf.sh \
             scripts/uninstall-vps.sh \
+            scripts/bootstrap-vps.sh \
             scripts/deploy-stack.sh \
             scripts/deploy-stack-test.sh \
             scripts/production-deploy-entrypoint.sh \
@@ -81,6 +101,20 @@ jobs:
             scripts/ci-change-classifier-test.sh \
             scripts/ci-gate.sh \
             scripts/ci-gate-test.sh \
+            scripts/ci-parity.sh \
+            scripts/ci-parity-test.sh \
+            scripts/ci-migration-integration.sh \
+            scripts/ci-migration-integration-test.sh \
+            scripts/atlas-migration-check.sh \
+            scripts/atlas-migration-check-test.sh \
+            scripts/openapi-breaking-check.sh \
+            scripts/csp-policy.sh \
+            scripts/csp-policy-test.sh \
+            scripts/qa-production-cleanup.sh \
+            scripts/qa-production-cleanup-test.sh \
+            scripts/secrets-init.sh \
+            scripts/secrets-render.sh \
+            scripts/secrets-validate.sh \
             scripts/ci-media-package-boundary.sh \
             scripts/ci-media-package-boundary-test.sh \
             scripts/ci-legacy-media-zero-scan.sh \

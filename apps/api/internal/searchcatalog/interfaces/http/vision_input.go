@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -15,8 +16,11 @@ import (
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/outboundhttp"
+	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/searchcatalog/application"
 	"ideaboard/api/internal/searchcatalog/domain"
+
+	"github.com/gin-gonic/gin"
 )
 
 type VisionInputReader interface {
@@ -370,4 +374,42 @@ func isExternalReferenceHost(host, provider string) bool {
 		return host == "images.pexels.com"
 	}
 	return false
+}
+
+// writeVisionError maps domain vision failures to stable machine codes.
+// Relocated from the deleted legacy vision HTTP handler file (its only
+// production caller is gone; the mapping stays pinned by
+// TestWriteVisionErrorUsesStableMachineCodes as the stable vision
+// error-code contract).
+func writeVisionError(c *gin.Context, err error) {
+	status, code, message := http.StatusBadGateway, "vision_search_provider_error", "视觉搜索暂时不可用"
+	switch {
+	case errors.Is(err, domain.ErrVisionInput):
+		status, code, message = http.StatusBadRequest, "vision_search_input_invalid", "请添加 1–4 张参考图"
+	case errors.Is(err, domain.ErrVisionImageInvalid):
+		status, code, message = http.StatusBadRequest, "vision_search_image_invalid", "参考图格式、尺寸或总大小无效"
+	case errors.Is(err, domain.ErrVisionImageUnavailable):
+		status, code, message = http.StatusBadRequest, "vision_search_image_unavailable", "参考图暂时无法读取"
+	case errors.Is(err, domain.ErrVisionNotConfigured):
+		status, code, message = http.StatusServiceUnavailable, "vision_search_not_configured", "视觉搜索暂未配置"
+	case errors.Is(err, domain.ErrVisionUnavailable):
+		status, code, message = http.StatusServiceUnavailable, "vision_search_unavailable", "视觉搜索暂不可用"
+	case errors.Is(err, domain.ErrVisionSchema):
+		status, code, message = http.StatusBadGateway, "vision_search_schema_error", "视觉搜索返回格式无效"
+	default:
+		var providerErr *domain.VisionProviderError
+		if errors.As(err, &providerErr) {
+			switch providerErr.Kind {
+			case domain.VisionProviderFailureCredentials:
+				status, code, message = http.StatusBadGateway, "vision_search_credentials", "视觉搜索凭证无效"
+			case domain.VisionProviderFailureQuota:
+				status, code, message = http.StatusBadGateway, "vision_search_quota", "视觉搜索权限或配额不可用"
+			case domain.VisionProviderFailureTimeout:
+				status, code, message = http.StatusGatewayTimeout, "vision_search_timeout", "视觉搜索超时，请重试"
+			case domain.VisionProviderFailureNetwork:
+				status, code, message = http.StatusBadGateway, "vision_search_network", "视觉搜索连接失败，请重试"
+			}
+		}
+	}
+	response.MachineError(c, status, code, message)
 }

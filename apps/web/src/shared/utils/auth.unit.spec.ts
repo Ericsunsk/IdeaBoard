@@ -7,7 +7,7 @@ import {
   handleAuthFailure,
   setStoredAuth,
 } from './auth'
-import type { User } from '../api/sessionUser'
+import type { User } from '../api/sessionUserType'
 
 const adminUser: User = {
   public_id: '00000000-0000-0000-0000-000000000001',

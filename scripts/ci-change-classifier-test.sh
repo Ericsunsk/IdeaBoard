@@ -42,7 +42,7 @@ assert_output_line "${services_output}" 'docker=false'
 assert_output_line "${services_output}" 'web=false'
 assert_output_line "${services_output}" 'docs_only=false'
 
-ops_output="$(printf '%s\n' deploy/nginx/default.conf scripts/deploy-stack.sh | "${classifier}")"
+ops_output="$(printf '%s\n' deploy/templates/nginx/ideaboard.conf.template scripts/deploy-stack.sh | "${classifier}")"
 
 assert_output_line "${ops_output}" 'ops=true'
 assert_output_line "${ops_output}" 'web=false'
@@ -113,12 +113,6 @@ assert_output_line "${migration_workflow_output}" 'docker=false'
 assert_output_line "${migration_workflow_output}" 'migration_integration=true'
 assert_output_line "${migration_workflow_output}" 'ops=true'
 
-openapi_output="$(printf '%s\n' apps/api/openapi.yaml | "${classifier}")"
-
-assert_output_line "${openapi_output}" 'web=true'
-assert_output_line "${openapi_output}" 'api=true'
-assert_output_line "${openapi_output}" 'auth=false'
-
 openapi_public_output="$(printf '%s\n' apps/api/openapi.public.yaml | "${classifier}")"
 
 assert_output_line "${openapi_public_output}" 'web=true'
@@ -146,6 +140,15 @@ assert_output_line "${atlas_hcl_output}" 'api=true'
 assert_output_line "${atlas_hcl_output}" 'migration_integration=true'
 assert_output_line "${atlas_hcl_output}" 'web=false'
 assert_output_line "${atlas_hcl_output}" 'docs_only=false'
+
+auth_migration_output="$(printf '%s\n' apps/auth/src/infrastructure/authMigration.ts | "${classifier}")"
+
+assert_output_line "${auth_migration_output}" 'auth=true'
+assert_output_line "${auth_migration_output}" 'docker=true'
+assert_output_line "${auth_migration_output}" 'migration_integration=true'
+assert_output_line "${auth_migration_output}" 'web=false'
+assert_output_line "${auth_migration_output}" 'api=false'
+assert_output_line "${auth_migration_output}" 'docs_only=false'
 
 queries_output="$(printf '%s\n' apps/api/internal/db/queries/users.sql | "${classifier}")"
 

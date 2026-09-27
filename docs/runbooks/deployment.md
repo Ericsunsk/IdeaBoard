@@ -168,7 +168,7 @@ git tag v0.1.0 <verified-main-commit>
 git push origin v0.1.0
 ```
 
-Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、三张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
+Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、四张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
 
 发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本且经过 repo-local SHA-256 校验的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
@@ -238,7 +238,7 @@ ideaboard update --manifest release-manifest.json
 
 `ideaboard update --manifest ...` 会执行：
 
-1. 读取 manifest 中的三张 immutable image digest 并写入 `.env`；缺少 manifest 会 fail closed。
+1. 读取 manifest 中的四张 immutable image digest 并写入 `.env`；缺少 manifest 会 fail closed。
 2. 校验当前 stack checkout 与 manifest 的完整 commit SHA 一致；拒绝 mutable tag/latest，不从 registry tag 反查 digest。
 3. 创建 `.env` snapshot 与 `docker/releases/history/*.json` 发布记录。
 4. 执行 preflight、Cosign 验签、pull、backup、migration、重启与 smoke gate。
@@ -268,7 +268,7 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 空 PostgreSQL 库由 API migration 以 `20260827000000_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
 
-Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中修改 domain fragment 或 manifest 后运行 `BASE_SHA=HEAD API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release --write-artifact` 生成 `internal/db/schema/schema.sql`，提交 snapshot 与 append-only migration；发布前和 CI 使用相同 command 但不带 `--write-artifact`，以只读方式检查 manifest assembly、snapshot drift、sqlc generation、migration immutability 和 PostgreSQL catalog semantics。不要调用已移除的旧 schema assembly 或 migration history scripts。
+Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中修改 domain fragment 或 manifest 后运行 `BASE_SHA=HEAD API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease --write-artifact` 生成 `internal/db/schema/schema.sql`，提交 snapshot 与 append-only migration；发布前和 CI 使用相同 command 但不带 `--write-artifact`，以只读方式检查 manifest assembly、snapshot drift、sqlc generation、migration immutability 和 PostgreSQL catalog semantics。不要调用已移除的旧 schema assembly 或 migration history scripts。
 
 非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `atlas_schema_revisions` 绕过 migration 校验。
 
@@ -551,7 +551,7 @@ ideaboard update --manifest release-manifest.json
 ideaboard rollback --to previous
 ```
 
-脚本会把 previous manifest 中的三张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+脚本会把 previous manifest 中的四张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 确认最近 backup：
 

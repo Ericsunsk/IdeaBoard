@@ -104,7 +104,7 @@ const principalContextKey = "ideaboard.auth.principal"
 // Legacy accessors (UserID, Role, IsAdmin, Require, RequireAdmin) are
 // preserved for the /api/user and /api/admin surfaces and are DEPRECATED
 // for new /api/v1 code, which must use Subject/SubjectType/TenantScope/
-// Capabilities and RequireCapability instead. Removal is #809.
+// Capabilities and RequireCapability instead. Removed in #809.
 type Principal struct {
 	userID      int64
 	publicID    uuid.UUID

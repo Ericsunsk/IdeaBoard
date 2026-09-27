@@ -1098,7 +1098,7 @@ export const getCreateWorkspaceLibraryMaterializationUrl = (workspaceId: string)
 }
 
 /**
- * Runs server-side quote (SKU library:materialize), credit hold through credits.Commands, job record (pending -> running), media settle, then capture (completed with the asset_ link) or release (failed record). Materializer failures fold into a failed job record so the job stays status-addressable; only billing failures abort with an error response (billing_quote_unavailable 503, billing_wallet_restricted 403). Requires the Idempotency-Key header (scope library:materialize).
+ * Runs server-side quote (SKU library:materialize), credit hold through credits.Commands, job record (pending -> running), media settle, then capture (completed with the asset_ link) or release (failed record). Materializer failures fold into a failed job record so the job stays status-addressable; only billing failures abort with an error response (billing_quote_unavailable 503 transient, billing_pricing_unavailable 422 unpriced SKU, billing_wallet_restricted 403). Requires the Idempotency-Key header (scope library:materialize).
  * @summary Materialize an owned library reference into a managed media asset (members only, 202)
  */
 export const createWorkspaceLibraryMaterialization = async (

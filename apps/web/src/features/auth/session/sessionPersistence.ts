@@ -1,4 +1,4 @@
-import type { User } from '../../../shared/api/sessionUser'
+import type { User } from '../../../shared/api/sessionUserType'
 import { clearStoredAuth, getStoredUser, setStoredAuth } from '../../../shared/utils/auth'
 
 export function readStoredSessionUser(): User | null {

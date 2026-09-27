@@ -172,7 +172,7 @@ export const getCreateWorkspaceVisionQueryUrl = (workspaceId: string) => {
 }
 
 /**
- * Inputs reference owned workspace library assets by lasset_ id (resolved server-side; unknown, malformed, or cross-workspace refs converge to 404 library_asset_not_found), staged workspace uploads by upload_ id (stage-then-reference through the upload-session byte PUT; unknown ids 404 upload_not_found, expired 410 upload_expired, failed 409 upload_state_conflict, unstaged 422 validation_failed), and external images by allowlisted https URL (images.unsplash.com, plus.unsplash.com, images.pexels.com; anything else 422); client bytes never cross this boundary, so there is no multipart surface. Billing settles through credits.Commands against a server-side quote for the ai-search:vision SKU (billing_quote_unavailable 503, billing_wallet_restricted 403). Provider extraction failures render 502 search_vision_provider_error (hold refunded); unconfigured vision renders 503 search_vision_not_configured. Requires the Idempotency-Key header (scope search:vision): key reuse with a different request renders 409 search_idempotency_conflict.
+ * Inputs reference owned workspace library assets by lasset_ id (resolved server-side; unknown, malformed, or cross-workspace refs converge to 404 library_asset_not_found), staged workspace uploads by upload_ id (stage-then-reference through the upload-session byte PUT; unknown ids 404 upload_not_found, expired 410 upload_expired, failed 409 upload_state_conflict, unstaged 422 validation_failed), and external images by allowlisted https URL (images.unsplash.com, plus.unsplash.com, images.pexels.com; anything else 422); client bytes never cross this boundary, so there is no multipart surface. Billing settles through credits.Commands against a server-side quote for the ai-search:vision SKU (unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic, transient quote failures billing_quote_unavailable 503, billing_wallet_restricted 403). Provider extraction failures render 502 search_vision_provider_error (hold refunded); unconfigured vision renders 503 search_vision_not_configured. Requires the Idempotency-Key header (scope search:vision): key reuse with a different request renders 409 search_idempotency_conflict.
  * @summary File a vision query from text plus owned refs (members only)
  */
 export const createWorkspaceVisionQuery = async (
@@ -215,12 +215,7 @@ export const getCreateWorkspaceVisionQueryMutationKey = () =>
 
 export const getCreateWorkspaceVisionQueryMutationOptions = <
   TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -260,12 +255,7 @@ export type CreateWorkspaceVisionQueryMutationResult = NonNullable<
 >
 export type CreateWorkspaceVisionQueryMutationBody = CreateWorkspaceVisionQueryRequest
 export type CreateWorkspaceVisionQueryMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ErrorEnvelope
-  | NotFoundResponse
-  | ConflictResponse
-  | UnprocessableEntityResponse
+  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse
 export type CreateWorkspaceVisionQueryMutationVariables = {
   workspaceId: string
   data: CreateWorkspaceVisionQueryRequest
@@ -276,12 +266,7 @@ export type CreateWorkspaceVisionQueryMutationVariables = {
  */
 export const useCreateWorkspaceVisionQuery = <
   TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {

@@ -10,9 +10,9 @@ import (
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/pagination"
-	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,7 +48,7 @@ func (h *AdminHandler) ListAdminPaymentOrders(c *gin.Context) {
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "支付订单服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付订单服务暂不可用")
 		return
 	}
 	input, err := adminPaymentOrderListInputFromQuery(c)
@@ -61,7 +61,7 @@ func (h *AdminHandler) ListAdminPaymentOrders(c *gin.Context) {
 		writeAdminPaymentOrderListError(c, err)
 		return
 	}
-	response.SuccessDTO(c, page)
+	contract.RenderSuccess(c, page)
 }
 
 func (h *AdminHandler) GetAdminPaymentOrder(c *gin.Context) {
@@ -70,23 +70,23 @@ func (h *AdminHandler) GetAdminPaymentOrder(c *gin.Context) {
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "支付订单服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付订单服务暂不可用")
 		return
 	}
 	detail, err := h.service.GetAdminPaymentOrder(c.Request.Context(), c.Param("order_number"))
 	if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter) {
-		response.Error(c, http.StatusBadRequest, "支付订单号无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单号无效")
 		return
 	}
 	if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderNotFound) {
-		response.Error(c, http.StatusNotFound, "支付订单不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeNotFound, "支付订单不存在")
 		return
 	}
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "读取支付订单失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取支付订单失败")
 		return
 	}
-	response.SuccessDTO(c, detail)
+	contract.RenderSuccess(c, detail)
 }
 
 func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
@@ -96,12 +96,12 @@ func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "退款服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "退款服务暂不可用")
 		return
 	}
 	var request createPaymentRefundRequest
 	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxPaymentRefundRequestBytes, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "退款参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "退款参数错误")
 		return
 	}
 	refund, err := h.service.CreatePaymentRefund(c.Request.Context(), paymentcontracts.CreatePaymentRefundCommand{
@@ -112,32 +112,32 @@ func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
 		switch {
 		case errors.Is(err, paymentcontracts.ErrRefundAmountInvalid):
 			slog.Warn("admin payment refund rejected", "outcome", "invalid_amount", "err", err)
-			response.Error(c, http.StatusBadRequest, "退款 Idea 数量无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "退款 Idea 数量无效")
 		case errors.Is(err, paymentcontracts.ErrRefundIdempotency):
 			slog.Warn("admin payment refund rejected", "outcome", "invalid_idempotency", "err", err)
-			response.Error(c, http.StatusBadRequest, "退款幂等键无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "退款幂等键无效")
 		case errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter):
 			slog.Warn("admin payment refund rejected", "outcome", "invalid_filter", "err", err)
-			response.Error(c, http.StatusBadRequest, "支付订单筛选条件无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
 		case errors.Is(err, paymentcontracts.ErrRefundExpired):
 			slog.Warn("admin payment refund rejected", "outcome", "refund_expired", "err", err)
-			response.Error(c, http.StatusConflict, "支付订单已超过 14 天退款期限")
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "支付订单已超过 14 天退款期限")
 		case errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible):
 			slog.Warn("admin payment refund rejected", "outcome", "order_not_eligible", "err", err)
-			response.Error(c, http.StatusConflict, "支付订单当前不满足退款条件")
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "支付订单当前不满足退款条件")
 		case errors.Is(err, paymentcontracts.ErrRefundAmountExceeds):
 			slog.Warn("admin payment refund rejected", "outcome", "amount_exceeds", "err", err)
-			response.Error(c, http.StatusConflict, "退款 Idea 数量超过可退余额")
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "退款 Idea 数量超过可退余额")
 		case errors.Is(err, domain.ErrInsufficientCredits):
-			response.Error(c, http.StatusConflict, "Wallet 可用 Idea 不足")
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "Wallet 可用 Idea 不足")
 		case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable):
-			response.Error(c, http.StatusServiceUnavailable, "Stripe 服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Stripe 服务暂不可用")
 		default:
-			response.Error(c, http.StatusInternalServerError, "发起退款失败")
+			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "发起退款失败")
 		}
 		return
 	}
-	response.SuccessDTO(c, newAdminPaymentRefundResult(refund))
+	contract.RenderSuccess(c, newAdminPaymentRefundResult(refund))
 }
 
 func adminPaymentOrderListInputFromQuery(c *gin.Context) (paymentcontracts.AdminPaymentOrderListInput, error) {
@@ -202,15 +202,15 @@ func (h *AdminHandler) GetStripeConfiguration(c *gin.Context) {
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "支付设置服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付设置服务暂不可用")
 		return
 	}
 	summary, err := h.service.GetStripeConfiguration(c.Request.Context())
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "读取 Stripe 设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取 Stripe 设置失败")
 		return
 	}
-	response.SuccessDTO(c, summary)
+	contract.RenderSuccess(c, summary)
 }
 
 func (h *AdminHandler) UpdateStripeConfiguration(c *gin.Context) {
@@ -220,12 +220,12 @@ func (h *AdminHandler) UpdateStripeConfiguration(c *gin.Context) {
 		return
 	}
 	if h == nil || h.service == nil {
-		response.Error(c, http.StatusServiceUnavailable, "支付设置服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付设置服务暂不可用")
 		return
 	}
 	var request updateStripeConfigurationRequest
 	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxStripeConfigurationRequestBytes, &request); err != nil || request.PurchasesEnabled == nil {
-		response.Error(c, http.StatusBadRequest, "Stripe 设置参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "Stripe 设置参数错误")
 		return
 	}
 	apiKey := ""
@@ -242,5 +242,5 @@ func (h *AdminHandler) UpdateStripeConfiguration(c *gin.Context) {
 		writeStripeConfigurationError(c, err)
 		return
 	}
-	response.SuccessDTO(c, summary)
+	contract.RenderSuccess(c, summary)
 }

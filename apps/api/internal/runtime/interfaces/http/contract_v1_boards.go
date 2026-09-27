@@ -5,7 +5,7 @@ package httpapi
 // Additive only: all routes mount under
 // /api/v1/workspaces/{workspace_id}/boards via the existing
 // ContractV1GroupPath + PublicContractChain pattern. Legacy
-// /api/user|/api/admin board routes are untouched (removal is #809).
+// /api/user|/api/admin board routes were removed in #809.
 //
 // Auth model: ResolvePrincipal + RequireWorkspaceCapability for the explicit
 // workspace context, then an explicit board ACL (roles owner|editor|viewer).

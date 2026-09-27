@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -462,6 +463,66 @@ func TestV1TaskAuthMatrix(t *testing.T) {
 		if status != 422 || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
 			t.Fatalf("%s = %d %v, want 422 validation_failed", tc.name, status, payload)
 		}
+	}
+}
+
+func TestV1TaskCreateBillingBranches(t *testing.T) {
+	tasksPath := func(fx *v1TaskFixture) string { return "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks" }
+	quotePath := func(fx *v1TaskFixture) string { return "/api/v1/workspaces/" + fx.ws.PublicID + "/task-quotes" }
+	create := func(fx *v1TaskFixture, key string) (int, map[string]any) {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: tasksPath(fx), userID: 3,
+			body:    v1CreateTaskBodyJSON("render"),
+			headers: map[string]string{contract.IdempotencyKeyHeader: key},
+		})
+		return status, payload
+	}
+	quote := func(fx *v1TaskFixture) (int, map[string]any) {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: quotePath(fx), userID: 3,
+			body: `{"data":{"workflow_kind":"render","quantity":1}}`,
+		})
+		return status, payload
+	}
+
+	fx := newV1TaskFixture(t)
+	// The fake stands in for the production WorkspaceTaskQuoter, which
+	// always keeps the ErrQuoteUnavailable routing identity (multi-%w):
+	// transient failures carry only that identity, pricing failures
+	// carry the catalog cause alongside it.
+	fx.quoter.err = fmt.Errorf("workspace task quoter: %w", workspacetasks.ErrQuoteUnavailable)
+	status, payload := create(fx, "bill-q")
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeBillingQuoteUnavailable) {
+		t.Fatalf("quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
+	}
+	status, payload = quote(fx)
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeBillingQuoteUnavailable) {
+		t.Fatalf("preflight quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
+	}
+
+	// Unpriced/unregistered SKUs are deterministic 422s (no retry),
+	// whether the catalog surfaces ErrPricingUnavailable (the production
+	// catalog normalizes unknown SKUs to it) or ErrSKUNotFound. The
+	// quoter preserves the cause alongside the quote-unavailable
+	// identity (multi-%w), and the 422-first branch wins.
+	for i, quoteErr := range []error{billing.ErrPricingUnavailable, billing.ErrSKUNotFound} {
+		fx = newV1TaskFixture(t)
+		fx.quoter.err = fmt.Errorf("workspace task quoter: %w: %w", quoteErr, workspacetasks.ErrQuoteUnavailable)
+		status, payload = create(fx, fmt.Sprintf("bill-p-%d", i))
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
+			t.Fatalf("pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
+		}
+		status, payload = quote(fx)
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
+			t.Fatalf("preflight pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
+		}
+	}
+
+	fx = newV1TaskFixture(t)
+	fx.holder.holdErr = workspacetasks.ErrWalletRestricted
+	status, payload = create(fx, "bill-h")
+	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingWalletRestricted) {
+		t.Fatalf("hold rejection = %d %v, want 403 billing_wallet_restricted", status, payload)
 	}
 }
 

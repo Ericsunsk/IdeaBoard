@@ -6,9 +6,9 @@
 // issues #801-809 build on top.
 //
 // Rules for this package:
-//   - Additive only. The legacy numeric envelope in platform/response
-//     stays untouched as the compat shim for the existing /api/user and
-//     /api/admin routes (removal is #809).
+//   - Historical note. The legacy numeric envelope in platform/response
+//     was the compat shim for the former /api/user and
+//     /api/admin routes (removed in #809).
 //   - Thin wrappers freeze the new wire bounds (page_size default 20 max
 //     100; header-only Idempotency-Key) without changing the underlying
 //     platform packages.

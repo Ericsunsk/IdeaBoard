@@ -1,9 +1,13 @@
-// Issue #800: Public/Control dual-client contract kernel skeleton.
+// Issue #800: Public/Control dual-client contract kernel.
 //
 // New-envelope (`{ data, meta }` / `{ error: { code, message, details, request_id } }`)
 // parsing plus Request-Id / RateLimit / ETag / Last-Event-ID passthrough helpers.
-// These sit ALONGSIDE the legacy `apiResponse.ts` boundary: no feature migrates
-// to the new envelope yet (migration is #801-#808), and existing logic is untouched.
+// This is the sole response boundary: the legacy `{code, msg, data}`
+// `apiResponse.ts` boundary is deleted (frontend audit T2), and every
+// transport (hand-rolled `api.request` calls included) parses through it.
+// Surviving Public success bodies still carry legacy `code`/`msg` keys
+// alongside `data`; the parser ignores them. Legacy numeric error bodies
+// never reach the parser (non-2xx throws in the shared client first).
 //
 // Per-feature migration TODOs (#801-#808):
 // - boardSync: move the board sync adapter to the public client + requireContractData.
@@ -11,6 +15,8 @@
 // - library/search: add the snake_case -> camelCase boundary on top of parseContractEnvelope.
 // - media/upload: resolve delivery URLs through the public client envelope.
 // - SSE: resume via withSseResumeParam / buildSseResumeHeaders (Last-Event-ID).
+
+import { formatDisplayErrorMessage } from '../utils/errorMessages'
 
 export type ContractMeta = {
   request_id?: string | undefined
@@ -105,6 +111,51 @@ export function requireContractData<T>(payload: unknown, fallback: string): T {
   }
   if (parsed.data == null) throw new Error(fallback)
   return parsed.data
+}
+
+export function createContractDataSelector<T>(fallback: string) {
+  return (payload: unknown): T => requireContractData<T>(payload, fallback)
+}
+
+export async function resolveContractData<T>(
+  request: Promise<unknown>,
+  fallback: string,
+): Promise<T> {
+  try {
+    return requireContractData<T>(await request, fallback)
+  } catch (error) {
+    throw contextualizeContractError(error, fallback)
+  }
+}
+
+function contextualizeContractError(error: unknown, fallback: string): Error {
+  const message = formatDisplayErrorMessage(error, fallback)
+  if (error instanceof Error && error.message === message) return error
+
+  const contextualError = new Error(message, { cause: error }) as Error & {
+    code?: unknown
+    requestId?: unknown
+    details?: unknown
+    data?: unknown
+    msg?: string
+    status?: unknown
+  }
+  if (error && typeof error === 'object') {
+    const source = error as {
+      code?: unknown
+      requestId?: unknown
+      details?: unknown
+      data?: unknown
+      status?: unknown
+    }
+    contextualError.code = source.code
+    contextualError.requestId = source.requestId
+    contextualError.details = source.details
+    contextualError.data = source.data
+    contextualError.status = source.status
+  }
+  contextualError.msg = message
+  return contextualError
 }
 
 // Opaque public IDs: usr_|org_|ws_|board_|task_|asset_|upload_|evt_ + payload.

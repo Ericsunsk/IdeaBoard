@@ -8,7 +8,7 @@ import (
 
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/rewards/application/redemptions"
-	"ideaboard/api/internal/rewards/application/reward_codes"
+	"ideaboard/api/internal/rewards/application/rewardcodes"
 	"ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/infrastructure/postgres"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
@@ -21,7 +21,7 @@ import (
 type Service struct {
 	pool        *pgxpool.Pool
 	keyring     domain.CodeKeyring
-	rewardCodes *reward_codes.Service
+	rewardCodes *rewardcodes.Service
 	redemptions *redemptions.Service
 	now         func() time.Time
 }
@@ -43,7 +43,7 @@ func NewServiceWithOptions(pool *pgxpool.Pool, credits redemptions.CreditGateway
 	return &Service{
 		pool:        pool,
 		keyring:     keyring,
-		rewardCodes: reward_codes.NewServiceWithOptions(pool, keyring, reward_codes.ServiceOptions{Now: opts.Now, Locker: locker}),
+		rewardCodes: rewardcodes.NewServiceWithOptions(pool, keyring, rewardcodes.ServiceOptions{Now: opts.Now, Locker: locker}),
 		redemptions: redemptions.NewServiceWithOptions(pool, credits, keyring, redemptions.ServiceOptions{Now: opts.Now, Locker: locker}),
 		now:         opts.Now,
 	}
@@ -60,7 +60,7 @@ func (s *Service) ValidateActiveCodeKeyVersions(ctx context.Context) error {
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("validate reward Code key versions: service unavailable")
 	}
-	return reward_codes.ValidateActiveCodeKeyVersions(ctx, s.pool, s.keyring)
+	return rewardcodes.ValidateActiveCodeKeyVersions(ctx, s.pool, s.keyring)
 }
 
 // --- AdminCommands implementation ---
@@ -113,18 +113,6 @@ type UserHandler = rewardhttp.UserHandler
 type AdminCommandHandler = rewardhttp.AdminCommandHandler
 type AdminReadHandler = rewardhttp.AdminReadHandler
 
-func NewUserHandler(service ports.UserService) *UserHandler {
-	return rewardhttp.NewUserHandler(service)
-}
-
-func NewAdminCommandHandler(service ports.AdminCommandService) *AdminCommandHandler {
-	return rewardhttp.NewAdminCommandHandler(service)
-}
-
-func NewAdminReadHandler(service ports.AdminReads, identityProjection ports.IdentityProjectionReader) *AdminReadHandler {
-	return rewardhttp.NewAdminReadHandler(service, identityProjection)
-}
-
 func RuntimePrivilegePolicy() dbprivileges.Policy {
 	return postgres.RuntimePrivilegePolicy()
 }
@@ -135,10 +123,6 @@ type CodeKeyring = domain.CodeKeyring
 type RedemptionHandlerOptions = rewardhttp.RedemptionHandlerOptions
 
 const DefaultRedemptionAttemptLimit = rewardhttp.DefaultRedemptionAttemptLimit
-
-func NewUserHandlerWithOptions(service ports.UserService, options RedemptionHandlerOptions) *UserHandler {
-	return rewardhttp.NewUserHandlerWithOptions(service, options)
-}
 
 func ParseCodeKeyring(raw string) (CodeKeyring, error) {
 	return domain.ParseCodeKeyring(raw)

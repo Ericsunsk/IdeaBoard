@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/rewards/domain"
 	creditsadapter "ideaboard/api/internal/rewards/infrastructure/credits"
 	"ideaboard/api/internal/rewards/infrastructure/postgres"
+	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	"ideaboard/api/internal/rewards/ports"
 
 	"github.com/jackc/pgx/v5"
@@ -73,14 +74,14 @@ const (
 )
 
 var (
-	NewUserHandler            = rewards.NewUserHandler
-	NewAdminCommandHandler    = rewards.NewAdminCommandHandler
-	NewAdminReadHandler       = rewards.NewAdminReadHandler
+	NewUserHandler            = rewardhttp.NewUserHandler
+	NewAdminCommandHandler    = rewardhttp.NewAdminCommandHandler
+	NewAdminReadHandler       = rewardhttp.NewAdminReadHandler
 	RuntimePrivilegePolicy    = rewards.RuntimePrivilegePolicy
 	NewService                = newRewardsService
 	NewServiceWithOptions     = newRewardsServiceWithOptions
 	NewCodeKeyring            = rewards.NewCodeKeyring
-	newUserHandlerWithOptions = rewards.NewUserHandlerWithOptions
+	newUserHandlerWithOptions = rewardhttp.NewUserHandlerWithOptions
 )
 
 func newTestRewardService(t *testing.T, pool *pgxpool.Pool, creditService *credits.Service) *rewards.Service {

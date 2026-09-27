@@ -1,6 +1,9 @@
 import type { SearchPage } from '../domain/models'
 import { api } from '../../../shared/api/client'
-import { resolveApiData, type ApiResponseWithData } from '../../../shared/api/apiResponse'
+import {
+  resolveContractData,
+  type ContractSuccessEnvelope,
+} from '../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
 import { i18n } from '../../../shared/i18n'
 
@@ -67,8 +70,8 @@ export async function searchInspiration(input: {
   } else if (inFlight) {
     return inFlight.promise
   }
-  const request = resolveApiData(
-    api.request<ApiResponseWithData<SearchPage>>(
+  const request = resolveContractData<SearchPage>(
+    api.request<ContractSuccessEnvelope<SearchPage>>(
       searchInspirationUrl({ q: input.query, cursor: input.cursor, limit: input.limit }),
       {
         method: 'GET',

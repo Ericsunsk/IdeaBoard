@@ -14,7 +14,7 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 | Locale Parity | `en` resident, `zh` lazy; `en` / `zh-CN` / `es` / `ko` keys must match (`localeParity` contract); locale switch atomically updates i18n + `<html lang>` + storage, and writes nothing on failure. |
 
 ## Public Seams
-- `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `resolveApiData`/`Ok`, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`.
+- `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`.
 - `shared/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy; never depends on feature route components.
 - `shared/components` pure display components (account menu, balance button, confirm box, language picker, table frame, chart card); balance numbers are injected, never self-fetched; never depends on feature stores/resources.
 - `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables.

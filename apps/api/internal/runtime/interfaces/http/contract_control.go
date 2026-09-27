@@ -4,7 +4,7 @@ package httpapi
 //
 // Additive only: this file and its control_* siblings mount a SEPARATE
 // middleware chain and route group under /api/control/v1. Legacy
-// /api/admin/* routes and their handlers are untouched (removal is #809).
+// /api/admin/* routes and their handlers were removed in #809.
 //
 // Separation guarantees (Baseline 2.2):
 //   - Auth: same session transport as Public, but authorization is

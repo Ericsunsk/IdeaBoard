@@ -1,7 +1,7 @@
-// Package reward_codes implements the admin and read business operations
+// Package rewardcodes implements the admin and read business operations
 // for the RewardCode aggregate, including idempotent creation, update,
 // code rotation, status management, and deletion.
-package reward_codes
+package rewardcodes
 
 import (
 	"bytes"

@@ -1,12 +1,12 @@
 import { getMe } from './generated-query/public/me/me'
 import { i18n } from '../i18n'
-import type { User } from './sessionUser'
+import type { User } from './sessionUserType'
 
 // Session principal owned by the shared API boundary (issue #809).
 //
 // The legacy `generated-query/user` + `apiResponse` transport is gone; the
 // Public Data Plane serves the principal at `GET /api/v1/me` (`MeEnvelope`).
-// The `User` view type lives in `./sessionUser` (import it from there, never
+// The `User` view type lives in `./sessionUserType` (import it from there, never
 // from here: this module's runtime transport sits downstream of the shared
 // API client and a type edge back would close an import cycle); unknown
 // envelope fields fail closed to `undefined`.

@@ -156,7 +156,7 @@ export const getCreateWorkspaceTaskUrl = (workspaceId: string) => {
 }
 
 /**
- * Submits an async task under the discriminated input union {workflow_kind, inputs:{media_asset_ids}, params}: workflow_kind names a registered AI image feature (generation, inpaint, render, variations, cutout, fusion, upscale, outpaint); media_asset_ids carry asset_... references only (no raw storage URLs); unknown params keys and storage URLs render 422 validation_failed with details.fields. Settlement runs Quote -> Hold -> Insert -> Enqueue with compensating rollback. Requires the Idempotency-Key header (scope task:create): same key+hash replays the first task, key reuse with a different request renders 409 task_idempotency_conflict. Insufficient Ideas render 402 task_insufficient_credits.
+ * Submits an async task under the discriminated input union {workflow_kind, inputs:{media_asset_ids}, params}: workflow_kind names a registered AI image feature (generation, inpaint, render, variations, cutout, fusion, upscale, outpaint); media_asset_ids carry asset_... references only (no raw storage URLs); unknown params keys and storage URLs render 422 validation_failed with details.fields. Settlement runs Quote -> Hold -> Insert -> Enqueue with compensating rollback. Requires the Idempotency-Key header (scope task:create): same key+hash replays the first task, key reuse with a different request renders 409 task_idempotency_conflict. Insufficient Ideas render 402 task_insufficient_credits. Billing settles against a server-side quote for the ai-image:<feature> SKU (unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic, transient quote failures billing_quote_unavailable 503, billing_wallet_restricted 403).
  * @summary Submit a workspace task (members only, 202 + Location)
  */
 export const createWorkspaceTask = async (
@@ -195,12 +195,7 @@ export const getCreateWorkspaceTaskMutationKey = () => ['createWorkspaceTask'] a
 
 export const getCreateWorkspaceTaskMutationOptions = <
   TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -240,12 +235,7 @@ export type CreateWorkspaceTaskMutationResult = NonNullable<
 >
 export type CreateWorkspaceTaskMutationBody = CreateWorkspaceTaskRequest
 export type CreateWorkspaceTaskMutationError =
-  | BadRequestResponse
-  | UnauthorizedResponse
-  | ErrorEnvelope
-  | NotFoundResponse
-  | ConflictResponse
-  | UnprocessableEntityResponse
+  BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse
 export type CreateWorkspaceTaskMutationVariables = {
   workspaceId: string
   data: CreateWorkspaceTaskRequest
@@ -256,12 +246,7 @@ export type CreateWorkspaceTaskMutationVariables = {
  */
 export const useCreateWorkspaceTask = <
   TError =
-    | BadRequestResponse
-    | UnauthorizedResponse
-    | ErrorEnvelope
-    | NotFoundResponse
-    | ConflictResponse
-    | UnprocessableEntityResponse,
+    BadRequestResponse | UnauthorizedResponse | ErrorEnvelope | NotFoundResponse | ConflictResponse,
   TContext = unknown,
 >(
   options?: {
@@ -604,7 +589,7 @@ export const getQuoteWorkspaceTaskUrl = (workspaceId: string) => {
 }
 
 /**
- * Returns an immutable price snapshot with no persistence (separate from the authoritative create). No Idempotency-Key is required.
+ * Returns an immutable price snapshot with no persistence (separate from the authoritative create). No Idempotency-Key is required. Unpriced or unregistered SKU renders billing_pricing_unavailable 422 deterministic; transient quote failures render billing_quote_unavailable 503.
  * @summary Preflight price quote for a task (members only, no persistence)
  */
 export const quoteWorkspaceTask = async (

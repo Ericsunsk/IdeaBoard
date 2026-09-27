@@ -14,10 +14,11 @@ package runtime
 // workspace_task_adapters.go and the vision reserve/capture/release
 // shape in searchcatalog/application/vision_billing.go):
 //   - Quote goes through BillableItemCatalog.QuoteAtResolution with the
-//     default variant, quantity 1. Any error stays an error: the handler
-//     already maps every quoter failure to billing_quote_unavailable,
-//     and unpriced/unregistered SKUs fail closed as pricing-unavailable
-//     inside the catalog (registry gate).
+//     default variant, quantity 1. Errors pass through wrapped (%w) so
+//     the handler still sees the billing cause: unpriced/unregistered
+//     SKUs (ErrPricingUnavailable, incl. the catalog's normalized
+//     ErrSKUNotFound) render 422 billing_pricing_unavailable, transient
+//     failures render 503 billing_quote_unavailable.
 //   - Hold/Capture/Release go through credits.Service (the sole ledger
 //     writer); this seam performs no ledger SQL of its own. Metadata
 //     carries the caller idempotency key, the user actor, the
@@ -27,7 +28,8 @@ package runtime
 //     changes (the trigger crafts keys embedding both ids).
 //   - Wallet rejections (insufficient/restricted) map to the exported
 //     httpapi.ErrV1BillingRestricted identity so the handler renders the
-//     #804 403 billing_wallet_restricted; everything else surfaces raw
+//     #804 403 billing_wallet_restricted; pricing causes keep their
+//     billing shape for the 422 branch; everything else surfaces raw
 //     for the 503 branch.
 //   - Zero/negative amounts are free markers, not ledger commands:
 //     Hold returns ("", nil) and Capture/Release are no-ops, so a free

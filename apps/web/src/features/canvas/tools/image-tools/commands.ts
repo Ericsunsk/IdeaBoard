@@ -1,7 +1,7 @@
 import {
   hasRenderableRetouchLayerStack,
   renderRetouchLayerStackFile,
-} from '../retouch/services/renderer'
+} from '../retouch/rendering/renderer'
 import {
   MediaAssetDerivativeNotReadyError,
   resolveMediaAssetProcessingURL,

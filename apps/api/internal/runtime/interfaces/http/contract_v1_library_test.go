@@ -19,6 +19,7 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/platform/contract"
@@ -513,6 +514,20 @@ func TestV1LibraryMaterializationBillingBranches(t *testing.T) {
 		headers: map[string]string{contract.IdempotencyKeyHeader: "bill-q"}})
 	if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeBillingQuoteUnavailable) {
 		t.Fatalf("quote failure = %d %v, want 503 billing_quote_unavailable", status, payload)
+	}
+
+	// Unpriced/unregistered SKUs are deterministic 422s (no retry),
+	// whether the quoter surfaces ErrPricingUnavailable (the production
+	// catalog normalizes unknown SKUs to it) or ErrSKUNotFound.
+	for i, quoteErr := range []error{billing.ErrPricingUnavailable, billing.ErrSKUNotFound} {
+		fx = newBillingFixture(&fakeLibraryQuoter{err: quoteErr}, &fakeLibraryBilling{}, &fakeLibraryMaterializer{mediaID: "asset_x"})
+		assetID = saveOne(fx)
+		status, _, payload = doV1(t, fx.engine, v1Call{method: http.MethodPost, path: fx.materializationsPath(), userID: fx.owner,
+			body:    fmt.Sprintf(`{"data":{"library_asset_id":%q}}`, assetID),
+			headers: map[string]string{contract.IdempotencyKeyHeader: fmt.Sprintf("bill-p-%d", i)}})
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
+			t.Fatalf("pricing failure (%v) = %d %v, want 422 billing_pricing_unavailable", quoteErr, status, payload)
+		}
 	}
 
 	fx = newBillingFixture(&fakeLibraryQuoter{amount: 5},

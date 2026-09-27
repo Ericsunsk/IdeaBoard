@@ -13,7 +13,7 @@ QA_TEST_RUN_ID=qa-20260831-abc123 \
   --library-asset-id <qa-library-asset-id>
 ```
 
-确认清单、session owner 和 marker 均正确后，才追加 `--confirm`。脚本只调用现有 authenticated `DELETE /api/user/boards/:board_id` 和 `DELETE /api/user/library/assets/:asset_id` API；不会删除 Task、Task Billing snapshot、Credit Ledger、Provider、Prompt、Account 或 User。
+确认清单、session owner 和 marker 均正确后，才追加 `--confirm`。脚本只调用现有 authenticated workspace-scoped v1 API：`POST /api/v1/workspaces/:workspace_id/boards/:board_id/archive` 归档 Board，`DELETE /api/v1/workspaces/:workspace_id/library/assets/:id` 删除 library asset；不会删除 Task、Task Billing snapshot、Credit Ledger、Provider、Prompt、Account 或 User。
 
 脚本不直接删除 Storage object。删除 Board 后，Media refs 由现有 Media reclamation 流程收敛；对象仍遵守 grace period 和 worker claim 保护。需要查看未引用对象时使用只读命令：
 
