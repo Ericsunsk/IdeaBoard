@@ -13,6 +13,7 @@
       @cancel-board-rename="emit('cancel-board-rename')"
       @confirm-board-rename="emit('confirm-board-rename')"
       @reload-catalog="emit('reload-catalog')"
+      @restore-archived-board="emit('restore-archived-board')"
       @select-board="emit('select-board', $event)"
       @navigate-back="emit('navigate-back')"
     />
@@ -185,6 +186,7 @@ const emit = defineEmits<{
   'cancel-board-rename': []
   'confirm-board-rename': []
   'reload-catalog': []
+  'restore-archived-board': []
   'select-board': [boardId: string]
   export: []
   'navigate-back': []

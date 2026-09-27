@@ -4,6 +4,7 @@ import type {
 } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
 
 export type AdminCreditFindingStatus = 'open' | 'resolved'
 export type AdminCreditFinding = CreditReconciliationFinding
@@ -25,7 +26,7 @@ export function createAdminCreditFindingQueueResource(
         stripUndefined({
           status,
           before_id: beforeId,
-          limit: 25,
+          limit: PAGE_SIZES.adminFindingQueue,
         }) satisfies ListAdminCreditReconciliationFindingQueueParams,
         { signal },
       ),

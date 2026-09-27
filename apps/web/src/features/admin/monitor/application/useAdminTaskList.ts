@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
 import { usePagePagination } from '../../shared/composables/usePagePagination'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { keepPrevious } from '../../../../shared/query/queryDefaults'
 import { useQueryPolling } from '../../shared/composables/useQueryPolling'
 import {
   useAdminTaskListResource,
@@ -73,7 +74,7 @@ export function useAdminTaskList() {
 
   const tasksQuery = useAdminTaskListResource(computed(resolveParams), {
     query: {
-      placeholderData: (prev) => prev,
+      ...keepPrevious(),
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,

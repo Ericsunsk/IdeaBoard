@@ -14,6 +14,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// RollbackTimeout bounds one transaction rollback on a detached
+// context. It is the single home for the pgx rollback budget duplicated
+// across credits, tasking settlement, and this package's WithTx helper:
+// rollback only releases locks and discards an already-doomed tx, so
+// every site shares the same small budget.
+const RollbackTimeout = 5 * time.Second
+
 func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) error) error {
 	if fn == nil {
 		return errors.New("dbutil: tx function is nil")
@@ -37,7 +44,7 @@ func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries
 	committed := false
 	defer func() {
 		if !committed {
-			rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			rollbackCtx, cancel := context.WithTimeout(context.Background(), RollbackTimeout)
 			defer cancel()
 			if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 				slog.Warn("failed to roll back database transaction", "err", rollbackErr)
@@ -53,6 +60,19 @@ func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries
 	}
 	committed = true
 	return nil
+}
+
+// ResolveWorkspaceInternalID maps an opaque workspace public id to its
+// internal id. The input is trimmed before lookup; the query error returns
+// unchanged so callers map "not found" to their own operation-scoped
+// sentinel (hidden workspaces must never leak a distinct status). Callers
+// that fail closed on malformed ids keep their own shape pre-check.
+func ResolveWorkspaceInternalID(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (int64, error) {
+	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
+	if err != nil {
+		return 0, err
+	}
+	return row.InternalID, nil
 }
 
 func NullTime(value *time.Time) pgtype.Timestamptz {

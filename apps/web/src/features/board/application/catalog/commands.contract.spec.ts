@@ -42,13 +42,11 @@ function makeDeps(): BoardCommandDependencies {
     resolveWorkspace: vi.fn(() => 'ws_test123'),
     createServerBoard: vi.fn(async (_workspaceId: string, name: string) => ({
       id: 'board-server-1',
-      workspace_id: 'ws_test123',
       name,
       revision: 1,
-      schema_version: 4,
-      archived_at: null,
-      created_at: '2026-09-25T00:00:00.000Z',
-      updated_at: '2026-09-25T00:00:00.000Z',
+      schemaVersion: 4,
+      createdAt: 100,
+      updatedAt: 200,
     })),
     registerServerBoard: vi.fn((input: { id: string; name: string; revision?: number }) =>
       makeBoard(input.id, input.name),

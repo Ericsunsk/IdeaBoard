@@ -118,6 +118,13 @@ export default {
       'Rename sync failed. Original name could not be restored. Please reload the canvas list.',
     catalogReloadedSuccess: 'Canvas list reloaded.',
     catalogReloadFailedError: 'Failed to reload the canvas list. Please try again later.',
+    boardArchivedLabel: 'This board is archived and read-only.',
+    restoreArchivedBoard: 'Restore archived board',
+    restore: 'Restore',
+    restoringArchivedBoard: 'Restoring…',
+    boardRestoredSuccess: 'Board restored.',
+    boardRestoreFailedError: 'Failed to restore the board. Please try again later.',
+    boardArchivedRenameBlocked: 'This board is archived. Restore it before renaming.',
   },
   viewport: {
     zoomIn: 'Zoom In',
@@ -305,6 +312,8 @@ export default {
     saveAuthUnavailable: 'Save failed: user session is missing. Please sign in and try again.',
     savedLocallySyncFailed:
       'Saved locally. Remote sync failed; it will retry once the network recovers.',
+    savedLocallyServerFailed:
+      'Saved locally. Remote sync failed (HTTP {code}); it will retry on your next edit.',
     nameConflictSavedLocally:
       'Saved locally, but this board name already exists. Please choose another name.',
     boardDataInvalid:
@@ -312,6 +321,7 @@ export default {
     importSnapshotFailed: 'Failed to load the canvas snapshot. Please try again later.',
     saved: 'Saved',
     saveFailed: 'Save failed. Please try again later.',
+    boardArchivedSaveBlocked: 'This board is archived. Restore it to keep editing.',
     downloadEmptyResponse: 'Download failed: empty response.',
     downloadImageHttpFailed: 'Download failed: HTTP {code}',
     downloadImageFailed: 'Download failed: {reason}',

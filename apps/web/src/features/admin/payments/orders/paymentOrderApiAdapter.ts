@@ -10,6 +10,7 @@ import {
   requireContractData,
 } from '../../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 export type PaymentOrderApiUser = {
@@ -131,7 +132,7 @@ export type AdminPaymentOrderApiAdapter = {
 // transport.
 export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
   return {
-    search: async ({ orderNumber, user, status, anomalyOnly, cursor, limit = 20, signal }) => {
+    search: async ({ orderNumber, user, status, anomalyOnly, cursor, limit = PAGE_SIZES.standard, signal }) => {
       // The generated filter param is typed as order_number only, but the
       // control contract accepts the same six legacy filters (see the
       // openapi description on ListControlPaymentOrdersParams).

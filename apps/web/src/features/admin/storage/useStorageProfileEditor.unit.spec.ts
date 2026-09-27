@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mockAppToast } from '../../../test/toast'
 import { useStorageProfileEditor } from './useStorageProfileEditor'
 import {
   normalizeProfile,
@@ -9,14 +10,7 @@ import {
   type StorageProviderMeta,
 } from './profiles'
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-  }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 vi.mock('../../../shared/composables/useAsyncAction', () => ({
   useAsyncAction: () => ({
@@ -35,6 +29,10 @@ vi.mock('../../../shared/composables/useAsyncAction', () => ({
 }))
 
 describe('useStorageProfileEditor', () => {
+  beforeEach(() => {
+    mockAppToast()
+  })
+
   it('applies vendor presets and clears saved secret fields from the editor form', async () => {
     const providers = ref([makeS3Provider()])
     const providerMap = computed(() => toProviderMetaMap(providers.value))

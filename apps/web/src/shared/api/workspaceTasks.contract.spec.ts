@@ -117,7 +117,7 @@ describe('workspace task union validation mapping', () => {
     const task = toWorkspaceTask(taskFixture())
     expect(task.id).toBe(TASK_ID)
     expect(task.status).toBe('pending')
-    expect(() => toWorkspaceTask({ data: { ...taskFixture().data, status: 'ready' } })).toThrow()
+    expect(() => toWorkspaceTask({ data: { ...(taskFixture().data as Record<string, unknown>), status: 'ready' } })).toThrow()
   })
 
   it('rejects output refs that leak storage internals', () => {

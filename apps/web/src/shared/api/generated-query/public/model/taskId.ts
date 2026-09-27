@@ -16,6 +16,6 @@
 
 /**
  * Opaque public task identifier.
- * @pattern ^task_[A-Za-z0-9]+$
+ * @pattern ^task_[A-Za-z0-9_-]+$
  */
 export type TaskId = string

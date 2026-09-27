@@ -27,6 +27,12 @@ func TestWithTxDBTXRejectsNilInputs(t *testing.T) {
 	}
 }
 
+func TestRollbackTimeoutIsFiveSeconds(t *testing.T) {
+	if RollbackTimeout != 5*time.Second {
+		t.Fatalf("RollbackTimeout = %v, want 5s (shared pgx rollback budget)", RollbackTimeout)
+	}
+}
+
 func TestNullHelpersRoundTrip(t *testing.T) {
 	now := time.Now().Truncate(time.Microsecond)
 	if got := TimePtr(NullTime(&now)); got == nil || !got.Equal(now) {

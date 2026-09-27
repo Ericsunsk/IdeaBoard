@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
-import type { AdminUserCommandTarget } from './view'
+import { makeAdminUserCommandTarget } from '../../../test/factories'
 
 const userQueryClientMock = vi.hoisted(() => ({
   invalidateQueries: vi.fn().mockResolvedValue(undefined),
@@ -61,20 +61,28 @@ describe('admin user command query invalidation', () => {
     const harness = createHarness()
     const commands = harness.commands
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-1', status: 1, displayName: 'alice' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-1', status: 1, displayName: 'alice' }),
+    )
     commands.handleActionSelect('status')
     commands.banForm.value = { expiresInDays: 0, reason: 'audit reason' }
     await commands.confirmBanUser()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-2', status: 0, displayName: 'bob' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-2', status: 0, displayName: 'bob' }),
+    )
     commands.handleActionSelect('status')
     await harness.settleConfirms()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-3', role: 'user', displayName: 'cara' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-3', role: 'user', displayName: 'cara' }),
+    )
     commands.handleActionSelect('role')
     await harness.settleConfirms()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'dana' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-4', role: 'user', displayName: 'dana' }),
+    )
     commands.handleActionSelect('delete')
     await harness.settleConfirms()
 
@@ -137,15 +145,5 @@ function createAdminUsersFeedback() {
     userDeleteFailed: vi.fn(),
     roleUpdated: vi.fn(),
     roleUpdateFailed: vi.fn(),
-  }
-}
-
-function makeUser(overrides: Partial<AdminUserCommandTarget> = {}): AdminUserCommandTarget {
-  return {
-    publicId: 'user-1',
-    displayName: 'user',
-    role: 'user',
-    status: 1,
-    ...overrides,
   }
 }

@@ -19,6 +19,11 @@
 // non-`evt_` ids fail closed (frame dropped, never delivered).
 
 import { resolveApiUrl } from '../config/runtimeUrls'
+import {
+  EVENT_STREAM_RECONNECT_BACKOFF_FACTOR,
+  EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS,
+  EVENT_STREAM_RECONNECT_MAX_DELAY_MS,
+} from '../config/timing'
 import { isOpaqueId, opaqueIdPrefix } from './contractKernel'
 
 export const WORKSPACE_EVENT_TYPES = [
@@ -196,9 +201,9 @@ export type SubscribeWorkspaceEventsOptions = {
   onError?: (() => void) | undefined
 }
 
-const RECONNECT_INITIAL_DELAY_MS = 1000
-const RECONNECT_MAX_DELAY_MS = 30000
-const RECONNECT_BACKOFF_FACTOR = 1.6
+const RECONNECT_INITIAL_DELAY_MS = EVENT_STREAM_RECONNECT_INITIAL_DELAY_MS
+const RECONNECT_MAX_DELAY_MS = EVENT_STREAM_RECONNECT_MAX_DELAY_MS
+const RECONNECT_BACKOFF_FACTOR = EVENT_STREAM_RECONNECT_BACKOFF_FACTOR
 
 type WorkspaceStreamEntry = {
   workspaceId: string

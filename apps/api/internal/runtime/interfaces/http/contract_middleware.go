@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/response"
 
@@ -39,6 +40,12 @@ func ContractRequestIDMiddleware() gin.HandlerFunc {
 		if requestID != "" {
 			c.Set(contract.RequestIDHeader, requestID)
 			c.Header(contract.RequestIDHeader, requestID)
+			// Keep the applog scope in sync for engines mounted without
+			// the global RequestIDMiddleware (tests, contract-only
+			// mounts). Same-id re-seeds keep existing enrichment.
+			if c.Request != nil {
+				c.Request = c.Request.WithContext(applog.ContextWithRequestID(c.Request.Context(), requestID))
+			}
 		}
 		c.Next()
 	}
@@ -90,8 +97,19 @@ func ResolvePrincipal() gin.HandlerFunc {
 				// the scoped principal. A set failure fails closed to the
 				// unscoped principal rather than 500: visibility checks
 				// still converge to 404/403 below.
-				_ = principal.Set(c, scoped)
+				if setErr := principal.Set(c, scoped); setErr == nil {
+					identityPrincipal = scoped
+				}
 			}
+		}
+		// The principal is resolved here (this middleware runs AFTER the
+		// cookie-session AuthMiddleware, and aborts 401 above when absent),
+		// so enrich the request scope with user_id/workspace_id. Request-ID
+		// seeding happened upstream (global + contract middleware), so this
+		// only adds identity fields — never clears the scope.
+		if c.Request != nil {
+			c.Request = c.Request.WithContext(applog.ContextWithPrincipal(
+				c.Request.Context(), identityPrincipal.UserID(), identityPrincipal.TenantScope()))
 		}
 		c.Next()
 	}

@@ -2,11 +2,10 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen } from '../../../../test/render'
+import { mockAppToast } from '../../../../test/toast'
 import AdminSettingsStoragePage from './AdminSettingsStoragePage.vue'
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }),
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
@@ -50,6 +49,7 @@ vi.mock('../../storage/resource', () => ({
 
 describe('AdminSettingsStoragePage', () => {
   beforeEach(() => {
+    mockAppToast()
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/media-upload', () =>
         HttpResponse.json({

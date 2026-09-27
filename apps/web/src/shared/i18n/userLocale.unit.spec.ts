@@ -12,21 +12,15 @@ import {
 } from './userLocale'
 import { englishMessages, i18n } from './index'
 import { LOCALE_MANIFEST } from './localeManifest'
+import { mockAppToast, type AppToastMocks } from '../../test/toast'
 
-const toastErrorMock = vi.fn()
-vi.mock('../composables/useAppToast', () => ({
-  useAppToast: () => ({
-    error: toastErrorMock,
-    success: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-  }),
-}))
+let toast: AppToastMocks
+vi.mock('../composables/useAppToast')
 
 describe('User Locale Infrastructure (Milestone 1)', () => {
   beforeEach(() => {
     localStorage.clear()
-    toastErrorMock.mockClear()
+    toast = mockAppToast()
     ;(i18n.global.locale as { value: string }).value = 'en'
     document.documentElement.lang = 'en'
   })
@@ -231,7 +225,7 @@ describe('User Locale Infrastructure (Milestone 1)', () => {
       expect(i18n.global.locale.value).toBe('en')
       expect(document.documentElement.lang).toBe('en')
       expect(localStorage.getItem(USER_LOCALE_STORAGE_KEY)).toBe('en')
-      expect(toastErrorMock).toHaveBeenCalledWith('The request could not be completed.')
+      expect(toast.error).toHaveBeenCalledWith('The request could not be completed.')
     })
 
     it('returns false and ignores unsupported locale', async () => {

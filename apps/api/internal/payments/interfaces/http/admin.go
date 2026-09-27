@@ -181,13 +181,13 @@ var adminPaymentOrderListErrorTable = []paymentErrorMapping{
 	{
 		targets: []error{paymentcontracts.ErrAdminPaymentOrderFilter},
 		status:  http.StatusBadRequest,
-		code:    "admin_payment_order_filter_invalid",
+		code:    string(contract.CodeAdminPaymentOrderFilterInvalid),
 		message: "支付订单筛选条件无效",
 	},
 	{
 		targets: []error{paymentcontracts.ErrAdminPaymentOrderCursor},
 		status:  http.StatusBadRequest,
-		code:    "admin_payment_order_cursor_invalid",
+		code:    string(contract.CodeAdminPaymentOrderCursorInvalid),
 		message: "支付订单游标无效",
 	},
 }

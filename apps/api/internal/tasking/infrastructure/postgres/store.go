@@ -198,11 +198,11 @@ func resolveWorkspace(ctx context.Context, q *dbsqlc.Queries, workspacePublicID 
 	if !contract.IsValidPublicID(contract.PrefixWorkspace, workspacePublicID) {
 		return 0, workspacetasks.ErrNotFound
 	}
-	row, err := q.GetWorkspaceByPublicID(ctx, workspacePublicID)
+	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, q, workspacePublicID)
 	if err != nil {
 		return 0, notFound(err)
 	}
-	return row.InternalID, nil
+	return internalID, nil
 }
 
 // resolveBillingAccount returns the workspace billing account (1:1),

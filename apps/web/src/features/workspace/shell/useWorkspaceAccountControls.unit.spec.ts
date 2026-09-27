@@ -11,6 +11,7 @@ import {
 } from '../../account'
 import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth'
 import { useWorkspaceAccountControls } from './useWorkspaceAccountControls'
+import { makeSessionUser } from '../../../test/factories'
 
 const currentUser = ref<User | null>(null)
 const walletState = ref<CreditWalletState>({
@@ -33,19 +34,6 @@ vi.mock('../../account', async (importOriginal) => {
     useCreditWallet: () => ({ state: walletState }),
   }
 })
-
-function makeUser(role: 'admin' | 'user' = 'user'): User {
-  return {
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'demo-user',
-    storage_namespace: 'USR001',
-    avatar: 'https://example.test/avatar.png',
-    role,
-    status: 1,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-  }
-}
 
 function renderAccountControls(options: Parameters<typeof useWorkspaceAccountControls>[0]): {
   controls: ReturnType<typeof useWorkspaceAccountControls>
@@ -89,7 +77,14 @@ function renderAccountControls(options: Parameters<typeof useWorkspaceAccountCon
 describe('useWorkspaceAccountControls', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/')
-    currentUser.value = makeUser()
+    currentUser.value = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      avatar: 'https://example.test/avatar.png',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
     walletState.value = { status: 'ready', availableCredits: 1280 }
   })
 
@@ -180,7 +175,15 @@ describe('useWorkspaceAccountControls', () => {
   })
 
   it('routes account controls through the supplied navigation adapter and exposes admin only to admins', async () => {
-    currentUser.value = makeUser('admin')
+    currentUser.value = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      avatar: 'https://example.test/avatar.png',
+      role: 'admin',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
     const navigate = vi.fn()
     const logout = vi.fn()
     const { controls, overlay } = renderAccountControls({

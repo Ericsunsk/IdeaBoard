@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mockAppToast } from '../../test/toast'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
 import { createLibraryFolderFacts } from './folderFacts'
 import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from './workspace'
@@ -15,8 +16,6 @@ const mocks = vi.hoisted(() => ({
   removeFolder: vi.fn(),
   removeAsset: vi.fn(),
   moveAsset: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -24,9 +23,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 
-vi.mock('../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
-}))
+vi.mock('../../shared/composables/useAppToast')
 
 vi.mock('./workspace', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./workspace')>()
@@ -89,6 +86,7 @@ describe('useLibraryWorkspace', () => {
   beforeEach(() => {
     mocks.route.query = {}
     vi.clearAllMocks()
+    mockAppToast()
     mocks.listFolders.mockResolvedValue([])
   })
 
@@ -113,9 +111,7 @@ describe('useLibraryWorkspace', () => {
     await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledTimes(2))
 
     folderPage.resolve({ items: [{ id: 'lasset_asset0002' }], nextCursor: '', hasMore: false })
-    await vi.waitFor(() =>
-      expect(workspace.assets.value).toEqual([{ id: 'lasset_asset0002' }]),
-    )
+    await vi.waitFor(() => expect(workspace.assets.value).toEqual([{ id: 'lasset_asset0002' }]))
     allPage.resolve({ items: [{ id: 'lasset_asset0001' }], nextCursor: '', hasMore: false })
     await allPage.promise
 

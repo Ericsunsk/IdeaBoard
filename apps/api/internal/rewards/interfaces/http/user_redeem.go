@@ -10,8 +10,8 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/idempotency"
-	"ideaboard/api/internal/platform/response"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 
@@ -94,7 +94,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 		if idempotency.IsConflict(err) {
 			finishMetrics(redemptionOutcomeInvalid, 0, err)
 			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
-			response.MachineError(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原请求不一致")
+			errorrender.Render(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原请求不一致")
 			return
 		}
 		finishMetrics(redemptionOutcomeForError(err), 0, err)

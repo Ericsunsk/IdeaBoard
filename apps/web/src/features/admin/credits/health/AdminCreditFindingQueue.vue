@@ -315,6 +315,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollectionQuery'
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
+import { adminPolling } from '../../../../shared/query/queryDefaults'
 import {
   adminActionButtonClass,
   adminCompactTagClass,
@@ -375,7 +376,13 @@ const {
     }),
   getNextCursor: (page) => page.next_before_id,
   pagination,
-  refetchInterval: computed(() => (status.value === 'open' ? 5_000 : 30_000)),
+  // Status cadence (5s open / 30s resolved); fail-fast stays in the shared
+  // collection wrapper.
+  refetchInterval: adminPolling(
+    5_000,
+    30_000,
+    () => status.value === 'open',
+  ).refetchInterval,
 })
 const findings = computed(() => findingPage.value?.findings ?? [])
 const currentPage = pagination.currentPage

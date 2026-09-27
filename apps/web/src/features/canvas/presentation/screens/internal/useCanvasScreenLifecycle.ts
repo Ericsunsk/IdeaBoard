@@ -1,4 +1,5 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
+import { stringParam } from '../../../../../shared/router/queryParams'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CanvasConnectionPort } from '../../../../board'
 import { useCanvasKeyboardShortcuts } from '../useCanvasKeyboardShortcuts'
@@ -41,7 +42,7 @@ export function useCanvasScreenLifecycle(options: {
     await options.persistence.recoverBoardSession()
   }
 
-  watch(() => options.route.query.boardId, loadBoardSession)
+  watch(() => stringParam(options.route.query.boardId), loadBoardSession)
 
   useCanvasKeyboardShortcuts({
     onSave: () => {
@@ -64,7 +65,7 @@ export function useCanvasScreenLifecycle(options: {
     onLeave: () => options.persistence.flushAutosave(),
   })
 
-  if (import.meta.env.DEV && options.route.query.canvasBenchmarkActions === '1') {
+  if (import.meta.env.DEV && stringParam(options.route.query.canvasBenchmarkActions) === '1') {
     const benchmarkWindow = window as CanvasBenchmarkWindow
     benchmarkWindow.__ideaboardCanvasBenchmarkActions = {
       connectDelete: (target) => {

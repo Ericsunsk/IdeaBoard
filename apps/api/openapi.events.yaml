@@ -209,7 +209,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^ws_[A-Za-z0-9]+$'
+        pattern: '^ws_[A-Za-z0-9_-]+$'
     EventSubscriptionId:
       name: subscription_id
       in: path
@@ -351,7 +351,7 @@ components:
           $ref: '#/components/schemas/EventResource'
         workspace_id:
           type: string
-          pattern: '^ws_[A-Za-z0-9]+$'
+          pattern: '^ws_[A-Za-z0-9_-]+$'
         data:
           type: object
           description: Versioned payload discriminated by type + version.
@@ -385,7 +385,7 @@ components:
       properties:
         task_id:
           type: string
-          pattern: '^task_[A-Za-z0-9]+$'
+          pattern: '^task_[A-Za-z0-9_-]+$'
         workflow_kind:
           type: string
     TaskRunningData:
@@ -395,7 +395,7 @@ components:
       properties:
         task_id:
           type: string
-          pattern: '^task_[A-Za-z0-9]+$'
+          pattern: '^task_[A-Za-z0-9_-]+$'
     TaskCompletedData:
       type: object
       required: [task_id, outputs_uri]
@@ -403,7 +403,7 @@ components:
       properties:
         task_id:
           type: string
-          pattern: '^task_[A-Za-z0-9]+$'
+          pattern: '^task_[A-Za-z0-9_-]+$'
         outputs_uri:
           type: string
           description: API URI for task outputs, never a raw storage URL.
@@ -414,7 +414,7 @@ components:
       properties:
         task_id:
           type: string
-          pattern: '^task_[A-Za-z0-9]+$'
+          pattern: '^task_[A-Za-z0-9_-]+$'
         error_code:
           type: string
           description: Stable machine-readable failure code.
@@ -425,7 +425,7 @@ components:
       properties:
         task_id:
           type: string
-          pattern: '^task_[A-Za-z0-9]+$'
+          pattern: '^task_[A-Za-z0-9_-]+$'
         cancel_reason:
           type: string
     MediaAssetReadyData:
@@ -503,7 +503,7 @@ components:
           pattern: '^sub_[A-Za-z0-9]+$'
         workspace_id:
           type: string
-          pattern: '^ws_[A-Za-z0-9]+$'
+          pattern: '^ws_[A-Za-z0-9_-]+$'
         url:
           type: string
           format: uri

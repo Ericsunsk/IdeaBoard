@@ -34,6 +34,7 @@ jobs:
           bash scripts/ci-media-package-boundary-test.sh
           bash scripts/ci-legacy-media-zero-scan-test.sh
           bash scripts/ci-workflow-contract-test.sh
+          bash scripts/sql-workspace-scope-check-test.sh
 
       - name: Check shell syntax
         shell: bash
@@ -72,6 +73,8 @@ jobs:
           bash -n scripts/ci-legacy-media-zero-scan.sh
           bash -n scripts/ci-legacy-media-zero-scan-test.sh
           bash -n scripts/ci-workflow-contract-test.sh
+          bash -n scripts/sql-workspace-scope-check.sh
+          bash -n scripts/sql-workspace-scope-check-test.sh
 
       - name: Install ShellCheck
         shell: bash
@@ -119,7 +122,9 @@ jobs:
             scripts/ci-media-package-boundary-test.sh \
             scripts/ci-legacy-media-zero-scan.sh \
             scripts/ci-legacy-media-zero-scan-test.sh \
-            scripts/ci-workflow-contract-test.sh
+            scripts/ci-workflow-contract-test.sh \
+            scripts/sql-workspace-scope-check.sh \
+            scripts/sql-workspace-scope-check-test.sh
 
       - name: Lint Dockerfiles
         run: |

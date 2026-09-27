@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { mockAppToast } from '../../../test/toast'
 import {
   clearCachedVisionReferences,
   setCachedVisionReferences,
@@ -11,11 +12,10 @@ const mocks = vi.hoisted(() => ({
   createVisionQuery: vi.fn(),
   fetchPrice: vi.fn(),
   requireLogin: vi.fn(),
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace }) }))
-vi.mock('../../../shared/composables/useAppToast', () => ({ useAppToast: () => mocks.toast }))
+vi.mock('../../../shared/composables/useAppToast')
 vi.mock('../infrastructure/visionBillingResource', () => ({
   fetchVisionSearchPrice: mocks.fetchPrice,
 }))
@@ -64,6 +64,7 @@ describe('useVisionQueryLifecycle', () => {
   beforeEach(() => {
     window.sessionStorage.clear()
     vi.clearAllMocks()
+    mockAppToast()
     mocks.fetchPrice.mockResolvedValue(12)
   })
 
@@ -171,7 +172,11 @@ describe('useVisionQueryLifecycle', () => {
     await lifecycle.submit()
     const textChangedKey = mocks.createVisionQuery.mock.calls[1]?.[1].idempotencyKey
     expect(textChangedKey).not.toBe(firstKey)
-    lifecycle.addLibraryAsset({ ...libraryAsset, id: 'lasset_asset0008', sourceId: 'photo-2' } as never)
+    lifecycle.addLibraryAsset({
+      ...libraryAsset,
+      id: 'lasset_asset0008',
+      sourceId: 'photo-2',
+    } as never)
     await lifecycle.submit()
     expect(mocks.createVisionQuery.mock.calls[2]?.[1].idempotencyKey).not.toBe(textChangedKey)
     lifecycle.dispose()

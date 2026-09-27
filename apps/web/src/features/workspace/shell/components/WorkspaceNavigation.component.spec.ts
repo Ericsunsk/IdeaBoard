@@ -5,6 +5,7 @@ import { renderWithUser, waitFor } from '../../../../test/render'
 import type { User } from '../../../../shared/api/sessionUserType'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
 import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../../auth'
+import { makeSessionUser } from '../../../../test/factories'
 import WorkspaceNavigation from './WorkspaceNavigation.vue'
 
 const session = vi.hoisted(() => ({
@@ -20,19 +21,6 @@ vi.mock('../../../auth/session/userSession', () => ({
     ensureSession: session.ensureSession,
   }),
 }))
-
-function makeUser(): User {
-  return {
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'demo-user',
-    storage_namespace: 'USR001',
-    avatar: 'https://example.test/avatar.png',
-    role: 'user',
-    status: 1,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-  }
-}
 
 async function renderNavigation(path = USER_SEARCH_PATH): Promise<{
   overlay: AuthOverlay
@@ -70,7 +58,14 @@ describe('WorkspaceNavigation', () => {
   })
 
   it('keeps a stale cached user on the current page and opens the login overlay', async () => {
-    session.user = makeUser()
+    session.user = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      avatar: 'https://example.test/avatar.png',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
     session.ensureSession.mockResolvedValue(null)
     const { overlay, router, view } = await renderNavigation()
 
@@ -83,7 +78,14 @@ describe('WorkspaceNavigation', () => {
   })
 
   it('fails closed on a session validation error without leaving the current page', async () => {
-    session.user = makeUser()
+    session.user = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      avatar: 'https://example.test/avatar.png',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
     session.ensureSession.mockRejectedValue(new Error('session unavailable'))
     const { overlay, router, view } = await renderNavigation()
 
@@ -95,7 +97,14 @@ describe('WorkspaceNavigation', () => {
   })
 
   it('navigates only after the session seam confirms the user', async () => {
-    const user = makeUser()
+    const user = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      avatar: 'https://example.test/avatar.png',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
     session.user = user
     session.ensureSession.mockResolvedValue(user)
     const { overlay, router, view } = await renderNavigation()

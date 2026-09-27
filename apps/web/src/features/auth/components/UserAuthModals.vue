@@ -30,6 +30,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+import { stringParam, stringParamWhere } from '../../../shared/router/queryParams'
 import {
   HOME_PATH,
   SHARE_JOIN_PATH,
@@ -82,15 +83,13 @@ function goRegister() {
 }
 
 function authRedirectQuery(): Record<string, string> {
-  const redirect = route.query.redirect
-  const value = Array.isArray(redirect) ? redirect[0] : redirect
-  return typeof value === 'string' && value ? { redirect: value } : {}
+  const value = stringParamWhere(route.query.redirect, (candidate) => candidate !== '')
+  return value === undefined ? {} : { redirect: value }
 }
 
 function resolveLoginRedirectPath() {
-  const redirect = route.query.redirect
-  const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
-  const normalizedPath = typeof redirectPath === 'string' ? redirectPath.trim() : ''
+  const redirectPath = stringParam(route.query.redirect)
+  const normalizedPath = redirectPath?.trim() ?? ''
   if (!normalizedPath) {
     return USER_BOARDS_PATH
   }

@@ -1,5 +1,9 @@
 import { computed, type ComputedRef } from 'vue'
-import { isBoardNameConflictError, type BoardSnapshot } from '../../../board'
+import {
+  isBoardArchivedError,
+  isBoardNameConflictError,
+  type BoardSnapshot,
+} from '../../../board'
 import { i18n } from '../../../../shared/i18n'
 import {
   createBoardSessionRepository,
@@ -39,7 +43,7 @@ export type BoardSessionSaveOptions = {
   waitForPreview?: boolean | undefined
 }
 
-export type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict'
+export type BoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict' | 'archived'
 
 export type BoardSessionRemoteSyncResult =
   { ok: true } | { ok: false; reason: BoardSessionRemoteSyncFailureReason; error: unknown }
@@ -76,6 +80,7 @@ export type BoardSessionTestOptions = UseBoardSessionOptions & {
 }
 
 function classifyRemoteSyncFailure(error: unknown): BoardSessionRemoteSyncFailureReason {
+  if (isBoardArchivedError(error)) return 'archived'
   return isBoardNameConflictError(error) ? 'conflict' : 'sync-failed'
 }
 

@@ -3,15 +3,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { i18n } from '../../../shared/i18n'
 import { loadLocaleMessages } from '../../../shared/i18n/userLocale'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
+import { makeControlUserPayload } from '../../../test/factories'
+import { mockAppToast, type AppToastMocks } from '../../../test/toast'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import AdminUsersPage from './AdminUsersPage.vue'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const toastMocks = vi.hoisted(() => ({
-  success: vi.fn(),
-  warning: vi.fn(),
-  error: vi.fn(),
-}))
+
+let toastMocks: AppToastMocks
 const userPublicID = 'usr_000000000000000000000012'
 const secondUserPublicID = 'usr_000000000000000000000013'
 
@@ -19,9 +18,7 @@ vi.mock('../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ confirm: confirmMock }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => toastMocks,
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 describe('AdminUsersPage', () => {
   beforeAll(async () => {
@@ -40,6 +37,7 @@ describe('AdminUsersPage', () => {
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
     vi.clearAllMocks()
+    toastMocks = mockAppToast()
     userListRequestCount = 0
     commandRequests = []
     useMswHandlers(
@@ -217,7 +215,9 @@ describe('AdminUsersPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          data: [{ ...makeUser(125), status: 0 }],
+          data: [
+            { ...makeControlUserPayload({ id: userPublicID, available_credits: 125 }), status: 0 },
+          ],
           meta: { next_cursor: null, has_more: false },
         }),
       ),
@@ -284,7 +284,7 @@ describe('AdminUsersPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          data: [makeUser(availableCredits)],
+          data: [makeControlUserPayload({ id: userPublicID, available_credits: availableCredits })],
           meta: { next_cursor: null, has_more: false },
         }),
       ),
@@ -488,7 +488,7 @@ describe('AdminUsersPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/users', () =>
         HttpResponse.json({
-          data: [makeUser(availableCredits)],
+          data: [makeControlUserPayload({ id: userPublicID, available_credits: availableCredits })],
           meta: { next_cursor: null, has_more: false },
         }),
       ),
@@ -578,9 +578,9 @@ describe('AdminUsersPage', () => {
       http.get('/api/control/v1/users', () =>
         HttpResponse.json({
           data: [
-            makeUser(125),
+            makeControlUserPayload({ id: userPublicID, available_credits: 125 }),
             {
-              ...makeUser(55),
+              ...makeControlUserPayload({ id: userPublicID, available_credits: 55 }),
               id: secondUserPublicID,
               display_name: 'another_balance_user',
             },
@@ -718,21 +718,6 @@ describe('AdminUsersPage', () => {
     expect(await within(dialog).findByText('恢复后的流水')).toBeVisible()
   })
 })
-
-function makeUser(availableCredits: number) {
-  return {
-    id: userPublicID,
-    email: 'admin@example.com',
-    providers: ['email'],
-    display_name: 'admin_balance_user',
-    avatar: '',
-    role: 'user',
-    status: 1,
-    available_credits: availableCredits,
-    created_at: '2026-07-24T08:00:00Z',
-    updated_at: '2026-07-24T08:00:00Z',
-  }
-}
 
 function makeLedgerTransaction(
   transactionId: string,

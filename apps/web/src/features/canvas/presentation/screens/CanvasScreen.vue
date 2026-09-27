@@ -18,6 +18,7 @@
       @cancel-board-rename="cancelBoardRename"
       @confirm-board-rename="confirmBoardRename"
       @reload-catalog="reloadCatalog"
+      @restore-archived-board="restoreArchivedBoard"
       @select-board="selectBoard"
       @export="exportSelectedImages"
       @navigate-back="navigateBack"
@@ -248,6 +249,8 @@ const {
   boardNameDraft,
   isRenamePending,
   catalogRecovery,
+  isBoardArchived,
+  isRestoringArchivedBoard,
   currentBoardName,
   boardOptions,
 } = viewModel.boardChrome
@@ -259,6 +262,7 @@ const {
   closeBoardHeaderEditing,
   onConfirmBoardRename,
   reloadCatalog,
+  restoreArchivedBoard: onRestoreArchivedBoard,
   onSelectBoard,
   onNavigateRequest,
   onLogoutRequest,
@@ -281,6 +285,10 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   isRenaming: isRenamingBoard.value,
   isRenamePending: isRenamePending.value,
   catalogRecovery: catalogRecovery.value,
+  archived: {
+    isArchived: isBoardArchived.value,
+    isRestoring: isRestoringArchivedBoard.value,
+  },
   setNameInputRef: setBoardNameInputRef,
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
@@ -399,7 +407,11 @@ const chromeProps = computed(() => ({
 const vueFlowProps = computed(() => {
   const isSelectTool = activeTool.value === 'select'
   const isHandTool = activeTool.value === 'hand'
-  const isCanvasLocked = isFlowCanvasLocked.value
+  // Archived boards reuse the existing canvas lock: while the archived
+  // banner is visible the graph is read-only and autosaves cannot dirty it.
+  // Any residual programmatic edit still funnels through the save path,
+  // where 409 `board_archived` re-asserts the banner without toast spam.
+  const isCanvasLocked = isFlowCanvasLocked.value || isBoardArchived.value
 
   return {
     panOnDrag: !isCanvasLocked && isHandTool,
@@ -438,6 +450,10 @@ function updateBoardNameDraft(value: string) {
 
 function confirmBoardRename() {
   void onConfirmBoardRename()
+}
+
+function restoreArchivedBoard() {
+  void onRestoreArchivedBoard()
 }
 
 function selectBoard(boardId: string) {

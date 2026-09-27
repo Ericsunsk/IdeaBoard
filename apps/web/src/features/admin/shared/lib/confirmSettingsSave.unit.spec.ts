@@ -22,9 +22,7 @@ vi.mock('./toast', () => ({
     error instanceof Error ? error.message : fallback,
 }))
 
-function port(overrides: Partial<AdminConfirmPort> = {}): AdminConfirmPort & {
-  confirm: ReturnType<typeof vi.fn>
-} {
+function port(overrides: Partial<AdminConfirmPort> = {}): AdminConfirmPort {
   return {
     confirm: vi.fn().mockResolvedValue(true),
     readReason: () => 'typed reason',

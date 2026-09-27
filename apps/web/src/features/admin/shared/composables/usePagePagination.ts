@@ -7,6 +7,7 @@ import {
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue'
+import { normalizePageSize } from '../../../../shared/config/pagination'
 
 type AdminPagePaginationOptions = {
   currentPage: Ref<number>
@@ -31,7 +32,10 @@ export function usePagePagination(options: AdminPagePaginationOptions) {
       const totalRecords = normalizeTotalRecords(rawTotalRecords)
       if (totalRecords === undefined) return
 
-      const nextTotalPages = Math.max(1, Math.ceil(totalRecords / normalizePageSize(rawPageSize)))
+      const nextTotalPages = Math.max(
+  1,
+  Math.ceil(totalRecords / normalizePageSize(rawPageSize, 1, Number.POSITIVE_INFINITY)),
+)
       totalPages.value = nextTotalPages
       if (options.currentPage.value > nextTotalPages) {
         options.currentPage.value = nextTotalPages
@@ -72,8 +76,4 @@ export function usePagePagination(options: AdminPagePaginationOptions) {
 function normalizeTotalRecords(value: number | null | undefined) {
   if (value == null) return undefined
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
-}
-
-function normalizePageSize(value: number) {
-  return Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : 1
 }

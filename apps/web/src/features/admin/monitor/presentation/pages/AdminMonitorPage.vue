@@ -106,6 +106,8 @@ import {
   monitorChartSpecs,
   type TaskMetricStatsSnapshot,
 } from '../../../../../shared/domain/taskMetricTokens'
+import { keepPrevious } from '../../../../../shared/query/queryDefaults'
+import { stringParam } from '../../../../../shared/router/queryParams'
 
 const adminConfirm = useAdminConfirm()
 const taskCancellationFeedback = useAdminTaskCancellationFeedback()
@@ -119,7 +121,7 @@ const route = useRoute()
 // 显式演示模式：仅当 URL 携带 ?demo=1 时生效，默认关闭。
 // 演示数据只做界面预览，取消等写操作与真实请求一律禁用；详情用本地数据预览。
 // 注意：必须位于所有传给 resource/query 的 computed 之前，避免 setup 求值期 TDZ。
-const isDemoMode = computed(() => route.query.demo === DEMO_MODE_QUERY_VALUE)
+const isDemoMode = computed(() => stringParam(route.query.demo) === DEMO_MODE_QUERY_VALUE)
 
 const detailModalVisible = ref(false)
 const selectedDetailTaskID = ref('')
@@ -171,7 +173,7 @@ const chartListParams = computed(() =>
 const chartListQuery = useAdminTaskListResource(chartListParams, {
   query: {
     enabled: computed(() => !isDemoMode.value),
-    placeholderData: (previous) => previous,
+    ...keepPrevious(),
     refetchInterval: ADMIN_MONITOR_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,

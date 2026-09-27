@@ -6,12 +6,14 @@ import {
   joinBoardByToken,
   listBoards,
   replaceBoardDocument,
+  restoreBoard,
   updateBoard,
 } from '../../../../shared/api/generated-query/public/boards/boards'
 import type { Board } from '../../../../shared/api/generated-query/public/model/board'
 import type { BoardDocument } from '../../../../shared/api/generated-query/public/model/boardDocument'
 import { boardOperationIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../shared/utils/workspaceId'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
 import { getWorkspaceSelectionStore } from '../../../workspace'
 import type { BoardState } from '../../domain'
 
@@ -157,7 +159,7 @@ function toWorkspaceBoardDocument(document: BoardDocument): WorkspaceBoardDocume
   }
 }
 
-const BOARD_LIST_PAGE_SIZE = 100
+const BOARD_LIST_PAGE_SIZE = PAGE_SIZES.dense
 const BOARD_LIST_MAX_PAGES = 50
 
 /** Lists every accessible board meta in the workspace (cursor loop, bounded). */
@@ -281,6 +283,38 @@ export async function archiveWorkspaceBoard(
       idempotencyKey: boardOperationIdempotencyKey('archive'),
     }),
   )
+  return toWorkspaceBoardMeta(envelope.data)
+}
+
+/** Restores an archived board (live boards read 404). */
+export async function restoreWorkspaceBoard(
+  workspaceId: string | null | undefined,
+  boardId: string,
+  options: BoardsRequestOptions = {},
+): Promise<WorkspaceBoardMeta> {
+  const workspace = requireBoardWorkspaceId(workspaceId)
+  const normalizedBoardId = boardId.trim()
+  if (!normalizedBoardId) throw new BoardPayloadError('id')
+  const envelope = await restoreBoard(
+    workspace,
+    normalizedBoardId,
+    requestConfig(options, {
+      idempotencyKey: boardOperationIdempotencyKey('restore'),
+    }),
+  )
+  return toWorkspaceBoardMeta(envelope.data)
+}
+
+/** Reads one board meta (carries `archivedAt` for the canvas archived banner). */
+export async function fetchWorkspaceBoardMeta(
+  workspaceId: string | null | undefined,
+  boardId: string,
+  options: BoardsRequestOptions = {},
+): Promise<WorkspaceBoardMeta> {
+  const workspace = requireBoardWorkspaceId(workspaceId)
+  const normalizedBoardId = boardId.trim()
+  if (!normalizedBoardId) throw new BoardPayloadError('id')
+  const envelope = await getBoard(workspace, normalizedBoardId, requestConfig(options))
   return toWorkspaceBoardMeta(envelope.data)
 }
 

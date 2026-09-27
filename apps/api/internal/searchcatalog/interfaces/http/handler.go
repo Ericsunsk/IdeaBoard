@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/searchcatalog/domain"
 	"ideaboard/api/internal/searchcatalog/ports"
@@ -58,7 +60,7 @@ func NewHandler(repository providerConfigStore, adapters ...ports.ProviderTestAd
 
 func (h *Handler) List(c *gin.Context) {
 	if h == nil || h.repository == nil {
-		response.MachineError(c, http.StatusInternalServerError, "search_provider_unavailable", "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
 		return
 	}
 	configs, err := h.repository.List(c.Request.Context())
@@ -77,27 +79,27 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		response.MachineError(c, http.StatusServiceUnavailable, "search_provider_unavailable", "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		response.MachineError(c, http.StatusNotFound, "search_provider_not_found", "搜索供应商不存在")
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), "搜索供应商不存在")
 		return
 	}
 	var request UpdateProviderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.MachineError(c, http.StatusBadRequest, "search_request_invalid", "参数错误")
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchRequestInvalid), "参数错误")
 		return
 	}
 	saveErr := h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
 	if saveErr != nil {
 		if errors.Is(saveErr, domain.ErrProviderTestRequired) {
-			response.MachineError(c, http.StatusConflict, "search_provider_test_required", "启用前请先通过连接测试")
+			errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderTestRequired), "启用前请先通过连接测试")
 			return
 		}
 		if strings.Contains(saveErr.Error(), "api key cannot be empty") {
-			response.MachineError(c, http.StatusBadRequest, "search_provider_api_key_invalid", "API Key 不能为空")
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderAPIKeyInvalid), "API Key 不能为空")
 			return
 		}
 		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商配置失败", saveErr)
@@ -114,22 +116,22 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		response.MachineError(c, http.StatusServiceUnavailable, "search_provider_unavailable", "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		response.MachineError(c, http.StatusNotFound, "search_provider_not_found", "搜索供应商不存在")
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), "搜索供应商不存在")
 		return
 	}
 	adapter := h.adapters[provider]
 	if adapter == nil {
-		response.MachineError(c, http.StatusInternalServerError, "search_provider_unavailable", "搜索供应商测试不可用")
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), "搜索供应商测试不可用")
 		return
 	}
 	key, err := h.repository.RawAPIKey(c.Request.Context(), provider)
 	if err != nil {
-		response.MachineError(c, http.StatusConflict, "search_provider_api_key_required", "请先保存 API Key")
+		errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderAPIKeyRequired), "请先保存 API Key")
 		return
 	}
 	category, message, testErr := adapter.Test(c.Request.Context(), key)
@@ -142,7 +144,7 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	if testErr != nil {
-		response.MachineError(c, http.StatusBadRequest, "search_provider_test_failed", "搜索供应商连接测试失败")
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderTestFailed), "搜索供应商连接测试失败")
 		return
 	}
 	response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})

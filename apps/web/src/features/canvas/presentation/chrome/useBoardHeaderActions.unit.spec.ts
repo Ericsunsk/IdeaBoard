@@ -1,10 +1,25 @@
 import { computed, ref } from 'vue'
 import type { Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBoardRepository, type BoardRepository } from '../../../board'
+import {
+  createBoardRepository,
+  fetchBoardArchivedAt,
+  syncRestoreBoardToServer,
+  type BoardRepository,
+} from '../../../board'
 import { replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
+
+vi.mock('../../../board', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../board')>()
+  return {
+    ...actual,
+    fetchBoardArchivedAt: vi.fn(async () => null),
+    markBoardArchivedLocally: vi.fn(),
+    syncRestoreBoardToServer: vi.fn(async () => ({})),
+  }
+})
 
 function createCatalog(
   rename: BoardRepository['commands']['rename'] = vi.fn(async () => ({
@@ -51,6 +66,8 @@ describe('useBoardHeaderActions', () => {
   beforeEach(() => {
     localStorage.clear()
     clearStoredAuth()
+    vi.mocked(fetchBoardArchivedAt).mockResolvedValue(null)
+    vi.mocked(syncRestoreBoardToServer).mockResolvedValue({} as never)
   })
 
   it('reads the current board and menu options from the shared catalog view model', () => {
@@ -222,6 +239,82 @@ describe('useBoardHeaderActions', () => {
     expect(header.currentBoardName.value).toBe('User B Board')
     expect(header.boardOptions.value).toEqual([{ id: 'board-b', name: 'User B Board' }])
     catalog.dispose()
+  })
+
+  it('banners an archived board on load', async () => {
+    vi.mocked(fetchBoardArchivedAt).mockResolvedValue('2026-09-25T00:00:00.000Z')
+    const { header } = createHeader(createCatalog())
+
+    await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
+    expect(fetchBoardArchivedAt).toHaveBeenCalledWith('board-a')
+  })
+
+  it('restores an archived board with success feedback', async () => {
+    vi.mocked(fetchBoardArchivedAt).mockResolvedValue('2026-09-25T00:00:00.000Z')
+    const { header, message } = createHeader(createCatalog())
+    await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
+
+    const restored = await header.restoreArchivedBoard()
+
+    expect(restored).toBe(true)
+    expect(syncRestoreBoardToServer).toHaveBeenCalledWith('board-a')
+    expect(header.isBoardArchived.value).toBe(false)
+    expect(message.success).toHaveBeenCalledWith('Board restored.')
+  })
+
+  it('keeps the banner and toasts restore failures', async () => {
+    vi.mocked(fetchBoardArchivedAt).mockResolvedValue('2026-09-25T00:00:00.000Z')
+    vi.mocked(syncRestoreBoardToServer).mockRejectedValueOnce(new Error('offline'))
+    const { header, message } = createHeader(createCatalog())
+    await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
+
+    const restored = await header.restoreArchivedBoard()
+
+    expect(restored).toBe(false)
+    expect(header.isBoardArchived.value).toBe(true)
+    expect(message.error).toHaveBeenCalledWith(
+      'Failed to restore the board. Please try again later.',
+    )
+  })
+
+  it('blocks renames while the archived banner is visible', async () => {
+    vi.mocked(fetchBoardArchivedAt).mockResolvedValue('2026-09-25T00:00:00.000Z')
+    const rename = vi.fn()
+    const { header, message } = createHeader(createCatalog(rename))
+    await vi.waitFor(() => expect(header.isBoardArchived.value).toBe(true))
+
+    header.startBoardRename()
+
+    expect(header.isRenamingBoard.value).toBe(false)
+    expect(message.warning).toHaveBeenCalledWith(
+      'This board is archived. Restore it before renaming.',
+    )
+    expect(rename).not.toHaveBeenCalled()
+  })
+
+  it('banners the board on archived rename conflicts instead of the reload flow', async () => {
+    const rename = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'sync-failed' as const,
+      boardId: 'board-a',
+      previousBoard: board('board-a', 'Old Board'),
+      rolledBackBoard: board('board-a', 'Old Board'),
+      rollback: { ok: true as const, board: board('board-a', 'Old Board') },
+      error: Object.assign(new Error('board is archived'), {
+        status: 409,
+        code: 'board_archived',
+      }),
+    }))
+    const { header, message } = createHeader(createCatalog(rename))
+
+    header.boardNameDraft.value = 'New Board'
+    await header.onConfirmBoardRename()
+
+    expect(header.isBoardArchived.value).toBe(true)
+    expect(message.error).toHaveBeenCalledWith(
+      'This board is archived. Restore it before renaming.',
+    )
+    expect(header.catalogRecovery.value).toEqual({ status: 'idle' })
   })
 })
 

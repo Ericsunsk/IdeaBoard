@@ -1,6 +1,7 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 
 const resource = vi.hoisted(() => ({
@@ -12,7 +13,8 @@ const confirm = vi.hoisted(() => ({
   confirm: vi.fn().mockResolvedValue(true),
   readReason: vi.fn().mockReturnValue('refund review'),
 }))
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+
+let toast: AppToastMocks
 
 vi.mock('./paymentOrderResource', () => ({
   createAdminPaymentOrderResource: () => resource,
@@ -22,13 +24,12 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => confirm,
 }))
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => toast,
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 describe('AdminPaymentOrdersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    toast = mockAppToast()
     resource.search.mockResolvedValue({
       orders: [makeOrder()],
       total: 27,

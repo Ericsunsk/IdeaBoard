@@ -1,12 +1,12 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
+import { useMswHandlers } from '../../../test/msw'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { mockAppToast } from '../../../test/toast'
+import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from './testing'
 import AdminOutboundPolicyCard from './AdminOutboundPolicyCard.vue'
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('policy review'))
@@ -20,30 +20,20 @@ describe('AdminOutboundPolicyCard', () => {
   let allowHosts: string[]
 
   beforeEach(() => {
+    mockAppToast()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
     readReasonMock.mockReset()
     readReasonMock.mockReturnValue('policy review')
-    updateRequests = []
     allowHosts = ['models.internal']
-    useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json({
-          data: { allow_hosts: allowHosts },
-        }),
-      ),
-      http.put('/api/control/v1/platform/settings/outbound-policy', async ({ request }) => {
-        const body = (await request.json()) as { allow_hosts: string[] }
-        updateRequests.push({
-          body,
-          operatorReason: request.headers.get('X-Operator-Reason'),
-        })
+    const policyApi = createOutboundPolicyMswState({
+      getAllowHosts: () => allowHosts,
+      onUpdate: (body) => {
         allowHosts = body.allow_hosts
-        return HttpResponse.json({
-          data: { allow_hosts: allowHosts },
-        })
-      }),
-    )
+      },
+    })
+    updateRequests = policyApi.updateRequests
+    useMswHandlers(...createOutboundPolicyHandlers(policyApi))
   })
 
   it('lets an admin update private host access through control with an operator reason', async () => {

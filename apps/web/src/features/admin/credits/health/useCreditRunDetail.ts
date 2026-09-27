@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { adminPolling, noRetry } from '../../../../shared/query/queryDefaults'
 
 type PollableRun = {
   id: number
@@ -26,12 +27,12 @@ export function useCreditRunDetail<TRun extends PollableRun>(
     enabled: computed(() => selectedRunId.value !== null),
     // Single attempt like the previous hand-rolled loader: failures surface
     // as the detail error state instead of retrying behind the dialog.
-    retry: false,
+    ...noRetry(),
     // Terminal runs settle; queued/running runs keep the 3s cadence.
-    refetchInterval: (query) => {
-      const run = query.state.data as TRun | undefined
-      return run && isPollableStatus(run.status) ? RUN_DETAIL_POLL_MS : false
-    },
+    ...adminPolling(RUN_DETAIL_POLL_MS, false, (data) => {
+      const run = data as TRun | undefined
+      return run != null && isPollableStatus(run.status)
+    }),
   })
 
   async function open(runId: number) {

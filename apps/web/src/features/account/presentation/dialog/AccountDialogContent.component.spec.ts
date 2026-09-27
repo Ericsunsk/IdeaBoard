@@ -4,15 +4,17 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import { createDeferred } from '../../../../test/deferred'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import { useUserStore } from '../../../auth'
-import type { User } from '../../../../shared/api/sessionUserType'
+import { makeSessionUser } from '../../../../test/factories'
 import { HOME_PATH } from '../../../../shared/constants/routePaths'
 import { accountTabRegistry, type AccountTab } from '../common/tabRegistry'
 import AccountDialogContent from './AccountDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
 const useAvatarUploadMock = vi.hoisted(() => vi.fn())
-const toastErrorMock = vi.hoisted(() => vi.fn())
+
+let toast: AppToastMocks
 
 vi.mock('../../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
@@ -28,11 +30,7 @@ vi.mock('../../../../shared/composables/useLogoutRedirect', () => ({
   }),
 }))
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({
-    error: toastErrorMock,
-  }),
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 vi.mock('../../application/profile/useAvatarUpload', () => ({
   useAvatarUpload: useAvatarUploadMock,
@@ -129,22 +127,18 @@ const accountTabCases: Array<{ key: AccountTab; label: string }> = accountTabReg
     })),
 )
 
-function makeUser(): User {
-  return {
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'mock-user',
-    storage_namespace: 'USM001',
-    avatar: '',
-    role: 'user',
-    status: 1,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-02T00:00:00Z',
-  }
-}
-
 function renderAccountDialogContent(initialTab?: AccountTab) {
   const store = useUserStore()
-  store.setAuth(makeUser())
+  store.setAuth(
+    makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'mock-user',
+      storage_namespace: 'USM001',
+      avatar: '',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+    }),
+  )
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
@@ -194,7 +188,7 @@ describe('AccountDialogContent', () => {
     )
     logoutAndRedirectMock.mockReset()
     logoutAndRedirectMock.mockResolvedValue(true)
-    toastErrorMock.mockReset()
+    toast = mockAppToast()
     useAvatarUploadMock.mockReset()
     useAvatarUploadMock.mockReturnValue({
       uploading: ref(false),
@@ -396,7 +390,7 @@ describe('AccountDialogContent', () => {
 
     await waitFor(() => expect(logoutButton).toBeEnabled())
     expect(logoutButton).toHaveAccessibleName('Sign out')
-    expect(toastErrorMock).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
+    expect(toast.error).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
   })
 
   it('restores logout controls and shows safe feedback after a rejected request', async () => {
@@ -407,6 +401,6 @@ describe('AccountDialogContent', () => {
     await user.click(logoutButton)
 
     await waitFor(() => expect(logoutButton).toBeEnabled())
-    expect(toastErrorMock).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
+    expect(toast.error).toHaveBeenCalledWith('Sign-out failed. Please try again later.')
   })
 })

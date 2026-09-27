@@ -79,6 +79,29 @@
       <span class="canvas-chrome-catalog-recovery-label">{{ t('canvas.chrome.syncingName') }}</span>
     </div>
     <div
+      v-if="board.archived.isArchived"
+      class="canvas-chrome-catalog-recovery"
+      aria-live="polite"
+      role="status"
+    >
+      <span class="canvas-chrome-catalog-recovery-label">{{
+        t('canvas.chrome.boardArchivedLabel')
+      }}</span>
+      <button
+        type="button"
+        class="canvas-chrome-catalog-recovery-action"
+        :aria-label="t('canvas.chrome.restoreArchivedBoard')"
+        :disabled="board.archived.isRestoring"
+        @click="emit('restore-archived-board')"
+      >
+        {{
+          board.archived.isRestoring
+            ? t('canvas.chrome.restoringArchivedBoard')
+            : t('canvas.chrome.restore')
+        }}
+      </button>
+    </div>
+    <div
       v-if="board.catalogRecovery.status !== 'idle'"
       class="canvas-chrome-catalog-recovery"
       aria-live="polite"
@@ -125,6 +148,7 @@ const emit = defineEmits<{
   'cancel-board-rename': []
   'confirm-board-rename': []
   'reload-catalog': []
+  'restore-archived-board': []
   'select-board': [boardId: string]
   'navigate-back': []
 }>()

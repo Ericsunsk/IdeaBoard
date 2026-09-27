@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useAdminUserCommands } from './commands'
-import type { AdminUserCommandTarget } from './view'
+import { makeAdminUserCommandTarget } from '../../../test/factories'
 
 describe('admin user commands', () => {
   it('opens the ban dialog for active users and submits the ban payload', async () => {
     const harness = createHarness()
-    const user = makeUser({ publicId: 'user-7', displayName: 'alice', status: 1 })
+    const user = makeAdminUserCommandTarget({ publicId: 'user-7', displayName: 'alice', status: 1 })
     const commands = harness.createCommands()
 
     commands.openUserActionMenu(user)
@@ -27,7 +27,7 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-7', status: 1 }))
+    commands.openUserActionMenu(makeAdminUserCommandTarget({ publicId: 'user-7', status: 1 }))
     commands.handleActionSelect('status')
     commands.banForm.value = { expiresInDays: 0, reason: '   ' }
     await commands.confirmBanUser()
@@ -41,7 +41,7 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ role: 'admin', status: 1 }))
+    commands.openUserActionMenu(makeAdminUserCommandTarget({ role: 'admin', status: 1 }))
     commands.handleActionSelect('status')
 
     expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
@@ -52,7 +52,7 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ role: 'admin', displayName: 'root' }))
+    commands.openUserActionMenu(makeAdminUserCommandTarget({ role: 'admin', displayName: 'root' }))
     commands.handleActionSelect('delete')
 
     expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
@@ -65,7 +65,9 @@ describe('admin user commands', () => {
     harness.mutations.unbanUser.mutateAsync.mockRejectedValueOnce(new Error('backend denied'))
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-3', status: 0, displayName: 'bob' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-3', status: 0, displayName: 'bob' }),
+    )
     commands.handleActionSelect('status')
     await harness.settleConfirms()
 
@@ -87,7 +89,9 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'cara' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-4', role: 'user', displayName: 'cara' }),
+    )
     commands.handleActionSelect('role')
     await harness.settleConfirms()
 
@@ -107,7 +111,7 @@ describe('admin user commands', () => {
     const commands = harness.createCommands()
 
     commands.openUserActionMenu(
-      makeUser({ publicId: 'user-8', role: 'admin', displayName: 'root' }),
+      makeAdminUserCommandTarget({ publicId: 'user-8', role: 'admin', displayName: 'root' }),
     )
     commands.handleActionSelect('role')
     await harness.settleConfirms()
@@ -125,7 +129,9 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-5', displayName: 'dana' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-5', displayName: 'dana' }),
+    )
     commands.handleActionSelect('revoke')
     await harness.settleConfirms()
 
@@ -140,7 +146,9 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-6', displayName: 'erin' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-6', displayName: 'erin' }),
+    )
     commands.handleActionSelect('impersonate')
     await vi.waitFor(() =>
       expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6', {
@@ -162,7 +170,9 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ publicId: 'user-9', displayName: 'fran' }))
+    commands.openUserActionMenu(
+      makeAdminUserCommandTarget({ publicId: 'user-9', displayName: 'fran' }),
+    )
     commands.handleActionSelect('impersonate')
     await vi.waitFor(() =>
       expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9', {
@@ -227,15 +237,5 @@ function createAdminUsersFeedback() {
     userDeleteFailed: vi.fn(),
     roleUpdated: vi.fn(),
     roleUpdateFailed: vi.fn(),
-  }
-}
-
-function makeUser(overrides: Partial<AdminUserCommandTarget> = {}): AdminUserCommandTarget {
-  return {
-    publicId: 'user-1',
-    displayName: 'user',
-    role: 'user',
-    status: 1,
-    ...overrides,
   }
 }

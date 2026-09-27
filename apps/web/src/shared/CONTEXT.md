@@ -18,7 +18,7 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 - `shared/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy; never depends on feature route components.
 - `shared/components` pure display components (account menu, balance button, confirm box, language picker, table frame, chart card); balance numbers are injected, never self-fetched; never depends on feature stores/resources.
 - `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables.
-- `shared/config` `API_BASE_URL` (production forces `/api`), `AUTH_BASE_URL` derivation, asset/upload ref normalization; never depends on business constants.
+- `shared/config` `API_BASE_URL` (production forces `/api`), `AUTH_BASE_URL` derivation, asset/upload ref normalization; `pagination` (`PAGE_SIZES` + `normalizePageSize` for all cursor lists) and `timing` (cross-cutting transport waits only); never depends on business constants.
 - `shared/constants` single source for route paths, legal links, media constants; never depends on i18n copy.
 - `shared/domain` workflow dictionary (8 slugs), generation primitives (`outputCount` 1-4 strictly rejects, never clamps), `outputResolution`; never depends on backend SKU/pricing.
 - `shared/errors` error-code convergence and user-facing copy; never depends on scattered `t('...')` error copy.
@@ -27,11 +27,18 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 - `shared/lib` dependency-free pure functions (brand, page chrome, chart primitives); never depends on DOM/Query.
 - `shared/media` MediaRef and upload pipeline (magic-byte sniffing, HEIC-to-JPEG, compression thresholds, fail-back-to-original); never stores URLs in Canvas facts.
 - `shared/motion` duration/easing tokens plus dialog/popover/chart presets (`motionPolicyGuard.spec` guards hard-codes); never depends on business logic.
-- `shared/query` queryClient singleton, task-result normalization (only `role=image + asset_id`), user-credits invalidation pub/sub; credits invalidation must use this channel.
+- `shared/query` queryClient singleton, task-result normalization (only `role=image + asset_id`), user-credits invalidation pub/sub; `queryDefaults` presets (`noRetry` / `accountScoped` / `adminPolling` / `keepPrevious`) own all freshness/polling overrides; credits invalidation must use this channel.
 - `shared/theme` PT single source + CSS tokens; never depends on feature-authored overlay/dialog styles.
 - `shared/utils` client identity single source (`get`/`set`/`clearStoredAuth` with Query clear), error-copy scrubbing, date/form/upload helpers; `localStorage['user']` only via `shared/utils/auth.ts`.
 - `shared/seo` route SEO meta and static HTML; never depends on business data.
 - `shared/assets` provider/storage/oauth pure static assets; never referenced except by code import.
+
+## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
+- Prefer the generated orval `getXQueryKey()` helper when the operation exists (workspace list, control users, model catalog); never hand-roll a key for a generated op.
+- Hand-rolled `*QueryKeys` factories (or `*_QUERY_ROOT` + cursor-index consts for cursor collections) exist only for composed queries with no generated key helper (account infra resources, admin health/monitor/statistics, run-detail, finding/run-history lists).
+- No inline array literals in `queryKey:` positions or invalidation/removal calls: reference the factory or root const (`adminStatisticsQueryKeys`, `ADMIN_TASK_LIST_QUERY_KEY`, `walletQueryRoot`, `RUN_HISTORY_QUERY_ROOT`).
+- Invalidation targets the narrowest stable root (prefix) for scope clears (`walletQueryRoot`, `[...RUN_HISTORY_QUERY_ROOT]`); composed keys append criteria/cursor after the root.
+- Freshness/polling options ride `shared/query/queryDefaults` presets (`noRetry` / `accountScoped` / `adminPolling` / `keepPrevious`); visibility-aware polling stays on `useQueryPolling`, never in a preset.
 
 ## Invariants
 - Prove three or more callers before adding a shared module; no generic layers for speculative reuse.

@@ -3,6 +3,7 @@
 -- All lookups are keyed by workspace first: every folder/asset row is
 -- addressed as (workspace_id, public_id) so cross-workspace ids miss by
 -- construction and read as not found (never a distinct status).
+-- Scope guard: scripts/sql-workspace-scope-check.sh enforces one workspace_id key per query.
 -- Durable public ids follow the schema CHECK patterns
 -- (lfolder_% / lasset_% / lmat_%); callers mint them through the library
 -- seam (NewV1FolderPublicID / NewV1AssetPublicID) and pass them opaquely.

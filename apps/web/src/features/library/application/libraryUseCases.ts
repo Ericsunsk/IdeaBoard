@@ -15,6 +15,7 @@
 // `retryLibraryImport` / `resumePending`) owns the retry.
 
 import { getWorkspaceMediaAssetMetadata } from '../../../shared/api/mediaAssetDelivery'
+import { PAGE_SIZES } from '../../../shared/config/pagination'
 import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import { i18n } from '../../../shared/i18n'
 import {
@@ -31,7 +32,7 @@ import {
   type WorkspaceLibraryRequestOptions,
 } from '../infrastructure/resource'
 
-const LIBRARY_FOLDER_PAGE_SIZE = 100
+const LIBRARY_FOLDER_PAGE_SIZE = PAGE_SIZES.dense
 const LIBRARY_FOLDER_MAX_PAGES = 10
 
 /** Loads every workspace folder (cursor loop, bounded) for folder-facts snapshots. */

@@ -27,6 +27,7 @@ import (
 	searchinfra "ideaboard/api/internal/searchcatalog/infrastructure"
 	searchhttp "ideaboard/api/internal/searchcatalog/interfaces/http"
 	searchports "ideaboard/api/internal/searchcatalog/ports"
+	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	statisticsapp "ideaboard/api/internal/tasking/application/statistics"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
@@ -97,11 +98,13 @@ func newAppRouter(
 				Store: library.NewService(repos.db),
 			},
 			Media: taskServices.workspaceTaskMedia,
-			// Binary reads ride the storage service. Derivative rendering
-			// is wired in the workspace task worker; this HTTP contract
-			// keeps its optional renderer nil, so metadata remains usable
-			// while ungenerated tiers stay pending.
-			MediaObjects: services.storageService,
+			// Binary reads ride the storage service. Upload completion
+			// renders display tiers inline with the same bounded
+			// production renderer the task worker uses, so tiers are
+			// materialized instead of staying pending forever (nothing
+			// else generates them for uploads).
+			MediaObjects:  services.storageService,
+			MediaRenderer: taskruntime.WorkspaceTaskDerivativeRenderer{},
 			// #821 (#809 Phase 4-04): workspace-scoped task postgres
 			// store + production settlement adapters. Task routes
 			// are live: Quote via the billing catalog, Hold/Capture/

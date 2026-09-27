@@ -121,6 +121,14 @@ export default {
       '이름 변경 동기화에 실패했고 원래 이름을 복원할 수 없습니다. 캔버스 목록을 새로고침해 주세요.',
     catalogReloadedSuccess: '캔버스 목록을 새로고침했습니다.',
     catalogReloadFailedError: '캔버스 목록을 새로고침하지 못했습니다. 나중에 다시 시도해 주세요.',
+    boardArchivedLabel: '이 캔버스는 보관 처리되어 읽기 전용입니다.',
+    restoreArchivedBoard: '보관된 캔버스 복원',
+    restore: '복원',
+    restoringArchivedBoard: '복원 중…',
+    boardRestoredSuccess: '캔버스가 복원되었습니다.',
+    boardRestoreFailedError: '캔버스를 복원하지 못했습니다. 나중에 다시 시도해 주세요.',
+    boardArchivedRenameBlocked:
+      '이 캔버스는 보관 처리되었습니다. 이름을 변경하려면 먼저 복원해 주세요.',
   },
   viewport: {
     zoomIn: '확대',
@@ -313,6 +321,8 @@ export default {
     saveAuthUnavailable: '저장 실패: 사용자 세션이 없습니다. 로그인한 뒤 다시 시도해 주세요.',
     savedLocallySyncFailed:
       '로컬에 저장되었습니다. 원격 동기화에 실패하여 네트워크가 복구되면 다시 시도합니다.',
+    savedLocallyServerFailed:
+      '로컬에 저장되었습니다. 원격 동기화에 실패했습니다(HTTP {code}). 다음 편집 시 다시 시도합니다.',
     nameConflictSavedLocally:
       '로컬에 저장되었지만 이미 존재하는 보드 이름입니다. 다른 이름을 선택해 주세요.',
     boardDataInvalid:
@@ -320,6 +330,7 @@ export default {
     importSnapshotFailed: '캔버스 스냅샷을 불러오지 못했습니다. 나중에 다시 시도해 주세요.',
     saved: '저장됨',
     saveFailed: '저장에 실패했습니다. 나중에 다시 시도해 주세요.',
+    boardArchivedSaveBlocked: '이 캔버스는 보관 처리되었습니다. 계속 편집하려면 복원해 주세요.',
     downloadEmptyResponse: '다운로드 실패: 빈 응답입니다.',
     downloadImageHttpFailed: '다운로드 실패: HTTP {code}',
     downloadImageFailed: '다운로드 실패: {reason}',

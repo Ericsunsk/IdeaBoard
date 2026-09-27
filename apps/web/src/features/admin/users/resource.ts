@@ -18,6 +18,7 @@ import type {
   ListControlUsersParams,
 } from '../../../shared/api/generated-query/control/model'
 import { stripUndefined } from '../../../shared/api/stripUndefined'
+import { normalizePageSize, PAGE_SIZES } from '../../../shared/config/pagination'
 import { useAdminCursorCollection } from '../shared/composables/useAdminCursorCollection'
 
 export type AdminUsersRoleFilterValue = 'admin' | 'user'
@@ -53,8 +54,8 @@ export type AdminUsersPage = {
   hasMore: boolean
 }
 
-const ADMIN_USERS_PAGE_SIZE_DEFAULT = 10
-const ADMIN_USERS_PAGE_SIZE_MAX = 100
+const ADMIN_USERS_PAGE_SIZE_DEFAULT = PAGE_SIZES.adminUsers
+const ADMIN_USERS_PAGE_SIZE_MAX = PAGE_SIZES.max
 
 function normalizeRole(value: ControlUser['role']): AdminUsersRoleFilterValue {
   return value === 'admin' ? 'admin' : 'user'
@@ -77,10 +78,8 @@ export function mapControlUserToListItem(user: ControlUser): AdminUserListItem {
   }
 }
 
-function normalizePageSize(pageSize: number | undefined): number {
-  if (pageSize === undefined) return ADMIN_USERS_PAGE_SIZE_DEFAULT
-  if (!Number.isFinite(pageSize)) return ADMIN_USERS_PAGE_SIZE_DEFAULT
-  return Math.min(Math.max(1, Math.floor(pageSize)), ADMIN_USERS_PAGE_SIZE_MAX)
+function normalizeAdminUsersPageSize(pageSize: number | undefined): number {
+  return normalizePageSize(pageSize, ADMIN_USERS_PAGE_SIZE_DEFAULT, ADMIN_USERS_PAGE_SIZE_MAX)
 }
 
 function normalizeStatusFilter(
@@ -96,7 +95,7 @@ export function buildListControlUsersParams(
 ): ListControlUsersParams {
   return stripUndefined({
     ...(cursor === undefined ? {} : { cursor }),
-    page_size: normalizePageSize(filters.pageSize),
+    page_size: normalizeAdminUsersPageSize(filters.pageSize),
     keyword: filters.keyword?.trim() ? filters.keyword.trim() : undefined,
     role: filters.role,
     status: normalizeStatusFilter(filters.status),
@@ -114,7 +113,7 @@ export function useAdminUsersResource(filters: MaybeRefOrGetter<AdminUsersQueryF
       keyword: raw.keyword?.trim() ? raw.keyword.trim() : undefined,
       role: raw.role,
       status: raw.status,
-      pageSize: normalizePageSize(raw.pageSize),
+      pageSize: normalizeAdminUsersPageSize(raw.pageSize),
     }
   })
 

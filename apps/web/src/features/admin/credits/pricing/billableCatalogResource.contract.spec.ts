@@ -6,27 +6,27 @@ import {
   publishBillableItemPrices,
   setBillableItemAvailability,
 } from './billableCatalogResource'
+import { createBillingCatalogHandlers, createBillingCatalogMswState } from './testing'
 
 const reason = { operatorReason: 'pricing review' }
 
 describe('Admin Billable Catalog resource', () => {
   it('lists the catalog through the control plane with pricing normalization', async () => {
     useMswHandlers(
-      http.get('/api/control/v1/billing/catalog', () =>
-        HttpResponse.json({
-          data: {
-            items: [
-              {
-                sku: 'ai-image:inpaint',
-                namespace: 'ai-image',
-                product_kind: 'workflow-feature',
-                display_name: '局部重绘',
-                sort_order: 30,
-                status: 'unpriced',
-                pricing_variants: ['default'],
-              },
-            ],
-          },
+      ...createBillingCatalogHandlers(
+        createBillingCatalogMswState({
+          items: [
+            {
+              sku: 'ai-image:inpaint',
+              namespace: 'ai-image',
+              product_kind: 'workflow-feature',
+              display_name: '局部重绘',
+              sort_order: 30,
+              status: 'unpriced',
+              pricing_variants: ['default'],
+            },
+          ],
+          wrapItems: (items) => ({ data: { items } }),
         }),
       ),
     )
@@ -104,9 +104,7 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(
-      setBillableItemAvailability('ai-image:inpaint', false, reason),
-    ).resolves.toEqual({
+    await expect(setBillableItemAvailability('ai-image:inpaint', false, reason)).resolves.toEqual({
       sku: 'ai-image:inpaint',
       status: 'disabled',
       updatedAt: '2026-07-16T10:00:00Z',

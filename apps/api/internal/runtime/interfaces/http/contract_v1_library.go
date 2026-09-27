@@ -300,28 +300,23 @@ func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta,
 }
 
 func (h *contractV1Handler) listLibraryFolders(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	all, err := h.deps.Library.Store.ListFolders(c.Request.Context(), workspace.PublicID)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	page := make([]v1LibraryFolderDTO, 0, len(all))
-	for _, folder := range all {
-		page = append(page, toLibraryFolderDTO(workspace.PublicID, folder))
-	}
-	slice, meta, ok := libraryPageSlice(page, c)
-	if !ok {
-		return
-	}
-	contract.RenderPaginated(c, slice, meta)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		all, err := h.deps.Library.Store.ListFolders(c.Request.Context(), workspace.PublicID)
+		if err != nil {
+			renderLibraryError(c, err)
+			return
+		}
+		page := make([]v1LibraryFolderDTO, 0, len(all))
+		for _, folder := range all {
+			page = append(page, toLibraryFolderDTO(workspace.PublicID, folder))
+		}
+		slice, meta, ok := libraryPageSlice(page, c)
+		if !ok {
+			return
+		}
+		contract.RenderPaginated(c, slice, meta)
+	})
 }
 
 type v1CreateLibraryFolderBody struct {
@@ -331,48 +326,42 @@ type v1CreateLibraryFolderBody struct {
 }
 
 func (h *contractV1Handler) createLibraryFolder(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	key, ok := requireLibraryIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1CreateLibraryFolderBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("library:folder-create", workspace.PublicID, name)
-	result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "folder-create", key, hash, func() (any, error) {
-		publicID, mintErr := library.NewV1FolderPublicID()
-		if mintErr != nil {
-			return nil, mintErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		key, ok := requireLibraryIdempotencyKey(c)
+		if !ok {
+			return
 		}
-		return h.deps.Library.Store.CreateFolder(c.Request.Context(), workspace.PublicID, name, publicID)
+		var body v1CreateLibraryFolderBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		name := strings.TrimSpace(body.Data.Name)
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("library:folder-create", workspace.PublicID, name)
+		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "folder-create", key, hash, func() (any, error) {
+			publicID, mintErr := library.NewV1FolderPublicID()
+			if mintErr != nil {
+				return nil, mintErr
+			}
+			return h.deps.Library.Store.CreateFolder(c.Request.Context(), workspace.PublicID, name, publicID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderLibraryError(c, fnErr)
+			return
+		}
+		created, ok := result.(*library.V1Folder)
+		if !ok || created == nil {
+			renderLibraryError(c, errors.New("library: folder-create type mismatch"))
+			return
+		}
+		contract.RenderCreated(c, toLibraryFolderDTO(workspace.PublicID, created))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderLibraryError(c, fnErr)
-		return
-	}
-	created, ok := result.(*library.V1Folder)
-	if !ok || created == nil {
-		renderLibraryError(c, errors.New("library: folder-create type mismatch"))
-		return
-	}
-	contract.RenderCreated(c, toLibraryFolderDTO(workspace.PublicID, created))
 }
 
 type v1RenameLibraryFolderBody struct {
@@ -404,109 +393,93 @@ func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy
 }
 
 func (h *contractV1Handler) renameLibraryFolder(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	folder, ok := h.libraryFolderByID(c, workspace, c.Param("folder_id"))
-	if !ok {
-		return
-	}
-	var body v1RenameLibraryFolderBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	renamed, err := h.deps.Library.Store.RenameFolder(c.Request.Context(), workspace.PublicID, folder.PublicID, body.Data.Name)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, toLibraryFolderDTO(workspace.PublicID, renamed))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		folder, ok := h.libraryFolderByID(c, workspace, c.Param("folder_id"))
+		if !ok {
+			return
+		}
+		var body v1RenameLibraryFolderBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		renamed, err := h.deps.Library.Store.RenameFolder(c.Request.Context(), workspace.PublicID, folder.PublicID, body.Data.Name)
+		if err != nil {
+			renderLibraryError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, toLibraryFolderDTO(workspace.PublicID, renamed))
+	})
 }
 
 func (h *contractV1Handler) deleteLibraryFolder(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	// Shape-check only here: the existence lookup runs inside the
-	// idempotent fn so replays converge instead of 404ing on the
-	// already-deleted folder.
-	folderID := strings.TrimSpace(c.Param("folder_id"))
-	if !library.IsV1FolderID(folderID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
-		c.Abort()
-		return
-	}
-	key, ok := requireLibraryIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("library:folder-delete", workspace.PublicID, folderID)
-	result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "folder-delete", key, hash, func() (any, error) {
-		return &v1DeletedDTO{Deleted: true}, h.deps.Library.Store.DeleteFolder(c.Request.Context(), workspace.PublicID, folderID)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		// Shape-check only here: the existence lookup runs inside the
+		// idempotent fn so replays converge instead of 404ing on the
+		// already-deleted folder.
+		folderID := strings.TrimSpace(c.Param("folder_id"))
+		if !library.IsV1FolderID(folderID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
+			c.Abort()
+			return
+		}
+		key, ok := requireLibraryIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("library:folder-delete", workspace.PublicID, folderID)
+		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "folder-delete", key, hash, func() (any, error) {
+			return &v1DeletedDTO{Deleted: true}, h.deps.Library.Store.DeleteFolder(c.Request.Context(), workspace.PublicID, folderID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderLibraryError(c, fnErr)
+			return
+		}
+		deleted, ok := result.(*v1DeletedDTO)
+		if !ok || deleted == nil {
+			renderLibraryError(c, errors.New("library: folder-delete type mismatch"))
+			return
+		}
+		logLibraryAudit("library_folder_delete", identityPrincipal.UserID(), workspace.PublicID+"/"+folderID, "folder_delete", "deleted")
+		contract.RenderSuccess(c, *deleted)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderLibraryError(c, fnErr)
-		return
-	}
-	deleted, ok := result.(*v1DeletedDTO)
-	if !ok || deleted == nil {
-		renderLibraryError(c, errors.New("library: folder-delete type mismatch"))
-		return
-	}
-	logLibraryAudit("library_folder_delete", identityPrincipal.UserID(), workspace.PublicID+"/"+folderID, "folder_delete", "deleted")
-	contract.RenderSuccess(c, *deleted)
 }
 
 func (h *contractV1Handler) listLibraryAssets(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	var folderFilter *string
-	if raw := strings.TrimSpace(c.Query("folder_id")); raw != "" {
-		if _, ok := h.libraryFolderByID(c, workspace, raw); !ok {
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		var folderFilter *string
+		if raw := strings.TrimSpace(c.Query("folder_id")); raw != "" {
+			if _, ok := h.libraryFolderByID(c, workspace, raw); !ok {
+				return
+			}
+			folderFilter = &raw
+		}
+		all, err := h.deps.Library.Store.ListAssets(c.Request.Context(), workspace.PublicID)
+		if err != nil {
+			renderLibraryError(c, err)
 			return
 		}
-		folderFilter = &raw
-	}
-	all, err := h.deps.Library.Store.ListAssets(c.Request.Context(), workspace.PublicID)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	page := make([]v1LibraryAssetDTO, 0, len(all))
-	for _, asset := range all {
-		if folderFilter != nil && asset.FolderPublicID != *folderFilter {
-			continue
+		page := make([]v1LibraryAssetDTO, 0, len(all))
+		for _, asset := range all {
+			if folderFilter != nil && asset.FolderPublicID != *folderFilter {
+				continue
+			}
+			page = append(page, toLibraryAssetDTO(workspace.PublicID, asset))
 		}
-		page = append(page, toLibraryAssetDTO(workspace.PublicID, asset))
-	}
-	slice, meta, ok := libraryPageSlice(page, c)
-	if !ok {
-		return
-	}
-	contract.RenderPaginated(c, slice, meta)
+		slice, meta, ok := libraryPageSlice(page, c)
+		if !ok {
+			return
+		}
+		contract.RenderPaginated(c, slice, meta)
+	})
 }
 
 type v1SaveLibraryAssetBody struct {
@@ -525,72 +498,66 @@ type v1SaveLibraryAssetBody struct {
 }
 
 func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	key, ok := requireLibraryIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1SaveLibraryAssetBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	input := library.V1SaveAssetInput{
-		FolderPublicID: strings.TrimSpace(body.Data.FolderID),
-		Asset: library.AssetInput{
-			Provider: body.Data.Provider, SourceID: body.Data.SourceID,
-			SourceURL: body.Data.SourceURL, PreviewURL: body.Data.PreviewURL, OriginalURL: body.Data.OriginalURL,
-			Title: body.Data.Title, Author: body.Data.Author,
-			Width: body.Data.Width, Height: body.Data.Height,
-		},
-	}
-	// Folder binding is validated up front so unknown folders 404 before
-	// any idempotency state is recorded.
-	if input.FolderPublicID != "" {
-		if _, ok := h.libraryFolderByID(c, workspace, input.FolderPublicID); !ok {
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		key, ok := requireLibraryIdempotencyKey(c)
+		if !ok {
 			return
 		}
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID,
-		strings.ToLower(strings.TrimSpace(body.Data.Provider)), strings.TrimSpace(body.Data.SourceID), input.FolderPublicID)
-	result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-save", key, hash, func() (any, error) {
-		publicID, mintErr := library.NewV1AssetPublicID()
-		if mintErr != nil {
-			return nil, mintErr
+		var body v1SaveLibraryAssetBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
 		}
-		saved, created, saveErr := h.deps.Library.Store.SaveAsset(c.Request.Context(), workspace.PublicID, input, publicID)
-		if saveErr != nil {
-			return nil, saveErr
+		input := library.V1SaveAssetInput{
+			FolderPublicID: strings.TrimSpace(body.Data.FolderID),
+			Asset: library.AssetInput{
+				Provider: body.Data.Provider, SourceID: body.Data.SourceID,
+				SourceURL: body.Data.SourceURL, PreviewURL: body.Data.PreviewURL, OriginalURL: body.Data.OriginalURL,
+				Title: body.Data.Title, Author: body.Data.Author,
+				Width: body.Data.Width, Height: body.Data.Height,
+			},
 		}
-		return &v1SavedAsset{Asset: saved, Created: created}, nil
+		// Folder binding is validated up front so unknown folders 404 before
+		// any idempotency state is recorded.
+		if input.FolderPublicID != "" {
+			if _, ok := h.libraryFolderByID(c, workspace, input.FolderPublicID); !ok {
+				return
+			}
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID,
+			strings.ToLower(strings.TrimSpace(body.Data.Provider)), strings.TrimSpace(body.Data.SourceID), input.FolderPublicID)
+		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-save", key, hash, func() (any, error) {
+			publicID, mintErr := library.NewV1AssetPublicID()
+			if mintErr != nil {
+				return nil, mintErr
+			}
+			saved, created, saveErr := h.deps.Library.Store.SaveAsset(c.Request.Context(), workspace.PublicID, input, publicID)
+			if saveErr != nil {
+				return nil, saveErr
+			}
+			return &v1SavedAsset{Asset: saved, Created: created}, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderLibraryError(c, fnErr)
+			return
+		}
+		saved, ok := result.(*v1SavedAsset)
+		if !ok || saved == nil || saved.Asset == nil {
+			renderLibraryError(c, errors.New("library: asset-save type mismatch"))
+			return
+		}
+		if saved.Created {
+			contract.RenderCreated(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
+			return
+		}
+		contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderLibraryError(c, fnErr)
-		return
-	}
-	saved, ok := result.(*v1SavedAsset)
-	if !ok || saved == nil || saved.Asset == nil {
-		renderLibraryError(c, errors.New("library: asset-save type mismatch"))
-		return
-	}
-	if saved.Created {
-		contract.RenderCreated(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
-		return
-	}
-	contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, saved.Asset))
 }
 
 type v1SavedAsset struct {
@@ -620,71 +587,60 @@ type v1MoveLibraryAssetBody struct {
 }
 
 func (h *contractV1Handler) moveLibraryAsset(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	asset, ok := h.libraryAssetOr404(c, workspace)
-	if !ok {
-		return
-	}
-	var body v1MoveLibraryAssetBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	moved, err := h.deps.Library.Store.MoveAsset(c.Request.Context(), workspace.PublicID, asset.PublicID, body.Data.FolderID)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, moved))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		asset, ok := h.libraryAssetOr404(c, workspace)
+		if !ok {
+			return
+		}
+		var body v1MoveLibraryAssetBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		moved, err := h.deps.Library.Store.MoveAsset(c.Request.Context(), workspace.PublicID, asset.PublicID, body.Data.FolderID)
+		if err != nil {
+			renderLibraryError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, toLibraryAssetDTO(workspace.PublicID, moved))
+	})
 }
 
 func (h *contractV1Handler) deleteLibraryAsset(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	assetID := strings.TrimSpace(c.Param("asset_id"))
-	if !library.IsV1AssetID(assetID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
-		c.Abort()
-		return
-	}
-	key, ok := requireLibraryIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("library:asset-delete", workspace.PublicID, assetID)
-	result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-delete", key, hash, func() (any, error) {
-		return &v1DeletedDTO{Deleted: true}, h.deps.Library.Store.DeleteAsset(c.Request.Context(), workspace.PublicID, assetID)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		assetID := strings.TrimSpace(c.Param("asset_id"))
+		if !library.IsV1AssetID(assetID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
+			c.Abort()
+			return
+		}
+		key, ok := requireLibraryIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("library:asset-delete", workspace.PublicID, assetID)
+		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-delete", key, hash, func() (any, error) {
+			return &v1DeletedDTO{Deleted: true}, h.deps.Library.Store.DeleteAsset(c.Request.Context(), workspace.PublicID, assetID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderLibraryError(c, fnErr)
+			return
+		}
+		deleted, ok := result.(*v1DeletedDTO)
+		if !ok || deleted == nil {
+			renderLibraryError(c, errors.New("library: asset-delete type mismatch"))
+			return
+		}
+		logLibraryAudit("library_asset_delete", identityPrincipal.UserID(), workspace.PublicID+"/"+assetID, "asset_delete", "deleted")
+		contract.RenderSuccess(c, *deleted)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderLibraryError(c, fnErr)
-		return
-	}
-	deleted, ok := result.(*v1DeletedDTO)
-	if !ok || deleted == nil {
-		renderLibraryError(c, errors.New("library: asset-delete type mismatch"))
-		return
-	}
-	logLibraryAudit("library_asset_delete", identityPrincipal.UserID(), workspace.PublicID+"/"+assetID, "asset_delete", "deleted")
-	contract.RenderSuccess(c, *deleted)
 }
 
 type v1ResolveLibraryAssetsBody struct {
@@ -711,42 +667,30 @@ type v1ResolveLibraryResponseDTO struct {
 }
 
 func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireLibraryStore(c) {
-		return
-	}
-	workspace, _ := h.libraryWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	var body v1ResolveLibraryAssetsBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	items := make([]library.V1ResolveItem, 0, len(body.Data.Items))
-	for _, item := range body.Data.Items {
-		items = append(items, library.V1ResolveItem{
-			Provider: item.Provider, SourceID: item.SourceID, SourceURL: item.SourceURL,
-		})
-	}
-	results, err := h.deps.Library.Store.ResolveAssets(c.Request.Context(), workspace.PublicID, items)
-	if err != nil {
-		renderLibraryError(c, err)
-		return
-	}
-	dto := v1ResolveLibraryResponseDTO{Items: make([]v1ResolveLibraryResultDTO, 0, len(results))}
-	for _, result := range results {
-		entry := v1ResolveLibraryResultDTO{Provider: result.Provider, SourceID: result.SourceID, Status: result.Status}
-		if result.Asset != nil {
-			asset := toLibraryAssetDTO(workspace.PublicID, result.Asset)
-			entry.Asset = &asset
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx, body v1ResolveLibraryAssetsBody) {
+		workspace := wctx.Workspace
+		items := make([]library.V1ResolveItem, 0, len(body.Data.Items))
+		for _, item := range body.Data.Items {
+			items = append(items, library.V1ResolveItem{
+				Provider: item.Provider, SourceID: item.SourceID, SourceURL: item.SourceURL,
+			})
 		}
-		dto.Items = append(dto.Items, entry)
-	}
-	contract.RenderSuccess(c, dto)
+		results, err := h.deps.Library.Store.ResolveAssets(c.Request.Context(), workspace.PublicID, items)
+		if err != nil {
+			renderLibraryError(c, err)
+			return
+		}
+		dto := v1ResolveLibraryResponseDTO{Items: make([]v1ResolveLibraryResultDTO, 0, len(results))}
+		for _, result := range results {
+			entry := v1ResolveLibraryResultDTO{Provider: result.Provider, SourceID: result.SourceID, Status: result.Status}
+			if result.Asset != nil {
+				asset := toLibraryAssetDTO(workspace.PublicID, result.Asset)
+				entry.Asset = &asset
+			}
+			dto.Items = append(dto.Items, entry)
+		}
+		contract.RenderSuccess(c, dto)
+	})
 }
 
 // OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).

@@ -1,5 +1,6 @@
 import { computed, watch, type MaybeRef, type MaybeRefOrGetter } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useQuery, type Query } from '@tanstack/vue-query'
+import { noRetry } from '../../../../shared/query/queryDefaults'
 
 /**
  * Shared TanStack Query owner for Admin list lifecycles.
@@ -15,15 +16,21 @@ export function useAdminCollectionQuery<TPage, TCursor>(options: {
   queryKey: MaybeRef<readonly unknown[]>
   queryFn: (context: { queryKey: readonly unknown[]; signal: AbortSignal }) => Promise<TPage>
   enabled?: MaybeRefOrGetter<boolean>
-  refetchInterval?: MaybeRefOrGetter<number | false>
+  // Value/getter forms (including the `useQueryPolling` getter) plus the
+  // query-callback form from `shared/query/queryDefaults` presets. The bare
+  // getter rides the callback branch structurally (fewer params), matching
+  // how `useQuery` itself accepts it.
+  refetchInterval?:
+    | MaybeRefOrGetter<number | false>
+    | ((query: Query<TPage>) => number | false | undefined)
   getNextCursor?: (page: TPage) => TCursor | undefined
   pagination?: { setNextCursor: (cursor: TCursor | undefined) => boolean }
 }) {
   const query = useQuery({
     queryKey: options.queryKey,
     queryFn: options.queryFn,
+    ...noRetry(),
     ...(options.enabled !== undefined ? { enabled: options.enabled } : {}),
-    retry: false,
     ...(options.refetchInterval !== undefined ? { refetchInterval: options.refetchInterval } : {}),
   })
   const data = query.data

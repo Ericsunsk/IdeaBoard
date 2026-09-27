@@ -79,10 +79,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Frozen v1-local reward error codes (wire-stable; document for the merger
-// to promote into internal/platform/contract + openapi.public.yaml).
-// Explicit statuses are rendered at each site (never via StatusOf), so the
-// kernel registry needs no edit for this batch.
+// Frozen v1 reward error codes (wire-stable). Promoted into
+// internal/platform/contract: the kernel registry is the single source
+// of truth, these v1-local names keep the render-site diffs trivial.
+// Explicit statuses are rendered at each site (never via StatusOf);
+// StatusOf still documents the exact status for each code.
 //
 //   - reward_code_unavailable (422): unknown, expired, exhausted, or
 //     disabled code (no oracle between shapes).
@@ -90,9 +91,9 @@ import (
 //   - reward_redeem_conflict (409): Idempotency-Key reused with a different
 //     redeem request (hash mismatch); replay otherwise.
 const (
-	CodeRewardCodeUnavailable contract.Code = "reward_code_unavailable"
-	CodeRewardWalletLocked    contract.Code = "reward_wallet_locked"
-	CodeRewardRedeemConflict  contract.Code = "reward_redeem_conflict"
+	CodeRewardCodeUnavailable contract.Code = contract.CodeRewardCodeUnavailable
+	CodeRewardWalletLocked    contract.Code = contract.CodeRewardWalletLocked
+	CodeRewardRedeemConflict  contract.Code = contract.CodeRewardRedeemConflict
 )
 
 // v1PurchaseOptionsService is the caller-owned read over the Payments
@@ -140,32 +141,24 @@ func registerContractV1BillingGapsRoutes(group *gin.RouterGroup, handler *contra
 }
 
 func (h *contractV1BillingHandler) getPurchaseOptions(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.PurchaseOptions == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	options, err := h.deps.PurchaseOptions.GetPurchaseOptions(c.Request.Context(), p.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	if options.QuickIdeaQuantities == nil {
-		options.QuickIdeaQuantities = []int64{}
-	}
-	contract.RenderSuccess(c, options)
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		if h.deps.PurchaseOptions == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		options, err := h.deps.PurchaseOptions.GetPurchaseOptions(c.Request.Context(), p.UserID())
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		if options.QuickIdeaQuantities == nil {
+			options.QuickIdeaQuantities = []int64{}
+		}
+		contract.RenderSuccess(c, options)
+	})
 }
 
 type v1PendingOrderDTO struct {
@@ -189,33 +182,25 @@ func toV1PendingOrderDTO(order paymentcontracts.PendingPaymentOrder) v1PendingOr
 }
 
 func (h *contractV1BillingHandler) listPendingOrders(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.PendingOrders == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	orders, err := h.deps.PendingOrders.ListPendingOrders(c.Request.Context(), p.UserID())
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	items := make([]v1PendingOrderDTO, 0, len(orders.Items))
-	for _, order := range orders.Items {
-		items = append(items, toV1PendingOrderDTO(order))
-	}
-	contract.RenderSuccess(c, map[string]any{"items": items})
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		if h.deps.PendingOrders == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		orders, err := h.deps.PendingOrders.ListPendingOrders(c.Request.Context(), p.UserID())
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		items := make([]v1PendingOrderDTO, 0, len(orders.Items))
+		for _, order := range orders.Items {
+			items = append(items, toV1PendingOrderDTO(order))
+		}
+		contract.RenderSuccess(c, map[string]any{"items": items})
+	})
 }
 
 // v1PendingOrderToken validates the order path param with the legacy
@@ -269,113 +254,99 @@ func renderPendingOrderError(c *gin.Context, err error, action string) {
 }
 
 func (h *contractV1BillingHandler) continuePendingOrder(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.PendingOrders == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	orderID, ok := v1PendingOrderToken(c)
-	if !ok {
-		return
-	}
-	if !requireEmptyV1BillingActionBody(c) {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(p.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "billing.pending.continue")
-	hash := contract.HashIdempotencyRequest("billing.pending.continue", workspace.PublicID, orderID)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-		return h.deps.PendingOrders.ContinuePendingOrder(ctx, p.UserID(), orderID)
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		workspace := wctx.Workspace
+		if h.deps.PendingOrders == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
 			c.Abort()
 			return
 		}
-		renderPendingOrderError(c, doErr, "继续充值")
-		return
-	}
-	order, ok := result.(paymentcontracts.PendingPaymentOrder)
-	if !ok {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+		orderID, ok := v1PendingOrderToken(c)
+		if !ok {
+			return
+		}
+		if !requireEmptyV1BillingActionBody(c) {
+			return
+		}
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(p.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "billing.pending.continue")
+		hash := contract.HashIdempotencyRequest("billing.pending.continue", workspace.PublicID, orderID)
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
+			return h.deps.PendingOrders.ContinuePendingOrder(ctx, p.UserID(), orderID)
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderPendingOrderError(c, doErr, "继续充值")
+			return
+		}
+		order, ok := result.(paymentcontracts.PendingPaymentOrder)
+		if !ok {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+	})
 }
 
 func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.PendingOrders == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	orderID, ok := v1PendingOrderToken(c)
-	if !ok {
-		return
-	}
-	if !requireEmptyV1BillingActionBody(c) {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(p.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "billing.pending.abandon")
-	hash := contract.HashIdempotencyRequest("billing.pending.abandon", workspace.PublicID, orderID)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-		return h.deps.PendingOrders.AbandonPendingOrder(ctx, p.UserID(), orderID)
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		workspace := wctx.Workspace
+		if h.deps.PendingOrders == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
 			c.Abort()
 			return
 		}
-		renderPendingOrderError(c, doErr, "放弃充值")
-		return
-	}
-	order, ok := result.(paymentcontracts.PendingPaymentOrder)
-	if !ok {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+		orderID, ok := v1PendingOrderToken(c)
+		if !ok {
+			return
+		}
+		if !requireEmptyV1BillingActionBody(c) {
+			return
+		}
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(p.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "billing.pending.abandon")
+		hash := contract.HashIdempotencyRequest("billing.pending.abandon", workspace.PublicID, orderID)
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
+			return h.deps.PendingOrders.AbandonPendingOrder(ctx, p.UserID(), orderID)
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderPendingOrderError(c, doErr, "放弃充值")
+			return
+		}
+		order, ok := result.(paymentcontracts.PendingPaymentOrder)
+		if !ok {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, toV1PendingOrderDTO(order))
+	})
 }
 
 type v1RechargeHistoryItemDTO struct {
@@ -390,60 +361,52 @@ type v1RechargeHistoryItemDTO struct {
 }
 
 func (h *contractV1BillingHandler) listRecharges(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.Recharges == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
-		c.Abort()
-		return
-	}
-	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		c.Abort()
-		return
-	}
-	cursor := strings.TrimSpace(c.Query(contract.CursorParam))
-	page, err := h.deps.Recharges.ListRecharges(c.Request.Context(), p.UserID(), cursor, pageSize)
-	if err != nil {
-		switch {
-		case errors.Is(err, paymentcontracts.ErrRechargeHistoryCursor):
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
-		case errors.Is(err, paymentcontracts.ErrRechargeHistoryLimit):
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		default:
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		if h.deps.Recharges == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			c.Abort()
+			return
 		}
-		c.Abort()
-		return
-	}
-	items := make([]v1RechargeHistoryItemDTO, 0, len(page.Items))
-	for _, item := range page.Items {
-		items = append(items, v1RechargeHistoryItemDTO{
-			OccurredAt:           item.OccurredAt.UTC().Format(time.RFC3339),
-			IdeaQuantity:         item.IdeaQuantity,
-			PaidAmountMinor:      item.PaidAmountMinor,
-			PaidCurrency:         item.PaidCurrency,
-			Status:               item.Status,
-			RefundedIdeaQuantity: item.RefundedIdeaQuantity,
-			RefundedAmountMinor:  item.RefundedAmountMinor,
-			ReceiptURL:           item.ReceiptURL,
-		})
-	}
-	meta := contract.NewPageMeta("", false)
-	if strings.TrimSpace(page.NextCursor) != "" {
-		meta = contract.NewPageMeta(page.NextCursor, true)
-	}
-	contract.RenderPaginated(c, items, meta)
+		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			c.Abort()
+			return
+		}
+		cursor := strings.TrimSpace(c.Query(contract.CursorParam))
+		page, err := h.deps.Recharges.ListRecharges(c.Request.Context(), p.UserID(), cursor, pageSize)
+		if err != nil {
+			switch {
+			case errors.Is(err, paymentcontracts.ErrRechargeHistoryCursor):
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			case errors.Is(err, paymentcontracts.ErrRechargeHistoryLimit):
+				contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			default:
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			}
+			c.Abort()
+			return
+		}
+		items := make([]v1RechargeHistoryItemDTO, 0, len(page.Items))
+		for _, item := range page.Items {
+			items = append(items, v1RechargeHistoryItemDTO{
+				OccurredAt:           item.OccurredAt.UTC().Format(time.RFC3339),
+				IdeaQuantity:         item.IdeaQuantity,
+				PaidAmountMinor:      item.PaidAmountMinor,
+				PaidCurrency:         item.PaidCurrency,
+				Status:               item.Status,
+				RefundedIdeaQuantity: item.RefundedIdeaQuantity,
+				RefundedAmountMinor:  item.RefundedAmountMinor,
+				ReceiptURL:           item.ReceiptURL,
+			})
+		}
+		meta := contract.NewPageMeta("", false)
+		if strings.TrimSpace(page.NextCursor) != "" {
+			meta = contract.NewPageMeta(page.NextCursor, true)
+		}
+		contract.RenderPaginated(c, items, meta)
+	})
 }
 
 type v1CreateBillingQuoteBody struct {
@@ -471,89 +434,78 @@ type v1BillingQuoteDTO struct {
 // place a price is ever shown, and settlement re-quotes authoritatively.
 // No Idempotency-Key: pure read, safe to retry.
 func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.Quoter == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
-		c.Abort()
-		return
-	}
-	var body v1CreateBillingQuoteBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	sku := strings.TrimSpace(body.Data.SKU)
-	if sku == "" {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"计费功能标识非法", contract.FieldErrors{Fields: map[string]string{"sku": "invalid"}})
-		c.Abort()
-		return
-	}
-	resolutionRaw := strings.TrimSpace(body.Data.OutputResolution)
-	if resolutionRaw == "" {
-		resolutionRaw = string(billing.OutputResolutionDefault)
-	}
-	resolution, err := billing.NormalizeOutputResolution(resolutionRaw)
-	if err != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"输出规格非法", contract.FieldErrors{Fields: map[string]string{"output_resolution": "invalid"}})
-		c.Abort()
-		return
-	}
-	quantity := int64(1)
-	if body.Data.Quantity != nil {
-		quantity = *body.Data.Quantity
-	}
-	if quantity <= 0 {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"报价数量非法", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
-		c.Abort()
-		return
-	}
-	quote, err := h.deps.Quoter.QuoteAtResolution(c.Request.Context(), sku, resolution, quantity)
-	if err != nil {
-		if renderBillingPricingUnavailable(c, err) {
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		if h.deps.Quoter == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
 			c.Abort()
 			return
 		}
-		switch {
-		case errors.Is(err, billing.ErrInvalidSKU),
-			errors.Is(err, billing.ErrInvalidCatalogEntry),
-			errors.Is(err, billing.ErrInvalidOutputResolution):
+		var body v1CreateBillingQuoteBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		sku := strings.TrimSpace(body.Data.SKU)
+		if sku == "" {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 				"计费功能标识非法", contract.FieldErrors{Fields: map[string]string{"sku": "invalid"}})
-		case errors.Is(err, billing.ErrInvalidQuantity):
+			c.Abort()
+			return
+		}
+		resolutionRaw := strings.TrimSpace(body.Data.OutputResolution)
+		if resolutionRaw == "" {
+			resolutionRaw = string(billing.OutputResolutionDefault)
+		}
+		resolution, err := billing.NormalizeOutputResolution(resolutionRaw)
+		if err != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"输出规格非法", contract.FieldErrors{Fields: map[string]string{"output_resolution": "invalid"}})
+			c.Abort()
+			return
+		}
+		quantity := int64(1)
+		if body.Data.Quantity != nil {
+			quantity = *body.Data.Quantity
+		}
+		if quantity <= 0 {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 				"报价数量非法", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
-		case errors.Is(err, billing.ErrQuoteTotalExceeded):
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"报价超过允许上限", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
-		case errors.Is(err, billing.ErrServiceUnavailable):
-			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
-		default:
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+			c.Abort()
+			return
 		}
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, v1BillingQuoteDTO{
-		SKU: string(quote.SKU), DisplayName: quote.DisplayName,
-		PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
-		OutputResolution: string(quote.OutputResolution), UnitCredits: quote.UnitCredits,
-		Quantity: quote.Quantity, TotalCredits: quote.TotalCredits,
-		QuotedAt: quote.QuotedAt.UTC().Format(time.RFC3339),
+		quote, err := h.deps.Quoter.QuoteAtResolution(c.Request.Context(), sku, resolution, quantity)
+		if err != nil {
+			if renderBillingPricingUnavailable(c, err) {
+				c.Abort()
+				return
+			}
+			switch {
+			case errors.Is(err, billing.ErrInvalidSKU),
+				errors.Is(err, billing.ErrInvalidCatalogEntry),
+				errors.Is(err, billing.ErrInvalidOutputResolution):
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+					"计费功能标识非法", contract.FieldErrors{Fields: map[string]string{"sku": "invalid"}})
+			case errors.Is(err, billing.ErrInvalidQuantity):
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+					"报价数量非法", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
+			case errors.Is(err, billing.ErrQuoteTotalExceeded):
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+					"报价超过允许上限", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
+			case errors.Is(err, billing.ErrServiceUnavailable):
+				contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
+			default:
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
+			}
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, v1BillingQuoteDTO{
+			SKU: string(quote.SKU), DisplayName: quote.DisplayName,
+			PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
+			OutputResolution: string(quote.OutputResolution), UnitCredits: quote.UnitCredits,
+			Quantity: quote.Quantity, TotalCredits: quote.TotalCredits,
+			QuotedAt: quote.QuotedAt.UTC().Format(time.RFC3339),
+		})
 	})
 }
 
@@ -604,87 +556,78 @@ func toV1RewardHistoryItemDTO(item ports.RedemptionHistoryItem) v1RewardRedempti
 // adds header-key replay for transport retries. Code plaintext never
 // leaves the request hash.
 func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.Rewards == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
-		c.Abort()
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	var body v1RedeemRewardBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	code := strings.TrimSpace(body.Data.Code)
-	if code == "" {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"兑换码不能为空", contract.FieldErrors{Fields: map[string]string{"code": "required"}})
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(p.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "rewards.redeem")
-	hash := contract.HashIdempotencyRequest("rewards.redeem", workspace.PublicID, code)
-	result, replayed, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
-		return h.deps.Rewards.Redeem(ctx, ports.RedeemCommand{UserID: p.UserID(), Code: code})
-	})
-	if doErr != nil {
-		switch {
-		case contract.IsIdempotencyConflict(doErr):
-			contract.RenderError(c, http.StatusConflict, CodeRewardRedeemConflict, "幂等请求与原请求不一致")
-		case errors.Is(doErr, rewardsdomain.ErrInvalidCode),
-			errors.Is(doErr, rewardsdomain.ErrCodeUnavailable):
-			contract.RenderError(c, http.StatusUnprocessableEntity, CodeRewardCodeUnavailable, "兑换码无效或已失效")
-		case errors.Is(doErr, rewardsdomain.ErrWalletFrozen):
-			contract.RenderError(c, http.StatusConflict, CodeRewardWalletLocked, "当前账户无法兑换奖励")
-		default:
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		workspace := wctx.Workspace
+		if h.deps.Rewards == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
+			c.Abort()
+			return
 		}
-		c.Abort()
-		return
-	}
-	redeemed, ok := result.(ports.RedeemResult)
-	if !ok {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
-		c.Abort()
-		return
-	}
-	redeemed.Redemption.UserPublicID = p.PublicID()
-	redeemed.Redemption.DisplayName = p.DisplayName()
-	redemption := redeemed.Redemption
-	dto := v1RedeemRewardResultDTO{
-		Redemption: v1RewardRedemptionDTO{
-			ID: redemption.ID, RewardCodeID: redemption.RewardCodeID,
-			UserPublicID: redemption.UserPublicID.String(), DisplayName: redemption.DisplayName,
-			CreditAmount: redemption.CreditAmount, CreditTransactionID: redemption.CreditTransactionID,
-			AvailableBalanceAfter: redemption.AvailableBalanceAfter,
-			RedeemedAt:            redemption.RedeemedAt.UTC().Format(time.RFC3339),
-		},
-		HistoryItem:      toV1RewardHistoryItemDTO(redeemed.HistoryItem),
-		CreditedAmount:   redeemed.CreditedAmount,
-		AvailableBalance: redeemed.AvailableBalance,
-		Replayed:         replayed || redeemed.Replayed,
-	}
-	contract.RenderCreated(c, dto)
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		var body v1RedeemRewardBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		code := strings.TrimSpace(body.Data.Code)
+		if code == "" {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"兑换码不能为空", contract.FieldErrors{Fields: map[string]string{"code": "required"}})
+			c.Abort()
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(p.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "rewards.redeem")
+		hash := contract.HashIdempotencyRequest("rewards.redeem", workspace.PublicID, code)
+		result, replayed, doErr := h.deps.Idempotency.Do(ctx, scope, p.UserID(), key, hash, func() (any, error) {
+			return h.deps.Rewards.Redeem(ctx, ports.RedeemCommand{UserID: p.UserID(), Code: code})
+		})
+		if doErr != nil {
+			switch {
+			case contract.IsIdempotencyConflict(doErr):
+				contract.RenderError(c, http.StatusConflict, CodeRewardRedeemConflict, "幂等请求与原请求不一致")
+			case errors.Is(doErr, rewardsdomain.ErrInvalidCode),
+				errors.Is(doErr, rewardsdomain.ErrCodeUnavailable):
+				contract.RenderError(c, http.StatusUnprocessableEntity, CodeRewardCodeUnavailable, "兑换码无效或已失效")
+			case errors.Is(doErr, rewardsdomain.ErrWalletFrozen):
+				contract.RenderError(c, http.StatusConflict, CodeRewardWalletLocked, "当前账户无法兑换奖励")
+			default:
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
+			}
+			c.Abort()
+			return
+		}
+		redeemed, ok := result.(ports.RedeemResult)
+		if !ok {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
+			c.Abort()
+			return
+		}
+		redeemed.Redemption.UserPublicID = p.PublicID()
+		redeemed.Redemption.DisplayName = p.DisplayName()
+		redemption := redeemed.Redemption
+		dto := v1RedeemRewardResultDTO{
+			Redemption: v1RewardRedemptionDTO{
+				ID: redemption.ID, RewardCodeID: redemption.RewardCodeID,
+				UserPublicID: redemption.UserPublicID.String(), DisplayName: redemption.DisplayName,
+				CreditAmount: redemption.CreditAmount, CreditTransactionID: redemption.CreditTransactionID,
+				AvailableBalanceAfter: redemption.AvailableBalanceAfter,
+				RedeemedAt:            redemption.RedeemedAt.UTC().Format(time.RFC3339),
+			},
+			HistoryItem:      toV1RewardHistoryItemDTO(redeemed.HistoryItem),
+			CreditedAmount:   redeemed.CreditedAmount,
+			AvailableBalance: redeemed.AvailableBalance,
+			Replayed:         replayed || redeemed.Replayed,
+		}
+		contract.RenderCreated(c, dto)
+	})
 }
 
 type v1RewardRedemptionCursor struct {
@@ -692,61 +635,53 @@ type v1RewardRedemptionCursor struct {
 }
 
 func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
-	p, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireTenancy(c) {
-		return
-	}
-	workspace, _, visible := h.billingWorkspaceContext(c, p)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	if h.deps.Rewards == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
-		c.Abort()
-		return
-	}
-	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		c.Abort()
-		return
-	}
-	var beforeID int64
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1RewardRedemptionCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.BeforeID < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
-			c.Abort()
-			return
-		}
-		beforeID = cursor.BeforeID
-	}
-	page, err := h.deps.Rewards.ListRedemptions(c.Request.Context(), ports.ListRedemptionsInput{
-		UserID: p.UserID(), BeforeID: beforeID, Limit: pageSize,
-	})
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
-		c.Abort()
-		return
-	}
-	items := make([]v1RewardRedemptionHistoryItemDTO, 0, len(page.Redemptions))
-	for _, item := range page.Redemptions {
-		items = append(items, toV1RewardHistoryItemDTO(item))
-	}
-	meta := contract.NewPageMeta("", false)
-	if page.NextBeforeID > 0 {
-		next, encodeErr := contract.EncodeCursor(v1RewardRedemptionCursor{BeforeID: page.NextBeforeID})
-		if encodeErr != nil {
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		p := wctx.Principal
+		if h.deps.Rewards == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
 			c.Abort()
 			return
 		}
-		meta = contract.NewPageMeta(next, true)
-	}
-	contract.RenderPaginated(c, items, meta)
+		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			c.Abort()
+			return
+		}
+		var beforeID int64
+		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
+			cursor, decodeErr := contract.DecodeCursor[v1RewardRedemptionCursor](raw)
+			if decodeErr != nil || cursor == nil || cursor.BeforeID < 0 {
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				c.Abort()
+				return
+			}
+			beforeID = cursor.BeforeID
+		}
+		page, err := h.deps.Rewards.ListRedemptions(c.Request.Context(), ports.ListRedemptionsInput{
+			UserID: p.UserID(), BeforeID: beforeID, Limit: pageSize,
+		})
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
+			c.Abort()
+			return
+		}
+		items := make([]v1RewardRedemptionHistoryItemDTO, 0, len(page.Redemptions))
+		for _, item := range page.Redemptions {
+			items = append(items, toV1RewardHistoryItemDTO(item))
+		}
+		meta := contract.NewPageMeta("", false)
+		if page.NextBeforeID > 0 {
+			next, encodeErr := contract.EncodeCursor(v1RewardRedemptionCursor{BeforeID: page.NextBeforeID})
+			if encodeErr != nil {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
+				c.Abort()
+				return
+			}
+			meta = contract.NewPageMeta(next, true)
+		}
+		contract.RenderPaginated(c, items, meta)
+	})
 }
 
 // OpenAPI deltas for the merger (DO NOT edit apps/api/openapi*.yaml here).

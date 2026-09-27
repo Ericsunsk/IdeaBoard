@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/validation"
 
@@ -14,16 +15,25 @@ import (
 // Identity admin/user HTTP wire codes are stable. Do not rename a code
 // without coordinating frontend callers that branch on it. Messages stay
 // intentionally safe for public display.
+// Identity admin/user HTTP wire codes are stable. Do not rename a code
+// without coordinating frontend callers that branch on it. Messages stay
+// intentionally safe for public display.
+//
+// The values below alias the kernel registry
+// (platform/contract.CodeIdentity*): the registry is the single source of
+// truth, these names keep the edge diffs trivial. Wire values are
+// unchanged.
 const (
-	codeIdentityRequestInvalid      = "identity_request_invalid"
-	codeIdentityUserPublicIDInvalid = "identity_user_public_id_invalid"
-	codeIdentityUserNotFound        = "identity_user_not_found"
-	codeIdentityForbidden           = "identity_forbidden"
-	codeIdentityConflict            = "identity_conflict"
-	codeIdentityUpstreamRejected    = "identity_upstream_rejected"
-	codeIdentityUpstreamUnavailable = "identity_upstream_unavailable"
-	codeIdentityOperationFailed     = "identity_operation_failed"
-	codeIdentityServiceUnavailable  = "identity_service_unavailable"
+	codeIdentityRequestInvalid      = string(contract.CodeIdentityRequestInvalid)
+	codeIdentityUnauthorized        = string(contract.CodeIdentityUnauthorized)
+	codeIdentityUserPublicIDInvalid = string(contract.CodeIdentityUserPublicIDInvalid)
+	codeIdentityUserNotFound        = string(contract.CodeIdentityUserNotFound)
+	codeIdentityForbidden           = string(contract.CodeIdentityForbidden)
+	codeIdentityConflict            = string(contract.CodeIdentityConflict)
+	codeIdentityUpstreamRejected    = string(contract.CodeIdentityUpstreamRejected)
+	codeIdentityUpstreamUnavailable = string(contract.CodeIdentityUpstreamUnavailable)
+	codeIdentityOperationFailed     = string(contract.CodeIdentityOperationFailed)
+	codeIdentityServiceUnavailable  = string(contract.CodeIdentityServiceUnavailable)
 )
 
 func writeIdentityRequestInvalid(c *gin.Context, message string) {

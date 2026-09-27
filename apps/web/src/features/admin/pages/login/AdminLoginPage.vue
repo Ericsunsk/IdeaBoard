@@ -113,6 +113,7 @@ import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedir
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { i18n } from '../../../../shared/i18n'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
+import { stringParam } from '../../../../shared/router/queryParams'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import { useAdminLoginFeedback } from './useAdminLoginFeedback'
@@ -143,9 +144,7 @@ const formValue = ref({
 })
 
 function resolveAdminRedirectPath() {
-  const redirect = Array.isArray(route.query.redirect)
-    ? route.query.redirect[0]
-    : route.query.redirect
+  const redirect = stringParam(route.query.redirect)
   if (!redirect || typeof redirect !== 'string') {
     return ADMIN_DEFAULT_PATH
   }

@@ -4,6 +4,7 @@ import type {
 } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
 
 export type AdminCreditRun = CreditReconciliationRun
 
@@ -18,7 +19,7 @@ export function createAdminCreditRunHistoryResource(
       api.listReconciliationRuns(
         stripUndefined({
           before_id: beforeId,
-          limit: 20,
+          limit: PAGE_SIZES.standard,
         }) satisfies ListAdminCreditReconciliationRunsParams,
         { signal },
       ),

@@ -38,6 +38,12 @@ import {
   type OpaqueIdPrefix,
 } from './contractKernel'
 import { createPollDelay, sleep } from '../utils/polling'
+import { PAGE_SIZES } from '../config/pagination'
+import {
+  TASK_POLL_BACKOFF_FACTOR,
+  TASK_POLL_INITIAL_DELAY_MS,
+  TASK_POLL_MAX_DELAY_MS,
+} from '../config/timing'
 import { subscribeWorkspaceEvent } from './workspaceEventStream'
 
 export type WorkspaceTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -204,7 +210,7 @@ export async function listWorkspaceTasks(
   params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<PaginatedWorkspaceTasks> {
-  const query: { cursor?: string; page_size?: number } = { page_size: params?.pageSize ?? 20 }
+  const query: { cursor?: string; page_size?: number } = { page_size: params?.pageSize ?? PAGE_SIZES.standard }
   if (params?.cursor?.trim()) query.cursor = params.cursor.trim()
   return listWorkspaceTasksTransport(
     assertWorkspaceTaskWorkspaceId(workspaceId),
@@ -314,9 +320,9 @@ const WORKSPACE_TASK_WAIT_TYPES = [
 ] as const
 
 const WORKSPACE_TASK_WAIT_TIMEOUT_MS = 6 * 60 * 1000
-const WORKSPACE_TASK_POLL_INITIAL_DELAY_MS = 1200
-const WORKSPACE_TASK_POLL_MAX_DELAY_MS = 8000
-const WORKSPACE_TASK_POLL_BACKOFF_FACTOR = 1.6
+const WORKSPACE_TASK_POLL_INITIAL_DELAY_MS = TASK_POLL_INITIAL_DELAY_MS
+const WORKSPACE_TASK_POLL_MAX_DELAY_MS = TASK_POLL_MAX_DELAY_MS
+const WORKSPACE_TASK_POLL_BACKOFF_FACTOR = TASK_POLL_BACKOFF_FACTOR
 
 export type WaitWorkspaceTaskOptions = {
   timeoutMs?: number | undefined

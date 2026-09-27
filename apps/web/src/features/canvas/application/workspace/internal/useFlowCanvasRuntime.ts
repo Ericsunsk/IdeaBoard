@@ -47,6 +47,7 @@ export type UseFlowCanvasRuntimeOptions = {
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
+  onArchived?: ((boardId: string) => void) | undefined
   scheduleMicrotask?: ((callback: () => void) => void) | undefined
   vueFlowGraphActions?: CanvasVueFlowGraphActions | undefined
 }
@@ -143,6 +144,7 @@ function useCanvasRuntimeBoardSync(
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
+    ...(options.onArchived ? { onArchived: options.onArchived } : {}),
     canApplyReconciliation,
   })
 }

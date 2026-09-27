@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
@@ -24,11 +25,15 @@ import (
 // vision search edge renders through MachineError): those messages are
 // written for display and carry no secrets. The full underlying error only
 // ever reaches server logs.
+// The values below alias the kernel registry
+// (platform/contract.CodeStorage*): the registry is the single source of
+// truth, these names keep the edge diffs trivial. Wire values are
+// unchanged.
 const (
-	codeStorageInvalidInput       = "storage_invalid_input"
-	codeStorageServiceUnavailable = "storage_service_unavailable"
-	codeStorageProfileInvalid     = "storage_profile_invalid"
-	codeStorageOperationFailed    = "storage_operation_failed"
+	codeStorageInvalidInput       = string(contract.CodeStorageInvalidInput)
+	codeStorageServiceUnavailable = string(contract.CodeStorageServiceUnavailable)
+	codeStorageProfileInvalid     = string(contract.CodeStorageProfileInvalid)
+	codeStorageOperationFailed    = string(contract.CodeStorageOperationFailed)
 )
 
 // writeStorageInputError renders request-shape failures (malformed JSON)

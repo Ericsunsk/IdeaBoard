@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminUserListItem } from './resource'
+import { makeAdminUserListItem } from '../../../test/factories'
 import {
   createAdminUserRowView,
   getUserActionItems,
@@ -14,7 +14,7 @@ import {
 
 describe('admin user view model', () => {
   it('marks admin and active users from role/status values', () => {
-    const user = makeUser({ role: 'admin', status: 1 })
+    const user = makeAdminUserListItem({ role: 'admin', status: 1 })
 
     expect(isAdminUser(user)).toBe(true)
     expect(isActiveUser(user)).toBe(true)
@@ -27,7 +27,7 @@ describe('admin user view model', () => {
 
   it('maps backend user fields into row presentation fields', () => {
     const row = createAdminUserRowView(
-      makeUser({
+      makeAdminUserListItem({
         available_credits: 125,
         role: 'admin',
         status: 0,
@@ -91,27 +91,9 @@ describe('admin user view model', () => {
   })
 })
 
-function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
-  return {
-    public_id: 'usr_000000000000000000000001',
-    email: 'user@example.com',
-    providers: ['email'],
-    display_name: 'user',
-    role: 'user',
-    status: 1,
-    available_credits: 0,
-    avatar: '',
-    created_at: '',
-    updated_at: '',
-    last_login_ip: '',
-    last_login_country: '',
-    ...overrides,
-  }
-}
-
 function makeCommandTarget(overrides: Partial<ReturnType<typeof createAdminUserRowView>> = {}) {
   return {
-    ...createAdminUserRowView(makeUser()),
+    ...createAdminUserRowView(makeAdminUserListItem()),
     ...overrides,
   }
 }

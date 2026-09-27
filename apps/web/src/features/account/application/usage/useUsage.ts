@@ -7,8 +7,12 @@ import {
   type UsageRange,
 } from '../../infrastructure/usage/resource'
 import { useAccountWorkspace } from '../accountWorkspace'
-
-const USAGE_STALE_TIME_MS = 30_000
+import {
+  accountScoped,
+  keepPrevious,
+  noRetry,
+  STALE_TIME_MS,
+} from '../../../../shared/query/queryDefaults'
 
 type SuccessfulUsage = {
   range: UsageRange
@@ -33,10 +37,10 @@ export function useUsage(
       }
     },
     enabled: () => toValue(enabled) && selectionSettled.value,
-    staleTime: USAGE_STALE_TIME_MS,
+    ...accountScoped(STALE_TIME_MS.usage),
     refetchOnWindowFocus: true,
-    retry: false,
-    placeholderData: (previousData) => previousData,
+    ...noRetry(),
+    ...keepPrevious(),
   })
 
   watch(

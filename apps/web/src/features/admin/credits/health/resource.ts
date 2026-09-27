@@ -5,6 +5,7 @@ import type {
   CreditReconciliationRequest,
 } from '../shared/api'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
+import { adminPolling } from '../../../../shared/query/queryDefaults'
 
 const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
 
@@ -19,7 +20,13 @@ export function useAdminCreditHealthResource(
     queryKey: adminCreditHealthQueryKey,
     queryFn: ({ signal }) => api.getCreditHealth({ signal }),
     enabled,
-    refetchInterval: (query) => (query.state.data?.active_run ? 5_000 : 30_000),
+    // Interval only: the global retry policy stays (a failed poll still
+    // retries once); only the active/idle cadence converges on the preset.
+    refetchInterval: adminPolling(
+      5_000,
+      30_000,
+      (data) => (data as CreditHealth | undefined)?.active_run != null,
+    ).refetchInterval,
   })
   const startMutation = useMutation({
     mutationFn: (request: CreditReconciliationRequest) => api.startReconciliation(request),

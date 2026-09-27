@@ -2,12 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +36,10 @@ func RequestIDFromContext(ctx context.Context) string {
 
 // RequestIDMiddleware binds a correlation ID to every request: it echoes a
 // client-supplied X-Request-ID (trimmed, max 128 chars) or mints a UUIDv4,
-// then exposes it via response header, gin context and request context.
+// then exposes it via response header, gin context and request context. It
+// also seeds the applog request scope so downstream logs carry request_id
+// without manual plumbing; principal enrichment happens later in
+// ResolvePrincipal (post-auth by middleware order).
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := normalizeRequestID(c.GetHeader(RequestIDHeader))
@@ -46,7 +49,8 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		c.Set(RequestIDHeader, requestID)
 		c.Header(RequestIDHeader, requestID)
 		if c.Request != nil {
-			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), requestIDContextKey{}, requestID))
+			ctx := context.WithValue(c.Request.Context(), requestIDContextKey{}, requestID)
+			c.Request = c.Request.WithContext(applog.ContextWithRequestID(ctx, requestID))
 		}
 		c.Next()
 	}
@@ -69,22 +73,24 @@ func AccessLogMiddleware() gin.HandlerFunc {
 		c.Next()
 		latency := time.Since(start)
 		status := c.Writer.Status()
+		// request_id rides the applog scope seeded by RequestIDMiddleware
+		// (first in the global chain), so it is not plumbed manually here.
+		logger := applog.FromContext(c.Request.Context())
 		attrs := []any{
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
 			"status", status,
 			"latency_ms", latency.Milliseconds(),
-			"request_id", c.GetString(RequestIDHeader),
 			"client_ip", c.ClientIP(),
 		}
 		if len(c.Errors) > 0 {
 			attrs = append(attrs, "errors", c.Errors.String())
 		}
 		if status >= http.StatusInternalServerError {
-			slog.Error("http request", attrs...)
+			logger.Error("http request", attrs...)
 			return
 		}
-		slog.Info("http request", attrs...)
+		logger.Info("http request", attrs...)
 	}
 }
 
@@ -95,9 +101,7 @@ func RecoveryMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				requestID := c.GetString(RequestIDHeader)
-				slog.Error("http panic recovered",
-					"request_id", requestID,
+				applog.FromContext(c.Request.Context()).Error("http panic recovered",
 					"method", c.Request.Method,
 					"path", c.Request.URL.Path,
 					"panic", recovered,

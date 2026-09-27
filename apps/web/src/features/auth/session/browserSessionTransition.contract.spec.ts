@@ -18,10 +18,7 @@ vi.mock('./sessionPersistence', () => ({
 }))
 
 import { createBrowserSessionTransition } from './browserSessionTransition'
-
-function makeUser(publicId: string): User {
-  return { public_id: publicId } as User
-}
+import { makeSessionUser } from '../../../test/factories'
 
 function createHarness(
   overrides: Partial<{
@@ -75,18 +72,24 @@ describe('browser session transition', () => {
   })
 
   it('commits a refreshed identity and clears auth-scoped cache only when it changes', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true, validatedAt: 0 })
-    harness.loadUser.mockResolvedValue({ user: makeUser('user-2') })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      loaded: true,
+      validatedAt: 0,
+    })
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-2' }) })
 
-    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(makeUser('user-2'))
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-2' }),
+    )
 
-    expect(harness.state.commit).toHaveBeenCalledWith(makeUser('user-2'))
-    expect(mocks.persistSessionUser).toHaveBeenCalledWith(makeUser('user-2'))
+    expect(harness.state.commit).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-2' }))
+    expect(mocks.persistSessionUser).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-2' }))
     expect(mocks.clearAuthScopedQueryCache).toHaveBeenCalledOnce()
   })
 
   it('clears local state when a fresh user projection is rejected as unauthorized', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser.mockRejectedValue({ status: 401 })
 
     await expect(harness.transition.fetchUserInfo(true)).resolves.toBeNull()
@@ -98,12 +101,14 @@ describe('browser session transition', () => {
   })
 
   it('keeps the stale user and marks unloaded on 500 so the next nav retries', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser.mockRejectedValue({ status: 500 })
 
-    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(makeUser('user-1'))
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
 
-    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.getUser()).toEqual(makeSessionUser({ public_id: 'user-1' }))
     expect(harness.state.clear).not.toHaveBeenCalled()
     expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
     expect(mocks.clearPersistedSession).not.toHaveBeenCalled()
@@ -111,45 +116,51 @@ describe('browser session transition', () => {
   })
 
   it('keeps the stale user and marks unloaded on timeouts without a status', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser.mockRejectedValue(new Error('upstream unavailable'))
 
-    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(makeUser('user-1'))
+    await expect(harness.transition.fetchUserInfo(true)).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-1' }),
+    )
 
-    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.getUser()).toEqual(makeSessionUser({ public_id: 'user-1' }))
     expect(harness.state.clear).not.toHaveBeenCalled()
     expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
   })
 
   it('keeps the stale user for fresh ensureSession probes on server errors', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true, validatedAt: 0 })
+    const harness = createHarness({
+      user: makeSessionUser({ public_id: 'user-1' }),
+      loaded: true,
+      validatedAt: 0,
+    })
     harness.loadUser.mockRejectedValue({ status: 503 })
 
     await expect(harness.transition.ensureSession({ fresh: true })).resolves.toEqual(
-      makeUser('user-1'),
+      makeSessionUser({ public_id: 'user-1' }),
     )
 
-    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.getUser()).toEqual(makeSessionUser({ public_id: 'user-1' }))
     expect(harness.state.clear).not.toHaveBeenCalled()
     expect(harness.state.markUnloaded).toHaveBeenCalledOnce()
   })
 
   it('retries a transient projection failure once when requested, then commits', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser
       .mockRejectedValueOnce({ status: 500 })
-      .mockResolvedValueOnce({ user: makeUser('user-2') })
+      .mockResolvedValueOnce({ user: makeSessionUser({ public_id: 'user-2' }) })
 
-    await expect(
-      harness.transition.fetchUserInfo(true, { retryTransient: true }),
-    ).resolves.toEqual(makeUser('user-2'))
+    await expect(harness.transition.fetchUserInfo(true, { retryTransient: true })).resolves.toEqual(
+      makeSessionUser({ public_id: 'user-2' }),
+    )
 
     expect(harness.loadUser).toHaveBeenCalledTimes(2)
-    expect(harness.state.commit).toHaveBeenCalledWith(makeUser('user-2'))
+    expect(harness.state.commit).toHaveBeenCalledWith(makeSessionUser({ public_id: 'user-2' }))
   })
 
   it('clears the stale identity after a post-auth retry is exhausted', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser.mockRejectedValue({ status: 500 })
 
     await expect(
@@ -163,7 +174,7 @@ describe('browser session transition', () => {
   })
 
   it('does not retry when the projection is rejected as unauthorized', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.loadUser.mockRejectedValue({ status: 403 })
 
     await expect(
@@ -193,7 +204,7 @@ describe('browser session transition', () => {
 
   it('falls back to User Boards after a successful callback with an unsafe redirect', async () => {
     const harness = createHarness()
-    harness.loadUser.mockResolvedValue({ user: makeUser('user-1') })
+    harness.loadUser.mockResolvedValue({ user: makeSessionUser({ public_id: 'user-1' }) })
     const replace = vi.fn().mockResolvedValue(undefined)
 
     await expect(
@@ -207,12 +218,12 @@ describe('browser session transition', () => {
   })
 
   it('does not clear local state when logout fails', async () => {
-    const harness = createHarness({ user: makeUser('user-1'), loaded: true })
+    const harness = createHarness({ user: makeSessionUser({ public_id: 'user-1' }), loaded: true })
     harness.transport.logout.mockResolvedValue(false)
 
     await expect(harness.transition.logout()).resolves.toBe(false)
 
     expect(harness.state.clear).not.toHaveBeenCalled()
-    expect(harness.getUser()).toEqual(makeUser('user-1'))
+    expect(harness.getUser()).toEqual(makeSessionUser({ public_id: 'user-1' }))
   })
 })

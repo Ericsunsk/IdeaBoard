@@ -200,6 +200,7 @@ type CreateUploadSessionParams struct {
 // ids miss by construction and read as not found (never a distinct
 // status). Membership gating stays at the v1 handler layer; the
 // repository enforces scoping + transitions.
+// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 func (q *Queries) CreateUploadSession(ctx context.Context, arg CreateUploadSessionParams) (UploadSession, error) {
 	row := q.db.QueryRow(ctx, createUploadSession,
 		arg.PublicID,

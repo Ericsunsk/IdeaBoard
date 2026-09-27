@@ -1,20 +1,27 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import AdminCreditHealthPage from './AdminCreditHealthPage.vue'
+import {
+  createCreditHealthHandlers,
+  createCreditHealthMswState,
+  makeCreditFinding,
+  makeCreditHealth,
+  makeReconciliationRun,
+} from './testing'
 
 const pushMock = vi.hoisted(() => vi.fn())
-const toastMocks = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+
+let toastMocks: AppToastMocks
 
 vi.mock('vue-router', async (importOriginal) => {
   const original = await importOriginal<typeof import('vue-router')>()
   return { ...original, useRouter: () => ({ push: pushMock }) }
 })
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => toastMocks,
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 describe('AdminCreditHealthPage', () => {
   let findingRequests: Array<{ status: string | null; beforeId: string | null }>
@@ -27,9 +34,10 @@ describe('AdminCreditHealthPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    toastMocks = mockAppToast()
     findingRequests = []
     findingsShouldFail = false
-    findings = [makeFinding()]
+    findings = [makeCreditFinding()]
     delayResolvedFindings = false
     releaseResolvedFindings = undefined
     delayNextFindingPage = false
@@ -37,7 +45,10 @@ describe('AdminCreditHealthPage', () => {
     useMswHandlers(
       http.get('/api/control/v1/credits/reconciliation/findings', async ({ request }) => {
         if (findingsShouldFail) {
-          return HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
+          return HttpResponse.json(
+            { error: { code: 'unavailable', message: 'unavailable' } },
+            { status: 503 },
+          )
         }
         const query = new URL(request.url).searchParams
         const status = query.get('status')
@@ -54,11 +65,11 @@ describe('AdminCreditHealthPage', () => {
           })
         }
         return HttpResponse.json({
-                    data: {
+          data: {
             findings:
               status === 'resolved'
                 ? [
-                    makeFinding({
+                    makeCreditFinding({
                       id: 40,
                       status: 'resolved',
                       isolated: false,
@@ -67,7 +78,7 @@ describe('AdminCreditHealthPage', () => {
                   ]
                 : beforeId !== null
                   ? [
-                      makeFinding({
+                      makeCreditFinding({
                         id: 39,
                         finding_type: 'stale_hold',
                         severity: 'warning',
@@ -87,12 +98,16 @@ describe('AdminCreditHealthPage', () => {
 
   it('shows one operational health panel while an active Run preserves the trusted result', async () => {
     useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({
-                    data: makeHealth({
+      ...createCreditHealthHandlers(
+        createCreditHealthMswState({
+          health: makeCreditHealth({
             status: 'attention',
-            active_run: makeRun({ id: 12, status: 'running', completed_at: undefined }),
-            latest_successful_run: makeRun({ id: 11, status: 'completed' }),
+            active_run: makeReconciliationRun({
+              id: 12,
+              status: 'running',
+              completed_at: undefined,
+            }),
+            latest_successful_run: makeReconciliationRun({ id: 11, status: 'completed' }),
             open_findings: { total: 2, warning: 1, error: 1, critical: 0, high_risk: 0 },
           }),
         }),
@@ -110,41 +125,37 @@ describe('AdminCreditHealthPage', () => {
   })
 
   it('recovers from an initial load failure', async () => {
-    let shouldFail = true
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        shouldFail
-          ? HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
-          : HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    const state = createCreditHealthMswState({
+      healthError: {
+        status: 503,
+        body: { error: { code: 'unavailable', message: 'unavailable' } },
+      },
+    })
+    useMswHandlers(...createCreditHealthHandlers(state))
     const { user } = renderPage()
 
     expect(await screen.findByText('账本健康状态不可用')).toBeVisible()
-    shouldFail = false
+    state.healthError = null
     await user.click(screen.getByRole('button', { name: '重新加载' }))
 
     expect(await screen.findByText('账本健康')).toBeVisible()
   })
 
   it('keeps cached health visible when a background refresh fails and offers recovery', async () => {
-    let shouldFail = false
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        shouldFail
-          ? HttpResponse.json({ error: { code: 'unavailable', message: 'unavailable' } }, { status: 503 })
-          : HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    const state = createCreditHealthMswState()
+    useMswHandlers(...createCreditHealthHandlers(state))
     const { user, queryClient } = renderPage()
     expect(await screen.findByText('账本健康')).toBeVisible()
 
-    shouldFail = true
+    state.healthError = {
+      status: 503,
+      body: { error: { code: 'unavailable', message: 'unavailable' } },
+    }
     await queryClient.refetchQueries({ queryKey: ['admin', 'credits', 'health'] })
     expect(await screen.findByText('状态刷新失败，当前显示上次加载的数据。')).toBeVisible()
     expect(screen.getByText('账本健康')).toBeVisible()
 
-    shouldFail = false
+    state.healthError = null
     await user.click(screen.getByRole('button', { name: '重试刷新' }))
     await waitFor(() =>
       expect(screen.queryByText('状态刷新失败，当前显示上次加载的数据。')).not.toBeInTheDocument(),
@@ -152,31 +163,24 @@ describe('AdminCreditHealthPage', () => {
   })
 
   it('starts a manual check with an automatic audited reason and refreshes health', async () => {
-    const requests: unknown[] = []
-    let health = makeHealth()
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: health }),
-      ),
-      http.post('/api/control/v1/credits/reconciliation/runs', async ({ request }) => {
-        requests.push(await request.json())
-        const activeRun = makeRun({ id: 14, status: 'queued', completed_at: undefined })
-        health = makeHealth({ active_run: activeRun })
-        return HttpResponse.json({
-                    data: activeRun,
-        })
-      }),
-    )
+    let health = makeCreditHealth()
+    const state = createCreditHealthMswState({
+      getHealth: () => health,
+      onRunStarted: (activeRun) => {
+        health = makeCreditHealth({ active_run: activeRun })
+      },
+    })
+    useMswHandlers(...createCreditHealthHandlers(state))
     const { user, queryClient } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: '重新检查' }))
 
-    await waitFor(() => expect(requests).toEqual([{ reason: '管理员手动触发账本检查' }]))
+    await waitFor(() => expect(state.startRequests).toEqual([{ reason: '管理员手动触发账本检查' }]))
     expect(await screen.findByText('检查进行中 · Run #14')).toBeVisible()
     expect(screen.getByRole('button', { name: '检查中' })).toBeDisabled()
     expect(toastMocks.success).toHaveBeenCalledWith('账本检查已启动')
 
-    health = makeHealth({ latest_successful_run: makeRun({ id: 14 }) })
+    health = makeCreditHealth({ latest_successful_run: makeReconciliationRun({ id: 14 }) })
     await queryClient.refetchQueries({ queryKey: ['admin', 'credits', 'health'] })
 
     await waitFor(() => expect(screen.queryByText('检查进行中 · Run #14')).not.toBeInTheDocument())
@@ -185,39 +189,32 @@ describe('AdminCreditHealthPage', () => {
   })
 
   it('shows keyset-paginated check history and expands technical details on demand', async () => {
-    const runRequests: Array<string | null> = []
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-      http.get('/api/control/v1/credits/reconciliation/runs', ({ request }) => {
-        const beforeId = new URL(request.url).searchParams.get('before_id')
-        runRequests.push(beforeId)
-        return HttpResponse.json({
-                    data: {
-            runs:
-              beforeId === null
-                ? [
-                    makeRun({
-                      id: 21,
-                      trigger: 'manual',
-                      requested_by: 7,
-                      reason: '人工复核账本',
-                      finding_count: 3,
-                      critical_count: 1,
-                      isolated_wallet_count: 1,
-                      attempt_count: 2,
-                      error_message: 'provider timeout',
-                    }),
-                  ]
-                : [makeRun({ id: 20 })],
-            next_before_id: beforeId === null ? 21 : undefined,
-          },
-        })
+    const state = createCreditHealthMswState({
+      getRunsPage: (beforeId) => ({
+        runs:
+          beforeId === null
+            ? [
+                makeReconciliationRun({
+                  id: 21,
+                  trigger: 'manual',
+                  requested_by: 7,
+                  reason: '人工复核账本',
+                  finding_count: 3,
+                  critical_count: 1,
+                  isolated_wallet_count: 1,
+                  attempt_count: 2,
+                  error_message: 'provider timeout',
+                }),
+              ]
+            : [makeReconciliationRun({ id: 20 })],
+        next_before_id: beforeId === null ? 21 : undefined,
       }),
+    })
+    useMswHandlers(
+      ...createCreditHealthHandlers(state),
       http.get('/api/control/v1/credits/reconciliation/runs/:runId', ({ params }) =>
         HttpResponse.json({
-                    data: makeRun({
+          data: makeReconciliationRun({
             id: Number(params.runId),
             trigger: 'manual',
             requested_by: 7,
@@ -256,7 +253,7 @@ describe('AdminCreditHealthPage', () => {
     const nextButton = within(dialog).getByRole('button', { name: '下一页' })
     await waitFor(() => expect(nextButton).toBeEnabled())
     await user.click(nextButton)
-    await waitFor(() => expect(runRequests).toContain('21'))
+    await waitFor(() => expect(state.runRequests).toContain('21'))
     expect(
       await within(dialog).findByText(
         '0 检查发现（含业务追踪） · 0 严重 Finding · 0 Wallet 已受限',
@@ -266,11 +263,7 @@ describe('AdminCreditHealthPage', () => {
   })
 
   it('shows a global open finding queue and opens complete diagnostics without manual resolution actions', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
     expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
@@ -298,11 +291,7 @@ describe('AdminCreditHealthPage', () => {
   })
 
   it('supports only open and resolved views and resets keyset pagination on view changes', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
     expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
@@ -321,11 +310,7 @@ describe('AdminCreditHealthPage', () => {
 
   it('does not leak open rows while the resolved view is loading', async () => {
     delayResolvedFindings = true
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
     expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
@@ -341,11 +326,7 @@ describe('AdminCreditHealthPage', () => {
 
   it('does not display previous-page rows while the next keyset page is loading', async () => {
     delayNextFindingPage = true
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
     expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
@@ -361,11 +342,7 @@ describe('AdminCreditHealthPage', () => {
 
   it('renders finding empty state and recovers from an initial queue error', async () => {
     findingsShouldFail = true
-    useMswHandlers(
-      http.get('/api/control/v1/credits/health', () =>
-        HttpResponse.json({ data: makeHealth() }),
-      ),
-    )
+    useMswHandlers(...createCreditHealthHandlers(createCreditHealthMswState()))
     const { user } = renderPage()
 
     expect(await screen.findByText('异常队列加载失败。')).toBeVisible()
@@ -394,51 +371,5 @@ function renderPage() {
       },
     }),
     queryClient,
-  }
-}
-
-function makeHealth(overrides: Record<string, unknown> = {}) {
-  return {
-    status: 'healthy',
-    open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
-    restricted_wallet_count: 0,
-    ...overrides,
-  }
-}
-
-function makeRun(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 11,
-    status: 'completed',
-    trigger: 'scheduled',
-    finding_count: 0,
-    critical_count: 0,
-    isolated_wallet_count: 0,
-    attempt_count: 1,
-    requested_at: '2026-07-17T02:00:00Z',
-    started_at: '2026-07-17T02:00:01Z',
-    completed_at: '2026-07-17T02:00:04Z',
-    ...overrides,
-  }
-}
-
-function makeFinding(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 41,
-    fingerprint: 'a'.repeat(64),
-    finding_type: 'wallet_projection_mismatch',
-    severity: 'critical',
-    risk: 'high',
-    wallet_public_id: '00000000-0000-0000-0000-000000000012',
-    wallet_display_name: 'User #12',
-    subject_type: 'credit_account',
-    subject_id: '17',
-    details: { account_id: 17, ledger_balance: 10, projected_balance: 17 },
-    status: 'open',
-    isolated: true,
-    occurrence_count: 3,
-    first_seen_at: '2026-07-17T01:00:00Z',
-    last_seen_at: '2026-07-17T02:00:00Z',
-    ...overrides,
   }
 }

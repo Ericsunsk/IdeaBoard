@@ -1,6 +1,7 @@
 import { defineComponent, nextTick } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
+import { mockAppToast } from '../../../test/toast'
 import UserAuthModals from './UserAuthModals.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -16,9 +17,7 @@ vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({ projectName: 'IdeaBoard' }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 const TransitioningDialogRootStub = defineComponent({
   props: {
@@ -64,6 +63,10 @@ const OverlayLoginPanelStub = defineComponent({
 })
 
 describe('UserAuthModals', () => {
+  beforeEach(() => {
+    mockAppToast()
+  })
+
   it('keeps one dialog surface mounted while switching auth modes', async () => {
     const view = renderWithUser(UserAuthModals, {
       props: { mode: 'login' },

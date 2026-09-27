@@ -1,6 +1,7 @@
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { mockAppToast, type AppToastMocks } from '../../../test/toast'
 import AdminLoginPage from '../../admin/pages/login/AdminLoginPage.vue'
 import LoginAuthPanel from '../components/LoginAuthPanel.vue'
 import UserAuthCallbackPage from './UserAuthCallbackPage.vue'
@@ -17,9 +18,9 @@ const mocks = vi.hoisted(() => ({
   logout: vi.fn(),
   getCapabilities: vi.fn(),
   signInWithOAuth: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
 }))
+
+let toast: AppToastMocks
 
 vi.mock('vue-router', () => ({
   useRoute: () => mocks.route,
@@ -51,9 +52,7 @@ vi.mock('../../../shared/composables/useSiteBranding', () => ({
   }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 vi.mock('../../admin/pages/login/useAdminLoginFeedback', () => ({
   useAdminLoginFeedback: () => ({
@@ -138,6 +137,7 @@ function renderCallbackPage() {
 describe('Social OAuth entry points', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    toast = mockAppToast()
     mocks.route.path = '/user/auth/callback'
     mocks.route.query = {}
     mocks.getCapabilities.mockResolvedValue({ social: { google: false, discord: false } })
@@ -157,7 +157,7 @@ describe('Social OAuth entry points', () => {
     await view.user.click(googleButton)
 
     expect(mocks.signInWithOAuth).toHaveBeenCalledWith('google')
-    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('shows enabled Google and Discord buttons in one row', async () => {
@@ -185,8 +185,8 @@ describe('Social OAuth entry points', () => {
 
     await view.user.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
-    expect(mocks.toastError).toHaveBeenCalledOnce()
-    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledOnce()
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('does not expose Google login on Admin Login', () => {
@@ -200,6 +200,7 @@ describe('Social OAuth entry points', () => {
 describe('UserAuthCallbackPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    toast = mockAppToast()
     mocks.route.path = '/user/auth/callback'
     mocks.route.query = {}
     mocks.completeOAuthCallback.mockResolvedValue(true)

@@ -85,14 +85,14 @@ func (db serviceQueryer) queries() (*dbsqlc.Queries, error) {
 // internal id. Unknown workspaces report errWorkspaceNotFound so
 // callers converge to their operation's not-found error.
 func resolveWorkspaceInternal(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string) (int64, error) {
-	row, err := q.GetWorkspaceByPublicID(ctx, strings.TrimSpace(workspacePublicID))
+	internalID, err := dbutil.ResolveWorkspaceInternalID(ctx, q, workspacePublicID)
 	if database.IsNotFound(err) {
 		return 0, errWorkspaceNotFound
 	}
 	if err != nil {
 		return 0, err
 	}
-	return row.InternalID, nil
+	return internalID, nil
 }
 
 func nullText(value string) pgtype.Text {

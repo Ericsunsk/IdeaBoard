@@ -27,6 +27,8 @@ import {
 import { isOpaqueId, opaqueIdPrefix } from '../../../shared/api/contractKernel'
 import type { AuthFailureMode } from '../../../shared/api/client'
 import { getStoredUser } from '../../../shared/utils/auth'
+import { stringParam } from '../../../shared/router/queryParams'
+import { accountScoped } from '../../../shared/query/queryDefaults'
 import { setMediaWorkspaceIdResolver } from '../../../shared/api/mediaWorkspaceScope'
 
 export const WORKSPACE_URL_PARAM = 'workspace'
@@ -236,13 +238,13 @@ export function useWorkspaceSelection(options?: UseWorkspaceSelectionOptions) {
         authFailure: options?.authFailure ?? (getStoredUser() == null ? 'silent' : undefined),
       }),
     enabled: () => toValue(options?.enabled ?? true),
-    staleTime: 15_000,
+    ...accountScoped(),
   })
 
   const urlId = computed(() =>
     options?.routeWorkspaceId !== undefined
       ? asWorkspaceId(toValue(options.routeWorkspaceId))
-      : asWorkspaceId(route.query[WORKSPACE_URL_PARAM]),
+      : asWorkspaceId(stringParam(route.query[WORKSPACE_URL_PARAM])),
   )
 
   // Keep the shared choice sticky across refetches without ever

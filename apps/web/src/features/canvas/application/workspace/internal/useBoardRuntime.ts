@@ -3,6 +3,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../../shared/constants/routePaths'
+import { stringParam } from '../../../../../shared/router/queryParams'
 import { useBoardSession, type SaveStatus } from '../../board-session'
 import { useBoardHeaderActions } from '../../../presentation/chrome/useBoardHeaderActions.ts'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
@@ -47,13 +48,21 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
   const autosaveResumeSignal = computed(() => boardSessionIdentityKey(options.getUserIdentity()))
 
   const boardSession = useBoardSession({
-    getBoardIdQuery: () => options.route.query.boardId,
+    getBoardIdQuery: () => stringParam(options.route.query.boardId),
     getUserIdentity: options.getUserIdentity,
     getWorkspaceId: options.getWorkspaceId,
     message: {
       warning: options.feedback.warning,
     },
   })
+
+  // Save-409 archived fan-out: the sync coordinator owns the save outcome,
+  // the board header owns the banner. The dispatcher stays stable across
+  // creation order so the coordinator can notify a header created later.
+  let markBoardArchived: ((boardId: string) => void) | null = null
+  function handleBoardArchived(boardId: string) {
+    markBoardArchived?.(boardId)
+  }
 
   const flowRuntime = useFlowCanvasRuntime({
     nodes,
@@ -71,6 +80,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,
+    onArchived: handleBoardArchived,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
@@ -81,6 +91,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
     route: options.route,
     flushAutosave: () => flowRuntime.persistence.flushAutosave(),
   })
+  markBoardArchived = boardHeader.markArchivedFromSave
 
   async function loadInitialOrRouteBoard() {
     const result = await flowRuntime.persistence.loadInitialOrRouteBoard()
@@ -123,6 +134,10 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
       boardNameDraft: boardHeader.boardNameDraft,
       isRenamePending: boardHeader.isRenamePending,
       catalogRecovery: boardHeader.catalogRecovery,
+      isBoardArchived: boardHeader.isBoardArchived,
+      isRestoringArchivedBoard: boardHeader.isRestoringArchivedBoard,
+      refreshArchivedState: boardHeader.refreshArchivedState,
+      restoreArchivedBoard: boardHeader.restoreArchivedBoard,
       currentBoardName: boardHeader.currentBoardName,
       boardOptions: boardHeader.boardOptions,
       setBoardNameInputRef: boardHeader.setBoardNameInputRef,

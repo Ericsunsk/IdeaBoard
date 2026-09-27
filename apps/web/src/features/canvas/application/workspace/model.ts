@@ -54,6 +54,8 @@ export type CanvasWorkspaceRuntimeViewModel = {
     boardNameDraft: Ref<string>
     isRenamePending: Ref<boolean>
     catalogRecovery: Ref<CanvasWorkspaceCatalogRecoveryState>
+    isBoardArchived: Ref<boolean>
+    isRestoringArchivedBoard: Ref<boolean>
     currentBoardName: ComputedRef<string>
     boardOptions: ComputedRef<Array<{ id: string; name: string }>>
   }
@@ -87,6 +89,7 @@ export type CanvasWorkspaceRuntimeCommands = {
     closeBoardHeaderEditing: () => void
     onConfirmBoardRename: () => Promise<void>
     reloadCatalog: () => Promise<void>
+    restoreArchivedBoard: () => Promise<boolean>
     onSelectBoard: (boardId: string) => void
     onNavigateRequest: (path: string) => Promise<void>
     onLogoutRequest: () => Promise<void>

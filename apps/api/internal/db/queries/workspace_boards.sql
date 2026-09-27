@@ -3,6 +3,7 @@
 -- table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
 -- revision query exists here by design. Every board-scoped query joins
 -- workspaces on public_id so foreign-workspace rows stay invisible.
+-- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 
 -- name: CreateWorkspaceBoard :one
 INSERT INTO boards (public_id, workspace_id, owner_user_id, title)

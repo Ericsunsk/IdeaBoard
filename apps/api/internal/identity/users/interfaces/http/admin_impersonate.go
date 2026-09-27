@@ -3,14 +3,15 @@ package http
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/domain"
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -67,8 +68,8 @@ func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
 	}
 	attempt.TargetID = publicID
 	if h == nil || h.userService == nil || h.impersonator == nil {
-		slog.Error("admin impersonation dependencies not configured")
-		response.MachineError(c, http.StatusInternalServerError, codeIdentityOperationFailed, "伪装登录服务未配置")
+		applog.FromContext(c.Request.Context()).Error("admin impersonation dependencies not configured")
+		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, "伪装登录服务未配置")
 		attempt.ErrorMessage = "伪装登录服务未配置"
 		attempt.Status = http.StatusInternalServerError
 		return
@@ -77,7 +78,7 @@ func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
 	target, err := h.userService.GetByPublicID(c.Request.Context(), publicID)
 	if err != nil {
 		if database.IsNotFound(err) {
-			response.MachineError(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
+			errorrender.Render(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
 			attempt.ErrorMessage = "用户不存在"
 			attempt.Status = http.StatusNotFound
 			return
@@ -88,7 +89,7 @@ func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
 		return
 	}
 	if target == nil || target.ID <= 0 {
-		response.MachineError(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
+		errorrender.Render(c, http.StatusNotFound, codeIdentityUserNotFound, "用户不存在")
 		attempt.ErrorMessage = "用户不存在"
 		attempt.Status = http.StatusNotFound
 		return
@@ -141,21 +142,21 @@ type impersonationStatusError interface {
 func respondAdminUserImpersonationError(c *gin.Context, err error) (int, string) {
 	var statusErr impersonationStatusError
 	if err == nil || !errors.As(err, &statusErr) {
-		slog.Error("admin impersonation upstream failure", "err", err)
-		response.MachineError(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
+		applog.FromContext(c.Request.Context()).Error("admin impersonation upstream failure", "err", err)
+		errorrender.Render(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
 		return http.StatusBadGateway, "认证服务伪装登录失败"
 	}
 
 	switch statusErr.StatusCode() {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		response.MachineError(c, statusErr.StatusCode(), codeIdentityUpstreamRejected, "认证服务拒绝伪装登录")
+		errorrender.Render(c, statusErr.StatusCode(), codeIdentityUpstreamRejected, "认证服务拒绝伪装登录")
 		return statusErr.StatusCode(), "认证服务拒绝伪装登录"
 	case http.StatusBadRequest, http.StatusNotFound:
-		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "目标用户无法进行伪装登录")
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, "目标用户无法进行伪装登录")
 		return http.StatusBadRequest, "目标用户无法进行伪装登录"
 	default:
-		slog.Error("admin impersonation upstream failure", "status", statusErr.StatusCode(), "err", err)
-		response.MachineError(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
+		applog.FromContext(c.Request.Context()).Error("admin impersonation upstream failure", "status", statusErr.StatusCode(), "err", err)
+		errorrender.Render(c, http.StatusBadGateway, codeIdentityUpstreamUnavailable, "认证服务伪装登录失败")
 		return http.StatusBadGateway, "认证服务伪装登录失败"
 	}
 }
@@ -164,12 +165,13 @@ func respondAdminUserImpersonationError(c *gin.Context, err error) (int, string)
 // impersonation attempt and persists it best-effort to the immutable
 // admin-action store. Audit failures are logged and never fail the
 // request; a nil receiver or unwired sink keeps the slog trail.
+// request_id rides the applog scope from ctx, so it is not plumbed
+// manually here.
 func (h *AdminHandler) recordImpersonationAttempt(ctx context.Context, attempt audit.RecordParams) {
-	slog.InfoContext(ctx, "admin impersonation attempt",
+	applog.FromContext(ctx).InfoContext(ctx, "admin impersonation attempt",
 		"actor_id", attempt.OperatorUserID,
 		"target_public_id", attempt.TargetID,
 		"auth_user_id", attempt.AuthUserID,
-		"request_id", attempt.RequestID,
 		"outcome", attempt.Outcome,
 		"reason", attempt.ErrorMessage,
 		"status", attempt.Status,
@@ -178,10 +180,9 @@ func (h *AdminHandler) recordImpersonationAttempt(ctx context.Context, attempt a
 		return
 	}
 	if err := h.impersonationAuditor.AppendRecord(ctx, attempt); err != nil {
-		slog.WarnContext(ctx, "admin impersonation audit write failed",
+		applog.FromContext(ctx).WarnContext(ctx, "admin impersonation audit write failed",
 			"actor_id", attempt.OperatorUserID,
 			"target_public_id", attempt.TargetID,
-			"request_id", attempt.RequestID,
 			"err", err,
 		)
 	}

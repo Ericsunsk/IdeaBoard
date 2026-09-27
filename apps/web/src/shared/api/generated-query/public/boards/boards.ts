@@ -482,7 +482,7 @@ export const getUpdateBoardUrl = (workspaceId: string, boardId: string) => {
 }
 
 /**
- * Viewers render 403 board_forbidden. Writes against an archived board also render 403 board_forbidden. Blank or overlong names render 422 validation_failed. No Idempotency-Key is required.
+ * Viewers render 403 board_forbidden. Writes against an archived board render 409 board_archived. Blank or overlong names render 422 validation_failed. No Idempotency-Key is required.
  * @summary Rename a board (owner/editor only)
  */
 export const updateBoard = async (
@@ -902,7 +902,7 @@ export const getReplaceBoardDocumentUrl = (workspaceId: string, boardId: string)
 }
 
 /**
- * Requires both the Idempotency-Key header and the If-Match precondition carrying the expected revision (the ETag value from the last read). Missing, wildcard, or unparsable preconditions render 400; stale revisions render 409 board_revision_conflict. The snapshot is a versioned discriminated union {schema_version, payload}: unknown fields are rejected with 400.
+ * Requires both the Idempotency-Key header and the If-Match precondition carrying the expected revision (the ETag value from the last read). Missing, wildcard, or unparsable preconditions render 400; stale revisions render 409 board_revision_conflict; archived boards render 409 board_archived. The snapshot is a versioned discriminated union {schema_version, payload}: unknown fields are rejected with 400.
  * @summary Replace the board document (owner/editor only, optimistic concurrency)
  */
 export const replaceBoardDocument = async (

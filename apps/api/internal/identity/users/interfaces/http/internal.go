@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/users/ports"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -30,17 +31,17 @@ func NewInternalHandler(updater LoginMetadataUpdater, key string) *InternalHandl
 
 func (h *InternalHandler) UpdateLoginMetadata(c *gin.Context) {
 	if h == nil || h.updater == nil || !constantTimeHeaderEquals(c.GetHeader("X-Internal-Key"), h.key) {
-		response.MachineError(c, http.StatusUnauthorized, "identity_unauthorized", "unauthorized")
+		errorrender.Render(c, http.StatusUnauthorized, codeIdentityUnauthorized, "unauthorized")
 		return
 	}
 	var req ports.LoginMetadataRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
 		return
 	}
 	req.AuthUserID, req.IP, req.Country = strings.TrimSpace(req.AuthUserID), strings.TrimSpace(req.IP), strings.ToUpper(strings.TrimSpace(req.Country))
 	if req.AuthUserID == "" || len(req.AuthUserID) > maxAuthUserIDLength || (req.IP != "" && net.ParseIP(req.IP) == nil) || !validLoginCountry(req.Country) {
-		response.MachineError(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityRequestInvalid, "参数错误")
 		return
 	}
 	if err := h.updater.UpdateLastLoginMetadata(c.Request.Context(), req.AuthUserID, req.IP, req.Country); err != nil {

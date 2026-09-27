@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { USER_BOARDS_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
+import { stringParam } from '../../../shared/router/queryParams'
 import { joinSharedBoardByToken } from '../../board'
 
 const { t } = useI18n()
@@ -51,11 +52,7 @@ const statusText = computed(() => {
 })
 
 function getTokenFromQuery(): string {
-  const raw = route.query.token
-  if (Array.isArray(raw)) {
-    return (raw[0] || '').trim()
-  }
-  return String(raw || '').trim()
+  return (stringParam(route.query.token) ?? '').trim()
 }
 
 function goBoards() {

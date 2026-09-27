@@ -17,6 +17,7 @@ import {
   requireContractData,
 } from '../../../../shared/api/contractKernel'
 import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 
 // Admin reward code boundary (W2 transports). Search/create/update/
 // enable/delete ride the Control Plane reward-code operations
@@ -357,41 +358,4 @@ function controlError(
   return error
 }
 
-// withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text. request_id flows through for
-// correlation wherever the app surfaces the error.
-function withControlCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  const requestId = readRequestId(error)
-  if (code === 'idempotency_conflict' || code === 409) {
-    return controlError('idempotency_conflict', '操作已提交，请勿重复操作', requestId)
-  }
-  if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因', requestId)
-  }
-  if (error instanceof Error) return error
-  return controlError('control_failed', fallback, requestId)
-}
-
-function readErrorCode(error: unknown): string | number | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    if (typeof code === 'string' || typeof code === 'number') return code
-  }
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (typeof status === 'number') return status
-  }
-  return undefined
-}
-
-function readRequestId(error: unknown): string | undefined {
-  if (error && typeof error === 'object') {
-    const candidate = error as { requestId?: unknown; request_id?: unknown }
-    if (typeof candidate.requestId === 'string' && candidate.requestId) return candidate.requestId
-    if (typeof candidate.request_id === 'string' && candidate.request_id) {
-      return candidate.request_id
-    }
-  }
-  return undefined
-}
+// withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

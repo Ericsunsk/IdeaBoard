@@ -1,22 +1,17 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick } from 'vue'
-import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
+import { useMswHandlers } from '../../../test/msw'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import type { AdminOutboundPolicyFeedback } from './useSettingsFeedback'
 import { useOutboundPolicy } from './useOutboundPolicy'
+import { createOutboundPolicyHandlers, createOutboundPolicyMswState } from './testing'
 
 type OutboundPolicyLifecycle = ReturnType<typeof useOutboundPolicy>
 
 describe('useOutboundPolicy', () => {
   it('loads the saved policy, tracks edits, and resets to the last synced value', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json({
-          data: { allow_hosts: ['models.internal'] },
-        }),
-      ),
-    )
+    useMswHandlers(...createOutboundPolicyHandlers(createOutboundPolicyMswState()))
     const harness = mountOutboundPolicy()
 
     try {
@@ -42,11 +37,7 @@ describe('useOutboundPolicy', () => {
 
   it('reports validation feedback and stops invalid drafts before saving', async () => {
     useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json({
-          data: { allow_hosts: [] },
-        }),
-      ),
+      ...createOutboundPolicyHandlers(createOutboundPolicyMswState({ getAllowHosts: () => [] })),
     )
     const harness = mountOutboundPolicy()
 
@@ -79,32 +70,20 @@ describe('useOutboundPolicy', () => {
   it('hydrates the saved response before invalidation and finishes with refreshed server state', async () => {
     const invalidationStarted = createGate()
     const releaseInvalidation = createGate()
-    const updateRequests: Array<{ body: unknown; operatorReason: string | null }> = []
     let loadCount = 0
-    useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', async () => {
+    const state = createOutboundPolicyMswState({
+      getAllowHosts: async () => {
         loadCount += 1
         if (loadCount === 1) {
-          return HttpResponse.json({
-            data: { allow_hosts: ['models.internal'] },
-          })
+          return ['models.internal']
         }
         invalidationStarted.open()
         await releaseInvalidation.promise
-        return HttpResponse.json({
-          data: { allow_hosts: ['server.internal'] },
-        })
-      }),
-      http.put('/api/control/v1/platform/settings/outbound-policy', async ({ request }) => {
-        updateRequests.push({
-          body: await request.json(),
-          operatorReason: request.headers.get('X-Operator-Reason'),
-        })
-        return HttpResponse.json({
-          data: { allow_hosts: ['draft.internal'] },
-        })
-      }),
-    )
+        return ['server.internal']
+      },
+      respondToUpdate: () => ({ allow_hosts: ['draft.internal'] }),
+    })
+    useMswHandlers(...createOutboundPolicyHandlers(state))
     const harness = mountOutboundPolicy()
 
     try {
@@ -116,7 +95,7 @@ describe('useOutboundPolicy', () => {
       const saveResult = harness.lifecycle.save()
       await invalidationStarted.promise
 
-      expect(updateRequests).toEqual([
+      expect(state.updateRequests).toEqual([
         {
           body: { allow_hosts: ['draft.internal'], reason: 'policy review' },
           operatorReason: 'policy review',
@@ -145,8 +124,10 @@ describe('useOutboundPolicy', () => {
 
   it('surfaces load errors through state and feedback', async () => {
     useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json({ code: 500, msg: 'load failed' }, { status: 500 }),
+      ...createOutboundPolicyHandlers(
+        createOutboundPolicyMswState({
+          loadError: { status: 500, body: { code: 500, msg: 'load failed' } },
+        }),
       ),
     )
     const harness = mountOutboundPolicy()
@@ -164,21 +145,13 @@ describe('useOutboundPolicy', () => {
   })
 
   it('keeps a failed save editable and reports save feedback', async () => {
-    let loadCount = 0
-    useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () => {
-        loadCount += 1
-        return HttpResponse.json({
-          data: { allow_hosts: ['models.internal'] },
-        })
-      }),
-      http.put('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json(
-          { error: { code: 'idempotency_conflict', message: 'reused', request_id: 'r' } },
-          { status: 409 },
-        ),
-      ),
-    )
+    const state = createOutboundPolicyMswState({
+      updateError: {
+        status: 409,
+        body: { error: { code: 'idempotency_conflict', message: 'reused', request_id: 'r' } },
+      },
+    })
+    useMswHandlers(...createOutboundPolicyHandlers(state))
     const harness = mountOutboundPolicy()
 
     try {
@@ -197,25 +170,15 @@ describe('useOutboundPolicy', () => {
       expect(harness.lifecycle.form.value.allow_hosts).toBe('draft.internal')
       expect(harness.lifecycle.isDirty.value).toBe(true)
       expect(harness.lifecycle.saving.value).toBe(false)
-      expect(loadCount).toBe(1)
+      expect(state.loadRequests).toBe(1)
     } finally {
       await harness.unmount()
     }
   })
 
   it('aborts the save silently when the operator cancels the confirm dialog', async () => {
-    let putCalls = 0
-    useMswHandlers(
-      http.get('/api/control/v1/platform/settings/outbound-policy', () =>
-        HttpResponse.json({
-          data: { allow_hosts: [] },
-        }),
-      ),
-      http.put('/api/control/v1/platform/settings/outbound-policy', () => {
-        putCalls += 1
-        return HttpResponse.json({ data: { allow_hosts: [] } })
-      }),
-    )
+    const state = createOutboundPolicyMswState({ getAllowHosts: () => [] })
+    useMswHandlers(...createOutboundPolicyHandlers(state))
     const harness = mountOutboundPolicy({
       confirm: { confirm: vi.fn().mockResolvedValue(false) },
     })
@@ -228,7 +191,7 @@ describe('useOutboundPolicy', () => {
 
       await expect(harness.lifecycle.save()).resolves.toBe(false)
 
-      expect(putCalls).toBe(0)
+      expect(state.updateRequests).toEqual([])
       expect(harness.feedback.saved).not.toHaveBeenCalled()
       expect(harness.feedback.saveFailed).not.toHaveBeenCalled()
       expect(harness.lifecycle.isDirty.value).toBe(true)

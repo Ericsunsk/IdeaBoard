@@ -7,6 +7,7 @@ import {
   USER_BOARDS_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
+import { stringParam } from '../../../shared/router/queryParams'
 import {
   defaultAccountTab,
   parsePaymentReturnQuery,
@@ -139,9 +140,9 @@ export function createAccountOverlay(options: AccountOverlayOptions) {
 
       const requestedTab =
         isAllowed && options.route.path === USER_BOARDS_PATH
-          ? options.route.query.accountTab
+          ? stringParam(options.route.query.accountTab)
           : undefined
-      if (requestedTab && !Array.isArray(requestedTab)) {
+      if (requestedTab) {
         open(resolveAccountTabKey(requestedTab))
         return
       }

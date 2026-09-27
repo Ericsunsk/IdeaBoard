@@ -133,6 +133,116 @@ func TestStatusMatrix(t *testing.T) {
 	}
 }
 
+func TestStatusMatrixPromotedEdgeCodes(t *testing.T) {
+	// Every code promoted from a domain edge table pins its exact
+	// pre-promotion HTTP status here, so a registry edit that
+	// re-maps a status fails loudly (wire freeze).
+	cases := map[Code]int{
+		CodeBillingInvalidInput:       http.StatusBadRequest,
+		CodeBillingSKUNotFound:        http.StatusNotFound,
+		CodeBillingPricingUnavailable: http.StatusUnprocessableEntity,
+		CodeBillingItemNotArchived:    http.StatusConflict,
+		CodeBillingArchivedItemInUse:  http.StatusConflict,
+		CodeBillingQuoteTotalExceeded: http.StatusUnprocessableEntity,
+		CodeBillingServiceUnavailable: http.StatusServiceUnavailable,
+		CodeBillingOperationFailed:    http.StatusInternalServerError,
+
+		CodeRewardInvalidInput:            http.StatusBadRequest,
+		CodeRewardCodeIDInvalid:           http.StatusBadRequest,
+		CodeRewardRedemptionIDInvalid:     http.StatusBadRequest,
+		CodeRewardPaginationInvalid:       http.StatusBadRequest,
+		CodeRewardCodeInvalid:             http.StatusBadRequest,
+		CodeRewardCodeConflict:            http.StatusConflict,
+		CodeRewardCodeIdempotencyConflict: http.StatusConflict,
+		CodeRewardCodeNotFound:            http.StatusNotFound,
+		CodeRewardCodeCapInvalid:          http.StatusConflict,
+		CodeRewardCodeRedeemed:            http.StatusConflict,
+		CodeRewardRedemptionNotFound:      http.StatusNotFound,
+		CodeRewardCodeUnavailable:         http.StatusUnprocessableEntity,
+		CodeRewardRedeemConflict:          http.StatusConflict,
+		CodeRewardWalletLocked:            http.StatusConflict,
+		CodeRewardRateLimited:             http.StatusTooManyRequests,
+		CodeRewardServiceUnavailable:      http.StatusServiceUnavailable,
+		CodeRewardOperationFailed:         http.StatusInternalServerError,
+		CodeRewardRedeemFailed:            http.StatusInternalServerError,
+
+		CodeBoardInvalidInput:      http.StatusBadRequest,
+		CodeBoardNameConflict:      http.StatusConflict,
+		CodeBoardIDConflict:        http.StatusConflict,
+		CodeBoardPermissionDenied:  http.StatusForbidden,
+		CodeBoardMemberRoleInvalid: http.StatusBadRequest,
+		CodeBoardMemberSelfInvalid: http.StatusBadRequest,
+		CodeBoardShareTokenRevoked: http.StatusBadRequest,
+		CodeBoardShareTokenExpired: http.StatusBadRequest,
+		CodeBoardOperationFailed:   http.StatusInternalServerError,
+
+		CodeStripeConfigurationInvalidInput:  http.StatusBadRequest,
+		CodeStripePermissionDenied:           http.StatusForbidden,
+		CodeStripeConfigurationUnprocessable: http.StatusUnprocessableEntity,
+		CodeStripeProviderUnavailable:        http.StatusServiceUnavailable,
+		CodeStripeConfigurationChanged:       http.StatusConflict,
+		CodeCheckoutInvalidInput:             http.StatusBadRequest,
+		CodeCheckoutConflict:                 http.StatusConflict,
+		CodePaymentAlreadyCompleted:          http.StatusUnprocessableEntity,
+		CodeCheckoutSessionExpired:           http.StatusUnprocessableEntity,
+		CodeWalletNotRechargeable:            http.StatusConflict,
+		CodeCheckoutRequestRejected:          http.StatusUnprocessableEntity,
+		CodePaymentServiceUnavailable:        http.StatusServiceUnavailable,
+		CodePurchasesUnavailable:             http.StatusServiceUnavailable,
+		CodeRechargeHistoryLimitInvalid:      http.StatusBadRequest,
+		CodeRechargeHistoryCursorInvalid:     http.StatusBadRequest,
+		CodeWebhookSignatureInvalid:          http.StatusBadRequest,
+		CodeWebhookConfigurationMissing:      http.StatusServiceUnavailable,
+		CodeAdminPaymentOrderFilterInvalid:   http.StatusBadRequest,
+		CodeAdminPaymentOrderCursorInvalid:   http.StatusBadRequest,
+
+		CodeIdentityRequestInvalid:      http.StatusBadRequest,
+		CodeIdentityUnauthorized:        http.StatusUnauthorized,
+		CodeIdentityUserPublicIDInvalid: http.StatusBadRequest,
+		CodeIdentityUserNotFound:        http.StatusNotFound,
+		CodeIdentityForbidden:           http.StatusForbidden,
+		CodeIdentityConflict:            http.StatusConflict,
+		CodeIdentityUpstreamRejected:    http.StatusForbidden,
+		CodeIdentityUpstreamUnavailable: http.StatusBadGateway,
+		CodeIdentityOperationFailed:     http.StatusInternalServerError,
+		CodeIdentityServiceUnavailable:  http.StatusServiceUnavailable,
+
+		CodeStorageInvalidInput:       http.StatusBadRequest,
+		CodeStorageServiceUnavailable: http.StatusServiceUnavailable,
+		CodeStorageProfileInvalid:     http.StatusBadRequest,
+		CodeStorageOperationFailed:    http.StatusInternalServerError,
+
+		CodeSearchProviderNotFound:       http.StatusNotFound,
+		CodeSearchRequestInvalid:         http.StatusBadRequest,
+		CodeSearchProviderTestRequired:   http.StatusConflict,
+		CodeSearchProviderAPIKeyInvalid:  http.StatusBadRequest,
+		CodeSearchProviderAPIKeyRequired: http.StatusConflict,
+		CodeSearchProviderTestFailed:     http.StatusBadRequest,
+
+		CodeSearchUnavailable:   http.StatusServiceUnavailable,
+		CodeSearchLimitInvalid:  http.StatusBadRequest,
+		CodeSearchQueryInvalid:  http.StatusBadRequest,
+		CodeSearchCursorInvalid: http.StatusBadRequest,
+
+		CodeVisionSearchProviderError:    http.StatusBadGateway,
+		CodeVisionSearchInputInvalid:     http.StatusBadRequest,
+		CodeVisionSearchImageInvalid:     http.StatusBadRequest,
+		CodeVisionSearchImageUnavailable: http.StatusBadRequest,
+		CodeVisionSearchNotConfigured:    http.StatusServiceUnavailable,
+		CodeVisionSearchUnavailable:      http.StatusServiceUnavailable,
+		CodeVisionSearchSchemaError:      http.StatusBadGateway,
+		CodeVisionSearchCredentials:      http.StatusBadGateway,
+		CodeVisionSearchQuota:            http.StatusBadGateway,
+		CodeVisionSearchTimeout:          http.StatusGatewayTimeout,
+		CodeVisionSearchNetwork:          http.StatusBadGateway,
+	}
+	for code, want := range cases {
+		if got := StatusOf(code); got != want {
+			t.Errorf("StatusOf(%q) = %d, want %d", code, got, want)
+		}
+	}
+}
+
 func TestParsePageSizeBounds(t *testing.T) {
 	cases := []struct {
 		raw     string

@@ -1,6 +1,7 @@
 import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { requireContractData } from '../../../shared/api/contractKernel'
+import { keepPrevious, STALE_TIME_MS } from '../../../shared/query/queryDefaults'
 import { getControlStatistics } from '../../../shared/api/generated-query/control/control-platform/control-platform'
 import type { GetControlStatisticsParams } from '../../../shared/api/generated-query/control/model'
 
@@ -128,7 +129,15 @@ export type AdminStatisticsResourceOptions = {
   keepPreviousData?: boolean
 }
 
-const ADMIN_STATISTICS_STALE_TIME_MS = 60_000
+const ADMIN_STATISTICS_STALE_TIME_MS = STALE_TIME_MS.statistics
+
+// Composed-query keys: the Control statistics op has no orval query-key
+// helper, so this factory owns the key shape (never inline literals).
+const adminStatisticsQueryKeys = {
+  all: ['admin', 'statistics'] as const,
+  byParams: (params?: MaybeRef<GetAdminStatisticsParams>) =>
+    ['admin', 'statistics', params] as const,
+}
 function selectAdminStatistics(response: ApiResponseAdminStatistics): AdminStatistics {
   return requireContractData<AdminStatistics>(response, '加载统计数据失败')
 }
@@ -143,7 +152,7 @@ export function useAdminStatisticsResource(
   options: AdminStatisticsResourceOptions = {},
 ) {
   const query = useQuery<ApiResponseAdminStatistics, Error, AdminStatistics>({
-    queryKey: ['admin', 'statistics', params] as const,
+    queryKey: adminStatisticsQueryKeys.byParams(params),
     queryFn: ({ signal }) =>
       getControlStatistics(statisticsParams(toValue(params)), {
         ...(signal == null ? {} : { signal }),
@@ -154,11 +163,7 @@ export function useAdminStatisticsResource(
     refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     ...(options.enabled !== undefined ? { enabled: options.enabled } : {}),
     ...(options.refetchInterval !== undefined ? { refetchInterval: options.refetchInterval } : {}),
-    ...(options.keepPreviousData
-      ? {
-          placeholderData: (previous: ApiResponseAdminStatistics | undefined) => previous,
-        }
-      : {}),
+    ...(options.keepPreviousData ? { ...keepPrevious() } : {}),
   })
   const statistics = computed<AdminStatistics | null>(() => query.data.value ?? null)
   const isSettled = computed(() => query.isFetched.value || query.isError.value)

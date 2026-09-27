@@ -4,6 +4,7 @@ import { fireEvent } from '@testing-library/vue'
 import { i18n } from '../../../../shared/i18n'
 import { loadLocaleMessages } from '../../../../shared/i18n/userLocale'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { mockAppToast, type AppToastMocks } from '../../../../test/toast'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
 const resource = vi.hoisted(() => ({
   create: vi.fn(),
@@ -12,11 +13,12 @@ const resource = vi.hoisted(() => ({
   setEnabled: vi.fn(),
   update: vi.fn(),
 }))
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 const confirm = vi.hoisted(() => ({
   confirm: vi.fn().mockResolvedValue(true),
   readReason: vi.fn().mockReturnValue('运营复核'),
 }))
+
+let toast: AppToastMocks
 const redemptionsResource = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
@@ -32,9 +34,7 @@ vi.mock('./rewardCodeRedemptionResource', async (importOriginal) => ({
   createRewardCodeRedemptionResource: () => redemptionsResource,
 }))
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => toast,
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 // Route clipboard access to the spec-controlled API so success and failure stay deterministic.
 vi.mock('../../../../shared/composables/useAppClipboard', () => ({
@@ -70,6 +70,7 @@ describe('AdminRewardCodesPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    toast = mockAppToast()
     resource.search.mockResolvedValue({
       rewardCodes: [makeRewardCode()],
       total: 21,
@@ -464,7 +465,9 @@ describe('AdminRewardCodesPage', () => {
       }),
     )
 
-    await waitFor(() => expect(resource.delete).toHaveBeenCalledWith(7, { operatorReason: '运营复核' }))
+    await waitFor(() =>
+      expect(resource.delete).toHaveBeenCalledWith(7, { operatorReason: '运营复核' }),
+    )
     expect(screen.getByText('新用户奖励')).toBeVisible()
     expect(toast.error).toHaveBeenCalledWith('已有兑换记录，只能停用')
   })

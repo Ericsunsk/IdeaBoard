@@ -88,6 +88,7 @@ type CreateWorkspaceBoardRow struct {
 // table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
 // revision query exists here by design. Every board-scoped query joins
 // workspaces on public_id so foreign-workspace rows stay invisible.
+// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 func (q *Queries) CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error) {
 	row := q.db.QueryRow(ctx, createWorkspaceBoard,
 		arg.PublicID,

@@ -37,6 +37,7 @@ function createHarness() {
   const onWarning = vi.fn()
   const onSuccess = vi.fn()
   const onError = vi.fn()
+  const onArchived = vi.fn()
   const boardSession: BoardSession = {
     currentBoardId: computed(() => routeBoardId.value),
     exists: vi.fn(() => true),
@@ -60,6 +61,7 @@ function createHarness() {
     onWarning,
     onSuccess,
     onError,
+    onArchived,
   })
   return {
     coordinator,
@@ -74,6 +76,7 @@ function createHarness() {
     onWarning,
     onSuccess,
     onError,
+    onArchived,
   }
 }
 
@@ -159,6 +162,51 @@ describe('Board Sync Coordinator', () => {
     )
   })
 
+  it('names the server status when remote sync fails with HTTP 5xx', async () => {
+    const harness = createHarness()
+    const failure = Object.assign(new Error('boom'), { status: 500 })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+    })
+
+    await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      'Saved locally. Remote sync failed (HTTP 500); it will retry on your next edit.',
+    )
+  })
+
+  it('surfaces validation failures without the network-recovery copy', async () => {
+    const harness = createHarness()
+    const failure = Object.assign(new Error('bad'), { status: 400 })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+    })
+
+    await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(harness.onError).toHaveBeenCalledWith(
+      'Canvas data validation failed. Your current canvas was kept. Please try again later.',
+    )
+  })
+
+  it('surfaces auth failures without the network-recovery copy', async () => {
+    const harness = createHarness()
+    const failure = Object.assign(new Error('denied'), { status: 403 })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { ok: false, reason: 'sync-failed', error: failure },
+    })
+
+    await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(harness.onError).toHaveBeenCalledWith(
+      'Save failed: user session is missing. Please sign in and try again.',
+    )
+  })
+
   it('does not return a stale reconciliation after a route switch', async () => {
     const harness = createHarness()
     let resolveSave!: (result: BoardSessionSaveResult) => void
@@ -239,6 +287,80 @@ describe('Board Sync Coordinator', () => {
     expect(result).toEqual({ status: 'failed' })
     expect(harness.onError).toHaveBeenCalledWith(
       'Canvas data validation failed. Your current canvas was kept. Please try again later.',
+    )
+  })
+
+  it('maps 409 board_archived to the archived banner instead of the generic local-save toast', async () => {
+    const harness = createHarness()
+    const archivedError = Object.assign(new Error('board is archived'), {
+      status: 409,
+      code: 'board_archived',
+    })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { ok: false, reason: 'archived', error: archivedError },
+    })
+
+    const result = await harness.coordinator.saveCurrentBoardSnapshot()
+
+    expect(result.saved).toBe(false)
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('archived')
+    // Banner signal, never the generic "Saved locally..." toast.
+    expect(harness.onArchived).toHaveBeenCalledWith('board-a')
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.onError).not.toHaveBeenCalled()
+  })
+
+  it('dedupes repeated silent archived saves without re-notifying', async () => {
+    const harness = createHarness()
+    const archivedError = Object.assign(new Error('board is archived'), {
+      status: 409,
+      code: 'board_archived',
+    })
+    vi.mocked(harness.boardSession.save).mockResolvedValue({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: { ok: false, reason: 'archived', error: archivedError },
+    })
+
+    await harness.coordinator.saveCurrentBoardSnapshot({ silent: true })
+    await harness.coordinator.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.onArchived).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to an explicit error toast for archived saves without a banner handler', async () => {
+    const harness = createHarness()
+    const coordinatorWithoutBanner = createBoardSyncCoordinator({
+      buildCurrentSnapshot: () => harness.currentSnapshot.value,
+      isDirty: harness.isDirty,
+      saveStatus: harness.saveStatus,
+      graphRevision: harness.graphRevision,
+      isLoadingBoardSnapshot: harness.isLoadingBoardSnapshot,
+      isSavingBoard: harness.isSavingBoard,
+      boardSession: harness.boardSession,
+      readBoardAttachmentEpoch: () => 1,
+      canApplyReconciliation: () => true,
+      onWarning: harness.onWarning,
+      onSuccess: harness.onSuccess,
+      onError: harness.onError,
+    })
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: makeSnapshot('saved-locally'),
+      remoteSync: {
+        ok: false,
+        reason: 'archived',
+        error: Object.assign(new Error('board is archived'), {
+          status: 409,
+          code: 'board_archived',
+        }),
+      },
+    })
+
+    await coordinatorWithoutBanner.saveCurrentBoardSnapshot()
+
+    expect(harness.onError).toHaveBeenCalledWith(
+      'This board is archived. Restore it to keep editing.',
     )
   })
 })

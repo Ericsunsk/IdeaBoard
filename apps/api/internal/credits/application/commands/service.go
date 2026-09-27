@@ -6,16 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-const rollbackTimeout = 5 * time.Second
 
 type Service struct {
 	pool    *pgxpool.Pool
@@ -157,7 +155,7 @@ func withManagedTransactionResult[T any](
 		if committed {
 			return
 		}
-		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dbutil.RollbackTimeout)
 		defer cancel()
 		if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			slog.Warn("failed to roll back Credits transaction", "err", rollbackErr)

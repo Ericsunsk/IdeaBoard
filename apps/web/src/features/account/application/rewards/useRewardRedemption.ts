@@ -2,9 +2,9 @@ import { ref } from 'vue'
 import { i18n } from '../../../../shared/i18n'
 import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/vue-query'
 import { useAccountWorkspace } from '../accountWorkspace'
+import { invalidateUserMoney } from '../invalidateUserMoney'
 import {
   billingRecordsQueryKeys,
-  creditsQueryKeys,
   redeemRewardCode,
   rewardRedemptionsQueryKeys,
   type RewardRedeemResult,
@@ -55,7 +55,7 @@ export function useRewardRedemption() {
     setAvailableBalance: () => {
       // Wallet keys are workspace-scoped now; redemption invalidates the
       // whole wallet root instead of patching one entry.
-      void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
+      invalidateUserMoney(queryClient)
     },
     prependRedemption: (redemption) => prependRewardRedemption(queryClient, redemption),
     invalidateBillingRecords: () =>

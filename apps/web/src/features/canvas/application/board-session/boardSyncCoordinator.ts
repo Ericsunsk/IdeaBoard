@@ -13,9 +13,9 @@ import {
 } from '../../infrastructure/browser/canvasPerfProbe.ts'
 import { rebaseStabilizedMedia } from './boardSyncMediaReconciliation'
 
-export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
+export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover' | 'archived'
 
-type SaveFailureKind = 'sync-failed' | 'conflict' | 'save-failed'
+type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
 export type ValueRef<T> = { value: T }
 export type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean | undefined
@@ -35,6 +35,7 @@ export type BoardSyncCoordinatorOptions = {
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
+  onArchived?: ((boardId: string) => void) | undefined
 }
 
 export type BoardSyncCoordinator = {
@@ -67,7 +68,7 @@ function cloneBoardSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
 }
 
 function isRecoverableSaveStatus(status: SaveStatus): boolean {
-  return status === 'retry' || status === 'conflict' || status === 'recover'
+  return status === 'retry' || status === 'conflict' || status === 'recover' || status === 'archived'
 }
 
 export function createBoardSyncCoordinator(
@@ -197,9 +198,44 @@ export function createBoardSyncCoordinator(
     return Number(options.graphRevision.value)
   }
 
-  function notifyRemoteSyncFailure(reason: 'sync-failed' | 'conflict') {
+  function notifyRemoteSyncFailure(
+    boardId: string,
+    reason: 'sync-failed' | 'conflict' | 'archived',
+    error?: unknown,
+  ) {
     if (reason === 'conflict') {
       options.onError(i18n.global.t('canvas.session.nameConflictSavedLocally'))
+      return
+    }
+    if (reason === 'archived') {
+      // Archived writes surface the non-dismissible banner via onArchived,
+      // never the generic "Saved locally..." toast. When no banner handler
+      // is wired (unit harnesses), fall back to an explicit error toast so
+      // the failure is never silent.
+      if (options.onArchived) {
+        options.onArchived(boardId)
+        return
+      }
+      options.onError(i18n.global.t('canvas.session.boardArchivedSaveBlocked'))
+      return
+    }
+    // Classify the failure so the toast names the cause instead of blaming
+    // the network for everything: only status-less errors (offline/timeout)
+    // keep the network-recovery copy.
+    const status =
+      typeof (error as { status?: unknown } | null)?.status === 'number'
+        ? ((error as { status?: number }).status as number)
+        : null
+    if (status === 401 || status === 403) {
+      options.onError(i18n.global.t('canvas.session.saveAuthUnavailable'))
+      return
+    }
+    if (status === 400 || status === 422) {
+      options.onError(i18n.global.t('canvas.session.boardDataInvalid'))
+      return
+    }
+    if (status !== null) {
+      options.onWarning(i18n.global.t('canvas.session.savedLocallyServerFailed', { code: status }))
       return
     }
     options.onWarning(i18n.global.t('canvas.session.savedLocallySyncFailed'))
@@ -224,10 +260,15 @@ export function createBoardSyncCoordinator(
       return
     }
     options.isDirty.value = true
-    const failureStatus = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
+    const failureStatus =
+      remoteSync.reason === 'conflict'
+        ? 'conflict'
+        : remoteSync.reason === 'archived'
+          ? 'archived'
+          : 'retry'
     options.saveStatus.value = failureStatus
     if (shouldNotifySaveFailure(saveOptions.silent, boardId, remoteSync.reason)) {
-      notifyRemoteSyncFailure(remoteSync.reason)
+      notifyRemoteSyncFailure(boardId, remoteSync.reason, remoteSync.error)
     }
   }
 

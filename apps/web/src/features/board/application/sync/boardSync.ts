@@ -1,13 +1,16 @@
 import {
   archiveWorkspaceBoard,
   fetchWorkspaceBoardDocument,
+  fetchWorkspaceBoardMeta,
   fetchWorkspaceBoards,
   requireBoardWorkspaceId,
+  restoreWorkspaceBoard,
   saveWorkspaceBoard,
   type SaveWorkspaceBoardResult,
   type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
 } from '../../infrastructure/api/boardsResource'
+import { userErrorCode } from '../../../../shared/errors/errorCatalog'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import {
   getAuthStorageUserScope,
@@ -18,7 +21,9 @@ import {
   listBoards,
   normalizeBoardName,
   publishCatalogChange,
+  registerBoardMeta,
   replaceBoards,
+  setBoardArchivedAt,
   setBoardRevision,
   type BoardMeta,
 } from '../catalog/boards'
@@ -67,6 +72,9 @@ function toLocalMeta(board: WorkspaceBoardMeta): BoardMeta | null {
     createdAt,
     updatedAt,
     ...(Number.isFinite(revision) && revision >= 0 ? { revision } : {}),
+    ...(typeof board.archivedAt === 'string' && board.archivedAt
+      ? { archivedAt: board.archivedAt }
+      : {}),
   }
 }
 
@@ -346,6 +354,7 @@ export async function syncDeleteBoardToServer(boardId: string) {
 }
 
 export function isBoardNameConflictError(error: unknown): boolean {
+  if (isBoardArchivedError(error)) return false
   if (typeof error !== 'object' || !error) return false
   const status = 'status' in error ? (error as { status?: unknown }).status : undefined
   if (status === 409) return true
@@ -353,9 +362,64 @@ export function isBoardNameConflictError(error: unknown): boolean {
   // v1 has no board-name uniqueness: 409s are `board_revision_conflict`
   // (stale If-Match) or `board_idempotency_conflict`. They drive the same
   // rollback/reconcile policy the legacy name conflict used.
+  // `board_archived` (409) is excluded above: archived writes surface the
+  // archived banner instead of the conflict recovery path.
   return (
     code === 409 ||
     code === 'board_revision_conflict' ||
     code === 'board_idempotency_conflict'
   )
+}
+
+/**
+ * Archived-write classifier for the v1 `board_archived` contract: archived
+ * writes render HTTP 409 with wire code `board_archived` (previously 403
+ * `board_forbidden`). Classification goes through the shared error catalog
+ * so wrapped causes (e.g. `BoardSessionRemoteSyncError.cause`) resolve.
+ */
+export function isBoardArchivedError(error: unknown): boolean {
+  return userErrorCode(error) === 'board_archived'
+}
+
+/**
+ * Reads the remote board meta to learn its archived flag (list excludes
+ * archived boards, so hydration alone can never reveal it). Syncs the flag
+ * into the local catalog when the board is cached locally; returns the raw
+ * `archivedAt` (string when archived, null when live).
+ */
+export async function fetchBoardArchivedAt(boardId: string): Promise<string | null> {
+  const normalized = boardId.trim()
+  if (!normalized) throw new Error('MISSING_BOARD_ID')
+  const meta = await fetchWorkspaceBoardMeta(requireBoardWorkspaceId(), normalized)
+  const archivedAt = typeof meta.archivedAt === 'string' && meta.archivedAt ? meta.archivedAt : null
+  if (getBoardById(normalized)) {
+    setBoardArchivedAt(normalized, archivedAt)
+  }
+  return archivedAt
+}
+
+/** Marks the local catalog entry archived without a network call (save-409 fast path). */
+export function markBoardArchivedLocally(boardId: string, archivedAt?: string): void {
+  const normalized = boardId.trim()
+  if (!normalized || !getBoardById(normalized)) return
+  setBoardArchivedAt(normalized, archivedAt ?? new Date().toISOString())
+}
+
+export async function syncRestoreBoardToServer(boardId: string): Promise<WorkspaceBoardMeta> {
+  const normalized = boardId.trim()
+  if (!normalized) throw new Error('MISSING_BOARD_ID')
+  const meta = await restoreWorkspaceBoard(requireBoardWorkspaceId(), normalized)
+  if (getBoardById(normalized)) {
+    setBoardArchivedAt(normalized, null)
+    if (Number.isFinite(meta.revision)) setBoardRevision(normalized, meta.revision)
+  } else {
+    registerBoardMeta({
+      id: meta.id,
+      name: meta.name,
+      createdAt: meta.createdAt,
+      updatedAt: meta.updatedAt,
+      revision: meta.revision,
+    })
+  }
+  return meta
 }

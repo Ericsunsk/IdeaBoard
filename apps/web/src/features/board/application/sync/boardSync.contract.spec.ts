@@ -17,8 +17,11 @@ import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persis
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {
   hydrateBoardsFromServer,
+  isBoardArchivedError,
+  isBoardNameConflictError,
   syncBoardToServer,
   syncDeleteBoardToServer,
+  syncRestoreBoardToServer,
 } from './boardSync'
 
 const WORKSPACE_ID = 'ws_test123'
@@ -68,7 +71,7 @@ function boardDto(params: {
   name: string
   createdAt: number
   updatedAt: number
-  revision?: number
+  revision?: number | undefined
 }): Record<string, unknown> {
   return {
     id: params.id,
@@ -82,7 +85,7 @@ function boardDto(params: {
   }
 }
 
-function documentData(params: { id: string; revision?: number; state: BoardState }) {
+function documentData(params: { id: string; revision?: number | undefined; state: BoardState }) {
   // Backend wire shape: the stored snapshot nests nodes under `payload`
   // beside `schema_version` (see `saveWorkspaceBoard` + `V1InitialDocument`).
   const { schemaVersion, ...payload } = params.state
@@ -100,7 +103,7 @@ function addRemoteBoard(params: {
   name: string
   createdAt: number
   updatedAt: number
-  revision?: number
+  revision?: number | undefined
   state: BoardState
 }) {
   apiState.boardsResponse.data.push(
@@ -283,6 +286,7 @@ describe('boardSync', () => {
     const result = await hydrateBoardsFromServer()
 
     expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected hydrate failure')
     expect(result.error).toBeInstanceOf(BoardWorkspaceUnavailableError)
     expect(mocks.request).not.toHaveBeenCalled()
   })
@@ -606,6 +610,53 @@ describe('boardSync', () => {
     )
     expect(call).toBeTruthy()
     expect(apiState.archivedBoardIds).toEqual(['board-1'])
+  })
+
+  it('classifies 409 board_archived as archived, never as a name conflict', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Board', createdAt: 100, updatedAt: 2_000 }])
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Board',
+      createdAt: 100,
+      updatedAt: 2_000,
+      state: makeState(2_000, 'board-state'),
+    })
+    apiState.saveError = {
+      status: 409,
+      code: 'board_archived',
+      msg: '看板已归档',
+    }
+
+    await expect(syncBoardToServer('board-1')).rejects.toMatchObject({
+      code: 'board_archived',
+    })
+    expect(isBoardArchivedError(apiState.saveError)).toBe(true)
+    expect(isBoardNameConflictError(apiState.saveError)).toBe(false)
+  })
+
+  it('restores an archived board on the v1 restore path', async () => {
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Board',
+      createdAt: 100,
+      updatedAt: 2_000,
+      state: makeState(2_000, 'restored'),
+    })
+    apiState.archivedBoardIds.push('board-1')
+
+    const meta = await syncRestoreBoardToServer('board-1')
+
+    const call = mocks.request.mock.calls.find(
+      ([url, config]) =>
+        url === `/v1/workspaces/${WORKSPACE_ID}/boards/board-1/restore` &&
+        typeof config === 'object' &&
+        config !== null &&
+        'method' in config &&
+        config.method === 'POST',
+    )
+    expect(call).toBeTruthy()
+    expect(apiState.archivedBoardIds).toEqual([])
+    expect(meta.archivedAt).toBeUndefined()
   })
 })
 

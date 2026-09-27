@@ -2,6 +2,8 @@ import { computed, onScopeDispose, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { ControlLedgerTransaction } from '../../../../shared/api/generated-query/control/model'
 import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { keepPrevious } from '../../../../shared/query/queryDefaults'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../shared/api'
 import {
   buildAdminCreditCommandRequest,
@@ -12,7 +14,7 @@ const walletQueryRoot = ['control', 'credits', 'wallets'] as const
 
 export type AdminCreditLedgerTransaction = ControlLedgerTransaction
 
-const ADMIN_CREDIT_LEDGER_PAGE_SIZE = 25
+const ADMIN_CREDIT_LEDGER_PAGE_SIZE = PAGE_SIZES.adminLedger
 
 interface AdminCreditLedgerCriteria {
   userPublicId: string
@@ -66,7 +68,7 @@ export function useAdminCreditWalletResource(
       return { criteria, page }
     },
     enabled,
-    placeholderData: (previous) => previous,
+    ...keepPrevious(),
   })
 
   function invalidateWallet() {

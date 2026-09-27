@@ -24,6 +24,7 @@
 -- ids miss by construction and read as not found (never a distinct
 -- status). Membership gating stays at the v1 handler layer; the
 -- repository enforces scoping + transitions.
+-- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 
 -- name: CreateUploadSession :one
 INSERT INTO upload_sessions (public_id, workspace_id, uploader_user_id, declared_mime_type, declared_size_bytes, declared_checksum, storage_key, status)

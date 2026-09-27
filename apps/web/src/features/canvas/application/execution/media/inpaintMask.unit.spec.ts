@@ -13,7 +13,7 @@ const WORKSPACE_ID = 'ws_test123'
 const MASK_DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
 const CHECKSUM = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
-function maskBytes(): Uint8Array {
+function maskBytes(): Uint8Array<ArrayBuffer> {
   return new Uint8Array([137, 80, 78, 71])
 }
 

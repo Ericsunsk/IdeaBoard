@@ -380,96 +380,89 @@ type v1CreateUploadBody struct {
 }
 
 func (h *contractV1Handler) createUploadSession(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok {
-		return
-	}
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	var body v1CreateUploadBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	filename := strings.TrimSpace(body.Data.Filename)
-	mimeType := strings.TrimSpace(body.Data.MIMEType)
-	checksum := workspacemedia.NormalizeChecksum(body.Data.ChecksumSHA256)
-	kind := strings.TrimSpace(body.Data.MediaKind)
-	if kind == "" {
-		kind = workspacemedia.MediaKindImage
-	}
-	if validateErr := workspacemedia.ValidateCreateInput(filename, mimeType, body.Data.SizeBytes, checksum, kind); validateErr != nil {
-		renderUploadValidationError(c, validateErr)
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "upload:create")
-	hash := contract.HashIdempotencyRequest("upload:create", workspacePublicID, filename,
-		workspacemedia.CanonicalMIME(mimeType), strconv.FormatInt(body.Data.SizeBytes, 10), checksum, kind)
-	ownerUserID := identityPrincipal.UserID()
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, ownerUserID, key, hash, func() (any, error) {
-		session, createErr := h.deps.Media.CreateSession(ctx, workspacemedia.CreateSessionParams{
-			WorkspaceID:    workspacePublicID,
-			OwnerUserID:    ownerUserID,
-			Filename:       filename,
-			MIMEType:       mimeType,
-			SizeBytes:      body.Data.SizeBytes,
-			ChecksumSHA256: checksum,
-			MediaKind:      kind,
-		})
-		if createErr != nil {
-			return nil, createErr
-		}
-		dto := toUploadSessionDTO(session)
-		return &dto, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspacePublicID := wctx.Workspace.PublicID
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
 			c.Abort()
 			return
 		}
-		renderUploadValidationError(c, doErr)
-		return
-	}
-	dto, ok := result.(*v1UploadSessionDTO)
-	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
-		c.Abort()
-		return
-	}
-	contract.RenderCreated(c, dto)
+		var body v1CreateUploadBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		filename := strings.TrimSpace(body.Data.Filename)
+		mimeType := strings.TrimSpace(body.Data.MIMEType)
+		checksum := workspacemedia.NormalizeChecksum(body.Data.ChecksumSHA256)
+		kind := strings.TrimSpace(body.Data.MediaKind)
+		if kind == "" {
+			kind = workspacemedia.MediaKindImage
+		}
+		if validateErr := workspacemedia.ValidateCreateInput(filename, mimeType, body.Data.SizeBytes, checksum, kind); validateErr != nil {
+			renderUploadValidationError(c, validateErr)
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "upload:create")
+		hash := contract.HashIdempotencyRequest("upload:create", workspacePublicID, filename,
+			workspacemedia.CanonicalMIME(mimeType), strconv.FormatInt(body.Data.SizeBytes, 10), checksum, kind)
+		ownerUserID := identityPrincipal.UserID()
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, ownerUserID, key, hash, func() (any, error) {
+			session, createErr := h.deps.Media.CreateSession(ctx, workspacemedia.CreateSessionParams{
+				WorkspaceID:    workspacePublicID,
+				OwnerUserID:    ownerUserID,
+				Filename:       filename,
+				MIMEType:       mimeType,
+				SizeBytes:      body.Data.SizeBytes,
+				ChecksumSHA256: checksum,
+				MediaKind:      kind,
+			})
+			if createErr != nil {
+				return nil, createErr
+			}
+			dto := toUploadSessionDTO(session)
+			return &dto, nil
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderUploadValidationError(c, doErr)
+			return
+		}
+		dto, ok := result.(*v1UploadSessionDTO)
+		if !ok || dto == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+			c.Abort()
+			return
+		}
+		contract.RenderCreated(c, dto)
+	})
 }
 
 func (h *contractV1Handler) getUploadSession(c *gin.Context) {
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	uploadID := strings.TrimSpace(c.Param("upload_id"))
-	if !contract.IsUploadID(uploadID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
-		c.Abort()
-		return
-	}
-	session, err := h.deps.Media.GetSession(c.Request.Context(), workspacePublicID, uploadID)
-	if err != nil {
-		renderUploadStoreError(c, err)
-		return
-	}
-	dto := toUploadSessionDTO(session)
-	contract.RenderSuccess(c, dto)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		workspacePublicID := wctx.Workspace.PublicID
+		uploadID := strings.TrimSpace(c.Param("upload_id"))
+		if !contract.IsUploadID(uploadID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+			c.Abort()
+			return
+		}
+		session, err := h.deps.Media.GetSession(c.Request.Context(), workspacePublicID, uploadID)
+		if err != nil {
+			renderUploadStoreError(c, err)
+			return
+		}
+		dto := toUploadSessionDTO(session)
+		contract.RenderSuccess(c, dto)
+	})
 }
 
 // v1OptionalIdempotencyKey resolves the idempotency key for
@@ -644,84 +637,78 @@ type v1CompleteUploadDTO struct {
 }
 
 func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok {
-		return
-	}
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	uploadID := strings.TrimSpace(c.Param("upload_id"))
-	if !contract.IsUploadID(uploadID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
-		c.Abort()
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	var body v1CompleteUploadBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	checksum := workspacemedia.NormalizeChecksum(body.Data.ChecksumSHA256)
-	if !workspacemedia.IsValidChecksum(checksum) {
-		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("checksum_sha256"))
-		return
-	}
-	if body.Data.SizeBytes < 1 || body.Data.SizeBytes > workspacemedia.MaxUploadSizeBytes {
-		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("size_bytes"))
-		return
-	}
-	if body.Data.Width < 0 || body.Data.Width > maxCompleteDimension ||
-		body.Data.Height < 0 || body.Data.Height > maxCompleteDimension {
-		renderUploadValidationError(c, workspacemedia.NewFieldValidationError("dimensions"))
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "upload:complete")
-	hash := contract.HashIdempotencyRequest("upload:complete", workspacePublicID, uploadID, checksum,
-		strconv.FormatInt(body.Data.SizeBytes, 10), strings.TrimSpace(body.Data.MIMEType), strings.TrimSpace(body.Data.MediaKind),
-		strconv.FormatInt(int64(body.Data.Width), 10), strconv.FormatInt(int64(body.Data.Height), 10))
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		return h.completeUploadOnce(ctx, workspacePublicID, uploadID, identityPrincipal, workspacemedia.CompleteFacts{
-			ChecksumSHA256: checksum,
-			SizeBytes:      body.Data.SizeBytes,
-			MIMEType:       strings.TrimSpace(body.Data.MIMEType),
-			MediaKind:      strings.TrimSpace(body.Data.MediaKind),
-			Width:          body.Data.Width,
-			Height:         body.Data.Height,
-		})
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspacePublicID := wctx.Workspace.PublicID
+		uploadID := strings.TrimSpace(c.Param("upload_id"))
+		if !contract.IsUploadID(uploadID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
 			c.Abort()
 			return
 		}
-		if errors.Is(doErr, errV1MediaStagedReadUnavailable) {
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		var body v1CompleteUploadBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		checksum := workspacemedia.NormalizeChecksum(body.Data.ChecksumSHA256)
+		if !workspacemedia.IsValidChecksum(checksum) {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("checksum_sha256"))
+			return
+		}
+		if body.Data.SizeBytes < 1 || body.Data.SizeBytes > workspacemedia.MaxUploadSizeBytes {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("size_bytes"))
+			return
+		}
+		if body.Data.Width < 0 || body.Data.Width > maxCompleteDimension ||
+			body.Data.Height < 0 || body.Data.Height > maxCompleteDimension {
+			renderUploadValidationError(c, workspacemedia.NewFieldValidationError("dimensions"))
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "upload:complete")
+		hash := contract.HashIdempotencyRequest("upload:complete", workspacePublicID, uploadID, checksum,
+			strconv.FormatInt(body.Data.SizeBytes, 10), strings.TrimSpace(body.Data.MIMEType), strings.TrimSpace(body.Data.MediaKind),
+			strconv.FormatInt(int64(body.Data.Width), 10), strconv.FormatInt(int64(body.Data.Height), 10))
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			return h.completeUploadOnce(ctx, workspacePublicID, uploadID, identityPrincipal, workspacemedia.CompleteFacts{
+				ChecksumSHA256: checksum,
+				SizeBytes:      body.Data.SizeBytes,
+				MIMEType:       strings.TrimSpace(body.Data.MIMEType),
+				MediaKind:      strings.TrimSpace(body.Data.MediaKind),
+				Width:          body.Data.Width,
+				Height:         body.Data.Height,
+			})
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			if errors.Is(doErr, errV1MediaStagedReadUnavailable) {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+				c.Abort()
+				return
+			}
+			renderUploadValidationError(c, doErr)
+			return
+		}
+		dto, ok := result.(*v1CompleteUploadDTO)
+		if !ok || dto == nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
 			c.Abort()
 			return
 		}
-		renderUploadValidationError(c, doErr)
-		return
-	}
-	dto, ok := result.(*v1CompleteUploadDTO)
-	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, dto)
+		contract.RenderSuccess(c, dto)
+	})
 }
 
 // v1MediaRenderer renders display derivatives during completion. The
@@ -822,80 +809,78 @@ func (h *contractV1Handler) generateMediaDerivativesBestEffort(ctx context.Conte
 }
 
 func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		c.Abort()
-		return
-	}
-	offset := 0
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		workspacePublicID := wctx.Workspace.PublicID
+		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
 			c.Abort()
 			return
 		}
-		offset = cursor.Offset
-	}
-	// Over-fetch by one to compute has_more without a count query.
-	assets, err := h.deps.Media.ListAssets(c.Request.Context(), workspacePublicID, pageSize+1, offset)
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
-		c.Abort()
-		return
-	}
-	hasMore := len(assets) > pageSize
-	if hasMore {
-		assets = assets[:pageSize]
-	}
-	page := make([]v1MediaAssetDTO, 0, len(assets))
-	for _, asset := range assets {
-		page = append(page, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
-	}
-	meta := contract.NewPageMeta("", false)
-	if hasMore {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
-		if encodeErr != nil {
+		offset := 0
+		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
+			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
+			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				c.Abort()
+				return
+			}
+			offset = cursor.Offset
+		}
+		// Over-fetch by one to compute has_more without a count query.
+		assets, err := h.deps.Media.ListAssets(c.Request.Context(), workspacePublicID, pageSize+1, offset)
+		if err != nil {
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
 			c.Abort()
 			return
 		}
-		meta = contract.NewPageMeta(next, true)
-	}
-	contract.RenderPaginated(c, page, meta)
+		hasMore := len(assets) > pageSize
+		if hasMore {
+			assets = assets[:pageSize]
+		}
+		page := make([]v1MediaAssetDTO, 0, len(assets))
+		for _, asset := range assets {
+			page = append(page, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
+		}
+		meta := contract.NewPageMeta("", false)
+		if hasMore {
+			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
+			if encodeErr != nil {
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
+				c.Abort()
+				return
+			}
+			meta = contract.NewPageMeta(next, true)
+		}
+		contract.RenderPaginated(c, page, meta)
+	})
 }
 
 func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	assetID := strings.TrimSpace(c.Param("asset_id"))
-	// Library read-through: the Canvas import path reads managed media
-	// through this endpoint with the owned lasset_ id (poll-free single
-	// attempt; the Canvas pending-fact loop owns the retry). A
-	// completed materialization link serves the managed asset; a miss
-	// triggers one best-effort async fetch and 404s now.
-	if contract.IsLibraryAssetID(assetID) {
-		h.getLibraryMaterializedMediaAsset(c, workspacePublicID, assetID)
-		return
-	}
-	if !contract.IsAssetID(assetID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
-		c.Abort()
-		return
-	}
-	asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
-	if err != nil {
-		renderMediaStoreError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx) {
+		workspacePublicID := wctx.Workspace.PublicID
+		assetID := strings.TrimSpace(c.Param("asset_id"))
+		// Library read-through: the Canvas import path reads managed media
+		// through this endpoint with the owned lasset_ id (poll-free single
+		// attempt; the Canvas pending-fact loop owns the retry). A
+		// completed materialization link serves the managed asset; a miss
+		// triggers one best-effort async fetch and 404s now.
+		if contract.IsLibraryAssetID(assetID) {
+			h.getLibraryMaterializedMediaAsset(c, workspacePublicID, assetID)
+			return
+		}
+		if !contract.IsAssetID(assetID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
+			c.Abort()
+			return
+		}
+		asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
+		if err != nil {
+			renderMediaStoreError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
+	})
 }
 
 type v1BatchMediaAssetsBody struct {
@@ -914,93 +899,81 @@ type v1BatchMediaAssetsDTO struct {
 // same asset DTOs in request order. Read-only, so no Idempotency-Key
 // (library asset-resolutions precedent).
 func (h *contractV1Handler) batchGetMediaAssets(c *gin.Context) {
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, false)
-	if !allowed {
-		return
-	}
-	var body v1BatchMediaAssetsBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	ids := body.Data.AssetIDs
-	if len(ids) < 1 || len(ids) > maxV1MediaBatchAssets {
-		renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"asset_ids": "out_of_range"}})
-		return
-	}
-	items := make([]v1MediaAssetDTO, 0, len(ids))
-	for _, raw := range ids {
-		assetID := strings.TrimSpace(raw)
-		if !contract.IsAssetID(assetID) {
-			renderMediaStoreError(c, workspacemedia.ErrNotFound)
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndMedia}, func(wctx v1WorkspaceCtx, body v1BatchMediaAssetsBody) {
+		workspacePublicID := wctx.Workspace.PublicID
+		ids := body.Data.AssetIDs
+		if len(ids) < 1 || len(ids) > maxV1MediaBatchAssets {
+			renderMediaValidationError(c, &workspacemedia.ValidationError{Fields: map[string]string{"asset_ids": "out_of_range"}})
 			return
 		}
-		asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
-		if err != nil {
-			renderMediaStoreError(c, err)
-			return
+		items := make([]v1MediaAssetDTO, 0, len(ids))
+		for _, raw := range ids {
+			assetID := strings.TrimSpace(raw)
+			if !contract.IsAssetID(assetID) {
+				renderMediaStoreError(c, workspacemedia.ErrNotFound)
+				return
+			}
+			asset, err := h.deps.Media.GetAsset(c.Request.Context(), workspacePublicID, assetID)
+			if err != nil {
+				renderMediaStoreError(c, err)
+				return
+			}
+			items = append(items, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
 		}
-		items = append(items, toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt)))
-	}
-	contract.RenderSuccess(c, v1BatchMediaAssetsDTO{Items: items})
+		contract.RenderSuccess(c, v1BatchMediaAssetsDTO{Items: items})
+	})
 }
 
 func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok {
-		return
-	}
-	workspacePublicID, allowed := h.v1MediaWorkspaceContext(c, true)
-	if !allowed {
-		return
-	}
-	assetID := strings.TrimSpace(c.Param("asset_id"))
-	if !contract.IsAssetID(assetID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
-		c.Abort()
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	ctx := c.Request.Context()
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "media:archive")
-	hash := contract.HashIdempotencyRequest("media:archive", workspacePublicID, assetID)
-	result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		asset, archiveErr := h.deps.Media.ArchiveAsset(ctx, workspacePublicID, assetID)
-		if archiveErr != nil {
-			return nil, archiveErr
-		}
-		// #807: media.asset_archived AFTER the archive commit (inside
-		// the once-fn: replays never re-emit).
-		h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetArchived,
-			events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
-			events.V1MediaAssetArchivedData{AssetID: asset.ID})
-		dto := toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt))
-		return &dto, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndMedia, Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspacePublicID := wctx.Workspace.PublicID
+		assetID := strings.TrimSpace(c.Param("asset_id"))
+		if !contract.IsAssetID(assetID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
 			c.Abort()
 			return
 		}
-		renderMediaStoreError(c, doErr)
-		return
-	}
-	dto, ok := result.(*v1MediaAssetDTO)
-	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, dto)
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		ctx := c.Request.Context()
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "media:archive")
+		hash := contract.HashIdempotencyRequest("media:archive", workspacePublicID, assetID)
+		result, _, doErr := h.deps.Idempotency.Do(ctx, scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			asset, archiveErr := h.deps.Media.ArchiveAsset(ctx, workspacePublicID, assetID)
+			if archiveErr != nil {
+				return nil, archiveErr
+			}
+			// #807: media.asset_archived AFTER the archive commit (inside
+			// the once-fn: replays never re-emit).
+			h.emitWorkspaceEvent(ctx, identityPrincipal, workspacePublicID, events.EventV1MediaAssetArchived,
+				events.V1Resource{Type: events.V1ResourceMediaAsset, ID: asset.ID},
+				events.V1MediaAssetArchivedData{AssetID: asset.ID})
+			dto := toMediaAssetDTO(workspacePublicID, asset, v1FormatTime(asset.CreatedAt))
+			return &dto, nil
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderMediaStoreError(c, doErr)
+			return
+		}
+		dto, ok := result.(*v1MediaAssetDTO)
+		if !ok || dto == nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, dto)
+	})
 }
 
 // v1BinaryWorkspaceContext is the plain-status counterpart of

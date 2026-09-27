@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 
@@ -21,24 +22,33 @@ import (
 // Classification lives here at the HTTP edge so domain/ports sentinels stay
 // dependency-free; every rewards failure below renders through
 // response.MachineError, never through the numeric response.Error envelope.
+// Reward error codes are wire-stable. Do not rename a code without
+// coordinating the frontend caller that branches on it. Messages stay
+// intentionally safe for public display and never carry Code plaintext,
+// digests, or provider payloads.
+//
+// The values below alias the kernel registry
+// (platform/contract.CodeReward*): the registry is the single source of
+// truth, these names keep the edge diffs trivial. Wire values are
+// unchanged.
 const (
-	codeRewardInvalidInput            = "reward_invalid_input"
-	codeRewardCodeIDInvalid           = "reward_code_id_invalid"
-	codeRewardRedemptionIDInvalid     = "reward_redemption_id_invalid"
-	codeRewardPaginationInvalid       = "reward_pagination_invalid"
-	codeRewardCodeInvalid             = "reward_code_invalid"
-	codeRewardCodeConflict            = "reward_code_conflict"
-	codeRewardCodeIdempotencyConflict = "reward_code_idempotency_conflict"
-	codeRewardCodeNotFound            = "reward_code_not_found"
-	codeRewardCodeCapInvalid          = "reward_code_cap_invalid"
-	codeRewardCodeRedeemed            = "reward_code_redeemed"
-	codeRewardRedemptionNotFound      = "reward_redemption_not_found"
-	codeRewardCodeUnavailable         = "reward_code_unavailable"
-	codeRewardWalletLocked            = "reward_wallet_locked"
-	codeRewardRateLimited             = "reward_rate_limited"
-	codeRewardServiceUnavailable      = "reward_service_unavailable"
-	codeRewardOperationFailed         = "reward_operation_failed"
-	codeRewardRedeemFailed            = "reward_redeem_failed"
+	codeRewardInvalidInput            = string(contract.CodeRewardInvalidInput)
+	codeRewardCodeIDInvalid           = string(contract.CodeRewardCodeIDInvalid)
+	codeRewardRedemptionIDInvalid     = string(contract.CodeRewardRedemptionIDInvalid)
+	codeRewardPaginationInvalid       = string(contract.CodeRewardPaginationInvalid)
+	codeRewardCodeInvalid             = string(contract.CodeRewardCodeInvalid)
+	codeRewardCodeConflict            = string(contract.CodeRewardCodeConflict)
+	codeRewardCodeIdempotencyConflict = string(contract.CodeRewardCodeIdempotencyConflict)
+	codeRewardCodeNotFound            = string(contract.CodeRewardCodeNotFound)
+	codeRewardCodeCapInvalid          = string(contract.CodeRewardCodeCapInvalid)
+	codeRewardCodeRedeemed            = string(contract.CodeRewardCodeRedeemed)
+	codeRewardRedemptionNotFound      = string(contract.CodeRewardRedemptionNotFound)
+	codeRewardCodeUnavailable         = string(contract.CodeRewardCodeUnavailable)
+	codeRewardWalletLocked            = string(contract.CodeRewardWalletLocked)
+	codeRewardRateLimited             = string(contract.CodeRewardRateLimited)
+	codeRewardServiceUnavailable      = string(contract.CodeRewardServiceUnavailable)
+	codeRewardOperationFailed         = string(contract.CodeRewardOperationFailed)
+	codeRewardRedeemFailed            = string(contract.CodeRewardRedeemFailed)
 )
 
 type rewardErrorMapping struct {
@@ -55,7 +65,7 @@ func (m rewardErrorMapping) Matches(err error) bool {
 func (m rewardErrorMapping) render(c *gin.Context, err error) {
 	msg := m.message
 	if msg == "" {
-		slog.Warn("reward error mapping missing safe message",
+		slog.Error("reward error mapping missing safe message",
 			"code", m.code,
 			"status", m.status,
 			"error_type", fmt.Sprintf("%T", err),
@@ -130,7 +140,7 @@ func renderMappedRewardError(c *gin.Context, err error, table []rewardErrorMappi
 		row.render(c, err)
 		return
 	}
-	slog.Warn("reward operation failed",
+	slog.Error("reward operation failed",
 		"outcome", "internal_error",
 		"error_type", fmt.Sprintf("%T", err),
 		"error_summary", redactedRewardErrorSummary(err))

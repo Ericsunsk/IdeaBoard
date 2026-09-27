@@ -2,6 +2,7 @@ import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from '../session/userSession'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { mockAppToast } from '../../../test/toast'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import AuthModalHost from './AuthModalHost.vue'
 import LoginAuthPanel from './LoginAuthPanel.vue'
@@ -11,9 +12,7 @@ vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({ projectName: 'IdeaBoard' }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 const DialogRootStub = defineComponent({
   props: {
@@ -198,6 +197,7 @@ function renderAuthPanel(testCase: AuthPanelCase) {
 
 describe('AuthModalHost motion', () => {
   beforeEach(() => {
+    mockAppToast()
     stubMotionPreference(false)
   })
 

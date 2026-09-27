@@ -1,6 +1,7 @@
 import { computed, ref, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
+import { stringParam } from '../../../shared/router/queryParams'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import { i18n } from '../../../shared/i18n'
@@ -124,8 +125,7 @@ export function useSearchSession(options: SearchSessionOptions) {
   })
 
   function queryValue(): string {
-    const value = route.query.q
-    return Array.isArray(value) ? String(value[0] || '') : String(value || '')
+    return stringParam(route.query.q) ?? ''
   }
 
   function clearSearch(): void {
@@ -133,7 +133,7 @@ export function useSearchSession(options: SearchSessionOptions) {
     draftQuery.value = ''
     submittedQuery.value = ''
     queryError.value = ''
-    if (route.query.q) {
+    if (stringParam(route.query.q)) {
       void router.replace({ path: USER_SEARCH_PATH, query: {} })
       return
     }
@@ -267,7 +267,7 @@ export function useSearchSession(options: SearchSessionOptions) {
     if (value.trim() !== '' || vision.references.value.length > 0 || submittedQuery.value === '')
       return
     submittedQuery.value = ''
-    if (route.query.q) {
+    if (stringParam(route.query.q)) {
       void router.replace({ path: USER_SEARCH_PATH, query: {} })
       return
     }

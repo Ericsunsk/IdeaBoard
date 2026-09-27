@@ -8,6 +8,7 @@ export interface BoardMeta {
   createdAt: number
   updatedAt: number
   revision?: number
+  archivedAt?: string | undefined
 }
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
@@ -43,12 +44,14 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
     typeof record.revision === 'number' && Number.isFinite(record.revision) && record.revision >= 0
       ? record.revision
       : undefined
+  const archivedAt = typeof record.archivedAt === 'string' && record.archivedAt ? record.archivedAt : undefined
   return {
     id: record.id,
     name: normalizeBoardName(record.name) || 'Untitled',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     ...(revision === undefined ? {} : { revision }),
+    ...(archivedAt === undefined ? {} : { archivedAt }),
   }
 }
 
@@ -169,6 +172,7 @@ export function registerBoardMeta(input: {
   createdAt?: number
   updatedAt?: number
   revision?: number
+  archivedAt?: string | null | undefined
 }): BoardMeta | null {
   const id = input.id.trim()
   const name = normalizeBoardName(input.name)
@@ -180,6 +184,9 @@ export function registerBoardMeta(input: {
     createdAt: Number.isFinite(input.createdAt) ? Number(input.createdAt) : now,
     updatedAt: Number.isFinite(input.updatedAt) ? Number(input.updatedAt) : now,
     ...(input.revision === undefined ? {} : { revision: input.revision }),
+    ...(typeof input.archivedAt === 'string' && input.archivedAt
+      ? { archivedAt: input.archivedAt }
+      : {}),
   }
   const valid = toValidBoardMeta(board)
   if (!valid) return null
@@ -224,6 +231,29 @@ export function setBoardRevision(boardId: string, revision: number): BoardMeta |
   const target = boards.find((board) => board.id === id)
   if (!target) return null
   target.revision = revision
+  writeRawBoards(boards)
+  publishCatalogChange()
+  return target
+}
+
+/**
+ * Tracks the server archived flag locally so the canvas can render the
+ * archived banner without refetching. `archivedAt` null clears the flag.
+ */
+export function setBoardArchivedAt(
+  boardId: string,
+  archivedAt: string | null | undefined,
+): BoardMeta | null {
+  const id = boardId.trim()
+  if (!id) return null
+  const boards = readRawBoards()
+  const target = boards.find((board) => board.id === id)
+  if (!target) return null
+  if (typeof archivedAt === 'string' && archivedAt) {
+    target.archivedAt = archivedAt
+  } else {
+    delete target.archivedAt
+  }
   writeRawBoards(boards)
   publishCatalogChange()
   return target

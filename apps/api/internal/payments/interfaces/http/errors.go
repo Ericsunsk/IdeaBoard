@@ -7,6 +7,7 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,7 @@ func (m paymentErrorMapping) Matches(err error) bool {
 func (m paymentErrorMapping) render(c *gin.Context, err error) {
 	msg := m.message
 	if msg == "" {
-		slog.Warn("payment error mapping missing safe message", "code", m.code, "status", m.status, "err", err)
+		slog.Error("payment error mapping missing safe message", "code", m.code, "status", m.status, "err", err)
 		msg = "请求处理失败，请稍后重试"
 	}
 	errorrender.Render(c, m.status, m.code, msg)
@@ -59,13 +60,13 @@ var stripeConfigurationErrorTable = []paymentErrorMapping{
 			paymentcontracts.ErrInvalidWebhookURL,
 		},
 		status:  http.StatusBadRequest,
-		code:    "stripe_configuration_invalid_input",
+		code:    string(contract.CodeStripeConfigurationInvalidInput),
 		message: "Stripe 配置参数错误",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripePermissionDenied},
 		status:  http.StatusForbidden,
-		code:    "stripe_permission_denied",
+		code:    string(contract.CodeStripePermissionDenied),
 		message: paymentcontracts.ErrStripePermissionDenied.Error(),
 	},
 	{
@@ -74,19 +75,19 @@ var stripeConfigurationErrorTable = []paymentErrorMapping{
 			paymentcontracts.ErrStripeConfigurationInvalid,
 		},
 		status:  http.StatusUnprocessableEntity,
-		code:    "stripe_configuration_unprocessable",
+		code:    string(contract.CodeStripeConfigurationUnprocessable),
 		message: "当前 Stripe 配置不可用",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeProviderUnavailable},
 		status:  http.StatusServiceUnavailable,
-		code:    "stripe_provider_unavailable",
+		code:    string(contract.CodeStripeProviderUnavailable),
 		message: paymentcontracts.ErrStripeProviderUnavailable.Error(),
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeConfigurationChanged},
 		status:  http.StatusConflict,
-		code:    "stripe_configuration_changed",
+		code:    string(contract.CodeStripeConfigurationChanged),
 		message: "Stripe 配置已被其他操作更新，请重试",
 	},
 }
@@ -98,7 +99,7 @@ var checkoutErrorTable = []paymentErrorMapping{
 			paymentsdomain.ErrCheckoutIdempotencyKey,
 		},
 		status:  http.StatusBadRequest,
-		code:    "checkout_invalid_input",
+		code:    string(contract.CodeCheckoutInvalidInput),
 		message: "充值参数错误",
 	},
 	{
@@ -107,31 +108,31 @@ var checkoutErrorTable = []paymentErrorMapping{
 			paymentcontracts.ErrPaymentAlreadyInProgress,
 		},
 		status:  http.StatusConflict,
-		code:    "checkout_conflict",
+		code:    string(contract.CodeCheckoutConflict),
 		message: "充值请求冲突，请稍后重试",
 	},
 	{
 		targets: []error{paymentcontracts.ErrPaymentAlreadyCompleted},
 		status:  http.StatusUnprocessableEntity,
-		code:    "payment_already_completed",
+		code:    string(contract.CodePaymentAlreadyCompleted),
 		message: "该充值已完成，请勿重复支付",
 	},
 	{
 		targets: []error{paymentcontracts.ErrCheckoutSessionExpired},
 		status:  http.StatusUnprocessableEntity,
-		code:    "checkout_session_expired",
+		code:    string(contract.CodeCheckoutSessionExpired),
 		message: "支付页面已过期，请重新发起充值",
 	},
 	{
 		targets: []error{paymentsdomain.ErrWalletNotRechargeable},
 		status:  http.StatusConflict,
-		code:    "wallet_not_rechargeable",
+		code:    string(contract.CodeWalletNotRechargeable),
 		message: "当前账户暂不可充值",
 	},
 	{
 		targets: []error{paymentsdomain.ErrCheckoutRequestRejected},
 		status:  http.StatusUnprocessableEntity,
-		code:    "checkout_request_rejected",
+		code:    string(contract.CodeCheckoutRequestRejected),
 		// Provider details stay out of the response: the joined error may
 		// carry raw decline payloads, so render the fixed safe copy instead.
 		message: "无法创建支付页面，请重试",
@@ -139,13 +140,13 @@ var checkoutErrorTable = []paymentErrorMapping{
 	{
 		targets: []error{paymentcontracts.ErrStripeProviderUnavailable},
 		status:  http.StatusServiceUnavailable,
-		code:    "payment_service_unavailable",
+		code:    string(contract.CodePaymentServiceUnavailable),
 		message: "支付服务暂不可用",
 	},
 	{
 		targets: []error{paymentsdomain.ErrPurchasesUnavailable},
 		status:  http.StatusServiceUnavailable,
-		code:    "purchases_unavailable",
+		code:    string(contract.CodePurchasesUnavailable),
 		message: "充值服务暂不可用",
 	},
 }
@@ -154,13 +155,13 @@ var rechargeHistoryErrorTable = []paymentErrorMapping{
 	{
 		targets: []error{paymentcontracts.ErrRechargeHistoryLimit},
 		status:  http.StatusBadRequest,
-		code:    "recharge_history_limit_invalid",
+		code:    string(contract.CodeRechargeHistoryLimitInvalid),
 		message: "充值记录 limit 无效",
 	},
 	{
 		targets: []error{paymentcontracts.ErrRechargeHistoryCursor},
 		status:  http.StatusBadRequest,
-		code:    "recharge_history_cursor_invalid",
+		code:    string(contract.CodeRechargeHistoryCursorInvalid),
 		message: "充值记录游标无效",
 	},
 }
@@ -172,13 +173,13 @@ var stripeWebhookErrorTable = []paymentErrorMapping{
 			paymentports.ErrMalformedWebhookPayload,
 		},
 		status:  http.StatusBadRequest,
-		code:    "webhook_signature_invalid",
+		code:    string(contract.CodeWebhookSignatureInvalid),
 		message: "Stripe Webhook 签名无效",
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeConfigurationNotFound, paymentcontracts.ErrStripeConfigurationInvalid},
 		status:  http.StatusServiceUnavailable,
-		code:    "webhook_configuration_missing",
+		code:    string(contract.CodeWebhookConfigurationMissing),
 		message: "Stripe Webhook 尚未配置",
 	},
 }

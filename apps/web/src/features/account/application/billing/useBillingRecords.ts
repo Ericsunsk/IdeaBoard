@@ -2,9 +2,11 @@ import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery } from '@tanstack/vue-query'
 import { useCreditsSync } from '../recharge/useCreditsSync'
 import { billingRecordsQueryKeys, fetchBillingRecords } from '../../infrastructure/billing/resource'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { noRetry } from '../../../../shared/query/queryDefaults'
 import { useAccountWorkspace } from '../accountWorkspace'
 
-const pageSize = 20
+const pageSize = PAGE_SIZES.standard
 
 export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
   useCreditsSync()
@@ -24,7 +26,7 @@ export function useBillingRecords(enabled: MaybeRefOrGetter<boolean> = true) {
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     enabled: () => toValue(enabled) && selectionSettled.value,
-    retry: false,
+    ...noRetry(),
   })
 
   const records = computed(() => query.data.value?.pages.flatMap((page) => page.records) ?? [])

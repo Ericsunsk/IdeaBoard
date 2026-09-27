@@ -1,7 +1,7 @@
 import { onScopeDispose } from 'vue'
 import { useQueryClient, type QueryClient } from '@tanstack/vue-query'
 import { subscribeUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
-import { billingRecordsQueryKeys, creditsQueryKeys } from '../../infrastructure'
+import { invalidateUserMoney } from '../invalidateUserMoney'
 
 type CreditsSyncSubscription = {
   consumers: number
@@ -18,8 +18,7 @@ export function useCreditsSync(): void {
     sync = {
       consumers: 0,
       unsubscribe: subscribeUserCreditsInvalidation(() => {
-        void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-        void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
+        invalidateUserMoney(queryClient)
       }),
     }
     syncSubscriptions.set(queryClient, sync)

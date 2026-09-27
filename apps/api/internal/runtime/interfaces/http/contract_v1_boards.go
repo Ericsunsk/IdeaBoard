@@ -138,8 +138,10 @@ func renderBoardError(c *gin.Context, err error) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
 	case errors.Is(err, boards.ErrRevisionConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeBoardRevisionConflict, "看板版本已变更，请刷新后重试")
-	case errors.Is(err, boards.ErrPermissionDenied), errors.Is(err, boards.ErrV1Archived):
+	case errors.Is(err, boards.ErrPermissionDenied):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, "权限不足")
+	case errors.Is(err, boards.ErrV1Archived):
+		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, "看板已归档")
 	case errors.Is(err, boards.ErrMemberNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, "成员不存在")
 	case errors.Is(err, boards.ErrMemberInviteSelf):
@@ -321,34 +323,31 @@ func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, b
 }
 
 func (h *contractV1Handler) listBoards(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	all, err := h.deps.Boards.ListBoards(c.Request.Context(), workspace.PublicID, false)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	// Visible workspace members default to viewer (owners to owner);
-	// explicit board rows override: only boards with an effective role
-	// are enumerable.
-	page := make([]v1BoardDTO, 0, len(all))
-	for _, board := range all {
-		if _, ok, roleErr := h.deps.Boards.GetBoardRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), workspaceRole); roleErr != nil || !ok {
-			continue
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		all, err := h.deps.Boards.ListBoards(c.Request.Context(), workspace.PublicID, false)
+		if err != nil {
+			renderBoardError(c, err)
+			return
 		}
-		page = append(page, toBoardDTO(board))
-	}
-	slice, meta, ok := boardPageSlice(page, c)
-	if !ok {
-		return
-	}
-	contract.RenderPaginated(c, slice, meta)
+		// Visible workspace members default to viewer (owners to owner);
+		// explicit board rows override: only boards with an effective role
+		// are enumerable.
+		page := make([]v1BoardDTO, 0, len(all))
+		for _, board := range all {
+			if _, ok, roleErr := h.deps.Boards.GetBoardRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), workspaceRole); roleErr != nil || !ok {
+				continue
+			}
+			page = append(page, toBoardDTO(board))
+		}
+		slice, meta, ok := boardPageSlice(page, c)
+		if !ok {
+			return
+		}
+		contract.RenderPaginated(c, slice, meta)
+	})
 }
 
 type v1CreateBoardBody struct {
@@ -358,73 +357,64 @@ type v1CreateBoardBody struct {
 }
 
 func (h *contractV1Handler) createBoard(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, _, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1CreateBoardBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if err := boards.ValidateV1BoardName(name); err != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:create", workspace.PublicID, name)
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "create", key, hash, func() (any, error) {
-		publicID, mintErr := boards.NewV1BoardPublicID()
-		if mintErr != nil {
-			return nil, mintErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
 		}
-		return h.deps.Boards.CreateBoard(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), name, publicID)
+		var body v1CreateBoardBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		name := strings.TrimSpace(body.Data.Name)
+		if err := boards.ValidateV1BoardName(name); err != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			c.Abort()
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:create", workspace.PublicID, name)
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "create", key, hash, func() (any, error) {
+			publicID, mintErr := boards.NewV1BoardPublicID()
+			if mintErr != nil {
+				return nil, mintErr
+			}
+			return h.deps.Boards.CreateBoard(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), name, publicID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		created, ok := result.(*boards.V1Board)
+		if !ok || created == nil {
+			renderBoardError(c, errors.New("boards: create type mismatch"))
+			return
+		}
+		logBoardAudit("board_create", identityPrincipal.UserID(), workspace.PublicID+"/"+created.PublicID, "board_create", "created")
+		contract.SetETag(c, boards.FormatV1ETag(created.Revision))
+		contract.RenderCreated(c, toBoardDTO(created))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	created, ok := result.(*boards.V1Board)
-	if !ok || created == nil {
-		renderBoardError(c, errors.New("boards: create type mismatch"))
-		return
-	}
-	logBoardAudit("board_create", identityPrincipal.UserID(), workspace.PublicID+"/"+created.PublicID, "board_create", "created")
-	contract.SetETag(c, boards.FormatV1ETag(created.Revision))
-	contract.RenderCreated(c, toBoardDTO(created))
 }
 
 func (h *contractV1Handler) getBoard(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	contract.SetETag(c, boards.FormatV1ETag(board.Revision))
-	contract.RenderSuccess(c, toBoardDTO(board))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		contract.SetETag(c, boards.FormatV1ETag(board.Revision))
+		contract.RenderSuccess(c, toBoardDTO(board))
+	})
 }
 
 type v1RenameBoardBody struct {
@@ -434,124 +424,113 @@ type v1RenameBoardBody struct {
 }
 
 func (h *contractV1Handler) renameBoard(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
-		return
-	}
-	var body v1RenameBoardBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if err := boards.ValidateV1BoardName(name); err != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	renamed, err := h.deps.Boards.RenameBoard(c.Request.Context(), workspace.PublicID, board.PublicID, name)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	contract.SetETag(c, boards.FormatV1ETag(renamed.Revision))
-	contract.RenderSuccess(c, toBoardDTO(renamed))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
+			return
+		}
+		var body v1RenameBoardBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		name := strings.TrimSpace(body.Data.Name)
+		if err := boards.ValidateV1BoardName(name); err != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			c.Abort()
+			return
+		}
+		renamed, err := h.deps.Boards.RenameBoard(c.Request.Context(), workspace.PublicID, board.PublicID, name)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		contract.SetETag(c, boards.FormatV1ETag(renamed.Revision))
+		contract.RenderSuccess(c, toBoardDTO(renamed))
+	})
 }
 
 func (h *contractV1Handler) archiveBoard(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:archive", workspace.PublicID, board.PublicID)
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "archive", key, hash, func() (any, error) {
-		return h.deps.Boards.ArchiveBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:archive", workspace.PublicID, board.PublicID)
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "archive", key, hash, func() (any, error) {
+			return h.deps.Boards.ArchiveBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		archived, ok := result.(*boards.V1Board)
+		if !ok || archived == nil {
+			renderBoardError(c, errors.New("boards: archive type mismatch"))
+			return
+		}
+		logBoardAudit("board_archive", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_archive", "archived")
+		contract.RenderSuccess(c, toBoardDTO(archived))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	archived, ok := result.(*boards.V1Board)
-	if !ok || archived == nil {
-		renderBoardError(c, errors.New("boards: archive type mismatch"))
-		return
-	}
-	logBoardAudit("board_archive", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_archive", "archived")
-	contract.RenderSuccess(c, toBoardDTO(archived))
 }
 
 func (h *contractV1Handler) restoreBoard(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:restore", workspace.PublicID, board.PublicID)
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "restore", key, hash, func() (any, error) {
-		return h.deps.Boards.RestoreBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:restore", workspace.PublicID, board.PublicID)
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "restore", key, hash, func() (any, error) {
+			return h.deps.Boards.RestoreBoard(c.Request.Context(), workspace.PublicID, board.PublicID)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		restored, ok := result.(*boards.V1Board)
+		if !ok || restored == nil {
+			renderBoardError(c, errors.New("boards: restore type mismatch"))
+			return
+		}
+		logBoardAudit("board_restore", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_restore", "restored")
+		contract.RenderSuccess(c, toBoardDTO(restored))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	restored, ok := result.(*boards.V1Board)
-	if !ok || restored == nil {
-		renderBoardError(c, errors.New("boards: restore type mismatch"))
-		return
-	}
-	logBoardAudit("board_restore", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "board_restore", "restored")
-	contract.RenderSuccess(c, toBoardDTO(restored))
 }
 
 type v1BoardDocumentDTO struct {
@@ -577,20 +556,17 @@ func toBoardDocumentDTO(board *boards.V1Board) v1BoardDocumentDTO {
 }
 
 func (h *contractV1Handler) getBoardDocument(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	contract.SetETag(c, boards.FormatV1ETag(board.Revision))
-	contract.RenderSuccess(c, toBoardDocumentDTO(board))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		contract.SetETag(c, boards.FormatV1ETag(board.Revision))
+		contract.RenderSuccess(c, toBoardDocumentDTO(board))
+	})
 }
 
 type v1ReplaceDocumentBody struct {
@@ -601,88 +577,83 @@ type v1ReplaceDocumentBody struct {
 }
 
 func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	expectedRevision, ok := parseBoardIfMatch(c)
-	if !ok {
-		return
-	}
-	var body v1ReplaceDocumentBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	// Re-encode through the strict discriminated-union validator so unknown
-	// fields are rejected even though the envelope itself is strict-decoded.
-	rawEnvelope, marshalErr := json.Marshal(map[string]any{
-		"schema_version": body.Data.SchemaVersion,
-		"payload":        body.Data.Payload,
-	})
-	if marshalErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
-		c.Abort()
-		return
-	}
-	schemaVersion, _, validateErr := boards.ValidateV1DocumentStrict(rawEnvelope)
-	if validateErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
-		c.Abort()
-		return
-	}
-	// Canonical snapshot: re-marshal the validated envelope so stored bytes
-	// are stable regardless of client whitespace.
-	snapshot := json.RawMessage(rawEnvelope)
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:document-replace", workspace.PublicID, board.PublicID,
-		strconv.FormatInt(expectedRevision, 10), string(rawEnvelope))
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "document-replace", key, hash, func() (any, error) {
-		updated, replaceErr := h.deps.Boards.ReplaceDocument(c.Request.Context(), workspace.PublicID, board.PublicID,
-			identityPrincipal.UserID(), expectedRevision, schemaVersion, snapshot)
-		if replaceErr != nil {
-			return nil, replaceErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
 		}
-		// #807: board.document_replaced AFTER the revision commit.
-		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-			events.EventV1BoardDocumentReplaced,
-			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-			events.V1BoardDocumentReplacedData{BoardID: board.PublicID, Revision: updated.Revision})
-		return updated, nil
+		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		expectedRevision, ok := parseBoardIfMatch(c)
+		if !ok {
+			return
+		}
+		var body v1ReplaceDocumentBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		// Re-encode through the strict discriminated-union validator so unknown
+		// fields are rejected even though the envelope itself is strict-decoded.
+		rawEnvelope, marshalErr := json.Marshal(map[string]any{
+			"schema_version": body.Data.SchemaVersion,
+			"payload":        body.Data.Payload,
+		})
+		if marshalErr != nil {
+			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+				"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
+			c.Abort()
+			return
+		}
+		schemaVersion, _, validateErr := boards.ValidateV1DocumentStrict(rawEnvelope)
+		if validateErr != nil {
+			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
+				"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
+			c.Abort()
+			return
+		}
+		// Canonical snapshot: re-marshal the validated envelope so stored bytes
+		// are stable regardless of client whitespace.
+		snapshot := json.RawMessage(rawEnvelope)
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:document-replace", workspace.PublicID, board.PublicID,
+			strconv.FormatInt(expectedRevision, 10), string(rawEnvelope))
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "document-replace", key, hash, func() (any, error) {
+			updated, replaceErr := h.deps.Boards.ReplaceDocument(c.Request.Context(), workspace.PublicID, board.PublicID,
+				identityPrincipal.UserID(), expectedRevision, schemaVersion, snapshot)
+			if replaceErr != nil {
+				return nil, replaceErr
+			}
+			// #807: board.document_replaced AFTER the revision commit.
+			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+				events.EventV1BoardDocumentReplaced,
+				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+				events.V1BoardDocumentReplacedData{BoardID: board.PublicID, Revision: updated.Revision})
+			return updated, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		updated, ok := result.(*boards.V1Board)
+		if !ok || updated == nil {
+			renderBoardError(c, errors.New("boards: document type mismatch"))
+			return
+		}
+		contract.SetETag(c, boards.FormatV1ETag(updated.Revision))
+		contract.RenderSuccess(c, toBoardDocumentDTO(updated))
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	updated, ok := result.(*boards.V1Board)
-	if !ok || updated == nil {
-		renderBoardError(c, errors.New("boards: document type mismatch"))
-		return
-	}
-	contract.SetETag(c, boards.FormatV1ETag(updated.Revision))
-	contract.RenderSuccess(c, toBoardDocumentDTO(updated))
 }
 
 type v1BoardRevisionDTO struct {
@@ -711,32 +682,29 @@ func (h *contractV1Handler) toBoardRevisionDTO(c *gin.Context, revision *boards.
 }
 
 func (h *contractV1Handler) listBoardRevisions(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	revisions, err := h.deps.Boards.ListRevisions(c.Request.Context(), workspace.PublicID, board.PublicID)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	page := make([]v1BoardRevisionDTO, 0, len(revisions))
-	for _, revision := range revisions {
-		page = append(page, h.toBoardRevisionDTO(c, revision))
-	}
-	slice, meta, ok := boardPageSlice(page, c)
-	if !ok {
-		return
-	}
-	contract.RenderPaginated(c, slice, meta)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		revisions, err := h.deps.Boards.ListRevisions(c.Request.Context(), workspace.PublicID, board.PublicID)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		page := make([]v1BoardRevisionDTO, 0, len(revisions))
+		for _, revision := range revisions {
+			page = append(page, h.toBoardRevisionDTO(c, revision))
+		}
+		slice, meta, ok := boardPageSlice(page, c)
+		if !ok {
+			return
+		}
+		contract.RenderPaginated(c, slice, meta)
+	})
 }
 
 type v1BoardRevisionDetailDTO struct {
@@ -745,37 +713,34 @@ type v1BoardRevisionDetailDTO struct {
 }
 
 func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	// :revision_id is the board-scoped revision_number (1-based sequence
-	// within one board), NOT the board_revisions internal_id — so the
-	// numeric shape is a formal exception to the opaque-id policy, not a
-	// DB-id leak. Lookups stay scoped to (workspace, board) and unknown
-	// numbers converge to 404.
-	revisionNumber, parseErr := strconv.ParseInt(strings.TrimSpace(c.Param("revision_id")), 10, 64)
-	if parseErr != nil || revisionNumber <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板版本不存在")
-		c.Abort()
-		return
-	}
-	revision, err := h.deps.Boards.GetRevision(c.Request.Context(), workspace.PublicID, board.PublicID, revisionNumber)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, v1BoardRevisionDetailDTO{
-		v1BoardRevisionDTO: h.toBoardRevisionDTO(c, revision),
-		Snapshot:           revision.Snapshot,
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		// :revision_id is the board-scoped revision_number (1-based sequence
+		// within one board), NOT the board_revisions internal_id — so the
+		// numeric shape is a formal exception to the opaque-id policy, not a
+		// DB-id leak. Lookups stay scoped to (workspace, board) and unknown
+		// numbers converge to 404.
+		revisionNumber, parseErr := strconv.ParseInt(strings.TrimSpace(c.Param("revision_id")), 10, 64)
+		if parseErr != nil || revisionNumber <= 0 {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板版本不存在")
+			c.Abort()
+			return
+		}
+		revision, err := h.deps.Boards.GetRevision(c.Request.Context(), workspace.PublicID, board.PublicID, revisionNumber)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, v1BoardRevisionDetailDTO{
+			v1BoardRevisionDTO: h.toBoardRevisionDTO(c, revision),
+			Snapshot:           revision.Snapshot,
+		})
 	})
 }
 
@@ -830,39 +795,36 @@ func (h *contractV1Handler) resolveBoardMemberUserID(c *gin.Context, raw string)
 }
 
 func (h *contractV1Handler) listBoardMembers(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	ownerDTO, ok := h.toBoardMemberDTO(c, board.OwnerUserID, boards.RoleOwner, v1FormatTime(board.CreatedAt))
-	if !ok {
-		return
-	}
-	members, err := h.deps.Boards.ListBoardMembers(c.Request.Context(), workspace.PublicID, board.PublicID)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	page := []v1BoardMemberDTO{ownerDTO}
-	for _, member := range members {
-		if member.UserID == board.OwnerUserID {
-			continue
-		}
-		dto, ok := h.toBoardMemberDTO(c, member.UserID, member.Role, v1FormatTime(member.CreatedAt))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, _, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
 		if !ok {
 			return
 		}
-		page = append(page, dto)
-	}
-	contract.RenderSuccess(c, page)
+		ownerDTO, ok := h.toBoardMemberDTO(c, board.OwnerUserID, boards.RoleOwner, v1FormatTime(board.CreatedAt))
+		if !ok {
+			return
+		}
+		members, err := h.deps.Boards.ListBoardMembers(c.Request.Context(), workspace.PublicID, board.PublicID)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		page := []v1BoardMemberDTO{ownerDTO}
+		for _, member := range members {
+			if member.UserID == board.OwnerUserID {
+				continue
+			}
+			dto, ok := h.toBoardMemberDTO(c, member.UserID, member.Role, v1FormatTime(member.CreatedAt))
+			if !ok {
+				return
+			}
+			page = append(page, dto)
+		}
+		contract.RenderSuccess(c, page)
+	})
 }
 
 type v1AddBoardMemberBody struct {
@@ -873,81 +835,76 @@ type v1AddBoardMemberBody struct {
 }
 
 func (h *contractV1Handler) addBoardMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1AddBoardMemberBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	targetRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-	if err := boards.ValidateV1BoardRole(targetRole); err != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-		c.Abort()
-		return
-	}
-	targetUserID, ok := h.resolveBoardMemberUserID(c, body.Data.UserID)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:member-add", workspace.PublicID, board.PublicID, body.Data.UserID, string(targetRole))
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-add", key, hash, func() (any, error) {
-		added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole, workspaceRole)
-		if addErr != nil {
-			return nil, addErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
 		}
-		// #807: board.member_changed AFTER the roster commit.
-		memberExternal := body.Data.UserID
-		if h.deps.Users != nil {
-			if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
-				memberExternal = tenancy.FormatUserPublicID(publicID)
+		if !requireBoardRole(c, role, boards.RoleOwner) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		var body v1AddBoardMemberBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		targetRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
+		if err := boards.ValidateV1BoardRole(targetRole); err != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			c.Abort()
+			return
+		}
+		targetUserID, ok := h.resolveBoardMemberUserID(c, body.Data.UserID)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:member-add", workspace.PublicID, board.PublicID, body.Data.UserID, string(targetRole))
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-add", key, hash, func() (any, error) {
+			added, addErr := h.deps.Boards.AddBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, targetRole, workspaceRole)
+			if addErr != nil {
+				return nil, addErr
 			}
+			// #807: board.member_changed AFTER the roster commit.
+			memberExternal := body.Data.UserID
+			if h.deps.Users != nil {
+				if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
+					memberExternal = tenancy.FormatUserPublicID(publicID)
+				}
+			}
+			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+				events.EventV1BoardMemberChanged,
+				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+				events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
+			return added, nil
+		})
+		if !ok {
+			return
 		}
-		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-			events.EventV1BoardMemberChanged,
-			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-			events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-		return added, nil
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		added, ok := result.(*boards.V1BoardMember)
+		if !ok || added == nil {
+			renderBoardError(c, errors.New("boards: member-add type mismatch"))
+			return
+		}
+		dto, ok := h.toBoardMemberDTO(c, added.UserID, added.Role, v1FormatTime(added.CreatedAt))
+		if !ok {
+			return
+		}
+		logBoardAudit("board_member_add", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_add:"+string(targetRole), "added")
+		contract.RenderCreated(c, dto)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	added, ok := result.(*boards.V1BoardMember)
-	if !ok || added == nil {
-		renderBoardError(c, errors.New("boards: member-add type mismatch"))
-		return
-	}
-	dto, ok := h.toBoardMemberDTO(c, added.UserID, added.Role, v1FormatTime(added.CreatedAt))
-	if !ok {
-		return
-	}
-	logBoardAudit("board_member_add", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_add:"+string(targetRole), "added")
-	contract.RenderCreated(c, dto)
 }
 
 type v1UpdateBoardMemberBody struct {
@@ -957,119 +914,111 @@ type v1UpdateBoardMemberBody struct {
 }
 
 func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	var body v1UpdateBoardMemberBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	newRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-	if err := boards.ValidateV1BoardRole(newRole); err != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-		c.Abort()
-		return
-	}
-	targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
-	if !ok {
-		return
-	}
-	updated, err := h.deps.Boards.UpdateBoardMemberRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, newRole, workspaceRole)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	// #807: board.member_changed AFTER the role commit (no idempotency
-	// wrapper on this route; the store commit is the boundary).
-	memberExternal := strings.TrimSpace(c.Param("member_id"))
-	if h.deps.Users != nil {
-		if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
-			memberExternal = tenancy.FormatUserPublicID(publicID)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
 		}
-	}
-	h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-		events.EventV1BoardMemberChanged,
-		events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-		events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-	dto, ok := h.toBoardMemberDTO(c, updated.UserID, updated.Role, v1FormatTime(updated.CreatedAt))
-	if !ok {
-		return
-	}
-	logBoardAudit("board_member_update", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_update:"+string(newRole), "updated")
-	contract.RenderSuccess(c, dto)
-}
-
-func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
-	if !ok {
-		return
-	}
-	// Owners manage the roster; anyone may leave by removing themselves
-	// (last-owner protection still applies).
-	if targetUserID != identityPrincipal.UserID() && !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	targetExternal, _ := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID)
-	hash := contract.HashIdempotencyRequest("board:member-remove", workspace.PublicID, board.PublicID, tenancy.FormatUserPublicID(targetExternal))
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-remove", key, hash, func() (any, error) {
-		if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, workspaceRole); removeErr != nil {
-			return nil, removeErr
+		if !requireBoardRole(c, role, boards.RoleOwner) {
+			return
 		}
-		// #807: board.member_changed AFTER the roster commit.
-		memberExternal := tenancy.FormatUserPublicID(targetExternal)
+		var body v1UpdateBoardMemberBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		newRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
+		if err := boards.ValidateV1BoardRole(newRole); err != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			c.Abort()
+			return
+		}
+		targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
+		if !ok {
+			return
+		}
+		updated, err := h.deps.Boards.UpdateBoardMemberRole(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, newRole, workspaceRole)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		// #807: board.member_changed AFTER the role commit (no idempotency
+		// wrapper on this route; the store commit is the boundary).
+		memberExternal := strings.TrimSpace(c.Param("member_id"))
+		if h.deps.Users != nil {
+			if publicID, lookupErr := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID); lookupErr == nil {
+				memberExternal = tenancy.FormatUserPublicID(publicID)
+			}
+		}
 		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
 			events.EventV1BoardMemberChanged,
 			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
 			events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
-		return &v1DeletedDTO{Deleted: true}, nil
+		dto, ok := h.toBoardMemberDTO(c, updated.UserID, updated.Role, v1FormatTime(updated.CreatedAt))
+		if !ok {
+			return
+		}
+		logBoardAudit("board_member_update", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.UserID, "member_update:"+string(newRole), "updated")
+		contract.RenderSuccess(c, dto)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	deleted, ok := result.(*v1DeletedDTO)
-	if !ok || deleted == nil {
-		renderBoardError(c, errors.New("boards: member-remove type mismatch"))
-		return
-	}
-	logBoardAudit("board_member_remove", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "member_remove", "removed")
-	contract.RenderSuccess(c, *deleted)
+}
+
+func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		targetUserID, ok := h.resolveBoardMemberUserID(c, c.Param("member_id"))
+		if !ok {
+			return
+		}
+		// Owners manage the roster; anyone may leave by removing themselves
+		// (last-owner protection still applies).
+		if targetUserID != identityPrincipal.UserID() && !requireBoardRole(c, role, boards.RoleOwner) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		targetExternal, _ := h.deps.Users.GetUserPublicID(c.Request.Context(), targetUserID)
+		hash := contract.HashIdempotencyRequest("board:member-remove", workspace.PublicID, board.PublicID, tenancy.FormatUserPublicID(targetExternal))
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "member-remove", key, hash, func() (any, error) {
+			if removeErr := h.deps.Boards.RemoveBoardMember(c.Request.Context(), workspace.PublicID, board.PublicID, identityPrincipal.UserID(), targetUserID, workspaceRole); removeErr != nil {
+				return nil, removeErr
+			}
+			// #807: board.member_changed AFTER the roster commit.
+			memberExternal := tenancy.FormatUserPublicID(targetExternal)
+			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+				events.EventV1BoardMemberChanged,
+				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+				events.V1BoardMemberChangedData{BoardID: board.PublicID, MemberID: memberExternal})
+			return &v1DeletedDTO{Deleted: true}, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		deleted, ok := result.(*v1DeletedDTO)
+		if !ok || deleted == nil {
+			renderBoardError(c, errors.New("boards: member-remove type mismatch"))
+			return
+		}
+		logBoardAudit("board_member_remove", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID, "member_remove", "removed")
+		contract.RenderSuccess(c, *deleted)
+	})
 }
 
 type v1BoardShareDTO struct {
@@ -1103,31 +1052,28 @@ func toBoardShareDTO(token *boards.V1ShareToken, withBearer bool) v1BoardShareDT
 }
 
 func (h *contractV1Handler) listShareTokens(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	tokens, err := h.deps.Boards.ListShareTokens(c.Request.Context(), workspace.PublicID, board.PublicID)
-	if err != nil {
-		renderBoardError(c, err)
-		return
-	}
-	page := make([]v1BoardShareDTO, 0, len(tokens))
-	for _, token := range tokens {
-		page = append(page, toBoardShareDTO(token, false))
-	}
-	contract.RenderSuccess(c, page)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
+		}
+		if !requireBoardRole(c, role, boards.RoleOwner) {
+			return
+		}
+		tokens, err := h.deps.Boards.ListShareTokens(c.Request.Context(), workspace.PublicID, board.PublicID)
+		if err != nil {
+			renderBoardError(c, err)
+			return
+		}
+		page := make([]v1BoardShareDTO, 0, len(tokens))
+		for _, token := range tokens {
+			page = append(page, toBoardShareDTO(token, false))
+		}
+		contract.RenderSuccess(c, page)
+	})
 }
 
 type v1CreateShareBody struct {
@@ -1137,130 +1083,122 @@ type v1CreateShareBody struct {
 }
 
 func (h *contractV1Handler) createShareToken(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1CreateShareBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	shareRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
-	if shareRole != boards.RoleEditor && shareRole != boards.RoleViewer {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"分享角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-		c.Abort()
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:share-create", workspace.PublicID, board.PublicID, string(shareRole))
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-create", key, hash, func() (any, error) {
-		tokenID, mintErr := boards.NewV1ShareTokenID()
-		if mintErr != nil {
-			return nil, mintErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
 		}
-		created, createErr := h.deps.Boards.CreateShareToken(c.Request.Context(), workspace.PublicID, board.PublicID,
-			identityPrincipal.UserID(), shareRole, tokenID, boards.V1ShareTokenHash(tokenID), tokenID)
-		if createErr != nil {
-			return nil, createErr
+		if !requireBoardRole(c, role, boards.RoleOwner) {
+			return
 		}
-		dto := toBoardShareDTO(created, true)
-		return &dto, nil
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		var body v1CreateShareBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		shareRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
+		if shareRole != boards.RoleEditor && shareRole != boards.RoleViewer {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"分享角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			c.Abort()
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:share-create", workspace.PublicID, board.PublicID, string(shareRole))
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-create", key, hash, func() (any, error) {
+			tokenID, mintErr := boards.NewV1ShareTokenID()
+			if mintErr != nil {
+				return nil, mintErr
+			}
+			created, createErr := h.deps.Boards.CreateShareToken(c.Request.Context(), workspace.PublicID, board.PublicID,
+				identityPrincipal.UserID(), shareRole, tokenID, boards.V1ShareTokenHash(tokenID), tokenID)
+			if createErr != nil {
+				return nil, createErr
+			}
+			dto := toBoardShareDTO(created, true)
+			return &dto, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		dto, ok := result.(*v1BoardShareDTO)
+		if !ok || dto == nil {
+			renderBoardError(c, errors.New("boards: share-create type mismatch"))
+			return
+		}
+		logBoardAudit("board_share_create", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.TokenPrefix, "share_create:"+string(shareRole), "created")
+		contract.RenderCreated(c, *dto)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	dto, ok := result.(*v1BoardShareDTO)
-	if !ok || dto == nil {
-		renderBoardError(c, errors.New("boards: share-create type mismatch"))
-		return
-	}
-	logBoardAudit("board_share_create", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+dto.TokenPrefix, "share_create:"+string(shareRole), "created")
-	contract.RenderCreated(c, *dto)
 }
 
 func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireBoardsStore(c) {
-		return
-	}
-	workspace, workspaceRole, _ := h.boardWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
-	if !ok {
-		return
-	}
-	if !requireBoardRole(c, role, boards.RoleOwner) {
-		return
-	}
-	key, ok := requireBoardIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	// {token_id} stays an opaque string: legacy integer ids simply miss the
-	// lookup and read as 404 (tolerated read-only, never a distinct status).
-	tokenID := strings.TrimSpace(c.Param("token_id"))
-	if tokenID == "" {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, "分享链接不存在")
-		c.Abort()
-		return
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hash := contract.HashIdempotencyRequest("board:share-revoke", workspace.PublicID, board.PublicID, tokenID)
-	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-revoke", key, hash, func() (any, error) {
-		if revokeErr := h.deps.Boards.RevokeShareToken(c.Request.Context(), workspace.PublicID, board.PublicID, tokenID, identityPrincipal.UserID()); revokeErr != nil {
-			return nil, revokeErr
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		workspaceRole := wctx.Role
+		board, role, ok := h.boardAccess(c, workspace, workspaceRole, identityPrincipal.UserID())
+		if !ok {
+			return
 		}
-		// #807: board.share_revoked AFTER the revocation commit (token
-		// id only; the bearer never leaves the server).
-		h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
-			events.EventV1BoardShareRevoked,
-			events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
-			events.V1BoardShareRevokedData{BoardID: board.PublicID, ShareTokenID: tokenID})
-		return &v1DeletedDTO{Deleted: true}, nil
+		if !requireBoardRole(c, role, boards.RoleOwner) {
+			return
+		}
+		key, ok := requireBoardIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		// {token_id} stays an opaque string: legacy integer ids simply miss the
+		// lookup and read as 404 (tolerated read-only, never a distinct status).
+		tokenID := strings.TrimSpace(c.Param("token_id"))
+		if tokenID == "" {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, "分享链接不存在")
+			c.Abort()
+			return
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hash := contract.HashIdempotencyRequest("board:share-revoke", workspace.PublicID, board.PublicID, tokenID)
+		result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "share-revoke", key, hash, func() (any, error) {
+			if revokeErr := h.deps.Boards.RevokeShareToken(c.Request.Context(), workspace.PublicID, board.PublicID, tokenID, identityPrincipal.UserID()); revokeErr != nil {
+				return nil, revokeErr
+			}
+			// #807: board.share_revoked AFTER the revocation commit (token
+			// id only; the bearer never leaves the server).
+			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, workspace.PublicID,
+				events.EventV1BoardShareRevoked,
+				events.V1Resource{Type: events.V1ResourceBoard, ID: board.PublicID},
+				events.V1BoardShareRevokedData{BoardID: board.PublicID, ShareTokenID: tokenID})
+			return &v1DeletedDTO{Deleted: true}, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderBoardError(c, fnErr)
+			return
+		}
+		deleted, ok := result.(*v1DeletedDTO)
+		if !ok || deleted == nil {
+			renderBoardError(c, errors.New("boards: share-revoke type mismatch"))
+			return
+		}
+		prefix := tokenID
+		if len(prefix) > 8 {
+			prefix = prefix[:8]
+		}
+		logBoardAudit("board_share_revoke", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+prefix, "share_revoke", "revoked")
+		contract.RenderSuccess(c, *deleted)
 	})
-	if !ok {
-		return
-	}
-	if fnErr != nil {
-		renderBoardError(c, fnErr)
-		return
-	}
-	deleted, ok := result.(*v1DeletedDTO)
-	if !ok || deleted == nil {
-		renderBoardError(c, errors.New("boards: share-revoke type mismatch"))
-		return
-	}
-	prefix := tokenID
-	if len(prefix) > 8 {
-		prefix = prefix[:8]
-	}
-	logBoardAudit("board_share_revoke", identityPrincipal.UserID(), workspace.PublicID+"/"+board.PublicID+"/"+prefix, "share_revoke", "revoked")
-	contract.RenderSuccess(c, *deleted)
 }
 
 type v1JoinBoardBody struct {
@@ -1299,9 +1237,7 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	}
 	var body v1JoinBoardBody
 	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
+		writeV1InputError(c)
 		return
 	}
 	bearer := strings.TrimSpace(body.Data.Token)

@@ -2,14 +2,14 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { renderWithUser, screen } from '../../../../test/render'
+import { mockAppToast } from '../../../../test/toast'
 import AdminSettingsGeneralPage from './AdminSettingsGeneralPage.vue'
 
-vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }),
-}))
+vi.mock('../../../../shared/composables/useAppToast')
 
 describe('AdminSettingsGeneralPage', () => {
   beforeEach(() => {
+    mockAppToast()
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/branding', () =>
         HttpResponse.json({

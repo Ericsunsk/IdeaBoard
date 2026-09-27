@@ -101,6 +101,7 @@ type Querier interface {
 	// All lookups are keyed by workspace first: every folder/asset row is
 	// addressed as (workspace_id, public_id) so cross-workspace ids miss by
 	// construction and read as not found (never a distinct status).
+	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one workspace_id key per query.
 	// Durable public ids follow the schema CHECK patterns
 	// (lfolder_% / lasset_% / lmat_%); callers mint them through the library
 	// seam (NewV1FolderPublicID / NewV1AssetPublicID) and pass them opaquely.
@@ -154,6 +155,7 @@ type Querier interface {
 	// ids miss by construction and read as not found (never a distinct
 	// status). Membership gating stays at the v1 handler layer; the
 	// repository enforces scoping + transitions.
+	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateUploadSession(ctx context.Context, arg CreateUploadSessionParams) (UploadSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	// Workspace tenancy queries (#801). Public references use public_id;
@@ -164,6 +166,7 @@ type Querier interface {
 	// table); board_revisions rows are INSERT-only, so no UPDATE/DELETE
 	// revision query exists here by design. Every board-scoped query joins
 	// workspaces on public_id so foreign-workspace rows stay invisible.
+	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateWorkspaceBoard(ctx context.Context, arg CreateWorkspaceBoardParams) (CreateWorkspaceBoardRow, error)
 	// Workspace-scoped task queries (#819, Phase 4-02). The tasks table is the
 	// workspace-scoped async job resource (public_id LIKE 'task_%'):
@@ -173,6 +176,7 @@ type Querier interface {
 	// so cross-workspace ids stay invisible (ErrNotFound), never 403.
 	// Workspace membership gating stays at the v1 handler layer
 	// (taskWorkspaceContext); the repository enforces scoping + transitions.
+	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)

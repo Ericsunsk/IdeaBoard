@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, nextTick, ref } from 'vue'
+import { mockAppToast } from '../../../test/toast'
 import { useSearchScreenRuntime } from '../application/useSearchScreenRuntime'
 
 const mocks = vi.hoisted(() => ({
@@ -38,9 +39,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
 
-vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
-}))
+vi.mock('../../../shared/composables/useAppToast')
 
 vi.mock('../infrastructure/authContinuation', () => ({
   setPendingSearchAuthAction: mocks.setPendingSearchAuthAction,
@@ -157,6 +156,7 @@ function mountRuntime(isAuthenticated: boolean, references: { key: string }[] = 
 
 describe('useSearchScreenRuntime', () => {
   beforeEach(() => {
+    mockAppToast()
     mocks.nextSession = null
     mocks.sessions = []
     mocks.authOpen.mockReset()

@@ -224,15 +224,13 @@ func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 }
 
 func (h *contractV1Handler) listEventSubscriptions(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireEventSinks(c) {
-		return
-	}
-	workspace, role, _ := h.eventWorkspaceContext(c, identityPrincipal)
-	if workspace == nil || !requireEventSubscriptionAdmin(c, role) {
-		return
-	}
-	contract.RenderSuccess(c, map[string]any{"subscriptions": h.deps.Webhooks.List(workspace.PublicID)})
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndEvents, Resolve: h.eventWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		if !requireEventSubscriptionAdmin(c, wctx.Role) {
+			return
+		}
+		contract.RenderSuccess(c, map[string]any{"subscriptions": h.deps.Webhooks.List(workspace.PublicID)})
+	})
 }
 
 type v1CreateEventSubscriptionBody struct {
@@ -244,123 +242,118 @@ type v1CreateEventSubscriptionBody struct {
 }
 
 func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireEventSinks(c) {
-		return
-	}
-	workspace, role, _ := h.eventWorkspaceContext(c, identityPrincipal)
-	if workspace == nil || !requireEventSubscriptionAdmin(c, role) {
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	var body v1CreateEventSubscriptionBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	destination := strings.TrimSpace(body.Data.URL)
-	if validationErr := events.ValidateWebhookURL(destination); validationErr != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-			contract.CodeValidationFailed, "回调地址非法",
-			contract.FieldErrors{Fields: map[string]string{"url": "invalid"}})
-		c.Abort()
-		return
-	}
-	for _, typ := range body.Data.EventTypes {
-		if strings.TrimSpace(typ) != "" && !events.IsV1EventType(typ) {
-			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-				contract.CodeValidationFailed, "事件类型非法",
-				contract.FieldErrors{Fields: map[string]string{"event_types": "invalid"}})
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndEvents, Resolve: h.eventWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		if !requireEventSubscriptionAdmin(c, wctx.Role) {
+			return
+		}
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
 			c.Abort()
 			return
 		}
-	}
-	var secret []byte
-	if body.Data.Secret != nil {
-		secret = []byte(*body.Data.Secret)
-		if len(secret) > 0 && len(secret) < 16 {
+		var body v1CreateEventSubscriptionBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		destination := strings.TrimSpace(body.Data.URL)
+		if validationErr := events.ValidateWebhookURL(destination); validationErr != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-				contract.CodeValidationFailed, "签名密钥过短",
-				contract.FieldErrors{Fields: map[string]string{"secret": "too_short"}})
+				contract.CodeValidationFailed, "回调地址非法",
+				contract.FieldErrors{Fields: map[string]string{"url": "invalid"}})
 			c.Abort()
 			return
 		}
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "event-subscription:create")
-	hash := contract.HashIdempotencyRequest("event-subscription:create", workspace.PublicID, destination, strings.Join(body.Data.EventTypes, ","))
-	result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		sub, minted, _, createErr := h.deps.Webhooks.Create(c.Request.Context(), workspace.PublicID, destination, body.Data.EventTypes, secret)
-		if createErr != nil {
-			return nil, createErr
-		}
-		view := h.deps.Webhooks.List(workspace.PublicID)
-		for _, candidate := range view {
-			if candidate.ID == sub.ID {
-				if len(minted) == 0 {
-					return map[string]any{"subscription": candidate}, nil
-				}
-				// Minted secrets are whsec_-encoded for transport and
-				// returned exactly once; reads never carry them.
-				return map[string]any{"subscription": candidate, "secret": events.FormatWhsecSecret(minted)}, nil
+		for _, typ := range body.Data.EventTypes {
+			if strings.TrimSpace(typ) != "" && !events.IsV1EventType(typ) {
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
+					contract.CodeValidationFailed, "事件类型非法",
+					contract.FieldErrors{Fields: map[string]string{"event_types": "invalid"}})
+				c.Abort()
+				return
 			}
 		}
-		return map[string]any{"subscription": sub.ID}, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeEventSubscriptionConflict, "幂等请求与原请求不一致")
+		var secret []byte
+		if body.Data.Secret != nil {
+			secret = []byte(*body.Data.Secret)
+			if len(secret) > 0 && len(secret) < 16 {
+				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
+					contract.CodeValidationFailed, "签名密钥过短",
+					contract.FieldErrors{Fields: map[string]string{"secret": "too_short"}})
+				c.Abort()
+				return
+			}
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "event-subscription:create")
+		hash := contract.HashIdempotencyRequest("event-subscription:create", workspace.PublicID, destination, strings.Join(body.Data.EventTypes, ","))
+		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			sub, minted, _, createErr := h.deps.Webhooks.Create(c.Request.Context(), workspace.PublicID, destination, body.Data.EventTypes, secret)
+			if createErr != nil {
+				return nil, createErr
+			}
+			view := h.deps.Webhooks.List(workspace.PublicID)
+			for _, candidate := range view {
+				if candidate.ID == sub.ID {
+					if len(minted) == 0 {
+						return map[string]any{"subscription": candidate}, nil
+					}
+					// Minted secrets are whsec_-encoded for transport and
+					// returned exactly once; reads never carry them.
+					return map[string]any{"subscription": candidate, "secret": events.FormatWhsecSecret(minted)}, nil
+				}
+			}
+			return map[string]any{"subscription": sub.ID}, nil
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeEventSubscriptionConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
+				contract.CodeValidationFailed, "订阅参数非法",
+				contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
 			c.Abort()
 			return
 		}
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-			contract.CodeValidationFailed, "订阅参数非法",
-			contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	contract.RenderCreated(c, result)
+		contract.RenderCreated(c, result)
+	})
 }
 
 func (h *contractV1Handler) deleteEventSubscription(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireEventSinks(c) {
-		return
-	}
-	workspace, role, _ := h.eventWorkspaceContext(c, identityPrincipal)
-	if workspace == nil || !requireEventSubscriptionAdmin(c, role) {
-		return
-	}
-	if _, err := contract.IdempotencyKeyFromHeader(c); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	subscriptionID := strings.TrimSpace(c.Param("subscription_id"))
-	if !events.IsWebhookSubscriptionID(subscriptionID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
-		c.Abort()
-		return
-	}
-	deleted, err := h.deps.Webhooks.Delete(c.Request.Context(), workspace.PublicID, subscriptionID)
-	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "事件服务暂不可用")
-		c.Abort()
-		return
-	}
-	if !deleted {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, v1DeletedDTO{Deleted: true, ID: subscriptionID})
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndEvents, Resolve: h.eventWorkspaceContext}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		if !requireEventSubscriptionAdmin(c, wctx.Role) {
+			return
+		}
+		if _, err := contract.IdempotencyKeyFromHeader(c); err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		subscriptionID := strings.TrimSpace(c.Param("subscription_id"))
+		if !events.IsWebhookSubscriptionID(subscriptionID) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
+			c.Abort()
+			return
+		}
+		deleted, err := h.deps.Webhooks.Delete(c.Request.Context(), workspace.PublicID, subscriptionID)
+		if err != nil {
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "事件服务暂不可用")
+			c.Abort()
+			return
+		}
+		if !deleted {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, v1DeletedDTO{Deleted: true, ID: subscriptionID})
+	})
 }
 
 // emitWorkspaceEvent mints one envelope and fans it out best-effort:

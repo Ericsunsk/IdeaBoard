@@ -195,13 +195,27 @@ function mockArchiveBoard(
   })
 }
 
+function mockRestoreBoard(
+  state: MockWorkspaceBoardApiState,
+  boardId: string,
+): Promise<unknown> {
+  state.archivedBoardIds = state.archivedBoardIds.filter((id) => id !== boardId)
+  const board = state.boardsResponse.data.find((item) => item.id === boardId)
+  return Promise.resolve({
+    data: {
+      ...(board ?? { id: boardId, name: 'Board' }),
+      archived_at: null,
+    },
+  })
+}
+
 /**
  * Shared request mock for the v1 workspace boards contract
  * (`/api/v1/workspaces/{ws}/boards/*` through `publicMutator`): cursor
  * list on GET collection, document reads on GET `.../document`, rename on
  * PATCH, document replace on PUT (echoes revision + 1 unless overridden),
  * server-mint create on POST collection, archive on POST `.../archive`,
- * share join on POST `.../join`. State stays caller-owned so each spec
+ * restore on POST `.../restore`, share join on POST `.../join`. State stays caller-owned so each spec
  * drives its own fixtures; failures inject via `listError`/`saveError`/
  * `createError` as rejected transport errors.
  */
@@ -253,6 +267,11 @@ const BOARD_ROUTE_TABLE: Array<{
     pattern: /^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/archive$/,
     methods: ['POST'],
     run: (state, _url, _config, match) => mockArchiveBoard(state, match[1] ?? ''),
+  },
+  {
+    pattern: /^\/v1\/workspaces\/[^/]+\/boards\/([^/]+)\/restore$/,
+    methods: ['POST'],
+    run: (state, _url, _config, match) => mockRestoreBoard(state, match[1] ?? ''),
   },
 ]
 

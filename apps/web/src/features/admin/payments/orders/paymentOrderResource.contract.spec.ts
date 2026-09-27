@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { HttpResponse, http, useMswHandlers } from '../../../../test/msw'
+import {
+  adminPaymentOrderNumber as orderNumber,
+  makePaymentOrderDetail as makeApiDetail,
+  makePaymentOrderSummary as makeApiSummary,
+} from '../../../../test/factories'
 import { createAdminPaymentOrderApiAdapter } from './paymentOrderApiAdapter'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
-
-const orderNumber = 'IBP-20260803-ABCDEF123456'
 
 describe('paymentOrderResource', () => {
   it('searches through the control plane with bounded filters', async () => {
@@ -118,54 +121,3 @@ describe('paymentOrderResource', () => {
     expect(seenHeaders.operatorReason).toBe('duplicate charge')
   })
 })
-
-function makeApiSummary() {
-  return {
-    public_order_number: orderNumber,
-    user: {
-      public_id: '00000000-0000-4000-8000-000000000042',
-      display_name: 'Sunshi',
-    },
-    idea_quantity: 12_000,
-    base_amount_minor: 12_000,
-    base_currency: 'usd',
-    paid_amount_minor: 12_750,
-    paid_currency: 'hkd',
-    status: 'paid_pending_credit',
-    stripe_status: 'paid',
-    credit_status: 'pending',
-    created_at: '2026-08-01T01:00:00Z',
-    paid_at: '2026-08-01T01:03:00Z',
-    last_checked_at: '2026-08-03T01:00:00Z',
-    anomalous_at: '2026-08-02T01:00:00Z',
-  }
-}
-
-function makeApiDetail() {
-  return {
-    ...makeApiSummary(),
-    paid_subtotal_minor: 12_000,
-    paid_tax_minor: 750,
-    paid_total_minor: 12_750,
-    stripe: {
-      account_id: 'acct…7890',
-      customer_id: 'cus_…7890',
-      checkout_session_id: 'cs_t…7890',
-      payment_intent_id: 'pi_1…7890',
-      charge_id: 'ch_1…7890',
-    },
-    terms_version: '2026-08-01',
-    refund_policy_version: '2026-08-01',
-    receipt_url: 'https://pay.stripe.com/receipts/example',
-    expires_at: '2026-08-01T01:30:00Z',
-    updated_at: '2026-08-03T01:00:00Z',
-    reconciliation: {
-      anomalous: true,
-      anomalous_at: '2026-08-02T01:00:00Z',
-      last_checked_at: '2026-08-03T01:00:00Z',
-      next_attempt_at: '2026-08-03T01:05:00Z',
-      last_error_code: 'stripe_unavailable',
-      last_error_summary: 'Stripe 暂时不可用',
-    },
-  }
-}

@@ -4,6 +4,7 @@ import { fetchCreditWallet, creditsQueryKeys } from '../../infrastructure'
 import { i18n } from '../../../../shared/i18n'
 import { useAccountWorkspace } from '../accountWorkspace'
 import { useCreditsSync } from './useCreditsSync'
+import { accountScoped } from '../../../../shared/query/queryDefaults'
 
 export type CreditWalletState =
   | { status: 'loading' }
@@ -17,7 +18,7 @@ export function useCreditWallet(enabled: MaybeRefOrGetter<boolean> = true) {
     queryKey: computed(() => creditsQueryKeys.wallet(workspaceId.value ?? '')),
     queryFn: ({ signal }) => fetchCreditWallet(workspaceId.value ?? '', signal),
     enabled: () => toValue(enabled) && selectionSettled.value,
-    staleTime: 15_000,
+    ...accountScoped(),
   })
   const state = computed<CreditWalletState>(() => {
     if (query.isError.value) {

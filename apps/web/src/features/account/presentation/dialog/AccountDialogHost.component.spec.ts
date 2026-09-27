@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '../../../../test/render'
 import { useUserStore } from '../../../auth'
-import type { User } from '../../../../shared/api/sessionUserType'
+import { makeSessionUser } from '../../../../test/factories'
 import {
   createAccountOverlay,
   provideAccountOverlay,
@@ -21,19 +21,6 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/users', component: { template: '<div />' } },
 ]
 
-function makeUser(): User {
-  return {
-    public_id: '00000000-0000-0000-0000-000000000001',
-    display_name: 'mock-user',
-    storage_namespace: 'USM001',
-    avatar: '',
-    role: 'user',
-    status: 1,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-02T00:00:00Z',
-  }
-}
-
 async function renderHost(
   path = '/user/boards',
   authenticated = true,
@@ -47,7 +34,17 @@ async function renderHost(
   await router.push(path)
   await router.isReady()
   const store = useUserStore()
-  if (authenticated) store.setAuth(makeUser())
+  if (authenticated)
+    store.setAuth(
+      makeSessionUser({
+        public_id: '00000000-0000-0000-0000-000000000001',
+        display_name: 'mock-user',
+        storage_namespace: 'USM001',
+        avatar: '',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-02T00:00:00Z',
+      }),
+    )
   let overlay: AccountOverlay | undefined
   const HostHarness = defineComponent({
     setup() {
@@ -148,7 +145,16 @@ describe('AccountDialogHost', () => {
     )
 
     expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument()
-    store.setAuth(makeUser())
+    store.setAuth(
+      makeSessionUser({
+        public_id: '00000000-0000-0000-0000-000000000001',
+        display_name: 'mock-user',
+        storage_namespace: 'USM001',
+        avatar: '',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-02T00:00:00Z',
+      }),
+    )
 
     const dialog = await screen.findByRole('dialog', { name: 'Account' })
     expect(dialog).toHaveAttribute('data-payment-token', token)

@@ -335,6 +335,7 @@ import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
+import { stringParam } from '../../../../shared/router/queryParams'
 import { useAuthOverlay, useUserStore } from '../../../auth'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
@@ -396,7 +397,7 @@ const {
   buttonTitle: searchButtonTitle,
 } = search
 const hasActiveSearch = computed(() => {
-  const queryFromRoute = String(route.query.q || '').trim()
+  const queryFromRoute = (stringParam(route.query.q) ?? '').trim()
   return Boolean(draftQuery.value.trim() || queryFromRoute || references.value.length > 0)
 })
 const {

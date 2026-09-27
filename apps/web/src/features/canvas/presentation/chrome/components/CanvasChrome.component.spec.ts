@@ -17,6 +17,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -63,6 +64,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -109,6 +111,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'reload-required', boardId: 'board-a' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -149,6 +152,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -193,6 +197,7 @@ describe('CanvasChrome', () => {
           isRenaming: true,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef,
         },
         account: {
@@ -237,6 +242,7 @@ describe('CanvasChrome', () => {
         isRenaming: true,
         isRenamePending: true,
         catalogRecovery: { status: 'idle' },
+        archived: { isArchived: false, isRestoring: false },
         setNameInputRef,
       },
     })
@@ -266,6 +272,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'reload-required', boardId: 'board-a' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -310,6 +317,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -354,6 +362,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -399,6 +408,7 @@ describe('CanvasChrome', () => {
           isRenaming: false,
           isRenamePending: false,
           catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -427,5 +437,129 @@ describe('CanvasChrome', () => {
       expect(region.getAttribute('class')).toContain('is-hidden')
       expect(region).toHaveAttribute('inert')
     }
+  })
+
+  it('hides the archived banner for live boards', () => {
+    render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: 'board-a',
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: false, isRestoring: false },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    expect(screen.queryByRole('button', { name: 'Restore archived board' })).toBeNull()
+  })
+
+  it('shows a non-dismissible archived banner with a restore action', async () => {
+    const { emitted } = render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: 'board-a',
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: true, isRestoring: false },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    // Non-dismissible: the banner carries the archived label with no close control.
+    expect(screen.getByRole('status')).toBeVisible()
+    const restore = screen.getByRole('button', { name: 'Restore archived board' })
+    expect(restore).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+
+    restore.click()
+    expect(emitted()['restore-archived-board']).toHaveLength(1)
+  })
+
+  it('disables the restore action while a restore is in flight', () => {
+    render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: 'board-a',
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          archived: { isArchived: true, isRestoring: true },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: {
+          activeTool: 'select',
+          libraryMounted: false,
+          libraryOpen: false,
+          minimapEnabled: false,
+        },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Restore archived board' })).toBeDisabled()
   })
 })

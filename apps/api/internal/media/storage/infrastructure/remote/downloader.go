@@ -75,9 +75,6 @@ var remoteImageOutbound = outboundhttp.NewClient(outboundhttp.Config{})
 // remoteImageTarget names remote image egress in outbound logs/metrics.
 const remoteImageTarget = "remote-image"
 
-// remoteImageTimeout bounds one remote image fetch.
-const remoteImageTimeout = 30 * time.Second
-
 // remoteImageResponse fetches one remote URL through the standard outbound
 // client. An exhausted retryable status returns its status with a nil
 // error, exactly like the single-shot response it replaces, so the
@@ -89,7 +86,7 @@ func remoteImageResponse(ctx context.Context, remoteURL string, allowHosts []str
 		return nil, err
 	}
 	resp, err := remoteImageOutbound.Do(ctx, req, outboundhttp.RequestOptions{
-		Timeout:    remoteImageTimeout,
+		Timeout:    outboundhttp.DefaultTimeout,
 		AllowHosts: allowHosts,
 		Target:     remoteImageTarget,
 	})

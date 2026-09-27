@@ -92,32 +92,23 @@ func renderMemberTransitionError(c *gin.Context, err error) {
 }
 
 func (h *contractV1Handler) listWorkspaceMembers(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	members, err := h.deps.Store.ListWorkspaceMembers(c.Request.Context(), workspace.PublicID)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
-		c.Abort()
-		return
-	}
-	page := make([]v1MemberDTO, 0, len(members))
-	for _, m := range members {
-		dto, ok := h.toMemberDTO(c, m)
-		if !ok {
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		members, err := h.deps.Store.ListWorkspaceMembers(c.Request.Context(), wctx.Workspace.PublicID)
+		if err != nil {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			c.Abort()
 			return
 		}
-		page = append(page, dto)
-	}
-	contract.RenderSuccess(c, page)
+		page := make([]v1MemberDTO, 0, len(members))
+		for _, m := range members {
+			dto, ok := h.toMemberDTO(c, m)
+			if !ok {
+				return
+			}
+			page = append(page, dto)
+		}
+		contract.RenderSuccess(c, page)
+	})
 }
 
 type v1AddMemberBody struct {
@@ -128,49 +119,33 @@ type v1AddMemberBody struct {
 }
 
 func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, actorRole, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, actorRole == tenancy.RoleOwner || actorRole == tenancy.RoleAdmin) {
-		return
-	}
-	var body v1AddMemberBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	newRole := strings.TrimSpace(body.Data.Role)
-	if !tenancy.IsValidRole(newRole) {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-		c.Abort()
-		return
-	}
-	if err := tenancy.CheckMemberAdd(actorRole, newRole); err != nil {
-		renderMemberTransitionError(c, err)
-		return
-	}
-	targetUserID, ok := h.resolveMemberUserID(c, body.Data.UserID)
-	if !ok {
-		return
-	}
-	added, err := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, targetUserID, newRole)
-	if err != nil {
-		renderMemberTransitionError(c, err)
-		return
-	}
-	dto, ok := h.toMemberDTO(c, added)
-	if !ok {
-		return
-	}
-	contract.RenderCreated(c, dto)
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx, body v1AddMemberBody) {
+		newRole := strings.TrimSpace(body.Data.Role)
+		if !tenancy.IsValidRole(newRole) {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			c.Abort()
+			return
+		}
+		if err := tenancy.CheckMemberAdd(wctx.Role, newRole); err != nil {
+			renderMemberTransitionError(c, err)
+			return
+		}
+		targetUserID, ok := h.resolveMemberUserID(c, body.Data.UserID)
+		if !ok {
+			return
+		}
+		added, err := h.deps.Store.AddWorkspaceMember(c.Request.Context(), wctx.Workspace.PublicID, targetUserID, newRole)
+		if err != nil {
+			renderMemberTransitionError(c, err)
+			return
+		}
+		dto, ok := h.toMemberDTO(c, added)
+		if !ok {
+			return
+		}
+		contract.RenderCreated(c, dto)
+	})
 }
 
 type v1UpdateMemberBody struct {
@@ -180,70 +155,45 @@ type v1UpdateMemberBody struct {
 }
 
 func (h *contractV1Handler) updateWorkspaceMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
 	// Visibility first (hidden -> 404); the store enforces the
 	// actor-role transition rules below (403 on violation).
-	if !RequireWorkspaceCapability(c, visible, true) {
-		return
-	}
-	var body v1UpdateMemberBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	newRole := strings.TrimSpace(body.Data.Role)
-	if !tenancy.IsValidRole(newRole) {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
-		c.Abort()
-		return
-	}
-	targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
-	if !ok {
-		return
-	}
-	updated, err := h.deps.Store.UpdateWorkspaceMemberRole(
-		c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), targetUserID, newRole)
-	if err != nil {
-		renderMemberTransitionError(c, err)
-		return
-	}
-	dto, ok := h.toMemberDTO(c, updated)
-	if !ok {
-		return
-	}
-	contract.RenderSuccess(c, dto)
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx, body v1UpdateMemberBody) {
+		newRole := strings.TrimSpace(body.Data.Role)
+		if !tenancy.IsValidRole(newRole) {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			c.Abort()
+			return
+		}
+		targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
+		if !ok {
+			return
+		}
+		updated, err := h.deps.Store.UpdateWorkspaceMemberRole(
+			c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID, newRole)
+		if err != nil {
+			renderMemberTransitionError(c, err)
+			return
+		}
+		dto, ok := h.toMemberDTO(c, updated)
+		if !ok {
+			return
+		}
+		contract.RenderSuccess(c, dto)
+	})
 }
 
 func (h *contractV1Handler) removeWorkspaceMember(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, true) {
-		return
-	}
-	targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
-	if !ok {
-		return
-	}
-	if err := h.deps.Store.RemoveWorkspaceMember(
-		c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), targetUserID); err != nil {
-		renderMemberTransitionError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, v1DeletedDTO{Deleted: true})
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
+		if !ok {
+			return
+		}
+		if err := h.deps.Store.RemoveWorkspaceMember(
+			c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID); err != nil {
+			renderMemberTransitionError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, v1DeletedDTO{Deleted: true})
+	})
 }

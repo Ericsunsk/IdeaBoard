@@ -9,12 +9,11 @@ import (
 
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-const rollbackTimeoutSeconds = 5
 
 func CreateReconciliationRun(
 	ctx context.Context,
@@ -31,7 +30,7 @@ func CreateReconciliationRun(
 		return nil, false, fmt.Errorf("credits reconciliation: begin: %w", err)
 	}
 	defer func() {
-		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeoutSeconds*time.Second)
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dbutil.RollbackTimeout)
 		defer cancel()
 		if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			slog.Warn("failed to roll back Credits reconciliation transaction", "err", rollbackErr)

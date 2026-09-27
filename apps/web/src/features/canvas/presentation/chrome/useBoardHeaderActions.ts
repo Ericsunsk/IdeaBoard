@@ -1,6 +1,12 @@
-import { computed, nextTick, ref, type Ref } from 'vue'
+import { computed, nextTick, ref, watch, type Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { normalizeBoardName } from '../../../board'
+import {
+  fetchBoardArchivedAt,
+  isBoardArchivedError,
+  markBoardArchivedLocally,
+  normalizeBoardName,
+  syncRestoreBoardToServer,
+} from '../../../board'
 import { useBoardRepository, type BoardRepository } from '../../../board'
 import { USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
 import { i18n } from '../../../../shared/i18n'
@@ -30,6 +36,65 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
   const boardNameInputRef = ref<HTMLElement | null>(null)
   const isRenamePending = ref(false)
   const catalogRecovery = ref<CatalogRecoveryState>({ status: 'idle' })
+  const isBoardArchived = ref(false)
+  const isRestoringArchivedBoard = ref(false)
+
+  // Archived banner source: the board list excludes archived boards, so the
+  // flag is resolved per-board via a direct meta read. Fail-closed and
+  // silent: when the read fails (no workspace, offline, unknown board) the
+  // banner stays hidden and the save-409 path discovers archived state.
+  let archivedCheckSequence = 0
+  async function refreshArchivedState(boardId?: string | null): Promise<boolean> {
+    const normalized = `${boardId ?? options.currentBoardId.value ?? ''}`.trim()
+    if (!normalized) {
+      isBoardArchived.value = false
+      return false
+    }
+    const checkToken = ++archivedCheckSequence
+    try {
+      const archivedAt = await fetchBoardArchivedAt(normalized)
+      if (checkToken !== archivedCheckSequence) return isBoardArchived.value
+      isBoardArchived.value = archivedAt != null
+      return isBoardArchived.value
+    } catch {
+      return isBoardArchived.value
+    }
+  }
+
+  /** Save-409 fast path: banner the board without the generic toast (dedupe: no-op when shown). */
+  function markArchivedFromSave(boardId: string): void {
+    const normalized = boardId.trim()
+    if (!normalized) return
+    markBoardArchivedLocally(normalized)
+    isBoardArchived.value = true
+  }
+
+  async function restoreArchivedBoard(): Promise<boolean> {
+    const boardId = `${options.currentBoardId.value ?? ''}`.trim()
+    if (!boardId || isRestoringArchivedBoard.value) return false
+    isRestoringArchivedBoard.value = true
+    try {
+      await syncRestoreBoardToServer(boardId)
+      isBoardArchived.value = false
+      options.message.success(t('canvas.chrome.boardRestoredSuccess'))
+      return true
+    } catch (error) {
+      console.warn('[canvas] failed to restore archived board', error)
+      options.message.error?.(t('canvas.chrome.boardRestoreFailedError'))
+      return false
+    } finally {
+      isRestoringArchivedBoard.value = false
+    }
+  }
+
+  watch(
+    () => options.currentBoardId.value,
+    (boardId) => {
+      isBoardArchived.value = false
+      void refreshArchivedState(boardId)
+    },
+    { immediate: true },
+  )
 
   const currentBoardName = computed(() => {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
@@ -50,6 +115,10 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
   }
 
   function startBoardRename() {
+    if (isBoardArchived.value) {
+      options.message.warning(t('canvas.chrome.boardArchivedRenameBlocked'))
+      return
+    }
     if (isRenamePending.value) {
       options.message.warning(t('canvas.chrome.renamePendingWarning'))
       return
@@ -107,6 +176,12 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
       return
     }
     if (result.reason === 'scope-changed') return
+    if (isBoardArchivedError(result.error)) {
+      markArchivedFromSave(boardId)
+      options.message.error?.(t('canvas.chrome.boardArchivedRenameBlocked'))
+      console.warn('[canvas] failed to rename archived board', result.error)
+      return
+    }
     if (!('rollback' in result)) return
     const hydrateSucceeded = result.hydrate?.ok === true
     const rollbackSucceeded = result.rollback.ok
@@ -127,6 +202,12 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     if (isRenamePending.value) return
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return
+    if (isBoardArchived.value) {
+      isRenamingBoard.value = false
+      boardNameDraft.value = ''
+      options.message.warning(t('canvas.chrome.boardArchivedRenameBlocked'))
+      return
+    }
     const normalized = normalizeBoardName(boardNameDraft.value)
     const currentName = normalizeBoardName(currentBoardName.value)
     isRenamingBoard.value = false
@@ -189,6 +270,11 @@ export function useBoardHeaderActions(options: UseBoardHeaderActionsOptions) {
     boardNameInputRef,
     isRenamePending,
     catalogRecovery,
+    isBoardArchived,
+    isRestoringArchivedBoard,
+    refreshArchivedState,
+    markArchivedFromSave,
+    restoreArchivedBoard,
     currentBoardName,
     boardOptions,
     setBoardNameInputRef,

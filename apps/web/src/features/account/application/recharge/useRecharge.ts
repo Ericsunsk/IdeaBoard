@@ -4,8 +4,6 @@ import type { PaymentReturnContext } from '../../domain'
 import { i18n } from '../../../../shared/i18n'
 import { createUniqueId } from '../../../../shared/utils/ids'
 import {
-  billingRecordsQueryKeys,
-  creditsQueryKeys,
   paymentsQueryKeys,
   usePaymentsContext,
   type PaymentCheckoutRequest,
@@ -15,8 +13,11 @@ import {
   type PendingPaymentOrderList,
 } from '../../infrastructure'
 import { useAccountWorkspace } from '../accountWorkspace'
+import { invalidateUserMoney } from '../invalidateUserMoney'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { noRetry } from '../../../../shared/query/queryDefaults'
 
-const historyPageSize = 20
+const historyPageSize = PAGE_SIZES.standard
 type PendingOrderAction = { publicToken: string; kind: 'continue' | 'abandon' }
 
 export function useRecharge(
@@ -161,8 +162,7 @@ function createPendingOrderActions(
       void queryClient.invalidateQueries({
         queryKey: paymentsQueryKeys.history(toValue(workspaceId) ?? ''),
       })
-      void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-      void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
+      invalidateUserMoney(queryClient)
       if (action.kind === 'continue' && order.checkout_url) navigateToCheckout(order.checkout_url)
     },
   })
@@ -198,14 +198,14 @@ function useRechargeQueries(
     queryKey: computed(() => paymentsQueryKeys.options(toValue(workspaceId) ?? '')),
     queryFn: ({ signal }) => resource.getPurchaseOptions(toValue(workspaceId) ?? '', signal),
     enabled: transportReady,
-    retry: false,
+    ...noRetry(),
   })
 
   const pendingOrdersQuery = useQuery({
     queryKey: computed(() => paymentsQueryKeys.pending(toValue(workspaceId) ?? '')),
     queryFn: ({ signal }) => resource.listPendingOrders(toValue(workspaceId) ?? '', signal),
     enabled: transportReady,
-    retry: false,
+    ...noRetry(),
   })
 
   const historyQuery = useInfiniteQuery({
@@ -222,7 +222,7 @@ function useRechargeQueries(
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     enabled: transportReady,
-    retry: false,
+    ...noRetry(),
   })
 
   const returnQuery = useQuery({
@@ -232,7 +232,7 @@ function useRechargeQueries(
     queryFn: ({ signal }) =>
       resource.getReturnStatus(toValue(workspaceId) ?? '', toValue(returnToken), signal),
     enabled: computed(() => toValue(transportReady) && toValue(returnToken).length > 0),
-    retry: false,
+    ...noRetry(),
   })
 
   return { optionsQuery, pendingOrdersQuery, historyQuery, returnQuery }
@@ -355,8 +355,7 @@ function handlePaymentEvent(
   void queryClient.invalidateQueries({
     queryKey: paymentsQueryKeys.history(workspaceId),
   })
-  void queryClient.invalidateQueries({ queryKey: creditsQueryKeys.all })
-  void queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all })
+  invalidateUserMoney(queryClient)
   if (event.public_token) {
     void queryClient.invalidateQueries({
       queryKey: paymentsQueryKeys.returnStatus(workspaceId, event.public_token),

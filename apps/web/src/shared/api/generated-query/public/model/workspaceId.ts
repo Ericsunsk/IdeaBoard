@@ -16,6 +16,6 @@
 
 /**
  * Opaque public workspace identifier.
- * @pattern ^ws_[A-Za-z0-9]+$
+ * @pattern ^ws_[A-Za-z0-9_-]+$
  */
 export type WorkspaceId = string

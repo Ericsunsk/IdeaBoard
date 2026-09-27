@@ -6,6 +6,7 @@ import type { AdminModelItem } from '../../models/domain/catalogData'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
+import { noRetry } from '../../../../shared/query/queryDefaults'
 import { pricingMappingFeature } from './groups'
 import type { AdminBillableItemCard } from './billableCatalogTypes'
 
@@ -24,7 +25,7 @@ export function usePricingModelAdapter() {
     queryKey: getAdminModelCatalogQueryKey(),
     queryFn: () => gateway.catalog.list(),
     enabled: false,
-    retry: false,
+    ...noRetry(),
   })
   const availableModels = computed<AdminModelItem[]>(() => catalogQuery.data.value ?? [])
   const modelsLoading = ref(false)

@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
+
+	"ideaboard/api/internal/db/dbutil"
 
 	"github.com/jackc/pgx/v5"
 )
-
-const settlementRollbackTimeout = 5 * time.Second
 
 // SettlementTransactor demarcates the settlement transaction. The postgres
 // workspace task Store implements it over its pool; the in-memory test
@@ -145,7 +144,7 @@ func rollbackSettlementTx(ctx context.Context, tx pgx.Tx) {
 	if tx == nil {
 		return
 	}
-	rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settlementRollbackTimeout)
+	rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dbutil.RollbackTimeout)
 	defer cancel()
 	_ = tx.Rollback(rollbackCtx)
 }

@@ -291,6 +291,43 @@ describe('useBoardSession', () => {
     expect(repository.sync).not.toHaveBeenCalled()
   })
 
+  it('classifies 409 board_archived as archived instead of conflict', async () => {
+    const snapshot = makeSnapshot(100)
+    const stabilizedSnapshot = makeSnapshot(250)
+    const savedState = makeState(stabilizedSnapshot)
+    const archivedError = Object.assign(new Error('board is archived'), {
+      status: 409,
+      code: 'board_archived',
+    })
+    const lifecycle = {
+      stabilizeSnapshotForSave: vi.fn(async () => stabilizedSnapshot),
+    }
+    const repository = createRepository({
+      save: vi.fn(async () => {
+        throw new BoardSessionRemoteSyncError('board-a', savedState, archivedError)
+      }),
+      sync: vi.fn(async () => undefined),
+    })
+    const previewRenderer: BoardSessionPreviewRenderer = {
+      rendererVersion: 1,
+      render: vi.fn(async () => 'data:image/webp;base64,preview'),
+    }
+    const session = useBoardSession({
+      getBoardIdQuery: () => 'board-a',
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+      repository,
+      previewRenderer,
+      message: { warning: vi.fn() },
+      createUploadLifecycle: vi.fn(() => lifecycle),
+    })
+
+    const result = await session.save(snapshot, { waitForPreview: true })
+
+    expect(result.remoteSync).toEqual({ ok: false, reason: 'archived', error: archivedError })
+    expect(previewRenderer.render).not.toHaveBeenCalled()
+    expect(repository.sync).not.toHaveBeenCalled()
+  })
+
   it('normalizes board ids for load and exists', async () => {
     const loadedSnapshot = makeSnapshot(180)
     const exists = vi.fn((boardId: string) => boardId === 'route-board' || boardId === 'explicit')

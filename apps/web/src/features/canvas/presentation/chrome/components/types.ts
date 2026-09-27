@@ -11,6 +11,11 @@ export type CanvasChromeBoardOption = {
 export type CanvasChromeCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
+export type CanvasChromeArchivedState = {
+  isArchived: boolean
+  isRestoring: boolean
+}
+
 export type CanvasChromeBoardState = {
   currentName: string
   options: CanvasChromeBoardOption[]
@@ -19,6 +24,7 @@ export type CanvasChromeBoardState = {
   isRenaming: boolean
   isRenamePending: boolean
   catalogRecovery: CanvasChromeCatalogRecoveryState
+  archived: CanvasChromeArchivedState
   setNameInputRef: (el: HTMLElement | null) => void
 }
 

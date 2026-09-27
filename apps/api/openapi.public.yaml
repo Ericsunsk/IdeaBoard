@@ -678,7 +678,7 @@ paths:
       summary: Rename a board (owner/editor only)
       description: >-
         Viewers render 403 board_forbidden. Writes against an archived
-        board also render 403 board_forbidden. Blank or overlong names
+        board render 409 board_archived. Blank or overlong names
         render 422 validation_failed. No Idempotency-Key is required.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
@@ -810,7 +810,8 @@ paths:
         Requires both the Idempotency-Key header and the If-Match
         precondition carrying the expected revision (the ETag value from
         the last read). Missing, wildcard, or unparsable preconditions
-        render 400; stale revisions render 409 board_revision_conflict.
+        render 400; stale revisions render 409 board_revision_conflict;
+        archived boards render 409 board_archived.
         The snapshot is a versioned discriminated union
         {schema_version, payload}: unknown fields are rejected with 400.
       parameters:
@@ -3372,7 +3373,7 @@ components:
       description: Opaque public organization identifier.
     WorkspaceId:
       type: string
-      pattern: '^ws_[A-Za-z0-9]+$'
+      pattern: '^ws_[A-Za-z0-9_-]+$'
       description: Opaque public workspace identifier.
     BoardId:
       type: string
@@ -3380,7 +3381,7 @@ components:
       description: Opaque public board identifier.
     TaskId:
       type: string
-      pattern: '^task_[A-Za-z0-9]+$'
+      pattern: '^task_[A-Za-z0-9_-]+$'
       description: Opaque public task identifier.
     MediaAssetId:
       type: string

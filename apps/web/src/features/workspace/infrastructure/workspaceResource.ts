@@ -39,6 +39,7 @@ import {
   parseContractEnvelope,
 } from '../../../shared/api/contractKernel'
 import { workspaceCreationIdempotencyKey } from '../../../shared/api/idempotencyKey'
+import { normalizePageSize, PAGE_SIZES } from '../../../shared/config/pagination'
 import type { AuthFailureMode } from '../../../shared/api/client'
 import { resolveApiUrl } from '../../../shared/config/runtimeUrls'
 
@@ -66,8 +67,8 @@ export type WorkspaceListPage = {
 // visible-but-forbidden surfaces as 403. Branch on `kind`, not on copy.
 export type WorkspaceAccessKind = 'hidden' | 'forbidden'
 
-export const WORKSPACE_PAGE_SIZE_DEFAULT = 20
-export const WORKSPACE_PAGE_SIZE_MAX = 100
+export const WORKSPACE_PAGE_SIZE_DEFAULT = PAGE_SIZES.standard
+export const WORKSPACE_PAGE_SIZE_MAX = PAGE_SIZES.max
 export const WORKSPACE_NAME_MAX_LENGTH = 120
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,10 +167,11 @@ export function normalizeWorkspaceListParams(input?: {
   const cursor = typeof input?.cursor === 'string' ? input.cursor.trim() : ''
   if (cursor) params.cursor = cursor
   const requested = input?.pageSize
-  const pageSize =
-    typeof requested === 'number' && Number.isFinite(requested)
-      ? Math.min(WORKSPACE_PAGE_SIZE_MAX, Math.max(1, Math.floor(requested)))
-      : WORKSPACE_PAGE_SIZE_DEFAULT
+  const pageSize = normalizePageSize(
+    requested,
+    WORKSPACE_PAGE_SIZE_DEFAULT,
+    WORKSPACE_PAGE_SIZE_MAX,
+  )
   params.page_size = pageSize
   return params
 }

@@ -271,184 +271,168 @@ func requireTaskIdempotencyKey(c *gin.Context) (string, bool) {
 }
 
 func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	key, ok := requireTaskIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	var body v1CreateTaskBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	kind := strings.TrimSpace(body.Data.WorkflowKind)
-	assetIDs := append([]string(nil), body.Data.Inputs.MediaAssetIDs...)
-	for i := range assetIDs {
-		assetIDs[i] = strings.TrimSpace(assetIDs[i])
-	}
-	prompt := strings.TrimSpace(body.Data.Prompt)
-	if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
-		renderTaskError(c, err)
-		return
-	}
-	var quantity int64 = 1
-	if body.Data.Quantity != nil {
-		quantity = *body.Data.Quantity
-	}
-	resolution := ""
-	if body.Data.Resolution != nil {
-		resolution = strings.TrimSpace(*body.Data.Resolution)
-	}
-	// Canonical request hash for idempotent replay (same key+hash ->
-	// same task_id; conflict hash -> 409).
-	paramsJSON, _ := json.Marshal(body.Data.Params)
-	canonicalParams := ""
-	if h.deps.TaskCanonicalCompiler != nil {
-		var compileErr error
-		canonicalInput := make(map[string]interface{}, len(body.Data.Params)+1)
-		for key, value := range body.Data.Params {
-			canonicalInput[key] = value
-		}
-		if len(assetIDs) > 0 {
-			canonicalInput[taskservice.CompilerWorkspaceMediaAssetIDsParam] = append([]string(nil), assetIDs...)
-		}
-		canonicalParams, compileErr = h.deps.TaskCanonicalCompiler(kind, prompt, canonicalInput)
-		if compileErr != nil {
-			renderTaskError(c, compileErr)
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		key, ok := requireTaskIdempotencyKey(c)
+		if !ok {
 			return
 		}
-	}
-	hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
-		strings.Join(assetIDs, ","), prompt, string(paramsJSON),
-		strconv.FormatInt(quantity, 10), resolution)
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "task:create")
-	service := h.taskService()
-	result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
-			WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
-			WorkflowKind: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
-			Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
-		}, key)
-		if err != nil {
-			return nil, err
+		var body v1CreateTaskBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
 		}
-		// #807: emit AFTER the settlement commit, inside the once-fn so
-		// idempotent replays never re-emit. Staged pending maps to
-		// task.created; the hold/free ref maps to billing.settled.
-		for _, staged := range service.StagedEvents() {
-			typ, ok := events.TaskStatusV1Type(staged.Status)
-			if !ok {
-				continue
+		kind := strings.TrimSpace(body.Data.WorkflowKind)
+		assetIDs := append([]string(nil), body.Data.Inputs.MediaAssetIDs...)
+		for i := range assetIDs {
+			assetIDs[i] = strings.TrimSpace(assetIDs[i])
+		}
+		prompt := strings.TrimSpace(body.Data.Prompt)
+		if err := workspacetasks.ValidateWorkspacePrompt(prompt); err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		var quantity int64 = 1
+		if body.Data.Quantity != nil {
+			quantity = *body.Data.Quantity
+		}
+		resolution := ""
+		if body.Data.Resolution != nil {
+			resolution = strings.TrimSpace(*body.Data.Resolution)
+		}
+		// Canonical request hash for idempotent replay (same key+hash ->
+		// same task_id; conflict hash -> 409).
+		paramsJSON, _ := json.Marshal(body.Data.Params)
+		canonicalParams := ""
+		if h.deps.TaskCanonicalCompiler != nil {
+			var compileErr error
+			canonicalInput := make(map[string]interface{}, len(body.Data.Params)+1)
+			for key, value := range body.Data.Params {
+				canonicalInput[key] = value
 			}
-			h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
-				events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
-				events.V1TaskCreatedData{TaskID: staged.TaskID, WorkflowKind: kind})
+			if len(assetIDs) > 0 {
+				canonicalInput[taskservice.CompilerWorkspaceMediaAssetIDsParam] = append([]string(nil), assetIDs...)
+			}
+			canonicalParams, compileErr = h.deps.TaskCanonicalCompiler(kind, prompt, canonicalInput)
+			if compileErr != nil {
+				renderTaskError(c, compileErr)
+				return
+			}
 		}
-		h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
-			created.WorkspaceID, created.ID,
-			created.BillingSnapshot.SettlementState, created.BillingSnapshot.HoldTransactionID)
-		dto := toTaskDTO(created)
-		return &dto, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
-			c.Abort()
+		hash := contract.HashIdempotencyRequest("task:create", workspace.PublicID, kind,
+			strings.Join(assetIDs, ","), prompt, string(paramsJSON),
+			strconv.FormatInt(quantity, 10), resolution)
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "task:create")
+		service := h.taskService()
+		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
+				WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
+				WorkflowKind: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
+				Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
+			}, key)
+			if err != nil {
+				return nil, err
+			}
+			// #807: emit AFTER the settlement commit, inside the once-fn so
+			// idempotent replays never re-emit. Staged pending maps to
+			// task.created; the hold/free ref maps to billing.settled.
+			for _, staged := range service.StagedEvents() {
+				typ, ok := events.TaskStatusV1Type(staged.Status)
+				if !ok {
+					continue
+				}
+				h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
+					events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
+					events.V1TaskCreatedData{TaskID: staged.TaskID, WorkflowKind: kind})
+			}
+			h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
+				created.WorkspaceID, created.ID,
+				created.BillingSnapshot.SettlementState, created.BillingSnapshot.HoldTransactionID)
+			dto := toTaskDTO(created)
+			return &dto, nil
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderTaskError(c, doErr)
 			return
 		}
-		renderTaskError(c, doErr)
-		return
-	}
-	dto, ok := result.(*v1TaskDTO)
-	if !ok || dto == nil {
-		renderTaskError(c, errors.New("tasks: create type mismatch"))
-		return
-	}
-	c.Header("Location", taskLocation(workspace.PublicID, dto.ID))
-	contract.RenderAccepted(c, *dto)
+		dto, ok := result.(*v1TaskDTO)
+		if !ok || dto == nil {
+			renderTaskError(c, errors.New("tasks: create type mismatch"))
+			return
+		}
+		c.Header("Location", taskLocation(workspace.PublicID, dto.ID))
+		contract.RenderAccepted(c, *dto)
+	})
 }
 
 func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		c.Abort()
-		return
-	}
-	offset := 0
-	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
-		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
-		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
 			c.Abort()
 			return
 		}
-		offset = cursor.Offset
-	}
-	tasks, err := h.deps.Tasks.ListTasks(c.Request.Context(), workspace.PublicID, pageSize+1, offset)
-	if err != nil {
-		renderTaskError(c, err)
-		return
-	}
-	hasMore := len(tasks) > pageSize
-	if hasMore {
-		tasks = tasks[:pageSize]
-	}
-	page := make([]v1TaskDTO, 0, len(tasks))
-	for _, task := range tasks {
-		page = append(page, toTaskDTO(task))
-	}
-	meta := contract.NewPageMeta("", false)
-	if hasMore {
-		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
-		if encodeErr != nil {
-			renderTaskError(c, encodeErr)
+		offset := 0
+		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
+			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
+			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				c.Abort()
+				return
+			}
+			offset = cursor.Offset
+		}
+		tasks, err := h.deps.Tasks.ListTasks(c.Request.Context(), workspace.PublicID, pageSize+1, offset)
+		if err != nil {
+			renderTaskError(c, err)
 			return
 		}
-		meta = contract.NewPageMeta(next, true)
-	}
-	contract.RenderPaginated(c, page, meta)
+		hasMore := len(tasks) > pageSize
+		if hasMore {
+			tasks = tasks[:pageSize]
+		}
+		page := make([]v1TaskDTO, 0, len(tasks))
+		for _, task := range tasks {
+			page = append(page, toTaskDTO(task))
+		}
+		meta := contract.NewPageMeta("", false)
+		if hasMore {
+			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
+			if encodeErr != nil {
+				renderTaskError(c, encodeErr)
+				return
+			}
+			meta = contract.NewPageMeta(next, true)
+		}
+		contract.RenderPaginated(c, page, meta)
+	})
 }
 
 func (h *contractV1Handler) getWorkspaceTask(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	raw := strings.TrimSpace(c.Param("task_id"))
-	if !contract.IsTaskID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
-		c.Abort()
-		return
-	}
-	task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
-	if err != nil {
-		renderTaskError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, toTaskDTO(task))
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		raw := strings.TrimSpace(c.Param("task_id"))
+		if !contract.IsTaskID(raw) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+			c.Abort()
+			return
+		}
+		task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
+		if err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, toTaskDTO(task))
+	})
 }
 
 type v1CancelTaskBody struct {
@@ -458,111 +442,100 @@ type v1CancelTaskBody struct {
 }
 
 func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	raw := strings.TrimSpace(c.Param("task_id"))
-	if !contract.IsTaskID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
-		c.Abort()
-		return
-	}
-	key, ok := requireTaskIdempotencyKey(c)
-	if !ok {
-		return
-	}
-	reason := "user cancel"
-	if c.Request.ContentLength != 0 {
-		var body v1CancelTaskBody
-		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-				"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		raw := strings.TrimSpace(c.Param("task_id"))
+		if !contract.IsTaskID(raw) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
 			c.Abort()
 			return
 		}
-		if body.Data != nil && body.Data.Reason != nil && strings.TrimSpace(*body.Data.Reason) != "" {
-			reason = strings.TrimSpace(*body.Data.Reason)
+		key, ok := requireTaskIdempotencyKey(c)
+		if !ok {
+			return
 		}
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	scope := contract.IdempotencyScope(externalUser, "task:cancel")
-	hash := contract.HashIdempotencyRequest("task:cancel", workspace.PublicID, raw, reason)
-	service := h.taskService()
-	result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		cancelled, already, err := service.Cancel(c.Request.Context(), workspace.PublicID, raw, identityPrincipal.UserID(), reason)
-		if err != nil {
-			return nil, err
-		}
-		// #807: fresh flips emit task.cancelled + billing.settled
-		// (released) AFTER the atomic flip; terminal replays (already)
-		// never re-emit.
-		if !already {
-			for _, staged := range service.StagedEvents() {
-				typ, ok := events.TaskStatusV1Type(staged.Status)
-				if !ok {
-					continue
-				}
-				h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
-					events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
-					events.V1TaskCancelledData{TaskID: staged.TaskID, CancelReason: reason})
+		reason := "user cancel"
+		if c.Request.ContentLength != 0 {
+			var body v1CancelTaskBody
+			if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+				writeV1InputError(c)
+				return
 			}
-			h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
-				cancelled.WorkspaceID, cancelled.ID,
-				cancelled.BillingSnapshot.SettlementState, cancelled.BillingSnapshot.HoldTransactionID)
+			if body.Data != nil && body.Data.Reason != nil && strings.TrimSpace(*body.Data.Reason) != "" {
+				reason = strings.TrimSpace(*body.Data.Reason)
+			}
 		}
-		dto := toTaskDTO(cancelled)
-		return &dto, nil
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
-			c.Abort()
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		scope := contract.IdempotencyScope(externalUser, "task:cancel")
+		hash := contract.HashIdempotencyRequest("task:cancel", workspace.PublicID, raw, reason)
+		service := h.taskService()
+		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			cancelled, already, err := service.Cancel(c.Request.Context(), workspace.PublicID, raw, identityPrincipal.UserID(), reason)
+			if err != nil {
+				return nil, err
+			}
+			// #807: fresh flips emit task.cancelled + billing.settled
+			// (released) AFTER the atomic flip; terminal replays (already)
+			// never re-emit.
+			if !already {
+				for _, staged := range service.StagedEvents() {
+					typ, ok := events.TaskStatusV1Type(staged.Status)
+					if !ok {
+						continue
+					}
+					h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
+						events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
+						events.V1TaskCancelledData{TaskID: staged.TaskID, CancelReason: reason})
+				}
+				h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
+					cancelled.WorkspaceID, cancelled.ID,
+					cancelled.BillingSnapshot.SettlementState, cancelled.BillingSnapshot.HoldTransactionID)
+			}
+			dto := toTaskDTO(cancelled)
+			return &dto, nil
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			renderTaskError(c, doErr)
 			return
 		}
-		renderTaskError(c, doErr)
-		return
-	}
-	dto, ok := result.(*v1TaskDTO)
-	if !ok || dto == nil {
-		renderTaskError(c, errors.New("tasks: cancel type mismatch"))
-		return
-	}
-	contract.RenderSuccess(c, *dto)
+		dto, ok := result.(*v1TaskDTO)
+		if !ok || dto == nil {
+			renderTaskError(c, errors.New("tasks: cancel type mismatch"))
+			return
+		}
+		contract.RenderSuccess(c, *dto)
+	})
 }
 
 func (h *contractV1Handler) listWorkspaceTaskOutputs(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	raw := strings.TrimSpace(c.Param("task_id"))
-	if !contract.IsTaskID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
-		c.Abort()
-		return
-	}
-	task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
-	if err != nil {
-		renderTaskError(c, err)
-		return
-	}
-	refs := make([]v1TaskOutputRefDTO, 0, len(task.OutputRefs))
-	for _, ref := range task.OutputRefs {
-		refs = append(refs, v1TaskOutputRefDTO{
-			Kind: ref.Kind, AssetID: ref.AssetID, URL: ref.URL,
-			ChecksumSHA256: ref.ChecksumSHA256, Role: ref.Role, ResultIndex: ref.ResultIndex,
-		})
-	}
-	contract.RenderSuccess(c, map[string]any{"task_id": task.ID, "outputs": refs})
+	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
+		workspace := wctx.Workspace
+		raw := strings.TrimSpace(c.Param("task_id"))
+		if !contract.IsTaskID(raw) {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+			c.Abort()
+			return
+		}
+		task, err := h.deps.Tasks.GetTask(c.Request.Context(), workspace.PublicID, raw)
+		if err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		refs := make([]v1TaskOutputRefDTO, 0, len(task.OutputRefs))
+		for _, ref := range task.OutputRefs {
+			refs = append(refs, v1TaskOutputRefDTO{
+				Kind: ref.Kind, AssetID: ref.AssetID, URL: ref.URL,
+				ChecksumSHA256: ref.ChecksumSHA256, Role: ref.Role, ResultIndex: ref.ResultIndex,
+			})
+		}
+		contract.RenderSuccess(c, map[string]any{"task_id": task.ID, "outputs": refs})
+	})
 }
 
 type v1QuoteTaskBody struct {
@@ -576,43 +549,30 @@ type v1QuoteTaskBody struct {
 // quoteWorkspaceTask is the preflight seam: it returns an immutable price
 // snapshot with no persistence (separate from authoritative create).
 func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) || !h.requireTaskStores(c) {
-		return
-	}
-	workspace, _ := h.taskWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	var body v1QuoteTaskBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	quantity := int64(1)
-	if body.Data.Quantity != nil {
-		quantity = *body.Data.Quantity
-	}
-	resolution := "default"
-	if body.Data.Resolution != nil && strings.TrimSpace(*body.Data.Resolution) != "" {
-		resolution = strings.TrimSpace(*body.Data.Resolution)
-	}
-	service := h.taskService()
-	snapshot, err := service.Quote(c.Request.Context(), workspacetasks.QuoteParams{
-		WorkflowKind: strings.TrimSpace(body.Data.WorkflowKind), Quantity: quantity, Resolution: resolution,
-	})
-	if err != nil {
-		renderTaskError(c, err)
-		return
-	}
-	contract.RenderSuccess(c, v1TaskBillingSnapshotDTO{
-		SKU: snapshot.SKU, DisplayName: snapshot.DisplayName,
-		PriceVersionID: snapshot.PriceVersionID, PriceVersion: snapshot.PriceVersion,
-		OutputResolution: snapshot.OutputResolution, UnitCredits: snapshot.UnitCredits,
-		Quantity: snapshot.Quantity, TotalCredits: snapshot.TotalCredits,
-		QuotedAt: v1FormatTime(snapshot.QuotedAt), SettlementState: "quoted",
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx, body v1QuoteTaskBody) {
+		quantity := int64(1)
+		if body.Data.Quantity != nil {
+			quantity = *body.Data.Quantity
+		}
+		resolution := "default"
+		if body.Data.Resolution != nil && strings.TrimSpace(*body.Data.Resolution) != "" {
+			resolution = strings.TrimSpace(*body.Data.Resolution)
+		}
+		service := h.taskService()
+		snapshot, err := service.Quote(c.Request.Context(), workspacetasks.QuoteParams{
+			WorkflowKind: strings.TrimSpace(body.Data.WorkflowKind), Quantity: quantity, Resolution: resolution,
+		})
+		if err != nil {
+			renderTaskError(c, err)
+			return
+		}
+		contract.RenderSuccess(c, v1TaskBillingSnapshotDTO{
+			SKU: snapshot.SKU, DisplayName: snapshot.DisplayName,
+			PriceVersionID: snapshot.PriceVersionID, PriceVersion: snapshot.PriceVersion,
+			OutputResolution: snapshot.OutputResolution, UnitCredits: snapshot.UnitCredits,
+			Quantity: snapshot.Quantity, TotalCredits: snapshot.TotalCredits,
+			QuotedAt: v1FormatTime(snapshot.QuotedAt), SettlementState: "quoted",
+		})
 	})
 }
 

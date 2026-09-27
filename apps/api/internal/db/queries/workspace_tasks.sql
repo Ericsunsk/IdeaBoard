@@ -6,6 +6,7 @@
 -- so cross-workspace ids stay invisible (ErrNotFound), never 403.
 -- Workspace membership gating stays at the v1 handler layer
 -- (taskWorkspaceContext); the repository enforces scoping + transitions.
+-- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 
 -- name: CreateWorkspaceTask :one
 INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message)

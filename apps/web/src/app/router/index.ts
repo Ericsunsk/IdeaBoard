@@ -18,6 +18,7 @@ import {
   writeSessionStorageItem,
 } from '../../shared/utils/storage'
 import { CHUNK_RELOAD_GUARD_KEY, isChunkLoadFailure, resolveScrollPosition } from './routeRecovery'
+import { SESSION_FRESH_THRESHOLD_MS } from '../../shared/config/timing'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -58,7 +59,6 @@ router.beforeEach(async (to) => {
   // Admin routes revalidate at most every 5 min: single-team surface with
   // no role-flip threat, so a recently validated session is trusted between
   // navigations instead of reprobing on every admin navigation.
-  const SESSION_FRESH_THRESHOLD_MS = 300_000
   const needsFreshSession =
     isAdminRoute && Date.now() - userStore.sessionValidatedAt > SESSION_FRESH_THRESHOLD_MS
   const shouldRefreshSession = needsFreshSession || !!to.meta.requiresAuth || !!to.meta.guest

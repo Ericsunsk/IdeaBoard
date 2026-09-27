@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
@@ -22,15 +23,25 @@ import (
 // response.MachineError, never through the numeric response.Error envelope.
 // 5xx outcomes are logged server-side (InternalError semantics) so they stay
 // attributable; 4xx outcomes render without logging.
+// Billing error codes are wire-stable. Do not rename a code without
+// coordinating the frontend caller that branches on it. Messages stay
+// intentionally safe for public display and never carry SKU plaintext
+// beyond the already-constrained canonical form, quantities, or provider
+// payloads.
+//
+// The values below alias the kernel registry
+// (platform/contract.CodeBilling*): the registry is the single source of
+// truth, these names keep the edge diffs trivial. Wire values are
+// unchanged.
 const (
-	codeBillingInvalidInput       = "billing_invalid_input"
-	codeBillingSKUNotFound        = "billing_sku_not_found"
-	codeBillingPricingUnavailable = "billing_pricing_unavailable"
-	codeBillingItemNotArchived    = "billing_item_not_archived"
-	codeBillingArchivedItemInUse  = "billing_archived_item_in_use"
-	codeBillingQuoteTotalExceeded = "billing_quote_total_exceeded"
-	codeBillingServiceUnavailable = "billing_service_unavailable"
-	codeBillingOperationFailed    = "billing_operation_failed"
+	codeBillingInvalidInput       = string(contract.CodeBillingInvalidInput)
+	codeBillingSKUNotFound        = string(contract.CodeBillingSKUNotFound)
+	codeBillingPricingUnavailable = string(contract.CodeBillingPricingUnavailable)
+	codeBillingItemNotArchived    = string(contract.CodeBillingItemNotArchived)
+	codeBillingArchivedItemInUse  = string(contract.CodeBillingArchivedItemInUse)
+	codeBillingQuoteTotalExceeded = string(contract.CodeBillingQuoteTotalExceeded)
+	codeBillingServiceUnavailable = string(contract.CodeBillingServiceUnavailable)
+	codeBillingOperationFailed    = string(contract.CodeBillingOperationFailed)
 )
 
 type billingErrorMapping struct {

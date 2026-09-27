@@ -47,13 +47,13 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/contract"
 
 	"github.com/gin-gonic/gin"
@@ -163,7 +163,9 @@ func (s *ControlAuditMemorySink) Records() []ControlAuditRecord {
 }
 
 // emitControlAudit writes the record to structured slog and to the sink.
-// It never touches the public event layer.
+// It never touches the public event layer. request_id (plus user_id /
+// workspace_id once ResolvePrincipal enriched the scope) rides the applog
+// request scope from ctx, so it is not plumbed manually here.
 func emitControlAudit(ctx context.Context, sink ControlAuditSink, record ControlAuditRecord) {
 	attrs := []any{
 		"operator_type", record.OperatorType,
@@ -171,7 +173,6 @@ func emitControlAudit(ctx context.Context, sink ControlAuditSink, record Control
 		"capability", record.Capability,
 		"operation", record.Operation,
 		"route", record.Route,
-		"request_id", record.RequestID,
 		"outcome", record.Outcome,
 		"status", record.Status,
 	}
@@ -187,7 +188,7 @@ func emitControlAudit(ctx context.Context, sink ControlAuditSink, record Control
 	if record.Replayed {
 		attrs = append(attrs, "replayed", true)
 	}
-	slog.InfoContext(ctx, "control audit", attrs...)
+	applog.FromContext(ctx).InfoContext(ctx, "control audit", attrs...)
 	if sink != nil {
 		sink.AppendControlAudit(record)
 	}

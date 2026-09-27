@@ -93,9 +93,7 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 	}
 	var body v1CreateOrganizationBody
 	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
+		writeV1InputError(c)
 		return
 	}
 	name := strings.TrimSpace(body.Data.Name)
@@ -166,9 +164,7 @@ func (h *contractV1Handler) updateOrganization(c *gin.Context) {
 	}
 	var body v1UpdateOrganizationBody
 	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
+		writeV1InputError(c)
 		return
 	}
 	name := strings.TrimSpace(body.Data.Name)
@@ -242,9 +238,7 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 	}
 	var body v1CreateOrganizationWorkspaceBody
 	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
+		writeV1InputError(c)
 		return
 	}
 	name := strings.TrimSpace(body.Data.Name)

@@ -240,6 +240,7 @@ type CreateWorkspaceTaskParams struct {
 // so cross-workspace ids stay invisible (ErrNotFound), never 403.
 // Workspace membership gating stays at the v1 handler layer
 // (taskWorkspaceContext); the repository enforces scoping + transitions.
+// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 func (q *Queries) CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error) {
 	row := q.db.QueryRow(ctx, createWorkspaceTask,
 		arg.PublicID,

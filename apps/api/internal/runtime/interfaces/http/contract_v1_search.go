@@ -228,53 +228,48 @@ func toSearchResultDTO(result searchcatalog.V1SearchResult) v1SearchResultDTO {
 }
 
 func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _ := h.searchWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	query, err := searchcatalog.NormalizeV1SearchQuery(c.Query("q"))
-	if err != nil {
-		renderSearchError(c, err)
-		return
-	}
-	providers, err := searchcatalog.ParseV1SearchProviders(c.QueryArray("provider"))
-	if err != nil {
-		renderSearchError(c, err)
-		return
-	}
-	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
-		c.Abort()
-		return
-	}
-	cursor := strings.TrimSpace(c.Query(contract.CursorParam))
-	if h.deps.Search.Backend == nil {
-		renderSearchError(c, errV1SearchUnavailable)
-		return
-	}
-	items, nextCursor, hasMore, searchErr := h.deps.Search.Backend.Search(c.Request.Context(), query, providers, pageSize, cursor)
-	if searchErr != nil {
-		// Opaque cursor binding failures (wrong query/filter/page
-		// size, malformed bytes) converge to pagination_cursor_invalid
-		// (Baseline 5.5); backend outages stay 503.
-		if errors.Is(searchErr, errV1CursorInvalid) || contract.IsCursorInvalid(searchErr) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+	h.withWorkspace(c, v1WorkspaceOpts{Resolve: h.resolveSearchWorkspace}, func(wctx v1WorkspaceCtx) {
+		_ = wctx
+		query, err := searchcatalog.NormalizeV1SearchQuery(c.Query("q"))
+		if err != nil {
+			renderSearchError(c, err)
+			return
+		}
+		providers, err := searchcatalog.ParseV1SearchProviders(c.QueryArray("provider"))
+		if err != nil {
+			renderSearchError(c, err)
+			return
+		}
+		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
 			c.Abort()
 			return
 		}
-		renderSearchError(c, searchErr)
-		return
-	}
-	page := make([]v1SearchResultDTO, 0, len(items))
-	for _, item := range items {
-		page = append(page, toSearchResultDTO(item))
-	}
-	contract.RenderPaginated(c, page, contract.NewPageMeta(nextCursor, hasMore))
+		cursor := strings.TrimSpace(c.Query(contract.CursorParam))
+		if h.deps.Search.Backend == nil {
+			renderSearchError(c, errV1SearchUnavailable)
+			return
+		}
+		items, nextCursor, hasMore, searchErr := h.deps.Search.Backend.Search(c.Request.Context(), query, providers, pageSize, cursor)
+		if searchErr != nil {
+			// Opaque cursor binding failures (wrong query/filter/page
+			// size, malformed bytes) converge to pagination_cursor_invalid
+			// (Baseline 5.5); backend outages stay 503.
+			if errors.Is(searchErr, errV1CursorInvalid) || contract.IsCursorInvalid(searchErr) {
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				c.Abort()
+				return
+			}
+			renderSearchError(c, searchErr)
+			return
+		}
+		page := make([]v1SearchResultDTO, 0, len(items))
+		for _, item := range items {
+			page = append(page, toSearchResultDTO(item))
+		}
+		contract.RenderPaginated(c, page, contract.NewPageMeta(nextCursor, hasMore))
+	})
 }
 
 // SearchCatalogBackendAdapter binds the workspace search surface to the
@@ -409,97 +404,91 @@ type v1VisionQueryDTO struct {
 }
 
 func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _ := h.searchWorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if h.deps.Search.Library == nil {
-		contract.RenderError(c, http.StatusNotImplemented,
-			contract.CodeContractNotImplemented, "The v1 search surface is not implemented yet")
-		c.Abort()
-		return
-	}
-	if h.deps.Search.Quoter == nil || h.deps.Search.Settler == nil {
-		renderSearchBillingError(c, errV1BillingQuoteUnavailable)
-		return
-	}
-	if h.deps.Search.Extractor == nil {
-		renderSearchError(c, errV1VisionNotConfigured)
-		return
-	}
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
-		c.Abort()
-		return
-	}
-	var body v1CreateVisionQueryBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	input, validateErr := searchcatalog.ValidateV1VisionQueryInput(searchcatalog.V1VisionQueryInput{
-		UserText: body.Data.UserText, LibraryAssetIDs: body.Data.LibraryAssetIDs,
-		UploadIDs: body.Data.UploadIDs, ImageURLs: body.Data.ImageURLs,
-	})
-	if validateErr != nil {
-		renderSearchError(c, validateErr)
-		return
-	}
-	references, ok := h.resolveVisionReferences(c, workspace, input.LibraryAssetIDs)
-	if !ok {
-		return
-	}
-	uploadReferences, ok := h.resolveVisionUploads(c, workspace, input.UploadIDs)
-	if !ok {
-		return
-	}
-	references = append(references, uploadReferences...)
-	for _, raw := range input.ImageURLs {
-		references = append(references, searchcatalog.V1VisionReference{
-			Kind: searchcatalog.V1VisionReferenceExternal, ImageURL: raw,
-		})
-	}
-	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-	hashParts := append([]string{"search:vision", workspace.PublicID, input.UserText}, input.LibraryAssetIDs...)
-	hashParts = append(hashParts, input.UploadIDs...)
-	hashParts = append(hashParts, input.ImageURLs...)
-	hash := contract.HashIdempotencyRequest(hashParts...)
-	h.deps.Search.normalize()
-	scope := contract.IdempotencyScope(externalUser, "search:vision")
-	result, replayed, doErr := h.deps.Search.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
-		return h.runVisionQuery(c, workspace, identityPrincipal, input, references)
-	})
-	if doErr != nil {
-		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeSearchIdempotencyConflict, "幂等请求与原请求不一致")
+	h.withWorkspace(c, v1WorkspaceOpts{Resolve: h.resolveSearchWorkspace}, func(wctx v1WorkspaceCtx) {
+		identityPrincipal := wctx.Principal
+		workspace := wctx.Workspace
+		if h.deps.Search.Library == nil {
+			contract.RenderError(c, http.StatusNotImplemented,
+				contract.CodeContractNotImplemented, "The v1 search surface is not implemented yet")
 			c.Abort()
 			return
 		}
-		if errors.Is(doErr, errV1BillingRestricted) || errors.Is(doErr, errV1BillingQuoteUnavailable) {
-			renderSearchBillingError(c, doErr)
+		if h.deps.Search.Quoter == nil || h.deps.Search.Settler == nil {
+			renderSearchBillingError(c, errV1BillingQuoteUnavailable)
 			return
 		}
-		if errors.Is(doErr, errV1VisionNotConfigured) || errors.Is(doErr, errV1VisionProviderError) {
+		if h.deps.Search.Extractor == nil {
+			renderSearchError(c, errV1VisionNotConfigured)
+			return
+		}
+		key, err := contract.IdempotencyKeyFromHeader(c)
+		if err != nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			c.Abort()
+			return
+		}
+		var body v1CreateVisionQueryBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
+		input, validateErr := searchcatalog.ValidateV1VisionQueryInput(searchcatalog.V1VisionQueryInput{
+			UserText: body.Data.UserText, LibraryAssetIDs: body.Data.LibraryAssetIDs,
+			UploadIDs: body.Data.UploadIDs, ImageURLs: body.Data.ImageURLs,
+		})
+		if validateErr != nil {
+			renderSearchError(c, validateErr)
+			return
+		}
+		references, ok := h.resolveVisionReferences(c, workspace, input.LibraryAssetIDs)
+		if !ok {
+			return
+		}
+		uploadReferences, ok := h.resolveVisionUploads(c, workspace, input.UploadIDs)
+		if !ok {
+			return
+		}
+		references = append(references, uploadReferences...)
+		for _, raw := range input.ImageURLs {
+			references = append(references, searchcatalog.V1VisionReference{
+				Kind: searchcatalog.V1VisionReferenceExternal, ImageURL: raw,
+			})
+		}
+		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
+		hashParts := append([]string{"search:vision", workspace.PublicID, input.UserText}, input.LibraryAssetIDs...)
+		hashParts = append(hashParts, input.UploadIDs...)
+		hashParts = append(hashParts, input.ImageURLs...)
+		hash := contract.HashIdempotencyRequest(hashParts...)
+		h.deps.Search.normalize()
+		scope := contract.IdempotencyScope(externalUser, "search:vision")
+		result, replayed, doErr := h.deps.Search.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
+			return h.runVisionQuery(c, workspace, identityPrincipal, input, references)
+		})
+		if doErr != nil {
+			if contract.IsIdempotencyConflict(doErr) {
+				contract.RenderError(c, http.StatusConflict, contract.CodeSearchIdempotencyConflict, "幂等请求与原请求不一致")
+				c.Abort()
+				return
+			}
+			if errors.Is(doErr, errV1BillingRestricted) || errors.Is(doErr, errV1BillingQuoteUnavailable) {
+				renderSearchBillingError(c, doErr)
+				return
+			}
+			if errors.Is(doErr, errV1VisionNotConfigured) || errors.Is(doErr, errV1VisionProviderError) {
+				renderSearchError(c, doErr)
+				return
+			}
 			renderSearchError(c, doErr)
 			return
 		}
-		renderSearchError(c, doErr)
-		return
-	}
-	dto, ok := result.(v1VisionQueryDTO)
-	if !ok {
-		renderSearchError(c, errors.New("search: vision-query type mismatch"))
-		return
-	}
-	dto.Replayed = replayed
-	contract.RenderCreated(c, dto)
+		dto, ok := result.(v1VisionQueryDTO)
+		if !ok {
+			renderSearchError(c, errors.New("search: vision-query type mismatch"))
+			return
+		}
+		dto.Replayed = replayed
+		contract.RenderCreated(c, dto)
+	})
 }
 
 func renderSearchBillingError(c *gin.Context, err error) {

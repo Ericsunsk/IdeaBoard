@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 
 	"github.com/gin-gonic/gin"
@@ -22,21 +23,28 @@ import (
 // Idempotency outcomes are intentionally absent here: board POST writes use
 // the platform idempotency codes (idempotency_key_required /
 // idempotency_conflict), never a boards-owned code.
+// The values below alias the kernel registry (platform/contract): the
+// registry is the single source of truth, these names keep the edge
+// diffs trivial. codeBoardNotFound, codeBoardRevisionConflict,
+// codeBoardMemberNotFound, codeBoardShareTokenNotFound, and
+// codeBoardShareTokenInvalid alias the #802 kernel codes shared with the
+// v1 workspace board surface; the rest are canvas-edge-only outcomes
+// promoted into the same registry. Wire values are unchanged.
 const (
-	codeBoardInvalidInput       = "board_invalid_input"
-	codeBoardNotFound           = "board_not_found"
-	codeBoardNameConflict       = "board_name_conflict"
-	codeBoardRevisionConflict   = "board_revision_conflict"
-	codeBoardIDConflict         = "board_id_conflict"
-	codeBoardPermissionDenied   = "board_permission_denied"
-	codeBoardMemberNotFound     = "board_member_not_found"
-	codeBoardMemberRoleInvalid  = "board_member_role_invalid"
-	codeBoardMemberSelfInvalid  = "board_member_self_invalid"
-	codeBoardShareTokenNotFound = "board_share_token_not_found"
-	codeBoardShareTokenRevoked  = "board_share_token_revoked"
-	codeBoardShareTokenExpired  = "board_share_token_expired"
-	codeBoardShareTokenInvalid  = "board_share_token_invalid"
-	codeBoardOperationFailed    = "board_operation_failed"
+	codeBoardInvalidInput       = string(contract.CodeBoardInvalidInput)
+	codeBoardNotFound           = string(contract.CodeBoardNotFound)
+	codeBoardNameConflict       = string(contract.CodeBoardNameConflict)
+	codeBoardRevisionConflict   = string(contract.CodeBoardRevisionConflict)
+	codeBoardIDConflict         = string(contract.CodeBoardIDConflict)
+	codeBoardPermissionDenied   = string(contract.CodeBoardPermissionDenied)
+	codeBoardMemberNotFound     = string(contract.CodeBoardMemberNotFound)
+	codeBoardMemberRoleInvalid  = string(contract.CodeBoardMemberRoleInvalid)
+	codeBoardMemberSelfInvalid  = string(contract.CodeBoardMemberSelfInvalid)
+	codeBoardShareTokenNotFound = string(contract.CodeBoardShareTokenNotFound)
+	codeBoardShareTokenRevoked  = string(contract.CodeBoardShareTokenRevoked)
+	codeBoardShareTokenExpired  = string(contract.CodeBoardShareTokenExpired)
+	codeBoardShareTokenInvalid  = string(contract.CodeBoardShareTokenInvalid)
+	codeBoardOperationFailed    = string(contract.CodeBoardOperationFailed)
 )
 
 // boardErrorMapping binds one stable outcome to its wire rendering. The row

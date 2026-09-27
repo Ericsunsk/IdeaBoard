@@ -5,8 +5,10 @@ import {
   rewardRedemptionsQueryKeys,
 } from '../../infrastructure/rewards/resource'
 import { useAccountWorkspace } from '../accountWorkspace'
+import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { noRetry } from '../../../../shared/query/queryDefaults'
 
-const pageSize = 20
+const pageSize = PAGE_SIZES.standard
 
 export function useRewardHistory(enabled: MaybeRefOrGetter<boolean> = true) {
   const { workspaceId, selectionSettled } = useAccountWorkspace()
@@ -25,7 +27,7 @@ export function useRewardHistory(enabled: MaybeRefOrGetter<boolean> = true) {
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     enabled: () => toValue(enabled) && selectionSettled.value,
-    retry: false,
+    ...noRetry(),
   })
 
   const redemptions = computed(

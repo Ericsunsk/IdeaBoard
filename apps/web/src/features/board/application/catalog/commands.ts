@@ -387,6 +387,8 @@ function cloneBoardMeta(board: BoardMeta): BoardMeta {
     name: board.name,
     createdAt: board.createdAt,
     updatedAt: board.updatedAt,
+    ...(board.revision === undefined ? {} : { revision: board.revision }),
+    ...(board.archivedAt === undefined ? {} : { archivedAt: board.archivedAt }),
   }
 }
 

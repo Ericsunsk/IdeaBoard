@@ -502,3 +502,45 @@ func TestV1BoardsNilStoreFailsClosed(t *testing.T) {
 		t.Fatalf("nil boards store = %d %v, want 501 contract_not_implemented", status, payload)
 	}
 }
+
+func TestV1BoardsArchivedWritesConflict(t *testing.T) {
+	if got := contract.StatusOf(contract.CodeBoardArchived); got != http.StatusConflict {
+		t.Fatalf("StatusOf(board_archived) = %d, want 409", got)
+	}
+	f := newV1BoardsFixture(t)
+	detailPath := f.boardPath("")
+	docPath := f.boardPath("/document")
+
+	// Permission-denied control: viewer rename on a live board stays 403.
+	status, payload := boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.viewer, "", `{"data":{"name":"Nope"}}`)
+	if status != 403 || v1ErrorCode(t, payload) != string(contract.CodeBoardForbidden) {
+		t.Fatalf("viewer rename = %d %v, want 403 board_forbidden", status, payload)
+	}
+
+	// Archive the board, then writes must surface 409 board_archived.
+	status, _ = boardIDEMKey(t, f.engine, http.MethodPost, f.boardPath("/archive"), f.owner, "arch-w-1", "")
+	if status != 200 {
+		t.Fatalf("archive = %d, want 200", status)
+	}
+	status, payload = boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.owner, "", `{"data":{"name":"Archived Rename"}}`)
+	if status != 409 || v1ErrorCode(t, payload) != string(contract.CodeBoardArchived) {
+		t.Fatalf("archived rename = %d %v, want 409 board_archived", status, payload)
+	}
+	docCall := v1Call{method: http.MethodPut, path: docPath, userID: f.owner,
+		body:    `{"data":{"schema_version":1,"payload":{}}}`,
+		headers: map[string]string{contract.IdempotencyKeyHeader: "arch-doc-1", contract.IfMatchHeader: "1"}}
+	status, _, payload = doV1(t, f.engine, docCall)
+	if status != 409 || v1ErrorCode(t, payload) != string(contract.CodeBoardArchived) {
+		t.Fatalf("archived document write = %d %v, want 409 board_archived", status, payload)
+	}
+
+	// Restore returns the board to writable.
+	status, _ = boardIDEMKey(t, f.engine, http.MethodPost, f.boardPath("/restore"), f.owner, "rest-w-1", "")
+	if status != 200 {
+		t.Fatalf("restore = %d, want 200", status)
+	}
+	status, _ = boardIDEMKey(t, f.engine, http.MethodPatch, detailPath, f.owner, "", `{"data":{"name":"Restored"}}`)
+	if status != 200 {
+		t.Fatalf("rename after restore = %d, want 200", status)
+	}
+}

@@ -448,9 +448,7 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	}
 	var body v1CreateWorkspaceBody
 	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
+		writeV1InputError(c)
 		return
 	}
 	name := strings.TrimSpace(body.Data.Name)
@@ -542,18 +540,9 @@ func (h *contractV1Handler) orgRoleForCreate(ctx context.Context, orgID string, 
 }
 
 func (h *contractV1Handler) getWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, _, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, visible) {
-		return
-	}
-	contract.RenderSuccess(c, toWorkspaceDTO(workspace))
+	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
+		contract.RenderSuccess(c, toWorkspaceDTO(wctx.Workspace))
+	})
 }
 
 type v1UpdateWorkspaceBody struct {
@@ -563,57 +552,32 @@ type v1UpdateWorkspaceBody struct {
 }
 
 func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
-		return
-	}
-	var body v1UpdateWorkspaceBody
-	if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
-		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
-		c.Abort()
-		return
-	}
-	name := strings.TrimSpace(body.Data.Name)
-	if validateErr := tenancy.ValidateName(name); validateErr != nil {
-		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
-		c.Abort()
-		return
-	}
-	updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), workspace.PublicID, name)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, toWorkspaceDTO(updated))
+	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx, body v1UpdateWorkspaceBody) {
+		name := strings.TrimSpace(body.Data.Name)
+		if validateErr := tenancy.ValidateName(name); validateErr != nil {
+			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+				"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			c.Abort()
+			return
+		}
+		updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), wctx.Workspace.PublicID, name)
+		if err != nil {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, toWorkspaceDTO(updated))
+	})
 }
 
 func (h *contractV1Handler) archiveWorkspace(c *gin.Context) {
-	identityPrincipal, ok := v1RequestPrincipal(c)
-	if !ok || !h.requireStore(c) {
-		return
-	}
-	workspace, role, visible := h.v1WorkspaceContext(c, identityPrincipal)
-	if workspace == nil {
-		return
-	}
-	if !RequireWorkspaceCapability(c, visible, role == tenancy.RoleOwner || role == tenancy.RoleAdmin) {
-		return
-	}
-	archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), workspace.PublicID)
-	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
-		c.Abort()
-		return
-	}
-	contract.RenderSuccess(c, toWorkspaceDTO(archived))
+	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
+		archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), wctx.Workspace.PublicID)
+		if err != nil {
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			c.Abort()
+			return
+		}
+		contract.RenderSuccess(c, toWorkspaceDTO(archived))
+	})
 }

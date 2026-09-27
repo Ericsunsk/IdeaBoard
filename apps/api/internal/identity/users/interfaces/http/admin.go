@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/audit"
+	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
@@ -66,7 +67,7 @@ func RespondIdentityAdminCommandError(c *gin.Context, err error) {
 
 func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
 	if h == nil || h.runtimeSettings == nil {
-		response.MachineError(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, "系统设置服务未配置")
+		errorrender.Render(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, "系统设置服务未配置")
 		return nil, false
 	}
 	return h.runtimeSettings, true
@@ -75,7 +76,7 @@ func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.Runtime
 func (h *AdminHandler) requireIdentityAdminCommands(c *gin.Context) (ports.IdentityAdminCommands, bool) {
 	if h == nil || h.identityCommands == nil {
 		slog.Error("identity admin commands not configured")
-		response.MachineError(c, http.StatusInternalServerError, codeIdentityOperationFailed, "身份管理命令未配置")
+		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, "身份管理命令未配置")
 		return nil, false
 	}
 	return h.identityCommands, true
@@ -106,7 +107,7 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 func getTargetUserPublicIDParam(c *gin.Context) (string, bool) {
 	publicID, err := uuid.Parse(strings.TrimSpace(c.Param("public_id")))
 	if err != nil {
-		response.MachineError(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, "无效的用户 public_id")
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, "无效的用户 public_id")
 		return "", false
 	}
 	return publicID.String(), true

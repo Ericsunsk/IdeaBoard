@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppToast } from '../../shared/composables/useAppToast'
+import { stringParam } from '../../shared/router/queryParams'
 import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
 import { i18n } from '../../shared/i18n'
 import {
@@ -124,7 +125,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
   const activeAsset = ref<LibraryAssetView | null>(null)
   let assetRequestID = 0
   const selectedFolder = ref(
-    asFolderKey(syncRoute ? route.query.folder : options.initialFolder),
+    asFolderKey(syncRoute ? stringParam(route.query.folder) : options.initialFolder),
   )
   const folderTabs = computed(() => {
     const tabs = folders.value.map((folder) => ({
@@ -314,7 +315,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
 
   if (syncRoute) {
     watch(
-      () => route.query.folder,
+      () => stringParam(route.query.folder),
       (value) => {
         const next = asFolderKey(value)
         if (next !== selectedFolder.value) {

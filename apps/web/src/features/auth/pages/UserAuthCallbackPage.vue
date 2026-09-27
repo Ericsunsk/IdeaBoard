@@ -20,19 +20,14 @@ import { Spinner } from '@/components/ui/spinner'
 import { useUserStore } from '../session/userSession'
 import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+import { stringParam, stringParamWhere } from '../../../shared/router/queryParams'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
 const status = ref<'loading' | 'failed'>('loading')
-const rawRedirect = Array.isArray(route.query.redirect)
-  ? route.query.redirect[0]
-  : route.query.redirect
-const safeRedirect =
-  typeof rawRedirect === 'string' && isSafeInternalRedirectPath(rawRedirect)
-    ? rawRedirect
-    : undefined
+const safeRedirect = stringParamWhere(route.query.redirect, isSafeInternalRedirectPath)
 const title = computed(() =>
   status.value === 'loading' ? t('auth.oauth.completingTitle') : t('auth.oauth.failedTitle'),
 )
@@ -47,7 +42,7 @@ async function returnToLogin() {
 }
 
 onMounted(async () => {
-  const providerError = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error
+  const providerError = stringParam(route.query.error)
   const succeeded = await userStore.completeOAuthCallback({
     providerError,
     redirectPath: safeRedirect,

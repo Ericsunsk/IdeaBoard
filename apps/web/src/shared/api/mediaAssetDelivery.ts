@@ -8,6 +8,7 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
+import { MEDIA_METADATA_TTL_MS } from '../config/timing'
 import {
   batchGetWorkspaceMediaAssets as batchGetWorkspaceMediaAssetsTransport,
   getWorkspaceMediaAsset,
@@ -123,7 +124,7 @@ type CachedMetadata = {
   expiresAt: number
 }
 
-const METADATA_CACHE_TTL_MS = 5 * 60 * 1000
+const METADATA_CACHE_TTL_MS = MEDIA_METADATA_TTL_MS
 
 const metadataCache = new Map<string, CachedMetadata>()
 const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()

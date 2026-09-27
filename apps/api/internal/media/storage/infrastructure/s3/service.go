@@ -44,9 +44,6 @@ var s3DeliveryOutbound = outboundhttp.NewClient(outboundhttp.Config{})
 // s3DeliveryTarget names storage delivery egress in outbound logs/metrics.
 const s3DeliveryTarget = "s3-storage"
 
-// s3DeliveryTimeout bounds one delivery object fetch.
-const s3DeliveryTimeout = 30 * time.Second
-
 // s3GetWithPolicy fetches one delivery URL through the standard outbound
 // client under the runtime outbound policy. An exhausted retryable status
 // returns its status and body preview with a nil error, exactly like the
@@ -59,7 +56,7 @@ func s3GetWithPolicy(ctx context.Context, rawURL string) (*http.Response, error)
 		return nil, err
 	}
 	resp, err := s3DeliveryOutbound.Do(ctx, req, outboundhttp.RequestOptions{
-		Timeout:    s3DeliveryTimeout,
+		Timeout:    outboundhttp.DefaultTimeout,
 		AllowHosts: outbound.AllowHosts(ctx),
 		Target:     s3DeliveryTarget,
 	})

@@ -124,6 +124,15 @@ export default {
     catalogReloadedSuccess: 'Lista de lienzos recargada.',
     catalogReloadFailedError:
       'No se pudo recargar la lista de lienzos. Inténtelo de nuevo más tarde.',
+    boardArchivedLabel: 'Este lienzo está archivado y es de solo lectura.',
+    restoreArchivedBoard: 'Restaurar lienzo archivado',
+    restore: 'Restaurar',
+    restoringArchivedBoard: 'Restaurando…',
+    boardRestoredSuccess: 'Lienzo restaurado.',
+    boardRestoreFailedError:
+      'No se pudo restaurar el lienzo. Inténtelo de nuevo más tarde.',
+    boardArchivedRenameBlocked:
+      'Este lienzo está archivado. Restáurelo antes de renombrarlo.',
   },
   viewport: {
     zoomIn: 'Acercar',
@@ -318,6 +327,8 @@ export default {
       'Error al guardar: falta la sesión de usuario. Inicie sesión e inténtelo de nuevo.',
     savedLocallySyncFailed:
       'Guardado localmente. Falló la sincronización remota; se reintentará cuando se recupere la red.',
+    savedLocallyServerFailed:
+      'Guardado localmente. Falló la sincronización remota (HTTP {code}); se reintentará con tu próxima edición.',
     nameConflictSavedLocally:
       'Guardado localmente, pero ya existe este nombre de lienzo. Elija otro nombre.',
     boardDataInvalid:
@@ -326,6 +337,7 @@ export default {
       'Error al cargar la instantánea del lienzo. Inténtelo de nuevo más tarde.',
     saved: 'Guardado',
     saveFailed: 'Error al guardar. Inténtelo de nuevo más tarde.',
+    boardArchivedSaveBlocked: 'Este lienzo está archivado. Restáurelo para seguir editando.',
     downloadEmptyResponse: 'Error en la descarga: respuesta vacía.',
     downloadImageHttpFailed: 'Error en la descarga: HTTP {code}',
     downloadImageFailed: 'Error en la descarga: {reason}',
