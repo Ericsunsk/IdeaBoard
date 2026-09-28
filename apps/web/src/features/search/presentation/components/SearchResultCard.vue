@@ -33,14 +33,14 @@
 
     <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
     <div
-      class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
+      class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100 group-focus-within:opacity-100"
       :class="isSelected ? 'opacity-100' : 'opacity-0'"
     >
       <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 -->
       <div class="pointer-events-auto flex items-center justify-between">
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:shadow-board-focus"
           :class="
             isSelected
               ? '!bg-board-primary text-ib-text-inverse shadow-xs'
@@ -59,7 +59,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
           :class="{
             '!bg-board-primary shadow-xs': isUsedAsReference,
           }"

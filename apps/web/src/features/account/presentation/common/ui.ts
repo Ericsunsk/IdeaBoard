@@ -1,7 +1,7 @@
 // Dialog 内容区 chrome：mask 沿用 Dialog 内置 ibDialogMaskClass，
 // 动画走 reka data-state + Tailwind animate。
 export const accountDialogContentClass =
-  'w-[min(1120px,calc(100vw-32px))] max-w-[min(1120px,calc(100vw-32px))] grid-rows-[minmax(0,1fr)] shadow-ib-overlay max-h-[calc(100dvh-20px)] sm:max-h-none'
+  'w-[min(1120px,calc(100vw-32px))] max-w-[min(1120px,calc(100vw-32px))] grid-rows-[minmax(0,1fr)] shadow-ib-overlay max-h-[calc(100dvh-20px)]'
 
 export const accountMainContentClass =
   'relative grid h-[calc(100dvh-64px)] min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white md:h-[min(78dvh,720px)] md:grid-cols-[234px_minmax(0,1fr)] md:grid-rows-none'

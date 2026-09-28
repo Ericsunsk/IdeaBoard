@@ -211,11 +211,42 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
   const failures: string[] = []
   const consoleErrors: string[] = []
   const pageErrors: string[] = []
+  // Anonymous-lane benign noise: every visited page fires the session probe
+  // GET /api/v1/user, which correctly answers 401 for anonymous visitors
+  // (live backend) or fails to connect when the lane runs backend-less (CI).
+  // Chromium logs both at browser level regardless of app handling, so the
+  // script correlates them with the observed probe requests (count-matched)
+  // instead of failing the lane. Any 401/console error WITHOUT a matching
+  // observed probe request still fails.
+  const SESSION_PROBE_PATH = '/api/v1/user'
+  const SESSION_PROBE_NOISE =
+    /Failed to load resource.*(401|ERR_CONNECTION_REFUSED|ERR_PROXY_CONNECTION_FAILED)/
+  const probePathOf = (url: string): string | null => {
+    try {
+      return new URL(url).pathname
+    } catch {
+      return null
+    }
+  }
+  let observedProbeFailures = 0
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage()
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+    page.on('response', (response) => {
+      if (
+        probePathOf(response.url()) === SESSION_PROBE_PATH &&
+        response.status() === 401
+      ) {
+        observedProbeFailures += 1
+      }
+    })
+    page.on('requestfailed', (request) => {
+      if (probePathOf(request.url()) === SESSION_PROBE_PATH) {
+        observedProbeFailures += 1
+      }
     })
     page.on('pageerror', (error) => pageErrors.push(error.message))
     const checks: Array<() => Promise<void>> = [
@@ -248,7 +279,17 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
     await browser.close().catch(() => undefined)
   }
   for (const message of pageErrors) failures.push(`uncaught page error: ${message}`)
-  for (const message of consoleErrors) failures.push(`console error: ${message}`)
+  let allowedProbeNoise = 0
+  for (const message of consoleErrors) {
+    if (
+      SESSION_PROBE_NOISE.test(message) &&
+      allowedProbeNoise < observedProbeFailures
+    ) {
+      allowedProbeNoise += 1
+      continue
+    }
+    failures.push(`console error: ${message}`)
+  }
   return failures
 }
 

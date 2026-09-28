@@ -1,5 +1,5 @@
 <template>
-  <div class="grid min-h-screen place-items-center bg-ib-page p-4 text-ib-text sm:p-6">
+  <main class="grid min-h-screen place-items-center bg-ib-page p-4 text-ib-text sm:p-6">
     <div :class="loginCardClass">
       <div class="flex justify-center px-6 pt-[26px] pb-2 sm:px-8 sm:pt-8">
         <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
@@ -91,7 +91,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">

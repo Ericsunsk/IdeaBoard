@@ -67,58 +67,58 @@ type A11yShapeReport = {
   namelessImages: number
 }
 
-function collectA11yShape(): A11yShapeReport {
-  const isHidden = (element: Element): boolean => {
-    if (!(element instanceof HTMLElement)) return false
-    if (element.hidden || element.getAttribute('aria-hidden') === 'true') return true
-    const style = getComputedStyle(element)
-    return style.display === 'none' || style.visibility === 'hidden'
-  }
-  const accessibleName = (element: Element): string => {
-    const labelledBy = element.getAttribute('aria-labelledby')
-    if (labelledBy) {
-      const text = labelledBy
-        .split(/\s+/)
-        .map((id) => document.getElementById(id)?.textContent ?? '')
-        .join(' ')
-        .trim()
-      if (text) return text
+const COLLECT_A11Y_SHAPE_SOURCE = `
+  (() => {
+    const isHidden = (element) => {
+      if (!(element instanceof HTMLElement)) return false
+      if (element.hidden || element.getAttribute('aria-hidden') === 'true') return true
+      const style = getComputedStyle(element)
+      return style.display === 'none' || style.visibility === 'hidden'
     }
-    const direct =
-      element.getAttribute('aria-label') ??
-      (element instanceof HTMLInputElement ? element.value : null) ??
-      element.getAttribute('title') ??
-      element.textContent ??
-      ''
-    return direct.trim()
-  }
-  const visible = (element: Element) => !isHidden(element)
-  const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]'))
-    .filter(visible)
-    .filter((element) => accessibleName(element).length > 0).length
-  const landmarks = Array.from(
-    document.querySelectorAll(
-      'main, nav, [role="banner"], [role="complementary"], [role="contentinfo"], [role="main"], [role="navigation"], [role="search"]',
-    ),
-  ).filter(visible).length
-  const namelessButtons = Array.from(
-    document.querySelectorAll(
-      'button, [role="button"], input[type="button"], input[type="submit"]',
-    ),
-  )
-    .filter(visible)
-    .filter((element) => !(element instanceof HTMLInputElement && element.type === 'hidden'))
-    .filter((element) => accessibleName(element).length === 0).length
-  // Empty alt="" marks a decorative image and passes (axe-consistent);
-  // only images with no alt channel at all are violations.
-  const namelessImages = Array.from(document.querySelectorAll('img, [role="img"]'))
-    .filter(visible)
-    .filter((element) => accessibleName(element).length === 0)
-    .filter(
-      (element) => !(element instanceof HTMLImageElement && element.hasAttribute('alt')),
-    ).length
-  return { headings, landmarks, namelessButtons, namelessImages }
-}
+    const accessibleName = (element) => {
+      const labelledBy = element.getAttribute('aria-labelledby')
+      if (labelledBy) {
+        const text = labelledBy
+          .split(/\\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? '')
+          .join(' ')
+          .trim()
+        if (text) return text
+      }
+      const direct =
+        element.getAttribute('aria-label') ??
+        (element instanceof HTMLInputElement ? element.value : null) ??
+        element.getAttribute('title') ??
+        element.textContent ??
+        ''
+      return direct.trim()
+    }
+    const visible = (element) => !isHidden(element)
+    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, [role="heading"]'))
+      .filter(visible)
+      .filter((element) => accessibleName(element).length > 0).length
+    const landmarks = Array.from(
+      document.querySelectorAll(
+        'main, nav, [role="banner"], [role="complementary"], [role="contentinfo"], [role="main"], [role="navigation"], [role="search"]',
+      ),
+    ).filter(visible).length
+    const namelessButtons = Array.from(
+      document.querySelectorAll(
+        'button, [role="button"], input[type="button"], input[type="submit"]',
+      ),
+    )
+      .filter(visible)
+      .filter((element) => !(element instanceof HTMLInputElement && element.type === 'hidden'))
+      .filter((element) => accessibleName(element).length === 0).length
+    const namelessImages = Array.from(document.querySelectorAll('img, [role="img"]'))
+      .filter(visible)
+      .filter((element) => accessibleName(element).length === 0)
+      .filter(
+        (element) => !(element instanceof HTMLImageElement && element.hasAttribute('alt')),
+      ).length
+    return { headings, landmarks, namelessButtons, namelessImages }
+  })()
+`
 
 async function checkAccessibilityShape(page: Page, label: string): Promise<void> {
   const violations: string[] = []
@@ -126,7 +126,10 @@ async function checkAccessibilityShape(page: Page, label: string): Promise<void>
   if (!lang) violations.push('document is missing html[lang]')
   const title = await page.evaluate(() => document.title.trim())
   if (!title) violations.push('document is missing a non-empty <title>')
-  const raw = await page.evaluate(collectA11yShape)
+  // Pass the function source as a browser expression. The smoke script runs
+  // through esbuild/tsx, whose injected `__name` helper is not available in
+  // the page context when a compiled callback is serialized by Playwright.
+  const raw = await page.evaluate(COLLECT_A11Y_SHAPE_SOURCE)
   const report: A11yShapeReport = raw
   if (report.headings === 0) violations.push('no named heading found')
   if (report.landmarks === 0) violations.push('no landmark (main/nav/banner/contentinfo/...) found')
@@ -182,11 +185,30 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
   const failures: string[] = []
   const consoleErrors: string[] = []
   const pageErrors: string[] = []
+  const sessionProbePath = '/api/v1/user'
+  const sessionProbeNoise =
+    /Failed to load resource.*(401|ERR_CONNECTION_REFUSED|ERR_PROXY_CONNECTION_FAILED)/
+  const probePathOf = (url: string): string | null => {
+    try {
+      return new URL(url).pathname
+    } catch {
+      return null
+    }
+  }
+  let observedSessionProbeFailures = 0
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage()
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+    page.on('response', (response) => {
+      if (probePathOf(response.url()) === sessionProbePath && response.status() === 401) {
+        observedSessionProbeFailures += 1
+      }
+    })
+    page.on('requestfailed', (request) => {
+      if (probePathOf(request.url()) === sessionProbePath) observedSessionProbeFailures += 1
     })
     page.on('pageerror', (error) => pageErrors.push(error.message))
     const labels: string[] = [
@@ -214,7 +236,14 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
     await browser.close().catch(() => undefined)
   }
   for (const message of pageErrors) failures.push(`uncaught page error: ${message}`)
-  for (const message of consoleErrors) failures.push(`console error: ${message}`)
+  let allowedSessionProbeNoise = 0
+  for (const message of consoleErrors) {
+    if (sessionProbeNoise.test(message) && allowedSessionProbeNoise < observedSessionProbeFailures) {
+      allowedSessionProbeNoise += 1
+      continue
+    }
+    failures.push(`console error: ${message}`)
+  }
   return failures
 }
 
