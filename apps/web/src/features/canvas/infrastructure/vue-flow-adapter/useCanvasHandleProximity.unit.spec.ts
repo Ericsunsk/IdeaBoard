@@ -1,4 +1,4 @@
-import { createApp, defineComponent, h, ref } from 'vue'
+import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   provideCanvasHandleProximityCoordinator,
@@ -177,5 +177,44 @@ describe('useCanvasHandleProximity', () => {
     harness.unmount()
 
     expect(cancelAnimationFrame).toHaveBeenCalledWith(1)
+  })
+
+  it('re-registers the proximity handle when a reused rail instance changes node id', async () => {
+    installFrameScheduler()
+    const geometry = createGeometry()
+    const resolveAnchor = vi.fn(geometry.resolveAnchor)
+    geometry.resolveAnchor = resolveAnchor
+    const nodeId = ref('node-1')
+    const coordinator = createCanvasHandleProximityCoordinator(geometry)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const Consumer = defineComponent({
+      setup() {
+        useCanvasHandleProximity({ nodeId, direction: 'output', enabled: ref(true) })
+        return () => null
+      },
+    })
+    const Provider = defineComponent({
+      setup() {
+        provideCanvasHandleProximityCoordinator(geometry, coordinator)
+        return () => h(Consumer)
+      },
+    })
+    const app = createApp(Provider)
+    app.mount(host)
+    try {
+      movePointer(130, 100)
+      expect(resolveAnchor).toHaveBeenCalledWith('node-1', 'output')
+
+      resolveAnchor.mockClear()
+      nodeId.value = 'node-2'
+      await nextTick()
+      movePointer(130, 100)
+      expect(resolveAnchor).toHaveBeenCalledWith('node-2', 'output')
+      expect(resolveAnchor).not.toHaveBeenCalledWith('node-1', 'output')
+    } finally {
+      app.unmount()
+      host.remove()
+    }
   })
 })

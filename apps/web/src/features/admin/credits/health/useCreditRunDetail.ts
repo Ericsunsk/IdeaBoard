@@ -50,8 +50,11 @@ export function useCreditRunDetail<TRun extends PollableRun>(
   }
 
   function close() {
+    const runId = selectedRunId.value
     selectedRunId.value = null
-    void queryClient.removeQueries({ queryKey: [...CREDIT_RUN_DETAIL_QUERY_ROOT] })
+    if (runId !== null) {
+      void queryClient.removeQueries({ queryKey: [...CREDIT_RUN_DETAIL_QUERY_ROOT, runId] })
+    }
   }
 
   return {

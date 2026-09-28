@@ -98,7 +98,7 @@
           :copy-mode="props.copyMode"
           :prompt-composer-visible="props.fusionPresentation?.promptComposerVisible ?? false"
           :generation-available="props.generationAvailable"
-          :ui-state="props.uiState"
+          :ui-state="resolvedUiState"
           @node-mousedown="noopMouse"
           @update:title="onFusionParameterChanged('title', $event)"
           @update:output-count="onFusionParameterChanged('outputCount', $event)"
@@ -144,6 +144,7 @@ import {
   resolveCanvasNodeUiScale,
   useCanvasViewportContext,
 } from '../../infrastructure/vue-flow-adapter/useCanvasViewportContext'
+import { useCanvasNodeUiStateContext } from '../../infrastructure/vue-flow-adapter/useCanvasNodeUiStateContext'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import { FusionNode, ImageNode, PromptNode } from './workflows'
 
@@ -196,6 +197,15 @@ const nodeStyle = computed(() => ({
   '--canvas-node-ui-scale': String(resolveCanvasNodeUiScale(zoomLevel.value)),
 }))
 
+// Per-node uiState subscription: resolving the shared cache here keeps the
+// dependency inside this node's own render effect instead of the parent
+// CanvasScreen slot scope, so one node's uiState change cannot re-render
+// sibling subtrees. An explicit uiState prop (tests, previews) still wins.
+const nodeUiStateContext = useCanvasNodeUiStateContext()
+const resolvedUiState = computed(
+  () => props.uiState ?? nodeUiStateContext.getFlowNodeUiState(props.nodeId),
+)
+
 const {
   disableHandleRailInteraction,
   displayImage,
@@ -214,7 +224,7 @@ const {
   stageHeight,
 } = useFlowCanvasNodeAdapter({
   data: () => props.data,
-  uiState: () => props.uiState,
+  uiState: () => resolvedUiState.value,
   imageDirectGenerating: () => props.imagePresentation.actionBinding.directGenerating,
   outpaintModeActive: () => !!props.outpaintModeActive,
   isRetouchActive: () => isRetouchActive.value,

@@ -174,6 +174,57 @@ describe('workspace mediaAssetDelivery', () => {
     expect(mocks.request).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a joined load alive when the first caller aborts', async () => {
+    let resolveTransport!: (envelope: unknown) => void
+    mocks.request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTransport = resolve
+      }),
+    )
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const first = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, {
+      signal: firstController.signal,
+    })
+    const second = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, {
+      signal: secondController.signal,
+    })
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+
+    firstController.abort()
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+
+    resolveTransport(assetEnvelope('ready'))
+    await expect(second).resolves.toMatchObject({ asset_id: ASSET_ID })
+  })
+
+  it('replaces a stale read and shares concurrent force reads', async () => {
+    const resolvers: Array<(envelope: unknown) => void> = []
+    const deferred = () =>
+      new Promise<unknown>((resolve) => {
+        resolvers.push(resolve)
+      })
+    mocks.request.mockReturnValueOnce(deferred()).mockReturnValueOnce(deferred())
+    const stale = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
+    const fresh = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, { force: true })
+    const joined = getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID, { force: true })
+    expect(mocks.request).toHaveBeenCalledTimes(2)
+
+    const staleSignal = mocks.request.mock.calls[0]?.[1] as { signal?: AbortSignal }
+    expect(staleSignal.signal?.aborted).toBe(true)
+
+    resolvers[1]?.(assetEnvelope('ready'))
+    await expect(fresh).resolves.toMatchObject({ asset_id: ASSET_ID })
+    await expect(joined).resolves.toMatchObject({ asset_id: ASSET_ID })
+    // The superseded transport ignores its abort in the mock; settling it
+    // late must neither reject the fresh read nor poison the cache.
+    resolvers[0]?.(assetEnvelope('ready'))
+    await expect(stale).resolves.toMatchObject({ asset_id: ASSET_ID })
+    const reread = await getWorkspaceMediaAssetMetadata(WORKSPACE_ID, ASSET_ID)
+    expect(reread).toMatchObject({ asset_id: ASSET_ID })
+    expect(mocks.request).toHaveBeenCalledTimes(2)
+  })
+
   it('fails metadata reads closed without a workspace selection', async () => {
     mocks.selectedWorkspaceId.current = null
 

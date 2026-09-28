@@ -1,8 +1,8 @@
-import { ref } from 'vue'
+import { ref, toValue } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type ProximityOptions = {
-  nodeId: string
+  nodeId: string | (() => string)
   direction: 'input' | 'output'
 }
 
@@ -34,10 +34,11 @@ describe('useFlowNodeHandlesPresentation', () => {
       disabled: () => false,
     })
 
-    expect(proximityOptions).toMatchObject([
-      { nodeId: 'image-1', direction: 'input' },
-      { nodeId: 'image-1', direction: 'output' },
+    expect(proximityOptions.map((options) => toValue(options.nodeId))).toEqual([
+      'image-1',
+      'image-1',
     ])
+    expect(proximityOptions.map((options) => options.direction)).toEqual(['input', 'output'])
     expect(presentation.value.aggregates.every((aggregate) => !('setElement' in aggregate))).toBe(
       true,
     )

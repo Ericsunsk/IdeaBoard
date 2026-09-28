@@ -127,7 +127,12 @@ type CachedMetadata = {
 const METADATA_CACHE_TTL_MS = MEDIA_METADATA_TTL_MS
 
 const metadataCache = new Map<string, CachedMetadata>()
-const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
+type InFlightMetadataRequest = {
+  promise: Promise<MediaAssetDeliveryMetadata>
+  controller: AbortController
+  force: boolean
+}
+const metadataRequests = new Map<string, InFlightMetadataRequest>()
 const invalidationListeners = new Map<string, Set<() => void>>()
 
 export function normalizeMediaAssetId(value: MediaAssetId | null | undefined): string | null {
@@ -302,6 +307,36 @@ function toDeliveryMetadata(asset: MediaAsset): MediaAssetDeliveryMetadata {
   }
 }
 
+function createMetadataAbortError(): DOMException {
+  return new DOMException('Media asset metadata read aborted.', 'AbortError')
+}
+
+// Deduped reads share one transport, but each caller's AbortSignal stays
+// local: aborting one consumer rejects only its own read while the shared
+// fetch continues for joiners. Previously the first caller's signal rode
+// the shared fetch, so one component unmount aborted every joined load.
+function joinMetadataRequest(
+  shared: Promise<MediaAssetDeliveryMetadata>,
+  signal?: AbortSignal,
+): Promise<MediaAssetDeliveryMetadata> {
+  if (!signal) return shared
+  if (signal.aborted) return Promise.reject(createMetadataAbortError())
+  return new Promise<MediaAssetDeliveryMetadata>((resolve, reject) => {
+    const onAbort = () => reject(createMetadataAbortError())
+    signal.addEventListener('abort', onAbort, { once: true })
+    shared.then(
+      (metadata) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(metadata)
+      },
+      (error) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+    )
+  })
+}
+
 /**
  * Reads one workspace media asset and projects it onto the delivery
  * metadata shape shared delivery consumers (cache, composable, the
@@ -320,24 +355,46 @@ export async function getWorkspaceMediaAssetMetadata(
   const normalized = normalizeMediaAssetId(assetId)
   if (!normalized) throw new Error(i18n.global.t('common.errors.mediaInvalid'))
   const requestKey = metadataCacheKey(workspace, normalized)
+  // An already-aborted caller never touches shared state: no cache read,
+  // no dedup join, no stale cancellation.
+  if (options.signal?.aborted) return Promise.reject(createMetadataAbortError())
   if (!options.force) {
     const cached = getCachedMetadata(workspace, assetId)
     if (cached) return cached
+    const existing = metadataRequests.get(requestKey)
+    if (existing) return joinMetadataRequest(existing.promise, options.signal)
+  } else {
+    // `force` bypasses the cache. Replace a non-force in-flight read, while
+    // concurrent force callers share the same fresh transport.
+    const stale = metadataRequests.get(requestKey)
+    if (stale?.force) return joinMetadataRequest(stale.promise, options.signal)
+    if (stale) {
+      stale.controller.abort()
+      metadataRequests.delete(requestKey)
+    }
   }
-  const existing = metadataRequests.get(requestKey)
-  if (existing) return existing
 
-  const request = getWorkspaceMediaAsset(workspace, normalized, { signal: options.signal })
+  const controller = new AbortController()
+  const request = getWorkspaceMediaAsset(workspace, normalized, { signal: controller.signal })
     .then((envelope) => toDeliveryMetadata(envelope.data))
     .then((metadata) => {
-      metadataCache.set(requestKey, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
+      // A force-superseded read must not poison the cache when its
+      // transport ignores the abort and still resolves.
+      if (metadataRequests.get(requestKey)?.promise === request) {
+        metadataCache.set(requestKey, {
+          value: metadata,
+          expiresAt: resolveMetadataExpiry(metadata),
+        })
+      }
       return metadata
     })
     .finally(() => {
-      if (metadataRequests.get(requestKey) === request) metadataRequests.delete(requestKey)
+      if (metadataRequests.get(requestKey)?.promise === request) {
+        metadataRequests.delete(requestKey)
+      }
     })
-  metadataRequests.set(requestKey, request)
-  return request
+  metadataRequests.set(requestKey, { promise: request, controller, force: options.force === true })
+  return joinMetadataRequest(request, options.signal)
 }
 
 /**

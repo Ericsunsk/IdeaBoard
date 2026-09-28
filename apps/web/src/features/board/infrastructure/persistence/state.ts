@@ -124,6 +124,17 @@ export function getBoardState(boardId: string): BoardState | null {
   return stateMap[id] || null
 }
 
+export function getBoardStates(boardIds: readonly string[]): Record<string, BoardState | null> {
+  const stateMap = readRawStateMap()
+  const result: Record<string, BoardState | null> = {}
+  boardIds.forEach((boardId) => {
+    const id = normalizeBoardId(boardId)
+    if (!id) return
+    result[boardId] = stateMap[id] || null
+  })
+  return result
+}
+
 export function loadBoardState(boardId: string): BoardState | null {
   const id = normalizeBoardId(boardId)
   if (!id) return null

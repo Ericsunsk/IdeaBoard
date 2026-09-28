@@ -67,7 +67,7 @@ describe('useOutboundPolicy', () => {
     }
   })
 
-  it('hydrates the saved response before invalidation and finishes with refreshed server state', async () => {
+  it('keeps the saved response when invalidation returns a lagging server read', async () => {
     const invalidationStarted = createGate()
     const releaseInvalidation = createGate()
     let loadCount = 0
@@ -79,7 +79,7 @@ describe('useOutboundPolicy', () => {
         }
         invalidationStarted.open()
         await releaseInvalidation.promise
-        return ['server.internal']
+        return ['models.internal']
       },
       respondToUpdate: () => ({ allow_hosts: ['draft.internal'] }),
     })
@@ -111,8 +111,8 @@ describe('useOutboundPolicy', () => {
       releaseInvalidation.open()
 
       await expect(saveResult).resolves.toBe(true)
-      expect(harness.lifecycle.setting.value).toEqual({ allow_hosts: ['server.internal'] })
-      expect(harness.lifecycle.form.value.allow_hosts).toBe('server.internal')
+      expect(harness.lifecycle.setting.value).toEqual({ allow_hosts: ['draft.internal'] })
+      expect(harness.lifecycle.form.value.allow_hosts).toBe('draft.internal')
       expect(harness.lifecycle.isDirty.value).toBe(false)
       expect(harness.lifecycle.saving.value).toBe(false)
       expect(harness.feedback.saved).toHaveBeenCalledTimes(1)

@@ -2,6 +2,7 @@ import {
   computed,
   onScopeDispose,
   ref,
+  shallowRef,
   toValue,
   watch,
   type ComputedRef,
@@ -37,6 +38,20 @@ export type LibraryFolderTab = {
 }
 
 export const LIBRARY_ALL_FOLDER_KEY = 'all'
+
+type LibraryAssetRequest = {
+  id: number
+  folder: string
+  workspace: string | null
+}
+
+function isStaleAssetRequest(request: LibraryAssetRequest, current: LibraryAssetRequest): boolean {
+  return (
+    request.id !== current.id ||
+    request.folder !== current.folder ||
+    request.workspace !== current.workspace
+  )
+}
 
 function isLibraryAllFolderKey(value: string): boolean {
   return value === LIBRARY_ALL_FOLDER_KEY
@@ -117,7 +132,9 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
     )
   const mutationPublisher = options.mutationPublisher ?? createLibraryMutationPublisher(folderFacts)
   const folders = folderFacts.folders
-  const assets = ref<LibraryAssetView[]>([])
+  // Wholly replaced on every write (never mutated in place), so a
+  // shallow ref avoids deep-reactive tracking over the whole gallery.
+  const assets: Ref<LibraryAssetView[]> = shallowRef<LibraryAssetView[]>([])
   const loading = ref(true)
   const errorMessage = ref('')
   const nextCursor = ref('')
@@ -143,10 +160,21 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
     return tabs
   })
 
+  function liveAssetRequest(): LibraryAssetRequest {
+    return {
+      id: assetRequestID,
+      folder: selectedFolder.value,
+      workspace: workspaceId.value,
+    }
+  }
+
   async function loadAssets(reset = true) {
     if (!reset && (loading.value || !hasMore.value)) return
-    const requestID = ++assetRequestID
-    const requestFolder = selectedFolder.value
+    const request: LibraryAssetRequest = {
+      id: ++assetRequestID,
+      folder: selectedFolder.value,
+      workspace: workspaceId.value,
+    }
     const requestCursor = reset ? '' : nextCursor.value
     loading.value = true
     if (reset) {
@@ -154,20 +182,20 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
       errorMessage.value = ''
     }
     try {
-      const wid = resolveWorkspaceId(options.workspaceId)
-      const page = await fetchLibraryAssetPage(wid, requestFolder, requestCursor)
-      if (requestID !== assetRequestID || requestFolder !== selectedFolder.value) return
+      const wid = requireWorkspaceId(request.workspace)
+      const page = await fetchLibraryAssetPage(wid, request.folder, requestCursor)
+      if (isStaleAssetRequest(request, liveAssetRequest())) return
       assets.value = reset ? page.items : [...assets.value, ...page.items]
       nextCursor.value = page.nextCursor
       hasMore.value = page.hasMore
     } catch (error) {
-      if (requestID !== assetRequestID || requestFolder !== selectedFolder.value) return
+      if (isStaleAssetRequest(request, liveAssetRequest())) return
       errorMessage.value = userFacingErrorCopy(
         error,
         i18n.global.t('library.errors.loadAssetsFailed'),
       )
     } finally {
-      if (requestID === assetRequestID) loading.value = false
+      if (request.id === assetRequestID) loading.value = false
     }
   }
 

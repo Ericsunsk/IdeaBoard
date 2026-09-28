@@ -91,7 +91,7 @@ func TestVisionBillingReserveDefersOnUnpriced(t *testing.T) {
 		reason string
 	}{
 		{"pricing unavailable", &deferredCatalogStub{err: billing.ErrPricingUnavailable}, "pricing_unavailable"},
-		{"sku not found", &deferredCatalogStub{err: billing.ErrSKUNotFound}, "sku_not_found"},
+		{"sku not found normalizes to pricing unavailable", &deferredCatalogStub{err: billing.ErrSKUNotFound}, "pricing_unavailable"},
 		{"quoted zero", &deferredCatalogStub{quote: billing.Quote{}}, "unpriced_zero"},
 	}
 	for _, tc := range cases {

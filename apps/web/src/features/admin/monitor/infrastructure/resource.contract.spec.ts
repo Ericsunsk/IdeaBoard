@@ -34,7 +34,7 @@ describe('task monitor resource', () => {
 
   it('keeps the admin task query keys stable for invalidation', () => {
     expect(getAdminTaskListQueryKey()).toEqual(ADMIN_TASK_LIST_QUERY_KEY)
-    expect(getAdminTaskDetailQueryKey('task-a')).toEqual(['admin', 'tasks', 'task-a'])
+    expect(getAdminTaskDetailQueryKey('task-a')).toEqual(['admin', 'monitor', 'detail', 'task-a'])
     expect(getAdminMonitorQueryKey()).toEqual(ADMIN_MONITOR_QUERY_KEY)
   })
 

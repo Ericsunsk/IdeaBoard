@@ -1,6 +1,10 @@
 import { ref, type Ref } from 'vue'
 import { normalizeLatestBoardState, type BoardState } from '../../domain'
-import { getBoardState, setBoardPreviewSnapshot } from '../../infrastructure/persistence'
+import {
+  getBoardState,
+  getBoardStates,
+  setBoardPreviewSnapshot,
+} from '../../infrastructure/persistence'
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
 import { isBoardNameConflictError, syncBoardToServer } from '../../application/sync/boardSync'
@@ -8,6 +12,7 @@ import type { BoardMeta } from '../../application/catalog/boards'
 
 export interface BoardPreviewRefreshQueueDependencies {
   getBoardState: (boardId: string) => BoardState | null
+  getBoardStates: (boardIds: readonly string[]) => Record<string, BoardState | null>
   setPreviewSnapshot: (
     boardId: string,
     previewSnapshotDataUrl: string | undefined,
@@ -32,6 +37,7 @@ export interface BoardPreviewRefreshQueue {
 
 const defaultDependencies: BoardPreviewRefreshQueueDependencies = {
   getBoardState: getBoardState,
+  getBoardStates: getBoardStates,
   setPreviewSnapshot: setBoardPreviewSnapshot,
   renderPreview: renderBoardPreviewDataUrl,
   syncBoard: syncBoardToServer,
@@ -62,11 +68,38 @@ export function createBoardPreviewRefreshQueue(
     return null
   }
 
+  function readLatestBoardStates(
+    boardIds: readonly string[],
+    boundary: string,
+  ): Map<string, BoardState | null> {
+    // Bulk-read once per round: the local persistence layer keeps every board
+    // in a single storage blob, so one parse serves the whole round instead
+    // of re-parsing the blob once per board (O(n^2) total parsing).
+    const rawMap = deps.getBoardStates(boardIds)
+    const result = new Map<string, BoardState | null>()
+    boardIds.forEach((boardId) => {
+      const state = rawMap[boardId] ?? null
+      const normalized = normalizeLatestBoardState(state, { mode: 'result', boundary })
+      if (normalized.ok) {
+        result.set(boardId, normalized.value)
+        return
+      }
+      if (state) {
+        deps.warn('[boards] invalid board state for preview refresh', boardId, normalized.error)
+      }
+      result.set(boardId, null)
+    })
+    return result
+  }
+
   function reloadFromLocal(boards: BoardMeta[]) {
     const nextMap: Record<string, string> = {}
+    const states = readLatestBoardStates(
+      boards.map((board) => board.id),
+      'preview-reload',
+    )
     boards.forEach((board) => {
-      nextMap[board.id] =
-        readLatestBoardState(board.id, 'preview-reload')?.previewSnapshotDataUrl || ''
+      nextMap[board.id] = states.get(board.id)?.previewSnapshotDataUrl || ''
     })
     previewMap.value = nextMap
   }
@@ -150,8 +183,13 @@ export function createBoardPreviewRefreshQueue(
 
   function schedule(boards: BoardMeta[]) {
     if (isDisposed) return
+    if (boards.length === 0) return
+    const states = readLatestBoardStates(
+      boards.map((board) => board.id),
+      'preview-stale-check',
+    )
     boards.forEach((board) => {
-      if (isPreviewStale(board.id)) {
+      if (isPreviewStaleState(states.get(board.id) ?? null)) {
         enqueue(board.id)
       }
     })

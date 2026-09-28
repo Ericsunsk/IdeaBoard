@@ -40,7 +40,7 @@ export function useBoardRuntime(options: UseBoardRuntimeOptions) {
   }
   const nodes: Ref<Node[]> = shallowRef([])
   const edges: Ref<Edge[]> = shallowRef([])
-  const boardBaseSnapshot: Ref<BoardSnapshot> = ref(createEmptyBoardSnapshot())
+  const boardBaseSnapshot: Ref<BoardSnapshot> = shallowRef(createEmptyBoardSnapshot())
   const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
   const isSavingBoard: Ref<boolean> = ref(false)
   const isDirty: Ref<boolean> = ref(false)

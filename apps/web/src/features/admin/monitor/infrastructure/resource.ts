@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query'
-import { type MaybeRef, type MaybeRefOrGetter } from 'vue'
+import { computed, toValue, type MaybeRef, type MaybeRefOrGetter } from 'vue'
 import { requireContractData } from '../../../../shared/api/contractKernel'
 import { getControlMonitor } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
@@ -221,8 +221,9 @@ export type AdminMonitorDetailModel = AdminMonitorDetail
 export type AdminMonitorListItemModel = AdminMonitorListItem
 export type AdminMonitorExecutionAttempt = AdminTaskExecutionAttempt
 
-export const ADMIN_TASK_LIST_QUERY_KEY = ['admin', 'tasks'] as const
+export const ADMIN_TASK_LIST_QUERY_KEY = ['admin', 'tasks', 'list'] as const
 export const ADMIN_MONITOR_QUERY_KEY = ['admin', 'monitor'] as const
+export const ADMIN_TASK_DETAIL_QUERY_ROOT = [...ADMIN_MONITOR_QUERY_KEY, 'detail'] as const
 
 type NestedQueryOptions<TQueryFnData> = {
   query?: {
@@ -258,7 +259,7 @@ export function useAdminTaskListResource(
     ApiResponseAdminTaskListData
   >({
     ...(options?.query ?? {}),
-    queryKey: [ADMIN_TASK_LIST_QUERY_KEY, params] as const,
+    queryKey: computed(() => [...ADMIN_TASK_LIST_QUERY_KEY, toValue(params)]),
     queryFn: () => Promise.reject(taskListUnavailable()),
     select: selectAdminTaskList,
   })
@@ -269,7 +270,7 @@ export function getAdminTaskListQueryKey() {
 }
 
 export function getAdminTaskDetailQueryKey(taskID: string) {
-  return ['admin', 'tasks', taskID] as const
+  return [...ADMIN_TASK_DETAIL_QUERY_ROOT, taskID] as const
 }
 
 export async function getAdminTaskList(
@@ -314,7 +315,7 @@ export function useAdminTaskDetailResource(
     ApiResponseAdminTaskData
   >({
     ...(options?.query ?? {}),
-    queryKey: [ADMIN_MONITOR_QUERY_KEY, 'detail', taskID] as const,
+    queryKey: computed(() => getAdminTaskDetailQueryKey(toValue(taskID))),
     queryFn: () => Promise.reject(adminControlUnavailable('task-detail')),
     select: selectAdminTaskDetail,
   })

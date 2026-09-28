@@ -119,6 +119,7 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useCanvasImageLightbox } from './useCanvasImageLightbox'
 import { provideCanvasHandleProximityCoordinator } from '../../infrastructure/vue-flow-adapter/useCanvasHandleProximity.ts'
+import { provideCanvasNodeUiStateContext } from '../../infrastructure/vue-flow-adapter/useCanvasNodeUiStateContext.ts'
 import { provideCanvasViewportContext } from '../../infrastructure/vue-flow-adapter/useCanvasViewportContext.ts'
 import { CanvasGroupPresentation } from '../nodes/groups'
 import {
@@ -308,6 +309,9 @@ const {
   onMiniMapDragEnd,
 } = commands.viewportControls
 provideCanvasViewportContext({ zoomLevel })
+provideCanvasNodeUiStateContext({
+  getFlowNodeUiState: (...args) => commands.graphEditing.getFlowNodeUiStateCached(...args),
+})
 watch(zoomLevel, handleProximitySurface.requestRefresh, { flush: 'post' })
 
 const imageTools = {

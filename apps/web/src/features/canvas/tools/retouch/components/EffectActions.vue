@@ -15,6 +15,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Component } from 'vue'
 import { Brightness, ColorFilter, PrecisionTool, ReportsSolid, SineWave } from '@iconoir/vue'
@@ -31,17 +32,19 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const actionItems: Array<{
-  kind: ImageRetouchKind
-  label: string
-  icon: Component
-}> = [
+const actionItems = computed<
+  Array<{
+    kind: ImageRetouchKind
+    label: string
+    icon: Component
+  }>
+>(() => [
   { kind: 'threshold', label: t('canvas.retouch.effects.threshold'), icon: Brightness },
   { kind: 'hsl', label: t('canvas.retouch.effects.hsl'), icon: ColorFilter },
   { kind: 'sharpen', label: t('canvas.retouch.effects.sharpen'), icon: PrecisionTool },
   { kind: 'curves', label: t('canvas.retouch.effects.curves'), icon: SineWave },
   { kind: 'levels', label: t('canvas.retouch.effects.levels'), icon: ReportsSolid },
-]
+])
 </script>
 
 <style scoped>

@@ -39,7 +39,10 @@ export function useOutboundPolicy(options: {
       hydrate(savedSetting)
       writeOutboundPolicyQueryCache(queryClient, savedSetting)
       await queryClient.invalidateQueries({ queryKey: outboundPolicyQueryKey })
-      if (resource.query.data.value) hydrate(resource.query.data.value)
+      // The refetch can resolve from a lagging read replica. Keep the
+      // mutation response as the source of truth until a later explicit load.
+      writeOutboundPolicyQueryCache(queryClient, savedSetting)
+      hydrate(savedSetting)
     },
   })
   const saving = computed(() => saveMutation.isPending.value)

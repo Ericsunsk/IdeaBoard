@@ -29,6 +29,7 @@ function mountDetail(load: (runId: number, signal: AbortSignal) => Promise<TestR
   app.mount(host)
   return {
     detail,
+    queryClient,
     cleanup() {
       app.unmount()
       queryClient.clear()
@@ -86,6 +87,28 @@ describe('useCreditRunDetail', () => {
     expect(detail.loading.value).toBe(false)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(load).toHaveBeenCalledTimes(1)
+    cleanup()
+  })
+
+  it('keeps sibling run caches when the detail closes', async () => {
+    const load = vi.fn(async (runId: number) => ({ id: runId, status: 'completed' }))
+    const { detail, queryClient, cleanup } = mountDetail(load)
+
+    await detail.open(21)
+    await flushQuery()
+    await detail.open(22)
+    await flushQuery()
+    expect(load).toHaveBeenCalledTimes(2)
+
+    detail.close()
+    await flushQuery()
+
+    const remaining = queryClient.getQueriesData({
+      queryKey: ['admin', 'credits', 'run-detail'],
+    })
+    const keys = remaining.map(([key]) => key as unknown[])
+    expect(keys.some((key) => key[key.length - 1] === 21)).toBe(true)
+    expect(keys.some((key) => key[key.length - 1] === 22)).toBe(false)
     cleanup()
   })
 })

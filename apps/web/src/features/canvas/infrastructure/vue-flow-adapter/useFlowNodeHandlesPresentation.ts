@@ -1,4 +1,4 @@
-import { computed, type CSSProperties } from 'vue'
+import { computed, type CSSProperties, type MaybeRefOrGetter } from 'vue'
 import { Position } from '@vue-flow/core'
 import { i18n } from '../../../../shared/i18n'
 import {
@@ -39,7 +39,7 @@ type FlowNodeHandlesPresentation = {
 }
 
 type UseFlowNodeHandlesPresentationOptions = {
-  nodeId: () => string
+  nodeId: MaybeRefOrGetter<string>
   kind: () => CanvasConnectionNodeType
   showHandles: () => boolean
   disabled: () => boolean
@@ -125,7 +125,7 @@ function useHandleDirectionPresentation(
     policy.getPorts(options.kind()).map((port) => `${policy.portPrefix}:${port}`),
   )
   const proximity = useCanvasHandleProximity({
-    nodeId: options.nodeId(),
+    nodeId: options.nodeId,
     direction,
     enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
   })

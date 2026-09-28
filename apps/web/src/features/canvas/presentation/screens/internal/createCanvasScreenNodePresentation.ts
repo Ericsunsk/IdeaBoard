@@ -86,13 +86,17 @@ export function createCanvasScreenNodePresentation(options: {
     const outpaint = viewModel.imageWorkflow.outpaint
     const isOutpaintModeActive = outpaint.nodeId.value === node.id
 
+    // uiState is intentionally NOT resolved here: reading the shared ui-state
+    // cache in the parent render effect would subscribe EVERY node slot to a
+    // single computed covering all nodes/edges, so one node's change
+    // re-renders all subtrees. Each FlowCanvasNode resolves its own uiState
+    // from the injected canvas node-ui-state context instead.
     return {
       nodeId: node.id,
       data: node.data,
       selected: node.selected,
       dragging: node.dragging,
       copyMode: options.duplicateModifierPressed.value,
-      uiState: commands.graphEditing.getFlowNodeUiStateCached(node.id),
       imagePresentation: imagePresentationFor(node.id),
       fusionPresentation: fusionPresentationFor(node.id),
       generationAvailable: isGenerationAvailable.value,

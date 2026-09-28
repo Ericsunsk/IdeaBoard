@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, ref } from 'vue'
+import { createApp, defineComponent, effectScope, nextTick, ref } from 'vue'
 import {
   isUsableTextureImage,
   resolveDomTextureImage,
@@ -81,6 +81,39 @@ describe('useZeroCopyRetouchStage', () => {
     rendererMocks.instances.length = 0
     vi.useFakeTimers()
   })
+
+  function mountStageComponent(domImage: HTMLImageElement | null) {
+    const isAdjustMode = ref(true)
+    const layers = ref([
+      {
+        id: 'hsl:1',
+        type: 'effect',
+        kind: 'hsl',
+        name: 'HSL',
+        visible: true,
+        params: { hue: 10, saturation: 20, lightness: 5 },
+      },
+    ] as never[])
+    let handle: ReturnType<typeof useZeroCopyRetouchStage> | undefined
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const app = createApp(
+      defineComponent({
+        setup() {
+          handle = useZeroCopyRetouchStage({
+            isAdjustMode,
+            layers: layers as never,
+            resolveDomImage: () => domImage,
+          })
+          handle.setCanvasRef(document.createElement('canvas'))
+          return () => null
+        },
+      }),
+    )
+    app.mount(host)
+    if (!handle) throw new Error('stage was not created')
+    return { app, host, handle, isAdjustMode, layers }
+  }
 
   function mountStage(domImage: HTMLImageElement | null) {
     const scope = effectScope()
@@ -239,5 +272,54 @@ describe('useZeroCopyRetouchStage', () => {
     expect(rendererMocks.latest().render).toHaveBeenCalled()
     expect(firstRenderer.render).not.toHaveBeenCalled()
     scope.stop()
+  })
+
+  it('cancels a queued draw on unmount so the callback never runs against the disposed renderer', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout')
+    const cancelRafSpy =
+      typeof globalThis.cancelAnimationFrame === 'function'
+        ? vi.spyOn(globalThis, 'cancelAnimationFrame')
+        : null
+    try {
+      const { app, host, layers } = mountStageComponent(readyImage())
+      await nextTick()
+      vi.advanceTimersByTime(32)
+      await Promise.resolve()
+      const renderer = rendererMocks.latest()
+      expect(renderer.dispose).not.toHaveBeenCalled()
+      renderer.render.mockClear()
+      renderer.updateUniforms.mockClear()
+      clearTimeoutSpy.mockClear()
+      cancelRafSpy?.mockClear()
+
+      // Queue a draw via a layer change, then unmount before it fires.
+      layers.value = [
+        {
+          id: 'hsl:1',
+          type: 'effect',
+          kind: 'hsl',
+          name: 'HSL',
+          visible: true,
+          params: { hue: 90, saturation: 20, lightness: 5 },
+        },
+      ] as never[]
+      await nextTick()
+
+      app.unmount()
+      host.remove()
+
+      expect(renderer.dispose).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(64)
+      await Promise.resolve()
+
+      expect(renderer.render).not.toHaveBeenCalled()
+      expect(renderer.updateUniforms).not.toHaveBeenCalled()
+      const cancelled =
+        clearTimeoutSpy.mock.calls.length + (cancelRafSpy?.mock.calls.length ?? 0)
+      expect(cancelled).toBeGreaterThan(0)
+    } finally {
+      clearTimeoutSpy.mockRestore()
+      cancelRafSpy?.mockRestore()
+    }
   })
 })

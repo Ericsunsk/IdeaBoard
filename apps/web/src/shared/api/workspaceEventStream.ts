@@ -299,6 +299,11 @@ function openTransport(entry: WorkspaceStreamEntry): void {
   })
   source.onerror = () => {
     for (const listener of entry.errorListeners) listener()
+    // An error on a listener-less entry must not resurrect it: a failed
+    // transport abandoned by its last consumer would otherwise schedule
+    // reconnects forever with nobody reading the stream (zombie SSE).
+    closeWhenIdle(entry)
+    if (entry.closed) return
     scheduleReconnect(entry)
   }
 }
@@ -320,6 +325,7 @@ export function subscribeWorkspaceEvent(
   const types = normalizeWorkspaceEventTypesFilter(options?.types)
   const key = streamKey(workspace, types)
   let entry = streams.get(key)
+  let isNewEntry = false
   if (!entry || entry.closed) {
     entry = {
       workspaceId: workspace,
@@ -335,12 +341,16 @@ export function subscribeWorkspaceEvent(
     }
     if (entry.lastEventId.length > 0) assertEvtId(entry.lastEventId, 'cursor')
     streams.set(key, entry)
-    openTransport(entry)
+    isNewEntry = true
   }
   const active = entry
   active.listeners.add(listener)
   if (options?.onGap) active.gapListeners.add(options.onGap)
   if (options?.onError) active.errorListeners.add(options.onError)
+  // The first listener registers before the first transport opens so a
+  // synchronously failing connect can never leave a listener-less entry
+  // behind (which `onerror` would then close instead of reconnecting).
+  if (isNewEntry) openTransport(active)
 
   return () => {
     active.listeners.delete(listener)

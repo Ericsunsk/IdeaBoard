@@ -36,7 +36,7 @@
       <div class="flex items-start" :class="isExpanded ? 'gap-3' : 'gap-2'">
         <div
           v-for="(column, colIndex) in columnBuckets"
-          :key="colIndex"
+          :key="column[0]?.id ?? colIndex"
           class="flex-1 flex flex-col min-w-0"
           :class="isExpanded ? 'gap-3' : 'gap-2'"
         >

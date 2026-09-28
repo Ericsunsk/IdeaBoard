@@ -5,10 +5,12 @@ import {
   onScopeDispose,
   provide,
   ref,
+  toValue,
   unref,
   watch,
   type InjectionKey,
   type MaybeRef,
+  type MaybeRefOrGetter,
 } from 'vue'
 import {
   createCanvasHandleProximityCoordinator,
@@ -19,7 +21,7 @@ import {
 } from './canvasHandleProximityCoordinator'
 
 type UseCanvasHandleProximityOptions = {
-  nodeId: string
+  nodeId: MaybeRefOrGetter<string>
   direction: CanvasHandleProximityDirection
   enabled: MaybeRef<boolean>
 }
@@ -136,9 +138,12 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
   const point = ref<CanvasHandleProximityPoint>({ x: 0, y: 0 })
   let unregister: (() => void) | null = null
 
-  onMounted(() => {
+  function registerCurrentNode() {
+    unregister?.()
+    unregister = null
+    const nodeId = toValue(options.nodeId)
     unregister = coordinator.register({
-      nodeId: options.nodeId,
+      nodeId,
       direction: options.direction,
       isEnabled: () => unref(options.enabled),
       onStateChange: (state) => {
@@ -146,7 +151,24 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
         point.value = state.point
       },
     })
+  }
+
+  onMounted(() => {
+    registerCurrentNode()
   })
+
+  watch(
+    () => toValue(options.nodeId),
+    (nodeId, previousNodeId) => {
+      if (nodeId === previousNodeId) return
+      // Vue Flow may reuse a rail instance for a different node id; the
+      // proximity registration captures the id once, so re-register to keep
+      // geometry resolution pointed at the current node.
+      if (!unregister) return
+      registerCurrentNode()
+      surface.requestRefresh()
+    },
+  )
 
   watch(
     () => unref(options.enabled),

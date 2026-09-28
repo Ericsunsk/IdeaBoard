@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { mockAppToast } from '../../../test/toast'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
 import { createLibraryFolderFacts } from './folderFacts'
 import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from '../domain/validators'
 
 const WORKSPACE_ID = 'ws_test123'
+const WORKSPACE_A_ID = 'ws_test0001'
+const WORKSPACE_B_ID = 'ws_test0002'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string> },
@@ -83,10 +86,18 @@ function asset(overrides: Partial<WorkspaceLibraryAsset> = {}): WorkspaceLibrary
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((nextResolve) => {
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve
+    reject = nextReject
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
+}
+
+type AssetPage = {
+  items: Array<{ id: string }>
+  nextCursor: string
+  hasMore: boolean
 }
 
 describe('useLibraryWorkspace', () => {
@@ -124,6 +135,78 @@ describe('useLibraryWorkspace', () => {
 
     expect(workspace.selectedFolder.value).toBe('lfolder_folder0002')
     expect(workspace.assets.value).toEqual([{ id: 'lasset_asset0002' }])
+  })
+
+  it('discards a late workspace A response after switching to workspace B with no reload', async () => {
+    const pageA = deferred<AssetPage>()
+    mocks.listAssets.mockReturnValue(pageA.promise)
+    const activeWorkspace = ref<string | null>(WORKSPACE_A_ID)
+    const workspace = useLibraryWorkspace({
+      workspaceId: activeWorkspace,
+      syncRoute: false,
+      autoLoad: false,
+    })
+
+    const pending = workspace.loadAssets(true)
+    await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledOnce())
+    expect(mocks.listAssets.mock.calls[0]?.[0]).toBe(WORKSPACE_A_ID)
+
+    // Island closed: the workspace switches with no reload/invalidation,
+    // so the request id and folder guards still match the late response.
+    activeWorkspace.value = WORKSPACE_B_ID
+
+    pageA.resolve({ items: [{ id: 'lasset_asset0001' }], nextCursor: '', hasMore: false })
+    await pending
+
+    expect(workspace.assets.value).toEqual([])
+    expect(workspace.loading.value).toBe(false)
+  })
+
+  it('discards a late workspace A failure after switching to workspace B', async () => {
+    const pageA = deferred<AssetPage>()
+    mocks.listAssets.mockReturnValue(pageA.promise)
+    const activeWorkspace = ref<string | null>(WORKSPACE_A_ID)
+    const workspace = useLibraryWorkspace({
+      workspaceId: activeWorkspace,
+      syncRoute: false,
+      autoLoad: false,
+    })
+
+    const pending = workspace.loadAssets(true)
+    await vi.waitFor(() => expect(mocks.listAssets).toHaveBeenCalledOnce())
+
+    activeWorkspace.value = WORKSPACE_B_ID
+
+    pageA.reject(new Error('workspace A exploded'))
+    await pending
+
+    expect(workspace.errorMessage.value).toBe('')
+    expect(workspace.assets.value).toEqual([])
+  })
+
+  it('keeps all server-paginated assets available to load-more', async () => {
+    const firstHalf = Array.from({ length: 300 }, (_, index) => ({
+      id: `lasset_asset${String(index).padStart(4, '0')}`,
+    }))
+    const secondHalf = Array.from({ length: 300 }, (_, index) => ({
+      id: `lasset_asset${String(index + 300).padStart(4, '0')}`,
+    }))
+    mocks.listAssets
+      .mockResolvedValueOnce({ items: firstHalf, nextCursor: 'cursor-1', hasMore: true })
+      .mockResolvedValueOnce({ items: secondHalf, nextCursor: '', hasMore: false })
+    const workspace = useLibraryWorkspace({
+      workspaceId: WORKSPACE_ID,
+      syncRoute: false,
+      autoLoad: false,
+    })
+
+    await workspace.loadAssets(true)
+    expect(workspace.assets.value).toHaveLength(300)
+    expect(workspace.hasMore.value).toBe(true)
+
+    await workspace.loadAssets(false)
+    expect(workspace.assets.value).toHaveLength(600)
+    expect(workspace.hasMore.value).toBe(false)
   })
 
   it('publishes Folder create, rename, and delete through one shared snapshot', async () => {

@@ -81,6 +81,8 @@ export function useZeroCopyRetouchStage(
   let renderer: WebGLRetouchRenderer | null = null
   let boundCanvas: HTMLCanvasElement | null = null
   let drawQueued = false
+  let drawHandle: number | ReturnType<typeof setTimeout> | null = null
+  let drawHandleIsRaf = false
   let lastHistogramAt = 0
   let restoredListener: (() => void) | null = null
   // Set when bind found no usable DOM image yet (e.g. entering Retouch
@@ -109,7 +111,28 @@ export function useZeroCopyRetouchStage(
     canvasRef.value = element instanceof HTMLCanvasElement ? element : null
   }
 
+  function cancelScheduledDraw(): void {
+    if (drawHandle === null) {
+      drawQueued = false
+      return
+    }
+    const handle = drawHandle
+    const isRaf = drawHandleIsRaf
+    drawHandle = null
+    drawQueued = false
+    try {
+      if (isRaf && typeof globalThis.cancelAnimationFrame === 'function') {
+        globalThis.cancelAnimationFrame(handle as number)
+      } else if (!isRaf && typeof globalThis.clearTimeout === 'function') {
+        globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>)
+      }
+    } catch {
+      // Ignore cancellation errors during teardown.
+    }
+  }
+
   function disposeRenderer(): void {
+    cancelScheduledDraw()
     const canvas = boundCanvas
     boundCanvas = null
     if (canvas && restoredListener)
@@ -118,18 +141,14 @@ export function useZeroCopyRetouchStage(
     renderer?.dispose()
     renderer = null
     textureReady.value = false
-    drawQueued = false
     sourcePending = false
   }
 
   function scheduleDraw(): void {
     if (drawQueued || !renderer || renderer.isContextLost()) return
     drawQueued = true
-    const schedule =
-      typeof requestAnimationFrame === 'function'
-        ? requestAnimationFrame
-        : (callback: () => void) => globalThis.setTimeout(callback, 16)
-    schedule(() => {
+    const onDraw = () => {
+      drawHandle = null
       drawQueued = false
       if (!renderer || renderer.isContextLost()) return
       try {
@@ -141,7 +160,17 @@ export function useZeroCopyRetouchStage(
       } catch {
         contextFailed.value = true
       }
-    })
+    }
+    if (
+      typeof globalThis.requestAnimationFrame === 'function' &&
+      typeof globalThis.cancelAnimationFrame === 'function'
+    ) {
+      drawHandleIsRaf = true
+      drawHandle = globalThis.requestAnimationFrame(onDraw)
+      return
+    }
+    drawHandleIsRaf = false
+    drawHandle = globalThis.setTimeout(onDraw, 16)
   }
 
   const effectLayers = computed(() => flattenVisibleRetouchEffectLayers(options.layers.value))
@@ -248,7 +277,7 @@ export function useZeroCopyRetouchStage(
   watch([canvasRef, () => options.isAdjustMode.value], () => {
     if (!options.isAdjustMode.value) {
       textureReady.value = false
-      drawQueued = false
+      cancelScheduledDraw()
       return
     }
     ensureRenderer()

@@ -111,18 +111,39 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const curveChannels: Array<{ id: RetouchCurveChannel; label: string }> = [
+const curveChannels = computed<Array<{ id: RetouchCurveChannel; label: string }>>(() => [
   { id: 'rgb', label: 'RGB' },
   { id: 'red', label: t('canvas.retouch.channels.red') },
   { id: 'green', label: t('canvas.retouch.channels.green') },
   { id: 'blue', label: t('canvas.retouch.channels.blue') },
-]
+])
+
+const CURVE_PRESET_LABEL_KEYS: Record<string, string> = {
+  linear: 'canvas.retouch.curvesPresets.linear',
+  brighten: 'canvas.retouch.curvesPresets.brighten',
+  darken: 'canvas.retouch.curvesPresets.darken',
+  'soft-contrast': 'canvas.retouch.curvesPresets.softContrast',
+  'strong-contrast': 'canvas.retouch.curvesPresets.strongContrast',
+  matte: 'canvas.retouch.curvesPresets.matte',
+}
+
+// Preset labels in `RETOUCH_CURVE_PRESETS` are baked at module load via the
+// i18n singleton, so re-translate here to stay reactive across runtime locale
+// switches (see `setUserLocale`).
+const curvePresets = computed(() =>
+  RETOUCH_CURVE_PRESETS.map((preset) => ({
+    ...preset,
+    label:
+      preset.id in CURVE_PRESET_LABEL_KEYS
+        ? t(CURVE_PRESET_LABEL_KEYS[preset.id] as string)
+        : preset.label,
+  })),
+)
 
 const activeChannel = ref<RetouchCurveChannel>('rgb')
 const selectedPointId = ref<string>(RETOUCH_CURVE_ENDPOINT_BLACK_ID)
 const focusRequest = ref(0)
 let pointIdSeed = 0
-const curvePresets = RETOUCH_CURVE_PRESETS
 
 const normalizedParams = computed(() => normalizeCurvesParams(props.params))
 const activePoints = computed(() => getChannelPoints(activeChannel.value))

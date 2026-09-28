@@ -41,6 +41,9 @@ function flushPromises() {
 function makeDeps(states: Record<string, BoardState | null>): BoardPreviewRefreshQueueDependencies {
   return {
     getBoardState: vi.fn((boardId: string) => states[boardId] ?? null),
+    getBoardStates: vi.fn((boardIds: readonly string[]) =>
+      Object.fromEntries(boardIds.map((boardId) => [boardId, states[boardId] ?? null])),
+    ),
     setPreviewSnapshot: vi.fn(
       (
         boardId: string,
@@ -322,5 +325,32 @@ describe('boardPreviewRefreshQueue', () => {
       'boardA',
       error,
     )
+  })
+
+  it('bulk-reads board states once per round instead of once per board', async () => {
+    const states = {
+      boardA: makeState({ updatedAt: 100 }),
+      boardB: makeState({ updatedAt: 100 }),
+      boardC: makeState({ updatedAt: 100 }),
+    }
+    const deps = makeDeps(states)
+    const queue = createBoardPreviewRefreshQueue(deps)
+    const boards = [makeBoard('boardA'), makeBoard('boardB'), makeBoard('boardC')]
+
+    queue.reloadFromLocal(boards)
+    expect(deps.getBoardStates).toHaveBeenCalledTimes(1)
+    expect(deps.getBoardStates).toHaveBeenCalledWith(['boardA', 'boardB', 'boardC'])
+    expect(vi.mocked(deps.getBoardState)).not.toHaveBeenCalled()
+
+    vi.mocked(deps.getBoardStates).mockClear()
+    vi.mocked(deps.getBoardState).mockClear()
+    queue.schedule(boards)
+    // One bulk read serves the whole scheduling round; the per-board
+    // background refreshes that follow re-read only the stale boards they
+    // actually render, never the full catalog per board.
+    expect(deps.getBoardStates).toHaveBeenCalledTimes(1)
+    expect(deps.getBoardStates).toHaveBeenCalledWith(['boardA', 'boardB', 'boardC'])
+    await flushPromises()
+    expect(queue.previewMap.value.boardA).toBe('data:image/png;base64,preview')
   })
 })

@@ -251,6 +251,28 @@ describe('workspace event subscriptions', () => {
     stop()
   })
 
+  it('does not reconnect after the last listener unsubscribed', () => {
+    stubEventSource()
+    vi.useFakeTimers()
+    const stop = subscribeWorkspaceEvent(WORKSPACE_ID, () => undefined)
+    expect(MockEventSource.instances).toHaveLength(1)
+    MockEventSource.instances[0]?.fail()
+    stop()
+    vi.advanceTimersByTime(30_000)
+    expect(MockEventSource.instances).toHaveLength(1)
+  })
+
+  it('does not resurrect a listener-less entry on transport error', () => {
+    stubEventSource()
+    vi.useFakeTimers()
+    const stop = subscribeWorkspaceEvent(WORKSPACE_ID, () => undefined)
+    expect(MockEventSource.instances).toHaveLength(1)
+    stop()
+    MockEventSource.instances[0]?.fail()
+    vi.advanceTimersByTime(30_000)
+    expect(MockEventSource.instances).toHaveLength(1)
+  })
+
   it('surfaces gap notices so clients refetch state', () => {
     stubEventSource()
     const gaps: { lastEventId: string }[] = []

@@ -24,8 +24,8 @@ vi.mock('@tanstack/vue-query', () => ({
 vi.mock('../infrastructure/resource', () => ({
   cancelAdminTaskByID: mocks.cancelAdminTaskByID,
   getAdminMonitorQueryKey: () => ['admin', 'monitor'],
-  getAdminTaskDetailQueryKey: (taskID: string) => ['admin', 'tasks', taskID],
-  getAdminTaskListQueryKey: () => ['admin', 'tasks'],
+  getAdminTaskDetailQueryKey: (taskID: string) => ['admin', 'monitor', 'detail', taskID],
+  getAdminTaskListQueryKey: () => ['admin', 'tasks', 'list'],
 }))
 
 describe('useAdminTaskCancel', () => {
@@ -57,10 +57,10 @@ describe('useAdminTaskCancel', () => {
 
     expect(mocks.cancelAdminTaskByID).toHaveBeenCalledWith(runningTask.task_id)
     expect(feedback.taskCancelled).toHaveBeenCalledOnce()
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'tasks'] })
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'tasks', 'list'] })
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'monitor'] })
     expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['admin', 'tasks', runningTask.task_id],
+      queryKey: ['admin', 'monitor', 'detail', runningTask.task_id],
     })
   })
 

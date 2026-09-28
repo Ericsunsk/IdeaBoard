@@ -49,8 +49,8 @@
     "passwordLengthFieldError",
     "provideAuthOverlay",
     "requiredFieldError",
-    "useAuthForm",
     "useAuthFeedback",
+    "useAuthForm",
     "useAuthOverlay",
     "useAuthSession",
     "useUserStore"
@@ -173,6 +173,7 @@
     "formatCatalogDate",
     "getBoardById",
     "getBoardState",
+    "getBoardStates",
     "getCanvasNodeImageInputLimit",
     "getCanvasNodePortInputLimit",
     "getCanvasNodePrimaryOutputPort",
