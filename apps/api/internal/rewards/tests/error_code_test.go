@@ -47,7 +47,7 @@ func TestRewardFailuresRenderMachineCodes(t *testing.T) {
 			stub: rewardHandlerServiceStub{create: func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error) {
 				return CreatedRewardCode{}, ErrRewardCodeConflict
 			}},
-			wantStatus: http.StatusConflict, wantCode: "reward_code_idempotency_conflict", wantMsg: "幂等请求与原创建参数不一致",
+			wantStatus: http.StatusConflict, wantCode: "reward_code_idempotency_conflict", wantMsg: "幂等请求与原请求不一致",
 		},
 		{
 			name:   "create Code collision",
@@ -265,7 +265,7 @@ func TestRewardRedeemThrottleRendersMachineCode(t *testing.T) {
 		}
 	}
 	limited := performRawRewardRedeem(t, router, `{"code":"MACHINE01"}`)
-	assertRewardMachineError(t, limited, http.StatusTooManyRequests, "reward_rate_limited", "操作频繁，请稍后重试")
+	assertRewardMachineError(t, limited, http.StatusTooManyRequests, "reward_rate_limited", "操作过于频繁，请稍后重试")
 }
 
 func assertRewardMachineError(t *testing.T, recorder *httptest.ResponseRecorder, wantStatus int, wantCode, wantMsg string) {

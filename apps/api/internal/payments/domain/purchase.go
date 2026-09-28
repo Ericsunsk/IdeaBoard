@@ -19,13 +19,13 @@ const (
 var QuickPurchaseIdeaQuantities = [...]int64{1_000, 2_000, 3_000, 5_000, 10_000}
 
 var (
-	ErrInvalidIdeaQuantity         = errors.New("充值 Idea 数量必须在 500 到 500,000 之间")
-	ErrTermsAcceptanceRequired     = errors.New("请先同意服务条款与退款政策")
-	ErrCheckoutIdempotencyKey      = errors.New("充值请求标识无效")
-	ErrCheckoutIdempotencyConflict = errors.New("充值请求与原请求不一致")
-	ErrCheckoutRequestRejected     = errors.New("stripe 拒绝创建支付页面")
-	ErrPurchasesUnavailable        = errors.New("充值服务暂不可用")
-	ErrWalletNotRechargeable       = errors.New("当前账户暂不可充值")
+	ErrInvalidIdeaQuantity         = errors.New(msgInvalidIdeaQuantity)
+	ErrTermsAcceptanceRequired     = errors.New(msgTermsAcceptanceRequired)
+	ErrCheckoutIdempotencyKey      = errors.New(msgCheckoutIdempotencyKey)
+	ErrCheckoutIdempotencyConflict = errors.New(msgCheckoutIdempotencyConflict)
+	ErrCheckoutRequestRejected     = errors.New(msgCheckoutRequestRejected)
+	ErrPurchasesUnavailable        = errors.New(msgPurchasesUnavailable)
+	ErrWalletNotRechargeable       = errors.New(msgWalletNotRechargeable)
 )
 
 type PurchaseQuote struct {

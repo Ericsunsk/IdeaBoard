@@ -108,7 +108,7 @@ func (s *Service) updatePurchaseAvailability(ctx context.Context, command paymen
 		return paymentcontracts.StripeConfigurationSummary{}, false, nil
 	}
 	metadata := SafeAuditMetadata(map[string]any{"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode, "payment_method_configuration_id": current.PaymentMethodConfigurationID, "purchases_enabled": command.PurchasesEnabled})
-	stored, shutdown, err := s.replace(ctx, current.Revision, StoredStripeConfiguration{CredentialID: current.CredentialID, AccountID: current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled, PaymentMethodConfigurationID: current.PaymentMethodConfigurationID, ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled, StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID, APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext, SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID}, Audit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
+	stored, shutdown, err := s.replace(ctx, current.Revision, StoredStripeConfiguration{CredentialID: current.CredentialID, AccountID: current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled, PaymentMethodConfigurationID: current.PaymentMethodConfigurationID, ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled, StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID, APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext, SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID}, Audit{ActorID: command.ActorID, Outcome: AuditOutcomeSucceeded, Metadata: metadata})
 	if err != nil {
 		return paymentcontracts.StripeConfigurationSummary{}, true, fmt.Errorf("update Stripe purchase availability: %w", err)
 	}
@@ -137,11 +137,11 @@ func (s *Service) resolveSecrets(ctx context.Context, command paymentcontracts.C
 		var err error
 		input.currentAPIKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe API Key 无法读取", nil, paymentcontracts.ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", msgResolveSecrets, nil, paymentcontracts.ErrStripeConfigurationInvalid)
 		}
 		input.currentWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
 		if err != nil {
-			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe Webhook Secret 无法读取", nil, paymentcontracts.ErrStripeConfigurationInvalid)
+			return stripeConfigurationInput{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", msgResolveSecrets2, nil, paymentcontracts.ErrStripeConfigurationInvalid)
 		}
 	}
 	input.apiKey = strings.TrimSpace(command.APIKey)
@@ -182,7 +182,7 @@ func (s *Service) persist(ctx context.Context, command paymentcontracts.Configur
 	if hasCurrent {
 		expectedRevision = current.Revision
 	}
-	stored, shutdown, err := s.replace(ctx, expectedRevision, StoredStripeConfiguration{CredentialID: credentialID, AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled, PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID, ProductTaxCode: input.taxCode, PurchasesEnabled: command.PurchasesEnabled, StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID, APIKeyCiphertext: encryptedAPIKey, WebhookSecretCiphertext: encryptedWebhookSecret, SecretMaterialKind: secrets.MaterialKindEncrypted, UpdatedBy: command.ActorID}, Audit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
+	stored, shutdown, err := s.replace(ctx, expectedRevision, StoredStripeConfiguration{CredentialID: credentialID, AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled, PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID, ProductTaxCode: input.taxCode, PurchasesEnabled: command.PurchasesEnabled, StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID, APIKeyCiphertext: encryptedAPIKey, WebhookSecretCiphertext: encryptedWebhookSecret, SecretMaterialKind: secrets.MaterialKindEncrypted, UpdatedBy: command.ActorID}, Audit{ActorID: command.ActorID, Outcome: AuditOutcomeSucceeded, Metadata: metadata})
 	if err != nil {
 		return paymentcontracts.StripeConfigurationSummary{}, fmt.Errorf("publish Stripe configuration: %w", err)
 	}
@@ -196,11 +196,11 @@ func (s *Service) persistCredentialMaterial(ctx context.Context, command payment
 	}
 	apiKey, err := secrets.EncryptString(input.apiKey)
 	if err != nil {
-		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe API Key 加密失败", map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", msgPersistCredentialMaterial, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
 	}
 	webhook, err := secrets.EncryptString(prepared.WebhookSecret)
 	if err != nil {
-		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe Webhook Secret 加密失败", map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
+		return "", "", "", s.recordFailure(ctx, command.ActorID, "encryption_failed", msgPersistCredentialMaterial2, map[string]any{"mode": input.mode}, paymentcontracts.ErrStripeConfigurationInvalid)
 	}
 	return "", apiKey, webhook, nil
 }
@@ -224,7 +224,7 @@ func (s *Service) loadCurrent(ctx context.Context) (StoredStripeConfiguration, b
 	return stored, true, nil
 }
 func (s *Service) recordFailure(ctx context.Context, actorID int64, code, summary string, metadata map[string]any, publicErr error) error {
-	auditErr := s.store.RecordConfigurationAudit(ctx, Audit{ActorID: actorID, Outcome: "failed", ErrorCode: BoundedText(code, 64), ErrorSummary: BoundedText(summary, 500), Metadata: SafeAuditMetadata(metadata)})
+	auditErr := s.store.RecordConfigurationAudit(ctx, Audit{ActorID: actorID, Outcome: AuditOutcomeFailed, ErrorCode: BoundedText(code, 64), ErrorSummary: BoundedText(summary, 500), Metadata: SafeAuditMetadata(metadata)})
 	if auditErr != nil {
 		return errors.Join(publicErr, auditErr)
 	}

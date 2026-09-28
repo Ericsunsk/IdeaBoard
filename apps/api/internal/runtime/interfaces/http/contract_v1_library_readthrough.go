@@ -67,7 +67,7 @@ import (
 // surface; the code word is seam-stable, not durably persisted).
 const (
 	libraryMaterializationFailureCode    = "library_materialization_failed"
-	libraryMaterializationFailureMessage = "素材转存失败，请稍后重试"
+	libraryMaterializationFailureMessage = msgPackage
 )
 
 // libraryReadThroughTimeout bounds one detached async fetch (the

@@ -112,9 +112,13 @@ func (f *fakeBillingWallets) ListLedger(ctx context.Context, input domain.ListLe
 type fakeBillingRecords struct {
 	mu      sync.Mutex
 	records map[int64][]billingrecords.Record
+	err     error
 }
 
 func (f *fakeBillingRecords) List(ctx context.Context, input billingrecords.ListInput) (billingrecords.Page, error) {
+	if f.err != nil {
+		return billingrecords.Page{}, f.err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	all := f.records[input.UserID]
@@ -508,6 +512,71 @@ func TestV1BillingRecordsAndUsage(t *testing.T) {
 	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, invalid) != string(contract.CodeValidationFailed) {
 		t.Fatalf("bad range = %d %v, want 422 validation_failed", status, invalid)
 	}
+}
+
+// TestV1BillingUsageAndRecordsInvalidInput pins the invalid-input→4xx
+// mapping behind the openapi-breaking-approved label: sentinel
+// invalid-input failures render 4xx with stable codes while store-side
+// failures stay 503 service_unavailable.
+func TestV1BillingUsageAndRecordsInvalidInput(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("usage invalid user id is 400", func(t *testing.T) {
+		fx := newBillingTestFixture()
+		ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+		fx.usage.err = usage.ErrInvalidUserID
+		engine := fx.engine()
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: 11})
+		if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodeBadRequest) {
+			t.Fatalf("usage invalid user = %d %v, want 400 bad_request", status, payload)
+		}
+	})
+
+	t.Run("usage invalid range is 422", func(t *testing.T) {
+		fx := newBillingTestFixture()
+		ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+		fx.usage.err = fmt.Errorf("wrap: %w", usage.ErrInvalidRange)
+		engine := fx.engine()
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: 11})
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+			t.Fatalf("usage invalid range = %d %v, want 422 validation_failed", status, payload)
+		}
+	})
+
+	t.Run("usage store failure stays 503", func(t *testing.T) {
+		fx := newBillingTestFixture()
+		ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+		fx.usage.err = fmt.Errorf("wrap: %w", usage.ErrReadSettledCaptures)
+		engine := fx.engine()
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/usage", userID: 11})
+		if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
+			t.Fatalf("usage store failure = %d %v, want 503 service_unavailable", status, payload)
+		}
+	})
+
+	t.Run("billing records invalid input is 400", func(t *testing.T) {
+		for _, err := range []error{billingrecords.ErrInvalidListInput, billingrecords.ErrInvalidPageLimit} {
+			fx := newBillingTestFixture()
+			ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+			fx.records.err = err
+			engine := fx.engine()
+			status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-records", userID: 11})
+			if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodeBadRequest) {
+				t.Fatalf("billing-records %v = %d %v, want 400 bad_request", err, status, payload)
+			}
+		}
+	})
+
+	t.Run("billing records store failure stays 503", func(t *testing.T) {
+		fx := newBillingTestFixture()
+		ws := v1WorkspaceFixture(t, ctx, fx.store, "billing", 11)
+		fx.records.err = billingrecords.ErrRepositoryNotConfigured
+		engine := fx.engine()
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-records", userID: 11})
+		if status != http.StatusServiceUnavailable || v1ErrorCode(t, payload) != string(contract.CodeServiceUnavailable) {
+			t.Fatalf("billing-records store failure = %d %v, want 503 service_unavailable", status, payload)
+		}
+	})
 }
 
 // TestV1BillingQuoteToSettlementStub covers the quote-to-settlement happy

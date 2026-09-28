@@ -42,6 +42,7 @@ export default {
     deleteFailed: '删除画布失败',
   },
   boards: {
+    title: '欢迎来到 IdeaBoard！',
     subtitle: '探索、扩展并打磨你的创意',
     newCanvas: '新建画布',
     searchPlaceholder: '搜索画布…',

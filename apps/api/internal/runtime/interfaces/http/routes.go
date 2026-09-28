@@ -147,7 +147,7 @@ func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
 		defer cancel()
 		status := checker.CheckHealth(ctx)
 		if !status.Ready {
-			response.Error(c, http.StatusServiceUnavailable, "服务尚未就绪")
+			response.Error(c, http.StatusServiceUnavailable, msgReadyHandler)
 			return
 		}
 		response.SuccessDTO(c, readyResponse{Status: "ok", Ready: true, Component: status.Name})
@@ -157,12 +157,12 @@ func readyHandler(checker ports.HealthChecker) gin.HandlerFunc {
 func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if provider == nil {
-			response.InternalError(c, http.StatusInternalServerError, "系统设置服务未初始化", errors.New("branding settings provider is not initialized"))
+			response.InternalError(c, http.StatusInternalServerError, msgPublicBrandingSettingsHandler, errors.New("branding settings provider is not initialized"))
 			return
 		}
 		branding, err := provider.GetBranding(c.Request.Context())
 		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取系统设置失败", err)
+			response.InternalError(c, http.StatusInternalServerError, msgServiceUnavailable22, err)
 			return
 		}
 		response.SuccessDTO(c, branding)

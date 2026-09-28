@@ -67,7 +67,7 @@ func RespondIdentityAdminCommandError(c *gin.Context, err error) {
 
 func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
 	if h == nil || h.runtimeSettings == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, "系统设置服务未配置")
+		errorrender.Render(c, http.StatusServiceUnavailable, codeIdentityServiceUnavailable, msgIdentityServiceUnavailable)
 		return nil, false
 	}
 	return h.runtimeSettings, true
@@ -76,7 +76,7 @@ func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.Runtime
 func (h *AdminHandler) requireIdentityAdminCommands(c *gin.Context) (ports.IdentityAdminCommands, bool) {
 	if h == nil || h.identityCommands == nil {
 		slog.Error("identity admin commands not configured")
-		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, "身份管理命令未配置")
+		errorrender.Render(c, http.StatusInternalServerError, codeIdentityOperationFailed, msgIdentityOperationFailed)
 		return nil, false
 	}
 	return h.identityCommands, true
@@ -86,7 +86,7 @@ func (h *AdminHandler) respondRuntimeSettingsReadError(c *gin.Context, err error
 	if err == nil {
 		return false
 	}
-	response.InternalError(c, 500, "读取系统设置失败", err)
+	response.InternalError(c, 500, msgRespondRuntimeSettingsReadError, err)
 	return true
 }
 
@@ -95,10 +95,10 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 		return false
 	}
 	if validation.Is(err) {
-		writeIdentityRequestInvalid(c, identityValidationMessage(err, "参数错误"))
+		writeIdentityRequestInvalid(c, identityValidationMessage(err, msgRespondRuntimeSettingsWriteError))
 		return true
 	}
-	response.InternalError(c, 500, "保存设置失败", err)
+	response.InternalError(c, 500, msgRespondRuntimeSettingsWriteError2, err)
 	return true
 }
 
@@ -107,7 +107,7 @@ func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err erro
 func getTargetUserPublicIDParam(c *gin.Context) (string, bool) {
 	publicID, err := uuid.Parse(strings.TrimSpace(c.Param("public_id")))
 	if err != nil {
-		errorrender.Render(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, "无效的用户 public_id")
+		errorrender.Render(c, http.StatusBadRequest, codeIdentityUserPublicIDInvalid, msgIdentityUserPublicIDInvalid)
 		return "", false
 	}
 	return publicID.String(), true

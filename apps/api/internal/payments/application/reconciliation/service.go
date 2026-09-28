@@ -296,10 +296,10 @@ func (s *Service) convergeRefund(ctx context.Context, refund paymentsdomain.Paym
 	if err != nil {
 		return err
 	}
-	switch provider.Status {
-	case "succeeded":
+	switch paymentports.StripeRefundStatus(provider.Status) {
+	case paymentports.StripeRefundSucceeded:
 		_, err = s.convergence.MarkPaymentRefundSucceeded(ctx, updated.ID, now)
-	case "failed", "canceled":
+	case paymentports.StripeRefundFailed, paymentports.StripeRefundCanceled:
 		_, err = s.convergence.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", now)
 	}
 	return err

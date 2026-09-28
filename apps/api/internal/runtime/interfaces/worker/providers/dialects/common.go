@@ -37,7 +37,7 @@ func InjectCustomParams(encoded []byte, customParamsJSON, provider, model string
 		return true
 	})
 	if mergeErr != nil {
-		return nil, fmt.Errorf("注入自定义参数失败: %w", mergeErr)
+		return nil, fmt.Errorf(msgInjectCustomParams, mergeErr)
 	}
 	return encoded, nil
 }
@@ -47,13 +47,13 @@ func InjectCustomParams(encoded []byte, customParamsJSON, provider, model string
 // owns retryability.
 func CheckVendorError(parsed gjson.Result) error {
 	if errVal := parsed.Get("error.message"); errVal.Exists() && strings.TrimSpace(errVal.String()) != "" {
-		return fmt.Errorf("供应商返回错误: %s", errVal.String())
+		return fmt.Errorf(msgCheckVendorError, errVal.String())
 	}
 	if errVal := parsed.Get("error"); errVal.Exists() && errVal.Type == gjson.String && strings.TrimSpace(errVal.String()) != "" {
-		return fmt.Errorf("供应商返回错误: %s", errVal.String())
+		return fmt.Errorf(msgCheckVendorError, errVal.String())
 	}
 	if detailVal := parsed.Get("detail"); detailVal.Exists() && strings.TrimSpace(detailVal.String()) != "" {
-		return fmt.Errorf("供应商返回错误: %s", detailVal.String())
+		return fmt.Errorf(msgCheckVendorError, detailVal.String())
 	}
 	return nil
 }
@@ -175,9 +175,9 @@ func topLevelKeysError(parsed gjson.Result) error {
 		})
 	}
 	if len(topKeys) > 0 {
-		return fmt.Errorf("未能从供应商响应中提取图片，返回字段: [%s]", strings.Join(topKeys, ", "))
+		return fmt.Errorf(msgTopLevelKeysError, strings.Join(topKeys, ", "))
 	}
-	return fmt.Errorf("供应商未返回有效图片数据")
+	return fmt.Errorf(msgTopLevelKeysError2)
 }
 
 // universalResponsePaths is the legacy extraction order, shared by every
@@ -231,11 +231,11 @@ func collectChatParts(parts []gjson.Result, collect *candidateCollector) {
 // transparent failure. Stage order mirrors the legacy extractor exactly.
 func decodeWithPaths(body []byte) ([]string, error) {
 	if len(strings.TrimSpace(string(body))) == 0 {
-		return nil, fmt.Errorf("供应商返回空响应")
+		return nil, fmt.Errorf(msgDecodeWithPaths)
 	}
 	parsed := gjson.ParseBytes(body)
 	if !parsed.IsObject() && !parsed.IsArray() {
-		return nil, fmt.Errorf("供应商返回非标准响应内容 (格式: %s)", http.DetectContentType(body))
+		return nil, fmt.Errorf(msgDecodeWithPaths2, http.DetectContentType(body))
 	}
 	if err := CheckVendorError(parsed); err != nil {
 		return nil, err

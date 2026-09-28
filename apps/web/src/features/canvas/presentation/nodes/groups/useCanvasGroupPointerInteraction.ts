@@ -73,16 +73,33 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
       !!options.selectionGroupAction.value &&
       options.isEnabled.value,
   )
+  let lastActionButtonPosition: { x: number; y: number } | null = null
+  // Windows captured at bind time so cleanup removes listeners from the same
+  // instance even if the canvas host moved across documents mid-drag.
+  let groupDragWindow: Window | null = null
+  let groupResizeWindow: Window | null = null
 
-  const selectionGroupActionButtonPosition = computed(() =>
-    resolveCanvasSelectionGroupActionButtonPosition({
+  const selectionGroupActionButtonPosition = computed(() => {
+    const next = resolveCanvasSelectionGroupActionButtonPosition({
       action: options.selectionGroupAction.value,
       nodes: options.nodes.value,
       frames: options.groupFrames.value,
       viewport: options.viewport.value,
       gapPx: ACTION_BUTTON_SELECTION_GAP_PX,
-    }),
-  )
+    })
+    // Preserve identity across unrelated nodes mutations so downstream
+    // memoization is not defeated by a fresh-but-equal point object.
+    if (
+      next &&
+      lastActionButtonPosition &&
+      next.x === lastActionButtonPosition.x &&
+      next.y === lastActionButtonPosition.y
+    ) {
+      return lastActionButtonPosition
+    }
+    lastActionButtonPosition = next
+    return next
+  })
 
   function readOwnerWindow() {
     return options.canvasWrapRef.value?.ownerDocument.defaultView ?? window
@@ -150,33 +167,41 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
   }
 
   function bindGroupDragListeners() {
+    if (groupDragWindow) cleanupGroupDragListeners()
     const ownerWindow = readOwnerWindow()
+    groupDragWindow = ownerWindow
     ownerWindow.addEventListener('pointermove', onGroupDragPointerMove)
     ownerWindow.addEventListener('pointerup', onGroupDragPointerUp)
     ownerWindow.addEventListener('pointercancel', onGroupDragPointerCancel)
   }
 
   function cleanupGroupDragListeners() {
-    const ownerWindow = readOwnerWindow()
+    activeGroupDragPointerId = null
+    if (!groupDragWindow) return
+    const ownerWindow = groupDragWindow
+    groupDragWindow = null
     ownerWindow.removeEventListener('pointermove', onGroupDragPointerMove)
     ownerWindow.removeEventListener('pointerup', onGroupDragPointerUp)
     ownerWindow.removeEventListener('pointercancel', onGroupDragPointerCancel)
-    activeGroupDragPointerId = null
   }
 
   function bindGroupResizeListeners() {
+    if (groupResizeWindow) cleanupGroupResizeListeners()
     const ownerWindow = readOwnerWindow()
+    groupResizeWindow = ownerWindow
     ownerWindow.addEventListener('pointermove', onGroupResizePointerMove)
     ownerWindow.addEventListener('pointerup', onGroupResizePointerUp)
     ownerWindow.addEventListener('pointercancel', onGroupResizePointerCancel)
   }
 
   function cleanupGroupResizeListeners() {
-    const ownerWindow = readOwnerWindow()
+    activeGroupResizePointerId = null
+    if (!groupResizeWindow) return
+    const ownerWindow = groupResizeWindow
+    groupResizeWindow = null
     ownerWindow.removeEventListener('pointermove', onGroupResizePointerMove)
     ownerWindow.removeEventListener('pointerup', onGroupResizePointerUp)
     ownerWindow.removeEventListener('pointercancel', onGroupResizePointerCancel)
-    activeGroupResizePointerId = null
   }
 
   function onGroupDragPointerMove(event: PointerEvent) {

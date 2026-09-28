@@ -5,7 +5,7 @@ package httpapi
 // The guard is the single choke point every /api/control/v1 route flows
 // through: capability check (never IsAdmin) -> reason + Idempotency-Key
 // enforcement on mutations -> idempotent execution with response replay
-// -> handler -> mandatory audit record (success/read/denied/failed).
+// -> handler -> mandatory audit record (success/read/denied/failure).
 // Denied and failed calls are audited too.
 
 import (
@@ -26,6 +26,7 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/adminbranding"
+	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
@@ -242,7 +243,7 @@ func ControlRateLimitMiddleware(limiter *ControlRateLimiter) gin.HandlerFunc {
 		contract.SetRateLimit(c, limiter.max, remaining, reset)
 		if !allowed {
 			contract.SetRetryAfterSeconds(c, reset)
-			contract.RenderError(c, http.StatusTooManyRequests, contract.CodeRateLimited, "操作过于频繁，请稍后重试")
+			contract.RenderError(c, http.StatusTooManyRequests, contract.CodeRateLimited, msgRateLimited2)
 			c.Abort()
 			return
 		}
@@ -265,13 +266,13 @@ func controlOperatorMiddleware(sink ControlAuditSink) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		p, ok := principal.From(c)
 		if !ok {
-			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, msgUnauthorized)
 			c.Abort()
 			return
 		}
 		if !isControlOperator(p) {
 			emitControlAudit(c.Request.Context(), sink, deniedControlAudit(c, p, "", "operator.grant", "operator grant"))
-			contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "权限不足")
+			contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, msgForbidden)
 			c.Abort()
 			return
 		}
@@ -330,7 +331,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 	return func(c *gin.Context) {
 		p, ok := principal.From(c)
 		if !ok {
-			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, msgUnauthorized)
 			c.Abort()
 			return
 		}
@@ -342,14 +343,14 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 			OccurredAt: time.Now().UTC(),
 		}
 		record.OperatorType, record.OperatorID = controlOperatorIdentity(p)
-		fail := func(status int, code contract.Code, message, outcome string) {
+		fail := func(status int, code contract.Code, message string, outcome audit.Outcome) {
 			record.Status = status
 			record.Outcome = outcome
 			emitControlAudit(c.Request.Context(), d.sink(), record)
 			contract.RenderError(c, status, code, message)
 		}
 		if !isControlOperator(p) {
-			fail(http.StatusForbidden, contract.CodeForbidden, "权限不足", ControlAuditDenied)
+			fail(http.StatusForbidden, contract.CodeForbidden, msgForbidden, ControlAuditDenied)
 			c.Abort()
 			return
 		}
@@ -368,7 +369,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 				record.Status = http.StatusBadRequest
 				record.Outcome = ControlAuditDenied
 				emitControlAudit(c.Request.Context(), d.sink(), record)
-				contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, "需要填写操作原因")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
 				c.Abort()
 				return
 			}
@@ -377,7 +378,7 @@ func (d *ContractControlDeps) guard(capability string, route controlRoute, handl
 				record.Status = http.StatusBadRequest
 				record.Outcome = ControlAuditDenied
 				emitControlAudit(c.Request.Context(), d.sink(), record)
-				contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少 Idempotency-Key")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired)
 				c.Abort()
 				return
 			}
@@ -423,7 +424,7 @@ func (d *ContractControlDeps) sink() ControlAuditSink {
 	return d.AuditSink
 }
 
-func controlOutcomeFromStatus(status int) string {
+func controlOutcomeFromStatus(status int) audit.Outcome {
 	switch {
 	case status < 400:
 		return ControlAuditRead
@@ -458,7 +459,7 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 		record.Status = http.StatusConflict
 		record.Outcome = ControlAuditFailed
 		emitControlAudit(c.Request.Context(), d.sink(), *record)
-		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, "Idempotency-Key 已用于不同的请求")
+		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 		return
 	} else if replayed {
 		stored, ok := existing.(controlStoredResponse)
@@ -466,7 +467,7 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 			record.Status = http.StatusConflict
 			record.Outcome = ControlAuditFailed
 			emitControlAudit(c.Request.Context(), d.sink(), *record)
-			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, "Idempotency-Key 已用于不同的请求")
+			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 			return
 		}
 		if contentType := stored.Header["Content-Type"]; contentType != "" {

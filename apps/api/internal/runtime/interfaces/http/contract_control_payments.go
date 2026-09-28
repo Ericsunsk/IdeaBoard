@@ -25,7 +25,7 @@ import (
 func controlPaymentOrderListInput(c *gin.Context) (paymentcontracts.AdminPaymentOrderListInput, bool) {
 	input := paymentcontracts.AdminPaymentOrderListInput{}
 	if c == nil || c.Request == nil || c.Request.URL == nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest20)
 		return input, false
 	}
 	query := c.Request.URL.Query()
@@ -34,7 +34,7 @@ func controlPaymentOrderListInput(c *gin.Context) (paymentcontracts.AdminPayment
 	}
 	for key, values := range query {
 		if _, ok := allowed[key]; !ok || len(values) != 1 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest20)
 			return input, false
 		}
 	}
@@ -44,7 +44,7 @@ func controlPaymentOrderListInput(c *gin.Context) (paymentcontracts.AdminPayment
 	input.Cursor = query.Get("cursor")
 	if raw, ok := query["anomaly_only"]; ok {
 		if raw[0] != "true" && raw[0] != "false" {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest20)
 			return input, false
 		}
 		input.AnomalyOnly = raw[0] == "true"
@@ -52,7 +52,7 @@ func controlPaymentOrderListInput(c *gin.Context) (paymentcontracts.AdminPayment
 	if raw, ok := query["limit"]; ok {
 		limit, err := pagination.ParseLimit(raw[0])
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest20)
 			return input, false
 		}
 		input.Limit = limit
@@ -62,7 +62,7 @@ func controlPaymentOrderListInput(c *gin.Context) (paymentcontracts.AdminPayment
 
 func (d *ContractControlDeps) listControlPaymentOrders(c *gin.Context, _ controlContext) {
 	if d == nil || d.Payments == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付订单服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable13)
 		return
 	}
 	input, ok := controlPaymentOrderListInput(c)
@@ -72,14 +72,14 @@ func (d *ContractControlDeps) listControlPaymentOrders(c *gin.Context, _ control
 	page, err := d.Payments.ListAdminPaymentOrders(c.Request.Context(), input)
 	if err != nil {
 		if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单筛选条件无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest20)
 			return
 		}
 		if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderCursor) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "支付订单游标无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid2)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取支付订单失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable14)
 		return
 	}
 	contract.RenderSuccess(c, page)
@@ -87,20 +87,20 @@ func (d *ContractControlDeps) listControlPaymentOrders(c *gin.Context, _ control
 
 func (d *ContractControlDeps) getControlPaymentOrder(c *gin.Context, _ controlContext) {
 	if d == nil || d.Payments == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付订单服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable13)
 		return
 	}
 	detail, err := d.Payments.GetAdminPaymentOrder(c.Request.Context(), strings.TrimSpace(c.Param("order_number")))
 	if err != nil {
 		if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "支付订单号无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest21)
 			return
 		}
 		if errors.Is(err, paymentcontracts.ErrAdminPaymentOrderNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "支付订单不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound7)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取支付订单失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable14)
 		return
 	}
 	contract.RenderSuccess(c, detail)
@@ -108,7 +108,7 @@ func (d *ContractControlDeps) getControlPaymentOrder(c *gin.Context, _ controlCo
 
 func (d *ContractControlDeps) createControlPaymentRefund(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Payments == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "退款服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable15)
 		return
 	}
 	var req struct {
@@ -116,7 +116,7 @@ func (d *ContractControlDeps) createControlPaymentRefund(c *gin.Context, ctx con
 		Reason       string `json:"reason"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "退款参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest22)
 		return
 	}
 	reason := strings.TrimSpace(req.Reason)
@@ -139,30 +139,30 @@ func writeControlPaymentRefundError(c *gin.Context, err error) {
 	case errors.Is(err, paymentcontracts.ErrRefundAmountInvalid),
 		errors.Is(err, paymentcontracts.ErrRefundIdempotency),
 		errors.Is(err, paymentcontracts.ErrAdminPaymentOrderFilter):
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "退款参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest22)
 	case errors.Is(err, paymentcontracts.ErrRefundExpired),
 		errors.Is(err, paymentcontracts.ErrRefundOrderNotEligible),
 		errors.Is(err, paymentcontracts.ErrRefundAmountExceeds),
 		errors.Is(err, paymentcontracts.ErrRefundProviderConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "支付订单当前不满足退款条件")
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict2)
 	case errors.Is(err, creditsdomain.ErrInsufficientCredits):
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "Wallet 可用 Idea 不足")
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgValidationFailed4)
 	case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable),
 		errors.Is(err, paymentcontracts.ErrRefundUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Stripe 服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable16)
 	default:
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "发起退款失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable17)
 	}
 }
 
 func (d *ContractControlDeps) getControlStripeConfig(c *gin.Context, _ controlContext) {
 	if d == nil || d.Payments == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付设置服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable18)
 		return
 	}
 	summary, err := d.Payments.GetStripeConfiguration(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取 Stripe 设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable19)
 		return
 	}
 	contract.RenderSuccess(c, summary)
@@ -170,7 +170,7 @@ func (d *ContractControlDeps) getControlStripeConfig(c *gin.Context, _ controlCo
 
 func (d *ContractControlDeps) updateControlStripeConfig(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Payments == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付设置服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable18)
 		return
 	}
 	var req struct {
@@ -180,7 +180,7 @@ func (d *ContractControlDeps) updateControlStripeConfig(c *gin.Context, ctx cont
 		PurchasesEnabled             *bool   `json:"purchases_enabled"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil || req.PurchasesEnabled == nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "Stripe 设置参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest23)
 		return
 	}
 	apiKey := ""
@@ -205,17 +205,17 @@ func writeControlStripeConfigError(c *gin.Context, err error) {
 	case errors.Is(err, paymentcontracts.ErrStripeAPIKeyRequired),
 		errors.Is(err, paymentcontracts.ErrInvalidStripeAPIKey),
 		errors.Is(err, paymentcontracts.ErrStripeConfigurationInvalid):
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "Stripe 设置参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest23)
 	case errors.Is(err, paymentcontracts.ErrStripePermissionDenied):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "当前 Stripe API Key 权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, msgForbidden2)
 	case errors.Is(err, paymentcontracts.ErrStripeAccountUnavailable),
 		errors.Is(err, paymentcontracts.ErrStripeCapabilityUnavailable):
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "当前 Stripe 配置不可用")
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgValidationFailed5)
 	case errors.Is(err, paymentcontracts.ErrStripeConfigurationChanged):
-		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "Stripe 配置已被其他操作更新，请重试")
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict3)
 	case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Stripe 服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable16)
 	default:
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "保存 Stripe 设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable20)
 	}
 }

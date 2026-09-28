@@ -77,10 +77,10 @@ func normalizeUserListRequest(req *ports.UserListRequest) (int16, bool, error) {
 	req.Keyword = strings.TrimSpace(req.Keyword)
 	req.Role = normalizeUserListRole(req.Role)
 	if utf8.RuneCountInString(req.Keyword) > maxUserKeywordLength {
-		return 0, false, validation.New("keyword 长度不能超过 64 个字符")
+		return 0, false, validation.New(msgNormalizeUserListRequest)
 	}
 	if req.Role != "" && req.Role != domain.RoleAdmin && req.Role != domain.RoleUser {
-		return 0, false, validation.New("role 仅支持 admin 或 user")
+		return 0, false, validation.New(msgSetRole)
 	}
 	status, hasStatus, err := normalizeUserListStatus(req.Status)
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 		return list, nil
 	}
 	if s.creditBalanceReader == nil {
-		return nil, errors.New("用户Idea余额读取服务未配置")
+		return nil, errors.New(msgEnrichUserList)
 	}
 	userIDs := make([]int64, 0, len(users))
 	for _, user := range users {
@@ -109,7 +109,7 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 	}
 	balances, err := s.creditBalanceReader.GetAvailableBalances(ctx, userIDs)
 	if err != nil {
-		return nil, fmt.Errorf("读取用户Idea余额失败: %w", err)
+		return nil, fmt.Errorf(msgEnrichUserList2, err)
 	}
 	identities := make(map[string]authidentity.UserIdentity)
 	if s.emailReader != nil {
@@ -121,13 +121,13 @@ func (s *Service) enrichUserList(ctx context.Context, users []*domain.User) ([]*
 		}
 		identities, err = s.emailReader.GetUserEmails(ctx, authUserIDs)
 		if err != nil {
-			return nil, fmt.Errorf("读取用户邮箱失败: %w", err)
+			return nil, fmt.Errorf(msgEnrichUserList3, err)
 		}
 	}
 	for _, user := range users {
 		availableCredits, ok := balances[user.ID]
 		if !ok {
-			return nil, fmt.Errorf("用户 %d 的Idea余额缺失", user.ID)
+			return nil, fmt.Errorf(msgEnrichUserList4, user.ID)
 		}
 		identity := identities[authUserIDValue(user.AuthUserID)]
 		list = append(list, &ports.AdminUserListItem{
@@ -166,7 +166,7 @@ func normalizeUserListStatus(raw string) (int16, bool, error) {
 	}
 	status, err := strconv.Atoi(value)
 	if err != nil || (status != 0 && status != 1) {
-		return 0, false, validation.New("status 仅支持 0 或 1")
+		return 0, false, validation.New(msgNormalizeUserListStatus)
 	}
 	return int16(status), true, nil
 }
@@ -174,16 +174,16 @@ func normalizeUserListStatus(raw string) (int16, bool, error) {
 // UpdateStatus 更新用户状态
 func (s *Service) UpdateStatus(ctx context.Context, userID int64, status int16) error {
 	if status != 0 && status != 1 {
-		return errors.New("状态值无效，仅支持0或1")
+		return errors.New(msgUpdateStatus)
 	}
 
 	if s.lifecycle == nil {
-		return errors.New("用户生命周期服务未配置")
+		return errors.New(msgUpdateStatus2)
 	}
 	err := s.lifecycle.SetUserStatus(ctx, userID, status)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return errors.New("用户不存在")
+			return errors.New(msgLoadTarget3)
 		}
 		return err
 	}
@@ -193,12 +193,12 @@ func (s *Service) UpdateStatus(ctx context.Context, userID int64, status int16) 
 func (s *Service) UpdateRole(ctx context.Context, userID int64, role string) error {
 	normalizedRole := strings.ToLower(strings.TrimSpace(role))
 	if normalizedRole != domain.RoleAdmin && normalizedRole != domain.RoleUser {
-		return errors.New("角色值无效，仅支持 admin 或 user")
+		return errors.New(msgUpdateRole)
 	}
 
 	if err := s.repo.UpdateRoleByID(ctx, userID, normalizedRole); err != nil {
 		if database.IsNotFound(err) {
-			return errors.New("用户不存在")
+			return errors.New(msgLoadTarget3)
 		}
 		return err
 	}
@@ -208,12 +208,12 @@ func (s *Service) UpdateRole(ctx context.Context, userID int64, role string) err
 // DeleteUser 删除用户
 func (s *Service) DeleteUser(ctx context.Context, userID int64, authDeleter ports.AuthUserDeleter) error {
 	if s.lifecycle == nil {
-		return errors.New("用户删除依赖未配置")
+		return errors.New(msgDeleteUser)
 	}
 	err := s.lifecycle.DeleteUser(ctx, userID, authDeleter, s.uploadCleaner)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return errors.New("用户不存在")
+			return errors.New(msgLoadTarget3)
 		}
 		return err
 	}

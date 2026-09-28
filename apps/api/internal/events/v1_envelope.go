@@ -404,15 +404,15 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 // completed/failed/cancelled map 1:1. Unknown statuses fail closed.
 func taskStatusToV1(status TaskStatus) (string, bool) {
 	switch strings.TrimSpace(string(status)) {
-	case "pending":
+	case string(TaskStatusPending):
 		return EventV1TaskCreated, true
-	case "running":
+	case string(TaskStatusRunning):
 		return EventV1TaskRunning, true
-	case "completed":
+	case string(TaskStatusCompleted):
 		return EventV1TaskCompleted, true
-	case "failed":
+	case string(TaskStatusFailed):
 		return EventV1TaskFailed, true
-	case "cancelled":
+	case string(TaskStatusCancelled):
 		return EventV1TaskCancelled, true
 	default:
 		return "", false

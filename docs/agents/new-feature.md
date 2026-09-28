@@ -1,5 +1,7 @@
 # New Feature Scaffolding Checklist
 
+> Scope: web-only (`apps/web/src/features/*`). Backend (`apps/api`) and Auth (`apps/auth`) changes follow their own `CONTEXT.md` + ADRs, not this checklist.
+
 Use this when creating a feature under `apps/web/src/features/*` or promoting a
 flat module into a layered one. It answers one question: *what shape must a new
 feature have before it lands?* Contracts live in `DESIGN.md` (Frontend Context
@@ -47,3 +49,11 @@ path), `issue-tracker.md` / `triage-labels.md` (process), `shared/CONTEXT.md`
 7. **Verification** — `npm run api:surface:check` (barrel presence + surface
    baseline), `vue-tsc -p tsconfig.app.json --noEmit`, `eslint` on touched
    files, `vitest run` on touched areas, `npm run build`.
+8. **Composable signatures** — options-object for two or more parameters
+   (`useAdminUsersContext({ feedback, confirm })`,
+   `useUsageStatisticsQualityTrendCharts(options)`); a single required
+   positional arg stays positional (`enabled` flags, source refs like
+   `adminStatistics` / `flowNodeRef` / `filters`, `isDataSettled`).
+   `create*Feedback(toast, ...wiring)` factories keep `(toast)` first
+   positionally by convention (`createBoardFeedback`,
+   `createCanvasFeedback`). Never wrap a single arg in an options-object.

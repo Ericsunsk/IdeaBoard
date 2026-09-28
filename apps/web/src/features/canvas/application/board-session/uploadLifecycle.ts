@@ -117,6 +117,39 @@ function collectStableRefs(snapshot: BoardSnapshot): StableRef[] {
   return refs
 }
 
+const STABILIZE_UPLOAD_CONCURRENCY = 4
+
+type StabilizeUploadResult =
+  | { status: 'fulfilled'; value: { url: string; mediaRef: MediaRef } }
+  | { status: 'rejected'; reason: unknown }
+
+async function uploadDedupedWithConcurrency(
+  taskKeysInOrder: string[],
+  runTask: (taskKey: string) => Promise<{ url: string; mediaRef: MediaRef }>,
+  concurrency: number,
+): Promise<Map<string, StabilizeUploadResult>> {
+  const results = new Map<string, StabilizeUploadResult>()
+  let nextIndex = 0
+  const workerCount = Math.max(1, Math.min(concurrency, taskKeysInOrder.length))
+  const workers = Array.from({ length: workerCount }, () =>
+    (async () => {
+      while (true) {
+        const currentIndex = nextIndex
+        nextIndex += 1
+        if (currentIndex >= taskKeysInOrder.length) return
+        const taskKey = taskKeysInOrder[currentIndex] as string
+        try {
+          results.set(taskKey, { status: 'fulfilled', value: await runTask(taskKey) })
+        } catch (reason) {
+          results.set(taskKey, { status: 'rejected', reason })
+        }
+      }
+    })(),
+  )
+  await Promise.all(workers)
+  return results
+}
+
 export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLifecycleOptions) {
   const { userUid, boardId, warning } = options
   const normalizedBoardId = boardId.trim()
@@ -210,7 +243,9 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
       }),
       async () => {
         const refs = collectStableRefs(snapshot)
-        const tasks = new Map<string, Promise<{ url: string; mediaRef: MediaRef }>>()
+        const unstableEntries: Array<{ ref: StableRef; taskKey: string }> = []
+        const normalizedByTaskKey = new Map<string, string>()
+        const taskKeysInOrder: string[] = []
         for (const ref of refs) {
           const current = ref.get()
           const normalized = current.trim()
@@ -225,21 +260,29 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
           if (isStableCanvasUrl(normalized)) continue
           unstableRefCount += 1
           const taskKey = `default::${normalized}`
-          let task = tasks.get(taskKey)
-          if (!task) {
-            task = fetchAndUploadStable(normalized)
-            tasks.set(taskKey, task)
+          unstableEntries.push({ ref, taskKey })
+          if (!normalizedByTaskKey.has(taskKey)) {
+            normalizedByTaskKey.set(taskKey, normalized)
+            taskKeysInOrder.push(taskKey)
           }
-          try {
-            const uploaded = await task
-            ref.set(uploaded.url)
-            ref.setMediaRef?.(uploaded.mediaRef)
-          } catch (error) {
+        }
+        const results = await uploadDedupedWithConcurrency(
+          taskKeysInOrder,
+          (taskKey) =>
+            fetchAndUploadStable(normalizedByTaskKey.get(taskKey) as string),
+          STABILIZE_UPLOAD_CONCURRENCY,
+        )
+        for (const { ref, taskKey } of unstableEntries) {
+          const result = results.get(taskKey)
+          if (!result || result.status === 'rejected') {
+            const error = result?.reason
             const reason = userFacingErrorCopy(error, t('canvas.session.unknownError'))
             throw new Error(t('canvas.session.unstableImageLink', { path: ref.path, reason }), {
               cause: error,
             })
           }
+          ref.set(result.value.url)
+          ref.setMediaRef?.(result.value.mediaRef)
         }
         rebuildBoardMediaRefs(snapshot)
         return snapshot

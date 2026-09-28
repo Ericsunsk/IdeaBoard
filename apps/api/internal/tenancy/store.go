@@ -27,6 +27,24 @@ var (
 	// ErrConflict reports a public_id collision during minting; callers
 	// retry with a fresh identifier.
 	ErrConflict = errors.New("tenancy: public id conflict")
+	// ErrInvalidName reports a display name outside 1..120 characters.
+	ErrInvalidName = errors.New("tenancy: name must be 1..120 characters")
+	// ErrWorkspaceOwnerRequired reports a workspace create without an
+	// organization or an owner.
+	ErrWorkspaceOwnerRequired = errors.New("tenancy: workspace requires an organization or an owner")
+	// ErrPersonalWorkspaceUserRequired reports a personal workspace
+	// provision without a user.
+	ErrPersonalWorkspaceUserRequired = errors.New("tenancy: personal workspace requires a user")
+	// ErrBillingStoreNotConfigured reports a billing account store
+	// without queries.
+	ErrBillingStoreNotConfigured = errors.New("tenancy: billing account store not configured")
+	// ErrBillingWorkspaceInvalid reports billing account provisioning
+	// with an invalid workspace.
+	ErrBillingWorkspaceInvalid = errors.New("tenancy: billing account workspace is invalid")
+	// ErrNotUserPublicID reports an identifier without the usr_ prefix.
+	ErrNotUserPublicID = errors.New("tenancy: not a user public id")
+	// ErrMalformedUserPublicID reports a usr_ identifier with bad hex.
+	ErrMalformedUserPublicID = errors.New("tenancy: malformed user public id")
 )
 
 // IsValidRole reports whether role is a known membership role.
@@ -134,7 +152,7 @@ type OrganizationStore interface {
 func ValidateName(name string) error {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" || len([]rune(trimmed)) > 120 {
-		return errors.New("tenancy: name must be 1..120 characters")
+		return ErrInvalidName
 	}
 	return nil
 }

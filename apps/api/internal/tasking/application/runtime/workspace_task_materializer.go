@@ -165,7 +165,7 @@ func (m *workspaceTaskAutoMaterializer) materializeOne(ctx context.Context, task
 		return
 	}
 	if _, runningErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationRunning, "", "", ""); runningErr != nil {
-		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
+		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationFailed, "", "library_materialization_failed", msgMaterializeOne)
 		slog.Warn("task auto-materialize: job start failed",
 			"task_id", task.ID, "materialization", matID, "err", runningErr)
 		return

@@ -41,10 +41,13 @@ func TestLegacyRouteGroupsStayDeleted(t *testing.T) {
 	}
 }
 
-// Error rendering is a trust boundary: handlers must use platform/response
-// (Error/InternalError/MachineError/Success*/AcceptedDTO) so public messages
-// stay safe and server failures stay logged. Raw c.JSON/gin.H error payloads
-// bypass that envelope.
+// Error rendering is a trust boundary: handlers must stay inside the
+// shared envelope (platform/contract Render* for new v1/control JSON,
+// platform/response Error/InternalError/MachineError/Success*/AcceptedDTO
+// for the control-proxy translator input, edge tables, and blessed
+// protocol exceptions; see the three-layer rule in apps/api/CONTEXT.md)
+// so public messages stay safe and server failures stay logged. Raw
+// c.JSON/gin.H error payloads bypass that envelope.
 func TestErrorResponsesStayInsideSharedEnvelope(t *testing.T) {
 	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -58,10 +61,10 @@ func TestErrorResponsesStayInsideSharedEnvelope(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		if strings.Contains(string(raw), "c.JSON(") {
-			t.Errorf("production file %s calls c.JSON directly; use platform/response instead", path)
+			t.Errorf("production file %s calls c.JSON directly; use platform/contract or platform/response instead", path)
 		}
 		if strings.Contains(string(raw), "gin.H{") {
-			t.Errorf("production file %s builds gin.H payloads; use platform/response instead", path)
+			t.Errorf("production file %s builds gin.H payloads; use platform/contract or platform/response instead", path)
 		}
 		return nil
 	})

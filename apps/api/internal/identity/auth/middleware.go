@@ -29,14 +29,14 @@ type IdentityProvisioner interface {
 func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecycle IdentityProvisioner) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if authService == nil || userRepo == nil {
-			response.InternalError(c, http.StatusInternalServerError, "认证服务未配置", fmt.Errorf("auth middleware dependencies missing"))
+			response.InternalError(c, http.StatusInternalServerError, msgAuthMiddleware, fmt.Errorf("auth middleware dependencies missing"))
 			c.Abort()
 			return
 		}
 
 		cookieHeader := strings.TrimSpace(c.GetHeader("Cookie"))
 		if cookieHeader == "" {
-			response.Error(c, http.StatusUnauthorized, "未登录")
+			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware2)
 			c.Abort()
 			return
 		}
@@ -48,9 +48,9 @@ func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecy
 			}
 			switch {
 			case errors.Is(err, ErrSessionUnauthorized):
-				response.Error(c, http.StatusUnauthorized, "会话已失效，请重新登录")
+				response.Error(c, http.StatusUnauthorized, msgAuthMiddleware3)
 			default:
-				response.InternalError(c, http.StatusBadGateway, "认证服务暂不可用", err)
+				response.InternalError(c, http.StatusBadGateway, msgAuthMiddleware4, err)
 			}
 			c.Abort()
 			return
@@ -62,22 +62,22 @@ func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecy
 				return
 			}
 			if database.IsNotFound(err) {
-				response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+				response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
 			} else {
-				response.InternalError(c, http.StatusServiceUnavailable, "用户服务暂不可用", err)
+				response.InternalError(c, http.StatusServiceUnavailable, msgAuthMiddleware6, err)
 			}
 			c.Abort()
 			return
 		}
 		if user.Status != 1 {
-			response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
 			c.Abort()
 			return
 		}
 
 		identityPrincipal, err := principal.New(user.ID, user.PublicID, identity.AuthUserID, user.DisplayName, user.Role)
 		if err != nil || principal.Set(c, identityPrincipal) != nil {
-			response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+			response.Error(c, http.StatusUnauthorized, msgAuthMiddleware5)
 			c.Abort()
 			return
 		}
@@ -130,7 +130,7 @@ func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		identityPrincipal, exists := principal.From(c)
 		if !exists || !identityPrincipal.IsAdmin() {
-			response.Error(c, http.StatusForbidden, "需要管理员权限")
+			response.Error(c, http.StatusForbidden, msgAdminMiddleware)
 			c.Abort()
 			return
 		}

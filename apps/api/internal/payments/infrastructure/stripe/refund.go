@@ -18,7 +18,7 @@ func (a *Adapter) CreateRefund(ctx context.Context, input paymentports.CreateStr
 		return paymentports.StripeRefund{}, err
 	}
 	if strings.TrimSpace(input.ChargeID) == "" || input.AmountMinor <= 0 || strings.TrimSpace(input.Currency) == "" {
-		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Refund 参数无效", nil)
+		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCreateRefund, nil)
 	}
 	params := &stripe.RefundCreateParams{Charge: stripe.String(input.ChargeID), Amount: stripe.Int64(input.AmountMinor), Currency: stripe.String(input.Currency)}
 	params.SetIdempotencyKey(input.IdempotencyKey)
@@ -26,10 +26,10 @@ func (a *Adapter) CreateRefund(ctx context.Context, input paymentports.CreateStr
 	refund, err := client.V1Refunds.Create(ctx, params)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.StripeRefund{}, mapStripeError("创建 Stripe Refund", err)
+		return paymentports.StripeRefund{}, mapStripeError(msgCreateRefund2, err)
 	}
 	if refund == nil || strings.TrimSpace(refund.ID) == "" {
-		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Refund 响应无效", nil)
+		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCreateRefund3, nil)
 	}
 	return stripeRefundFact(refund), nil
 }
@@ -43,10 +43,10 @@ func (a *Adapter) RetrieveRefund(ctx context.Context, apiKey, refundID string) (
 	refund, err := client.V1Refunds.Retrieve(ctx, refundID, nil)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.StripeRefund{}, mapStripeError("读取 Stripe Refund", err)
+		return paymentports.StripeRefund{}, mapStripeError(msgRetrieveRefund, err)
 	}
 	if refund == nil || strings.TrimSpace(refund.ID) == "" {
-		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Refund 响应无效", nil)
+		return paymentports.StripeRefund{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCreateRefund3, nil)
 	}
 	return stripeRefundFact(refund), nil
 }

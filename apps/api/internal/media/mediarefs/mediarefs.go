@@ -35,17 +35,17 @@ func ValidateUploadPath(raw string) (string, error) {
 	if isSupportedUploadPath(parts) {
 		return cleaned, nil
 	}
-	return "", fmt.Errorf("不支持的上传资源路径")
+	return "", fmt.Errorf(msgValidateUploadPath)
 }
 
 func normalizeUploadPath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return "", fmt.Errorf("仅支持 /uploads/ 相对路径")
+		return "", fmt.Errorf(msgNormalizeUploadPath)
 	}
 	cleaned := path.Clean(trimmed)
 	if !strings.HasPrefix(cleaned, "/uploads/") {
-		return "", fmt.Errorf("仅支持 /uploads/ 相对路径")
+		return "", fmt.Errorf(msgNormalizeUploadPath)
 	}
 	return cleaned, nil
 }
@@ -53,7 +53,7 @@ func normalizeUploadPath(raw string) (string, error) {
 func uploadPathParts(cleaned string) ([]string, error) {
 	parts := strings.Split(strings.TrimPrefix(cleaned, "/uploads/"), "/")
 	if len(parts) < 1 || parts[0] == "" {
-		return nil, fmt.Errorf("文件路径不能为空")
+		return nil, fmt.Errorf(msgUploadPathParts)
 	}
 	return parts, nil
 }
@@ -76,18 +76,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 	trimmed := strings.TrimSpace(raw)
 	lower := strings.ToLower(trimmed)
 	if !strings.HasPrefix(lower, "data:image/") {
-		return nil, fmt.Errorf("仅支持 data:image")
+		return nil, fmt.Errorf(msgParseDataImageURL)
 	}
 	comma := strings.Index(trimmed, ",")
 	if comma <= 5 {
-		return nil, fmt.Errorf("data URL 格式错误")
+		return nil, fmt.Errorf(msgParseDataImageURL2)
 	}
 	header := trimmed[5:comma]
 	payload := trimmed[comma+1:]
 	parts := strings.Split(header, ";")
 	mimeType := strings.ToLower(strings.TrimSpace(parts[0]))
 	if !strings.HasPrefix(mimeType, "image/") {
-		return nil, fmt.Errorf("data URL 格式错误")
+		return nil, fmt.Errorf(msgParseDataImageURL2)
 	}
 	isBase64 := false
 	for _, part := range parts[1:] {
@@ -97,18 +97,18 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 		}
 	}
 	if !isBase64 {
-		return nil, fmt.Errorf("data URL 格式错误")
+		return nil, fmt.Errorf(msgParseDataImageURL2)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {
-		return nil, fmt.Errorf("data URL 格式错误")
+		return nil, fmt.Errorf(msgParseDataImageURL2)
 	}
 	if maxDecodedBytes > 0 && len(decoded) > maxDecodedBytes {
-		return nil, fmt.Errorf("data URL 超过大小限制")
+		return nil, fmt.Errorf(msgParseDataImageURL3)
 	}
 	ext := imageExtensionFromMIME(mimeType)
 	if ext == "" {
-		return nil, fmt.Errorf("不支持的图片格式")
+		return nil, fmt.Errorf(msgParseDataImageURL4)
 	}
 	return &DataImage{
 		MIMEType: mimeType,
@@ -120,15 +120,15 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 func ValidateMediaRef(raw string, allowHosts []string, maxDataURLBytes int) error {
 	ref := strings.TrimSpace(raw)
 	if ref == "" {
-		return fmt.Errorf("地址不能为空")
+		return fmt.Errorf(msgValidateMediaRef)
 	}
 	lower := strings.ToLower(ref)
 	if strings.HasPrefix(lower, "//") {
-		return fmt.Errorf("不支持协议相对地址")
+		return fmt.Errorf(msgValidateMediaRef2)
 	}
 	if strings.HasPrefix(lower, "data:image/") {
 		if maxDataURLBytes > 0 && len(ref) >= maxDataURLBytes {
-			return fmt.Errorf("data URL 超过大小限制")
+			return fmt.Errorf(msgParseDataImageURL3)
 		}
 		_, err := ParseDataImageURL(ref, maxDataURLBytes)
 		return err
@@ -141,7 +141,7 @@ func ValidateMediaRef(raw string, allowHosts []string, maxDataURLBytes int) erro
 		_, err := outbound.ValidateMediaHTTPURL(ref, allowHosts...)
 		return err
 	}
-	return fmt.Errorf("仅支持 http(s)、/uploads/ 或 data:image")
+	return fmt.Errorf(msgValidateMediaRef3)
 }
 
 func ForEachParamMediaRef(params map[string]interface{}, onRef func(key string, ref string) error) error {
@@ -155,7 +155,7 @@ func ForEachParamMediaRef(params map[string]interface{}, onRef func(key string, 
 		}
 		value, ok := raw.(string)
 		if !ok {
-			return fmt.Errorf("%s 必须是字符串", key)
+			return fmt.Errorf(msgForEachParamMediaRef, key)
 		}
 		if err := onRef(key, value); err != nil {
 			return err
@@ -202,7 +202,7 @@ func forEachStringList(raw interface{}, key string, strict bool, onValue func(st
 			value, ok := item.(string)
 			if !ok {
 				if strict {
-					return fmt.Errorf("%s 必须是字符串数组", key)
+					return fmt.Errorf(msgForEachStringList, key)
 				}
 				continue
 			}
@@ -212,7 +212,7 @@ func forEachStringList(raw interface{}, key string, strict bool, onValue func(st
 		}
 	default:
 		if strict {
-			return fmt.Errorf("%s 必须是字符串数组", key)
+			return fmt.Errorf(msgForEachStringList, key)
 		}
 	}
 	return nil

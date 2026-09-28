@@ -71,11 +71,11 @@ func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (
 	default:
 		decoded, _, err := image.Decode(bytes.NewReader(data))
 		if err != nil {
-			return "", "", nil, fmt.Errorf("解码图像失败: %w", err)
+			return "", "", nil, fmt.Errorf(msgNormalizeOpenAIEditMultipartImage, err)
 		}
 		var encoded bytes.Buffer
 		if err := png.Encode(&encoded, decoded); err != nil {
-			return "", "", nil, fmt.Errorf("编码 PNG 失败: %w", err)
+			return "", "", nil, fmt.Errorf(msgNormalizeOpenAIEditMultipartImage2, err)
 		}
 		return ensureFilenameHasImageExt(filename, "image/png"), "image/png", encoded.Bytes(), nil
 	}

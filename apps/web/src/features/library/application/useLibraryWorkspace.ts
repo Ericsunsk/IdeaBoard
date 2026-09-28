@@ -32,7 +32,7 @@ import {
 import type { LibraryAssetView } from '../domain/transfer'
 
 export type LibraryFolderTab = {
-  queryKey: string
+  folderKey: string
   name: string
   isMutable: boolean
 }
@@ -146,13 +146,13 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
   )
   const folderTabs = computed(() => {
     const tabs = folders.value.map((folder) => ({
-      queryKey: folder.id,
+      folderKey: folder.id,
       name: folder.name,
       isMutable: true,
     }))
-    if (!tabs.some((tab) => tab.queryKey === LIBRARY_ALL_FOLDER_KEY)) {
+    if (!tabs.some((tab) => tab.folderKey === LIBRARY_ALL_FOLDER_KEY)) {
       tabs.unshift({
-        queryKey: LIBRARY_ALL_FOLDER_KEY,
+        folderKey: LIBRARY_ALL_FOLDER_KEY,
         name: i18n.global.t('library.folders.allAssets'),
         isMutable: false,
       })

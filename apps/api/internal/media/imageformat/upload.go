@@ -13,11 +13,11 @@ import (
 // negotiation or a client-side rename.
 func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	if fh == nil {
-		return Facts{}, fmt.Errorf("文件内容不合法")
+		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
 	}
 	f, err := fh.Open()
 	if err != nil {
-		return Facts{}, fmt.Errorf("读取文件失败: %w", err)
+		return Facts{}, fmt.Errorf(msgInspectFileHeader, err)
 	}
 	defer f.Close()
 	facts, err := InspectDetected(f)
@@ -29,10 +29,10 @@ func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 	// decoder is introduced; all other accepted upload formats are fully decoded.
 	if facts.Extension != ".avif" {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+			return Facts{}, fmt.Errorf(msgInspect3, err)
 		}
 		if _, _, err := image.Decode(f); err != nil {
-			return Facts{}, fmt.Errorf("图片内容无法完整解码: %w", err)
+			return Facts{}, fmt.Errorf(msgInspectFileHeader2, err)
 		}
 	}
 	return facts, nil
@@ -42,22 +42,22 @@ func InspectFileHeader(fh *multipart.FileHeader) (Facts, error) {
 // running the normal signature and image-config validation.
 func InspectDetected(source io.ReadSeeker) (Facts, error) {
 	if source == nil {
-		return Facts{}, fmt.Errorf("文件内容不合法")
+		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+		return Facts{}, fmt.Errorf(msgInspect3, err)
 	}
 	header := make([]byte, 64*1024)
 	n, readErr := io.ReadFull(source, header)
 	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
-		return Facts{}, fmt.Errorf("读取图片失败: %w", readErr)
+		return Facts{}, fmt.Errorf(msgInspect3, readErr)
 	}
 	ext := DetectImageExtensionFromBytes(header[:n])
 	if ext == "" {
-		return Facts{}, fmt.Errorf("文件内容不合法")
+		return Facts{}, fmt.Errorf(msgInspectDetectedBytes)
 	}
 	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return Facts{}, fmt.Errorf("读取图片失败: %w", err)
+		return Facts{}, fmt.Errorf(msgInspect3, err)
 	}
 	return Inspect(source, ext)
 }
@@ -66,13 +66,13 @@ func InspectDetected(source io.ReadSeeker) (Facts, error) {
 func ValidateImageBytes(data []byte, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf("不支持的图片格式: %s", ext)
+		return fmt.Errorf(msgInspect, ext)
 	}
 
 	signatures := imageSignaturesByExtension(normalizedExt)
 	required := requiredImageHeaderLength(signatures)
 	if len(data) < required {
-		return fmt.Errorf("文件内容不合法")
+		return fmt.Errorf(msgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(data[:required], normalizedExt)
@@ -83,10 +83,10 @@ func ValidateImageBytes(data []byte, ext string) error {
 func ValidateImageReader(r io.Reader, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf("不支持的图片格式: %s", ext)
+		return fmt.Errorf(msgInspect, ext)
 	}
 	if r == nil {
-		return fmt.Errorf("文件内容不合法")
+		return fmt.Errorf(msgInspectDetectedBytes)
 	}
 
 	signatures := imageSignaturesByExtension(normalizedExt)
@@ -94,7 +94,7 @@ func ValidateImageReader(r io.Reader, ext string) error {
 	buf := make([]byte, required)
 	n, err := io.ReadFull(r, buf)
 	if err != nil || n < required {
-		return fmt.Errorf("文件内容不合法")
+		return fmt.Errorf(msgInspectDetectedBytes)
 	}
 
 	return validateImageMagic(buf, normalizedExt)
@@ -113,14 +113,14 @@ func requiredImageHeaderLength(signatures []imageSignature) int {
 func validateImageMagic(buf []byte, ext string) error {
 	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
-		return fmt.Errorf("不支持的图片格式: %s", ext)
+		return fmt.Errorf(msgInspect, ext)
 	}
 	// A confident shared-database detection decides directly: a different
 	// allowlisted format is a mismatch, an unknown one (heic, svg, …) can
 	// never satisfy the claimed extension.
 	if detected := detectExtensionViaMimetype(buf); detected != "" {
 		if detected != normalizedExt {
-			return fmt.Errorf("文件内容与扩展名不匹配")
+			return fmt.Errorf(msgValidateImageMagic)
 		}
 		return nil
 	}
@@ -129,11 +129,11 @@ func validateImageMagic(buf []byte, ext string) error {
 	signatures := imageSignaturesByExtension(normalizedExt)
 	for _, sig := range signatures {
 		if len(buf) < sig.offset+len(sig.bytes) {
-			return fmt.Errorf("文件内容不合法")
+			return fmt.Errorf(msgInspectDetectedBytes)
 		}
 		for i, b := range sig.bytes {
 			if buf[sig.offset+i] != b {
-				return fmt.Errorf("文件内容与扩展名不匹配")
+				return fmt.Errorf(msgValidateImageMagic)
 			}
 		}
 	}

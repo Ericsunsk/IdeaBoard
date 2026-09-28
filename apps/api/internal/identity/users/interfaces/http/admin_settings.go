@@ -33,7 +33,7 @@ func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
 	}
 	var req settings.RegistrationSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
 	}
 	var req settings.RateLimitSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *AdminHandler) UpdateMediaUploadSettings(c *gin.Context) {
 	}
 	var req settings.MediaUploadSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
@@ -131,7 +131,7 @@ func (h *AdminHandler) UpdateBrandingSettings(c *gin.Context) {
 	}
 	var req settings.BrandingSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
@@ -165,11 +165,11 @@ func (h *AdminHandler) UpdateOutboundPolicy(c *gin.Context) {
 	}
 	var req updateOutboundPolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误，allow_hosts 为必填")
+		writeIdentityRequestInvalid(c, msgUpdateOutboundPolicy)
 		return
 	}
 	if req.AllowHosts == nil {
-		writeIdentityRequestInvalid(c, "allow_hosts 不能为空")
+		writeIdentityRequestInvalid(c, msgUpdateOutboundPolicy2)
 		return
 	}
 	updated, err := runtimeSettings.UpdateOutboundPolicy(c.Request.Context(), settings.OutboundPolicySetting{

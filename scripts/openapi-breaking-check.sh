@@ -34,6 +34,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via SCRIPT_DIR; scripts/lib/common.sh is linted directly in ops.yml.
+source "$SCRIPT_DIR/lib/common.sh"
+
 OASDIFF_VERSION="${OASDIFF_VERSION:-v1.32.1}"
 BASE_REF="${1:-}"
 DEFAULT_SPECS=(
@@ -85,7 +89,7 @@ for spec in "${SPEC_FILES[@]}"; do
 done
 
 workdir="$(mktemp -d)"
-trap 'rm -rf "${workdir}"' EXIT
+cleanup_path "${workdir}"
 
 gobin="${workdir}/bin"
 mkdir -p "${gobin}"

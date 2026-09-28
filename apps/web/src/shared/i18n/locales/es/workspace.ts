@@ -45,6 +45,7 @@ export default {
     deleteFailed: 'No se pudo eliminar el lienzo',
   },
   boards: {
+    title: '¡Te damos la bienvenida a IdeaBoard!',
     subtitle: 'Explora, amplía y perfecciona tus ideas',
     newCanvas: 'Nuevo lienzo',
     searchPlaceholder: 'Buscar lienzos...',

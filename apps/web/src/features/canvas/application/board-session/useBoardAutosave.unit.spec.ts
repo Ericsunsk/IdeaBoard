@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { effectScope, ref } from 'vue'
 import { useBoardAutosave } from './useBoardAutosave'
 
 async function flushPromises() {
@@ -104,6 +104,30 @@ describe('useBoardAutosave', () => {
 
       expect(save).toHaveBeenCalledTimes(2)
       expect(save).toHaveBeenLastCalledWith({ silent: false })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops a pending debounced save when the scope is disposed', async () => {
+    vi.useFakeTimers()
+    try {
+      const isDirty = ref(true)
+      const isSaving = ref(false)
+      const save = vi.fn(async () => true)
+      const scope = effectScope()
+      const autosave = scope.run(() => useBoardAutosave({ isDirty, isSaving, save, delay: 20 }))
+      if (!autosave) throw new Error('autosave was not created')
+
+      autosave.markDirtyAndSchedule()
+      scope.stop()
+      await vi.advanceTimersByTimeAsync(50)
+      await flushPromises()
+
+      expect(save).not.toHaveBeenCalled()
+
+      await autosave.flushAutosave()
+      expect(save).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

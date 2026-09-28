@@ -61,13 +61,13 @@ func rateLimitMiddleware(provider settings.RateLimitSettingProvider) gin.Handler
 		policy := resolveRateLimitPolicy(c.Request.Context(), provider)
 		if err := c.Request.Context().Err(); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
-				response.Error(c, http.StatusServiceUnavailable, "请求处理超时，请稍后重试")
+				response.Error(c, http.StatusServiceUnavailable, msgRateLimitMiddleware)
 			}
 			c.Abort()
 			return
 		}
 		if !rateLimitStore.allow(ip, policy) {
-			response.Error(c, http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
+			response.Error(c, http.StatusTooManyRequests, msgRateLimitMiddleware2)
 			c.Abort()
 			return
 		}

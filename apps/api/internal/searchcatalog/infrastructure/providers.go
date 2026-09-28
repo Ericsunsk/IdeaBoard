@@ -51,7 +51,7 @@ func (a *httpProviderAdapter) Provider() domain.Provider { return a.provider }
 func (a *httpProviderAdapter) Test(ctx context.Context, apiKey string) (domain.FailureCategory, string, error) {
 	request, err := a.request(ctx, apiKey)
 	if err != nil {
-		return domain.FailureUnknown, "请求构造失败", err
+		return domain.FailureUnknown, msgTest, err
 	}
 	allowHosts := append(outbound.AllowHosts(ctx), a.providerHost())
 	response, err := providerOutbound.Do(ctx, request, outboundhttp.RequestOptions{
@@ -65,32 +65,32 @@ func (a *httpProviderAdapter) Test(ctx context.Context, apiKey string) (domain.F
 			return providerTestStatusFailure(statusErr.StatusCode)
 		}
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return domain.FailureNetwork, "请求超时", err
+			return domain.FailureNetwork, msgTest2, err
 		}
-		return domain.FailureNetwork, "网络不可达", err
+		return domain.FailureNetwork, msgTest3, err
 	}
 	defer response.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, 64*1024))
 	if readErr != nil {
-		return domain.FailureResponse, "响应读取失败", readErr
+		return domain.FailureResponse, msgTest4, readErr
 	}
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return domain.FailureCredentials, "凭证无效或无权访问", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureCredentials, msgTest5, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode == http.StatusTooManyRequests {
-		return domain.FailureQuota, "请求频率或配额受限", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureQuota, msgTest6, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return domain.FailureUnknown, "供应商拒绝了测试请求", fmt.Errorf("provider returned status %d", response.StatusCode)
+		return domain.FailureUnknown, msgTest7, fmt.Errorf("provider returned status %d", response.StatusCode)
 	}
 	if len(body) == 0 {
-		return domain.FailureResponse, "供应商返回为空响应", errors.New("empty provider response")
+		return domain.FailureResponse, msgTest8, errors.New("empty provider response")
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return domain.FailureResponse, "供应商响应格式无效", err
+		return domain.FailureResponse, msgTest9, err
 	}
-	return "", "连接测试通过", nil
+	return "", msgTest10, nil
 }
 
 func (a *httpProviderAdapter) providerHost() string {
@@ -115,11 +115,11 @@ func providerTestStatusFailure(status int) (domain.FailureCategory, string, erro
 	err := fmt.Errorf("provider returned status %d", status)
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return domain.FailureCredentials, "凭证无效或无权访问", err
+		return domain.FailureCredentials, msgTest5, err
 	case http.StatusTooManyRequests:
-		return domain.FailureQuota, "请求频率或配额受限", err
+		return domain.FailureQuota, msgTest6, err
 	default:
-		return domain.FailureUnknown, "供应商拒绝了测试请求", err
+		return domain.FailureUnknown, msgTest7, err
 	}
 }
 

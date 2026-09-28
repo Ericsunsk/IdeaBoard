@@ -315,12 +315,12 @@ func renderUploadStoreError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, workspacemedia.ErrExpired):
 		contract.RenderError(c, contract.StatusOf(contract.CodeUploadExpired),
-			contract.CodeUploadExpired, "上传会话已过期，请重新创建")
+			contract.CodeUploadExpired, msgUploadExpired)
 	case errors.Is(err, workspacemedia.ErrStateConflict):
 		contract.RenderError(c, contract.StatusOf(contract.CodeUploadStateConflict),
-			contract.CodeUploadStateConflict, "上传会话状态不允许此操作")
+			contract.CodeUploadStateConflict, msgUploadStateConflict)
 	default:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, msgUploadNotFound)
 	}
 	c.Abort()
 }
@@ -333,7 +333,7 @@ func renderUploadValidationError(c *gin.Context, err error) {
 			fields[field] = message
 		}
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeUploadValidationFailed),
-			contract.CodeUploadValidationFailed, "上传声明非法",
+			contract.CodeUploadValidationFailed, msgUploadValidationFailed,
 			contract.FieldErrors{Fields: fields})
 		c.Abort()
 		return
@@ -342,7 +342,7 @@ func renderUploadValidationError(c *gin.Context, err error) {
 }
 
 func renderMediaStoreError(c *gin.Context, err error) {
-	contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
+	contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound)
 	c.Abort()
 }
 
@@ -354,7 +354,7 @@ func renderMediaValidationError(c *gin.Context, err error) {
 			fields[field] = message
 		}
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeMediaValidationFailed),
-			contract.CodeMediaValidationFailed, "媒体参数非法",
+			contract.CodeMediaValidationFailed, msgMediaValidationFailed,
 			contract.FieldErrors{Fields: fields})
 		c.Abort()
 		return
@@ -385,7 +385,7 @@ func (h *contractV1Handler) createUploadSession(c *gin.Context) {
 		workspacePublicID := wctx.Workspace.PublicID
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -429,7 +429,7 @@ func (h *contractV1Handler) createUploadSession(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
@@ -438,7 +438,7 @@ func (h *contractV1Handler) createUploadSession(c *gin.Context) {
 		}
 		dto, ok := result.(*v1UploadSessionDTO)
 		if !ok || dto == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable4)
 			c.Abort()
 			return
 		}
@@ -451,7 +451,7 @@ func (h *contractV1Handler) getUploadSession(c *gin.Context) {
 		workspacePublicID := wctx.Workspace.PublicID
 		uploadID := strings.TrimSpace(c.Param("upload_id"))
 		if !contract.IsUploadID(uploadID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, msgUploadNotFound)
 			c.Abort()
 			return
 		}
@@ -479,7 +479,7 @@ func v1OptionalIdempotencyKey(c *gin.Context, hash string) (string, bool) {
 	}
 	parsed, err := contract.ParseIdempotencyKey(key)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return "", false
 	}
@@ -506,18 +506,18 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 	}
 	uploadID := strings.TrimSpace(c.Param("upload_id"))
 	if !contract.IsUploadID(uploadID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, msgUploadNotFound)
 		c.Abort()
 		return
 	}
 	if h.deps.MediaObjects == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传字节服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable50)
 		c.Abort()
 		return
 	}
 	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, workspacemedia.MaxUploadSizeBytes+1))
 	if readErr != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgRequireEmptyV1BillingActionBody)
 		c.Abort()
 		return
 	}
@@ -582,12 +582,12 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return
 		}
 		if errors.Is(doErr, errV1MediaBytesStoreUnavailable) {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传字节服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable50)
 			c.Abort()
 			return
 		}
@@ -596,7 +596,7 @@ func (h *contractV1Handler) putUploadBytes(c *gin.Context) {
 	}
 	dto, ok := result.(*v1UploadSessionDTO)
 	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable4)
 		c.Abort()
 		return
 	}
@@ -642,13 +642,13 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 		workspacePublicID := wctx.Workspace.PublicID
 		uploadID := strings.TrimSpace(c.Param("upload_id"))
 		if !contract.IsUploadID(uploadID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, msgUploadNotFound)
 			c.Abort()
 			return
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -689,12 +689,12 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeUploadIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
 			if errors.Is(doErr, errV1MediaStagedReadUnavailable) {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable4)
 				c.Abort()
 				return
 			}
@@ -703,7 +703,7 @@ func (h *contractV1Handler) completeUploadSession(c *gin.Context) {
 		}
 		dto, ok := result.(*v1CompleteUploadDTO)
 		if !ok || dto == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable4)
 			c.Abort()
 			return
 		}
@@ -813,7 +813,7 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		workspacePublicID := wctx.Workspace.PublicID
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 			c.Abort()
 			return
 		}
@@ -821,7 +821,7 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 				c.Abort()
 				return
 			}
@@ -830,7 +830,7 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		// Over-fetch by one to compute has_more without a count query.
 		assets, err := h.deps.Media.ListAssets(c.Request.Context(), workspacePublicID, pageSize+1, offset)
 		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable51)
 			c.Abort()
 			return
 		}
@@ -846,7 +846,7 @@ func (h *contractV1Handler) listMediaAssets(c *gin.Context) {
 		if hasMore {
 			next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: offset + pageSize})
 			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable51)
 				c.Abort()
 				return
 			}
@@ -870,7 +870,7 @@ func (h *contractV1Handler) getMediaAsset(c *gin.Context) {
 			return
 		}
 		if !contract.IsAssetID(assetID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound)
 			c.Abort()
 			return
 		}
@@ -930,13 +930,13 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 		workspacePublicID := wctx.Workspace.PublicID
 		assetID := strings.TrimSpace(c.Param("asset_id"))
 		if !contract.IsAssetID(assetID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound)
 			c.Abort()
 			return
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -959,7 +959,7 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
@@ -968,7 +968,7 @@ func (h *contractV1Handler) archiveMediaAsset(c *gin.Context) {
 		}
 		dto, ok := result.(*v1MediaAssetDTO)
 		if !ok || dto == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "媒体服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable51)
 			c.Abort()
 			return
 		}
@@ -1142,13 +1142,13 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 		return
 	}
 	if h.deps.MediaObjects == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 		c.Abort()
 		return
 	}
 	data, readErr := io.ReadAll(io.LimitReader(c.Request.Body, v1AvatarMaxBytes+1))
 	if readErr != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgRequireEmptyV1BillingActionBody)
 		c.Abort()
 		return
 	}
@@ -1175,13 +1175,13 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 	ctx := c.Request.Context()
 	storageUID, err := h.deps.AvatarUID.GetStorageUIDByUserID(ctx, identityPrincipal.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 		c.Abort()
 		return
 	}
 	prefix, err := storagedomain.ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 		c.Abort()
 		return
 	}
@@ -1206,17 +1206,17 @@ func (h *contractV1Handler) uploadAvatar(c *gin.Context) {
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeMediaIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return
 		}
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 		c.Abort()
 		return
 	}
 	dto, ok := result.(*v1AvatarDTO)
 	if !ok || dto == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "头像服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable52)
 		c.Abort()
 		return
 	}

@@ -12,6 +12,29 @@ export const MASK_PAINTING_PREVIEW_ALPHA = 0.5
 export const MASK_PAINTING_EMPTY_ALPHA_THRESHOLD = 0
 export const INPAINT_HISTORY_LIMIT = 40
 
+/**
+ * Pending-stroke buffer cap per node while the painter loads. Drags that
+ * finish before Fabric resolves buffer as one-shot strokes; the cap keeps
+ * the newest strokes and drops the oldest so a slow load cannot grow memory
+ * without bound.
+ */
+export const INPAINT_MAX_PENDING_STROKES_PER_NODE = 10
+
+/**
+ * Per-drag sample cap. Moves past the cap thin the buffered shape (keep
+ * every other sample) instead of truncating the tail; the live preview
+ * already rendered every sample, the buffer only feeds the one-shot
+ * fallback when no live session exists.
+ */
+export const INPAINT_MAX_POINTS_PER_STROKE = 2048
+
+/**
+ * Pointermove decimation floor. Samples closer than this to the previous
+ * accepted sample are dropped from both the buffer and the live preview.
+ * Below the minimum brush width, so rendering is visually identical.
+ */
+export const INPAINT_STROKE_MIN_MOVE_DISTANCE_PX = 2
+
 export const INPAINT_DEFAULT_BRUSH_SIZE = 18
 export const INPAINT_MIN_BRUSH_SIZE = 4
 export const INPAINT_MAX_BRUSH_SIZE = 48

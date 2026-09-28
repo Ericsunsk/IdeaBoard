@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
 
 type EnvSource = Record<string, string | undefined>
-type LoadEnv = typeof import('./env.js')['loadEnv']
+type LoadEnv = (typeof import('./env.js'))['loadEnv']
 
 let loadEnv: LoadEnv
 

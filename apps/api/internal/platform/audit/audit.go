@@ -18,6 +18,27 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Outcome is the single wire-stable audit outcome vocabulary ( ONE typed
+// outcome: no "failure" vs "failed" split). Values mirror the durable
+// control_audit_records CHECK constraint plus the read word used by
+// non-persisted guard observations:
+//   - read: a guarded non-mutating observation (never persisted; the
+//     durable store maps it to success via MapOutcome).
+//   - success: the guarded call succeeded.
+//   - denied: the call was refused (authZ, missing reason/idempotency key).
+//   - failure: the guarded call failed (handler 4xx/5xx outcomes).
+//
+// Do not add spellings without coordinating openapi.control.yaml
+// AuditRecord.outcome and every emitter/consumer below.
+type Outcome string
+
+const (
+	OutcomeRead    Outcome = "read"
+	OutcomeSuccess Outcome = "success"
+	OutcomeDenied  Outcome = "denied"
+	OutcomeFailure Outcome = "failure"
+)
+
 // RecordParams carries one guarded Control Plane call for durable
 // storage. OperatorUserID is the internal numeric id (FK target);
 // OperatorType/OperatorID stay public-only for the slog record.
@@ -34,7 +55,7 @@ type RecordParams struct {
 	// set it is persisted inside metadata (never in error text).
 	AuthUserID     string
 	Reason         string
-	Outcome        string
+	Outcome        Outcome
 	ErrorMessage   string
 	RequestID      string
 	IdempotencyKey string
@@ -66,15 +87,17 @@ type repositoryQueryer struct {
 
 // MapOutcome converges guard outcomes to the table CHECK constraint
 // (success/failure/denied): reads are successful operations, failures
-// (including 4xx/5xx handler outcomes) map to failure.
-func MapOutcome(outcome string) string {
+// (including 4xx/5xx handler outcomes) map to failure. The durable
+// store has no read word, so OutcomeRead maps to success; the zero
+// value keeps the historical success default. There is no "failed"
+// spelling: emitters use the typed Outcome constants above.
+func MapOutcome(outcome Outcome) string {
 	switch outcome {
-	case "denied":
+	case OutcomeDenied:
 		return "denied"
+	case OutcomeFailure:
+		return "failure"
 	default:
-		if outcome == "failure" || outcome == "failed" {
-			return "failure"
-		}
 		return "success"
 	}
 }

@@ -139,6 +139,19 @@ describe('prompt config workspace facade', () => {
 
     expect(workspace.promptMap[featureSlug]).toBe('{{variation_strength}}tail')
   })
+
+  it('threads the caller signal to the fetch and stays silent on abort', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const controller = new AbortController()
+    const abortError = new DOMException('The operation was aborted.', 'AbortError')
+    mockResource.fetchPrompts.mockRejectedValueOnce(abortError)
+
+    await workspace.loadPrompts({ signal: controller.signal })
+
+    expect(mockResource.fetchPrompts).toHaveBeenCalledWith(controller.signal)
+    expect(feedback.loadPromptsFailed).not.toHaveBeenCalled()
+    expect(workspace.loading.value).toBe(false)
+  })
 })
 
 function createWorkspace() {

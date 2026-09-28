@@ -21,16 +21,16 @@ type creditErrorMapping struct {
 }
 
 var creditErrorTable = []creditErrorMapping{
-	{target: domain.ErrInvalidCommand, status: http.StatusBadRequest, message: "参数错误"},
-	{target: domain.ErrIdempotencyConflict, status: http.StatusConflict, message: "幂等键已用于不同的Idea操作"},
-	{target: domain.ErrWalletNotFound, status: http.StatusNotFound, message: "Idea钱包不存在"},
-	{target: domain.ErrWalletFrozen, status: http.StatusLocked, message: "Idea钱包已冻结"},
-	{target: domain.ErrWalletRestricted, status: http.StatusLocked, message: "Idea钱包当前受限"},
-	{target: domain.ErrInsufficientCredits, status: http.StatusUnprocessableEntity, message: "Idea不足"},
-	{target: domain.ErrChargeNotFound, status: http.StatusNotFound, message: "原扣款记录不存在"},
-	{target: domain.ErrRefundExceedsCharge, status: http.StatusUnprocessableEntity, message: "退款金额超过原扣款剩余额度"},
-	{target: domain.ErrReconciliationNotFound, status: http.StatusNotFound, message: "Idea对账任务不存在"},
-	{target: domain.ErrReconciliationUnavailable, status: http.StatusServiceUnavailable, message: "Idea对账服务暂不可用", internal: true},
+	{target: domain.ErrInvalidCommand, status: http.StatusBadRequest, message: msgPackage},
+	{target: domain.ErrIdempotencyConflict, status: http.StatusConflict, message: msgPackage2},
+	{target: domain.ErrWalletNotFound, status: http.StatusNotFound, message: msgPackage3},
+	{target: domain.ErrWalletFrozen, status: http.StatusLocked, message: msgPackage4},
+	{target: domain.ErrWalletRestricted, status: http.StatusLocked, message: msgPackage5},
+	{target: domain.ErrInsufficientCredits, status: http.StatusUnprocessableEntity, message: msgPackage6},
+	{target: domain.ErrChargeNotFound, status: http.StatusNotFound, message: msgPackage7},
+	{target: domain.ErrRefundExceedsCharge, status: http.StatusUnprocessableEntity, message: msgPackage8},
+	{target: domain.ErrReconciliationNotFound, status: http.StatusNotFound, message: msgPackage9},
+	{target: domain.ErrReconciliationUnavailable, status: http.StatusServiceUnavailable, message: msgPackage10, internal: true},
 }
 
 func writeCreditError(c *gin.Context, err error) {
@@ -44,5 +44,24 @@ func writeCreditError(c *gin.Context, err error) {
 			return
 		}
 	}
-	response.InternalError(c, http.StatusInternalServerError, "Idea操作失败", err)
+	response.InternalError(c, http.StatusInternalServerError, msgWriteCreditError, err)
 }
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgServiceUnavailable = "Idea服务暂不可用"      // CodeServiceUnavailable
+	msgPackage            = "参数错误"            // Package @ errors.go
+	msgPackage2           = "幂等键已用于不同的Idea操作" // Package @ errors.go
+	msgPackage3           = "Idea钱包不存在"       // Package @ errors.go
+	msgPackage4           = "Idea钱包已冻结"       // Package @ errors.go
+	msgPackage5           = "Idea钱包当前受限"      // Package @ errors.go
+	msgPackage6           = "Idea不足"          // Package @ errors.go
+	msgPackage7           = "原扣款记录不存在"        // Package @ errors.go
+	msgPackage8           = "退款金额超过原扣款剩余额度"   // Package @ errors.go
+	msgPackage9           = "Idea对账任务不存在"     // Package @ errors.go
+	msgPackage10          = "Idea对账服务暂不可用"    // Package @ errors.go
+	msgWriteCreditError   = "Idea操作失败"        // WriteCreditError @ errors.go
+)

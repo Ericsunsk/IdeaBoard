@@ -62,7 +62,7 @@ const emit = defineEmits<{
   'update:visible': [visible: boolean]
 }>()
 const { t } = useI18n()
-const busy = ref(false)
+const busy = ref(false) // Overlay dismiss guard (not `useAsyncAction`): wired into `useOverlayInteractionLifecycle`.
 const {
   ariaBusy,
   canDismiss,

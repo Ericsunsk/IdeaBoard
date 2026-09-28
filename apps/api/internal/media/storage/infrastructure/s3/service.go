@@ -188,7 +188,7 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 
 	src, err := file.Open()
 	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRefWithConfig, err)
 	}
 	defer src.Close()
 
@@ -198,7 +198,7 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 func (s *S3CompatibleService) UploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf("读取图片信息失败: %w", err)
+		return nil, fmt.Errorf(msgUploadBytesWithConfigRef, err)
 	}
 	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
@@ -222,14 +222,14 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return fmt.Errorf("文件路径不能为空")
+		return fmt.Errorf(msgPutBytesAtKeyWithConfig)
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
 	}
 	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
 	if err != nil {
-		return fmt.Errorf("读取对象 generation 失败: %w", err)
+		return fmt.Errorf(msgPutBytesAtKeyWithConfig2, err)
 	}
 	body := bytes.NewReader(data)
 	if err := s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
@@ -245,7 +245,7 @@ func (s *S3CompatibleService) PutBytesAtKeyWithConfig(ctx context.Context, objec
 		observeS3Data(putErr, time.Since(startedAt))
 		return putErr
 	}); err != nil {
-		return fmt.Errorf("上传派生图片失败: %w", err)
+		return fmt.Errorf(msgPutBytesAtKeyWithConfig3, err)
 	}
 	return nil
 }
@@ -259,13 +259,13 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	if body == nil {
-		return nil, fmt.Errorf("文件内容不能为空")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef2)
 	}
 	if size < 0 {
-		return nil, fmt.Errorf("文件大小无效")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef3)
 	}
 
 	client, err := s.prepareUploadClient(ctx, cfg)
@@ -278,7 +278,7 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 
 func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	return s.clientWithConfig(ctx, cfg)
 }
@@ -297,11 +297,11 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 	}
 	body, checksum, err := prepareChecksumBody(body)
 	if err != nil {
-		return nil, fmt.Errorf("计算上传文件 checksum 失败: %w", err)
+		return nil, fmt.Errorf(msgPutReaderWithConfigRef, err)
 	}
 	generation, err := s.nextObjectGeneration(ctx, client, cfg, key)
 	if err != nil {
-		return nil, fmt.Errorf("读取对象 generation 失败: %w", err)
+		return nil, fmt.Errorf(msgPutBytesAtKeyWithConfig2, err)
 	}
 
 	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
@@ -318,7 +318,7 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 		return putErr
 	})
 	if err != nil {
-		return nil, fmt.Errorf("上传失败: %w", err)
+		return nil, fmt.Errorf(msgPutReaderWithConfigRef2, err)
 	}
 
 	publicURL, err := s.PublicObjectURL(cfg, key)
@@ -383,7 +383,7 @@ func (s *S3CompatibleService) putObjectWithRetry(
 	return s.retryR2PermissionDenied(ctx, cfg, "object upload", func(attempt int) error {
 		if attempt > 0 {
 			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-				return fmt.Errorf("重试上传前重置文件失败: %w", err)
+				return fmt.Errorf(msgPutObjectWithRetry, err)
 			}
 		}
 		return put(ctx)
@@ -427,7 +427,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return fmt.Errorf("文件路径不能为空")
+		return fmt.Errorf(msgPutBytesAtKeyWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -440,7 +440,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 		return removeErr
 	})
 	if err != nil {
-		return fmt.Errorf("删除失败: %w", err)
+		return fmt.Errorf(msgDeleteWithConfig, err)
 	}
 	return nil
 }
@@ -450,11 +450,11 @@ func (s *S3CompatibleService) ReadWithConfig(ctx context.Context, objectKey stri
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return nil, fmt.Errorf("文件路径不能为空")
+		return nil, fmt.Errorf(msgPutBytesAtKeyWithConfig)
 	}
 	return s.readDeliveryObject(ctx, key, cfg, maxBytes)
 }
@@ -475,24 +475,24 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 		signedURL, signedErr := s.SignedURLWithConfig(ctx, key, time.Minute, cfg)
 		if signedErr != nil {
 			if err != nil {
-				return nil, fmt.Errorf("读取文件失败: %w", err)
+				return nil, fmt.Errorf(msgReadDeliveryObject, err)
 			}
-			return nil, fmt.Errorf("读取文件失败: %w", signedErr)
+			return nil, fmt.Errorf(msgReadDeliveryObject, signedErr)
 		}
 		response, err = s3GetWithPolicy(ctx, signedURL)
 		if err != nil {
-			return nil, fmt.Errorf("读取 signed 文件失败: %w", err)
+			return nil, fmt.Errorf(msgReadDeliveryObject2, err)
 		}
 	}
 	if response == nil {
-		return nil, fmt.Errorf("读取文件失败: 空响应")
+		return nil, fmt.Errorf(msgReadDeliveryObject3)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
 		return nil, domain.ErrStoredObjectNotFound
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("读取文件失败: 存储服务返回 HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf(msgReadDeliveryObject4, response.StatusCode)
 	}
 
 	data, err := readStorageObject(response.Body, maxBytes)
@@ -516,11 +516,11 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	prefix := strings.TrimSpace(objectKeyPrefix)
 	if prefix == "" {
-		return fmt.Errorf("文件前缀不能为空")
+		return fmt.Errorf(msgDeletePrefixWithConfig)
 	}
 
 	client, err := s.clientWithConfig(ctx, cfg)
@@ -551,7 +551,7 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("删除前缀对象失败: %w", err)
+		return fmt.Errorf(msgDeletePrefixWithConfig2, err)
 	}
 	return nil
 }
@@ -561,11 +561,11 @@ func (s *S3CompatibleService) ListObjectKeysWithConfig(ctx context.Context, obje
 		return nil, err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return nil, fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
 	if prefix == "" {
-		return nil, fmt.Errorf("文件前缀不能为空")
+		return nil, fmt.Errorf(msgDeletePrefixWithConfig)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
@@ -589,11 +589,11 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 		return "", err
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return "", fmt.Errorf(msgUploadReaderWithConfigRef)
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {
-		return "", fmt.Errorf("文件路径不能为空")
+		return "", fmt.Errorf(msgPutBytesAtKeyWithConfig)
 	}
 	if expiry <= 0 {
 		expiry = time.Hour
@@ -604,7 +604,7 @@ func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey
 	}
 	signed, err := client.PresignedGetObject(ctx, strings.TrimSpace(cfg.BucketName), key, expiry, nil)
 	if err != nil {
-		return "", fmt.Errorf("生成 S3 signed URL 失败: %w", err)
+		return "", fmt.Errorf(msgSignedURLWithConfig, err)
 	}
 	return signed.String(), nil
 }
@@ -618,7 +618,7 @@ func (s *S3CompatibleService) VerifyObjectGeneration(ctx context.Context, object
 		return fmt.Errorf("%w: object key is empty", domain.ErrObjectGenerationUnavailable)
 	}
 	if !s.IsConfigEnabled(cfg) {
-		return fmt.Errorf("%w: S3 兼容存储配置未启用或不完整", domain.ErrObjectGenerationUnavailable)
+		return fmt.Errorf(msgVerifyObjectGeneration, domain.ErrObjectGenerationUnavailable)
 	}
 	var actual int64
 	var err error
@@ -682,20 +682,20 @@ func (s *S3CompatibleService) nextObjectGeneration(ctx context.Context, client *
 
 func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
 	if cfg == nil {
-		return fmt.Errorf("配置不能为空")
+		return fmt.Errorf(msgValidateBaseConfig)
 	}
 	if strings.TrimSpace(cfg.AccessKeyID) == "" || cfg.SecretAccessKey == "" || strings.TrimSpace(cfg.BucketName) == "" {
-		return fmt.Errorf("请先填写 Access Key ID / Secret Access Key / Bucket 名称")
+		return fmt.Errorf(msgValidateBaseConfig2)
 	}
 	if strings.TrimSpace(cfg.Endpoint) == "" {
-		return fmt.Errorf("请先填写 Endpoint")
+		return fmt.Errorf(msgValidateBaseConfig3)
 	}
 	return validateS3EndpointPolicy(ctx, cfg.Endpoint)
 }
 
 func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("配置不能为空")
+		return nil, fmt.Errorf(msgValidateBaseConfig)
 	}
 	if err := validateS3EndpointPolicy(ctx, cfg.Endpoint); err != nil {
 		return nil, err
@@ -727,7 +727,7 @@ func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3Compa
 		Transport:    transport,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("初始化 S3 客户端失败: %w", err)
+		return nil, fmt.Errorf(msgClientWithConfig, err)
 	}
 
 	actual, _ := s.clientCache.LoadOrStore(cacheKey, client)
@@ -740,7 +740,7 @@ func s3ClientTransport(cfg *S3CompatibleConfig, secure bool) (http.RoundTripper,
 	}
 	transport, err := minio.DefaultTransport(secure)
 	if err != nil {
-		return nil, fmt.Errorf("初始化 R2 HTTP 传输失败: %w", err)
+		return nil, fmt.Errorf(msgS3ClientTransport, err)
 	}
 	transport.DisableKeepAlives = true
 	return transport, nil
@@ -798,13 +798,13 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %w", err)
+		return nil, fmt.Errorf(msgReadDeliveryObject, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("文件超过大小限制 (%d MB)", maxBytes/1024/1024)
+		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, fmt.Errorf("文件内容为空")
+		return nil, fmt.Errorf(msgReadStorageObject2)
 	}
 	return data, nil
 }

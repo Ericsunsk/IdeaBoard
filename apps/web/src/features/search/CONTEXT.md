@@ -14,6 +14,7 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 
 ## Public Seams
 - `features/search/index.ts` unified public export: exports domain models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
+- `ports/` (feature-root hexagonal seam): `libraryCoordinatorPort` + `persistencePort` are the only application↔infrastructure contracts; application and infrastructure never import each other directly.
 - `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `useSearchScreenRuntime`.
 - Search viewport components virtualized masonry viewport, save dialog, batch dock; callback props only (`load-next-page`, `scroll-position`), no data ownership.
 - `application/createSearchFeed` feed factory; `reload` keeps cards via `keepResultsOnNextLoad`.

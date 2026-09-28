@@ -65,7 +65,7 @@ func ValidatePreparedConfiguration(prepared paymentports.PreparedStripeConfigura
 func GatewayFailure(err error) (paymentports.GatewayErrorCode, string, error) {
 	var gatewayErr *paymentports.GatewayError
 	if !errors.As(err, &gatewayErr) {
-		return paymentports.GatewayErrorProviderUnavailable, "Stripe 服务暂时不可用", paymentcontracts.ErrStripeProviderUnavailable
+		return paymentports.GatewayErrorProviderUnavailable, msgGatewayFailure, paymentcontracts.ErrStripeProviderUnavailable
 	}
 	summary := gatewayErr.Error()
 	if summary == "" {

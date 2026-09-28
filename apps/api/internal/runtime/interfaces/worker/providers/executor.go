@@ -238,7 +238,7 @@ func marshalProviderTaskResult(taskID string, result map[string]interface{}) (st
 		return "", runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf("序列化任务结果失败 (task_id=%s): %w", taskID, err),
+			fmt.Errorf(msgMarshalProviderTaskResult, taskID, err),
 		)
 	}
 	return string(resultJSON), nil
@@ -252,7 +252,7 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("持久化上游图片失败: 存储服务未初始化"),
+			fmt.Errorf(msgMaterializeProviderResultImages),
 		)
 	}
 
@@ -272,21 +272,21 @@ func (c *Executor) materializeProviderResultImages(ctx context.Context, userID i
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("持久化上游图片失败: %w", storeErr),
+			fmt.Errorf(msgMaterializeProviderResultImages2, storeErr),
 		)
 	}
 	if len(materialized.Items) == 0 {
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("持久化上游图片失败: materializer returned no image URLs"),
+			fmt.Errorf(msgMaterializeProviderResultImages3),
 		)
 	}
 	if len(materialized.Items) != len(imageURLs) {
 		return nil, nil, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("持久化上游图片失败: materializer returned inconsistent result counts: source=%d items=%d", len(imageURLs), len(materialized.Items)),
+			fmt.Errorf(msgMaterializeProviderResultImages4, len(imageURLs), len(materialized.Items)),
 		)
 	}
 	for index, sourceURL := range imageURLs {

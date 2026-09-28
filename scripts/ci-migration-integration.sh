@@ -4,6 +4,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via script_dir; scripts/lib/common.sh is linted directly in ops.yml.
+source "${script_dir}/lib/common.sh"
 
 postgres_image="${CI_MIGRATION_POSTGRES_IMAGE:-postgres:17-alpine}"
 postgres_container="${CI_MIGRATION_POSTGRES_CONTAINER:-}"
@@ -45,7 +47,7 @@ esac
 atlas_binary="${CI_MIGRATION_ATLAS_BINARY:-}"
 if [[ -z "${atlas_binary}" ]]; then
   atlas_binary="$(mktemp)"
-  trap 'rm -f -- "${atlas_binary}"' EXIT
+  cleanup_path "${atlas_binary}"
   curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v${atlas_version}" -o "${atlas_binary}"
   chmod 0555 "${atlas_binary}"
 fi

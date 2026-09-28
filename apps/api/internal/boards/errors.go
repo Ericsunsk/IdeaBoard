@@ -61,27 +61,27 @@ type boardErrorMapping struct {
 }
 
 var (
-	boardErrInvalidInput     = boardErrorMapping{ErrInvalidInput, 400, codeBoardInvalidInput, "参数错误", false}
-	boardErrNotFound         = boardErrorMapping{ErrNotFound, 404, codeBoardNotFound, "画布不存在", false}
-	boardErrNameConflict     = boardErrorMapping{ErrNameConflict, 409, codeBoardNameConflict, "画布名称已存在，请使用其他名称", false}
-	boardErrRevisionConflict = boardErrorMapping{ErrRevisionConflict, 409, codeBoardRevisionConflict, "画布版本已变更，请刷新后重试", false}
-	boardErrIDConflict       = boardErrorMapping{ErrIDConflict, 409, codeBoardIDConflict, "画布ID已存在，请刷新后重试", false}
+	boardErrInvalidInput     = boardErrorMapping{ErrInvalidInput, 400, codeBoardInvalidInput, msgBoardInvalidInput, false}
+	boardErrNotFound         = boardErrorMapping{ErrNotFound, 404, codeBoardNotFound, msgBoardNotFound, false}
+	boardErrNameConflict     = boardErrorMapping{ErrNameConflict, 409, codeBoardNameConflict, msgBoardNameConflict, false}
+	boardErrRevisionConflict = boardErrorMapping{ErrRevisionConflict, 409, codeBoardRevisionConflict, msgBoardRevisionConflict, false}
+	boardErrIDConflict       = boardErrorMapping{ErrIDConflict, 409, codeBoardIDConflict, msgBoardIDConflict, false}
 
-	boardErrModifyForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, "无权修改该画布", false}
-	boardErrDeleteForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, "无权删除该画布", false}
-	boardErrMemberForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, "仅 owner 可管理成员", false}
-	boardErrShareForbidden  = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, "仅 owner 可管理分享链接", false}
+	boardErrModifyForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, msgBoardPermissionDenied, false}
+	boardErrDeleteForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, msgBoardPermissionDenied2, false}
+	boardErrMemberForbidden = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, msgBoardPermissionDenied3, false}
+	boardErrShareForbidden  = boardErrorMapping{ErrPermissionDenied, 403, codeBoardPermissionDenied, msgBoardPermissionDenied4, false}
 
-	boardErrCanvasCleanupFailed = boardErrorMapping{ErrCanvasCleanupFailed, 500, codeBoardOperationFailed, "删除画布失败：文件清理失败", true}
+	boardErrCanvasCleanupFailed = boardErrorMapping{ErrCanvasCleanupFailed, 500, codeBoardOperationFailed, msgBoardOperationFailed, true}
 
-	boardErrMemberNotFound    = boardErrorMapping{ErrMemberNotFound, 404, codeBoardMemberNotFound, "成员不存在", false}
-	boardErrMemberInvalidRole = boardErrorMapping{ErrMemberInvalidRole, 400, codeBoardMemberRoleInvalid, "角色无效，仅支持 editor/viewer", false}
-	boardErrMemberInviteSelf  = boardErrorMapping{ErrMemberInviteSelf, 400, codeBoardMemberSelfInvalid, "不能邀请或移除 owner 自己", false}
+	boardErrMemberNotFound    = boardErrorMapping{ErrMemberNotFound, 404, codeBoardMemberNotFound, msgBoardMemberNotFound, false}
+	boardErrMemberInvalidRole = boardErrorMapping{ErrMemberInvalidRole, 400, codeBoardMemberRoleInvalid, msgBoardMemberRoleInvalid, false}
+	boardErrMemberInviteSelf  = boardErrorMapping{ErrMemberInviteSelf, 400, codeBoardMemberSelfInvalid, msgBoardMemberSelfInvalid, false}
 
-	boardErrShareTokenNotFound = boardErrorMapping{ErrShareTokenNotFound, 404, codeBoardShareTokenNotFound, "分享链接不存在", false}
-	boardErrShareTokenRevoked  = boardErrorMapping{ErrShareTokenRevoked, 400, codeBoardShareTokenRevoked, "分享链接已撤销", false}
-	boardErrShareTokenExpired  = boardErrorMapping{ErrShareTokenExpired, 400, codeBoardShareTokenExpired, "分享链接已过期", false}
-	boardErrShareTokenInvalid  = boardErrorMapping{ErrShareTokenInvalid, 400, codeBoardShareTokenInvalid, "分享链接无效", false}
+	boardErrShareTokenNotFound = boardErrorMapping{ErrShareTokenNotFound, 404, codeBoardShareTokenNotFound, msgBoardShareTokenNotFound, false}
+	boardErrShareTokenRevoked  = boardErrorMapping{ErrShareTokenRevoked, 400, codeBoardShareTokenRevoked, msgBoardShareTokenRevoked, false}
+	boardErrShareTokenExpired  = boardErrorMapping{ErrShareTokenExpired, 400, codeBoardShareTokenExpired, msgBoardShareTokenExpired, false}
+	boardErrShareTokenInvalid  = boardErrorMapping{ErrShareTokenInvalid, 400, codeBoardShareTokenInvalid, msgBoardShareTokenInvalid, false}
 )
 
 // Matches reports errors.Is membership for this row's sentinel so the
@@ -107,7 +107,7 @@ func respondBoardError(c *gin.Context, err error, rows []boardErrorMapping, inte
 // code instead of copy.
 func writeBoardInputError(c *gin.Context, message string) {
 	if message == "" {
-		message = "参数错误"
+		message = msgBoardInvalidInput
 	}
 	errorrender.Render(c, 400, codeBoardInvalidInput, message)
 }
@@ -146,4 +146,30 @@ var (
 		boardErrShareTokenExpired,
 		boardErrShareTokenInvalid,
 	}
+)
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgBoardInvalidInput        = "参数错误"                   // codeBoardInvalidInput
+	msgBoardNotFound            = "画布不存在"                  // codeBoardNotFound
+	msgBoardNameConflict        = "画布名称已存在，请使用其他名称"        // codeBoardNameConflict
+	msgBoardRevisionConflict    = "画布版本已变更，请刷新后重试"         // codeBoardRevisionConflict
+	msgBoardIDConflict          = "画布ID已存在，请刷新后重试"         // codeBoardIDConflict
+	msgBoardPermissionDenied    = "无权修改该画布"                // codeBoardPermissionDenied
+	msgBoardPermissionDenied2   = "无权删除该画布"                // codeBoardPermissionDenied
+	msgBoardPermissionDenied3   = "仅 owner 可管理成员"          // codeBoardPermissionDenied
+	msgBoardPermissionDenied4   = "仅 owner 可管理分享链接"        // codeBoardPermissionDenied
+	msgBoardOperationFailed     = "删除画布失败：文件清理失败"          // codeBoardOperationFailed
+	msgBoardMemberNotFound      = "成员不存在"                  // codeBoardMemberNotFound
+	msgBoardMemberRoleInvalid   = "角色无效，仅支持 editor/viewer" // codeBoardMemberRoleInvalid
+	msgBoardMemberSelfInvalid   = "不能邀请或移除 owner 自己"       // codeBoardMemberSelfInvalid
+	msgBoardShareTokenNotFound  = "分享链接不存在"                // codeBoardShareTokenNotFound
+	msgBoardShareTokenRevoked   = "分享链接已撤销"                // codeBoardShareTokenRevoked
+	msgBoardShareTokenExpired   = "分享链接已过期"                // codeBoardShareTokenExpired
+	msgBoardShareTokenInvalid   = "分享链接无效"                 // codeBoardShareTokenInvalid
+	msgGenerateBoardShareToken  = "生成分享令牌失败: %w"           // GenerateBoardShareToken @ service.go
+	msgGenerateBoardShareToken2 = "生成分享令牌失败"               // GenerateBoardShareToken @ service.go
 )

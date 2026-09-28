@@ -383,32 +383,32 @@ func isExternalReferenceHost(host, provider string) bool {
 // TestWriteVisionErrorUsesStableMachineCodes as the stable vision
 // error-code contract).
 func writeVisionError(c *gin.Context, err error) {
-	status, code, message := http.StatusBadGateway, string(contract.CodeVisionSearchProviderError), "视觉搜索暂时不可用"
+	status, code, message := http.StatusBadGateway, string(contract.CodeVisionSearchProviderError), msgVisionSearchProviderError
 	switch {
 	case errors.Is(err, domain.ErrVisionInput):
-		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchInputInvalid), "请添加 1–4 张参考图"
+		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchInputInvalid), msgVisionSearchInputInvalid
 	case errors.Is(err, domain.ErrVisionImageInvalid):
-		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchImageInvalid), "参考图格式、尺寸或总大小无效"
+		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchImageInvalid), msgVisionSearchImageInvalid
 	case errors.Is(err, domain.ErrVisionImageUnavailable):
-		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchImageUnavailable), "参考图暂时无法读取"
+		status, code, message = http.StatusBadRequest, string(contract.CodeVisionSearchImageUnavailable), msgVisionSearchImageUnavailable
 	case errors.Is(err, domain.ErrVisionNotConfigured):
-		status, code, message = http.StatusServiceUnavailable, string(contract.CodeVisionSearchNotConfigured), "视觉搜索暂未配置"
+		status, code, message = http.StatusServiceUnavailable, string(contract.CodeVisionSearchNotConfigured), msgVisionSearchNotConfigured
 	case errors.Is(err, domain.ErrVisionUnavailable):
-		status, code, message = http.StatusServiceUnavailable, string(contract.CodeVisionSearchUnavailable), "视觉搜索暂不可用"
+		status, code, message = http.StatusServiceUnavailable, string(contract.CodeVisionSearchUnavailable), msgVisionSearchUnavailable
 	case errors.Is(err, domain.ErrVisionSchema):
-		status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchSchemaError), "视觉搜索返回格式无效"
+		status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchSchemaError), msgVisionSearchSchemaError
 	default:
 		var providerErr *domain.VisionProviderError
 		if errors.As(err, &providerErr) {
 			switch providerErr.Kind {
 			case domain.VisionProviderFailureCredentials:
-				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchCredentials), "视觉搜索凭证无效"
+				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchCredentials), msgVisionSearchCredentials
 			case domain.VisionProviderFailureQuota:
-				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchQuota), "视觉搜索权限或配额不可用"
+				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchQuota), msgVisionSearchQuota
 			case domain.VisionProviderFailureTimeout:
-				status, code, message = http.StatusGatewayTimeout, string(contract.CodeVisionSearchTimeout), "视觉搜索超时，请重试"
+				status, code, message = http.StatusGatewayTimeout, string(contract.CodeVisionSearchTimeout), msgVisionSearchTimeout
 			case domain.VisionProviderFailureNetwork:
-				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchNetwork), "视觉搜索连接失败，请重试"
+				status, code, message = http.StatusBadGateway, string(contract.CodeVisionSearchNetwork), msgVisionSearchNetwork
 			}
 		}
 	}

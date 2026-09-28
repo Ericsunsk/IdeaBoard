@@ -27,12 +27,12 @@ func (h *Handler) SetObservedService(svc *ObservedService) {
 // Authorization rides the outer Control Plane guard (controlProxy + guard).
 func (h *Handler) ListModelsObserved(c *gin.Context) {
 	if h == nil || h.observed == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "模型观测服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgListModelsObserved, nil)
 		return
 	}
 	rows, err := h.observed.ListModelsObserved(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取模型观测数据失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgListModelsObserved2, err)
 		return
 	}
 	response.SuccessDTO(c, rows)

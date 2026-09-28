@@ -9,7 +9,6 @@ import (
 
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
-	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/searchcatalog/application"
 	"ideaboard/api/internal/searchcatalog/domain"
 
@@ -24,14 +23,14 @@ func NewSearchHandler(service *application.SearchService) *SearchHandler {
 
 func (h *SearchHandler) Search(c *gin.Context) {
 	if h == nil || h.service == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchUnavailable), "搜索服务暂不可用")
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchUnavailable), msgSearchUnavailable)
 		return
 	}
 	limit := application.DefaultSearchLimit
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 || parsed > application.MaxSearchLimit {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchLimitInvalid), "limit 必须在 1 到 48 之间")
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchLimitInvalid), msgSearchLimitInvalid)
 			return
 		}
 		limit = parsed
@@ -39,20 +38,20 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit)
 	if err != nil {
 		if errors.Is(err, application.ErrNoSearchProviders) {
-			response.SuccessDTO(c, domain.SearchResponse{Query: c.Query("q"), Results: []domain.Result{}, HasMore: false})
+			contract.RenderSuccess(c, domain.SearchResponse{Query: c.Query("q"), Results: []domain.Result{}, HasMore: false})
 			return
 		}
 		msg := err.Error()
-		if strings.Contains(msg, "搜索关键词") {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf("搜索关键词不能超过 %d 个字符", application.MaxSearchQueryRunes))
+		if strings.Contains(msg, msgSearch) {
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(msgSearchQueryInvalid, application.MaxSearchQueryRunes))
 			return
 		}
-		if strings.Contains(msg, "分页游标") {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchCursorInvalid), "分页游标无效")
+		if strings.Contains(msg, msgSearch2) {
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchCursorInvalid), msgSearchCursorInvalid)
 			return
 		}
-		response.InternalError(c, http.StatusBadGateway, "搜索服务暂时不可用", err)
+		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchUnavailable, msgSearchUnavailable2)
 		return
 	}
-	response.SuccessDTO(c, result)
+	contract.RenderSuccess(c, result)
 }

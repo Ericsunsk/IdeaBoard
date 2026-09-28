@@ -113,17 +113,17 @@ func Validate(scope Scope, targetKey, logoKey string) error {
 		return err
 	}
 	if _, ok := allowedLogoKeys[strings.TrimSpace(logoKey)]; !ok {
-		return validation.New("logo_key 不受支持")
+		return validation.New(msgValidate)
 	}
 	return nil
 }
 
 func ValidateTarget(scope Scope, targetKey string) error {
 	if !scope.Valid() {
-		return validation.New("scope 不受支持")
+		return validation.New(msgValidateTarget)
 	}
 	if !validTargetKey.MatchString(strings.TrimSpace(targetKey)) {
-		return validation.New("target_key 格式无效")
+		return validation.New(msgValidateTarget2)
 	}
 	return nil
 }

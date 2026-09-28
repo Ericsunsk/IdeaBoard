@@ -319,7 +319,12 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         !isNodeUploadRequestCurrent(nodeId, requestId) ||
         !options.getImageNodeSnapshot(nodeId)
       ) {
-        releaseLocalUpload(nodeId)
+        // A newer drop may have replaced this call's entry while the upload
+        // was in flight. Only release when the stored entry is still this
+        // call's; otherwise return stale without destroying the newer upload.
+        if (localUploads.get(nodeId) === localUpload) {
+          releaseLocalUpload(nodeId)
+        }
         return { kind: 'stale' }
       }
       options.updateSnapshotNode(nodeId, (prev) => {
@@ -384,6 +389,10 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     for (const nodeId of Array.from(localUploads.keys())) releaseLocalUpload(nodeId)
   }
 
+  function hasLocalUploads(): boolean {
+    return localUploads.size > 0
+  }
+
   return {
     uploadImageToBoard,
     applyImageFileToImageNode,
@@ -391,5 +400,6 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     retryLocalUpload,
     releaseDetachedLocalUploads,
     disposeLocalUploads,
+    hasLocalUploads,
   }
 }

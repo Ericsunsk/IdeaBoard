@@ -49,7 +49,7 @@ func RequestTimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 		if ctx.Err() == context.DeadlineExceeded && !c.Writer.Written() {
-			response.Error(c, http.StatusServiceUnavailable, "请求处理超时，请稍后重试")
+			response.Error(c, http.StatusServiceUnavailable, msgRateLimitMiddleware)
 			c.Abort()
 		}
 	}

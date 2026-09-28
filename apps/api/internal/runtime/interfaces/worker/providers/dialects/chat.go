@@ -37,7 +37,7 @@ func (ChatDialect) Encode(req Request) ([]byte, error) {
 		"modalities": []string{"text", "image"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("序列化 chat 请求失败: %w", err)
+		return nil, fmt.Errorf(msgEncode, err)
 	}
 	return encoded, nil
 }

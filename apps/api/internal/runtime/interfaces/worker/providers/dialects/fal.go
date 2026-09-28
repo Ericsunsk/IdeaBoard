@@ -24,7 +24,7 @@ func (FalDialect) Encode(req Request) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("序列化 fal 请求失败: %w", err)
+		return nil, fmt.Errorf(msgEncode2, err)
 	}
 	return encoded, nil
 }

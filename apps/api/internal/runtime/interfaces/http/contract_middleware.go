@@ -86,7 +86,7 @@ func ResolvePrincipal() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		identityPrincipal, ok := principal.From(c)
 		if !ok {
-			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, msgUnauthorized)
 			c.Abort()
 			return
 		}
@@ -123,11 +123,11 @@ func ResolvePrincipal() gin.HandlerFunc {
 func RequireWorkspaceCapability(c *gin.Context, visible, allowed bool) bool {
 	switch {
 	case !visible:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return false
 	case !allowed:
-		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, msgForbidden)
 		c.Abort()
 		return false
 	default:
@@ -141,11 +141,11 @@ func RequireWorkspaceCapability(c *gin.Context, visible, allowed bool) bool {
 func RequireOrganizationCapability(c *gin.Context, visible, allowed bool) bool {
 	switch {
 	case !visible:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		c.Abort()
 		return false
 	case !allowed:
-		contract.RenderError(c, http.StatusForbidden, contract.CodeOrganizationForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeOrganizationForbidden, msgForbidden)
 		c.Abort()
 		return false
 	default:

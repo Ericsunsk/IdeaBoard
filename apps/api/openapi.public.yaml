@@ -1305,7 +1305,9 @@ paths:
       description: >-
         Read model over settled ledger facts plus immutable task billing
         snapshots; no ledger writes happen here. Cursor pagination over
-        the opaque before-sequence cursor.
+        the opaque before-sequence cursor. Invalid list input renders
+        400 bad_request; store-side failures render 503
+        service_unavailable.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/Cursor'
@@ -1342,7 +1344,10 @@ paths:
       summary: Get current workspace usage snapshot (members only)
       description: >-
         Read-only composition of settled captures plus task snapshots.
-        Unknown range values render 422 validation_failed.
+        Unknown range values render 422 validation_failed. Service-side
+        invalid input renders 4xx (bad user 400 bad_request, bad range
+        422 validation_failed); store-side failures render 503
+        service_unavailable.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - name: range
@@ -1363,6 +1368,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkspaceUsageEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

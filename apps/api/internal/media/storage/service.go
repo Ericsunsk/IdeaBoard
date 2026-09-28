@@ -16,6 +16,16 @@ import (
 	"ideaboard/api/internal/media/storage/ports"
 )
 
+// Backend-owned user-facing copy for this package. Each constant is the
+// single source of truth for one rendered message; call sites reference
+// these names so copy changes stay in one place. Values are byte-identical
+// to the previously inline literals. The table lives in service.go (not a
+// separate message.go) because the hexagonal-boundary architecture test
+// only allows service.go at the storage root.
+const (
+	msgNewServiceWithLocalRoot = "不支持的存储类型" // NewServiceWithLocalRoot
+)
+
 type dynamicAssetLocator struct {
 	svc *Service
 }
@@ -55,7 +65,7 @@ func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, assetLocator p
 		case domain.StorageProviderS3Compatible:
 			return s3Driver, nil
 		default:
-			return nil, fmt.Errorf("不支持的存储类型")
+			return nil, fmt.Errorf(msgNewServiceWithLocalRoot)
 		}
 	})
 

@@ -64,7 +64,7 @@ func newControlWorkspaceMember(member *tenancy.WorkspaceMember) controlWorkspace
 func parseControlWorkspaceID(c *gin.Context) (string, bool) {
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		return "", false
 	}
 	return raw, true
@@ -76,16 +76,16 @@ func (d *ContractControlDeps) resolveControlMemberUserID(c *gin.Context) (int64,
 	raw := strings.TrimSpace(c.Param("member_id"))
 	parsed, err := tenancy.ParseUserPublicID(raw)
 	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "无效的用户 id")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
 		return 0, false
 	}
 	if d == nil || d.UserDirectory == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用户目录暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable36)
 		return 0, false
 	}
 	userID, err := d.UserDirectory.ResolveUserID(c.Request.Context(), parsed)
 	if err != nil || userID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 		return 0, false
 	}
 	return userID, true
@@ -96,17 +96,17 @@ func writeControlTenancyError(c *gin.Context, err error, notFoundMessage string)
 	case errors.Is(err, tenancy.ErrNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, notFoundMessage)
 	case errors.Is(err, tenancy.ErrForbidden):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeWorkspaceForbidden, msgForbidden)
 	case errors.Is(err, tenancy.ErrLastOwner):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeMembershipTransitionForbidden, "不能移除或降级最后一位所有者")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden)
 	default:
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "工作区操作失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable37)
 	}
 }
 
 func (d *ContractControlDeps) getControlWorkspace(c *gin.Context, _ controlContext) {
 	if d == nil || d.Tenancy == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		return
 	}
 	id, ok := parseControlWorkspaceID(c)
@@ -115,7 +115,7 @@ func (d *ContractControlDeps) getControlWorkspace(c *gin.Context, _ controlConte
 	}
 	workspace, err := d.Tenancy.GetWorkspace(c.Request.Context(), id)
 	if err != nil {
-		writeControlTenancyError(c, err, "工作区不存在")
+		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
 	contract.RenderSuccess(c, newControlWorkspace(workspace))
@@ -123,7 +123,7 @@ func (d *ContractControlDeps) getControlWorkspace(c *gin.Context, _ controlConte
 
 func (d *ContractControlDeps) listControlWorkspaceMembers(c *gin.Context, _ controlContext) {
 	if d == nil || d.Tenancy == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		return
 	}
 	id, ok := parseControlWorkspaceID(c)
@@ -132,7 +132,7 @@ func (d *ContractControlDeps) listControlWorkspaceMembers(c *gin.Context, _ cont
 	}
 	members, err := d.Tenancy.ListWorkspaceMembers(c.Request.Context(), id)
 	if err != nil {
-		writeControlTenancyError(c, err, "工作区不存在")
+		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
 	items := make([]controlWorkspaceMember, 0, len(members))
@@ -149,7 +149,7 @@ type controlWorkspaceMemberRequest struct {
 
 func (d *ContractControlDeps) addControlWorkspaceMember(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Tenancy == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		return
 	}
 	id, ok := parseControlWorkspaceID(c)
@@ -158,31 +158,31 @@ func (d *ContractControlDeps) addControlWorkspaceMember(c *gin.Context, ctx cont
 	}
 	var req controlWorkspaceMemberRequest
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	targetUUID, err := tenancy.ParseUserPublicID(strings.TrimSpace(req.UserID))
 	if err != nil || targetUUID == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "无效的用户 id")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
 		return
 	}
 	if d.UserDirectory == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用户目录暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable36)
 		return
 	}
 	targetID, err := d.UserDirectory.ResolveUserID(c.Request.Context(), targetUUID)
 	if err != nil || targetID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 		return
 	}
 	role := strings.TrimSpace(req.Role)
 	if !tenancy.IsValidRole(role) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "role 无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest30)
 		return
 	}
 	member, err := d.Tenancy.AddWorkspaceMember(c.Request.Context(), id, targetID, role)
 	if err != nil {
-		writeControlTenancyError(c, err, "工作区不存在")
+		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
 	contract.RenderCreated(c, newControlWorkspaceMember(member))
@@ -190,7 +190,7 @@ func (d *ContractControlDeps) addControlWorkspaceMember(c *gin.Context, ctx cont
 
 func (d *ContractControlDeps) updateControlWorkspaceMember(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Tenancy == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		return
 	}
 	id, ok := parseControlWorkspaceID(c)
@@ -205,17 +205,17 @@ func (d *ContractControlDeps) updateControlWorkspaceMember(c *gin.Context, ctx c
 		Role string `json:"role"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	role := strings.TrimSpace(req.Role)
 	if !tenancy.IsValidRole(role) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "role 无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest30)
 		return
 	}
 	member, err := d.Tenancy.UpdateWorkspaceMemberRole(c.Request.Context(), id, ctx.Operator.UserID(), targetID, role)
 	if err != nil {
-		writeControlTenancyError(c, err, "工作区不存在")
+		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
 	contract.RenderSuccess(c, newControlWorkspaceMember(member))
@@ -223,7 +223,7 @@ func (d *ContractControlDeps) updateControlWorkspaceMember(c *gin.Context, ctx c
 
 func (d *ContractControlDeps) removeControlWorkspaceMember(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Tenancy == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		return
 	}
 	id, ok := parseControlWorkspaceID(c)
@@ -235,7 +235,7 @@ func (d *ContractControlDeps) removeControlWorkspaceMember(c *gin.Context, ctx c
 		return
 	}
 	if err := d.Tenancy.RemoveWorkspaceMember(c.Request.Context(), id, ctx.Operator.UserID(), targetID); err != nil {
-		writeControlTenancyError(c, err, "工作区不存在")
+		writeControlTenancyError(c, err, msgListControlBillingAccounts)
 		return
 	}
 	contract.RenderSuccess(c, struct {

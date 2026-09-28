@@ -33,6 +33,9 @@ jobs:
         with:
           working-directory: apps/auth
           omit-optional: 'true'
+      - name: Lint Auth
+        working-directory: apps/auth
+        run: npm run lint
       - name: Test Auth
         working-directory: apps/auth
         run: npm test

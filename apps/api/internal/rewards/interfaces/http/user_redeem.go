@@ -67,13 +67,13 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 	if err != nil {
 		finishMetrics(redemptionOutcomeInvalid, 0, err)
 		idempotency.DefaultMetrics.ObserveError(err)
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	var request redeemRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
 		finishMetrics(redemptionOutcomeInvalid, 0, err)
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	requestHash := idempotency.HashRequest(strings.TrimSpace(request.Code))
@@ -94,7 +94,7 @@ func (h *UserHandler) Redeem(c *gin.Context) {
 		if idempotency.IsConflict(err) {
 			finishMetrics(redemptionOutcomeInvalid, 0, err)
 			idempotency.DefaultMetrics.Observe(idempotency.OutcomeConflict)
-			errorrender.Render(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, "幂等请求与原请求不一致")
+			errorrender.Render(c, http.StatusConflict, codeRewardCodeIdempotencyConflict, msgRewardCodeIdempotencyConflict)
 			return
 		}
 		finishMetrics(redemptionOutcomeForError(err), 0, err)
@@ -145,7 +145,7 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "before_id 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid)
 			return
 		}
 		input.BeforeID = value
@@ -154,7 +154,7 @@ func (h *UserHandler) ListRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 100 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "limit 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid2)
 			return
 		}
 		input.Limit = value

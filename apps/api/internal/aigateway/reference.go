@@ -23,7 +23,7 @@ import (
 const ModelsReferenceSource = "models.dev"
 
 // modelsReferenceNote marks every result as non-settlement data.
-const modelsReferenceNote = "参照价，非结算依据"
+const modelsReferenceNote = msgPackage
 
 // Machine-readable error codes for the degraded reference result.
 const (
@@ -171,7 +171,7 @@ func (r *ConfigRepository) GetModelReference(ctx context.Context, modelID, provi
 		provider = strings.TrimSpace(provider)
 		model = strings.TrimSpace(model)
 		if model == "" {
-			return ModelReference{}, errors.New("需要指定 model_id（或 provider+model）")
+			return ModelReference{}, errors.New(msgGetModelReference)
 		}
 		if provider != "" {
 			id = provider + "/" + model
@@ -183,20 +183,20 @@ func (r *ConfigRepository) GetModelReference(ctx context.Context, modelID, provi
 
 	if !modelsDevAllowlisted(ctx) {
 		base.ErrorCode = ModelsReferenceCodeAllowlist
-		base.Message = "models.dev 未在 egress allowlist 中，请在出站策略中放行 models.dev 后重试"
+		base.Message = msgGetModelReference2
 		return base, nil
 	}
 	facts, fetchErr := loadModelsReferenceFacts(ctx, refresh)
 	if fetchErr != nil {
 		base.ErrorCode = ModelsReferenceCodeUpstream
-		base.Message = "models.dev 暂不可用，参照价为空，不影响目录主流程"
+		base.Message = msgGetModelReference3
 		//nolint:nilerr // upstream failure degrades to an explicit error_code by contract, never an error
 		return base, nil
 	}
 	fact, ok := lookupModelsReferenceFact(facts, id)
 	if !ok {
 		base.ErrorCode = ModelsReferenceCodeNotFound
-		base.Message = fmt.Sprintf("models.dev 未收录模型 %q", id)
+		base.Message = fmt.Sprintf(msgGetModelReference4, id)
 		return base, nil
 	}
 	base.Provider = fact.provider
@@ -263,24 +263,24 @@ func loadModelsReferenceFacts(ctx context.Context, refresh bool) (map[string]mod
 	if err != nil {
 		var statusErr *outboundhttp.HTTPStatusError
 		if errors.As(err, &statusErr) {
-			return nil, fmt.Errorf("models.dev 返回 %d", statusErr.StatusCode)
+			return nil, fmt.Errorf(msgLoadModelsReferenceFacts, statusErr.StatusCode)
 		}
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("models.dev 返回 %d", resp.StatusCode)
+		return nil, fmt.Errorf(msgLoadModelsReferenceFacts, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
 		return nil, err
 	}
 	if len(body) == 0 {
-		return nil, errors.New("models.dev 内容为空")
+		return nil, errors.New(msgLoadModelsReferenceFacts2)
 	}
 	var raw map[string]modelsDevProviderEntry
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, errors.New("models.dev 格式变化，解析失败")
+		return nil, errors.New(msgLoadModelsReferenceFacts3)
 	}
 	facts := make(map[string]modelsDevFact, 1024)
 	for providerID, provider := range raw {
@@ -314,7 +314,7 @@ func loadModelsReferenceFacts(ctx context.Context, refresh bool) (map[string]mod
 		}
 	}
 	if len(facts) == 0 {
-		return nil, errors.New("models.dev 无有效条目")
+		return nil, errors.New(msgLoadModelsReferenceFacts4)
 	}
 	modelsReferenceCache.Lock()
 	modelsReferenceCache.facts = facts

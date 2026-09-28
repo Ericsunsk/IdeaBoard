@@ -14,17 +14,17 @@ import (
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	var req ports.UserListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
 	result, err := h.userService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
 		if validation.Is(err) {
-			writeIdentityRequestInvalid(c, identityValidationMessage(err, "参数错误"))
+			writeIdentityRequestInvalid(c, identityValidationMessage(err, msgRespondRuntimeSettingsWriteError))
 			return
 		}
-		response.InternalError(c, 500, "获取用户列表失败", err)
+		response.InternalError(c, 500, msgListUsers, err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		Role string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 
@@ -77,11 +77,11 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 
 	var req ports.AdminBanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		writeIdentityRequestInvalid(c, "参数错误")
+		writeIdentityRequestInvalid(c, msgRespondRuntimeSettingsWriteError)
 		return
 	}
 	if req.ExpiresInDays < 0 {
-		writeIdentityRequestInvalid(c, "expires_in_days 不能小于 0")
+		writeIdentityRequestInvalid(c, msgBanUser)
 		return
 	}
 

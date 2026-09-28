@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var ErrInvalidStripeAPIKey = errors.New("无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key")
+var ErrInvalidStripeAPIKey = errors.New(msgInvalidStripeAPIKey)
 
 const maxStripeAPIKeyLength = 512
 

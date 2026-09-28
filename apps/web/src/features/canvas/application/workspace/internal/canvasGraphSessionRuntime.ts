@@ -66,6 +66,11 @@ export function createCanvasGraphSessionRuntime(
     unsubscribeGraphSessionCommits = null
     graphSession?.dispose()
     graphSession = null
+    // Drop undo/redo stacks synchronously with the session so a mid-switch
+    // undo can neither throw on the disposed session nor apply a
+    // cross-board patch. The history module additionally guards with
+    // isAttached() and board-id stamps as defense in depth.
+    options.history.clearBaseline()
   }
 
   function requireGraphSession(): CanvasGraphSession {

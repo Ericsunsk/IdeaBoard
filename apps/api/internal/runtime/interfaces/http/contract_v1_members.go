@@ -35,7 +35,7 @@ func (h *contractV1Handler) toMemberDTO(c *gin.Context, m *tenancy.WorkspaceMemb
 	}
 	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), m.UserID)
 	if err != nil || publicID == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "成员服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable47)
 		c.Abort()
 		return v1MemberDTO{}, false
 	}
@@ -49,7 +49,7 @@ func (h *contractV1Handler) toMemberDTO(c *gin.Context, m *tenancy.WorkspaceMemb
 func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int64, uuid.UUID, bool) {
 	trimmed := strings.TrimSpace(raw)
 	if !contract.IsUserID(trimmed) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, uuid.Nil, false
 	}
@@ -61,14 +61,14 @@ func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int
 	}
 	parsed, err := tenancy.ParseUserPublicID(trimmed)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, uuid.Nil, false
 	}
 	userID, err := h.deps.Users.ResolveUserID(c.Request.Context(), parsed)
 	if err != nil || userID <= 0 {
 		// Unknown users are invisible (404), never 403, per anti-enumeration.
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, uuid.Nil, false
 	}
@@ -79,14 +79,14 @@ func renderMemberTransitionError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, tenancy.ErrLastOwner):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
-			contract.CodeMembershipTransitionForbidden, "最后一个所有者不能被移除或降级")
+			contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden2)
 	case errors.Is(err, tenancy.ErrForbidden):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
-			contract.CodeMembershipTransitionForbidden, "成员角色变更需要更高权限")
+			contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden3)
 	case errors.Is(err, tenancy.ErrNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, msgWorkspaceMemberNotFound)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "成员服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable47)
 	}
 	c.Abort()
 }
@@ -95,7 +95,7 @@ func (h *contractV1Handler) listWorkspaceMembers(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		members, err := h.deps.Store.ListWorkspaceMembers(c.Request.Context(), wctx.Workspace.PublicID)
 		if err != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 			c.Abort()
 			return
 		}
@@ -129,7 +129,7 @@ func (h *contractV1Handler) workspaceDo(c *gin.Context, userExternalID string, u
 	result, _, err := h.deps.Idempotency.Do(c.Request.Context(), scope, userID, key, hash, fn)
 	if err != nil {
 		if contract.IsIdempotencyConflict(err) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return nil, nil, false
 		}
@@ -141,7 +141,7 @@ func (h *contractV1Handler) workspaceDo(c *gin.Context, userExternalID string, u
 func requireWorkspaceIdempotencyKey(c *gin.Context) (string, bool) {
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return "", false
 	}
@@ -166,7 +166,7 @@ func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
 		newRole := strings.TrimSpace(body.Data.Role)
 		if !tenancy.IsValidRole(newRole) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -216,7 +216,7 @@ func (h *contractV1Handler) updateWorkspaceMember(c *gin.Context) {
 		newRole := strings.TrimSpace(body.Data.Role)
 		if !tenancy.IsValidRole(newRole) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 			c.Abort()
 			return
 		}

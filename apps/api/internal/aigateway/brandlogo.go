@@ -92,7 +92,7 @@ func resetBrandLogoCache() {
 func normalizeBrandLogoProvider(raw string) (string, error) {
 	provider := strings.ToLower(strings.TrimSpace(raw))
 	if !brandLogoIDPattern.MatchString(provider) {
-		return "", errors.New("provider 非法：仅支持小写字母、数字与连字符（1-64 字符）")
+		return "", errors.New(msgNormalizeBrandLogoProvider)
 	}
 	return provider, nil
 }

@@ -84,7 +84,7 @@ func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 	if !errors.Is(err, billing.ErrPricingUnavailable) && !errors.Is(err, billing.ErrSKUNotFound) {
 		return false
 	}
-	contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeBillingPricingUnavailable, "当前功能暂未定价，暂不可用")
+	contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeBillingPricingUnavailable, msgBillingPricingUnavailable)
 	return true
 }
 
@@ -220,19 +220,19 @@ func (h *contractV1BillingHandler) requireTenancy(c *gin.Context) bool {
 func (h *contractV1BillingHandler) billingWorkspaceContext(c *gin.Context, p principal.Principal) (*tenancy.Workspace, string, bool) {
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
 	workspace, err := h.deps.Tenancy.GetWorkspace(c.Request.Context(), raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
 	role, member, err := h.deps.Tenancy.GetWorkspaceRole(c.Request.Context(), raw, p.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
@@ -268,14 +268,14 @@ func (h *contractV1BillingHandler) getBillingAccount(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		workspace := wctx.Workspace
 		if h.deps.BillingAccounts == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账单服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable39)
 			c.Abort()
 			return
 		}
 		account, err := h.deps.BillingAccounts.EnsureBillingAccountForWorkspace(
 			c.Request.Context(), workspace.InternalID, workspace.PublicID)
 		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账单服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable39)
 			c.Abort()
 			return
 		}
@@ -317,6 +317,42 @@ func billingToBalanceDTO(workspacePublicID string, wallet domain.WalletDetails) 
 	return dto
 }
 
+// renderV1BillingRecordsError maps billing-records read outcomes onto
+// the wire: invalid list input (bad user/cursor/limit facts) renders
+// 400 bad_request; every other List failure stays 503
+// service_unavailable (transient or store-side). Pagination-shape
+// failures (malformed cursor, bad page_size) are rejected at the edge
+// above with pagination_cursor_invalid/bad_request before the service
+// is reached.
+func renderV1BillingRecordsError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, billingrecords.ErrInvalidListInput),
+		errors.Is(err, billingrecords.ErrInvalidPageLimit):
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest32)
+	default:
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable39)
+	}
+	c.Abort()
+}
+
+// renderV1UsageError maps usage read outcomes onto the wire:
+// invalid-input sentinels render 4xx (bad range reuses the 422
+// validation_failed shape the edge uses for query parsing; bad user
+// renders 400 bad_request); every other GetCurrent failure stays 503
+// service_unavailable (transient or store-side).
+func renderV1UsageError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, usage.ErrInvalidRange):
+		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
+			msgRenderV1UsageError, contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
+	case errors.Is(err, usage.ErrInvalidUserID):
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest33)
+	default:
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable40)
+	}
+	c.Abort()
+}
+
 // billingRenderWalletGate maps frozen/restricted wallets to the frozen
 // billing_wallet_restricted code (403). Missing wallets are invisible
 // inside a visible workspace: 404 with the same code family would leak
@@ -324,11 +360,11 @@ func billingToBalanceDTO(workspacePublicID string, wallet domain.WalletDetails) 
 func billingRenderWalletGate(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrWalletRestricted), errors.Is(err, domain.ErrWalletFrozen):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted2)
 	case errors.Is(err, domain.ErrWalletNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingWalletRestricted, "当前工作区钱包不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted3)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "余额服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable41)
 	}
 	c.Abort()
 }
@@ -338,7 +374,7 @@ func (h *contractV1BillingHandler) getCreditsBalance(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Wallets == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "余额服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable41)
 			c.Abort()
 			return
 		}
@@ -380,13 +416,13 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Wallets == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账本服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable42)
 			c.Abort()
 			return
 		}
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 			c.Abort()
 			return
 		}
@@ -394,7 +430,7 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 			cursor, decodeErr := contract.DecodeCursor[v1BillingLedgerCursor](raw)
 			if decodeErr != nil || cursor == nil || cursor.BeforeSequence < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 				c.Abort()
 				return
 			}
@@ -410,7 +446,7 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 				billingRenderWalletGate(c, err)
 				return
 			}
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账本服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable42)
 			c.Abort()
 			return
 		}
@@ -422,7 +458,7 @@ func (h *contractV1BillingHandler) listCreditsLedger(c *gin.Context) {
 		if page.NextBeforeSequence > 0 {
 			next, encodeErr := contract.EncodeCursor(v1BillingLedgerCursor{BeforeSequence: page.NextBeforeSequence})
 			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账本服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable42)
 				c.Abort()
 				return
 			}
@@ -446,13 +482,13 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Records == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账单服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable39)
 			c.Abort()
 			return
 		}
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 			c.Abort()
 			return
 		}
@@ -460,7 +496,7 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 			cursor, decodeErr := contract.DecodeCursor[v1BillingLedgerCursor](raw)
 			if decodeErr != nil || cursor == nil || cursor.BeforeSequence < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 				c.Abort()
 				return
 			}
@@ -472,8 +508,7 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 			Limit:          pageSize,
 		})
 		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账单服务暂不可用")
-			c.Abort()
+			renderV1BillingRecordsError(c, err)
 			return
 		}
 		records := make([]v1BillingRecordDTO, 0, len(page.Records))
@@ -491,7 +526,7 @@ func (h *contractV1BillingHandler) listBillingRecords(c *gin.Context) {
 		if page.NextBeforeSequence > 0 {
 			next, encodeErr := contract.EncodeCursor(v1BillingLedgerCursor{BeforeSequence: page.NextBeforeSequence})
 			if encodeErr != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "账单服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable39)
 				c.Abort()
 				return
 			}
@@ -506,21 +541,20 @@ func (h *contractV1BillingHandler) getUsage(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Usage == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用量服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable40)
 			c.Abort()
 			return
 		}
 		usageRange, err := usage.ParseRange(strings.TrimSpace(c.Query("range")))
 		if err != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"用量范围非法", contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
+				msgRenderV1UsageError, contract.FieldErrors{Fields: map[string]string{"range": "invalid"}})
 			c.Abort()
 			return
 		}
 		snapshot, err := h.deps.Usage.GetCurrent(c.Request.Context(), billingWalletUser(workspace, p.UserID()), usageRange)
 		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用量服务暂不可用")
-			c.Abort()
+			renderV1UsageError(c, err)
 			return
 		}
 		contract.RenderSuccess(c, snapshot)
@@ -550,13 +584,13 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Checkout == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable43)
 			c.Abort()
 			return
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -568,7 +602,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		quantity := body.Data.IdeaQuantity
 		if quantity < paymentsdomain.MinimumPurchaseIdeas || quantity > paymentsdomain.MaximumPurchaseIdeas {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"充值数量非法", contract.FieldErrors{Fields: map[string]string{"idea_quantity": "invalid"}})
+				msgCreateCheckoutSession, contract.FieldErrors{Fields: map[string]string{"idea_quantity": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -582,7 +616,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		}
 		if !body.Data.TermsAccepted || termsVersion != paymentsdomain.CurrentTermsVersion || refundVersion != paymentsdomain.CurrentRefundPolicyVersion {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"请先同意当前服务条款与退款政策", contract.FieldErrors{Fields: map[string]string{"terms_accepted": "required"}})
+				msgCreateCheckoutSession2, contract.FieldErrors{Fields: map[string]string{"terms_accepted": "required"}})
 			c.Abort()
 			return
 		}
@@ -590,7 +624,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		// uses the fixed IdeasPerUSD PurchaseQuote inside Payments; Billing SKU
 		// quotes stay reserved for task settlement (#805).
 		if _, quoteErr := paymentsdomain.NewPurchaseQuote(quantity); quoteErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
 			c.Abort()
 			return
 		}
@@ -609,33 +643,33 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
 			if errors.Is(doErr, paymentsdomain.ErrWalletNotRechargeable) {
-				contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可充值")
+				contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted4)
 				c.Abort()
 				return
 			}
 			if errors.Is(doErr, paymentsdomain.ErrInvalidIdeaQuantity) || errors.Is(doErr, paymentsdomain.ErrTermsAcceptanceRequired) {
 				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-					"充值参数非法", contract.FieldErrors{Fields: map[string]string{"idea_quantity": "invalid"}})
+					msgCreateCheckoutSession3, contract.FieldErrors{Fields: map[string]string{"idea_quantity": "invalid"}})
 				c.Abort()
 				return
 			}
 			if errors.Is(doErr, paymentsdomain.ErrCheckoutIdempotencyConflict) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable43)
 			c.Abort()
 			return
 		}
 		created, ok := result.(workspaceCheckoutResult)
 		if !ok {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable43)
 			c.Abort()
 			return
 		}
@@ -655,22 +689,22 @@ func (h *contractV1BillingHandler) getCheckoutSession(c *gin.Context) {
 		p := wctx.Principal
 		workspace := wctx.Workspace
 		if h.deps.Checkout == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable43)
 			c.Abort()
 			return
 		}
 		sessionID := strings.TrimSpace(c.Param("session_id"))
 		if sessionID == "" {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值会话不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, msgBillingSessionNotFound)
 			c.Abort()
 			return
 		}
 		status, err := h.deps.Checkout.GetWorkspaceCheckout(c.Request.Context(), p.UserID(), workspace.PublicID, sessionID)
 		if err != nil {
 			if errors.Is(err, errBillingSessionNotFound) {
-				contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值会话不存在")
+				contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, msgBillingSessionNotFound)
 			} else {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable43)
 			}
 			c.Abort()
 			return

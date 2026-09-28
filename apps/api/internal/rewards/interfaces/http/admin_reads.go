@@ -38,25 +38,25 @@ func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 		return
 	}
 	if c.Request.URL.RawQuery != "" {
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	var request searchRewardCodesRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	input := ports.SearchRewardCodesInput{Query: request.Query, Status: request.Status, Limit: 20}
 	if request.BeforeID != nil {
 		if *request.BeforeID <= 0 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "参数错误")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardInvalidInput)
 			return
 		}
 		input.BeforeID = *request.BeforeID
 	}
 	if request.Limit != nil {
 		if *request.Limit < 1 || *request.Limit > 100 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "参数错误")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardInvalidInput)
 			return
 		}
 		input.Limit = *request.Limit
@@ -87,7 +87,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "before_id 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid)
 			return
 		}
 		input.BeforeID = value
@@ -96,7 +96,7 @@ func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 		raw = strings.TrimSpace(raw)
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > 100 {
-			writeRewardInputError(c, codeRewardPaginationInvalid, "limit 无效")
+			writeRewardInputError(c, codeRewardPaginationInvalid, msgRewardPaginationInvalid2)
 			return
 		}
 		input.Limit = value
@@ -128,7 +128,7 @@ func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 	// kernel for the migration). Operator-gated only.
 	redemptionID, err := strconv.ParseInt(strings.TrimSpace(c.Param("redemption_id")), 10, 64)
 	if err != nil || redemptionID <= 0 {
-		writeRewardInputError(c, codeRewardRedemptionIDInvalid, "兑换记录 ID 无效")
+		writeRewardInputError(c, codeRewardRedemptionIDInvalid, msgRewardRedemptionIDInvalid)
 		return
 	}
 	detail, err := h.service.GetAdminRedemption(c.Request.Context(), ports.GetAdminRedemptionInput{

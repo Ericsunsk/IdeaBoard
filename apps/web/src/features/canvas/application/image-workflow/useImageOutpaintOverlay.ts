@@ -289,6 +289,8 @@ export function useImageOutpaintOverlay(options: UseImageOutpaintOverlayOptions)
   })
 
   useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
+  // Intentional `tryOnScopeDispose`: the overlay is workflow state that stays
+  // safe when instantiated outside a component scope.
   tryOnScopeDispose(cancelOutpaintMode)
 
   return {

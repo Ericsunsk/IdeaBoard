@@ -48,7 +48,7 @@ type originPolicy struct {
 func newOriginPolicy(appEnv string, allowedOrigins []string) originPolicy {
 	allowed, configured, invalid := buildAllowedOriginSet(allowedOrigins)
 	if isProductionRuntime(appEnv) && configured {
-		slog.Warn("生产环境已配置 APP_CORS_ALLOWED_ORIGINS，但 Gateway 仅支持 same-origin；该 allowlist 将被忽略。")
+		slog.Warn(msgNewOriginPolicy)
 	}
 	return originPolicy{
 		production:       isProductionRuntime(appEnv),

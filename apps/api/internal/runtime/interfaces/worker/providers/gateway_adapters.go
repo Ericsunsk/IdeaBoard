@@ -52,7 +52,7 @@ func (c *Executor) callGatewayModelImage(
 	if body, err = dialects.InjectCustomParams(body, customParams, provider, model); err != nil {
 		return providerCallResult{}, err
 	}
-	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, body, "application/json", timeout, "网关")
+	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, body, "application/json", timeout, msgCallGatewayModelImage)
 	if err != nil {
 		return providerCallResult{Receipt: resp.Receipt}, err
 	}
@@ -90,7 +90,7 @@ func resolveDialectImageURLs(c *Executor, providerReq providerRequest) ([]string
 		if strings.TrimSpace(ref) == "" {
 			continue
 		}
-		pubURL, err := resolveProviderPublicImageURL(c, ref, "输入图像")
+		pubURL, err := resolveProviderPublicImageURL(c, ref, msgResolveDialectImageURLs)
 		if err != nil {
 			return nil, err
 		}
@@ -111,16 +111,16 @@ func decodeGatewayImageResponse(dialect dialects.Dialect, respBody []byte) ([]st
 
 func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
 	if len(providerReq.ImageRefs) == 0 || strings.TrimSpace(providerReq.ImageRefs[0]) == "" {
-		return nil, fmt.Errorf("高清放大请求缺少原图")
+		return nil, fmt.Errorf(msgBuildUpscaleGatewayPayload)
 	}
 	scaleRequest := providerReq
 	scaleRequest.CanvasRef = ""
-	inputURL, err := c.imageTransformInputURL(scaleRequest, "高清放大")
+	inputURL, err := c.imageTransformInputURL(scaleRequest, msgBuildUpscaleGatewayPayload2)
 	if err != nil {
 		return nil, err
 	}
 	if providerReq.Scale < 1 || providerReq.Scale > 4 || math.Abs(providerReq.Scale*10-math.Round(providerReq.Scale*10)) > 1e-9 {
-		return nil, fmt.Errorf("高清放大 scale 必须是 1.0-4.0 且步长为 0.1")
+		return nil, fmt.Errorf(msgBuildUpscaleGatewayPayload3)
 	}
 	return map[string]interface{}{
 		"image_url":     inputURL,
@@ -130,7 +130,7 @@ func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[s
 }
 
 func buildCutoutGatewayPayload(c *Executor, providerReq providerRequest) (map[string]interface{}, error) {
-	inputURL, err := c.imageTransformInputURL(providerReq, "抠图")
+	inputURL, err := c.imageTransformInputURL(providerReq, msgBuildCutoutGatewayPayload)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (c *Executor) callGatewayImageBytes(
 ) (providerCallResult, error) {
 	bodyJSON, err := json.Marshal(payload)
 	if err != nil {
-		return providerCallResult{}, fmt.Errorf("序列化%s请求失败: %w", label, err)
+		return providerCallResult{}, fmt.Errorf(msgCallGatewayImageBytes, label, err)
 	}
 	resp, err := doGatewayImageCall(ctx, c, taskID, feature, provider, model, route.Namespace, route.Path, bodyJSON, "application/json", timeout, label)
 	if err != nil {
@@ -168,7 +168,7 @@ func (c *Executor) callGatewayImageBytes(
 			Receipt:          resp.Receipt,
 			RawOutputPreview: providerRawOutputPreview(respBody),
 			ParsedOutputKind: "image-results",
-		}, runtimeports.NewProviderOutputParseError(fmt.Errorf("%s响应解析失败: %w", label, err))
+		}, runtimeports.NewProviderOutputParseError(fmt.Errorf(msgCallGatewayImageBytes2, label, err))
 	}
 	return providerCallResult{
 		ImageURL:          imageURLs[0],
@@ -218,10 +218,10 @@ func doGatewayImageCall(
 		if errors.Is(err, context.Canceled) {
 			return resp, err
 		}
-		return resp, fmt.Errorf("%s网关请求失败: %w", label, err)
+		return resp, fmt.Errorf(msgDoGatewayImageCall, label, err)
 	}
 	if len(resp.Body) == 0 {
-		return resp, fmt.Errorf("%s响应为空", label)
+		return resp, fmt.Errorf(msgDoGatewayImageCall2, label)
 	}
 	return resp, nil
 }

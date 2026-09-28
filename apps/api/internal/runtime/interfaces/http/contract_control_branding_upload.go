@@ -105,7 +105,7 @@ func controlBrandingUploadSlot(ctx context.Context, provider settings.MediaUploa
 
 func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx controlContext) {
 	if d == nil || d.BrandingUpload == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "上传服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable4)
 		return
 	}
 	// Handler-enforced mutation guarantees (see the file header): the
@@ -120,24 +120,24 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		}
 	}
 	if _, err := adminaction.New(ctx.Operator.UserID(), reason); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, "需要填写操作原因")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeControlReasonRequired, msgControlReasonRequired)
 		return
 	}
 	setControlReason(c, reason)
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少 Idempotency-Key")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired)
 		return
 	}
 	release, ok := controlBrandingUploadSlot(c.Request.Context(), d.Settings)
 	if !ok {
-		contract.RenderError(c, http.StatusTooManyRequests, contract.CodeRateLimited, "当前上传请求过多，请稍后重试")
+		contract.RenderError(c, http.StatusTooManyRequests, contract.CodeRateLimited, msgRateLimited)
 		return
 	}
 	defer release()
 	file, err := c.FormFile("file")
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请选择文件")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest6)
 		return
 	}
 	if _, ok := validateControlUploadFile(c, file); !ok {
@@ -145,7 +145,7 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 	}
 	contentHash, err := hashControlUploadFile(file)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "文件读取失败")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest7)
 		return
 	}
 	store := d.idempotencyStore()
@@ -153,12 +153,12 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 	scope := contract.IdempotencyScope(operatorID, "control:platform.upload_branding_logo")
 	requestHash := contract.HashIdempotencyRequest(c.Request.Method, c.FullPath(), contentHash)
 	if existing, replayed, err := store.Lookup(scope, ctx.Operator.UserID(), key, requestHash); err != nil {
-		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, "Idempotency-Key 已用于不同的请求")
+		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 		return
 	} else if replayed {
 		stored, ok := existing.(controlStoredResponse)
 		if !ok {
-			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, "Idempotency-Key 已用于不同的请求")
+			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 			return
 		}
 		if contentType := stored.Header["Content-Type"]; contentType != "" {
@@ -171,7 +171,7 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 		DirPrefix: domain.SiteAssetUploadDirPrefix(),
 	})
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "上传失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable5)
 		return
 	}
 	payload := controlBrandingLogoUpload{
@@ -187,7 +187,7 @@ func (d *ContractControlDeps) uploadControlBrandingLogo(c *gin.Context, ctx cont
 	// guard), so a transient storage failure never poisons the key.
 	body, err := json.Marshal(contract.SuccessEnvelope[controlBrandingLogoUpload]{Data: payload})
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "上传失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable5)
 		return
 	}
 	store.StoreResult(scope, ctx.Operator.UserID(), key, requestHash, controlStoredResponse{
@@ -223,23 +223,23 @@ func hashControlUploadFile(fh *multipart.FileHeader) (string, error) {
 // enforcement (never trust the filename). Failures render directly.
 func validateControlUploadFile(c *gin.Context, fh *multipart.FileHeader) (string, bool) {
 	if fh == nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请选择文件")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest6)
 		return "", false
 	}
 	if fh.Size > controlBrandingLogoMaxBytes {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest,
-			fmt.Sprintf("文件大小不能超过 %dMB", controlBrandingLogoMaxBytes/1024/1024))
+			fmt.Sprintf(msgValidateControlUploadFile, controlBrandingLogoMaxBytes/1024/1024))
 		return "", false
 	}
 	facts, err := imageformat.InspectFileHeader(fh)
 	if err != nil {
 		slog.Warn("control branding logo inspect failed", "err", err)
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "文件内容不合法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest8)
 		return "", false
 	}
 	if !imageformat.UploadAllowedImageExtensions()[facts.Extension] {
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"仅支持 "+imageformat.SupportedUploadImageLabel()+" 格式")
+			msgValidateControlUploadFile2+imageformat.SupportedUploadImageLabel()+msgValidateControlUploadFile3)
 		return "", false
 	}
 	return facts.Extension, true

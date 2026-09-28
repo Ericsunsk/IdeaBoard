@@ -11,11 +11,11 @@ import (
 func NormalizeCanvasStorageUserSegment(storageUID string) (string, error) {
 	normalized := strings.TrimSpace(storageUID)
 	if !domain.IsValidStorageUID(normalized) {
-		return "", fmt.Errorf("用户存储标识无效")
+		return "", fmt.Errorf(msgNormalizeCanvasStorageUserSegment)
 	}
 	escaped := url.PathEscape(normalized)
 	if escaped == "" {
-		return "", fmt.Errorf("用户存储标识无效")
+		return "", fmt.Errorf(msgNormalizeCanvasStorageUserSegment)
 	}
 	return escaped, nil
 }
@@ -23,11 +23,11 @@ func NormalizeCanvasStorageUserSegment(storageUID string) (string, error) {
 func NormalizeCanvasBoardSegment(boardID string) (string, error) {
 	normalized := strings.TrimSpace(boardID)
 	if normalized == "" {
-		return "", fmt.Errorf("缺少画布ID")
+		return "", fmt.Errorf(msgNormalizeCanvasBoardSegment)
 	}
 	escaped := url.PathEscape(normalized)
 	if escaped == "" {
-		return "", fmt.Errorf("缺少画布ID")
+		return "", fmt.Errorf(msgNormalizeCanvasBoardSegment)
 	}
 	return escaped, nil
 }

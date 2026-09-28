@@ -104,6 +104,8 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
     { immediate: true, flush: 'sync' },
   )
 
+  // Intentional `tryOnScopeDispose`: the rail state resets safely even when
+  // the composable is instantiated outside a component scope.
   tryOnScopeDispose(() => {
     isPointerOverNode.value = false
     isKeyboardFocusWithinNode.value = false

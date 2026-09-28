@@ -206,7 +206,7 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile domain.Storag
 	}
 	encrypted, err := secrets.EncryptString(secret)
 	if err != nil {
-		return fmt.Errorf("加密存储密钥失败: %w", err)
+		return fmt.Errorf(msgSaveProfileTx, err)
 	}
 	if _, err := q.RetireActiveStorageProfileSecretVersion(ctx, dbsqlc.RetireActiveStorageProfileSecretVersionParams{
 		ProfileID:  id,
@@ -281,7 +281,7 @@ func (r *Repository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfi
 		if err == nil {
 			plain, err := secrets.DecryptMaterialString(secret.SecretPayload, secret.SecretMaterialKind)
 			if err != nil {
-				return domain.StorageProfile{}, fmt.Errorf("解密存储密钥失败: %w", err)
+				return domain.StorageProfile{}, fmt.Errorf(msgProfileFromRow, err)
 			}
 			if strings.TrimSpace(plain) != "" {
 				config[storageSecretAccessKeyName] = plain

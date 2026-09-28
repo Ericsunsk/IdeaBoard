@@ -1,5 +1,11 @@
 # Public / Control 平面切换手册（Issue #809 Final Hard Cut）
 
+> 状态（2026-09-28）：RETIRED。切换已完成：legacy `/api/user`、`/api/admin` handler 树已删除
+>（`apps/api/internal/runtime/composition/http_wiring.go`），`apps/web` 全量走
+> `generated-query/public/*` + `generated-query/control/*`；`apps/web/src`
+> 中残留的 `/api/user|/api/admin` 命中均为 `userSession` 模块名、legacy-absence
+> 负断言 spec 与历史注释，无生产请求路径。本手册保留为切换证据；不要复活兼容路由。
+
 `apps/api` legacy `/api/user`、`/api/admin` 与单体 `openapi.yaml` 已删除；envelope 统一为 contract `{ data, meta? }` / `{ error: { code, message, request_id } }`。
 `apps/web` 全部走 `generated-query/public/*`（prefix `/api/v1`）与 `generated-query/control/*`（prefix `/api/control/v1`）；
 Better Auth 客户端（`AUTH_BASE_URL`）不受影响。Canvas 仍是产品主页，无路由重组。

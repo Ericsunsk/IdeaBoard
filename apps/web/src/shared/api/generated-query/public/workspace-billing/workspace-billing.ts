@@ -361,7 +361,7 @@ export const getListWorkspaceBillingRecordsUrl = (
 }
 
 /**
- * Read model over settled ledger facts plus immutable task billing snapshots; no ledger writes happen here. Cursor pagination over the opaque before-sequence cursor.
+ * Read model over settled ledger facts plus immutable task billing snapshots; no ledger writes happen here. Cursor pagination over the opaque before-sequence cursor. Invalid list input renders 400 bad_request; store-side failures render 503 service_unavailable.
  * @summary List caller-owned billing records (members only)
  */
 export const listWorkspaceBillingRecords = async (
@@ -470,7 +470,7 @@ export const getGetWorkspaceUsageUrl = (workspaceId: string, params?: GetWorkspa
 }
 
 /**
- * Read-only composition of settled captures plus task snapshots. Unknown range values render 422 validation_failed.
+ * Read-only composition of settled captures plus task snapshots. Unknown range values render 422 validation_failed. Service-side invalid input renders 4xx (bad user 400 bad_request, bad range 422 validation_failed); store-side failures render 503 service_unavailable.
  * @summary Get current workspace usage snapshot (members only)
  */
 export const getWorkspaceUsage = async (
@@ -493,7 +493,12 @@ export const getGetWorkspaceUsageQueryKey = (
 
 export const getGetWorkspaceUsageQueryOptions = <
   TData = Awaited<ReturnType<typeof getWorkspaceUsage>>,
-  TError = UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse
+    | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<GetWorkspaceUsageParams>,
@@ -521,7 +526,11 @@ export type GetWorkspaceUsageQueryResult = NonNullable<
   Awaited<ReturnType<typeof getWorkspaceUsage>>
 >
 export type GetWorkspaceUsageQueryError =
-  UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | NotFoundResponse
+  | UnprocessableEntityResponse
+  | ErrorEnvelope
 
 /**
  * @summary Get current workspace usage snapshot (members only)
@@ -529,7 +538,12 @@ export type GetWorkspaceUsageQueryError =
 
 export function useGetWorkspaceUsage<
   TData = Awaited<ReturnType<typeof getWorkspaceUsage>>,
-  TError = UnauthorizedResponse | NotFoundResponse | UnprocessableEntityResponse | ErrorEnvelope,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | NotFoundResponse
+    | UnprocessableEntityResponse
+    | ErrorEnvelope,
 >(
   workspaceId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<GetWorkspaceUsageParams>,

@@ -74,7 +74,7 @@ func (s *Service) UploadRefWithOptions(ctx context.Context, file *multipart.File
 func (s *Service) UploadRefAtProfile(ctx context.Context, profileID string, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
 	}
 	return s.UploadRefWithProfile(ctx, *profile, file, opts)
 }
@@ -90,7 +90,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 	}
 	checksum, err := checksumMultipartFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("读取上传文件 checksum 失败: %w", err)
+		return nil, fmt.Errorf(msgPrepareUploadRefFromFile, err)
 	}
 	key := strings.TrimSpace(opts.ObjectKey)
 	if key == "" {
@@ -103,7 +103,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 	}
 	key, err = domain.NormalizeUploadObjectKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("上传对象路径无效: %w", err)
+		return nil, fmt.Errorf(msgPrepareUploadRefFromFile2, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -132,7 +132,7 @@ func (s *Service) PrepareUploadRefFromFile(ctx context.Context, file *multipart.
 
 func checksumMultipartFile(file *multipart.FileHeader) (string, error) {
 	if file == nil {
-		return "", fmt.Errorf("文件内容不合法")
+		return "", fmt.Errorf(msgChecksumMultipartFile)
 	}
 	src, err := file.Open()
 	if err != nil {
@@ -163,7 +163,7 @@ func (s *Service) PrepareUploadRef(ctx context.Context, filename string, opts po
 	}
 	key, err = domain.NormalizeUploadObjectKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("上传对象路径无效: %w", err)
+		return nil, fmt.Errorf(msgPrepareUploadRefFromFile2, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -204,7 +204,7 @@ func (s *Service) StoreMediaRef(ctx context.Context, sourceRef string, opts port
 func (s *Service) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
 	}
 	return s.StoreMediaRefWithProfile(ctx, *profile, sourceRef, opts)
 }
@@ -232,7 +232,7 @@ func (s *Service) StoreBytesRef(ctx context.Context, filename string, data []byt
 func (s *Service) StoreBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
 	}
 	return s.StoreBytesRefWithProfile(ctx, *profile, filename, data, opts)
 }
@@ -248,7 +248,7 @@ func (s *Service) StoreBytesRefWithProfile(ctx context.Context, profile domain.S
 func (s *Service) StoreRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRefAtProfile, err)
 	}
 	return s.StoreRemoteRefWithProfile(ctx, *profile, remoteURL, opts)
 }
@@ -291,7 +291,7 @@ func (s *Service) ReadUploadResourceByURL(ctx context.Context, rawURL string, ma
 func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return fmt.Errorf("读取存储配置失败: %w", err)
+		return fmt.Errorf(msgPutObjectAtProfile, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -303,7 +303,7 @@ func (s *Service) PutObjectAtProfile(ctx context.Context, profileID, objectKey s
 func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*ports.StoredUploadObject, error) {
 	profile, err := s.profiles.ResolveProfileByID(ctx, profileID)
 	if err != nil {
-		return nil, fmt.Errorf("读取存储配置失败: %w", err)
+		return nil, fmt.Errorf(msgPutObjectAtProfile, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -314,26 +314,26 @@ func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey 
 
 func (s *Service) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
 	if s == nil || s.assetLocator == nil || assetID <= 0 || strings.TrimSpace(tier) == "" {
-		return "", fmt.Errorf("媒体衍生图解析器未配置")
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL)
 	}
 	locator, ok := s.assetLocator.(ports.StoredDerivativeLocator)
 	if !ok {
-		return "", fmt.Errorf("媒体衍生图解析器未配置")
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL)
 	}
 	location, found, err := locator.LocateStoredDerivative(ctx, ports.StoredDerivativeLookup{AssetID: assetID, Tier: strings.TrimSpace(tier)})
 	if err != nil {
-		return "", fmt.Errorf("定位媒体衍生图失败: %w", err)
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL2, err)
 	}
 	if !found {
-		return "", fmt.Errorf("媒体衍生图尚未就绪")
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL3)
 	}
 	key, err := domain.NormalizeUploadObjectKey(location.StorageKey)
 	if err != nil {
-		return "", fmt.Errorf("媒体衍生图存储路径无效: %w", err)
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL4, err)
 	}
 	profile, err := s.profiles.ResolveProfileByID(ctx, location.StorageProfileID)
 	if err != nil {
-		return "", fmt.Errorf("读取媒体衍生图存储配置失败: %w", err)
+		return "", fmt.Errorf(msgResolveProviderDerivativeURL5, err)
 	}
 	driver, err := s.drivers.GetDriver(profile.Provider)
 	if err != nil {
@@ -500,19 +500,19 @@ func (s *Service) ResolveStoredUploadTarget(ctx context.Context, rawURL string) 
 			ObjectKey: key,
 		})
 		if err != nil {
-			return nil, "", fmt.Errorf("定位媒体资产失败: %w", err)
+			return nil, "", fmt.Errorf(msgResolveStoredUploadTarget, err)
 		}
 		if found {
 			locatedKey, err := domain.NormalizeUploadObjectKey(location.StorageKey)
 			if err != nil {
-				return nil, "", fmt.Errorf("媒体资产存储路径无效: %w", err)
+				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget2, err)
 			}
 			if locatedKey != key {
-				return nil, "", fmt.Errorf("媒体资产存储路径与请求不一致")
+				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget3)
 			}
 			profile, err := s.profiles.ResolveProfileByID(ctx, location.StorageProfileID)
 			if err != nil {
-				return nil, "", fmt.Errorf("读取媒体资产存储配置失败: %w", err)
+				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget4, err)
 			}
 			return profile, locatedKey, nil
 		}
@@ -533,7 +533,7 @@ func (s *Service) resolveProfileFromUploadURL(ctx context.Context, rawURL string
 
 	parsed, err := url.Parse(trimmed)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return nil, fmt.Errorf("图片地址格式错误")
+		return nil, fmt.Errorf(msgResolveProfileFromUploadURL)
 	}
 	if s.isPublicLocalUploadURL(parsed) {
 		return s.profiles.ResolveProfileByID(ctx, "builtin-local")
@@ -570,12 +570,12 @@ func (s *Service) findS3ProfileForUploadURL(profiles []domain.StorageProfile, ra
 			continue
 		}
 		if matched != nil {
-			return nil, fmt.Errorf("图片地址匹配多个存储配置")
+			return nil, fmt.Errorf(msgFindS3ProfileForUploadURL)
 		}
 		matched = profile
 	}
 	if matched == nil {
-		return nil, fmt.Errorf("未找到图片所属的存储配置")
+		return nil, fmt.Errorf(msgFindS3ProfileForUploadURL2)
 	}
 	return matched, nil
 }
@@ -583,11 +583,11 @@ func (s *Service) findS3ProfileForUploadURL(profiles []domain.StorageProfile, ra
 func extractObjectKeyFromUserUploadURL(profile domain.StorageProfile, rawURL string) (string, error) {
 	trimmed := strings.TrimSpace(rawURL)
 	if trimmed == "" {
-		return "", fmt.Errorf("图片地址不能为空")
+		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL)
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("图片地址格式错误")
+		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return domain.NormalizeUploadObjectKey(strings.TrimPrefix(parsed.Path, "/"))
@@ -599,13 +599,13 @@ func extractObjectKeyFromUserUploadURL(profile domain.StorageProfile, rawURL str
 		accessDomain, _ := profile.Config["access_domain"].(string)
 		return extractObjectKeyFromAccessDomainURL(accessDomain, parsed)
 	default:
-		return "", fmt.Errorf("不支持的存储类型")
+		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL2)
 	}
 }
 
 func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (string, error) {
 	if parsed == nil {
-		return "", fmt.Errorf("图片地址格式错误")
+		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
 	}
 	base := strings.TrimSpace(accessDomain)
 	if !strings.Contains(base, "://") {
@@ -613,10 +613,10 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (
 	}
 	baseURL, err := url.Parse(base)
 	if err != nil || baseURL.Host == "" {
-		return "", fmt.Errorf("访问域名配置无效")
+		return "", fmt.Errorf(msgExtractObjectKeyFromAccessDomainURL)
 	}
 	if !strings.EqualFold(parsed.Hostname(), baseURL.Hostname()) {
-		return "", fmt.Errorf("仅允许删除当前存储域名下的文件")
+		return "", fmt.Errorf(msgExtractObjectKeyFromAccessDomainURL2)
 	}
 
 	relativePath := parsed.Path
@@ -637,22 +637,22 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (
 func uploadObjectKeyFromURL(rawURL string) (string, error) {
 	trimmed := strings.TrimSpace(rawURL)
 	if trimmed == "" {
-		return "", fmt.Errorf("图片地址不能为空")
+		return "", fmt.Errorf(msgExtractObjectKeyFromUserUploadURL)
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return "", fmt.Errorf("图片地址格式错误")
+		return "", fmt.Errorf(msgResolveProfileFromUploadURL)
 	}
 	if parsed.Scheme != "" {
 		scheme := strings.ToLower(parsed.Scheme)
 		if (scheme != "http" && scheme != "https") || parsed.Host == "" {
-			return "", fmt.Errorf("图片地址格式错误")
+			return "", fmt.Errorf(msgResolveProfileFromUploadURL)
 		}
 	}
 	pathValue := "/" + strings.TrimLeft(parsed.Path, "/")
 	markerIndex := strings.Index(pathValue, "/uploads/")
 	if markerIndex < 0 {
-		return "", fmt.Errorf("不支持的上传资源路径")
+		return "", fmt.Errorf(msgUploadObjectKeyFromURL)
 	}
 	return domain.NormalizeUploadObjectKey(strings.TrimPrefix(pathValue[markerIndex:], "/"))
 }
@@ -660,10 +660,10 @@ func uploadObjectKeyFromURL(rawURL string) (string, error) {
 func canonicalizeMultipartImageWithFacts(file *multipart.FileHeader) (imageformat.Facts, error) {
 	facts, err := imageformat.InspectFileHeader(file)
 	if err != nil {
-		return imageformat.Facts{}, fmt.Errorf("图片校验失败: %w", err)
+		return imageformat.Facts{}, fmt.Errorf(msgCanonicalizeMultipartImageWithFacts, err)
 	}
 	if file == nil {
-		return imageformat.Facts{}, fmt.Errorf("文件内容不合法")
+		return imageformat.Facts{}, fmt.Errorf(msgChecksumMultipartFile)
 	}
 	file.Filename = domain.CanonicalStorageFilename(file.Filename, facts.Extension)
 	if file.Header == nil {
@@ -684,7 +684,7 @@ func (s *Service) PublicUploadURL(objectKey string) string {
 func decodeDataURL(dataURL string) (string, []byte, error) {
 	parsed, err := mediarefs.ParseDataImageURL(dataURL, maxRemoteFileSize)
 	if err != nil {
-		return "", nil, fmt.Errorf("无效的 base64 图片格式")
+		return "", nil, fmt.Errorf(msgDecodeDataURL)
 	}
 	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), parsed.Ext), parsed.Data, nil
 }

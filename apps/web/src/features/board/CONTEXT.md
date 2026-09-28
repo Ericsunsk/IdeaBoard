@@ -29,6 +29,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - `serializeBoardState` / `parseBoardState` — serialization and version-migration adapters (via `persistence/index.ts`) in `infrastructure/persistence`.
 - `renderBoardPreviewDataUrl` / `createBoardPreviewRefreshQueue` — preview generation and refresh queue in `infrastructure/preview`.
 - `createCatalog` / `useCatalog` / `BoardsPage` — gallery page, controller, and views (via root `board/index.ts`) in `presentation/catalog`.
+- Gallery copy keys live only under `workspace.boards.*` in the shared locale bundles; there is no `board.*` namespace (the h1 included: `workspace.boards.title`).
 - `board/testing` — snapshot/state factories for tests only; never enters the production barrel.
 - `board/index.ts` — sole cross-feature entry; Canvas `board-session` orchestrates session lifecycle through this seam.
 

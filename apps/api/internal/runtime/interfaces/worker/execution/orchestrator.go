@@ -184,7 +184,7 @@ func (o *Orchestrator) prepareTaskExecution(
 		}
 		// Deterministic: unparseable params never succeed on retry, so fail
 		// the task now instead of enqueueing a hot retry loop.
-		return "", "", true, o.completeFailedTask(ctx, task, "", "任务参数无法解析", 0)
+		return "", "", true, o.completeFailedTask(ctx, task, "", msgPrepareTaskExecution, 0)
 	}
 	model, err = o.modelResolver.ResolveModel(ctx, feature)
 	if err != nil {
@@ -201,7 +201,7 @@ func (o *Orchestrator) prepareTaskExecution(
 		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
 			return "", "", true, phaseErr
 		}
-		return "", "", true, o.completeFailedTask(ctx, task, "", "功能模型未配置，请先在后台配置", 0)
+		return "", "", true, o.completeFailedTask(ctx, task, "", msgPrepareTaskExecution2, 0)
 	}
 	if err := phaseMachine.advance(phaseAssigned); err != nil {
 		return "", "", true, err
@@ -232,7 +232,7 @@ func (o *Orchestrator) startTaskAttempt(
 			if phaseErr := phaseMachine.advance(phaseDropped); phaseErr != nil {
 				return attemptContext{}, true, phaseErr
 			}
-			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
+			o.dropTask(ctx, task, msgStartTaskAttempt)
 			return attemptContext{}, true, nil
 		}
 		slog.Warn("claim and start task attempt failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
@@ -297,7 +297,7 @@ func (o *Orchestrator) checkCancelledBeforeFinalize(
 			return true, phaseErr
 		}
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
-		return true, o.requeueTask(ctx, task, attemptCtx.executionToken, "检查任务取消状态失败")
+		return true, o.requeueTask(ctx, task, attemptCtx.executionToken, msgCheckCancelledBeforeFinalize)
 	}
 	if cancelled {
 		if err := phaseMachine.advance(phaseCancelled); err != nil {
@@ -431,7 +431,7 @@ func (o *Orchestrator) handleProviderFailureConvergence(
 		if phaseErr := phaseMachine.advance(phaseDropped); phaseErr != nil {
 			return phaseErr
 		}
-		o.dropTask(ctx, attempt.task, "任务状态已收敛，丢弃脏队列任务")
+		o.dropTask(ctx, attempt.task, msgStartTaskAttempt)
 		return nil
 	default:
 		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
@@ -480,7 +480,7 @@ func (o *Orchestrator) requeueFailedAttempt(
 	})
 	if err != nil {
 		if isTaskConvergedError(err) {
-			o.dropTask(ctx, attempt.task, "任务状态已收敛，丢弃脏队列任务")
+			o.dropTask(ctx, attempt.task, msgStartTaskAttempt)
 			return nil
 		}
 		return err
@@ -571,7 +571,7 @@ func (o *Orchestrator) completeTask(
 		if failErr := o.taskExecution.FailTask(cleanupCtx, taskexecution.FailTaskInput{
 			TaskID:         task.TaskID,
 			ExecutionToken: attemptCtx.executionToken,
-			Reason:         "任务结果保存失败，请稍后重试",
+			Reason:         msgCompleteTask,
 		}); failErr != nil {
 			slog.Warn("mark task failed after completion writeback failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", failErr)
 		}
@@ -650,7 +650,7 @@ func (o *Orchestrator) skipCancelledTask(ctx context.Context, task *tasks.TaskPa
 	snapshot := tasks.TaskCancellationSnapshot{
 		TaskID:      task.TaskID,
 		CancelledAt: cancelledAt,
-		Reason:      "任务已取消",
+		Reason:      msgSkipCancelledTask,
 	}
 	if err := o.taskExecution.RecordTaskCancelled(cleanupCtx, snapshot); err != nil {
 		slog.Warn("record task cancellation snapshot failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
@@ -808,7 +808,7 @@ func isTaskConvergedError(err error) bool {
 
 func userFacingProviderError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return "上游图像服务响应超时"
+		return msgUserFacingProviderError
 	}
 	if message, ok := userFacingProviderHTTPError(err); ok {
 		return message
@@ -816,22 +816,22 @@ func userFacingProviderError(err error) string {
 	if message, ok := userFacingExecutionFailure(err); ok {
 		return message
 	}
-	return "上游图像服务调用失败"
+	return msgUserFacingProviderError2
 }
 
 func userFacingProviderHTTPError(err error) (string, bool) {
 	if status, ok := providerHTTPStatus(err); ok {
 		switch status {
 		case http.StatusBadRequest, http.StatusUnprocessableEntity:
-			return "请求参数不合法，请检查输入后重试", true
+			return msgUserFacingProviderHTTPError, true
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return "上游服务鉴权失败，请联系管理员", true
+			return msgUserFacingProviderHTTPError2, true
 		case http.StatusPaymentRequired:
-			return "上游服务额度不足或未开通，请联系管理员", true
+			return msgUserFacingProviderHTTPError3, true
 		case http.StatusNotFound:
-			return "上游服务接口或模型不可用，请联系管理员", true
+			return msgUserFacingProviderHTTPError4, true
 		case http.StatusTooManyRequests:
-			return "上游服务请求过于频繁，请稍后重试", true
+			return msgUserFacingProviderHTTPError5, true
 		}
 	}
 	return "", false
@@ -849,23 +849,23 @@ func userFacingFailureCategory(err error, category string) (string, bool) {
 	case tasks.FailureCategoryProviderError:
 		return providerFailureReason(err)
 	case tasks.FailureCategoryStorageError:
-		return "图片结果保存失败，请检查存储配置", true
+		return msgUserFacingFailureCategory, true
 	case tasks.FailureCategoryFinalizeError:
 		if reason, ok := providerFailureReason(err); ok {
 			return reason, true
 		}
-		return "图片结果保存失败，请检查存储配置", true
+		return msgUserFacingFailureCategory, true
 	case tasks.FailureCategoryAuth:
-		return "上游服务鉴权失败，请联系管理员", true
+		return msgUserFacingProviderHTTPError2, true
 	case tasks.FailureCategoryInputInvalid:
 		if reason := strings.TrimSpace(err.Error()); reason != "" {
 			return reason, true
 		}
-		return "请求参数不合法，请检查输入后重试", true
+		return msgUserFacingProviderHTTPError, true
 	case tasks.FailureCategoryQuota:
-		return "上游服务额度不足或未开通，请联系管理员", true
+		return msgUserFacingProviderHTTPError3, true
 	case tasks.FailureCategoryTimeout:
-		return "上游图像服务响应超时", true
+		return msgUserFacingProviderError, true
 	default:
 		return "", false
 	}

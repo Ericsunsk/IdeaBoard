@@ -275,7 +275,7 @@ func (p Principal) RequireCapability(c *gin.Context, capability string) bool {
 		return true
 	}
 	if c != nil {
-		response.Error(c, http.StatusForbidden, "权限不足")
+		response.Error(c, http.StatusForbidden, msgRequireCapability)
 		c.Abort()
 	}
 	return false
@@ -359,7 +359,7 @@ func Require(c *gin.Context) (Principal, bool) {
 		return principal, true
 	}
 	if c != nil {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+		response.Error(c, http.StatusUnauthorized, msgRequire)
 		c.Abort()
 	}
 	return Principal{}, false
@@ -371,7 +371,7 @@ func RequireAdmin(c *gin.Context) (Principal, bool) {
 		return Principal{}, false
 	}
 	if !identityPrincipal.IsAdmin() {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
+		response.Error(c, http.StatusForbidden, msgRequireAdmin)
 		c.Abort()
 		return Principal{}, false
 	}

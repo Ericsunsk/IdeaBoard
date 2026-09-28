@@ -64,7 +64,7 @@ func NewHandler(service *statisticsapp.Service, monitor MonitorInfoProvider) *Ha
 func (h *Handler) GetMonitor(c *gin.Context) {
 	snapshot, err := h.buildMonitorSnapshot(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, 500, "获取监控数据失败", err)
+		response.InternalError(c, 500, msgGetMonitor, err)
 		return
 	}
 	response.Success(c, snapshot)
@@ -76,7 +76,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 	}
 	if count := h.monitorStreamCount.Add(1); count > monitorStreamMaxConcurrent {
 		h.monitorStreamCount.Add(-1)
-		response.MachineError(c, http.StatusTooManyRequests, string(contract.CodeTaskMonitorConcurrencyLimited), "监控连接数已达上限，请稍后重试")
+		response.MachineError(c, http.StatusTooManyRequests, string(contract.CodeTaskMonitorConcurrencyLimited), msgTaskMonitorConcurrencyLimited)
 		return
 	}
 	defer h.monitorStreamCount.Add(-1)
@@ -84,7 +84,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 	ctx := c.Request.Context()
 	snapshot, err := h.buildMonitorSnapshot(ctx)
 	if err != nil {
-		response.InternalError(c, 500, "获取监控数据失败", err)
+		response.InternalError(c, 500, msgGetMonitor, err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 				slog.Warn("admin monitor SSE snapshot failed", "err", err)
 				if err := sse.WriteEvent(c, monitorSnapshotErrorEvent, response.Response{
 					Code: http.StatusInternalServerError,
-					Msg:  "获取监控数据失败",
+					Msg:  msgGetMonitor,
 				}); err != nil {
 					return
 				}
@@ -180,7 +180,7 @@ func (h *Handler) GetStatistics(c *gin.Context) {
 			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
-		response.InternalError(c, 500, "获取统计数据失败", err)
+		response.InternalError(c, 500, msgGetStatistics, err)
 		return
 	}
 	response.Success(c, stats)
@@ -192,7 +192,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), "请求参数错误")
+			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), msgTaskStatisticsRequestInvalid)
 			return
 		}
 	}
@@ -207,7 +207,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
-		response.InternalError(c, 500, "补录统计失败", err)
+		response.InternalError(c, 500, msgBackfillStatistics, err)
 		return
 	}
 	response.Success(c, result)
@@ -217,5 +217,5 @@ func validationMessage(err error) string {
 	if validation.Is(err) && err.Error() != "" {
 		return err.Error()
 	}
-	return "参数错误"
+	return msgValidationMessage
 }

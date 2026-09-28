@@ -40,7 +40,7 @@ func (GenericDialect) Encode(req Request) ([]byte, error) {
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("序列化图像请求失败: %w", err)
+		return nil, fmt.Errorf(msgEncode3, err)
 	}
 	return encoded, nil
 }

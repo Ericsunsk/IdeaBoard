@@ -63,11 +63,25 @@ export function usePointerDragSession<TPayload = void>(
     return { event, payload }
   }
 
+  function tryCapturePointer(target: PointerDragTarget | null, pointerId: number) {
+    if (!target?.setPointerCapture) return
+    try {
+      target.setPointerCapture(pointerId)
+    } catch {
+      // Proceed captureless: window-level move/up listeners still drive the session.
+    }
+  }
+
   function releasePointerCapture(session: PointerDragSession<TPayload>) {
     const target = session.target
     if (!target?.releasePointerCapture) return
-    if (target.hasPointerCapture && !target.hasPointerCapture(session.pointerId)) return
-    target.releasePointerCapture(session.pointerId)
+    try {
+      if (target.hasPointerCapture && !target.hasPointerCapture(session.pointerId)) return
+      target.releasePointerCapture(session.pointerId)
+    } catch {
+      // Capture was already lost or never acquired; session state is
+      // already rolled back by clearSession, so there is nothing to do.
+    }
   }
 
   function stopSessionListeners(session: PointerDragSession<TPayload>) {
@@ -169,7 +183,7 @@ export function usePointerDragSession<TPayload = void>(
 
     activeSession.value = session
     addSessionListeners(session)
-    session.target?.setPointerCapture?.(event.pointerId)
+    tryCapturePointer(session.target, event.pointerId)
     options.onStart?.(createContext(event, payload))
   }
 
@@ -191,6 +205,8 @@ export function usePointerDragSession<TPayload = void>(
     return session
   }
 
+  // Intentional `tryOnScopeDispose`: this drag session is a reusable utility
+  // that stays safe when instantiated outside a component scope.
   tryOnScopeDispose(() => {
     cancelDrag()
   })

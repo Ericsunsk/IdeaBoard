@@ -47,7 +47,7 @@ type authFirstMutation struct {
 func (commands *IdentityAdminCommands) SetRole(ctx context.Context, actor principal.Principal, targetPublicID string, role string) error {
 	nextRole := normalizeAdminRole(role)
 	if nextRole == "" {
-		return identityAdminError(ports.IdentityAdminInvalid, "role 仅支持 admin 或 user", nil)
+		return identityAdminError(ports.IdentityAdminInvalid, msgSetRole, nil)
 	}
 	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{requireAuth: true})
 	if err != nil {
@@ -56,7 +56,7 @@ func (commands *IdentityAdminCommands) SetRole(ctx context.Context, actor princi
 
 	currentRole := normalizeAdminRole(target.user.Role)
 	if currentRole == "" {
-		return identityAdminError(ports.IdentityAdminBusinessFailure, "目标用户的业务侧角色无效", nil)
+		return identityAdminError(ports.IdentityAdminBusinessFailure, msgSetRole2, nil)
 	}
 	if currentRole == nextRole {
 		return commands.reconcileAuthRole(ctx, target.authUserID, nextRole)
@@ -69,7 +69,7 @@ func (commands *IdentityAdminCommands) SetRole(ctx context.Context, actor princi
 
 func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.Principal, targetPublicID string, input ports.IdentityAdminBanInput) error {
 	if input.ExpiresInDays < 0 {
-		return identityAdminError(ports.IdentityAdminInvalid, "expires_in_days 不能小于 0", nil)
+		return identityAdminError(ports.IdentityAdminInvalid, msgBan, nil)
 	}
 	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
 	if err != nil {
@@ -81,7 +81,7 @@ func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.
 
 	const secondsPerDay = 24 * 60 * 60
 	if input.ExpiresInDays > int(^uint(0)>>1)/secondsPerDay {
-		return identityAdminError(ports.IdentityAdminInvalid, "expires_in_days 超出支持范围", nil)
+		return identityAdminError(ports.IdentityAdminInvalid, msgBan2, nil)
 	}
 	expiresInSeconds := input.ExpiresInDays * secondsPerDay
 	return commands.applyAuthThenLocal(authFirstMutation{
@@ -98,10 +98,10 @@ func (commands *IdentityAdminCommands) Ban(ctx context.Context, actor principal.
 			return commands.auth.UnbanUser(ctx, target.authUserID)
 		},
 		authFailure: func(err error) error {
-			return authMutationError(err, "目标用户在身份系统中不存在，已拒绝封禁以避免状态漂移", "身份侧封禁失败")
+			return authMutationError(err, msgBan3, msgBan4)
 		},
-		localFailureMsg:    "业务侧封禁失败",
-		rollbackFailureMsg: "业务侧封禁失败，且身份侧回滚失败，请按运维流程补偿处理",
+		localFailureMsg:    msgBan5,
+		rollbackFailureMsg: msgBan6,
 	})
 }
 
@@ -128,10 +128,10 @@ func (commands *IdentityAdminCommands) Unban(ctx context.Context, actor principa
 			return commands.auth.BanUser(ctx, target.authUserID, "rollback after local unban failure", 0)
 		},
 		authFailure: func(err error) error {
-			return authMutationError(err, "目标用户在身份系统中不存在，已拒绝解封以避免状态漂移", "身份侧解封失败")
+			return authMutationError(err, msgUnban, msgUnban2)
 		},
-		localFailureMsg:    "业务侧解封失败",
-		rollbackFailureMsg: "业务侧解封失败，且身份侧回滚失败，请按运维流程补偿处理",
+		localFailureMsg:    msgUnban3,
+		rollbackFailureMsg: msgUnban4,
 	})
 }
 
@@ -141,7 +141,7 @@ func (commands *IdentityAdminCommands) RevokeSessions(ctx context.Context, actor
 		return err
 	}
 	if err := commands.auth.RevokeUserSessions(ctx, target.authUserID); err != nil {
-		return authMutationError(err, "目标用户在身份系统中不存在，无法吊销会话", "身份侧会话吊销失败")
+		return authMutationError(err, msgRevokeSessions, msgRevokeSessions2)
 	}
 	return nil
 }
@@ -153,12 +153,12 @@ func (commands *IdentityAdminCommands) Delete(ctx context.Context, actor princip
 	}
 	if err := commands.users.DeleteUser(ctx, target.user.ID, commands.auth); err != nil {
 		if errors.Is(err, domain.ErrUserDeletionBlockedByPaymentState) {
-			return identityAdminError(ports.IdentityAdminConflict, "存在未结算的 Payment、Refund 或 Dispute，暂不能注销用户", err)
+			return identityAdminError(ports.IdentityAdminConflict, msgDelete, err)
 		}
 		if errors.Is(err, domain.ErrUserDeletionAuthUnavailable) {
-			return identityAdminError(ports.IdentityAdminUnavailable, "认证服务未配置", err)
+			return identityAdminError(ports.IdentityAdminUnavailable, msgDelete2, err)
 		}
-		return identityAdminError(ports.IdentityAdminBusinessFailure, "用户删除流程已安全冻结，可重试以继续收敛", err)
+		return identityAdminError(ports.IdentityAdminBusinessFailure, msgDelete3, err)
 	}
 	return nil
 }
@@ -178,22 +178,22 @@ func (commands *IdentityAdminCommands) promote(ctx context.Context, userID int64
 			return commands.auth.SetUserRole(ctx, authUserID, currentRole)
 		},
 		authFailure: func(err error) error {
-			return authMutationError(err, "目标用户在身份系统中不存在，已拒绝改角色以避免状态漂移", "同步 Auth 管理员角色失败")
+			return authMutationError(err, msgPromote, msgPromote2)
 		},
-		localFailureMsg:    "业务侧角色更新失败",
-		rollbackFailureMsg: "业务侧角色更新失败，且 Auth 角色回滚失败，请按运维流程补偿处理",
+		localFailureMsg:    msgPromote3,
+		rollbackFailureMsg: msgPromote4,
 	})
 }
 
 func (commands *IdentityAdminCommands) demote(ctx context.Context, userID int64, authUserID string) error {
 	if err := commands.users.UpdateRole(ctx, userID, principal.RoleUser.String()); err != nil {
-		return identityAdminError(ports.IdentityAdminBusinessFailure, "业务侧角色更新失败", err)
+		return identityAdminError(ports.IdentityAdminBusinessFailure, msgPromote3, err)
 	}
 	if err := commands.auth.SetUserRole(ctx, authUserID, principal.RoleUser.String()); err != nil {
 		if errors.Is(err, autherrors.ErrAuthUserNotFound) {
-			return identityAdminError(ports.IdentityAdminAuthIdentityNotFound, "业务侧已取消管理员，但目标用户在身份系统中不存在，请按运维流程核对", err)
+			return identityAdminError(ports.IdentityAdminAuthIdentityNotFound, msgDemote, err)
 		}
-		return identityAdminError(ports.IdentityAdminReconciliationRequired, "业务侧已取消管理员，但 Auth 角色同步失败，请重试或按运维流程补偿处理", err)
+		return identityAdminError(ports.IdentityAdminReconciliationRequired, msgDemote2, err)
 	}
 	return nil
 }
@@ -202,46 +202,46 @@ func (commands *IdentityAdminCommands) reconcileAuthRole(ctx context.Context, au
 	if err := commands.auth.SetUserRole(ctx, authUserID, nextRole); err != nil {
 		if nextRole == principal.RoleUser.String() {
 			if errors.Is(err, autherrors.ErrAuthUserNotFound) {
-				return identityAdminError(ports.IdentityAdminAuthIdentityNotFound, "业务侧已取消管理员，但目标用户在身份系统中不存在，请按运维流程核对", err)
+				return identityAdminError(ports.IdentityAdminAuthIdentityNotFound, msgDemote, err)
 			}
-			return identityAdminError(ports.IdentityAdminReconciliationRequired, "业务侧已取消管理员，但 Auth 角色同步失败，请重试或按运维流程补偿处理", err)
+			return identityAdminError(ports.IdentityAdminReconciliationRequired, msgDemote2, err)
 		}
-		return authMutationError(err, "目标用户在身份系统中不存在，已拒绝改角色以避免状态漂移", "同步 Auth 管理员角色失败")
+		return authMutationError(err, msgPromote, msgPromote2)
 	}
 	return nil
 }
 
 func (commands *IdentityAdminCommands) loadTarget(ctx context.Context, actor principal.Principal, targetPublicID string, policy identityAdminTargetPolicy) (*identityAdminTarget, error) {
 	if !actor.IsValid() {
-		return nil, identityAdminError(ports.IdentityAdminInvalid, "管理员身份无效", nil)
+		return nil, identityAdminError(ports.IdentityAdminInvalid, msgLoadTarget, nil)
 	}
 	if !actor.IsAdmin() {
-		return nil, identityAdminError(ports.IdentityAdminForbidden, "需要管理员权限", nil)
+		return nil, identityAdminError(ports.IdentityAdminForbidden, msgLoadTarget2, nil)
 	}
 	target, err := commands.users.GetByPublicID(ctx, targetPublicID)
 	if err != nil {
 		if database.IsNotFound(err) {
-			return nil, identityAdminError(ports.IdentityAdminTargetNotFound, "用户不存在", err)
+			return nil, identityAdminError(ports.IdentityAdminTargetNotFound, msgLoadTarget3, err)
 		}
-		return nil, identityAdminError(ports.IdentityAdminBusinessFailure, "读取用户失败", err)
+		return nil, identityAdminError(ports.IdentityAdminBusinessFailure, msgLoadTarget4, err)
 	}
 	if target == nil || target.ID <= 0 {
-		return nil, identityAdminError(ports.IdentityAdminTargetNotFound, "用户不存在", nil)
+		return nil, identityAdminError(ports.IdentityAdminTargetNotFound, msgLoadTarget3, nil)
 	}
 	if actor.UserID() == target.ID {
-		return nil, identityAdminError(ports.IdentityAdminInvalid, "不能操作当前登录管理员自己", nil)
+		return nil, identityAdminError(ports.IdentityAdminInvalid, msgLoadTarget5, nil)
 	}
 	if policy.rejectAdmins && normalizeAdminRole(target.Role) == principal.RoleAdmin.String() {
-		return nil, identityAdminError(ports.IdentityAdminInvalid, "不能操作管理员账号", nil)
+		return nil, identityAdminError(ports.IdentityAdminInvalid, msgLoadTarget6, nil)
 	}
 	result := &identityAdminTarget{user: target}
 	if policy.requireAuth {
 		if commands.auth == nil {
-			return nil, identityAdminError(ports.IdentityAdminUnavailable, "认证服务未配置", errors.New("admin auth service client not configured"))
+			return nil, identityAdminError(ports.IdentityAdminUnavailable, msgDelete2, errors.New("admin auth service client not configured"))
 		}
 		result.authUserID = strings.TrimSpace(derefString(target.AuthUserID))
 		if result.authUserID == "" {
-			return nil, identityAdminError(ports.IdentityAdminInvalid, "目标用户缺少 auth_user_id，已拒绝操作以避免状态漂移", nil)
+			return nil, identityAdminError(ports.IdentityAdminInvalid, msgLoadTarget7, nil)
 		}
 	}
 	return result, nil

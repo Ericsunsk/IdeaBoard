@@ -18,11 +18,8 @@ const creditFunctions = [
   'guard_credit_posting_transaction_scope()',
 ] as const
 
-export async function configureAuthRuntimePrivileges(
-  pool: Pool,
-  runtimeRole: string,
-) {
-  const normalizedRole = runtimeRole.trim();
+export async function configureAuthRuntimePrivileges(pool: Pool, runtimeRole: string) {
+  const normalizedRole = runtimeRole.trim()
   if (!normalizedRole) {
     throw new Error('Auth runtime role is required')
   }
@@ -31,19 +28,13 @@ export async function configureAuthRuntimePrivileges(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    const schemaResult = await client.query<{ current_schema: string }>(
-      'SELECT current_schema()',
-    )
+    const schemaResult = await client.query<{ current_schema: string }>('SELECT current_schema()')
     const schemaName = schemaResult.rows[0]?.current_schema
     if (!schemaName) {
       throw new Error('Could not resolve Auth database schema')
     }
-    await client.query(
-      `GRANT USAGE ON SCHEMA ${quoteIdentifier(schemaName)} TO ${roleSQL}`,
-    )
-    await client.query(
-      `GRANT SELECT, INSERT, UPDATE, DELETE ON ${tableSQL} TO ${roleSQL}`,
-    )
+    await client.query(`GRANT USAGE ON SCHEMA ${quoteIdentifier(schemaName)} TO ${roleSQL}`)
+    await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${tableSQL} TO ${roleSQL}`)
     await client.query(
       `REVOKE ALL ON TABLE ${quoteIdentifier(schemaName)}.system_configs FROM ${roleSQL}`,
     )
@@ -55,10 +46,7 @@ export async function configureAuthRuntimePrivileges(
     try {
       await client.query('ROLLBACK')
     } catch (rollbackError) {
-      throw new AggregateError(
-        [error, rollbackError],
-        'Auth runtime privilege transaction failed',
-      )
+      throw new AggregateError([error, rollbackError], 'Auth runtime privilege transaction failed')
     }
     throw error
   } finally {
@@ -68,18 +56,18 @@ export async function configureAuthRuntimePrivileges(
 
 export async function verifyAuthRuntimePrivileges(pool: Pool) {
   const result = await pool.query<{
-    can_execute_auth_settings: boolean;
-    can_execute_credit_functions: boolean;
-    can_read_system_configs: boolean;
-    can_write_credits: boolean;
-    can_read_auth_users: boolean;
-    can_manage_mail_settings?: boolean;
-    can_insert_mail_audit?: boolean;
-    can_allocate_mail_config_version?: boolean;
-    can_mutate_mail_audit?: boolean;
-    can_manage_social_provider_settings?: boolean;
-    can_delete_social_provider_settings?: boolean;
-    current_user: string;
+    can_execute_auth_settings: boolean
+    can_execute_credit_functions: boolean
+    can_read_system_configs: boolean
+    can_write_credits: boolean
+    can_read_auth_users: boolean
+    can_manage_mail_settings?: boolean
+    can_insert_mail_audit?: boolean
+    can_allocate_mail_config_version?: boolean
+    can_mutate_mail_audit?: boolean
+    can_manage_social_provider_settings?: boolean
+    can_delete_social_provider_settings?: boolean
+    current_user: string
   }>(
     `
 SELECT current_user,

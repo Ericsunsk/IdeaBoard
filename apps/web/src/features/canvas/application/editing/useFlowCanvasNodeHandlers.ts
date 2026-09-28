@@ -1,3 +1,4 @@
+import { getCurrentScope, onScopeDispose } from 'vue'
 import type { DismissTransientCanvasUi } from '../../presentation/screens/useFlowTransientUiDismissal.ts'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
 
@@ -9,9 +10,55 @@ type UseFlowCanvasNodeHandlersOptions = {
   updateNodeParams: (nodeId: string, payload: FlowSnapshotParamPatch) => void
   resetImage: (nodeId: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
+  /** Trailing delay for text-only dirty marks; injectable for specs. */
+  textDirtyDelayMs?: number | undefined
 }
 
+const DEFAULT_TEXT_DIRTY_DELAY_MS = 300
+
 export function useFlowCanvasNodeHandlers(options: UseFlowCanvasNodeHandlersOptions) {
+  const textDirtyDelayMs = Math.max(0, options.textDirtyDelayMs ?? DEFAULT_TEXT_DIRTY_DELAY_MS)
+  // Prompt text arrives per keystroke. The store commit below stays
+  // synchronous so the controlled textarea keeps reflecting each character,
+  // but the downstream staleness sweep rebuilds edge/node maps and opens its
+  // own transaction + autosave bump — defer it to a trailing edge so a typing
+  // burst pays that cost once.
+  const pendingTextDirty = new Map<string, ReturnType<typeof setTimeout>>()
+
+  function flushTextDirty(nodeId: string) {
+    const timer = pendingTextDirty.get(nodeId)
+    if (timer === undefined) return
+    pendingTextDirty.delete(nodeId)
+    clearTimeout(timer)
+    // Best effort: the board may have switched while the trailing call was
+    // pending, in which case the store is detached and there is nothing stale
+    // left to mark on this board.
+    try {
+      options.markFlowExecutionNodeDirty(nodeId)
+    } catch (error) {
+      console.error('[Canvas] Failed to mark execution nodes stale after text edit', error)
+    }
+  }
+
+  function scheduleTextDirty(nodeId: string) {
+    const timer = pendingTextDirty.get(nodeId)
+    if (timer !== undefined) clearTimeout(timer)
+    pendingTextDirty.set(
+      nodeId,
+      setTimeout(() => flushTextDirty(nodeId), textDirtyDelayMs),
+    )
+  }
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      for (const nodeId of pendingTextDirty.keys()) {
+        const timer = pendingTextDirty.get(nodeId)
+        pendingTextDirty.delete(nodeId)
+        if (timer !== undefined) clearTimeout(timer)
+      }
+    })
+  }
+
   function onFlowDeleteNode(nodeId: string) {
     options.dismissTransientCanvasUi({ closeContextMenu: true })
     options.discardFlowImageToolNodeEdits(nodeId)
@@ -20,7 +67,7 @@ export function useFlowCanvasNodeHandlers(options: UseFlowCanvasNodeHandlersOpti
 
   function onFlowPromptTextUpdate(nodeId: string, value: string) {
     options.updatePromptText(nodeId, value)
-    options.markFlowExecutionNodeDirty(nodeId)
+    scheduleTextDirty(nodeId)
   }
 
   function onFlowNodeParamUpdate(nodeId: string, payload: FlowSnapshotParamPatch) {

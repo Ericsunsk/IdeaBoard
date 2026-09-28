@@ -178,6 +178,8 @@ function rechargeStatusLabel(item: RechargeHistoryItem): string {
 }
 function formatDateTime(value: string): string {
   const date = new Date(value)
+  // Invalid-guard stays presentation-local (needs the `t()` fallback); the
+  // format itself converges on the account family (`formatters.ts`).
   if (Number.isNaN(date.getTime())) return t('account.topUp.unknownTime')
   return formatAccountRechargeDateTime(date)
 }

@@ -44,6 +44,7 @@ export default {
     deleteFailed: '캔버스를 삭제할 수 없습니다',
   },
   boards: {
+    title: 'IdeaBoard에 오신 것을 환영합니다!',
     subtitle: '아이디어를 탐색하고 확장하며 다듬어 보세요',
     newCanvas: '새 캔버스',
     searchPlaceholder: '캔버스 검색...',

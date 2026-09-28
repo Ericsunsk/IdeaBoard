@@ -279,7 +279,7 @@ func TestRewardRedeemLimitsEachAuthenticatedUser(t *testing.T) {
 		}
 	}
 	limited := performRawRewardRedeemWithKey(t, user41, `{"code":"SECURE01"}`, "secure-key-limited")
-	assertRewardErrorResponse(t, limited, http.StatusTooManyRequests, "操作频繁，请稍后重试")
+	assertRewardErrorResponse(t, limited, http.StatusTooManyRequests, "操作过于频繁，请稍后重试")
 	if got := limited.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("rate-limited Cache-Control = %q, want no-store", got)
 	}

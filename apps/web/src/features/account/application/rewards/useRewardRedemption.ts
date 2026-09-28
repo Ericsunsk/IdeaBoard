@@ -21,6 +21,8 @@ export type RewardRedemptionDependencies = {
 }
 
 export function createRewardRedemptionWorkflow(dependencies: RewardRedemptionDependencies) {
+  // Ad-hoc reentrancy guard (not `useAsyncAction`): redemption must throw on
+  // concurrent calls instead of counting them.
   const pending = ref(false)
 
   async function redeem(code: string): Promise<RewardRedeemResult> {

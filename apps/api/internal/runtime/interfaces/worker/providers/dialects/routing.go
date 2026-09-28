@@ -97,7 +97,7 @@ func adapterForOperation(operation workflow.RuntimeOperation) (domain.ProviderRu
 	case workflow.RuntimeOperationUpscale:
 		return domain.ProviderRuntimeAdapterUpscale, nil
 	default:
-		return 0, fmt.Errorf("网关不支持操作 %q", string(operation))
+		return 0, fmt.Errorf(msgAdapterForOperation, string(operation))
 	}
 }
 

@@ -72,7 +72,7 @@ func KeyVersion() string {
 
 func RequireEncryptionEnabled() error {
 	if !IsEncryptionEnabled() {
-		return errors.New("加密密钥未配置")
+		return errors.New(msgRequireEncryptionEnabled)
 	}
 	return nil
 }
@@ -85,15 +85,15 @@ func Encrypt(plaintext []byte) (string, error) {
 	}
 	block, err := aes.NewCipher(EncryptionKey)
 	if err != nil {
-		return "", fmt.Errorf("创建 AES cipher 失败: %w", err)
+		return "", fmt.Errorf(msgEncrypt, err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("创建 GCM 失败: %w", err)
+		return "", fmt.Errorf(msgEncrypt2, err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", fmt.Errorf("生成 nonce 失败: %w", err)
+		return "", fmt.Errorf(msgEncrypt3, err)
 	}
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
@@ -110,19 +110,19 @@ func Decrypt(encoded string) ([]byte, error) {
 	}
 	ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return nil, fmt.Errorf("解码密文失败: %w", err)
+		return nil, fmt.Errorf(msgDecrypt, err)
 	}
 	block, err := aes.NewCipher(EncryptionKey)
 	if err != nil {
-		return nil, fmt.Errorf("创建 AES cipher 失败: %w", err)
+		return nil, fmt.Errorf(msgEncrypt, err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("创建 GCM 失败: %w", err)
+		return nil, fmt.Errorf(msgEncrypt2, err)
 	}
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, errors.New("密文数据不完整")
+		return nil, errors.New(msgDecrypt2)
 	}
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	return gcm.Open(nil, nonce, ciphertext, nil)

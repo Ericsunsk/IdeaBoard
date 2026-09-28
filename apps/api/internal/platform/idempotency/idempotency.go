@@ -50,17 +50,17 @@ const (
 
 // MissingError classifies a missing key: the caller can retry with a key.
 func MissingError() *apperror.Error {
-	return apperror.BadRequest(CodeRequired, "缺少幂等键，请重试此次操作")
+	return apperror.BadRequest(CodeRequired, msgRequired)
 }
 
 // InvalidError classifies a malformed key (over length).
 func InvalidError() *apperror.Error {
-	return apperror.BadRequest(CodeRequired, "幂等键无效，请重试此次操作")
+	return apperror.BadRequest(CodeRequired, msgRequired2)
 }
 
 // ConflictError classifies a key reused with a different request payload.
 func ConflictError() *apperror.Error {
-	return apperror.Conflict(CodeConflict, "幂等请求与原请求不一致")
+	return apperror.Conflict(CodeConflict, msgConflict)
 }
 
 // IsConflict reports whether err is a key-reuse conflict (vs missing/invalid).

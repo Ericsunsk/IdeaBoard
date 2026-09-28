@@ -27,14 +27,14 @@ type controlTaskListCursor struct {
 
 func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext) {
 	if d == nil || d.Tasks == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "任务服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
 		return
 	}
 	page := 1
 	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
 		decoded, err := contract.DecodeCursor[controlTaskListCursor](raw)
 		if err != nil || decoded == nil || decoded.Page < 1 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
 			return
 		}
 		page = decoded.Page
@@ -43,7 +43,7 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
 		parsed, err := contract.ParsePageSize(raw)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
 			return
 		}
 		pageSize = parsed
@@ -58,9 +58,9 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 		userID, err := d.Tasks.ResolveAdminTaskUserID(c.Request.Context(), raw)
 		if err != nil {
 			if validation.Is(err) {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "user_id 无效")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest24)
 			} else {
-				contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "解析用户失败")
+				contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable26)
 			}
 			return
 		}
@@ -69,10 +69,10 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 	items, counts, err := d.Tasks.ListTasks(c.Request.Context(), &req)
 	if err != nil {
 		if validation.Is(err) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "获取任务列表失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable27)
 		return
 	}
 	if items == nil {
@@ -86,7 +86,7 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 	if hasMore {
 		encoded, err := contract.EncodeCursor(controlTaskListCursor{Page: page + 1})
 		if err != nil {
-			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "获取任务列表失败")
+			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable27)
 			return
 		}
 		nextCursor = encoded
@@ -96,17 +96,17 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 
 func (d *ContractControlDeps) getControlTask(c *gin.Context, _ controlContext) {
 	if d == nil || d.Tasks == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "任务服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
 		return
 	}
 	taskID := strings.TrimSpace(c.Param("task_id"))
 	if taskID == "" || !contract.IsTaskID(taskID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 		return
 	}
 	task, err := d.Tasks.GetTask(c.Request.Context(), taskID)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 		return
 	}
 	contract.RenderSuccess(c, struct {
@@ -116,24 +116,24 @@ func (d *ContractControlDeps) getControlTask(c *gin.Context, _ controlContext) {
 
 func (d *ContractControlDeps) cancelControlTask(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Tasks == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "任务服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
 		return
 	}
 	taskID := strings.TrimSpace(c.Param("task_id"))
 	if taskID == "" || !contract.IsTaskID(taskID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 		return
 	}
 	if err := d.Tasks.CancelAdminTask(c.Request.Context(), taskID, ctx.Operator.UserID(), ctx.Reason); err != nil {
 		if isControlTaskNotFound(err) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "任务不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound8)
 			return
 		}
 		if isControlTaskConflict(err) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "任务状态不允许取消")
+			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict4)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "取消失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable28)
 		return
 	}
 	contract.RenderSuccess(c, struct {

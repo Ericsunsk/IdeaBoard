@@ -67,12 +67,33 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
 }: UseSortableMediaInputsOptions<T>) {
   const sortableItems = ref<T[]>([]) as Ref<T[]>
   const isReordering = ref(false)
+  // Cached draggable list: populated at drag start so per-pointermove hover
+  // resolution avoids querySelectorAll (forced reflow in the hot path).
+  // Refreshed on commit only.
+  let cachedDraggableElements: HTMLElement[] | null = null
+  let cachedDraggableContainer: HTMLElement | null = null
+  let cachedDraggableIndexByElement: Map<HTMLElement, number> | null = null
 
   function getSourceItems(): T[] {
     return [...toValue(sourceItems)]
   }
 
+  function refreshDraggableCache(container: HTMLElement) {
+    cachedDraggableContainer = container
+    cachedDraggableElements = Array.from(container.querySelectorAll<HTMLElement>(draggableSelector))
+    cachedDraggableIndexByElement = new Map(
+      cachedDraggableElements.map((element, index) => [element, index] as const),
+    )
+  }
+
+  function invalidateDraggableCache() {
+    cachedDraggableElements = null
+    cachedDraggableContainer = null
+    cachedDraggableIndexByElement = null
+  }
+
   function finishReorder() {
+    invalidateDraggableCache()
     void nextTick(() => {
       isReordering.value = false
       sortableItems.value = getSourceItems()
@@ -98,10 +119,17 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
   }
 
   function getDraggableElements(container: HTMLElement): HTMLElement[] {
+    if (cachedDraggableContainer === container && cachedDraggableElements) {
+      return cachedDraggableElements
+    }
     return Array.from(container.querySelectorAll<HTMLElement>(draggableSelector))
   }
 
   function resolveDraggableIndex(container: HTMLElement, element: HTMLElement): number | null {
+    if (cachedDraggableContainer === container && cachedDraggableIndexByElement) {
+      const cached = cachedDraggableIndexByElement.get(element)
+      return cached === undefined ? null : cached
+    }
     const index = getDraggableElements(container).indexOf(element)
     return index >= 0 ? index : null
   }
@@ -203,8 +231,14 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
     const draggableElement = findClosestInside(target, draggableSelector, container)
     if (!draggableElement) return
 
+    // Snapshot the draggable list once per drag; hover resolution during the
+    // drag reuses this cache instead of querying the DOM per pointermove.
+    refreshDraggableCache(container)
     const itemId = resolveItemIdAtIndex(resolveDraggableIndex(container, draggableElement))
-    if (!itemId) return
+    if (!itemId) {
+      invalidateDraggableCache()
+      return
+    }
 
     event.preventDefault()
     pointerDragSession.beginDrag(

@@ -75,9 +75,9 @@
             >
               <div
                 v-for="folder in workspace.folderTabs.value"
-                :key="folder.queryKey"
+                :key="folder.folderKey"
                 class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-full"
-                @dragover.prevent.stop="handlePillDragOver($event, folder.queryKey)"
+                @dragover.prevent.stop="handlePillDragOver($event, folder.folderKey)"
                 @dragleave.stop="handlePillDragLeave"
                 @drop.prevent.stop="handlePillDrop($event, folder)"
                 @contextmenu.stop="openFolderMenu($event, folder)"
@@ -85,25 +85,25 @@
                 <button
                   type="button"
                   role="tab"
-                  :aria-selected="workspace.selectedFolder.value === folder.queryKey"
+                  :aria-selected="workspace.selectedFolder.value === folder.folderKey"
                   class="h-7 rounded-full border px-2.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
                   :class="[
-                    workspace.selectedFolder.value === folder.queryKey
+                    workspace.selectedFolder.value === folder.folderKey
                       ? 'border-transparent bg-board-primary text-ib-text-inverse shadow-xs'
                       : 'border-transparent bg-black/[0.04] text-board-page-text-muted hover:bg-black/[0.08] hover:text-board-page-text',
-                    hoveredPillKey === folder.queryKey
+                    hoveredPillKey === folder.folderKey
                       ? '!scale-105 !border-board-primary !bg-board-primary/10'
                       : '',
                   ]"
-                  @click="selectFolder(folder.queryKey)"
+                  @click="selectFolder(folder.folderKey)"
                 >
                   <ReportColumns
-                    v-if="folder.queryKey === 'all'"
+                    v-if="folder.folderKey === 'all'"
                     class="size-3 opacity-80"
                     aria-hidden="true"
                   />
                   <Bookmark
-                    v-else-if="folder.queryKey === 'quick-saves'"
+                    v-else-if="folder.folderKey === 'quick-saves'"
                     class="size-3 opacity-80"
                     aria-hidden="true"
                   />
@@ -358,7 +358,7 @@ function openFolderMenu(event: MouseEvent, folder: LibraryFolderTab) {
 
 function openRenameFolder(folder: LibraryFolderTab) {
   closeFolderMenu()
-  renameFolderKey.value = folder.queryKey
+  renameFolderKey.value = folder.folderKey
   renameInitialName.value = folder.name
   renameDialogVisible.value = true
 }
@@ -388,7 +388,7 @@ async function deleteFolder(folder: LibraryFolderTab) {
   try {
     const confirmed = await confirmDialog.confirmAsync(deleteFolderConfirmation(folder.name))
     if (!confirmed) return
-    await workspace.deleteFolder(folder.queryKey)
+    await workspace.deleteFolder(folder.folderKey)
   } catch (error) {
     toast.error(userFacingErrorCopy(error, t('library.errors.deleteFolderFailed')))
   }

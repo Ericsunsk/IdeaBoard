@@ -46,15 +46,41 @@ type VisionBillingResult struct {
 	Replayed    bool   `json:"replayed,omitempty"`
 }
 
+// VisionOperationStatus is the closed vision billing operation vocabulary
+// carried by VisionBillingResult.Status and the ai_search_operations
+// status column. The wire/DB words are unchanged
+// ("pending","succeeded","failed","reconciliation_pending"); the type
+// only documents the allowed words at compile time. The DTO field stays
+// string with conversion at each construction site, and DB-scanned words
+// convert at each comparison site.
+type VisionOperationStatus string
+
+const (
+	VisionOperationPending               VisionOperationStatus = "pending"
+	VisionOperationSucceeded             VisionOperationStatus = "succeeded"
+	VisionOperationFailed                VisionOperationStatus = "failed"
+	VisionOperationReconciliationPending VisionOperationStatus = "reconciliation_pending"
+)
+
+// visionFailureCodes are the closed settlement-failure code words flowing
+// through VisionOperationFailure.Code into httpStatusForVisionCode. The
+// wire words are unchanged; the constants only kill the raw literals.
+const (
+	visionFailureCodeSKUNotFound        = "sku_not_found"
+	visionFailureCodePricingUnavailable = "pricing_unavailable"
+	visionFailureCodeWalletRestricted   = "wallet_restricted"
+	visionFailureCodeUnpricedZero       = "unpriced_zero"
+)
+
 // visionBillingDeferredReason preserves the catalog miss distinction (do
 // NOT merge the sentinels): pricing_unavailable vs sku_not_found stay
 // distinct reasons in the deferred metric.
 func visionBillingDeferredReason(err error) (string, bool) {
 	if errors.Is(err, billing.ErrSKUNotFound) {
-		return "sku_not_found", true
+		return visionFailureCodeSKUNotFound, true
 	}
 	if errors.Is(err, billing.ErrPricingUnavailable) {
-		return "pricing_unavailable", true
+		return visionFailureCodePricingUnavailable, true
 	}
 	return "", false
 }
@@ -116,7 +142,7 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 	if err != nil {
 		return VisionBillingResult{}, err
 	}
-	if reserved.result.Status != "pending" {
+	if reserved.result.Status != string(VisionOperationPending) {
 		return reserved.result, reserved.failure
 	}
 	if !reserved.execute {
@@ -133,25 +159,25 @@ func (s *VisionBillingService) Extract(ctx context.Context, userID int64, idempo
 		}
 		if isVisionUncertain(providerErr) {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, &VisionBillingPending{OperationID: reserved.result.OperationID}
+			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, &VisionBillingPending{OperationID: reserved.result.OperationID}
 		}
 		code, message, status := visionFailureDetails(providerErr)
 		if err := s.release(context.WithoutCancel(ctx), reserved.result.OperationID, userID, code, message); err != nil {
 			_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: release: %w", ErrVisionSettlement, err)
+			return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, fmt.Errorf("%w: release: %w", ErrVisionSettlement, err)
 		}
 		return VisionBillingResult{}, &VisionOperationFailure{Code: code, Message: message, HTTPStatus: status}
 	}
 
 	if reserved.deferred {
 		// Deferred free path skips ledger capture: amount 0 free-marker.
-		return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: "succeeded"}, nil
+		return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: string(VisionOperationSucceeded)}, nil
 	}
 	if err := s.capture(context.WithoutCancel(ctx), reserved.result.OperationID, userID, extraction.Query); err != nil {
 		_ = s.markReconciliationPending(context.WithoutCancel(ctx), reserved.result.OperationID)
-		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: "reconciliation_pending"}, fmt.Errorf("%w: capture: %w", ErrVisionSettlement, err)
+		return VisionBillingResult{OperationID: reserved.result.OperationID, Status: string(VisionOperationReconciliationPending)}, fmt.Errorf("%w: capture: %w", ErrVisionSettlement, err)
 	}
-	return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: "succeeded"}, nil
+	return VisionBillingResult{VisionExtraction: extraction, OperationID: reserved.result.OperationID, Status: string(VisionOperationSucceeded)}, nil
 }
 
 type visionReservation struct {
@@ -183,10 +209,10 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 		}
 		existing.Status = status
 		existing.Replayed = true
-		if status == "failed" {
+		if status == string(VisionOperationFailed) {
 			return visionReservation{result: existing, failure: &VisionOperationFailure{Code: errorCode, Message: errorMessage, HTTPStatus: httpStatusForVisionCode(errorCode)}}, nil
 		}
-		if status != "pending" {
+		if status != string(VisionOperationPending) {
 			return visionReservation{result: existing}, nil
 		}
 		return visionReservation{result: existing, execute: false}, nil
@@ -207,14 +233,14 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 				// the reason label (not merged).
 				operationID := uuid.NewString()
 				visionBillingDeferredObserve(visionSearchSKU, reason, operationID)
-				return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: "pending"}, execute: true, deferred: true}, nil
+				return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: string(VisionOperationPending)}, execute: true, deferred: true}, nil
 			}
 			return visionReservation{}, fmt.Errorf("quote vision search: %w", err)
 		}
 		// Quoted zero/negative: same free-marker degrade (no ledger, no row).
 		operationID := uuid.NewString()
-		visionBillingDeferredObserve(visionSearchSKU, "unpriced_zero", operationID)
-		return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: "pending"}, execute: true, deferred: true}, nil
+		visionBillingDeferredObserve(visionSearchSKU, visionFailureCodeUnpricedZero, operationID)
+		return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: string(VisionOperationPending)}, execute: true, deferred: true}, nil
 	}
 	amount, err := domain.NewCreditAmount(quote.TotalCredits)
 	if err != nil {
@@ -243,7 +269,7 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 	if err := tx.Commit(ctx); err != nil {
 		return visionReservation{}, fmt.Errorf("commit vision billing reservation: %w", err)
 	}
-	return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: "pending"}, execute: true}, nil
+	return visionReservation{result: VisionBillingResult{OperationID: operationID, Status: string(VisionOperationPending)}, execute: true}, nil
 }
 
 func (s *VisionBillingService) capture(ctx context.Context, operationID string, userID int64, query string) error {
@@ -389,7 +415,7 @@ func validateVisionInput(input searchdomain.VisionInput) error {
 		return err
 	}
 	if utf8RuneCount(strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")) > MaxSearchQueryRunes {
-		return fmt.Errorf("搜索关键词不能超过 %d 个字符", MaxSearchQueryRunes)
+		return fmt.Errorf(msgNormalizeQuery, MaxSearchQueryRunes)
 	}
 	return nil
 }
@@ -421,30 +447,30 @@ func visionFailureDetails(err error) (string, string, int) {
 	if errors.As(err, &providerErr) {
 		switch providerErr.Kind {
 		case searchdomain.VisionProviderFailureCredentials:
-			return "vision_search_credentials", "视觉搜索凭证无效", 502
+			return "vision_search_credentials", msgVisionFailureDetails, 502
 		case searchdomain.VisionProviderFailureQuota:
-			return "vision_search_quota", "视觉搜索权限或配额不可用", 502
+			return "vision_search_quota", msgVisionFailureDetails2, 502
 		case searchdomain.VisionProviderFailureResponse:
-			return "vision_search_schema_error", "视觉搜索返回格式无效", 502
+			return "vision_search_schema_error", msgVisionFailureDetails3, 502
 		}
 	}
 	switch {
 	case errors.Is(err, searchdomain.ErrVisionSchema):
-		return "vision_search_schema_error", "视觉搜索返回格式无效", 502
+		return "vision_search_schema_error", msgVisionFailureDetails3, 502
 	case errors.Is(err, searchdomain.ErrVisionNotConfigured):
-		return "vision_search_not_configured", "视觉搜索暂未配置", 503
+		return "vision_search_not_configured", msgVisionFailureDetails4, 503
 	case errors.Is(err, searchdomain.ErrVisionInput), errors.Is(err, searchdomain.ErrVisionImageInvalid), errors.Is(err, searchdomain.ErrVisionImageUnavailable):
-		return "vision_search_input_invalid", "视觉搜索输入无效", 400
+		return "vision_search_input_invalid", msgVisionFailureDetails5, 400
 	default:
-		return "vision_search_provider_error", "视觉搜索暂时不可用", 502
+		return "vision_search_provider_error", msgVisionFailureDetails6, 502
 	}
 }
 
 func httpStatusForVisionCode(code string) int {
 	switch code {
-	case "pricing_unavailable":
+	case visionFailureCodePricingUnavailable:
 		return 503
-	case "wallet_restricted":
+	case visionFailureCodeWalletRestricted:
 		return 409
 	case string(idempotency.CodeConflict):
 		return 409

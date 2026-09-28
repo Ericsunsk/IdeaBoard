@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool } from 'pg'
 
 export async function ensureMailConfigSchema(pool: Pool) {
   await pool.query(`
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS auth_mail_settings_audit (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(metadata) = 'object'),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp()
 );
-`);
+`)
   await pool.query(`
 SELECT setval(
   'auth_mail_settings_config_version_seq',
@@ -35,7 +35,7 @@ SELECT setval(
   true
 )
 WHERE EXISTS (SELECT 1 FROM auth_mail_settings);
-`);
+`)
   await pool.query(`
 CREATE OR REPLACE FUNCTION prevent_auth_mail_settings_audit_mutation()
 RETURNS TRIGGER AS $$
@@ -43,7 +43,7 @@ BEGIN
   RAISE EXCEPTION USING ERRCODE = 'IB401', MESSAGE = 'auth mail settings audit is append-only';
 END;
 $$ LANGUAGE plpgsql SET search_path = pg_catalog;
-`);
+`)
   await pool.query(`
 DO $$
 BEGIN
@@ -55,32 +55,25 @@ BEGIN
     FOR EACH ROW EXECUTE FUNCTION prevent_auth_mail_settings_audit_mutation();
   END IF;
 END $$;
-`);
+`)
 }
 
-export async function configureMailConfigRuntimePrivileges(
-  pool: Pool,
-  runtimeRole: string,
-) {
-  const role = quoteIdentifier(runtimeRole.trim());
-  if (role === '""') throw new Error("Auth runtime role is required");
-  await pool.query(
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON auth_mail_settings TO ${role}`,
-  );
-  await pool.query(
-    `GRANT SELECT, INSERT ON auth_mail_settings_audit TO ${role}`,
-  );
+export async function configureMailConfigRuntimePrivileges(pool: Pool, runtimeRole: string) {
+  const role = quoteIdentifier(runtimeRole.trim())
+  if (role === '""') throw new Error('Auth runtime role is required')
+  await pool.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON auth_mail_settings TO ${role}`)
+  await pool.query(`GRANT SELECT, INSERT ON auth_mail_settings_audit TO ${role}`)
   await pool.query(
     `GRANT USAGE, SELECT ON SEQUENCE auth_mail_settings_audit_id_seq, auth_mail_settings_config_version_seq TO ${role}`,
-  );
+  )
 }
 
 export async function verifyMailConfigRuntimePrivileges(pool: Pool) {
   const result = await pool.query<{
-    can_manage_settings: boolean;
-    can_insert_audit: boolean;
-    can_allocate_config_version: boolean;
-    can_mutate_audit: boolean;
+    can_manage_settings: boolean
+    can_insert_audit: boolean
+    can_allocate_config_version: boolean
+    can_mutate_audit: boolean
   }>(`
 SELECT
   has_table_privilege(current_user, 'auth_mail_settings', 'SELECT,INSERT,UPDATE,DELETE') AS can_manage_settings,
@@ -89,8 +82,8 @@ SELECT
   has_table_privilege(current_user, 'auth_mail_settings_audit', 'UPDATE')
     OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'DELETE')
     OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'TRUNCATE') AS can_mutate_audit
-`);
-  const row = result.rows[0];
+`)
+  const row = result.rows[0]
   if (
     !row?.can_manage_settings ||
     !row.can_insert_audit ||
@@ -99,10 +92,10 @@ SELECT
   ) {
     throw new Error(
       `Unsafe Auth mail config privileges: manage_settings=${Boolean(row?.can_manage_settings)} insert_audit=${Boolean(row?.can_insert_audit)} allocate_config_version=${Boolean(row?.can_allocate_config_version)} mutate_audit=${Boolean(row?.can_mutate_audit)}`,
-    );
+    )
   }
 }
 
 function quoteIdentifier(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
+  return `"${value.replaceAll('"', '""')}"`
 }

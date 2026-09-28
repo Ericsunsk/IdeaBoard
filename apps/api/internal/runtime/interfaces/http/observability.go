@@ -108,7 +108,7 @@ func RecoveryMiddleware() gin.HandlerFunc {
 					"stack", string(debug.Stack()),
 				)
 				if !c.Writer.Written() {
-					response.Error(c, http.StatusInternalServerError, "服务器内部错误")
+					response.Error(c, http.StatusInternalServerError, msgRecoveryMiddleware)
 				}
 				c.Abort()
 			}

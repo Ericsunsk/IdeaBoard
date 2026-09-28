@@ -1,5 +1,4 @@
-import { computed, nextTick, ref, type Ref } from 'vue'
-import { useEventListener } from '@vueuse/core'
+import { computed, nextTick, onScopeDispose, ref, watch, type Ref } from 'vue'
 import {
   constrainFusionBlendPoint,
   getDefaultBlendPointForImageCount,
@@ -27,6 +26,11 @@ export function useFusionBlendControl({
   const blendHandleHover = ref(false)
   const draftBlendPoint = ref<FusionBlendPoint | null>(null)
   const activeBlendPointerId = ref<number | null>(null)
+  // Stage rect cached at pointerdown so per-pointermove resolution avoids
+  // getBoundingClientRect (forced reflow in the hot path).
+  let cachedStageRect: DOMRect | null = null
+  let dragWindow: Window | null = null
+  let blendHandleElement: HTMLElement | null = null
 
   const constrainedBlendPoint = computed(() =>
     constrainFusionBlendPoint(blendPoint.value, imageCount.value, nodeWidth.value),
@@ -46,11 +50,24 @@ export function useFusionBlendControl({
     onCommit(constrainBlendPointForCurrentInputs(point))
   }
 
-  function resolveBlendPointFromPointer(event: PointerEvent): FusionBlendPoint | null {
+  function readStageRect(): DOMRect | null {
     const stage = stageRef.value
     if (!stage) return null
-    const rect = stage.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return null
+    try {
+      return stage.getBoundingClientRect()
+    } catch {
+      return null
+    }
+  }
+
+  function refreshCachedStageRect() {
+    // Re-resolve on scroll/resize mid-drag; cheap (once per scroll frame, not per move).
+    cachedStageRect = readStageRect()
+  }
+
+  function resolveBlendPointFromPointer(event: PointerEvent): FusionBlendPoint | null {
+    const rect = blendDragging.value && cachedStageRect ? cachedStageRect : readStageRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null
     return {
       x: (event.clientX - rect.left) / rect.width,
       y: (event.clientY - rect.top) / rect.height,
@@ -66,6 +83,46 @@ export function useFusionBlendControl({
     draftBlendPoint.value = constrainBlendPointForCurrentInputs(point)
   }
 
+  function tryReleaseBlendCapture() {
+    if (blendHandleElement && activeBlendPointerId.value !== null) {
+      try {
+        if (blendHandleElement.hasPointerCapture?.(activeBlendPointerId.value) !== false) {
+          blendHandleElement.releasePointerCapture?.(activeBlendPointerId.value)
+        }
+      } catch {
+        // Capture already lost; drag state rolls back below regardless.
+      }
+    }
+    blendHandleElement = null
+  }
+
+  function cleanupBlendDragListeners() {
+    // Remove from the captured window instance: the stage may have moved
+    // across documents between bind and cleanup.
+    if (!dragWindow) return
+    const ownerWindow = dragWindow
+    dragWindow = null
+    ownerWindow.removeEventListener('pointermove', onBlendPointerMove, true)
+    ownerWindow.removeEventListener('pointerup', onBlendPointerUp, true)
+    ownerWindow.removeEventListener('pointercancel', onBlendPointerCancel, true)
+    ownerWindow.removeEventListener('scroll', refreshCachedStageRect, true)
+    ownerWindow.removeEventListener('resize', refreshCachedStageRect)
+  }
+
+  function bindBlendDragListeners() {
+    cleanupBlendDragListeners()
+    const ownerWindow =
+      stageRef.value?.ownerDocument.defaultView ??
+      (typeof window === 'undefined' ? null : window)
+    if (!ownerWindow) return
+    dragWindow = ownerWindow
+    ownerWindow.addEventListener('pointermove', onBlendPointerMove, true)
+    ownerWindow.addEventListener('pointerup', onBlendPointerUp, true)
+    ownerWindow.addEventListener('pointercancel', onBlendPointerCancel, true)
+    ownerWindow.addEventListener('scroll', refreshCachedStageRect, true)
+    ownerWindow.addEventListener('resize', refreshCachedStageRect)
+  }
+
   function stopBlendDrag(commit = false) {
     if (commit && draftBlendPoint.value) {
       commitBlendPoint(draftBlendPoint.value)
@@ -78,6 +135,9 @@ export function useFusionBlendControl({
     blendDragging.value = false
     blendHandleHover.value = false
     activeBlendPointerId.value = null
+    cachedStageRect = null
+    tryReleaseBlendCapture()
+    cleanupBlendDragListeners()
   }
 
   function onBlendPointerUp(event: PointerEvent) {
@@ -87,13 +147,31 @@ export function useFusionBlendControl({
     stopBlendDrag(true)
   }
 
+  function onBlendPointerCancel(event: PointerEvent) {
+    if (!blendDragging.value) return
+    if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
+      return
+    // A cancelled pointer was never released by the user: revert the draft
+    // instead of persisting a blend point.
+    stopBlendDrag(false)
+  }
+
   function onBlendHandlePointerDown(event: PointerEvent) {
     if (!enabled.value) return
     blendDragging.value = true
     blendHandleHover.value = true
     activeBlendPointerId.value = event.pointerId
+    cachedStageRect = readStageRect()
     const handleElement = event.currentTarget as HTMLElement | null
-    handleElement?.setPointerCapture?.(event.pointerId)
+    blendHandleElement = handleElement
+    if (handleElement) {
+      try {
+        handleElement.setPointerCapture?.(event.pointerId)
+      } catch {
+        // Proceed captureless: window-level listeners still drive the drag.
+      }
+    }
+    bindBlendDragListeners()
     const point = resolveBlendPointFromPointer(event)
     draftBlendPoint.value = point
       ? constrainBlendPointForCurrentInputs(point)
@@ -113,9 +191,14 @@ export function useFusionBlendControl({
     commitBlendPoint(getDefaultBlendPointForImageCount(imageCount.value, nodeWidth.value))
   }
 
-  useEventListener(window, 'pointermove', onBlendPointerMove)
-  useEventListener(window, 'pointerup', onBlendPointerUp)
-  useEventListener(window, 'pointercancel', onBlendPointerUp)
+  watch(enabled, (isEnabled) => {
+    if (!isEnabled && blendDragging.value) stopBlendDrag(false)
+  })
+
+  onScopeDispose(() => {
+    if (blendDragging.value) stopBlendDrag(false)
+    else cleanupBlendDragListeners()
+  })
 
   return {
     activeBlendPoint,

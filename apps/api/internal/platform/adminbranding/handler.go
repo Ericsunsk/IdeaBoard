@@ -44,7 +44,7 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	overrides, err := store.List(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取品牌 Logo 配置失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgList, err)
 		return
 	}
 	response.SuccessDTO(c, listResponse{Overrides: overrides})
@@ -64,7 +64,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 	}
 	var request updateRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpsert)
 		return
 	}
 	logoKey := strings.TrimSpace(request.LogoKey)
@@ -100,7 +100,7 @@ func (h *Handler) Delete(c *gin.Context) {
 // port denies fail-closed so platform never serves admin writes by default.
 func (h *Handler) checkAdmin(c *gin.Context) bool {
 	if h == nil || h.requireAdmin == nil {
-		response.Error(c, http.StatusForbidden, "需要管理员权限")
+		response.Error(c, http.StatusForbidden, msgCheckAdmin)
 		return false
 	}
 	return h.requireAdmin(c)
@@ -108,7 +108,7 @@ func (h *Handler) checkAdmin(c *gin.Context) bool {
 
 func (h *Handler) requireStore(c *gin.Context) (Store, bool) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusInternalServerError, "品牌 Logo 配置服务未初始化", errors.New("admin brand logo override store is unavailable"))
+		response.InternalError(c, http.StatusInternalServerError, msgRequireStore, errors.New("admin brand logo override store is unavailable"))
 		return nil, false
 	}
 	return h.store, true
@@ -119,7 +119,7 @@ func parseTarget(c *gin.Context) (Scope, string, bool) {
 	targetKey := strings.TrimSpace(c.Param("target_key"))
 	if err := ValidateTarget(scope, targetKey); err != nil {
 		slog.Warn("admin brand logo target invalid", "err", err)
-		response.Error(c, http.StatusBadRequest, "品牌 Logo 参数错误")
+		response.Error(c, http.StatusBadRequest, msgParseTarget)
 		return "", "", false
 	}
 	return scope, targetKey, true
@@ -131,9 +131,9 @@ func (h *Handler) respondStoreError(c *gin.Context, err error) bool {
 	}
 	if validation.Is(err) {
 		slog.Warn("admin brand logo validation failed", "err", err)
-		response.Error(c, http.StatusBadRequest, "品牌 Logo 参数错误")
+		response.Error(c, http.StatusBadRequest, msgParseTarget)
 		return true
 	}
-	response.InternalError(c, http.StatusInternalServerError, "保存品牌 Logo 配置失败", err)
+	response.InternalError(c, http.StatusInternalServerError, msgRespondStoreError, err)
 	return true
 }

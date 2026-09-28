@@ -336,11 +336,11 @@ func (c *ServiceClient) GetSocialProviderCapabilities(ctx context.Context) (*Soc
 // key is intentionally not sent because this is a public-session route.
 func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error) {
 	if c == nil || c.httpClient == nil || strings.TrimSpace(c.baseURL) == "" {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务未配置"}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgAuthMiddleware}
 	}
 	normalizedID := strings.TrimSpace(authUserID)
 	if normalizedID == "" {
-		return nil, &ImpersonationError{Status: http.StatusBadRequest, Message: "认证用户 ID 不能为空"}
+		return nil, &ImpersonationError{Status: http.StatusBadRequest, Message: msgImpersonateUser}
 	}
 	body, err := json.Marshal(map[string]string{"userId": normalizedID})
 	if err != nil {
@@ -356,14 +356,14 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 	}
 	upstreamResponse, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务不可用"}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser2}
 	}
 	defer upstreamResponse.Body.Close()
 	if _, err := io.Copy(io.Discard, upstreamResponse.Body); err != nil {
-		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "读取认证服务响应失败"}
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser3}
 	}
 	if upstreamResponse.StatusCode < http.StatusOK || upstreamResponse.StatusCode >= http.StatusMultipleChoices {
-		return nil, &ImpersonationError{Status: upstreamResponse.StatusCode, Message: "认证服务拒绝伪装登录"}
+		return nil, &ImpersonationError{Status: upstreamResponse.StatusCode, Message: msgImpersonateUser4}
 	}
 	cookies := upstreamResponse.Header.Values("Set-Cookie")
 	for _, cookie := range cookies {
@@ -371,7 +371,7 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 			return append([]string(nil), cookies...), nil
 		}
 	}
-	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务未返回伪装 Session"}
+	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: msgImpersonateUser5}
 }
 
 func convertMailConfigSummary(value internalcontract.MailConfigSummary) *MailConfigSummary {
@@ -789,10 +789,10 @@ func contractFailure(action string, status int, body []byte) error {
 func mailConfigContractFailure(action string, status int, body []byte) error {
 	failure, err := decodeContractFailure(body)
 	if err != nil {
-		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效响应: %s", err)}
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure, err)}
 	}
 	if failure.Code != status {
-		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效错误状态: code=%d status=%d", failure.Code, status)}
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure2, failure.Code, status)}
 	}
 	return &MailConfigError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
 }
@@ -800,10 +800,10 @@ func mailConfigContractFailure(action string, status int, body []byte) error {
 func socialProviderContractFailure(action string, status int, body []byte) error {
 	failure, err := decodeContractFailure(body)
 	if err != nil {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: msgSocialProviderContractFailure}
 	}
 	if failure.Code != status {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效错误状态: code=%d status=%d", failure.Code, status)}
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: fmt.Sprintf(msgMailConfigContractFailure2, failure.Code, status)}
 	}
 	return &SocialProviderSettingsError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
 }

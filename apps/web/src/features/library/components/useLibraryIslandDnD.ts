@@ -102,7 +102,7 @@ export function useLibraryIslandDnD(options: LibraryIslandDnDOptions) {
 
   async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
     hoveredPillKey.value = null
-    await handleDropIntoFolder(e, folder.queryKey)
+    await handleDropIntoFolder(e, folder.folderKey)
   }
 
   async function saveReferenceToFolder(reference: LibrarySearchReference, folderKey: string) {

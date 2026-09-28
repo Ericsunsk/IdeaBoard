@@ -159,6 +159,12 @@ function createPendingOrderActions(
       } else {
         removeCachedPendingOrder(order.public_token)
       }
+      // `setQueryData` above is a no-op when the pending list was never
+      // fetched, so always stale-mark it: the SSE path invalidates
+      // pending+history together and this mutation must match it.
+      void queryClient.invalidateQueries({
+        queryKey: paymentsQueryKeys.pending(toValue(workspaceId) ?? ''),
+      })
       void queryClient.invalidateQueries({
         queryKey: paymentsQueryKeys.history(toValue(workspaceId) ?? ''),
       })

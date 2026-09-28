@@ -43,7 +43,7 @@ type controlMailAck struct {
 
 func (d *ContractControlDeps) requireControlMail(c *gin.Context) (ControlMailService, bool) {
 	if d == nil || d.Mail == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "邮件配置服务未初始化")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable10)
 		return nil, false
 	}
 	return d.Mail, true
@@ -78,7 +78,7 @@ func (d *ContractControlDeps) updateControlMailSetting(c *gin.Context, ctx contr
 		OperatorNote string `json:"operator_note"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	summary, err := mail.UpdateMailConfig(c.Request.Context(), auth.MailConfigUpdate{
@@ -114,12 +114,12 @@ func (d *ContractControlDeps) testControlMailSetting(c *gin.Context, ctx control
 		OperatorNote string `json:"operator_note"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	recipient := strings.TrimSpace(req.Recipient)
 	if recipient == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请输入测试收件地址")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest19)
 		return
 	}
 	if err := mail.SendMailConfigTest(c.Request.Context(), recipient, ctx.Operator.UserID()); err != nil {
@@ -139,15 +139,15 @@ func writeControlMailError(c *gin.Context, err error) {
 		switch configErr.Status {
 		case http.StatusBadRequest:
 			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest,
-				nonEmptyControlMailMessage(configErr.Message, "参数错误"))
+				nonEmptyControlMailMessage(configErr.Message, msgBadRequest4))
 			return
 		case http.StatusConflict:
 			contract.RenderError(c, http.StatusConflict, contract.CodeConflict,
-				nonEmptyControlMailMessage(configErr.Message, "邮件配置冲突"))
+				nonEmptyControlMailMessage(configErr.Message, msgWriteControlMailError))
 			return
 		}
 	}
-	contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "认证服务暂不可用")
+	contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable11)
 }
 
 func nonEmptyControlMailMessage(message, fallback string) string {

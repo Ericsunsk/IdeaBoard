@@ -173,11 +173,11 @@ func resolveStaticUploadReadAccess(
 
 	if kind == domain.UploadResourceKindCanvas {
 		if deps.BoardService == nil || deps.Auth.UserRepo == nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("canvas upload dependencies not configured"))
+			response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, fmt.Errorf("canvas upload dependencies not configured"))
 			return nil, false
 		}
 	} else if deps.Auth.UserRepo == nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("upload dependencies not configured"))
+		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, fmt.Errorf("upload dependencies not configured"))
 		return nil, false
 	}
 
@@ -201,28 +201,28 @@ func writeStaticUploadReadError(c *gin.Context, kind domain.UploadResourceKind, 
 func writeCanvasUploadReadError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUploadAccessInvalidPath):
-		response.Error(c, http.StatusNotFound, "资源不存在")
+		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
 	case errors.Is(err, boards.ErrInvalidInput):
-		response.Error(c, http.StatusNotFound, "资源不存在")
+		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
 	case errors.Is(err, boards.ErrNotFound):
-		response.Error(c, http.StatusNotFound, "资源不存在")
+		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
 	case errors.Is(err, boards.ErrPermissionDenied), errors.Is(err, domain.ErrUploadAccessDenied):
-		response.Error(c, http.StatusForbidden, "无权访问该资源")
+		response.Error(c, http.StatusForbidden, msgWriteCanvasUploadReadError2)
 	case errors.Is(err, domain.ErrUploadAccessOwnerMismatch):
-		response.Error(c, http.StatusNotFound, "资源不存在")
+		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
 	default:
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, err)
 	}
 }
 
 func writeOwnedUploadReadError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUploadAccessInvalidPath):
-		response.Error(c, http.StatusNotFound, "资源不存在")
+		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
 	case errors.Is(err, domain.ErrUploadAccessDenied), errors.Is(err, domain.ErrUploadAccessOwnerMismatch):
-		response.Error(c, http.StatusForbidden, "无权访问该资源")
+		response.Error(c, http.StatusForbidden, msgWriteCanvasUploadReadError2)
 	default:
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, err)
 	}
 }
 

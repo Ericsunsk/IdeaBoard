@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shallowRef, triggerRef } from 'vue'
+import { ref, shallowRef, triggerRef } from 'vue'
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { FusionNodeItem, ImageNodeItem } from '../../../board'
@@ -261,5 +261,43 @@ describe('useFlowNodeUiState', () => {
 
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)
+  })
+
+  it('flips to running when only the execution epoch changes', () => {
+    const epochNodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', makeImageSnapshot()),
+      makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot()),
+    ] as Node[])
+    const epochEdges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'edge-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'fusion-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+    const activeNodeIds = new Set<string>()
+    const executionEpoch = ref(0)
+
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes: epochNodes,
+      edges: epochEdges,
+      isNodeExecutionActive: (nodeId) => activeNodeIds.has(nodeId),
+      executionEpoch,
+    })
+    const readyState = getFlowNodeUiStateCached('fusion-1')
+    expect(readyState.isRunning).toBe(false)
+    expect(readyState.primaryAction).toEqual({ label: 'Generate', disabled: false })
+
+    // Start execution without touching the graph: the epoch bump alone must
+    // invalidate the cache so the running label appears immediately.
+    activeNodeIds.add('fusion-1')
+    executionEpoch.value += 1
+
+    const runningState = getFlowNodeUiStateCached('fusion-1')
+    expect(runningState).not.toBe(readyState)
+    expect(runningState.isRunning).toBe(true)
+    expect(runningState.primaryAction?.disabled).toBe(true)
   })
 })

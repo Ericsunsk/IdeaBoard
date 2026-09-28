@@ -42,3 +42,20 @@ var (
 	// ErrProviderHTTPSUnavailable is returned when the storage profile does not expose a provider HTTPS URL.
 	ErrProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
 )
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgNormalizeCanvasStorageUserSegment = "用户存储标识无效"                          // NormalizeCanvasStorageUserSegment @ canvas_user_path.go
+	msgNormalizeCanvasBoardSegment       = "缺少画布ID"                            // NormalizeCanvasBoardSegment @ canvas_user_path.go
+	msgImageDerivativeObjectKey          = "图片派生对象参数无效"                        // ImageDerivativeObjectKey @ derivative_key.go
+	msgStableUploadObjectKey             = "上传文件名无效"                           // StableUploadObjectKey @ object_key.go
+	msgTaskOutputUserUploadObjectPrefix  = "用户ID无效"                            // TaskOutputUserUploadObjectPrefix @ upload_policy.go
+	msgLibraryAssetUploadDirPrefix       = "素材库媒体标识无效"                         // LibraryAssetUploadDirPrefix @ upload_policy.go
+	msgParseUploadResourceParts          = "文件路径不能为空"                          // ParseUploadResourceParts @ upload_policy.go
+	msgParseUploadResourceParts2         = "不支持的上传资源路径"                        // ParseUploadResourceParts @ upload_policy.go
+	msgNormalizeUploadObjectKey          = "仅允许操作 uploads 或 ws-uploads 目录下的文件" // NormalizeUploadObjectKey @ upload_policy.go
+	msgNormalizeUploadObjectPrefix       = "文件前缀不能为空"                          // NormalizeUploadObjectPrefix @ upload_policy.go
+)

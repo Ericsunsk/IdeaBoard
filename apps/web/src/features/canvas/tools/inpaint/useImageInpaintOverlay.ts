@@ -7,7 +7,13 @@ import type {
   InpaintInteractionKey,
 } from './model.ts'
 import { drawMaskRasterPreviewToCanvas } from './lib/maskPaintingCanvas'
-import { clampMaskBrushSize, INPAINT_DEFAULT_BRUSH_SIZE } from './config/constants'
+import {
+  clampMaskBrushSize,
+  INPAINT_DEFAULT_BRUSH_SIZE,
+  INPAINT_MAX_PENDING_STROKES_PER_NODE,
+  INPAINT_MAX_POINTS_PER_STROKE,
+  INPAINT_STROKE_MIN_MOVE_DISTANCE_PX,
+} from './config/constants'
 import type {
   MaskPainter,
   MaskPainterClientPoint,
@@ -56,6 +62,40 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
   const paintersByNodeId = new Map<string, MaskPainter>()
   const pendingStrokesByNodeId = new Map<string, PendingInpaintStroke[]>()
   const committedMaskDataMap = new Map<string, ImageInpaintCommittedData>()
+  /**
+   * Per-node painter creation generation. Every `createPainterForNode` call
+   * bumps the counter and captures it; the async attach disposes the painter
+   * when the captured generation is stale (element reused or removed while
+   * Fabric loaded), so at most the newest creation ever attaches.
+   */
+  const painterCreationGenerationByNodeId = new Map<string, number>()
+  /**
+   * Per-node committed-preview generation. Bumped whenever committed data is
+   * discarded or the host element changes; the `Image.onload` in
+   * `drawCommittedMask` re-checks it (plus data identity) so a stale load
+   * never paints over a cleared state or a reused element.
+   */
+  const committedPreviewGenerationByNodeId = new Map<string, number>()
+
+  function nextPainterCreationGeneration(nodeId: string): number {
+    const next = (painterCreationGenerationByNodeId.get(nodeId) ?? 0) + 1
+    painterCreationGenerationByNodeId.set(nodeId, next)
+    return next
+  }
+
+  function invalidatePainterCreations(nodeId: string) {
+    painterCreationGenerationByNodeId.set(
+      nodeId,
+      (painterCreationGenerationByNodeId.get(nodeId) ?? 0) + 1,
+    )
+  }
+
+  function bumpCommittedPreviewGeneration(nodeId: string) {
+    committedPreviewGenerationByNodeId.set(
+      nodeId,
+      (committedPreviewGenerationByNodeId.get(nodeId) ?? 0) + 1,
+    )
+  }
 
   let paintingNodeId: string | null = null
   let paintingPointerId: number | null = null
@@ -112,10 +152,15 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     const painter = paintersByNodeId.get(nodeId)
     if (!painter) {
       // Fabric still loading: buffer the stroke instead of dropping it; it
-      // flushes once the painter for this host resolves.
+      // flushes once the painter for this host resolves. Capped: keep the
+      // newest strokes, drop the oldest, so a slow load cannot grow memory
+      // without bound.
       if (canvasRefs.has(nodeId)) {
         const pending = pendingStrokesByNodeId.get(nodeId) ?? []
         pending.push(stroke)
+        if (pending.length > INPAINT_MAX_PENDING_STROKES_PER_NODE) {
+          pending.splice(0, pending.length - INPAINT_MAX_PENDING_STROKES_PER_NODE)
+        }
         pendingStrokesByNodeId.set(nodeId, pending)
       }
       updateHistoryAvailability(nodeId)
@@ -144,6 +189,10 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
       painter.dispose()
       return
     }
+    // Defensive: the creation generation already guarantees at most the
+    // newest creation attaches, but never leak an overwritten painter.
+    const existing = paintersByNodeId.get(nodeId)
+    if (existing && existing !== painter) existing.dispose()
     paintersByNodeId.set(nodeId, painter)
     // Baseline preview first, then strokes painted while Fabric loaded.
     if (restorePreview) drawCommittedMask(nodeId)
@@ -156,6 +205,7 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     canvas: HTMLCanvasElement,
     restorePreview: boolean,
   ) {
+    const generation = nextPainterCreationGeneration(nodeId)
     let created: MaskPainter | Promise<MaskPainter>
     try {
       created = createMaskPainter(canvas, {
@@ -171,7 +221,16 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     }
     if (created instanceof Promise) {
       void created.then(
-        (painter) => attachPainterForNode(nodeId, canvas, painter, restorePreview),
+        (painter) => {
+          // Element reused or removed while Fabric loaded: the stale
+          // creation must never attach (it would overwrite the newest
+          // painter and leak); dispose it instead.
+          if (painterCreationGenerationByNodeId.get(nodeId) !== generation) {
+            painter.dispose()
+            return
+          }
+          attachPainterForNode(nodeId, canvas, painter, restorePreview)
+        },
         () => updateHistoryAvailability(nodeId),
       )
       return
@@ -199,10 +258,18 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     if (!committed?.maskDataUrl) return
+    const canvasAtStart = canvas
+    const dataUrlAtStart = committed.maskDataUrl
+    const generationAtStart = committedPreviewGenerationByNodeId.get(nodeId) ?? 0
     const image = new Image()
     image.onload = () => {
+      // Stale-load guard: the committed data may have been cleared (or the
+      // node switched/element reused) while the bitmap loaded. The token
+      // plus data identity re-check drops the draw in that case.
+      if (committedPreviewGenerationByNodeId.get(nodeId) !== generationAtStart) return
       const latest = canvasRefs.get(nodeId)
-      if (!latest) return
+      if (!latest || latest !== canvasAtStart) return
+      if (committedMaskDataMap.get(nodeId)?.maskDataUrl !== dataUrlAtStart) return
       // The painter is still absent (loading or failed): a pixel preview is
       // safe because no Fabric render can wipe it yet. `attachPainterForNode`
       // re-baselines through the seam once the painter resolves.
@@ -284,6 +351,23 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     // Raw client samples only: projection and pressure handling belong to
     // the Fabric seam (constant-width brushes ignore pressure by design).
     const point = { x: event.clientX, y: event.clientY }
+    const previous = paintingClientPoints[paintingClientPoints.length - 1]
+    if (previous) {
+      // Distance decimation: sub-threshold jitter is dropped from both the
+      // buffer and the live preview. The floor sits below the minimum brush
+      // width, so rendering is visually identical while long drags stay
+      // bounded.
+      const deltaX = point.x - previous.x
+      const deltaY = point.y - previous.y
+      const minDistance = INPAINT_STROKE_MIN_MOVE_DISTANCE_PX
+      if (deltaX * deltaX + deltaY * deltaY < minDistance * minDistance) return
+    }
+    if (paintingClientPoints.length >= INPAINT_MAX_POINTS_PER_STROKE) {
+      // Sample cap: thin the buffered shape instead of truncating the tail.
+      // The live preview already rendered every accepted sample; the buffer
+      // only feeds the one-shot fallback when no live session exists.
+      paintingClientPoints = paintingClientPoints.filter((_, index) => index % 2 === 0)
+    }
     paintingClientPoints.push(point)
     if (liveStrokeNodeId === paintingNodeId) {
       // Incremental live preview: the seam renders this sample immediately
@@ -328,6 +412,10 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     const canvas = element instanceof HTMLCanvasElement ? element : null
     if (!canvas) {
       if (paintingNodeId === nodeId) stopPainting()
+      // Invalidate in-flight creations: their async attach must dispose
+      // instead of painting onto a removed (possibly later reused) element.
+      invalidatePainterCreations(nodeId)
+      bumpCommittedPreviewGeneration(nodeId)
       disposePainterForNode(nodeId)
       canvasRefs.delete(nodeId)
       pendingStrokesByNodeId.delete(nodeId)
@@ -335,6 +423,9 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     }
     if (paintingNodeId === nodeId) stopPainting()
     disposePainterForNode(nodeId)
+    // The new creation (bumped inside `createPainterForNode`) supersedes any
+    // in-flight one; a host swap also invalidates pending preview loads.
+    bumpCommittedPreviewGeneration(nodeId)
     canvasRefs.set(nodeId, canvas)
     pendingStrokesByNodeId.delete(nodeId)
     updateHistoryAvailability(nodeId)
@@ -383,6 +474,10 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
 
   function clearCommittedMaskData(nodeId: string) {
     committedMaskDataMap.delete(nodeId)
+    // Invalidate pending preview loads and painter creations: a bitmap or a
+    // Fabric chunk resolving after this point belongs to the discarded state.
+    bumpCommittedPreviewGeneration(nodeId)
+    invalidatePainterCreations(nodeId)
     // Reset seam history so discarded edits cannot resurface via undo; host
     // pixels stay untouched and no committed preview is restored.
     pendingStrokesByNodeId.delete(nodeId)
@@ -396,8 +491,11 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
     brushSize.value = clampMaskBrushSize(value)
   }
 
-  watch(inpaintNodeId, (nodeId) => {
+  watch(inpaintNodeId, (nodeId, previousNodeId) => {
     stopPainting()
+    // Switching away invalidates the previous node's pending preview load;
+    // switching back re-triggers `drawCommittedMask` for a fresh load.
+    if (previousNodeId && previousNodeId !== nodeId) bumpCommittedPreviewGeneration(previousNodeId)
     if (!nodeId) {
       updateHistoryAvailability(null)
       return
@@ -410,6 +508,7 @@ export function useImageInpaintOverlay(options: UseImageInpaintOverlayOptions) {
   onBeforeUnmount(() => {
     stopPainting()
     for (const nodeId of paintersByNodeId.keys()) disposePainterForNode(nodeId)
+    for (const nodeId of canvasRefs.keys()) invalidatePainterCreations(nodeId)
     canvasRefs.clear()
     pendingStrokesByNodeId.clear()
   })

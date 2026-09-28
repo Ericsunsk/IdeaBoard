@@ -36,7 +36,7 @@ func BuildObjectKey(dirPrefix string, ext string) (string, error) {
 func StableUploadObjectKey(dirPrefix, filename string) (string, error) {
 	base := path.Base(strings.TrimSpace(filename))
 	if base == "." || base == "" || base == ".." || strings.ContainsAny(base, `/\\`) {
-		return "", fmt.Errorf("上传文件名无效")
+		return "", fmt.Errorf(msgStableUploadObjectKey)
 	}
 	baseDir := UploadObjectRoot
 	if strings.TrimSpace(dirPrefix) != "" {

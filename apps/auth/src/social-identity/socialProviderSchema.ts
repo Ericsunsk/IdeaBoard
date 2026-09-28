@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool } from 'pg'
 
 export async function ensureSocialProviderSettingsSchema(pool: Pool) {
   await pool.query(`
@@ -11,20 +11,20 @@ CREATE TABLE IF NOT EXISTS social_provider_settings (
   config_version BIGINT NOT NULL CHECK (config_version > 0),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp()
 );
-`);
+`)
 }
 
 export async function configureSocialProviderSettingsRuntimePrivileges(
   pool: Pool,
   runtimeRole: string,
 ) {
-  const normalizedRole = runtimeRole.trim();
-  if (!normalizedRole) throw new Error("Auth runtime role is required");
+  const normalizedRole = runtimeRole.trim()
+  if (!normalizedRole) throw new Error('Auth runtime role is required')
   await pool.query(
     `GRANT SELECT, INSERT, UPDATE ON social_provider_settings TO ${quoteIdentifier(normalizedRole)}`,
-  );
+  )
 }
 
 function quoteIdentifier(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
+  return `"${value.replaceAll('"', '""')}"`
 }

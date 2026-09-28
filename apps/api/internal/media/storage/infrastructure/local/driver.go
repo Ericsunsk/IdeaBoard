@@ -80,10 +80,10 @@ func (d *LocalStorageDriver) localPath(objectKey string) (string, error) {
 	full := filepath.Join(d.root, filepath.FromSlash(objectKey))
 	relative, err := filepath.Rel(d.root, full)
 	if err != nil {
-		return "", fmt.Errorf("本地存储路径无效: %w", err)
+		return "", fmt.Errorf(msgLocalPath, err)
 	}
 	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("本地存储路径越界")
+		return "", fmt.Errorf(msgLocalPath2)
 	}
 	return full, nil
 }
@@ -108,7 +108,7 @@ func (d *LocalStorageDriver) GetBucketInfo(ctx context.Context, profile *domain.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("当前存储类型不支持读取 Bucket 信息")
+	return nil, fmt.Errorf(msgGetBucketInfo)
 }
 
 func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.StorageProfile, file *multipart.FileHeader, opts ports.StorageStoreOptions) (*ports.StoredUploadRef, error) {
@@ -117,14 +117,14 @@ func (d *LocalStorageDriver) UploadRef(ctx context.Context, profile *domain.Stor
 	}
 	facts, err := imageformat.InspectFileHeader(file)
 	if err != nil {
-		return nil, fmt.Errorf("图片校验失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRef, err)
 	}
 	filename := domain.CanonicalStorageFilename(file.Filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
 
 	src, err := file.Open()
 	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %w", err)
+		return nil, fmt.Errorf(msgUploadRef2, err)
 	}
 	defer src.Close()
 
@@ -144,7 +144,7 @@ func (d *LocalStorageDriver) StoreBytesRef(ctx context.Context, profile *domain.
 	}
 	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf("读取图片信息失败: %w", err)
+		return nil, fmt.Errorf(msgStoreBytesRef, err)
 	}
 	filename = domain.CanonicalStorageFilename(filename, facts.Extension)
 	opts.ObjectKey = domain.CanonicalObjectKeyExtension(opts.ObjectKey, facts.Extension)
@@ -195,18 +195,18 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	}
 	objectKey, err = domain.NormalizeUploadObjectKey(objectKey)
 	if err != nil {
-		return nil, fmt.Errorf("上传对象路径无效: %w", err)
+		return nil, fmt.Errorf(msgSaveReaderLocalRef, err)
 	}
 	dst, err := d.localPath(objectKey)
 	if err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return nil, fmt.Errorf("创建目录失败: %w", err)
+		return nil, fmt.Errorf(msgSaveReaderLocalRef2, err)
 	}
 	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return nil, fmt.Errorf("保存文件失败: %w", err)
+		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
 	cleanupDst := true
 	defer func() {
@@ -217,10 +217,10 @@ func (d *LocalStorageDriver) SaveReaderLocalRef(ctx context.Context, filename st
 	hash := sha256.New()
 	if err := copyExactWithBuffer(io.MultiWriter(dstFile, hash), src, size); err != nil {
 		_ = dstFile.Close()
-		return nil, fmt.Errorf("保存文件失败: %w", err)
+		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
 	if err := dstFile.Close(); err != nil {
-		return nil, fmt.Errorf("保存文件失败: %w", err)
+		return nil, fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
 	cleanupDst = false
 	if strings.TrimSpace(contentType) == "" {
@@ -253,15 +253,15 @@ func (d *LocalStorageDriver) PutObject(ctx context.Context, profile *domain.Stor
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return fmt.Errorf("创建目录失败: %w", err)
+		return fmt.Errorf(msgSaveReaderLocalRef2, err)
 	}
 	tmpDst := fmt.Sprintf("%s.tmp.%d", dst, time.Now().UnixNano())
 	if err := os.WriteFile(tmpDst, data, 0600); err != nil {
-		return fmt.Errorf("保存文件失败: %w", err)
+		return fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
 	if err := os.Rename(tmpDst, dst); err != nil {
 		_ = os.Remove(tmpDst)
-		return fmt.Errorf("保存文件失败: %w", err)
+		return fmt.Errorf(msgSaveReaderLocalRef3, err)
 	}
 	return nil
 }
@@ -283,7 +283,7 @@ func (d *LocalStorageDriver) Read(ctx context.Context, profile *domain.StoragePr
 		if os.IsNotExist(err) {
 			return nil, domain.ErrStoredObjectNotFound
 		}
-		return nil, fmt.Errorf("读取文件失败: %w", err)
+		return nil, fmt.Errorf(msgRead, err)
 	}
 	defer file.Close()
 	data, err := readStorageObject(file, maxBytes)
@@ -314,7 +314,7 @@ func (d *LocalStorageDriver) Delete(ctx context.Context, profile *domain.Storage
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("删除文件失败: %w", err)
+		return fmt.Errorf(msgDelete, err)
 	}
 	d.cleanupEmptyParentDirs(localPath)
 	return nil
@@ -333,7 +333,7 @@ func (d *LocalStorageDriver) DeleteByPrefix(ctx context.Context, profile *domain
 		return err
 	}
 	if err := os.RemoveAll(localPath); err != nil {
-		return fmt.Errorf("按前缀删除本地文件失败: %w", err)
+		return fmt.Errorf(msgDeleteByPrefix, err)
 	}
 	d.cleanupEmptyParentDirs(localPath)
 	return nil
@@ -458,13 +458,13 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %w", err)
+		return nil, fmt.Errorf(msgRead, err)
 	}
 	if int64(len(data)) > maxBytes {
-		return nil, fmt.Errorf("文件超过大小限制 (%d MB)", maxBytes/1024/1024)
+		return nil, fmt.Errorf(msgReadStorageObject, maxBytes/1024/1024)
 	}
 	if len(data) == 0 {
-		return nil, fmt.Errorf("文件内容为空")
+		return nil, fmt.Errorf(msgReadStorageObject2)
 	}
 	return data, nil
 }

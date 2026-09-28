@@ -178,7 +178,7 @@ func taskCommandMetadata(idempotencyKey, taskID string, userID int64) domain.Com
 		IdempotencyKey:    idempotencyKey,
 		Actor:             domain.Actor{Type: domain.ActorUser, ID: fmt.Sprint(userID)},
 		Source:            "task_submission",
-		Reason:            "AI 生图任务 Idea 预授权",
+		Reason:            msgTaskCommandMetadata,
 		BusinessReference: domain.BusinessReference{Type: "task", ID: taskID},
 	}
 }

@@ -70,7 +70,7 @@ func (m rewardErrorMapping) render(c *gin.Context, err error) {
 			"status", m.status,
 			"error_type", fmt.Sprintf("%T", err),
 			"error_summary", redactedRewardErrorSummary(err))
-		msg = "操作失败，请稍后重试"
+		msg = msgRender
 	}
 	errorrender.Render(c, m.status, m.code, msg)
 }
@@ -83,55 +83,55 @@ var rewardDomainErrorTable = []rewardErrorMapping{
 		targets: []error{rewardsdomain.ErrRewardCodeConflict},
 		status:  http.StatusConflict,
 		code:    codeRewardCodeIdempotencyConflict,
-		message: "幂等请求与原创建参数不一致",
+		message: msgRender2,
 	},
 	{
 		targets: []error{rewardsdomain.ErrCodeCollision},
 		status:  http.StatusConflict,
 		code:    codeRewardCodeConflict,
-		message: "兑换码已存在",
+		message: msgRender3,
 	},
 	{
 		targets: []error{rewardsdomain.ErrRewardCodeNotFound},
 		status:  http.StatusNotFound,
 		code:    codeRewardCodeNotFound,
-		message: "兑换码不存在",
+		message: msgRender4,
 	},
 	{
 		targets: []error{rewardsdomain.ErrCapBelowRedemptions},
 		status:  http.StatusConflict,
 		code:    codeRewardCodeCapInvalid,
-		message: "兑换上限不能低于已兑换次数",
+		message: msgRender5,
 	},
 	{
 		targets: []error{rewardsdomain.ErrRewardCodeRedeemed},
 		status:  http.StatusConflict,
 		code:    codeRewardCodeRedeemed,
-		message: "已有兑换记录，只能停用该兑换码",
+		message: msgRender6,
 	},
 	{
 		targets: []error{rewardsdomain.ErrRedemptionNotFound},
 		status:  http.StatusNotFound,
 		code:    codeRewardRedemptionNotFound,
-		message: "兑换记录不存在",
+		message: msgRender7,
 	},
 	{
 		targets: []error{rewardsdomain.ErrCodeUnavailable},
 		status:  http.StatusUnprocessableEntity,
 		code:    codeRewardCodeUnavailable,
-		message: "兑换码无效或已失效",
+		message: msgRender8,
 	},
 	{
 		targets: []error{rewardsdomain.ErrWalletFrozen},
 		status:  http.StatusConflict,
 		code:    codeRewardWalletLocked,
-		message: "当前账户无法兑换奖励",
+		message: msgRender9,
 	},
 	{
 		targets: []error{rewardsdomain.ErrInvalidCode},
 		status:  http.StatusBadRequest,
 		code:    codeRewardCodeInvalid,
-		message: "参数错误",
+		message: msgRewardInvalidInput,
 	},
 }
 
@@ -180,7 +180,7 @@ const maxRewardErrorSummaryRunes = 300
 // writeRewardError renders admin-side failures through the machine envelope.
 func writeRewardError(c *gin.Context, err error) {
 	renderMappedRewardError(c, err, rewardDomainErrorTable,
-		http.StatusInternalServerError, codeRewardOperationFailed, "奖励操作失败")
+		http.StatusInternalServerError, codeRewardOperationFailed, msgRewardOperationFailed)
 }
 
 // writeRewardRedeemError renders user redeem failures. Invalid and
@@ -191,15 +191,15 @@ func writeRewardRedeemError(c *gin.Context, err error) {
 			targets: []error{rewardsdomain.ErrInvalidCode, rewardsdomain.ErrCodeUnavailable},
 			status:  http.StatusUnprocessableEntity,
 			code:    codeRewardCodeUnavailable,
-			message: "兑换码无效或已失效",
+			message: msgRender8,
 		},
 		{
 			targets: []error{rewardsdomain.ErrWalletFrozen},
 			status:  http.StatusConflict,
 			code:    codeRewardWalletLocked,
-			message: "当前账户无法兑换奖励",
+			message: msgRender9,
 		},
-	}, http.StatusInternalServerError, codeRewardRedeemFailed, "网络错误，请重试")
+	}, http.StatusInternalServerError, codeRewardRedeemFailed, msgRewardRedeemFailed)
 }
 
 // writeRewardInputError renders request-shape failures (malformed JSON,
@@ -211,14 +211,40 @@ func writeRewardInputError(c *gin.Context, code, message string) {
 
 // writeRewardRateLimitedError renders the per-user redeem throttle outcome.
 func writeRewardRateLimitedError(c *gin.Context) {
-	errorrender.Render(c, http.StatusTooManyRequests, codeRewardRateLimited, "操作频繁，请稍后重试")
+	errorrender.Render(c, http.StatusTooManyRequests, codeRewardRateLimited, msgRewardRateLimited)
 }
 
 // writeRewardUnavailableError renders a missing service dependency.
 func writeRewardUnavailableError(c *gin.Context, userFacing bool) {
 	if userFacing {
-		errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, "网络错误，请重试")
+		errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, msgRewardRedeemFailed)
 		return
 	}
-	errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, "奖励服务暂不可用")
+	errorrender.Render(c, http.StatusServiceUnavailable, codeRewardServiceUnavailable, msgRewardServiceUnavailable)
 }
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgRewardInvalidInput            = "参数错误"            // codeRewardInvalidInput
+	msgRewardCodeIDInvalid           = "兑换码 ID 无效"       // codeRewardCodeIDInvalid
+	msgRewardPaginationInvalid       = "before_id 无效"    // codeRewardPaginationInvalid
+	msgRewardPaginationInvalid2      = "limit 无效"        // codeRewardPaginationInvalid
+	msgRewardRedemptionIDInvalid     = "兑换记录 ID 无效"      // codeRewardRedemptionIDInvalid
+	msgRender                        = "操作失败，请稍后重试"      // Render @ errors.go
+	msgRender2                       = "幂等请求与原请求不一致"     // Render @ errors.go
+	msgRender3                       = "兑换码已存在"          // Render @ errors.go
+	msgRender4                       = "兑换码不存在"          // Render @ errors.go
+	msgRender5                       = "兑换上限不能低于已兑换次数"   // Render @ errors.go
+	msgRender6                       = "已有兑换记录，只能停用该兑换码" // Render @ errors.go
+	msgRender7                       = "兑换记录不存在"         // Render @ errors.go
+	msgRender8                       = "兑换码无效或已失效"       // Render @ errors.go
+	msgRender9                       = "当前账户无法兑换奖励"      // Render @ errors.go
+	msgRewardOperationFailed         = "奖励操作失败"          // codeRewardOperationFailed
+	msgRewardRedeemFailed            = "网络错误，请重试"        // codeRewardRedeemFailed
+	msgRewardRateLimited             = "操作过于频繁，请稍后重试"    // codeRewardRateLimited
+	msgRewardServiceUnavailable      = "奖励服务暂不可用"        // codeRewardServiceUnavailable
+	msgRewardCodeIdempotencyConflict = "幂等请求与原请求不一致"     // codeRewardCodeIdempotencyConflict
+)

@@ -8,6 +8,7 @@ IdeaBoard is a multi-context repository.
 
 - `DESIGN.md` is the canonical system context map and contract.
 - `apps/api/CONTEXT.md` defines Backend context language and boundaries.
+- `apps/auth/CONTEXT.md` defines Auth service language (admission vs infrastructure, env contract, `{code,msg}` envelope rule) and boundaries.
 - `apps/web/src/features/canvas/CONTEXT.md` defines Canvas Workspace language and boundaries.
 - `docs/adr/` contains system-wide architecture decisions.
 - Context-local `docs/adr/` directories contain scoped decisions when present.

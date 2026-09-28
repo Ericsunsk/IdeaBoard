@@ -51,12 +51,12 @@ type updateGatewayRequest struct {
 // Get returns the masked gateway configuration.
 func (h *Handler) Get(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	summary, err := h.store.GetSummary(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取网关配置失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgGet2, err)
 		return
 	}
 	response.SuccessDTO(c, summary)
@@ -69,12 +69,12 @@ func (h *Handler) Get(c *gin.Context) {
 // the request principal without re-checking the admin role.
 func (h *Handler) Update(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	var req updateGatewayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpdate)
 		return
 	}
 	identity, ok := principal.Require(c)
@@ -102,12 +102,12 @@ type modelMappingResponse struct {
 // ListMappings returns every configured per-feature model mapping.
 func (h *Handler) ListMappings(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	mappings, err := h.store.ListModelMappings(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取模型映射失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgListMappings, err)
 		return
 	}
 	items := make([]modelMappingResponse, 0, len(mappings))
@@ -128,13 +128,13 @@ type saveModelMappingRequest struct {
 // Control Plane guard; the actor is resolved from the request principal.
 func (h *Handler) SaveMapping(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	feature := strings.TrimSpace(c.Param("feature"))
 	var req saveModelMappingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpdate)
 		return
 	}
 	identity, ok := principal.Require(c)
@@ -160,11 +160,11 @@ type previewGatewayRouteRequest struct {
 func (h *Handler) PreviewGatewayRoute(c *gin.Context) {
 	var req previewGatewayRouteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpdate)
 		return
 	}
 	if strings.TrimSpace(req.ModelID) == "" {
-		response.Error(c, http.StatusBadRequest, "模型标识不能为空")
+		response.Error(c, http.StatusBadRequest, msgPreviewGatewayRoute)
 		return
 	}
 	preview := PreviewGatewayRoute(req.ModelID, req.CustomPath, req.CustomParams)
@@ -185,19 +185,19 @@ type testGatewayConnectionRequest struct {
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) TestConnection(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	var req testGatewayConnectionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpdate)
 		return
 	}
 	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.TrimSpace(req.Path)
 	if provider == "" || path == "" {
 		mappings, err := h.store.ListModelMappings(c.Request.Context())
 		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取网关模型映射失败", err)
+			response.InternalError(c, http.StatusInternalServerError, msgTestConnection, err)
 			return
 		}
 		features := make([]string, 0, len(mappings))
@@ -226,12 +226,12 @@ func (h *Handler) TestConnection(c *gin.Context) {
 // ListCatalog returns every model item in the AI gateway catalog.
 func (h *Handler) ListCatalog(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	catalog, err := h.store.ListCatalog(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取模型库失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgListCatalog, err)
 		return
 	}
 	response.SuccessDTO(c, catalog)
@@ -249,7 +249,7 @@ type saveCatalogRequest struct {
 // from the request principal.
 func (h *Handler) SaveCatalog(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	var req saveCatalogRequest
@@ -257,10 +257,10 @@ func (h *Handler) SaveCatalog(c *gin.Context) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
 		if strings.Contains(err.Error(), "unknown field") {
-			response.Error(c, http.StatusBadRequest, "参数错误：含未知字段，目录单价字段已下线，请改用 models.dev 参照接口")
+			response.Error(c, http.StatusBadRequest, msgSaveCatalog)
 			return
 		}
-		response.Error(c, http.StatusBadRequest, "参数错误")
+		response.Error(c, http.StatusBadRequest, msgUpdate)
 		return
 	}
 	identity, ok := principal.Require(c)
@@ -301,7 +301,7 @@ func (h *Handler) ListProviders(c *gin.Context) {
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) DetectModels(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	provider := strings.TrimSpace(c.Query("provider"))
@@ -321,7 +321,7 @@ func (h *Handler) DetectModels(c *gin.Context) {
 // Authorization rides the outer Control Plane guard.
 func (h *Handler) GetModelReference(c *gin.Context) {
 	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "网关配置服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
 		return
 	}
 	reference, err := h.store.GetModelReference(

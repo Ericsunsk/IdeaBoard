@@ -192,7 +192,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 		hold, holdErr := s.credits.InTx(tx).Hold(ctx, ports.HoldCommand{
 			UserID:   userID,
 			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务 Idea 预授权", taskID),
+			Metadata: taskCommandMetadata("task-hold:"+taskID, domain.ActorUser, fmt.Sprint(userID), "task_submission", msgHoldAndPersist, taskID),
 		})
 		if errors.Is(holdErr, domain.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits

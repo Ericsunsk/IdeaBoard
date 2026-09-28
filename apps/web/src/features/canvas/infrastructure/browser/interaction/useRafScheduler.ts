@@ -37,6 +37,8 @@ export function useRafScheduler() {
     timeoutId = setTimeout(run, 0)
   }
 
+  // Intentional `tryOnScopeDispose`: the scheduler is shared infrastructure
+  // that stays safe when instantiated outside a component scope.
   tryOnScopeDispose(() => {
     isDisposed = true
     cancel()

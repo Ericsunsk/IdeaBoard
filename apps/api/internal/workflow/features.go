@@ -93,7 +93,7 @@ func ParseWorkflowFeatureSlug(raw string) (string, bool) {
 func ValidateWorkflowFeatureSlug(raw string) (string, error) {
 	slug, ok := ParseWorkflowFeatureSlug(raw)
 	if !ok {
-		return "", fmt.Errorf("feature %q 不支持", raw)
+		return "", fmt.Errorf(msgValidateWorkflowFeatureSlug, raw)
 	}
 	return slug, nil
 }

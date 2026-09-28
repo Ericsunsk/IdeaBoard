@@ -78,7 +78,7 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
 	case StatisticsRange1Y:
 		return StatisticsRange1Y, 365, nil
 	default:
-		return "", 0, validation.New("range 仅支持 1d、7d、30d 或 1y")
+		return "", 0, validation.New(msgNormalizeStatisticsRange)
 	}
 }
 
@@ -109,17 +109,17 @@ type executionPressureBucket struct {
 }
 
 var monitorExecutionPressureBuckets = []executionPressureBucket{
-	{key: "fast_completed", label: "快速完成", basePressure: 8},
-	{key: "slow_completed", label: "慢速完成", basePressure: 28},
-	{key: "normal_pending", label: "正常排队", basePressure: 22},
-	{key: "backlog_pending", label: "积压排队", basePressure: 58},
-	{key: "normal_running", label: "正常执行", basePressure: 32},
-	{key: "stuck_running", label: "卡住执行", basePressure: 82},
-	{key: "fast_failed", label: "快速失败", basePressure: 78},
-	{key: "slow_failed", label: "慢速失败", basePressure: 94},
-	{key: "cancelled", label: "已取消", basePressure: 34},
-	{key: "retrying", label: "重试中", basePressure: 68},
-	{key: "other", label: "其他状态", basePressure: 40},
+	{key: "fast_completed", label: msgGetTaskStats, basePressure: 8},
+	{key: "slow_completed", label: msgGetTaskStats2, basePressure: 28},
+	{key: "normal_pending", label: msgGetTaskStats3, basePressure: 22},
+	{key: "backlog_pending", label: msgGetTaskStats4, basePressure: 58},
+	{key: "normal_running", label: msgGetTaskStats5, basePressure: 32},
+	{key: "stuck_running", label: msgGetTaskStats6, basePressure: 82},
+	{key: "fast_failed", label: msgGetTaskStats7, basePressure: 78},
+	{key: "slow_failed", label: msgGetTaskStats8, basePressure: 94},
+	{key: "cancelled", label: msgGetTaskStats9, basePressure: 34},
+	{key: "retrying", label: msgGetTaskStats10, basePressure: 68},
+	{key: "other", label: msgGetTaskStats11, basePressure: 40},
 }
 
 func (s *Service) GetMonitorExecutionPressure(ctx context.Context) ([]MonitorExecutionPressurePoint, error) {
@@ -574,7 +574,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		}
 		model := strings.TrimSpace(row.ModelName)
 		if model == "" {
-			model = "未识别模型"
+			model = msgBuildIntradayTrendItems
 		}
 		bucket.models[model] += row.OutputCount
 	}
@@ -710,42 +710,42 @@ func buildFailureCategories(rows []statisticscontracts.ExecutionFailureCategoryA
 func bottleneckSourceLabel(source string) string {
 	switch source {
 	case tasks.BottleneckSourceQueue:
-		return "队列等待"
+		return msgBottleneckSourceLabel
 	case tasks.BottleneckSourceWorker:
-		return "Worker 调度"
+		return msgBottleneckSourceLabel2
 	case tasks.BottleneckSourceProvider:
-		return "上游模型"
+		return msgBottleneckSourceLabel3
 	case tasks.BottleneckSourceStorage:
-		return "存储链路"
+		return msgBottleneckSourceLabel4
 	case tasks.BottleneckSourceFinalize:
-		return "结果落库"
+		return msgBottleneckSourceLabel5
 	case tasks.BottleneckSourceInput:
-		return "输入校验"
+		return msgBottleneckSourceLabel6
 	default:
-		return "未知来源"
+		return msgBottleneckSourceLabel7
 	}
 }
 
 func failureCategoryLabel(category string) string {
 	switch category {
 	case tasks.FailureCategoryInputInvalid:
-		return "输入无效"
+		return msgFailureCategoryLabel
 	case tasks.FailureCategoryAuth:
-		return "认证失败"
+		return msgFailureCategoryLabel2
 	case tasks.FailureCategoryQuota:
-		return "额度限制"
+		return msgFailureCategoryLabel3
 	case tasks.FailureCategoryTimeout:
-		return "执行超时"
+		return msgFailureCategoryLabel4
 	case tasks.FailureCategoryProviderError:
-		return "上游错误"
+		return msgFailureCategoryLabel5
 	case tasks.FailureCategoryStorageError:
-		return "存储错误"
+		return msgFailureCategoryLabel6
 	case tasks.FailureCategoryFinalizeError:
-		return "结果落库"
+		return msgBottleneckSourceLabel5
 	case tasks.FailureCategoryCancelled:
-		return "任务取消"
+		return msgFailureCategoryLabel7
 	default:
-		return "未知错误"
+		return msgFailureCategoryLabel8
 	}
 }
 

@@ -64,7 +64,7 @@ func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
 		}
 
 		if c.Request.ContentLength > limitBytes {
-			response.Error(c, http.StatusRequestEntityTooLarge, "请求体过大")
+			response.Error(c, http.StatusRequestEntityTooLarge, msgBadRequest2)
 			c.Abort()
 			return
 		}

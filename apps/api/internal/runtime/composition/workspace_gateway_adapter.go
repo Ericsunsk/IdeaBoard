@@ -24,7 +24,7 @@ var _ taskworker.WorkspaceGatewayCaller = (*workspaceGatewayCallerAdapter)(nil)
 // CallGatewayAPI implements taskworker.WorkspaceGatewayCaller.
 func (a *workspaceGatewayCallerAdapter) CallGatewayAPI(ctx context.Context, input taskworker.WorkspaceGatewayCallInput) (taskworker.WorkspaceGatewayCallOutput, error) {
 	if a == nil || a.executor == nil {
-		return taskworker.WorkspaceGatewayCallOutput{}, errors.New("上游图像服务未配置，请联系管理员")
+		return taskworker.WorkspaceGatewayCallOutput{}, errors.New(msgCallGatewayAPI)
 	}
 	output, err := a.executor.CallGatewayAPI(ctx, runtimeports.GatewayCallInput{
 		Task:           input.Task,

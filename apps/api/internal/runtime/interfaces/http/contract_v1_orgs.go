@@ -28,7 +28,7 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	}
 	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 		c.Abort()
 		return
 	}
@@ -36,7 +36,7 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 			c.Abort()
 			return
 		}
@@ -44,12 +44,12 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	}
 	organizations, err := h.deps.Store.ListOrganizationsForUser(c.Request.Context(), identityPrincipal.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "组织服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable53)
 		c.Abort()
 		return
 	}
 	if offset > len(organizations) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 		c.Abort()
 		return
 	}
@@ -65,7 +65,7 @@ func (h *contractV1Handler) listOrganizations(c *gin.Context) {
 	if end < len(organizations) {
 		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
 		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "组织服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable53)
 			c.Abort()
 			return
 		}
@@ -87,7 +87,7 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 	}
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return
 	}
@@ -99,7 +99,7 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 	name := strings.TrimSpace(body.Data.Name)
 	if validateErr := tenancy.ValidateName(name); validateErr != nil {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"组织名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			msgCreateOrganization, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 		c.Abort()
 		return
 	}
@@ -112,17 +112,17 @@ func (h *contractV1Handler) createOrganization(c *gin.Context) {
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeOrganizationIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeOrganizationIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return
 		}
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "组织服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable53)
 		c.Abort()
 		return
 	}
 	created, ok := result.(*tenancy.Organization)
 	if !ok || created == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "组织服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable53)
 		c.Abort()
 		return
 	}
@@ -170,13 +170,13 @@ func (h *contractV1Handler) updateOrganization(c *gin.Context) {
 	name := strings.TrimSpace(body.Data.Name)
 	if validateErr := tenancy.ValidateName(name); validateErr != nil {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"组织名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			msgCreateOrganization, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 		c.Abort()
 		return
 	}
 	updated, err := h.deps.Store.UpdateOrganization(c.Request.Context(), organization.PublicID, name)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		c.Abort()
 		return
 	}
@@ -198,9 +198,9 @@ func (h *contractV1Handler) listOrganizationWorkspaces(c *gin.Context) {
 	workspaces, err := h.deps.Store.ListOrganizationWorkspaces(c.Request.Context(), organization.PublicID)
 	if err != nil {
 		if errors.Is(err, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		} else {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "组织服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable53)
 		}
 		c.Abort()
 		return
@@ -232,7 +232,7 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 	}
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return
 	}
@@ -244,7 +244,7 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 	name := strings.TrimSpace(body.Data.Name)
 	if validateErr := tenancy.ValidateName(name); validateErr != nil {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			msgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 		c.Abort()
 		return
 	}
@@ -258,21 +258,21 @@ func (h *contractV1Handler) createOrganizationWorkspace(c *gin.Context) {
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return
 		}
 		if errors.Is(doErr, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		} else {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		}
 		c.Abort()
 		return
 	}
 	created, ok := result.(*tenancy.Workspace)
 	if !ok || created == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		c.Abort()
 		return
 	}

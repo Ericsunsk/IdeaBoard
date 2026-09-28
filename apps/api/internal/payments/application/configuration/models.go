@@ -49,3 +49,11 @@ type Audit struct {
 	ErrorSummary string
 	Metadata     json.RawMessage
 }
+
+// Configuration publication outcomes. The wire words are unchanged
+// ("succeeded","failed"); the constants only kill the raw literals at
+// the three Audit construction sites.
+const (
+	AuditOutcomeSucceeded = "succeeded"
+	AuditOutcomeFailed    = "failed"
+)

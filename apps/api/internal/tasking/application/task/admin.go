@@ -255,7 +255,7 @@ func normalizeTaskListStatus(status string) (string, error) {
 	case "", tasks.StatusPending, tasks.StatusRunning, tasks.StatusCompleted, tasks.StatusFailed, tasks.StatusCancelled, tasks.StatusCancelledWithResults:
 		return normalized, nil
 	default:
-		return "", validation.New("status 仅支持 pending、running、completed、failed 或 cancelled")
+		return "", validation.New(msgNormalizeTaskListStatus)
 	}
 }
 

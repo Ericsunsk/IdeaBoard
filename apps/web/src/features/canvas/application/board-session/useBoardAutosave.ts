@@ -1,4 +1,4 @@
-import { useDebounceFn, useDocumentVisibility, useOnline } from '@vueuse/core'
+import { tryOnScopeDispose, useDebounceFn, useDocumentVisibility, useOnline } from '@vueuse/core'
 import { ref, watch, type Ref } from 'vue'
 import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics.ts'
 
@@ -18,11 +18,24 @@ export function useBoardAutosave(options: UseBoardAutosaveOptions) {
   const hasPendingSave = ref(false)
   const dirtyVersion = ref(0)
   let activeSaveTask: Promise<void> | null = null
+  // A pending debounced trigger is not scope-bound: without this guard it
+  // would fire after unmount, run a save against torn-down board state, and
+  // surface a post-unmount error toast via settleSaveFailure. Board switches
+  // and leave guards flush explicitly, so dropping the trailing debounce on
+  // dispose loses nothing.
+  let disposed = false
+  // Intentional `tryOnScopeDispose`: the autosave coordinator stays safe when
+  // instantiated outside a component scope; the trailing debounce drops on
+  // dispose either way (see above).
+  tryOnScopeDispose(() => {
+    disposed = true
+  })
 
   async function runSaveLoop(silent = true) {
     let nextSilent = silent
     do {
       hasPendingSave.value = false
+      if (disposed) return
       if (!options.isDirty.value) return
       if (options.canRun && !options.canRun()) {
         hasPendingSave.value = true
@@ -35,6 +48,7 @@ export function useBoardAutosave(options: UseBoardAutosaveOptions) {
       const saveVersion = dirtyVersion.value
       recordCanvasInteractionCount('autosaveSaveCount')
       const saved = await options.save({ silent: nextSilent })
+      if (disposed) return
       if (!saved) {
         hasPendingSave.value = true
         return
@@ -48,6 +62,7 @@ export function useBoardAutosave(options: UseBoardAutosaveOptions) {
   }
 
   async function runSaveNow(silent = true) {
+    if (disposed) return
     if (!options.isDirty.value && !hasPendingSave.value) return
     if (activeSaveTask) {
       hasPendingSave.value = true

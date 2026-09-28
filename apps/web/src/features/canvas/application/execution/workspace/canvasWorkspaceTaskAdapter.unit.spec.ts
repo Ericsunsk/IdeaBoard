@@ -440,6 +440,28 @@ describe('canvas workspace task transport', () => {
     ).resolves.toMatchObject({ ready: false, feature: 'generation' })
   })
 
+  it('threads an optional caller signal to the quote transport', async () => {
+    mocks.quoteWorkspaceTask.mockResolvedValue({
+      unit_credits: 6,
+      total_credits: 6,
+      price_version_id: 2,
+      price_version: 2,
+      quantity: 1,
+    })
+    const controller = new AbortController()
+
+    await fetchCanvasWorkspaceTaskReadiness(
+      { prompt: '', feature: 'generation' },
+      { signal: controller.signal },
+    )
+
+    expect(mocks.quoteWorkspaceTask).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.objectContaining({ workflow_kind: 'generation' }),
+      { signal: controller.signal },
+    )
+  })
+
   it('fans matrix readiness out to one quote per request', async () => {
     mocks.quoteWorkspaceTask
       .mockResolvedValueOnce({

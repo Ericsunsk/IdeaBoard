@@ -13,8 +13,8 @@ import (
 )
 
 const taskCancelTTL = 24 * time.Hour
-const userTaskCancelReason = "用户取消任务"
-const adminTaskCancelReason = "管理员取消任务"
+const userTaskCancelReason = msgPackage
+const adminTaskCancelReason = msgPackage2
 
 var (
 	errTaskIntakeUnavailable          = errors.New("task intake not configured")
@@ -33,14 +33,14 @@ type CommandService interface {
 
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if s == nil || s.taskIntake == nil {
-		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskIntakeUnavailable)
+		return "", newSubmissionError("submission_failed", msgSubmitTask, errTaskIntakeUnavailable)
 	}
 	canonical, err := s.taskIntake.Compile(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 	if s.submissionStore == nil {
-		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskSubmissionStoreUnavailable)
+		return "", newSubmissionError("submission_failed", msgSubmitTask, errTaskSubmissionStoreUnavailable)
 	}
 	canonical, err = s.taskIntake.PrepareMedia(ctx, userID, canonical)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		if errors.Is(err, taskbilling.ErrWalletRestricted) {
 			return "", taskbilling.ErrWalletRestricted
 		}
-		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", err)
+		return "", newSubmissionError("submission_failed", msgSubmitTask, err)
 	}
 
 	if result.Created {
@@ -75,7 +75,7 @@ type SubmitTaskReadiness struct {
 func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (SubmitTaskReadiness, error) {
 	if s == nil || s.taskIntake == nil {
 		return SubmitTaskReadiness{}, newSubmissionError(
-			"submission_failed", "任务提交检查暂不可用，请稍后重试", errTaskIntakeUnavailable,
+			"submission_failed", msgCheckSubmitTaskReadiness, errTaskIntakeUnavailable,
 		)
 	}
 	compilation, err := s.taskIntake.CompileReadiness(ctx, userID, req)
@@ -90,7 +90,7 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	if s.taskBilling == nil {
 		return SubmitTaskReadiness{}, newSubmissionError(
 			"submission_failed",
-			"任务提交检查暂不可用，请稍后重试",
+			msgCheckSubmitTaskReadiness,
 			errTaskBillingUnavailable,
 		)
 	}

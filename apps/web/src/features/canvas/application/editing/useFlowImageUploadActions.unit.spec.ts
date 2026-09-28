@@ -132,6 +132,63 @@ describe('useFlowImageUploadActions', () => {
     expect(warnings).toEqual([])
   })
 
+  it('keeps the second upload when the first drop resolves stale first', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])
+    const updates: string[] = []
+    const uploadA = createDeferred<{
+      url: string
+      width: number
+      height: number
+      asset_id: string
+    }>()
+    const uploadB = createDeferred<{
+      url: string
+      width: number
+      height: number
+      asset_id: string
+    }>()
+    const uploadApi = {
+      upload: vi.fn().mockReturnValueOnce(uploadA.promise).mockReturnValueOnce(uploadB.promise),
+    }
+    const warnings: string[] = []
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      workspaceId: () => 'ws_test123',
+      createNodeAtPosition: vi.fn(),
+      updateSnapshotNode: (nodeId, patcher) => {
+        const current = snapshots.get(nodeId)
+        if (!current) return
+        const next = patcher(current) as ImageNodeItem
+        snapshots.set(nodeId, next)
+        updates.push(next.sourceImageUrl)
+      },
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi,
+      onWarning: (msg) => warnings.push(msg),
+      setLocalUploadState: vi.fn(),
+    })
+
+    const firstUpload = actions.applyImageFileToImageNode('node-1', makeFile('a.png'))
+    const secondUpload = actions.applyImageFileToImageNode('node-1', makeFile('b.png'))
+    await flushPromises()
+
+    uploadA.resolve({ url: '/uploads/a.png', width: 100, height: 100, asset_id: 'asset_11' })
+    await expect(firstUpload).resolves.toBe(false)
+    uploadB.resolve({ url: '/uploads/b.png', width: 100, height: 100, asset_id: 'asset_22' })
+    await expect(secondUpload).resolves.toBe(true)
+
+    expect(snapshots.get('node-1')?.sourceImageUrl).toBe(
+      '/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview',
+    )
+    expect(snapshots.get('node-1')?.sourceMediaRef).toEqual({
+      assetId: 'asset_22',
+      derivativeTier: 'preview',
+    })
+    expect(updates).toEqual(['/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview'])
+    expect(warnings).toEqual([])
+  })
+
   it('publishes an optimistic blob preview when replacing an existing image node', async () => {
     const currentBoardId = { value: 'board-a' }
     const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])

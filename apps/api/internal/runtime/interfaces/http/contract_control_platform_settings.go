@@ -21,7 +21,7 @@ import (
 
 func (d *ContractControlDeps) requireControlSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
 	if d == nil || d.Settings == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "系统设置服务未配置")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable21)
 		return nil, false
 	}
 	return d.Settings, true
@@ -34,7 +34,7 @@ func (d *ContractControlDeps) getControlRegistrationSetting(c *gin.Context, _ co
 	}
 	setting, err := runtimeSettings.GetRegistration(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取系统设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
 		return
 	}
 	contract.RenderSuccess(c, setting)
@@ -47,7 +47,7 @@ func (d *ContractControlDeps) updateControlRegistrationSetting(c *gin.Context, _
 	}
 	var req settings.RegistrationSetting
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	updated, err := runtimeSettings.UpdateRegistration(c.Request.Context(), req)
@@ -65,7 +65,7 @@ func (d *ContractControlDeps) getControlRateLimitSetting(c *gin.Context, _ contr
 	}
 	setting, err := runtimeSettings.GetRateLimit(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取系统设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
 		return
 	}
 	contract.RenderSuccess(c, setting)
@@ -78,7 +78,7 @@ func (d *ContractControlDeps) updateControlRateLimitSetting(c *gin.Context, _ co
 	}
 	var req settings.RateLimitSetting
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	updated, err := runtimeSettings.UpdateRateLimit(c.Request.Context(), req)
@@ -96,7 +96,7 @@ func (d *ContractControlDeps) getControlBrandingSetting(c *gin.Context, _ contro
 	}
 	setting, err := runtimeSettings.GetBranding(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取系统设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
 		return
 	}
 	contract.RenderSuccess(c, setting)
@@ -109,7 +109,7 @@ func (d *ContractControlDeps) updateControlBrandingSetting(c *gin.Context, _ con
 	}
 	var req settings.BrandingSetting
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	updated, err := runtimeSettings.UpdateBranding(c.Request.Context(), req)
@@ -127,7 +127,7 @@ func (d *ContractControlDeps) getControlMediaUploadSetting(c *gin.Context, _ con
 	}
 	setting, err := runtimeSettings.GetMediaUpload(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取系统设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
 		return
 	}
 	contract.RenderSuccess(c, setting)
@@ -140,7 +140,7 @@ func (d *ContractControlDeps) updateControlMediaUploadSetting(c *gin.Context, _ 
 	}
 	var req settings.MediaUploadSetting
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	updated, err := runtimeSettings.UpdateMediaUpload(c.Request.Context(), req)
@@ -158,7 +158,7 @@ func (d *ContractControlDeps) getControlOutboundPolicy(c *gin.Context, _ control
 	}
 	setting, err := runtimeSettings.GetOutboundPolicy(c.Request.Context())
 	if err != nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取系统设置失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
 		return
 	}
 	contract.RenderSuccess(c, setting)
@@ -171,7 +171,7 @@ func (d *ContractControlDeps) updateControlOutboundPolicy(c *gin.Context, ctx co
 	}
 	var req settings.OutboundPolicySetting
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	updated, err := runtimeSettings.UpdateOutboundPolicy(c.Request.Context(), req, ctx.Operator.UserID())
@@ -184,8 +184,8 @@ func (d *ContractControlDeps) updateControlOutboundPolicy(c *gin.Context, ctx co
 
 func writeControlSettingsError(c *gin.Context, err error) {
 	if validation.Is(err) {
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "参数错误")
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgBadRequest4)
 		return
 	}
-	contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "保存设置失败")
+	contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable23)
 }

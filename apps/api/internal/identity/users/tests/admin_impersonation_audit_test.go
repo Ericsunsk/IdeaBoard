@@ -64,7 +64,7 @@ func TestAdminImpersonateUserAuditsEveryAttempt(t *testing.T) {
 		service     func() *fakeAdminUserService
 		impersonate *fakeAdminUserImpersonator
 		wantStatus  int
-		wantOutcome string
+		wantOutcome audit.Outcome
 		wantReason  string
 		wantTarget  string
 		wantAuth    string

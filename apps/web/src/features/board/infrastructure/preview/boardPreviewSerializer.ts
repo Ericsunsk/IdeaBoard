@@ -20,6 +20,7 @@ import {
   BLANK_BOARD_PREVIEW_DOT_SPACING,
 } from './boardPreviewStyle'
 import { clamp } from '../../../../shared/utils/number'
+import { withAlpha } from '../../../../shared/lib/chartPrimitives'
 
 interface BoardPreviewFrame {
   key: string
@@ -98,16 +99,6 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
-}
-
-function withAlpha(hex: string, alpha: number): string {
-  const normalized = hex.replace('#', '')
-  if (normalized.length !== 6) return `rgba(15, 23, 42, ${alpha})`
-  const value = Number.parseInt(normalized, 16)
-  const r = (value >> 16) & 255
-  const g = (value >> 8) & 255
-  const b = value & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 function toAbsolutePreviewUrl(url: string): string {

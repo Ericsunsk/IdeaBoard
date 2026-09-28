@@ -28,15 +28,7 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
       - name: Verify CI orchestration contracts
-        run: |
-          bash scripts/ci-change-classifier-test.sh
-          bash scripts/ci-gate-test.sh
-          bash scripts/ci-media-package-boundary-test.sh
-          bash scripts/ci-legacy-media-zero-scan-test.sh
-          bash scripts/ci-workflow-contract-test.sh
-          bash scripts/sql-workspace-scope-check-test.sh
-          bash scripts/openapi-pattern-check-test.sh
-          bash scripts/adr-template-check-test.sh
+        run: bash scripts/run-all-self-tests.sh
 
       - name: Check shell syntax
         shell: bash
@@ -63,13 +55,17 @@ jobs:
           bash -n scripts/atlas-migration-check.sh
           bash -n scripts/atlas-migration-check-test.sh
           bash -n scripts/openapi-breaking-check.sh
+          bash -n scripts/openapi-breaking-check-test.sh
           bash -n scripts/csp-policy.sh
           bash -n scripts/csp-policy-test.sh
           bash -n scripts/qa-production-cleanup.sh
           bash -n scripts/qa-production-cleanup-test.sh
           bash -n scripts/secrets-init.sh
+          bash -n scripts/secrets-init-test.sh
           bash -n scripts/secrets-render.sh
+          bash -n scripts/secrets-render-test.sh
           bash -n scripts/secrets-validate.sh
+          bash -n scripts/secrets-validate-test.sh
           bash -n scripts/ci-media-package-boundary.sh
           bash -n scripts/ci-media-package-boundary-test.sh
           bash -n scripts/ci-legacy-media-zero-scan.sh
@@ -81,6 +77,9 @@ jobs:
           bash -n scripts/openapi-pattern-check-test.sh
           bash -n scripts/adr-template-check.sh
           bash -n scripts/adr-template-check-test.sh
+          bash -n scripts/check-backend-copy.sh
+          bash -n scripts/check-backend-copy-test.sh
+          bash -n scripts/run-all-self-tests.sh
           bash -n scripts/lib/common.sh
 
       - name: Install ShellCheck
@@ -118,13 +117,17 @@ jobs:
             scripts/atlas-migration-check.sh \
             scripts/atlas-migration-check-test.sh \
             scripts/openapi-breaking-check.sh \
+            scripts/openapi-breaking-check-test.sh \
             scripts/csp-policy.sh \
             scripts/csp-policy-test.sh \
             scripts/qa-production-cleanup.sh \
             scripts/qa-production-cleanup-test.sh \
             scripts/secrets-init.sh \
+            scripts/secrets-init-test.sh \
             scripts/secrets-render.sh \
+            scripts/secrets-render-test.sh \
             scripts/secrets-validate.sh \
+            scripts/secrets-validate-test.sh \
             scripts/ci-media-package-boundary.sh \
             scripts/ci-media-package-boundary-test.sh \
             scripts/ci-legacy-media-zero-scan.sh \
@@ -136,6 +139,9 @@ jobs:
             scripts/openapi-pattern-check-test.sh \
             scripts/adr-template-check.sh \
             scripts/adr-template-check-test.sh \
+            scripts/check-backend-copy.sh \
+            scripts/check-backend-copy-test.sh \
+            scripts/run-all-self-tests.sh \
             scripts/lib/common.sh
 
       - name: Lint Dockerfiles
@@ -194,7 +200,8 @@ jobs:
             bash scripts/render-nginx-template.sh "$real_ip_conf"
 
           for rendered_conf in "$default_conf" "$docker_conf" "$real_ip_conf"; do
-            grep -F 'location /api/user/tasks/' "$rendered_conf"
+            grep -F 'location ~ ^/api/v1/workspaces/[^/]+/tasks(/|$)' "$rendered_conf"
+            grep -F 'location ~ ^/api/v1/workspaces/[^/]+/events(/|$)' "$rendered_conf"
             grep -F 'proxy_set_header Connection "";' "$rendered_conf"
             if grep -F "\${" "$rendered_conf"; then
               echo "Unrendered template variable in $rendered_conf" >&2

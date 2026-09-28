@@ -43,6 +43,12 @@ type UseFlowNodeUiStateOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   isNodeExecutionActive: (nodeId: string) => boolean
+  /**
+   * Reactive execution epoch. `isNodeExecutionActive` reads non-reactive
+   * lease state, so the ui-state cache must also track this ref or a running
+   * node keeps a stale "ready" label until the next graph change.
+   */
+  executionEpoch?: Ref<unknown>
 }
 type FlowNodeUiState = NodeUiState | PromptNodeUiState
 
@@ -272,6 +278,9 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
   )
 
   function recomputeFlowNodeUiState() {
+    // Track the execution epoch so lease-only transitions (no graph change)
+    // invalidate the cached ui state.
+    void options.executionEpoch?.value
     const result: Record<string, FlowNodeUiState> = {}
     const nextUiStateByNodeId = new Map<string, FlowNodeUiState>()
     const flowNodes = options.nodes.value as FlowNodeLike[]

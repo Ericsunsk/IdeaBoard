@@ -248,7 +248,7 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 // malformed tasks fail from pending without lease churn.
 func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *workspacetasks.WorkspaceTask) error {
 	if _, err := workspacetasks.ValidateCreate(task.WorkflowKind, task.MediaAssetIDs, task.Params); err != nil {
-		return fmt.Errorf("任务输入不合法: %w", err)
+		return fmt.Errorf(msgValidateInput, err)
 	}
 	return nil
 }
@@ -261,17 +261,17 @@ func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *worksp
 		return nil
 	}
 	if w.assets == nil && (len(task.MediaAssetIDs) > 0 || hasWorkspaceMaskParam(task)) {
-		return errors.New("任务媒体引用无法校验: 媒体读取器未配置")
+		return errors.New(msgResolveMediaRefs)
 	}
 	for i, id := range task.MediaAssetIDs {
 		if _, err := w.assets.GetAsset(ctx, task.WorkspaceID, id); err != nil {
 			switch {
 			case errors.Is(err, workspacetasks.ErrMediaArchived):
-				return fmt.Errorf("任务输入媒体 %d 已归档: %w", i, err)
+				return fmt.Errorf(msgResolveMediaRefs2, i, err)
 			case errors.Is(err, workspacetasks.ErrMediaNotReady):
-				return fmt.Errorf("任务输入媒体 %d 未就绪: %w", i, err)
+				return fmt.Errorf(msgResolveMediaRefs3, i, err)
 			default:
-				return fmt.Errorf("任务输入媒体 %d 不存在: %w", i, workspacetasks.ErrMediaNotFound)
+				return fmt.Errorf(msgResolveMediaRefs4, i, workspacetasks.ErrMediaNotFound)
 			}
 		}
 	}
@@ -280,16 +280,16 @@ func (w *WorkspaceTaskWorker) resolveMediaRefs(ctx context.Context, task *worksp
 	// dispatch fails deterministically instead of reaching the provider.
 	if maskID, ok := workspacetasks.MaskAssetIDFromParams(task.Params); ok {
 		if w.assets == nil {
-			return errors.New("任务遮罩引用无法校验: 媒体读取器未配置")
+			return errors.New(msgResolveMediaRefs5)
 		}
 		if _, err := w.assets.GetAsset(ctx, task.WorkspaceID, maskID); err != nil {
 			switch {
 			case errors.Is(err, workspacetasks.ErrMediaArchived):
-				return fmt.Errorf("任务遮罩已归档: %w", err)
+				return fmt.Errorf(msgResolveMediaRefs6, err)
 			case errors.Is(err, workspacetasks.ErrMediaNotReady):
-				return fmt.Errorf("任务遮罩未就绪: %w", err)
+				return fmt.Errorf(msgResolveMediaRefs7, err)
 			default:
-				return fmt.Errorf("任务遮罩不存在: %w", workspacetasks.ErrMediaNotFound)
+				return fmt.Errorf(msgResolveMediaRefs8, workspacetasks.ErrMediaNotFound)
 			}
 		}
 	}
@@ -341,7 +341,7 @@ func (w *WorkspaceTaskWorker) claim(ctx context.Context, args taskruntime.Worksp
 // message (tasks converge to failed, never strand).
 func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 	if w.provider == nil {
-		return nil, errors.New("任务执行器未配置: provider unavailable")
+		return nil, errors.New(msgGenerate)
 	}
 	outputs, err := w.provider.Generate(ctx, task)
 	if err != nil {
@@ -349,11 +349,11 @@ func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks
 	}
 	for _, ref := range outputs {
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
-			return nil, fmt.Errorf("provider 输出不合法: %w", err)
+			return nil, fmt.Errorf(msgGenerate2, err)
 		}
 	}
 	if len(outputs) > workspacetasks.MaxOutputsPerTask {
-		return nil, fmt.Errorf("provider 输出过多: 最多 %d", workspacetasks.MaxOutputsPerTask)
+		return nil, fmt.Errorf(msgGenerate3, workspacetasks.MaxOutputsPerTask)
 	}
 	return outputs, nil
 }
@@ -413,7 +413,7 @@ func isWorkspaceProviderRetryable(err error) bool {
 func workspaceFailureMessage(err error) string {
 	msg := strings.TrimSpace(err.Error())
 	if msg == "" {
-		return "任务执行失败，请稍后重试"
+		return msgWorkspaceFailureMessage
 	}
 	const maxLen = 500
 	if len(msg) > maxLen {
@@ -481,11 +481,11 @@ func NewWorkspaceGatewayProvider(caller WorkspaceGatewayCaller) WorkspaceTaskPro
 // Generate implements WorkspaceTaskProvider.
 func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 	if p == nil || p.caller == nil {
-		return nil, errors.New("上游图像服务未配置，请联系管理员")
+		return nil, errors.New(msgGenerate4)
 	}
 	model := strings.TrimSpace(task.ResolvedModel)
 	if model == "" {
-		return nil, errors.New("任务执行计划缺少模型，请重新提交任务")
+		return nil, errors.New(msgGenerate5)
 	}
 	legacy, err := workspaceBridgeTaskPayload(task)
 	if err != nil {
@@ -511,15 +511,15 @@ func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspace
 // materialization; an absent or invalid canonical plan fails closed.
 func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.TaskPayload, error) {
 	if task == nil || strings.TrimSpace(task.ID) == "" {
-		return nil, errors.New("任务标识缺失")
+		return nil, errors.New(msgWorkspaceBridgeTaskPayload)
 	}
 	raw := strings.TrimSpace(task.CanonicalParams)
 	if raw == "" {
-		return nil, errors.New("任务执行计划缺少 canonical 参数，请重新提交任务")
+		return nil, errors.New(msgWorkspaceBridgeTaskPayload2)
 	}
 	typed, err := tasks.UnmarshalParams(raw)
 	if err != nil {
-		return nil, fmt.Errorf("任务 canonical 参数解析失败: %w", err)
+		return nil, fmt.Errorf(msgWorkspaceBridgeTaskPayload3, err)
 	}
 	if typed.Extra == nil {
 		typed.Extra = make(map[string]interface{})
@@ -527,7 +527,7 @@ func workspaceBridgeTaskPayload(task *workspacetasks.WorkspaceTask) (*tasks.Task
 	typed.Extra[paramkeys.WorkspaceID] = strings.TrimSpace(task.WorkspaceID)
 	encoded, err := json.Marshal(&typed)
 	if err != nil {
-		return nil, fmt.Errorf("任务 canonical 参数编码失败: %w", err)
+		return nil, fmt.Errorf(msgWorkspaceBridgeTaskPayload4, err)
 	}
 	return &tasks.TaskPayload{
 		TaskID:    strings.TrimSpace(task.ID),
@@ -577,10 +577,10 @@ func mapWorkspaceProviderOutputs(outputs []tasks.TaskOutput) ([]workspacetasks.O
 				Role:           strings.TrimSpace(out.Role), ResultIndex: out.ResultIndex,
 			}
 		default:
-			return nil, errors.New("上游结果缺少可持久化的输出引用")
+			return nil, errors.New(msgMapWorkspaceProviderOutputs)
 		}
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
-			return nil, fmt.Errorf("上游输出不符合任务输出契约: %w", err)
+			return nil, fmt.Errorf(msgMapWorkspaceProviderOutputs2, err)
 		}
 		refs = append(refs, ref)
 	}

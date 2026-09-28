@@ -14,10 +14,11 @@ import { fetchCanvasWorkspaceTaskReadiness } from '../workspace/canvasWorkspaceT
 export async function assertTaskSubmitReady(
   request: SubmitTaskReadinessRequestData,
   fallbackMessage: string = i18n.global.t('common.errors.taskSubmitFailed'),
+  options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData> {
   let readiness: SubmitTaskReadinessData
   try {
-    readiness = await fetchCanvasWorkspaceTaskReadiness(request)
+    readiness = await fetchCanvasWorkspaceTaskReadiness(request, options)
   } catch (error) {
     throw mapCanvasBillingRequestError(error)
   }

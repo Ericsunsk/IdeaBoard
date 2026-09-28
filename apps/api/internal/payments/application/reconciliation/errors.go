@@ -15,36 +15,36 @@ func FailureDetail(err error) (string, string) {
 		return string(gatewayErr.Code()), boundedText(gatewayErr.Error(), 500)
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable) {
-		return string(paymentports.GatewayErrorProviderUnavailable), "Stripe 服务暂时不可用"
+		return string(paymentports.GatewayErrorProviderUnavailable), msgFailureDetail
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeConfigurationInvalid) {
-		return "configuration_invalid", "当前 Stripe 配置无效"
+		return "configuration_invalid", msgFailureDetail2
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeConfigurationNotFound) {
-		return "configuration_not_found", "当前 Stripe 配置尚未完成"
+		return "configuration_not_found", msgFailureDetail3
 	}
 	if errors.Is(err, paymentsdomain.ErrPurchasesUnavailable) {
-		return "configuration_unavailable", "当前 Stripe 配置无法收敛该订单"
+		return "configuration_unavailable", msgFailureDetail4
 	}
 	if errors.Is(err, paymentcontracts.ErrInvalidStripeAPIKey) {
-		return string(paymentports.GatewayErrorInvalidKey), "Stripe API Key 无效"
+		return string(paymentports.GatewayErrorInvalidKey), msgFailureDetail5
 	}
 	if errors.Is(err, paymentcontracts.ErrStripePermissionDenied) {
-		return string(paymentports.GatewayErrorPermissionDenied), "Stripe API Key 权限不足"
+		return string(paymentports.GatewayErrorPermissionDenied), msgFailureDetail6
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeAccountUnavailable) {
-		return string(paymentports.GatewayErrorAccountUnavailable), "Stripe 账户不可用"
+		return string(paymentports.GatewayErrorAccountUnavailable), msgFailureDetail7
 	}
 	if errors.Is(err, paymentcontracts.ErrStripeCapabilityUnavailable) {
-		return string(paymentports.GatewayErrorCapabilityMissing), "Stripe 账户暂不具备收款能力"
+		return string(paymentports.GatewayErrorCapabilityMissing), msgFailureDetail8
 	}
 	if errors.Is(err, paymentsdomain.ErrWalletNotRechargeable) {
-		return "wallet_not_rechargeable", "当前账户暂不可充值"
+		return "wallet_not_rechargeable", msgFailureDetail9
 	}
 	if errors.Is(err, paymentsdomain.ErrCheckoutIdempotencyConflict) {
-		return "identity_conflict", "Stripe Checkout Session 与订单绑定不一致"
+		return "identity_conflict", msgFailureDetail10
 	}
-	return "ledger_retry", "账本写入暂时失败"
+	return "ledger_retry", msgFailureDetail11
 }
 
 func OperationalErrorSummary(err error, fallback string) string {
@@ -106,3 +106,21 @@ func boundedText(value string, limit int) string {
 	}
 	return value[:limit]
 }
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgFailureDetail   = "Stripe 服务暂不可用"                    // FailureDetail @ errors.go
+	msgFailureDetail2  = "当前 Stripe 配置无效"                   // FailureDetail @ errors.go
+	msgFailureDetail3  = "当前 Stripe 配置尚未完成"                 // FailureDetail @ errors.go
+	msgFailureDetail4  = "当前 Stripe 配置无法收敛该订单"              // FailureDetail @ errors.go
+	msgFailureDetail5  = "Stripe API Key 无效"                // FailureDetail @ errors.go
+	msgFailureDetail6  = "当前 Stripe API Key 权限不足"           // FailureDetail @ errors.go
+	msgFailureDetail7  = "当前 Stripe 账户不可用"                  // FailureDetail @ errors.go
+	msgFailureDetail8  = "当前 Stripe 账户暂不具备收款能力"             // FailureDetail @ errors.go
+	msgFailureDetail9  = "当前账户暂不可充值"                        // FailureDetail @ errors.go
+	msgFailureDetail10 = "Stripe Checkout Session 与订单绑定不一致" // FailureDetail @ errors.go
+	msgFailureDetail11 = "账本写入失败"                           // FailureDetail @ errors.go
+)

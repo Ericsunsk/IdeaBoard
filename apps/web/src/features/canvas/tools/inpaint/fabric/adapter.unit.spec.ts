@@ -406,6 +406,57 @@ describe('FabricMaskPainter', () => {
     expect(painter.hasPaint()).toBe(true)
   })
 
+  it('reports paint state from the flag without scanning after paint', () => {
+    const { canvas } = createHost(2, 1)
+    const deps = createDependencies()
+    const painter = createFabricMaskPainter(canvas, { width: 2, height: 1 }, deps.dependencies)
+    const getContext = canvas.getContext as unknown as { mockClear: () => void; mock: { calls: unknown[] } }
+
+    painter.paintStroke(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      { left: 0, top: 0, width: 2, height: 1 },
+    )
+    getContext.mockClear()
+
+    // The painted-state flag answers without a full-canvas pixel scan.
+    expect(painter.hasPaint()).toBe(true)
+    expect(getContext.mock.calls).toHaveLength(0)
+  })
+
+  it('clears after paint without rescanning and resets the flag on undo-to-empty', () => {
+    const { canvas } = createHost(2, 1)
+    const deps = createDependencies()
+    const painter = createFabricMaskPainter(canvas, { width: 2, height: 1 }, deps.dependencies)
+    const getContext = canvas.getContext as unknown as { mockClear: () => void; mock: { calls: unknown[] } }
+
+    painter.paintStroke(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      { left: 0, top: 0, width: 2, height: 1 },
+    )
+    getContext.mockClear()
+
+    painter.clear()
+    expect(painter.canUndo()).toBe(true)
+    expect(getContext.mock.calls).toHaveLength(0)
+
+    // Undoing the clear restores the stroke; undoing the stroke empties the
+    // stack, which clears the flag.
+    painter.undo()
+    expect(painter.canUndo()).toBe(true)
+    painter.undo()
+    expect(painter.canUndo()).toBe(false)
+    // Undo-to-empty clears the flag: the next read falls back to the scan.
+    getContext.mockClear()
+    expect(painter.hasPaint()).toBe(false)
+    expect(getContext.mock.calls.length).toBeGreaterThan(0)
+  })
+
   it('commits dual mask data identical to the legacy builder for the same pixels', () => {
     const painted = [122, 107, 213, 0, 122, 107, 213, 128, 122, 107, 213, 255]
     const first = createHost(3, 1, painted)

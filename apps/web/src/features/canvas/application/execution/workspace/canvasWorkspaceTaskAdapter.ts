@@ -496,11 +496,16 @@ function toNotReady(
 
 export async function fetchCanvasWorkspaceTaskReadiness(
   request: SubmitTaskData,
+  options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData> {
   const workspaceId = requireCanvasWorkspaceId()
   const input = toWorkspaceQuoteInput(request)
   try {
-    const snapshot = await quoteWorkspaceTask(workspaceId, input)
+    const snapshot = await quoteWorkspaceTask(
+      workspaceId,
+      input,
+      options?.signal == null ? undefined : { signal: options.signal },
+    )
     return toSubmitTaskReadiness(snapshot, input.workflow_kind)
   } catch (error) {
     const apiError = error as ApiClientError
@@ -519,11 +524,12 @@ export async function fetchCanvasWorkspaceTaskReadiness(
 
 export async function fetchCanvasWorkspaceTaskReadinessMatrix(
   requests: readonly SubmitTaskData[],
+  options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData[]> {
   if (requests.length === 0) return []
   // No v1 matrix endpoint: one quote per request, order-preserved, first
   // rejection wins (matches the legacy matrix throw-on-transport-failure).
-  return Promise.all(requests.map((request) => fetchCanvasWorkspaceTaskReadiness(request)))
+  return Promise.all(requests.map((request) => fetchCanvasWorkspaceTaskReadiness(request, options)))
 }
 
 // ---------------------------------------------------------------------------

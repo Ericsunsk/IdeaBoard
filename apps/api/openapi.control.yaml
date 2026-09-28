@@ -3778,7 +3778,7 @@ components:
           description: Operator note justifying the high-risk mutation.
         outcome:
           type: string
-          enum: [read, success, denied, failed]
+          enum: [read, success, denied, failure]
         occurred_at:
           type: string
           format: date-time

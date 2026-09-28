@@ -34,6 +34,19 @@ export function formatAdminDateTime(input: string | Date, fallback = '-'): strin
   }).format(d)
 }
 
+/**
+ * Verbatim `YYYY.MM.DD` date part of an ISO-ish timestamp (profile surfaces).
+ * Reads the date part as transmitted — never parsed into a `Date`, so no
+ * timezone shift — and falls back for missing/malformed input.
+ */
+export function formatDottedIsoDate(input: string | null | undefined, fallback = '-'): string {
+  const datePart = input?.trim().split(/[T\s]/)[0]
+  if (!datePart) return fallback
+  const [year, month, day] = datePart.split('-')
+  if (!year || !month || !day) return datePart.replaceAll('-', '.')
+  return `${year}.${month}.${day}`
+}
+
 export function calcDurationSeconds(start: string | Date, end: string | Date): number | null {
   const startTime = typeof start === 'string' ? new Date(start).getTime() : start.getTime()
   const endTime = typeof end === 'string' ? new Date(end).getTime() : end.getTime()

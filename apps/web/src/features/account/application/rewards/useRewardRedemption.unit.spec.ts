@@ -1,6 +1,12 @@
 import { QueryClient, type InfiniteData } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { rewardRedemptionsQueryKeys, type RewardRedemptionPageData } from '../../infrastructure'
+import {
+  billingRecordsQueryKeys,
+  creditsQueryKeys,
+  rewardRedemptionsQueryKeys,
+  type RewardRedemptionPageData,
+} from '../../infrastructure'
+import { invalidateUserMoney } from '../invalidateUserMoney'
 import { createRewardRedemptionWorkflow, prependRewardRedemption } from './useRewardRedemption'
 
 const redeemed = {
@@ -83,6 +89,30 @@ describe('createRewardRedemptionWorkflow', () => {
     expect(prependRedemption).toHaveBeenCalledWith(redeemed.history_item)
     expect(consoleError).toHaveBeenCalledTimes(2)
     expect(workflow.pending.value).toBe(false)
+  })
+
+  it('issues a wallet refetch through the production invalidation wiring', async () => {
+    // Guards the redemption=>wallet link: the workflow delegates balance sync
+    // to `setAvailableBalance`, and the production wiring routes that through
+    // `invalidateUserMoney` (credits + billing roots). A regression that drops
+    // that wiring would leave the wallet stale after redemption.
+    const queryClient = new QueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const workflow = createRewardRedemptionWorkflow({
+      redeem: vi.fn().mockResolvedValue(redeemed),
+      setAvailableBalance: () => invalidateUserMoney(queryClient),
+      prependRedemption: (redemption) => prependRewardRedemption(queryClient, redemption),
+      invalidateBillingRecords: () =>
+        queryClient.invalidateQueries({ queryKey: billingRecordsQueryKeys.all }),
+      invalidateRedemptions: () =>
+        queryClient.invalidateQueries({ queryKey: rewardRedemptionsQueryKeys.all }),
+    })
+
+    await expect(workflow.redeem('IDEA2026')).resolves.toEqual(redeemed)
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: creditsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: billingRecordsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: rewardRedemptionsQueryKeys.all })
   })
 
   it('prepends a new history item and never duplicates a replayed redemption', () => {

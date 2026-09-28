@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { i18n } from '../../../../shared/i18n'
 import {
+  formatAccountExpiryDateTime,
   formatAccountLocalDateTime,
   formatAccountRechargeDateTime,
   formatAccountShanghaiDateTime,
@@ -68,6 +69,18 @@ describe('formatters', () => {
       )
     },
   )
+
+  it('formats pending-order expiry with the shared medium-date short-time shape', () => {
+    ;(i18n.global.locale as { value: string }).value = 'en'
+    const date = new Date('2026-08-01T01:00:00')
+    expect(formatAccountExpiryDateTime(date)).toBe(
+      new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        hour12: false,
+      }).format(date),
+    )
+  })
 
   it('uses the active locale at render time rather than retaining the initial formatter locale', () => {
     const date = new Date('2026-07-14T09:08:07')

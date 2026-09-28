@@ -51,6 +51,7 @@ type UseCanvasGraphInteractionsOptions = {
   }
   feedback: CanvasFeedback['graph']
   isNodeExecutionActive: (nodeId: string) => boolean
+  executionEpoch?: Ref<unknown>
 }
 
 type ExportImageEntry = {
@@ -137,6 +138,49 @@ function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
     }))
 }
 
+type ExportEntryOutcome = 'downloaded' | 'failed' | 'superseded'
+
+async function downloadExportEntry(
+  entry: ExportImageEntry,
+  counts: Map<string, number>,
+  ports: {
+    downloadImage: (args: { url: string; assetId?: string; fileName: string }) => unknown
+    isSuperseded: () => boolean
+  },
+): Promise<ExportEntryOutcome> {
+  let renderedUrl = ''
+  try {
+    let downloadUrl = entry.url
+    let exportFileName = ''
+    if (entry.retouchRecipe) {
+      const source: ImageRetouchRenderSource = {
+        url: resolveMediaAssetOriginalURL(entry.retouchRecipe.sourceAssetId),
+        title: entry.title,
+      }
+      const rendered = await renderImageRetouchRecipeFile(source, entry.retouchRecipe)
+      if (ports.isSuperseded()) return 'superseded'
+      renderedUrl = URL.createObjectURL(rendered)
+      downloadUrl = renderedUrl
+      exportFileName = buildUniqueExportFileName(
+        { ...entry, url: rendered.name, retouchRecipe: undefined },
+        counts,
+      )
+    } else {
+      exportFileName = buildUniqueExportFileName(entry, counts)
+    }
+    await ports.downloadImage({
+      url: downloadUrl,
+      ...(!entry.retouchRecipe && entry.assetId ? { assetId: entry.assetId } : {}),
+      fileName: exportFileName,
+    })
+    return ports.isSuperseded() ? 'superseded' : 'downloaded'
+  } catch {
+    return 'failed'
+  } finally {
+    if (renderedUrl) URL.revokeObjectURL(renderedUrl)
+  }
+}
+
 function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages'] {
   return source.outputImages
     .map((item) => {
@@ -171,8 +215,10 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     nodes: options.nodes,
     edges: options.edges,
     isNodeExecutionActive: options.isNodeExecutionActive,
+    ...(options.executionEpoch ? { executionEpoch: options.executionEpoch } : {}),
   })
   let exportLoading: MessageLoadingHandle | null = null
+  let exportRunSequence = 0
   const duplicateDrag = ref<
     Map<string, { graphNodeId: CanvasGraphNodeId; x: number; y: number }> | undefined
   >()
@@ -260,55 +306,43 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       return
     }
     exportLoading?.destroy()
+    exportRunSequence += 1
+    const exportRunId = exportRunSequence
     const loading = options.feedback.operationLoading(
       i18n.global.t('canvas.session.exportingImages', { count: entries.length }),
       { duration: Number.POSITIVE_INFINITY },
     )
     exportLoading = loading
     const counts = new Map<string, number>()
+    const isSuperseded = () => exportRunId !== exportRunSequence
     let failed = 0
     try {
       for (const [index, entry] of entries.entries()) {
+        // A second export supersedes the first: bail instead of continuing
+        // to download into a destroyed loading handle.
+        if (isSuperseded()) return
         loading.update?.(
           i18n.global.t('canvas.session.exportingImageProgress', {
             current: index + 1,
             total: entries.length,
           }),
         )
-        let renderedUrl = ''
-        let exportFileName = ''
-        try {
-          let downloadUrl = entry.url
-          if (entry.retouchRecipe) {
-            const source: ImageRetouchRenderSource = {
-              url: resolveMediaAssetOriginalURL(entry.retouchRecipe.sourceAssetId),
-              title: entry.title,
-            }
-            const rendered = await renderImageRetouchRecipeFile(source, entry.retouchRecipe)
-            renderedUrl = URL.createObjectURL(rendered)
-            downloadUrl = renderedUrl
-            exportFileName = buildUniqueExportFileName(
-              { ...entry, url: rendered.name, retouchRecipe: undefined },
-              counts,
-            )
-          } else {
-            exportFileName = buildUniqueExportFileName(entry, counts)
-          }
-          await options.browser.downloadImage({
-            url: downloadUrl,
-            ...(!entry.retouchRecipe && entry.assetId ? { assetId: entry.assetId } : {}),
-            fileName: exportFileName,
-          })
-        } catch {
-          failed += 1
-        } finally {
-          if (renderedUrl) URL.revokeObjectURL(renderedUrl)
-        }
+        const outcome = await downloadExportEntry(entry, counts, {
+          downloadImage: (args) => options.browser.downloadImage(args),
+          isSuperseded,
+        })
+        if (outcome === 'superseded') return
+        if (outcome === 'failed') failed += 1
       }
     } finally {
-      loading.destroy()
-      if (exportLoading === loading) exportLoading = null
+      // Only the latest run owns the loading handle; a superseded run must
+      // not destroy its successor's handle.
+      if (!isSuperseded()) {
+        loading.destroy()
+        if (exportLoading === loading) exportLoading = null
+      }
     }
+    if (isSuperseded()) return
     if (failed === 0) {
       options.feedback.operationSucceeded(
         i18n.global.t('canvas.session.exportQueued', { count: entries.length }),

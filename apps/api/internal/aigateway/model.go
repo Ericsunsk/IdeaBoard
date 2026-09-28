@@ -58,14 +58,14 @@ func validateModelMapping(feature, model string) (string, string, error) {
 	model = strings.TrimSpace(model)
 	separator := strings.IndexByte(model, '/')
 	if separator <= 0 || separator == len(model)-1 || strings.HasPrefix(model[separator+1:], "/") || strings.ContainsAny(model, " \t\n") {
-		return "", "", errors.New("模型必须是 provider/model 格式且不含空白")
+		return "", "", errors.New(msgSplitGatewayModel2)
 	}
 	if len(model) > 128 {
-		return "", "", errors.New("模型标识过长")
+		return "", "", errors.New(msgValidateModelMapping)
 	}
 	provider := strings.TrimSpace(model[:separator])
 	if provider == "" {
-		return "", "", errors.New("模型缺少 provider 前缀")
+		return "", "", errors.New(msgValidateModelMapping2)
 	}
 	return slug, model, nil
 }
@@ -238,21 +238,21 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model
 
 	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if trimmed == "" {
-		return ConnectionProbeResult{Message: "网关地址为空"}
+		return ConnectionProbeResult{Message: msgProbeGatewayConnection}
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" ||
 		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return ConnectionProbeResult{Message: "网关地址必须是 http(s) URL"}
+		return ConnectionProbeResult{Message: msgProbeGatewayConnection2}
 	}
 	provider = strings.TrimSpace(provider)
 	model = strings.TrimSpace(model)
 	path = strings.Trim(strings.TrimSpace(path), "/")
 	if provider == "" || path == "" {
-		return ConnectionProbeResult{Message: "必须提供 provider 和 provider-native path"}
+		return ConnectionProbeResult{Message: msgProbeGatewayConnection3}
 	}
 	if strings.ContainsAny(provider+path, "?&#\r\n") {
-		return ConnectionProbeResult{Message: "provider-native path 无效"}
+		return ConnectionProbeResult{Message: msgProbeGatewayConnection4}
 	}
 	probeURL := trimmed + "/" + workflow.GatewayProviderPath(provider) + "/" + path
 
@@ -289,7 +289,7 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model
 
 	resp, err := doRequest()
 	if err != nil {
-		return ConnectionProbeResult{Message: "网关连接失败: " + err.Error()}
+		return ConnectionProbeResult{Message: msgProbeGatewayConnection5 + err.Error()}
 	}
 	defer resp.Body.Close()
 	latency := time.Since(start).Milliseconds()
@@ -297,7 +297,7 @@ func ProbeGatewayConnection(ctx context.Context, baseURL, token, provider, model
 		Reachable:  true,
 		StatusCode: resp.StatusCode,
 		LatencyMs:  latency,
-		Message:    fmt.Sprintf("网关连接正常 (%dms, HTTP %d)", latency, resp.StatusCode),
+		Message:    fmt.Sprintf(msgProbeGatewayConnection6, latency, resp.StatusCode),
 	}
 }
 

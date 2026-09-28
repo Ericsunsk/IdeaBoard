@@ -34,7 +34,11 @@ function isUnsafeProductionSecret(value: string): boolean {
   )
 }
 
-function validateProductionURL(name: string, value: string, options: { requireHTTPS?: boolean } = {}) {
+function validateProductionURL(
+  name: string,
+  value: string,
+  options: { requireHTTPS?: boolean } = {},
+) {
   const normalized = normalizeOrigin(value)
   if (!normalized || (options.requireHTTPS && !normalized.startsWith('https://'))) {
     if (options.requireHTTPS) {
@@ -66,8 +70,7 @@ export function loadEnv(source: EnvSource) {
     .map((item) => item.trim())
     .filter(Boolean)
     .filter((item, index, all) => all.indexOf(item) === index)
-  const apiInternalURL =
-    getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
+  const apiInternalURL = getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
   const secretsEncryptionKey = getEnv(source, 'APP_SECRETS_ENCRYPTION_KEY', '')
   const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'DB_SSLMODE', 'disable'))
@@ -78,13 +81,17 @@ export function loadEnv(source: EnvSource) {
 
   if (productionRuntime) {
     if (isUnsafeProductionSecret(authInternalKey)) {
-      throw new Error('AUTH_INTERNAL_KEY must be set to a non-placeholder value when NODE_ENV=production')
+      throw new Error(
+        'AUTH_INTERNAL_KEY must be set to a non-placeholder value when NODE_ENV=production',
+      )
     }
     if (authInternalKey.length < 32) {
       throw new Error('AUTH_INTERNAL_KEY must be at least 32 characters long')
     }
     if (isUnsafeProductionSecret(authSecret)) {
-      throw new Error('BETTER_AUTH_SECRET must be set to a non-placeholder value when NODE_ENV=production')
+      throw new Error(
+        'BETTER_AUTH_SECRET must be set to a non-placeholder value when NODE_ENV=production',
+      )
     }
     if (authSecret.length < 32) {
       throw new Error('BETTER_AUTH_SECRET must be at least 32 characters long')

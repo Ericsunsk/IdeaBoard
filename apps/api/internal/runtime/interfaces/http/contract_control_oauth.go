@@ -35,7 +35,7 @@ type ControlOAuthService interface {
 
 func (d *ContractControlDeps) requireControlOAuth(c *gin.Context) (ControlOAuthService, bool) {
 	if d == nil || d.OAuth == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "OAuth Provider 配置服务未初始化")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable12)
 		return nil, false
 	}
 	return d.OAuth, true
@@ -47,12 +47,12 @@ func (d *ContractControlDeps) requireControlOAuth(c *gin.Context) (ControlOAuthS
 func parseControlOAuthProvider(c *gin.Context, svc ControlOAuthService) (string, bool) {
 	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
 	if provider == "" || len(provider) > 64 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "不支持的 OAuth Provider")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
 		return "", false
 	}
 	for _, character := range provider {
 		if (character < 'a' || character > 'z') && character != '-' && character != '_' && (character < '0' || character > '9') {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "不支持的 OAuth Provider")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
 			return "", false
 		}
 	}
@@ -72,7 +72,7 @@ func parseControlOAuthProvider(c *gin.Context, svc ControlOAuthService) (string,
 			return provider, true
 		}
 	}
-	contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "不支持的 OAuth Provider")
+	contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
 	return "", false
 }
 
@@ -112,7 +112,7 @@ func (d *ContractControlDeps) updateControlOAuthProvider(c *gin.Context, _ contr
 		OperatorNote string `json:"operator_note"`
 	}
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	summary, err := svc.UpdateSocialProviderSettings(c.Request.Context(), provider, auth.SocialProviderSettingsUpdate{
@@ -134,19 +134,19 @@ func writeControlOAuthError(c *gin.Context, err error) {
 	if errors.As(err, &providerErr) {
 		message := strings.TrimSpace(providerErr.Message)
 		if message == "" {
-			message = "OAuth Provider 配置失败"
+			message = msgWriteControlOAuthError
 		}
 		switch providerErr.Status {
 		case http.StatusBadRequest:
 			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, message)
 			return
 		case http.StatusNotFound:
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "不支持的 OAuth Provider")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound6)
 			return
 		case http.StatusConflict:
 			contract.RenderError(c, http.StatusConflict, contract.CodeConflict, message)
 			return
 		}
 	}
-	contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "认证服务暂不可用")
+	contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable11)
 }

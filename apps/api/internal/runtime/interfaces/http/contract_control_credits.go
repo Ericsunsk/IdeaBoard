@@ -83,26 +83,26 @@ func newControlCreditResult(result creditsports.CommandResult, userID uuid.UUID,
 func writeControlCreditError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, creditsdomain.ErrInvalidCommand):
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 	case errors.Is(err, creditsdomain.ErrIdempotencyConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, "幂等键已用于不同的Idea操作")
+		contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict2)
 	case errors.Is(err, creditsdomain.ErrWalletNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "Idea钱包不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound2)
 	case errors.Is(err, creditsdomain.ErrWalletFrozen),
 		errors.Is(err, creditsdomain.ErrWalletRestricted):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "Idea钱包当前受限")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted)
 	case errors.Is(err, creditsdomain.ErrInsufficientCredits):
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "Idea不足")
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgValidationFailed2)
 	case errors.Is(err, creditsdomain.ErrChargeNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "原扣款记录不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound3)
 	case errors.Is(err, creditsdomain.ErrRefundExceedsCharge):
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, "退款金额超过原扣款剩余额度")
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeValidationFailed, msgValidationFailed3)
 	case errors.Is(err, creditsdomain.ErrReconciliationNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "Idea对账任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound4)
 	case errors.Is(err, creditsdomain.ErrReconciliationUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea对账服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable6)
 	default:
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "Idea操作失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable7)
 	}
 }
 
@@ -124,16 +124,16 @@ type controlCreditLinkRequest struct {
 func (d *ContractControlDeps) resolveControlCreditUser(c *gin.Context, rawUserID string) (userID int64, publicID uuid.UUID, displayName string, ok bool) {
 	parsed, err := tenancy.ParseUserPublicID(strings.TrimSpace(rawUserID))
 	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "无效的用户 id")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
 		return 0, uuid.Nil, "", false
 	}
 	if d == nil || d.CreditUsers == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return 0, uuid.Nil, "", false
 	}
 	identity, err := d.CreditUsers.ResolvePublicID(c.Request.Context(), parsed.String())
 	if err != nil || identity.ID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 		return 0, uuid.Nil, "", false
 	}
 	return identity.ID, identity.PublicID, identity.DisplayName, true
@@ -162,7 +162,7 @@ func controlCreditMetadata(ctx controlContext, source, businessReferenceID strin
 func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context, ctx controlContext, allowLink bool) (userID int64, publicID uuid.UUID, displayName string, amount creditsdomain.CreditAmount, chargeID, originalID, businessRefID, reason string, ok bool) {
 	var req controlCreditLinkRequest
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return 0, uuid.Nil, "", 0, "", "", "", "", false
 	}
 	_ = allowLink
@@ -172,7 +172,7 @@ func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context, ctx co
 	}
 	parsed, err := creditsdomain.NewCreditAmount(req.AmountCredits)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "Idea数量必须是有效正整数")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest10)
 		return 0, uuid.Nil, "", 0, "", "", "", "", false
 	}
 	reason = strings.TrimSpace(req.Reason)
@@ -186,7 +186,7 @@ func (d *ContractControlDeps) prepareControlCreditCommand(c *gin.Context, ctx co
 
 func (d *ContractControlDeps) grantControlCredits(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Credits == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, publicID, displayName, amount, _, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, false)
@@ -206,7 +206,7 @@ func (d *ContractControlDeps) grantControlCredits(c *gin.Context, ctx controlCon
 
 func (d *ContractControlDeps) deductControlCredits(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Credits == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, publicID, displayName, amount, _, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, false)
@@ -226,7 +226,7 @@ func (d *ContractControlDeps) deductControlCredits(c *gin.Context, ctx controlCo
 
 func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Credits == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, publicID, displayName, amount, chargeID, _, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, true)
@@ -234,7 +234,7 @@ func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlCo
 		return
 	}
 	if chargeID == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "charge_transaction_id 为必填")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest11)
 		return
 	}
 	result, err := d.Credits.Refund(c.Request.Context(), creditsports.RefundCommand{
@@ -250,7 +250,7 @@ func (d *ContractControlDeps) refundControlCredits(c *gin.Context, ctx controlCo
 
 func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Credits == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, publicID, displayName, amount, _, originalID, businessRefID, _, ok := d.prepareControlCreditCommand(c, ctx, true)
@@ -258,7 +258,7 @@ func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlC
 		return
 	}
 	if originalID == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "original_transaction_id 为必填")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest12)
 		return
 	}
 	result, err := d.Credits.Correct(c.Request.Context(), creditsports.CorrectionCommand{
@@ -274,7 +274,7 @@ func (d *ContractControlDeps) correctControlCredits(c *gin.Context, ctx controlC
 
 func (d *ContractControlDeps) getControlCreditWallet(c *gin.Context, _ controlContext) {
 	if d == nil || d.CreditReads == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, _, _, ok := d.resolveControlCreditUser(c, c.Param("user_id"))
@@ -328,7 +328,7 @@ type controlLedgerCursor struct {
 
 func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlContext) {
 	if d == nil || d.CreditReads == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	userID, _, _, ok := d.resolveControlCreditUser(c, c.Param("user_id"))
@@ -339,7 +339,7 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
 		decoded, err := contract.DecodeCursor[controlLedgerCursor](raw)
 		if err != nil || decoded == nil || decoded.Before <= 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
 			return
 		}
 		before = decoded.Before
@@ -348,7 +348,7 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
 		parsed, err := contract.ParsePageSize(raw)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
 			return
 		}
 		limit = parsed
@@ -371,7 +371,7 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 	if hasMore {
 		encoded, err := contract.EncodeCursor(controlLedgerCursor{Before: page.NextBeforeSequence})
 		if err != nil {
-			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取账本失败")
+			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable9)
 			return
 		}
 		nextCursor = encoded
@@ -381,7 +381,7 @@ func (d *ContractControlDeps) listControlCreditLedger(c *gin.Context, _ controlC
 
 func (d *ContractControlDeps) getControlCreditHealth(c *gin.Context, _ controlContext) {
 	if d == nil || d.Reconciliation == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	health, err := d.Reconciliation.GetCreditHealth(c.Request.Context())
@@ -394,7 +394,7 @@ func (d *ContractControlDeps) getControlCreditHealth(c *gin.Context, _ controlCo
 
 func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Reconciliation == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	var req struct {
@@ -402,7 +402,7 @@ func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx con
 	}
 	if len(ctx.Body) > 0 {
 		if err := contract.DecodeStrict(ctx.Body, &req); err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 			return
 		}
 	}
@@ -412,7 +412,7 @@ func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx con
 	}
 	action, err := adminaction.New(ctx.Operator.UserID(), reason)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "reason 无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest14)
 		return
 	}
 	run, err := d.Reconciliation.StartReconciliation(c.Request.Context(), creditsports.StartManualReconciliationInput{
@@ -428,7 +428,7 @@ func (d *ContractControlDeps) startControlReconciliation(c *gin.Context, ctx con
 
 func (d *ContractControlDeps) listControlReconciliationRuns(c *gin.Context, _ controlContext) {
 	if d == nil || d.Reconciliation == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	input, ok := parseControlReconciliationPage(c)
@@ -448,7 +448,7 @@ func (d *ContractControlDeps) listControlReconciliationRuns(c *gin.Context, _ co
 
 func (d *ContractControlDeps) getControlReconciliationRun(c *gin.Context, _ controlContext) {
 	if d == nil || d.Reconciliation == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	// FORMAL EXCEPTION to the opaque-id policy (parent #809 S4): :run_id
@@ -459,7 +459,7 @@ func (d *ContractControlDeps) getControlReconciliationRun(c *gin.Context, _ cont
 	// exception. Migrate both when the public_id column lands.
 	runID, err := strconv.ParseInt(strings.TrimSpace(c.Param("run_id")), 10, 64)
 	if err != nil || runID <= 0 {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "run_id 无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest15)
 		return
 	}
 	run, err := d.Reconciliation.GetReconciliationRun(c.Request.Context(), runID)
@@ -472,7 +472,7 @@ func (d *ContractControlDeps) getControlReconciliationRun(c *gin.Context, _ cont
 
 func (d *ContractControlDeps) listControlReconciliationFindings(c *gin.Context, _ controlContext) {
 	if d == nil || d.Reconciliation == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable8)
 		return
 	}
 	input, ok := parseControlReconciliationPage(c)
@@ -481,7 +481,7 @@ func (d *ContractControlDeps) listControlReconciliationFindings(c *gin.Context, 
 	}
 	status := creditsports.ReconciliationFindingStatus(strings.TrimSpace(c.Query("status")))
 	if status != creditsports.ReconciliationFindingOpen && status != creditsports.ReconciliationFindingResolved {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "status 无效")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest16)
 		return
 	}
 	page, err := d.Reconciliation.ListGlobalReconciliationFindings(c.Request.Context(), status, input)
@@ -497,7 +497,7 @@ func parseControlReconciliationPage(c *gin.Context) (creditsports.ListReconcilia
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 || parsed > 200 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "limit 无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest17)
 			return input, false
 		}
 		input.Limit = parsed
@@ -505,7 +505,7 @@ func parseControlReconciliationPage(c *gin.Context) (creditsports.ListReconcilia
 	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
 		before, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || before <= 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "before_id 无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest18)
 			return input, false
 		}
 		input.BeforeID = before

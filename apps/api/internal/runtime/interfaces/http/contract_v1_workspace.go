@@ -71,7 +71,7 @@ func v1AllowOwnerOrAdmin(role string, visible bool) bool {
 // inline, so the shape cannot drift between surfaces.
 func writeV1InputError(c *gin.Context) {
 	contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-		"请求体非法", contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
+		msgRequireEmptyV1BillingActionBody, contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
 	c.Abort()
 }
 

@@ -110,6 +110,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { useUserStore } from '../../../auth'
 import { useAvatarUpload } from '../../application/profile/useAvatarUpload'
+import { formatDottedIsoDate } from '../../../../shared/utils/dateTime'
 import AccountPane from '../common/AccountPane.vue'
 
 type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
@@ -124,8 +125,8 @@ const userStore = useUserStore()
 const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } = useAvatarUpload()
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 
-const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
-const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
+const formattedJoinedAt = computed(() => formatDottedIsoDate(userStore.user?.created_at))
+const formattedUpdatedAt = computed(() => formatDottedIsoDate(userStore.user?.updated_at))
 const isUserBanned = computed(() => userStore.user?.status === 0)
 const userRoleLabel = computed(() =>
   userStore.user?.role === 'admin'
@@ -154,14 +155,6 @@ const profileFields = computed<ProfileField[]>(() => [
     value: formattedUpdatedAt.value,
   },
 ])
-
-function formatDateWithDots(value?: string) {
-  const datePart = value?.trim().split(/[T\s]/)[0]
-  if (!datePart) return '-'
-  const [year, month, day] = datePart.split('-')
-  if (!year || !month || !day) return datePart.replaceAll('-', '.')
-  return `${year}.${month}.${day}`
-}
 
 function openAvatarPicker() {
   avatarInputRef.value?.click()

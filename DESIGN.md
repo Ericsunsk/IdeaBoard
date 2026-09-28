@@ -315,7 +315,7 @@ UI 实现细节遵循 [apps/web/DESIGN.md](./apps/web/DESIGN.md)。
 - API/Auth should listen on loopback behind reverse proxy in production.
 - River worker concurrency 是部署级 `RIVER_WORKER_CONCURRENCY`；retry/timeout policy 由 Worker 代码拥有，NATS retention 由 Events implementation 固定为 7 天。Admin 只管理 typed Outbound Policy；allowlist 在 request-time 动态读取并 fail closed，写入必须与 append-only actor audit 原子提交。
 - Cloudflare proxied API domains need explicit cache bypass for API/Auth/SSE/upload writes and careful real-client-IP handling.
-- Rewards Redeem 在应用内按 User 执行 10 attempts / 10 minutes 的 instance-local limit；生产 Cloudflare/reverse proxy 必须另对 `/api/user/rewards/redeem` 按可信客户端 IP 执行初始 60 attempts / 10 minutes 的 coarse limit。
+- Rewards Redeem 在应用内按 User 执行 10 attempts / 10 minutes 的 instance-local limit；生产 Cloudflare/reverse proxy 必须另对 `POST /api/v1/workspaces/{workspace_id}/rewards/redemptions` 按可信客户端 IP 执行初始 60 attempts / 10 minutes 的 coarse limit。
 - Rewards rollout 只支持 canonical RewardCode schema 的 Fresh Database path。检测到已删除的 Rewards migration version 或 immutable Ledger reference 时 migration 必须 fail closed，禁止兼容性 replay、静默删除或语义 orphan。
 - PostgreSQL backup contains credentials and user/session data; treat `postgres-*.dump[.age|.gpg]` as secret artifacts.
 - DB restore and migration rollback are human-confirmed operations; runtime image rollback does not imply automatic database restore.

@@ -138,7 +138,7 @@ func normalizeVariationsContract(params map[string]interface{}) error {
 	}
 	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
-		return fmt.Errorf("variation.strength 必须是数字")
+		return fmt.Errorf(msgNormalizeVariationsContract)
 	}
 	obj[paramkeys.Strength] = clampPercent(strength)
 	params[ParamKeyVariation] = obj
@@ -153,16 +153,16 @@ func normalizeOutpaintContract(params map[string]interface{}) error {
 	for _, key := range []string{paramkeys.TargetWidth, paramkeys.TargetHeight, paramkeys.ImageOffsetX, paramkeys.ImageOffsetY} {
 		value, ok := readNumberField(obj, key)
 		if !ok {
-			return fmt.Errorf("outpaint.%s 必须是数字", key)
+			return fmt.Errorf(msgNormalizeOutpaintContract, key)
 		}
 		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value {
-			return fmt.Errorf("outpaint.%s 必须是整数", key)
+			return fmt.Errorf(msgNormalizeOutpaintContract2, key)
 		}
 		if (key == paramkeys.TargetWidth || key == paramkeys.TargetHeight) && value <= 0 {
-			return fmt.Errorf("outpaint.%s 必须是正整数", key)
+			return fmt.Errorf(msgNormalizeOutpaintContract3, key)
 		}
 		if (key == paramkeys.ImageOffsetX || key == paramkeys.ImageOffsetY) && value < 0 {
-			return fmt.Errorf("outpaint.%s 不能为负数", key)
+			return fmt.Errorf(msgNormalizeOutpaintContract4, key)
 		}
 		obj[key] = value
 	}
@@ -177,10 +177,10 @@ func normalizeUpscaleContract(params map[string]interface{}) error {
 	}
 	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return fmt.Errorf("upscale.scale 必须是数字")
+		return fmt.Errorf(msgNormalizeUpscaleContract)
 	}
 	if scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
-		return fmt.Errorf("upscale.scale 必须是 1.0-4.0 且步长为 0.1")
+		return fmt.Errorf(msgNormalizeUpscaleContract2)
 	}
 	obj[paramkeys.Scale] = math.Round(scale*10) / 10
 	params[ParamKeyUpscale] = obj
@@ -194,7 +194,7 @@ func normalizeFusionContract(params map[string]interface{}) error {
 	}
 	weights, ok := ReadFusionInputWeights(params)
 	if !ok || len(weights) == 0 {
-		return fmt.Errorf("fusion.input_weights 至少需要一个权重")
+		return fmt.Errorf(msgNormalizeFusionContract)
 	}
 	obj[paramkeys.InputWeights] = weights
 	obj[paramkeys.Mode] = "weighted_reference"
@@ -205,7 +205,7 @@ func normalizeFusionContract(params map[string]interface{}) error {
 func requiredWorkflowObjectParam(params map[string]interface{}, key string) (map[string]interface{}, error) {
 	obj, ok := readWorkflowObjectParam(params, key)
 	if !ok {
-		return nil, fmt.Errorf("%s 参数缺失或格式错误", key)
+		return nil, fmt.Errorf(msgRequiredWorkflowObjectParam, key)
 	}
 	return obj, nil
 }

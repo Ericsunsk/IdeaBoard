@@ -232,7 +232,7 @@ func (s *Service) grantRewardCodeCredits(ctx context.Context, tx pgx.Tx, userID 
 	grant, err := s.credits.Grant(ctx, tx, CreditGrantRequest{
 		UserID: userID,
 		Amount: rewardCode.CreditAmount, IdempotencyKey: "reward-code-redemption:" + reference,
-		ActorType: "user", ActorID: strconv.FormatInt(userID, 10), Source: "reward_redemption", Reason: "兑换奖励",
+		ActorType: "user", ActorID: strconv.FormatInt(userID, 10), Source: "reward_redemption", Reason: msgGrantRewardCodeCredits,
 		BusinessReferenceType: "reward_code_redemption", BusinessReferenceID: "rc:" + reference,
 	})
 	if err != nil {

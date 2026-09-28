@@ -271,7 +271,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 
 func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *testing.T) {
 	code, summary := paymentreconciliation.FailureDetail(errors.New(`Stripe response: {"api_key":"sk_live_should_not_persist","body":"raw provider response"}`))
-	if code != "ledger_retry" || summary != "账本写入暂时失败" {
+	if code != "ledger_retry" || summary != "账本写入失败" {
 		t.Fatalf("unknown failure detail = %q, %q", code, summary)
 	}
 	if strings.Contains(summary, "sk_live_should_not_persist") || strings.Contains(summary, "raw provider response") {

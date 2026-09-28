@@ -60,12 +60,12 @@ func NewHandler(repository providerConfigStore, adapters ...ports.ProviderTestAd
 
 func (h *Handler) List(c *gin.Context) {
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
 		return
 	}
 	configs, err := h.repository.List(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取搜索供应商配置失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgList, err)
 		return
 	}
 	response.SuccessDTO(c, ProviderListResponse{Providers: configs})
@@ -79,30 +79,30 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), "搜索供应商不存在")
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), msgSearchProviderNotFound)
 		return
 	}
 	var request UpdateProviderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchRequestInvalid), "参数错误")
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchRequestInvalid), msgSearchRequestInvalid)
 		return
 	}
 	saveErr := h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
 	if saveErr != nil {
 		if errors.Is(saveErr, domain.ErrProviderTestRequired) {
-			errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderTestRequired), "启用前请先通过连接测试")
+			errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderTestRequired), msgSearchProviderTestRequired)
 			return
 		}
 		if strings.Contains(saveErr.Error(), "api key cannot be empty") {
-			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderAPIKeyInvalid), "API Key 不能为空")
+			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderAPIKeyInvalid), msgSearchProviderAPIKeyInvalid)
 			return
 		}
-		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商配置失败", saveErr)
+		response.InternalError(c, http.StatusInternalServerError, msgUpdate, saveErr)
 		return
 	}
 	response.Success(c, nil)
@@ -116,22 +116,22 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	if h == nil || h.repository == nil {
-		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), "搜索供应商配置不可用")
+		errorrender.Render(c, http.StatusServiceUnavailable, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable)
 		return
 	}
 	provider, ok := parseProvider(c.Param("provider"))
 	if !ok {
-		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), "搜索供应商不存在")
+		errorrender.Render(c, http.StatusNotFound, string(contract.CodeSearchProviderNotFound), msgSearchProviderNotFound)
 		return
 	}
 	adapter := h.adapters[provider]
 	if adapter == nil {
-		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), "搜索供应商测试不可用")
+		errorrender.Render(c, http.StatusInternalServerError, string(contract.CodeSearchProviderUnavailable), msgSearchProviderUnavailable2)
 		return
 	}
 	key, err := h.repository.RawAPIKey(c.Request.Context(), provider)
 	if err != nil {
-		errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderAPIKeyRequired), "请先保存 API Key")
+		errorrender.Render(c, http.StatusConflict, string(contract.CodeSearchProviderAPIKeyRequired), msgSearchProviderAPIKeyRequired)
 		return
 	}
 	category, message, testErr := adapter.Test(c.Request.Context(), key)
@@ -140,11 +140,11 @@ func (h *Handler) Test(c *gin.Context) {
 		state = domain.TestStateFailed
 	}
 	if err := h.repository.RecordTest(c.Request.Context(), provider, state, category, message, admin.UserID()); err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商测试状态失败", err)
+		response.InternalError(c, http.StatusInternalServerError, msgTest, err)
 		return
 	}
 	if testErr != nil {
-		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderTestFailed), "搜索供应商连接测试失败")
+		errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchProviderTestFailed), msgSearchProviderTestFailed)
 		return
 	}
 	response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})

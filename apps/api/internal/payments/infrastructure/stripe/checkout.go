@@ -39,17 +39,17 @@ func (a *Adapter) CreateCustomer(ctx context.Context, input paymentports.CreateC
 	customer, err := client.V1Customers.Create(ctx, params)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.CheckoutCustomer{}, mapStripeCreateError("创建 Stripe Customer", err)
+		return paymentports.CheckoutCustomer{}, mapStripeCreateError(msgCreateCustomer, err)
 	}
 	if customer == nil || strings.TrimSpace(customer.ID) == "" {
-		return paymentports.CheckoutCustomer{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Customer 响应无效", nil)
+		return paymentports.CheckoutCustomer{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCreateCustomer2, nil)
 	}
 	return paymentports.CheckoutCustomer{ID: customer.ID}, nil
 }
 
 func (a *Adapter) CreateCheckoutSession(ctx context.Context, input paymentports.CreateCheckoutSessionInput) (paymentports.CheckoutSession, error) {
 	if strings.TrimSpace(input.PaymentMethodConfigurationID) == "" {
-		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Payment Method Configuration 未配置", nil)
+		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCreateCheckoutSession, nil)
 	}
 	client, err := a.checkoutClient(input.APIKey)
 	if err != nil {
@@ -85,7 +85,7 @@ func (a *Adapter) CreateCheckoutSession(ctx context.Context, input paymentports.
 	session, err := client.V1CheckoutSessions.Create(ctx, params)
 	a.observe(err, startedAt)
 	if err != nil {
-		return paymentports.CheckoutSession{}, mapStripeCreateError("创建 Stripe Checkout Session", err)
+		return paymentports.CheckoutSession{}, mapStripeCreateError(msgCreateCheckoutSession2, err)
 	}
 	return checkoutSessionFact(session, true)
 }
@@ -97,7 +97,7 @@ func (a *Adapter) RetrieveCheckoutSession(ctx context.Context, input paymentport
 	}
 	session, err := a.retrieveCheckoutSession(ctx, client, input.SessionID)
 	if err != nil {
-		return paymentports.CheckoutSession{}, mapStripeError("读取 Stripe Checkout Session", err)
+		return paymentports.CheckoutSession{}, mapStripeError(msgRetrieveCheckoutSession, err)
 	}
 	return checkoutSessionFact(session, false)
 }
@@ -113,7 +113,7 @@ func (a *Adapter) ExpireCheckoutSession(ctx context.Context, input paymentports.
 	})
 	a.observe(err, expireStartedAt)
 	if err != nil {
-		expireErr := mapStripeError("关闭 Stripe Checkout Session", err)
+		expireErr := mapStripeError(msgExpireCheckoutSession, err)
 		// A payment can complete between the local decision and Stripe's Expire
 		// call. Resolve that provider race from a fresh canonical Session without
 		// allowing a secondary read failure to hide the original operation error.
@@ -164,11 +164,11 @@ func checkoutMetadata(input paymentports.CreateCheckoutSessionInput) map[string]
 
 func checkoutSessionFact(session *stripe.CheckoutSession, requireURL bool) (paymentports.CheckoutSession, error) {
 	if session == nil || strings.TrimSpace(session.ID) == "" || (requireURL && strings.TrimSpace(session.URL) == "") {
-		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
+		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCheckoutSessionFact, nil)
 	}
 	status, ok := checkoutSessionStatus(session.Status)
 	if !ok {
-		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 状态无效", nil)
+		return paymentports.CheckoutSession{}, paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgCheckoutSessionFact2, nil)
 	}
 
 	fact := paymentports.CheckoutSession{
@@ -245,7 +245,7 @@ func checkoutSessionBinding(session *stripe.CheckoutSession) (checkoutBinding, e
 }
 
 func invalidCheckoutBinding() error {
-	return paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 订单绑定无效", nil)
+	return paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgInvalidCheckoutBinding, nil)
 }
 
 func checkoutPaymentStatus(status stripe.CheckoutSessionPaymentStatus) paymentports.CheckoutPaymentStatus {
@@ -287,5 +287,5 @@ func checkoutSessionExpirationOutcome(session *stripe.CheckoutSession) (paymentp
 }
 
 func invalidCheckoutExpirationResponse() error {
-	return paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, "Stripe Checkout Session 关闭结果无效", nil)
+	return paymentports.NewGatewayError(paymentports.GatewayErrorInvalidResponse, msgInvalidCheckoutExpirationResponse, nil)
 }

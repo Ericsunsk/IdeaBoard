@@ -62,7 +62,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
-const busy = ref(false)
+const busy = ref(false) // Overlay dismiss guard (not `useAsyncAction`): read by the modal lifecycle.
 
 function goLogin() {
   busy.value = false

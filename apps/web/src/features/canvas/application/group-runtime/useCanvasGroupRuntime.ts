@@ -113,7 +113,11 @@ export function useCanvasGroupRuntime(
   options: UseCanvasGroupRuntimeOptions,
 ): CanvasGroupRuntimeControls {
   const selectedGroupId = ref<CanvasGraphGroupId | null>(null)
-  const previewGroupBounds = ref<ReadonlyMap<CanvasGraphGroupId, CanvasRect>>(new Map())
+  // Single-slot preview for the group currently being dragged/resized.
+  // Drag and resize are mutually exclusive (each begin() bails while the
+  // other is active), so one slot covers every pointermove path without
+  // cloning a whole Map per event.
+  const activeGroupPreview = ref<{ groupId: CanvasGraphGroupId; bounds: CanvasRect } | null>(null)
 
   function projectCurrentGroupNodeLayers(nodes: readonly Node[]) {
     return projectCanvasGroupNodeLayers(nodes, options.boardBaseSnapshot.value.groups) as Node[]
@@ -232,22 +236,33 @@ export function useCanvasGroupRuntime(
       groups: options.boardBaseSnapshot.value.groups,
       selectedGroupId: selectedGroupId.value,
     }).map((frame) => {
-      const previewBounds = previewGroupBounds.value.get(frame.id)
-      return previewBounds ? { ...frame, bounds: previewBounds } : frame
+      const preview = activeGroupPreview.value
+      return preview && preview.groupId === frame.id
+        ? { ...frame, bounds: preview.bounds }
+        : frame
     }),
   )
 
   function setPreviewGroupBounds(groupId: CanvasGraphGroupId, bounds: CanvasRect) {
-    const nextBounds = new Map(previewGroupBounds.value)
-    nextBounds.set(groupId, bounds)
-    previewGroupBounds.value = nextBounds
+    const preview = activeGroupPreview.value
+    if (
+      preview &&
+      preview.groupId === groupId &&
+      preview.bounds.left === bounds.left &&
+      preview.bounds.top === bounds.top &&
+      preview.bounds.right === bounds.right &&
+      preview.bounds.bottom === bounds.bottom &&
+      preview.bounds.width === bounds.width &&
+      preview.bounds.height === bounds.height
+    ) {
+      return
+    }
+    activeGroupPreview.value = { groupId, bounds }
   }
 
   function clearPreviewGroupBounds(groupId: CanvasGraphGroupId) {
-    if (!previewGroupBounds.value.has(groupId)) return
-    const nextBounds = new Map(previewGroupBounds.value)
-    nextBounds.delete(groupId)
-    previewGroupBounds.value = nextBounds
+    if (activeGroupPreview.value?.groupId !== groupId) return
+    activeGroupPreview.value = null
   }
 
   function readGroup(groupId: CanvasGraphGroupId | null): CanvasGroup | null {

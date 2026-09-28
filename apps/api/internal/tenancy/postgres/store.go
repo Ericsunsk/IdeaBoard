@@ -9,7 +9,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 
@@ -222,7 +221,7 @@ func (s *Store) CreateWorkspace(ctx context.Context, params tenancy.CreateWorksp
 		orgPublicID = &org.PublicID
 	}
 	if !orgInternal.Valid && params.OwnerUserID <= 0 {
-		return nil, errors.New("tenancy: workspace requires an organization or an owner")
+		return nil, tenancy.ErrWorkspaceOwnerRequired
 	}
 	var created dbsqlc.Workspace
 	for attempt := 0; attempt < mintAttempts; attempt++ {
@@ -297,7 +296,7 @@ func (s *Store) ArchiveWorkspace(ctx context.Context, publicID string) (*tenancy
 // (INSERT ... ON CONFLICT DO NOTHING) and all read back the same row.
 func (s *Store) EnsurePersonalWorkspace(ctx context.Context, userID int64) (*tenancy.Workspace, error) {
 	if userID <= 0 {
-		return nil, errors.New("tenancy: personal workspace requires a user")
+		return nil, tenancy.ErrPersonalWorkspaceUserRequired
 	}
 	for attempt := 0; attempt < mintAttempts; attempt++ {
 		publicID, err := tenancy.NewWorkspacePublicID()

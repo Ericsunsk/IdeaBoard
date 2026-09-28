@@ -56,7 +56,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	}
 	var request createRewardCodeRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	// Idempotency-Key header is the only create key (header-only; the
@@ -66,7 +66,7 @@ func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
 		idempotency.DefaultMetrics.Observe(idempotency.OutcomeMissing)
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	created, err := h.service.CreateRewardCode(c.Request.Context(), ports.CreateRewardCodeCommand{
@@ -97,7 +97,7 @@ func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 	}
 	var request updateRewardCodeRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	updated, err := h.service.UpdateRewardCode(c.Request.Context(), ports.UpdateRewardCodeCommand{
@@ -128,7 +128,7 @@ func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 	}
 	var request setRewardCodeEnabledRequest
 	if err := decodeRewardJSON(c, &request); err != nil || request.Enabled == nil {
-		writeRewardInputError(c, codeRewardInvalidInput, "参数错误")
+		writeRewardInputError(c, codeRewardInvalidInput, msgRewardInvalidInput)
 		return
 	}
 	updated, err := h.service.SetRewardCodeEnabled(c.Request.Context(), ports.SetRewardCodeEnabledCommand{
@@ -190,7 +190,7 @@ func requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
 	}
 	rewardCodeID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
 	if err != nil || rewardCodeID <= 0 {
-		writeRewardInputError(c, codeRewardCodeIDInvalid, "兑换码 ID 无效")
+		writeRewardInputError(c, codeRewardCodeIDInvalid, msgRewardCodeIDInvalid)
 		return 0, 0, false
 	}
 	return rewardCodeID, actorID, true

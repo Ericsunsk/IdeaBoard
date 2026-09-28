@@ -284,18 +284,35 @@ describe('RechargePane', () => {
         continuePendingOrder,
         abandonPendingOrder,
         listRecharges,
-        listPendingOrders: vi.fn().mockResolvedValue({
-          items: [
-            {
-              public_token: 'open-order',
-              idea_quantity: 1000,
-              status: 'checkout_open',
-              checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
-              expires_at: '2026-08-01T01:00:00Z',
-              updated_at: '2026-08-01T00:00:00Z',
-            },
-          ],
-        }),
+        // Server truth: the order stays listed until abandon, then leaves the
+        // pending list, so the post-action invalidation refetches resolve so.
+        listPendingOrders: vi
+          .fn()
+          .mockResolvedValueOnce({
+            items: [
+              {
+                public_token: 'open-order',
+                idea_quantity: 1000,
+                status: 'checkout_open',
+                checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+                expires_at: '2026-08-01T01:00:00Z',
+                updated_at: '2026-08-01T00:00:00Z',
+              },
+            ],
+          })
+          .mockResolvedValueOnce({
+            items: [
+              {
+                public_token: 'open-order',
+                idea_quantity: 1000,
+                status: 'checkout_open',
+                checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+                expires_at: '2026-08-01T01:00:00Z',
+                updated_at: '2026-08-01T00:00:00Z',
+              },
+            ],
+          })
+          .mockResolvedValue({ items: [] }),
       }),
     })
 
@@ -319,6 +336,43 @@ describe('RechargePane', () => {
     expect(screen.queryByRole('button', { name: '确认放弃' })).not.toBeInTheDocument()
     expect(await within(historyTable).findByText('Cancelled')).toBeVisible()
     expect(within(historyTable).getByText('Unpaid')).toBeVisible()
+  })
+
+  it('refetches the pending list after a pending-order action even with no cached entry', async () => {
+    // Guards the mutation/SSE parity: `pendingActionMutation.onSuccess` must
+    // invalidate the pending root like the SSE path does. Surgical
+    // `setQueryData` alone never refetches (and is a no-op when the list was
+    // never cached), so the list would go stale without this invalidation.
+    const abandonPendingOrder = vi.fn().mockResolvedValue({
+      public_token: 'open-order',
+      idea_quantity: 1000,
+      status: 'cancelled',
+      expires_at: '2026-08-01T01:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+    })
+    const listPendingOrders = vi.fn().mockResolvedValue({
+      items: [
+        {
+          public_token: 'open-order',
+          idea_quantity: 1000,
+          status: 'checkout_open',
+          checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+          expires_at: '2026-08-01T01:00:00Z',
+          updated_at: '2026-08-01T00:00:00Z',
+        },
+      ],
+    })
+    const listRecharges = vi.fn().mockResolvedValue({ items: [] })
+    const { user } = renderPane({
+      resource: makeResource({ abandonPendingOrder, listPendingOrders, listRecharges }),
+    })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
+    await user.click(within(pendingOrder).getByRole('button', { name: 'Abandon order' }))
+
+    await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledWith('ws_1', 'open-order'))
+    await waitFor(() => expect(listPendingOrders).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listRecharges).toHaveBeenCalledTimes(2))
   })
 
   it('renders waiting, delayed credit processing, and expired pending order states', async () => {

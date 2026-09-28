@@ -6,13 +6,12 @@ import (
 )
 
 func TestMapOutcomeConvergesToCheckConstraint(t *testing.T) {
-	cases := map[string]string{
-		"read":    "success",
-		"success": "success",
-		"denied":  "denied",
-		"failed":  "failure",
-		"failure": "failure",
-		"":        "success",
+	cases := map[Outcome]string{
+		OutcomeRead:    "success",
+		OutcomeSuccess: "success",
+		OutcomeDenied:  "denied",
+		OutcomeFailure: "failure",
+		"":             "success",
 	}
 	for in, want := range cases {
 		if got := MapOutcome(in); got != want {

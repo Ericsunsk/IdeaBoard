@@ -288,6 +288,7 @@ func TestContractInventorySkeletonContractsExist(t *testing.T) {
 //   - static bytes: upload_static_handler.go (/uploads/*).
 //   - cross-cutting middleware (body-limit, timeout, rate-limit, recovery):
 //     routes_middleware.go, security.go, rate_limit.go, observability.go.
+//
 // There are currently no 204 / presigned-redirect sites in v1; v1 deletes
 // return 200 {data:{deleted:...}} by contract (status semantics frozen,
 // envelope shape only).

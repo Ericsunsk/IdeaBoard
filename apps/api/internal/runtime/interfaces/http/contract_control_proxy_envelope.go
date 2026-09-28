@@ -77,7 +77,7 @@ func (w *controlProxyCaptureWriter) Write(data []byte) (int, error) {
 func (d *ContractControlDeps) controlProxyRaw(route controlRoute, capability string, available bool, method func(*gin.Context)) gin.HandlerFunc {
 	return d.guard(capability, route, func(c *gin.Context, _ controlContext) {
 		if !available {
-			contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, "控制面服务未实现")
+			contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, msgContractNotImplemented)
 			return
 		}
 		method(c)
@@ -98,7 +98,7 @@ func translateControlProxyResponse(c *gin.Context, method func(*gin.Context)) {
 	status := capture.status
 	raw := capture.body.Bytes()
 	if !capture.wroteHeader && len(raw) == 0 {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "控制面服务暂不可用")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable24)
 		return
 	}
 	if status == 0 {
@@ -254,18 +254,18 @@ func controlProxyNumericCode(status int) contract.Code {
 func controlProxyDefaultMessage(status int) string {
 	switch status {
 	case http.StatusBadRequest:
-		return "参数错误"
+		return msgBadRequest4
 	case http.StatusUnauthorized:
-		return "未登录"
+		return msgUnauthorized
 	case http.StatusForbidden:
-		return "权限不足"
+		return msgForbidden
 	case http.StatusNotFound:
-		return "控制面资源不存在"
+		return msgControlProxyDefaultMessage
 	case http.StatusConflict:
-		return "操作冲突，请稍后重试"
+		return msgControlProxyDefaultMessage2
 	case http.StatusTooManyRequests:
-		return "操作过于频繁，请稍后重试"
+		return msgRateLimited2
 	default:
-		return "控制面服务暂不可用"
+		return msgServiceUnavailable24
 	}
 }

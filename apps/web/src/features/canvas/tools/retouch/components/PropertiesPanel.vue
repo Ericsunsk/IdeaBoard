@@ -31,7 +31,7 @@
       <RetouchThresholdControl
         :params="effectLayer.params"
         :histogram-source="histogramSource"
-        @update:params="emit('update-params', $event)"
+        @update:params="emit('update:params', $event)"
       />
     </div>
 
@@ -39,7 +39,7 @@
       <RetouchCurvesControl
         :params="effectLayer.params"
         :histogram-source="histogramSource"
-        @update:params="emit('update-params', $event)"
+        @update:params="emit('update:params', $event)"
       />
     </div>
 
@@ -47,14 +47,14 @@
       <RetouchLevelsControl
         :params="effectLayer.params"
         :histogram-source="histogramSource"
-        @update:params="emit('update-params', $event)"
+        @update:params="emit('update:params', $event)"
       />
     </div>
 
     <div v-else-if="effectLayer?.kind === 'sharpen'" class="editing-controls-panel__body">
       <RetouchSharpenControl
         :params="effectLayer.params"
-        @update:params="emit('update-params', $event)"
+        @update:params="emit('update:params', $event)"
       />
     </div>
 
@@ -86,7 +86,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update-param', key: RetouchParamKey, value: RetouchParamValue): void
-  (e: 'update-params', value: RetouchEffectWholeParams): void
+  (e: 'update:params', value: RetouchEffectWholeParams): void
 }>()
 
 const { t } = useI18n()

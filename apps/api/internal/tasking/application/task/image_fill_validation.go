@@ -20,11 +20,11 @@ func validateImageFillDimensions(featureSlug string, params *tasks.WorkflowTaskP
 		return nil
 	}
 	if params == nil || params.Controls == nil {
-		return validation.New("图像填充需要提供正整数的原图宽高和目标宽高")
+		return validation.New(msgValidateImageFillDimensions)
 	}
 
 	originalWidth, originalHeight, err := validateImageFillSize(
-		"原图",
+		msgValidateImageFillDimensions2,
 		params.Controls.OriginalWidth,
 		params.Controls.OriginalHeight,
 	)
@@ -46,10 +46,10 @@ func isImageFillFeature(featureSlug string) bool {
 
 func validateOutpaintDimensions(outpaint *tasks.OutpaintParams, originalWidth, originalHeight int64) error {
 	if outpaint == nil {
-		return validation.New("扩图需要提供目标尺寸和原图偏移")
+		return validation.New(msgValidateOutpaintDimensions)
 	}
 	targetWidth, targetHeight, err := validateImageFillSize(
-		"目标图片",
+		msgValidateOutpaintDimensions2,
 		float64(outpaint.TargetWidth),
 		float64(outpaint.TargetHeight),
 	)
@@ -57,13 +57,13 @@ func validateOutpaintDimensions(outpaint *tasks.OutpaintParams, originalWidth, o
 		return err
 	}
 	if targetWidth < originalWidth || targetHeight < originalHeight {
-		return validation.New("扩图目标尺寸不能小于原图尺寸")
+		return validation.New(msgValidateOutpaintDimensions3)
 	}
 	if !isValidOutpaintOffset(outpaint, targetWidth, targetHeight, originalWidth, originalHeight) {
-		return validation.New("扩图偏移不能让原图超出目标画布")
+		return validation.New(msgValidateOutpaintDimensions4)
 	}
 	if targetWidth == originalWidth && targetHeight == originalHeight {
-		return validation.New("扩图目标尺寸必须至少扩展一个方向")
+		return validation.New(msgValidateOutpaintDimensions5)
 	}
 	return nil
 }
@@ -78,7 +78,7 @@ func isValidOutpaintOffset(outpaint *tasks.OutpaintParams, targetWidth, targetHe
 
 func validateInpaintDimensions(controls *tasks.GenerationControls, originalWidth, originalHeight int64) error {
 	targetWidth, targetHeight, err := validateImageFillSize(
-		"目标图片",
+		msgValidateOutpaintDimensions2,
 		controls.CustomWidth,
 		controls.CustomHeight,
 	)
@@ -86,17 +86,17 @@ func validateInpaintDimensions(controls *tasks.GenerationControls, originalWidth
 		return err
 	}
 	if targetWidth != originalWidth || targetHeight != originalHeight {
-		return validation.New("局部重绘的目标尺寸必须与原图尺寸一致")
+		return validation.New(msgValidateInpaintDimensions)
 	}
 	return nil
 }
 
 func validateImageFillSize(label string, widthValue, heightValue float64) (int64, int64, error) {
 	if !isPositiveInteger(widthValue) || !isPositiveInteger(heightValue) {
-		return 0, 0, validation.New(fmt.Sprintf("%s宽高必须是正整数", label))
+		return 0, 0, validation.New(fmt.Sprintf(msgValidateImageFillSize, label))
 	}
 	if widthValue > float64(imageFillMaxEdgePixels) || heightValue > float64(imageFillMaxEdgePixels) {
-		return 0, 0, validation.New(fmt.Sprintf("%s超过图像填充服务的 4096 边长或约 4MP 限制", label))
+		return 0, 0, validation.New(fmt.Sprintf(msgValidateImageFillSize2, label))
 	}
 
 	width := int64(widthValue)
@@ -104,7 +104,7 @@ func validateImageFillSize(label string, widthValue, heightValue float64) (int64
 	alignedWidth := alignImageFillDimension(width)
 	alignedHeight := alignImageFillDimension(height)
 	if alignedWidth > imageFillMaxEdgePixels || alignedHeight > imageFillMaxEdgePixels || alignedWidth*alignedHeight > imageFillMaxPixels {
-		return 0, 0, validation.New(fmt.Sprintf("%s超过图像填充服务的 4096 边长或约 4MP 限制", label))
+		return 0, 0, validation.New(fmt.Sprintf(msgValidateImageFillSize2, label))
 	}
 	return width, height, nil
 }

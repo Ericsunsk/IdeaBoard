@@ -4,6 +4,10 @@ import { computed, nextTick, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import { useRetouchMode } from '../retouch/useRetouchMode'
 import { INPAINT_DEFAULT_BRUSH_SIZE, INPAINT_MAX_BRUSH_SIZE } from './config/constants'
+import {
+  INPAINT_MAX_PENDING_STROKES_PER_NODE,
+  INPAINT_MAX_POINTS_PER_STROKE,
+} from './config/constants'
 import type {
   MaskPainter,
   MaskPainterClientPoint,
@@ -203,6 +207,65 @@ function pointerDown(init: PointerEventInit = {}) {
     pointerType: 'mouse',
     ...init,
   })
+}
+
+/**
+ * Canvas with a working 2d double for the committed-preview pixel path:
+ * the overlay reads the target context and `drawMaskRasterPreviewToCanvas`
+ * allocates scratch canvases through `document.createElement`.
+ */
+function createPixelCanvas(width: number, height: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = {
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+    getImageData: vi.fn(
+      () =>
+        ({
+          width,
+          height,
+          data: new Uint8ClampedArray(width * height * 4),
+        }) as unknown as ImageData,
+    ),
+    createImageData: vi.fn(
+      (w: number, h: number) =>
+        ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }) as unknown as ImageData,
+    ),
+    putImageData: vi.fn(),
+  }
+  vi.spyOn(canvas, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D)
+  return { canvas, context }
+}
+
+/**
+ * Scratch canvases from `drawMaskRasterPreviewToCanvas` get an opaque
+ * bitmap so the tinted preview reaches the target `putImageData`.
+ */
+function stubCanvasElementCreation() {
+  const realCreateElement = document.createElement.bind(document)
+  const spy = vi.spyOn(document, 'createElement')
+  spy.mockImplementation(
+    ((tagName: string) => {
+      if (tagName.toLowerCase() !== 'canvas') return realCreateElement(tagName)
+      const temp = realCreateElement('canvas') as HTMLCanvasElement
+      const tempContext = {
+        clearRect: vi.fn(),
+        drawImage: vi.fn(),
+        getImageData: vi.fn(() => {
+          const data = new Uint8ClampedArray(temp.width * temp.height * 4)
+          for (let index = 3; index < data.length; index += 4) data[index] = 255
+          return { width: temp.width, height: temp.height, data }
+        }),
+      }
+      vi.spyOn(temp, 'getContext').mockReturnValue(
+        tempContext as unknown as CanvasRenderingContext2D,
+      )
+      return temp
+    }) as unknown as typeof document.createElement,
+  )
+  return spy
 }
 
 describe('useImageInpaintOverlay', () => {
@@ -464,5 +527,272 @@ describe('useImageInpaintOverlay', () => {
     overlay.onCanvasPointerDown(pointerDown())
     window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
     expect(painters.at(-1)?.setBrushSizeCalls.at(-1)).toBe(INPAINT_MAX_BRUSH_SIZE)
+  })
+
+  it('caps buffered strokes while the painter loads, keeping the newest', async () => {
+    const { editorMode, overlay, painters, createMaskPainter } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    let resolvePainter!: (painter: FakeMaskPainter) => void
+    createMaskPainter.mockImplementationOnce(
+      () =>
+        new Promise<FakeMaskPainter>((resolve) => {
+          resolvePainter = resolve
+        }),
+    )
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.setMaskCanvasRef('node-1', canvas)
+    await Promise.resolve()
+    await nextTick()
+
+    const total = INPAINT_MAX_PENDING_STROKES_PER_NODE + 4
+    for (let index = 0; index < total; index += 1) {
+      overlay.onCanvasPointerDown(pointerDown({ clientX: 60 + index * 10 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+    }
+
+    const latePainter = new FakeMaskPainter()
+    painters.push(latePainter)
+    resolvePainter(latePainter)
+    await Promise.resolve()
+    await nextTick()
+
+    // Unbounded buffering would flush every drag; the cap keeps the newest.
+    expect(latePainter.strokes).toHaveLength(INPAINT_MAX_PENDING_STROKES_PER_NODE)
+    expect(latePainter.strokes[0]?.points?.[0]).toEqual({ x: 60 + 4 * 10, y: 45 })
+  })
+
+  it('decimates sub-threshold jitter from the buffer and the live preview', async () => {
+    const { editorMode, overlay, painters } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    await mountPainter(overlay, canvas)
+    overlay.onCanvasPointerDown(pointerDown())
+    // Jitter under the 2px floor is dropped; the far sample is kept.
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 60.5, clientY: 45.2, pointerId: 1 }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 61, clientY: 45, pointerId: 1 }),
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', { clientX: 70, clientY: 50, pointerId: 1 }),
+    )
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    const painter = painters.at(-1)
+    expect(painter?.appendedBatches).toEqual([[{ x: 60, y: 45 }], [{ x: 70, y: 50 }]])
+    expect(painter?.endCalls).toBe(1)
+  })
+
+  it('caps buffered points per drag instead of growing without bound', async () => {
+    const { editorMode, overlay, painters, createMaskPainter } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    let resolvePainter!: (painter: FakeMaskPainter) => void
+    createMaskPainter.mockImplementationOnce(
+      () =>
+        new Promise<FakeMaskPainter>((resolve) => {
+          resolvePainter = resolve
+        }),
+    )
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.setMaskCanvasRef('node-1', canvas)
+    await Promise.resolve()
+    await nextTick()
+
+    // The painter is still loading: the drag only buffers, no live session.
+    overlay.onCanvasPointerDown(pointerDown())
+    for (let index = 1; index <= 2500; index += 1) {
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: 60 + index * 5,
+          clientY: 45,
+          pointerId: 1,
+          pointerType: 'mouse',
+        }),
+      )
+    }
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    const latePainter = new FakeMaskPainter()
+    painters.push(latePainter)
+    resolvePainter(latePainter)
+    await Promise.resolve()
+    await nextTick()
+
+    expect(latePainter.strokes).toHaveLength(1)
+    const buffered = latePainter.strokes[0]?.points ?? []
+    expect(buffered.length).toBeLessThanOrEqual(INPAINT_MAX_POINTS_PER_STROKE)
+    // Thinning preserves the shape instead of truncating the tail.
+    expect(buffered.length).toBeGreaterThan(1000)
+    expect(buffered.at(-1)).toEqual({ x: 60 + 2500 * 5, y: 45 })
+  })
+
+  it('disposes a stale painter creation when the element is reused', async () => {
+    const { editorMode, overlay, painters, createMaskPainter } = createHarness()
+    const canvas = createMaskCanvas()
+    canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    const deferred: Array<{ painter: FakeMaskPainter; resolve: (p: FakeMaskPainter) => void }> =
+      []
+    createMaskPainter.mockImplementation(
+      () =>
+        new Promise<FakeMaskPainter>((resolve) => {
+          const painter = new FakeMaskPainter()
+          painters.push(painter)
+          deferred.push({ painter, resolve })
+        }),
+    )
+
+    overlay.setMaskCanvasRef('node-1', canvas)
+    overlay.setMaskCanvasRef('node-1', null)
+    overlay.setMaskCanvasRef('node-1', canvas)
+    expect(deferred).toHaveLength(2)
+    const staleCreation = deferred[0]
+    const currentCreation = deferred[1]
+    expect(staleCreation).toBeDefined()
+    expect(currentCreation).toBeDefined()
+    if (!staleCreation || !currentCreation) return
+
+    // The stale creation resolves last: it must be disposed, never attached.
+    currentCreation.resolve(currentCreation.painter)
+    staleCreation.resolve(staleCreation.painter)
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+
+    const stale = staleCreation.painter
+    const current = currentCreation.painter
+    expect(stale.disposed).toBe(true)
+    expect(current.disposed).toBe(false)
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+
+    expect(current?.liveBegins).toHaveLength(1)
+    expect(stale.liveBegins).toHaveLength(0)
+  })
+
+  it('drops a stale committed preview when the data is cleared mid-load', async () => {
+    const { editorMode, overlay, createMaskPainter } = createHarness()
+    const target = createPixelCanvas(200, 100)
+    target.canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.setMaskCanvasRef('node-1', target.canvas)
+    await Promise.resolve()
+    await nextTick()
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+    expect(overlay.commitMaskDraft()).toBe(true)
+
+    // Remount with a still-loading painter, then re-enter so the committed
+    // preview starts as a pixel load (no painter to baseline through).
+    overlay.setMaskCanvasRef('node-1', null)
+    createMaskPainter.mockImplementationOnce(() => new Promise<FakeMaskPainter>(() => {}))
+    overlay.setMaskCanvasRef('node-1', target.canvas)
+    await Promise.resolve()
+    await nextTick()
+
+    const images: Array<{ src: string; onload: (() => void) | null }> = []
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = ''
+        onload: (() => void) | null = null
+        constructor() {
+          images.push(this)
+        }
+      },
+    )
+    const createElementSpy = stubCanvasElementCreation()
+    try {
+      editorMode.exitRetouchMode()
+      // Flush the null transition first: a synchronous exit+enter in one
+      // tick collapses the watcher (old and new are both 'node-1'), so the
+      // re-enter draw would never start.
+      await nextTick()
+      expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+      await nextTick()
+
+      const image = images.at(-1)
+      expect(image?.src).toBe('data:image/png;fake-preview')
+
+      // The bitmap resolves after the discard: the draw must not happen.
+      // The replacement painter stays loading so only the generation guard
+      // can stop the stale load.
+      createMaskPainter.mockImplementationOnce(() => new Promise<FakeMaskPainter>(() => {}))
+      overlay.clearCommittedMaskData('node-1')
+      target.context.putImageData.mockClear()
+      image?.onload?.()
+
+      expect(target.context.putImageData).not.toHaveBeenCalled()
+    } finally {
+      createElementSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('draws a fresh committed preview when nothing invalidates the load', async () => {
+    const { editorMode, overlay, createMaskPainter } = createHarness()
+    const target = createPixelCanvas(200, 100)
+    target.canvas.getBoundingClientRect = () =>
+      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+
+    expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+    overlay.setMaskCanvasRef('node-1', target.canvas)
+    await Promise.resolve()
+    await nextTick()
+    overlay.onCanvasPointerDown(pointerDown())
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' }))
+    expect(overlay.commitMaskDraft()).toBe(true)
+
+    overlay.setMaskCanvasRef('node-1', null)
+    createMaskPainter.mockImplementationOnce(() => new Promise<FakeMaskPainter>(() => {}))
+    overlay.setMaskCanvasRef('node-1', target.canvas)
+    await Promise.resolve()
+    await nextTick()
+
+    const images: Array<{ src: string; onload: (() => void) | null }> = []
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = ''
+        onload: (() => void) | null = null
+        constructor() {
+          images.push(this)
+        }
+      },
+    )
+    const createElementSpy = stubCanvasElementCreation()
+    try {
+      editorMode.exitRetouchMode()
+      // Flush the null transition first (see the stale-load spec above).
+      await nextTick()
+      expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
+      await nextTick()
+
+      const image = images.at(-1)
+      expect(image?.src).toBe('data:image/png;fake-preview')
+      image?.onload?.()
+
+      expect(target.context.putImageData).toHaveBeenCalled()
+    } finally {
+      createElementSpy.mockRestore()
+      vi.unstubAllGlobals()
+    }
   })
 })

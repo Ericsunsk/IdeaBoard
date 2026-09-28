@@ -163,7 +163,7 @@ func resolveControlPlaneIdentity(gateway ResolvedGateway) (accountID, gatewayID 
 		accountID, gatewayID = extractGatewayIdentity(gateway.BaseURL)
 	}
 	if accountID == "" || gatewayID == "" || strings.TrimSpace(gateway.Token) == "" {
-		return "", "", errors.New("网关缺少 Account/Gateway 身份，请先在网关设置中补全后再探测")
+		return "", "", errors.New(msgResolveControlPlaneIdentity)
 	}
 	return accountID, gatewayID, nil
 }
@@ -185,7 +185,7 @@ const (
 func fetchHTTPBody(ctx context.Context, rawURL string, headers map[string]string, timeout time.Duration, maxBytes int64, target string, maxAttempts int) (body []byte, statusCode int, err error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Hostname() == "" {
-		return nil, 0, fmt.Errorf("请求地址无效")
+		return nil, 0, fmt.Errorf(msgFetchHTTPBody)
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -272,12 +272,12 @@ func (r *ConfigRepository) DetectModels(ctx context.Context, providerFilter stri
 	filter := strings.ToLower(strings.TrimSpace(providerFilter))
 	configuredSlugs, err := cachedConfiguredSlugs(ctx, resolved)
 	if err != nil {
-		return ModelDetection{}, fmt.Errorf("读取网关已配置 Provider 失败: %w", err)
+		return ModelDetection{}, fmt.Errorf(msgDetectModels, err)
 	}
-	if filter != "" && filter != "all" && filter != "全部" {
+	if filter != "" && filter != "all" && filter != msgDetectModels2 {
 		spec, known := workflow.ResolveProvider(filter)
 		if !known {
-			return ModelDetection{}, fmt.Errorf("未知 Provider %q", strings.TrimSpace(providerFilter))
+			return ModelDetection{}, fmt.Errorf(msgDetectModels3, strings.TrimSpace(providerFilter))
 		}
 		configured := false
 		for _, configuredSlug := range configuredSlugs {
@@ -337,7 +337,7 @@ func workersAIAvailable(ctx context.Context, gateway ResolvedGateway) (bool, err
 	probeURL := strings.TrimRight(strings.TrimSpace(gateway.BaseURL), "/") + "/workers-ai/models/search"
 	parsed, err := url.Parse(probeURL)
 	if err != nil || parsed.Hostname() == "" {
-		return false, fmt.Errorf("网关地址无效")
+		return false, fmt.Errorf(msgWorkersAIAvailable)
 	}
 
 	headers := map[string]string{}
@@ -424,20 +424,20 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 		"User-Agent": "Mozilla/5.0 (compatible; IdeaBoard/1.0)",
 	}, 15*time.Second, 8<<20, detectCatalogTarget, 0)
 	if err != nil {
-		return nil, fmt.Errorf("获取社区模型目录失败: %w", err)
+		return nil, fmt.Errorf(msgFetchCommunityCatalog, err)
 	}
 
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("社区模型目录返回 %d", statusCode)
+		return nil, fmt.Errorf(msgFetchCommunityCatalog2, statusCode)
 	}
 
 	if len(bodyBytes) == 0 {
-		return nil, fmt.Errorf("社区模型目录内容为空")
+		return nil, fmt.Errorf(msgFetchCommunityCatalog3)
 	}
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
-		return nil, fmt.Errorf("社区模型目录格式变化，解析失败")
+		return nil, fmt.Errorf(msgFetchCommunityCatalog4)
 	}
 
 	now := time.Now()
@@ -466,7 +466,7 @@ func fetchCommunityCatalog(ctx context.Context) ([]communityRecord, error) {
 	}
 
 	if len(entries) == 0 {
-		return nil, fmt.Errorf("社区模型目录无有效条目")
+		return nil, fmt.Errorf(msgFetchCommunityCatalog5)
 	}
 
 	communityCache.Lock()
@@ -632,10 +632,10 @@ func modelsDevCapabilities(fact modelsDevFact) []string {
 // modelsDevModalityLabels renders common modality tokens for the admin UI;
 // unknown tokens pass through verbatim so feed additions stay visible.
 var modelsDevModalityLabels = map[string]string{
-	"text":  "文本",
-	"image": "图像",
-	"audio": "音频",
-	"video": "视频",
+	"text":  msgModelsDevCapabilities,
+	"image": msgModelsDevCapabilities2,
+	"audio": msgModelsDevCapabilities3,
+	"video": msgModelsDevCapabilities4,
 }
 
 // describeModelsDevFact renders a short auto-generated placeholder from
@@ -649,7 +649,7 @@ func describeModelsDevFact(fact modelsDevFact) string {
 		parts = append(parts, summary)
 	}
 	if knowledge := strings.TrimSpace(fact.knowledge); knowledge != "" {
-		parts = append(parts, "知识截止 "+knowledge)
+		parts = append(parts, msgDescribeModelsDevFact+knowledge)
 	}
 	return strings.Join(parts, "；")
 }
@@ -665,10 +665,10 @@ func summarizeModelsDevModalities(modalities *ModelReferenceModalities) string {
 	}
 	var parts []string
 	if labels := labelModalities(modalities.Input); len(labels) > 0 {
-		parts = append(parts, "输入："+strings.Join(labels, "、"))
+		parts = append(parts, msgSummarizeModelsDevModalities+strings.Join(labels, "、"))
 	}
 	if labels := labelModalities(modalities.Output); len(labels) > 0 {
-		parts = append(parts, "输出："+strings.Join(labels, "、"))
+		parts = append(parts, msgSummarizeModelsDevModalities2+strings.Join(labels, "、"))
 	}
 	return strings.Join(parts, "；")
 }

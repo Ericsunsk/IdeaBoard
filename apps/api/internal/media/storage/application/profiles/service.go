@@ -76,7 +76,7 @@ func (s *Service) SaveAndApplyProfile(ctx context.Context, profile *domain.Stora
 
 func (s *Service) saveProfile(ctx context.Context, profile *domain.StorageProfile, apply bool) (*domain.StorageProfile, error) {
 	if profile == nil {
-		return nil, fmt.Errorf("存储配置不能为空")
+		return nil, fmt.Errorf(msgSaveProfile)
 	}
 
 	profiles, err := s.LoadProfilesWithSecrets(ctx)
@@ -103,7 +103,7 @@ func (s *Service) saveProfile(ctx context.Context, profile *domain.StorageProfil
 func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, profile *domain.StorageProfile) (int, *domain.StorageProfile, error) {
 	meta, ok := s.meta[profile.Provider]
 	if !ok {
-		return -1, nil, fmt.Errorf("不支持的存储类型")
+		return -1, nil, fmt.Errorf(msgResolveProfileSaveTarget)
 	}
 
 	for i := range profiles {
@@ -111,7 +111,7 @@ func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, pro
 			continue
 		}
 		if profiles[i].Provider != profile.Provider {
-			return -1, nil, fmt.Errorf("不允许修改存储类型")
+			return -1, nil, fmt.Errorf(msgResolveProfileSaveTarget2)
 		}
 		return i, &profiles[i], nil
 	}
@@ -120,7 +120,7 @@ func (s *Service) resolveProfileSaveTarget(profiles []domain.StorageProfile, pro
 		profile.ID = fmt.Sprintf("%s-%d", profile.Provider, time.Now().UnixNano())
 	}
 	if profile.Provider == domain.StorageProviderLocal && !meta.CreateAllowed {
-		return -1, nil, fmt.Errorf("本地存储不支持新增额外卡片")
+		return -1, nil, fmt.Errorf(msgResolveProfileSaveTarget3)
 	}
 	return -1, &domain.StorageProfile{ID: profile.ID, Provider: profile.Provider}, nil
 }
@@ -135,7 +135,7 @@ func (s *Service) prepareProfileSave(ctx context.Context, existing, incoming dom
 		return domain.StorageProfile{}, false, err
 	}
 	if next.IsCurrent && !next.Enabled {
-		return domain.StorageProfile{}, false, fmt.Errorf("当前存储不允许停用")
+		return domain.StorageProfile{}, false, fmt.Errorf(msgPrepareProfileSave)
 	}
 	if apply {
 		if err := s.EnsureProfileReadyForRuntime(ctx, next); err != nil {
@@ -167,10 +167,10 @@ func (s *Service) DeleteProfile(ctx context.Context, id string) error {
 			continue
 		}
 		if profile.Builtin {
-			return fmt.Errorf("内置存储不允许删除")
+			return fmt.Errorf(msgDeleteProfile)
 		}
 		if profile.IsCurrent {
-			return fmt.Errorf("当前存储不允许删除")
+			return fmt.Errorf(msgDeleteProfile2)
 		}
 		return s.repo.DeleteProfile(ctx, id)
 	}
@@ -238,7 +238,7 @@ func (s *Service) EnsureProfileReadyForRuntime(ctx context.Context, profile doma
 		return err
 	}
 	if !driver.IsProfileReady(profile) {
-		return fmt.Errorf("存储未启用或未配置完整")
+		return fmt.Errorf(msgEnsureProfileReadyForRuntime)
 	}
 	return driver.TestProfile(ctx, &profile)
 }
@@ -270,7 +270,7 @@ func (s *Service) ResolveActiveProfile(ctx context.Context) (*domain.StorageProf
 	if len(profiles) > 0 {
 		return &profiles[0], nil
 	}
-	return nil, fmt.Errorf("未找到可用存储配置")
+	return nil, fmt.Errorf(msgResolveActiveProfile)
 }
 
 func (s *Service) loadProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
@@ -330,7 +330,7 @@ func (s *Service) EnsureDefaultProfiles(ctx context.Context) error {
 func (s *Service) DefaultLocalStorageProfile(isCurrent bool) domain.StorageProfile {
 	return domain.StorageProfile{
 		ID:        builtinLocalProfileID,
-		Name:      "本地存储",
+		Name:      msgDefaultProviderMeta,
 		Provider:  domain.StorageProviderLocal,
 		Enabled:   true,
 		IsCurrent: isCurrent,
@@ -359,11 +359,11 @@ func (s *Service) normalizeProfile(existing domain.StorageProfile, incoming doma
 	if next.Name == "" {
 		switch next.Provider {
 		case domain.StorageProviderLocal:
-			next.Name = "本地存储"
+			next.Name = msgDefaultProviderMeta
 		case domain.StorageProviderS3Compatible:
-			next.Name = "S3 兼容存储"
+			next.Name = msgDefaultProviderMeta3
 		default:
-			next.Name = "存储"
+			next.Name = msgNormalizeProfile
 		}
 	}
 	next.Enabled = incoming.Enabled
@@ -404,10 +404,10 @@ func (s *Service) normalizeProfile(existing domain.StorageProfile, incoming doma
 
 func (s *Service) validateProfile(profile domain.StorageProfile) error {
 	if strings.TrimSpace(profile.Name) == "" {
-		return fmt.Errorf("存储名称不能为空")
+		return fmt.Errorf(msgValidateProfile)
 	}
 	if _, ok := s.meta[profile.Provider]; !ok {
-		return fmt.Errorf("不支持的存储类型")
+		return fmt.Errorf(msgResolveProfileSaveTarget)
 	}
 	return nil
 }

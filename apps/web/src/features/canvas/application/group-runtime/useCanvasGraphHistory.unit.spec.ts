@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../board'
 import { CanvasGraphSession } from '../../domain/graph'
 import { useCanvasGraphHistory } from './useCanvasGraphHistory'
 
-function createHarness() {
+function createHarness(
+  harnessOptions: {
+    now?: () => number
+    isAttached?: () => boolean
+    getBoardId?: () => string | null | undefined
+  } = {},
+) {
   const snapshot = createEmptyBoardSnapshot()
   snapshot.promptNodes = [
     {
@@ -20,6 +26,9 @@ function createHarness() {
   ]
   const session = CanvasGraphSession.hydrate('board-1', snapshot)
   const history = useCanvasGraphHistory({
+    ...(harnessOptions.now ? { now: harnessOptions.now } : {}),
+    ...(harnessOptions.isAttached ? { isAttached: harnessOptions.isAttached } : {}),
+    ...(harnessOptions.getBoardId ? { getBoardId: harnessOptions.getBoardId } : {}),
     applyPatch: (patch, direction) =>
       session.applyCommitPatch(patch, direction, { recordHistory: false, markDirty: true })
         .didChange,
@@ -86,5 +95,103 @@ describe('useCanvasGraphHistory', () => {
     history.redo()
 
     expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('materialized')
+  })
+
+  it('coalesces per-keystroke text edits into a single history entry', () => {
+    let now = 1_000
+    const { session, history } = createHarness({ now: () => now })
+    const store = session.store
+    store.beginTransaction('node-update').updateNode('prompt-1', { x: 240 }).commit()
+
+    // Twelve keystrokes would evict the structural entry above under
+    // maxSteps: 10 without coalescing.
+    let text = 'before'
+    for (const char of ' typed text!') {
+      text += char
+      now += 100
+      store.beginTransaction('node-update').updateNode('prompt-1', { text }).commit()
+    }
+
+    history.undo()
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('before')
+
+    // The structural entry survived: a second undo restores the position.
+    history.undo()
+    expect(store.getNode('prompt-1')?.snapshot.x).toBe(40)
+  })
+
+  it('starts a new entry when text edits leave the coalescing window', () => {
+    let now = 1_000
+    const { session, history } = createHarness({ now: () => now })
+    const store = session.store
+    store.beginTransaction('node-update').updateNode('prompt-1', { text: 'before-a' }).commit()
+    now += 10_000
+    store.beginTransaction('node-update').updateNode('prompt-1', { text: 'before-a-b' }).commit()
+
+    history.undo()
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('before-a')
+    history.undo()
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('before')
+  })
+
+  it('does not coalesce text edits across structural commits', () => {
+    let now = 1_000
+    const { session, history } = createHarness({ now: () => now })
+    const store = session.store
+    store.beginTransaction('node-update').updateNode('prompt-1', { text: 'before-a' }).commit()
+    now += 100
+    store.beginTransaction('node-update').updateNode('prompt-1', { x: 240 }).commit()
+    now += 100
+    store.beginTransaction('node-update').updateNode('prompt-1', { text: 'before-a-b' }).commit()
+
+    history.undo()
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('before-a')
+    history.undo()
+    expect(store.getNode('prompt-1')?.snapshot.x).toBe(40)
+    history.undo()
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('before')
+  })
+
+  it('ignores undo/redo while detached and never applies a cross-board patch', () => {
+    let attached = true
+    let boardId: string | null = 'board-1'
+    const applyPatch = vi.fn(() => true)
+    const snapshot = createEmptyBoardSnapshot()
+    snapshot.promptNodes = [
+      {
+        id: 1,
+        type: 'prompt',
+        x: 40,
+        y: 40,
+        width: 280,
+        text: 'before',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ]
+    const boardSession = CanvasGraphSession.hydrate('board-1', snapshot)
+    const boardHistory = useCanvasGraphHistory({
+      isAttached: () => attached,
+      getBoardId: () => boardId,
+      applyPatch,
+    })
+    boardSession.subscribe((event) => {
+      if (event.sideEffects.recordHistory) boardHistory.record(event.patch)
+    })
+    boardSession.store
+      .beginTransaction('node-update')
+      .updateNode('prompt-1', { text: 'board-1 edit' })
+      .commit()
+
+    // Mid-switch: the session is disposed and the board id already moved on.
+    // The production readCanvasGraphStore throws here; the guard must bail
+    // before the applier is ever reached.
+    attached = false
+    boardId = 'board-2'
+
+    expect(() => boardHistory.undo()).not.toThrow()
+    expect(() => boardHistory.redo()).not.toThrow()
+    expect(applyPatch).not.toHaveBeenCalled()
   })
 })

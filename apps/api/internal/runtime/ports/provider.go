@@ -67,7 +67,7 @@ type UpstreamHTTPError struct {
 }
 
 func (e *UpstreamHTTPError) Error() string {
-	return fmt.Sprintf("API 返回 %d: %s", e.StatusCode, e.Body)
+	return fmt.Sprintf(msgError, e.StatusCode, e.Body)
 }
 
 func (e *UpstreamHTTPError) HTTPStatus() int {

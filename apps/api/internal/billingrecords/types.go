@@ -13,6 +13,22 @@ const (
 
 var ErrUnsafeNumber = errors.New("billing record value exceeds JavaScript safe integer range")
 
+// Service error sentinels. Application/domain errors originate here as
+// typed sentinels; fmt.Errorf is only a %w wrapper, never an origin.
+// The v1 billing-records edge (contract_v1_billing.go
+// renderV1BillingRecordsError) maps invalid input to 400 bad_request
+// (ErrInvalidListInput, ErrInvalidPageLimit); every other List failure
+// stays 503 service_unavailable.
+var (
+	ErrRepositoryNotConfigured = errors.New("billing records service: repository not configured")
+	ErrInvalidListInput        = errors.New("billing records service: invalid list input")
+	ErrInvalidPageLimit        = errors.New("billing records service: invalid page limit")
+	ErrMissingSnapshotName     = errors.New("AI usage is missing its immutable Task Billing Snapshot name")
+	ErrUndisplayableCorrection = errors.New("correction does not reference a displayable adjustment")
+	ErrUnsupportedCommandType  = errors.New("billing records service: unsupported command type")
+	ErrPoolNotConfigured       = errors.New("billing records repository: database pool not configured")
+)
+
 type Kind string
 
 const (

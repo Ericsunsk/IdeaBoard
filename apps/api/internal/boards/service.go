@@ -635,7 +635,7 @@ func generateBoardShareToken(ctx context.Context, repo *Repository) (string, err
 	for i := 0; i < 64; i++ {
 		buf := make([]byte, 24)
 		if _, err := rand.Read(buf); err != nil {
-			return "", fmt.Errorf("生成分享令牌失败: %w", err)
+			return "", fmt.Errorf(msgGenerateBoardShareToken, err)
 		}
 		token := base64.RawURLEncoding.EncodeToString(buf)
 		exists, err := repo.ShareTokenHashExists(ctx, boardShareTokenHash(token))
@@ -646,7 +646,7 @@ func generateBoardShareToken(ctx context.Context, repo *Repository) (string, err
 			return token, nil
 		}
 	}
-	return "", fmt.Errorf("生成分享令牌失败")
+	return "", fmt.Errorf(msgGenerateBoardShareToken2)
 }
 
 func boardShareTokenHash(token string) string {

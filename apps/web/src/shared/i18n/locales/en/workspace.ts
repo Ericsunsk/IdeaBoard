@@ -44,6 +44,7 @@ export default {
     deleteFailed: 'Could not delete the canvas',
   },
   boards: {
+    title: 'Welcome to IdeaBoard!',
     subtitle: 'Explore, expand, and refine your ideas',
     newCanvas: 'New Canvas',
     searchPlaceholder: 'Search canvases...',

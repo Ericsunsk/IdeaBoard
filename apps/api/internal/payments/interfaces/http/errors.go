@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
-	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
@@ -39,7 +38,7 @@ func (m paymentErrorMapping) render(c *gin.Context, err error) {
 	msg := m.message
 	if msg == "" {
 		slog.Error("payment error mapping missing safe message", "code", m.code, "status", m.status, "err", err)
-		msg = "请求处理失败，请稍后重试"
+		msg = msgRender
 	}
 	errorrender.Render(c, m.status, m.code, msg)
 }
@@ -52,120 +51,10 @@ func renderMappedPaymentError(c *gin.Context, err error, table []paymentErrorMap
 	errorrender.RenderNumeric(c, defaultStatus, defaultMessage)
 }
 
-var stripeConfigurationErrorTable = []paymentErrorMapping{
-	{
-		targets: []error{
-			paymentcontracts.ErrStripeAPIKeyRequired, paymentcontracts.ErrInvalidStripeAPIKey,
-			paymentcontracts.ErrInvalidPaymentMethodConfiguration, paymentcontracts.ErrInvalidProductTaxCode,
-			paymentcontracts.ErrInvalidWebhookURL,
-		},
-		status:  http.StatusBadRequest,
-		code:    string(contract.CodeStripeConfigurationInvalidInput),
-		message: "Stripe 配置参数错误",
-	},
-	{
-		targets: []error{paymentcontracts.ErrStripePermissionDenied},
-		status:  http.StatusForbidden,
-		code:    string(contract.CodeStripePermissionDenied),
-		message: paymentcontracts.ErrStripePermissionDenied.Error(),
-	},
-	{
-		targets: []error{
-			paymentcontracts.ErrStripeAccountUnavailable, paymentcontracts.ErrStripeCapabilityUnavailable,
-			paymentcontracts.ErrStripeConfigurationInvalid,
-		},
-		status:  http.StatusUnprocessableEntity,
-		code:    string(contract.CodeStripeConfigurationUnprocessable),
-		message: "当前 Stripe 配置不可用",
-	},
-	{
-		targets: []error{paymentcontracts.ErrStripeProviderUnavailable},
-		status:  http.StatusServiceUnavailable,
-		code:    string(contract.CodeStripeProviderUnavailable),
-		message: paymentcontracts.ErrStripeProviderUnavailable.Error(),
-	},
-	{
-		targets: []error{paymentcontracts.ErrStripeConfigurationChanged},
-		status:  http.StatusConflict,
-		code:    string(contract.CodeStripeConfigurationChanged),
-		message: "Stripe 配置已被其他操作更新，请重试",
-	},
-}
-
-var checkoutErrorTable = []paymentErrorMapping{
-	{
-		targets: []error{
-			paymentsdomain.ErrInvalidIdeaQuantity, paymentsdomain.ErrTermsAcceptanceRequired,
-			paymentsdomain.ErrCheckoutIdempotencyKey,
-		},
-		status:  http.StatusBadRequest,
-		code:    string(contract.CodeCheckoutInvalidInput),
-		message: "充值参数错误",
-	},
-	{
-		targets: []error{
-			paymentsdomain.ErrCheckoutIdempotencyConflict, paymentcontracts.ErrPendingCheckoutLimit,
-			paymentcontracts.ErrPaymentAlreadyInProgress,
-		},
-		status:  http.StatusConflict,
-		code:    string(contract.CodeCheckoutConflict),
-		message: "充值请求冲突，请稍后重试",
-	},
-	{
-		targets: []error{paymentcontracts.ErrPaymentAlreadyCompleted},
-		status:  http.StatusUnprocessableEntity,
-		code:    string(contract.CodePaymentAlreadyCompleted),
-		message: "该充值已完成，请勿重复支付",
-	},
-	{
-		targets: []error{paymentcontracts.ErrCheckoutSessionExpired},
-		status:  http.StatusUnprocessableEntity,
-		code:    string(contract.CodeCheckoutSessionExpired),
-		message: "支付页面已过期，请重新发起充值",
-	},
-	{
-		targets: []error{paymentsdomain.ErrWalletNotRechargeable},
-		status:  http.StatusConflict,
-		code:    string(contract.CodeWalletNotRechargeable),
-		message: "当前账户暂不可充值",
-	},
-	{
-		targets: []error{paymentsdomain.ErrCheckoutRequestRejected},
-		status:  http.StatusUnprocessableEntity,
-		code:    string(contract.CodeCheckoutRequestRejected),
-		// Provider details stay out of the response: the joined error may
-		// carry raw decline payloads, so render the fixed safe copy instead.
-		message: "无法创建支付页面，请重试",
-	},
-	{
-		targets: []error{paymentcontracts.ErrStripeProviderUnavailable},
-		status:  http.StatusServiceUnavailable,
-		code:    string(contract.CodePaymentServiceUnavailable),
-		message: "支付服务暂不可用",
-	},
-	{
-		targets: []error{paymentsdomain.ErrPurchasesUnavailable},
-		status:  http.StatusServiceUnavailable,
-		code:    string(contract.CodePurchasesUnavailable),
-		message: "充值服务暂不可用",
-	},
-}
-
-var rechargeHistoryErrorTable = []paymentErrorMapping{
-	{
-		targets: []error{paymentcontracts.ErrRechargeHistoryLimit},
-		status:  http.StatusBadRequest,
-		code:    string(contract.CodeRechargeHistoryLimitInvalid),
-		message: "充值记录 limit 无效",
-	},
-	{
-		targets: []error{paymentcontracts.ErrRechargeHistoryCursor},
-		status:  http.StatusBadRequest,
-		code:    string(contract.CodeRechargeHistoryCursorInvalid),
-		message: "充值记录游标无效",
-	},
-}
-
+// stripeWebhookErrorTable is the single source of truth for the wired
+// Stripe webhook edge (the only handler left in this package;
+// NewWebhookHandler). User-checkout and admin handlers were deleted
+// with their tables: only WebhookHandler is wired in composition.
 var stripeWebhookErrorTable = []paymentErrorMapping{
 	{
 		targets: []error{
@@ -174,32 +63,30 @@ var stripeWebhookErrorTable = []paymentErrorMapping{
 		},
 		status:  http.StatusBadRequest,
 		code:    string(contract.CodeWebhookSignatureInvalid),
-		message: "Stripe Webhook 签名无效",
+		message: msgRenderMappedPaymentError,
 	},
 	{
 		targets: []error{paymentcontracts.ErrStripeConfigurationNotFound, paymentcontracts.ErrStripeConfigurationInvalid},
 		status:  http.StatusServiceUnavailable,
 		code:    string(contract.CodeWebhookConfigurationMissing),
-		message: "Stripe Webhook 尚未配置",
+		message: msgRenderMappedPaymentError2,
 	},
 }
 
-func writeStripeConfigurationError(c *gin.Context, err error) {
-	renderMappedPaymentError(c, err, stripeConfigurationErrorTable, http.StatusInternalServerError, "保存 Stripe 设置失败")
-}
-
-func writeCheckoutError(c *gin.Context, err error) {
-	renderMappedPaymentError(c, err, checkoutErrorTable, http.StatusServiceUnavailable, "充值服务暂不可用")
-}
-
 func writeStripeWebhookError(c *gin.Context, err error) {
-	renderMappedPaymentError(c, err, stripeWebhookErrorTable, http.StatusInternalServerError, "Stripe Webhook 处理失败")
+	renderMappedPaymentError(c, err, stripeWebhookErrorTable, http.StatusInternalServerError, msgWriteStripeWebhookError)
 }
 
-// writeRechargeHistoryError renders recharge-history failures through the
-// machine envelope so callers branch on stable codes instead of copy.
-// Pagination outcomes (limit/cursor) are part of the shared pagination
-// standard; unmapped failures keep the established safe message.
-func writeRechargeHistoryError(c *gin.Context, err error) {
-	renderMappedPaymentError(c, err, rechargeHistoryErrorTable, http.StatusInternalServerError, "读取充值记录失败")
-}
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgRender                    = "请求处理失败，请稍后重试"        // Render @ errors.go
+	msgRenderMappedPaymentError  = "Stripe Webhook 签名无效" // RenderMappedPaymentError @ errors.go
+	msgRenderMappedPaymentError2 = "Stripe Webhook 尚未配置" // RenderMappedPaymentError @ errors.go
+	msgWriteStripeWebhookError   = "Stripe Webhook 处理失败" // WriteStripeWebhookError @ errors.go
+	msgReceiveStripeWebhook      = "Stripe Webhook 暂不可用" // ReceiveStripeWebhook @ webhook.go
+	msgReceiveStripeWebhook2     = "请求体过大"               // ReceiveStripeWebhook @ webhook.go
+	msgReceiveStripeWebhook3     = "Stripe Webhook 数据无效" // ReceiveStripeWebhook @ webhook.go
+)

@@ -63,43 +63,43 @@ var billingDomainErrorTable = []billingErrorMapping{
 		targets: []error{billing.ErrInvalidSKU, billing.ErrInvalidQuantity, billing.ErrInvalidCatalogEntry, billing.ErrInvalidOutputResolution},
 		status:  http.StatusBadRequest,
 		code:    codeBillingInvalidInput,
-		message: "参数错误",
+		message: msgMatches,
 	},
 	{
 		targets: []error{billing.ErrSKUNotFound},
 		status:  http.StatusNotFound,
 		code:    codeBillingSKUNotFound,
-		message: "计费功能不存在",
+		message: msgMatches2,
 	},
 	{
 		targets: []error{billing.ErrPricingUnavailable},
 		status:  http.StatusUnprocessableEntity,
 		code:    codeBillingPricingUnavailable,
-		message: "计费功能当前不可计价",
+		message: msgMatches3,
 	},
 	{
 		targets: []error{billing.ErrItemNotArchived},
 		status:  http.StatusConflict,
 		code:    codeBillingItemNotArchived,
-		message: "仅已归档功能可以删除",
+		message: msgMatches4,
 	},
 	{
 		targets: []error{billing.ErrArchivedItemInUse},
 		status:  http.StatusConflict,
 		code:    codeBillingArchivedItemInUse,
-		message: "功能已有历史计费记录，无法删除",
+		message: msgMatches5,
 	},
 	{
 		targets: []error{billing.ErrQuoteTotalExceeded},
 		status:  http.StatusUnprocessableEntity,
 		code:    codeBillingQuoteTotalExceeded,
-		message: "报价超过允许上限",
+		message: msgMatches6,
 	},
 	{
 		targets: []error{billing.ErrServiceUnavailable},
 		status:  http.StatusServiceUnavailable,
 		code:    codeBillingServiceUnavailable,
-		message: "计费服务暂不可用",
+		message: msgMatches7,
 	},
 }
 
@@ -116,7 +116,7 @@ func writeError(c *gin.Context, err error) {
 		return
 	}
 	errorrender.RenderDefault(c, "billing operation failed",
-		http.StatusInternalServerError, codeBillingOperationFailed, "计费操作失败", err,
+		http.StatusInternalServerError, codeBillingOperationFailed, msgBillingOperationFailed, err,
 		"error_type", errorTypeOf(err))
 }
 
@@ -124,9 +124,24 @@ func writeError(c *gin.Context, err error) {
 // unknown fields, missing required fields) through the machine envelope so
 // callers branch on a stable code instead of copy.
 func writeBillingInputError(c *gin.Context) {
-	errorrender.Render(c, http.StatusBadRequest, codeBillingInvalidInput, "参数错误")
+	errorrender.Render(c, http.StatusBadRequest, codeBillingInvalidInput, msgMatches)
 }
 
 func errorTypeOf(err error) string {
 	return fmt.Sprintf("%T", err)
 }
+
+// Backend-owned user-facing copy for this package. Each constant
+// is the single source of truth for one rendered message; call
+// sites reference these names so copy changes stay in one place.
+// Values are byte-identical to the previously inline literals.
+const (
+	msgMatches                = "参数错误"            // Matches @ errors.go
+	msgMatches2               = "计费功能不存在"         // Matches @ errors.go
+	msgMatches3               = "计费功能当前不可计价"      // Matches @ errors.go
+	msgMatches4               = "仅已归档功能可以删除"      // Matches @ errors.go
+	msgMatches5               = "功能已有历史计费记录，无法删除" // Matches @ errors.go
+	msgMatches6               = "报价超过允许上限"        // Matches @ errors.go
+	msgMatches7               = "计费服务暂不可用"        // Matches @ errors.go
+	msgBillingOperationFailed = "计费操作失败"          // codeBillingOperationFailed
+)

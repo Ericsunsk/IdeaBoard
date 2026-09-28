@@ -16,11 +16,11 @@ type AdminTaskUserResolver interface {
 
 func (s *Service) ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error) {
 	if s == nil || s.userResolver == nil {
-		return 0, validation.New("user_public_id 无效")
+		return 0, validation.New(msgResolveAdminTaskUserID)
 	}
 	publicID, err := uuid.Parse(strings.TrimSpace(rawPublicID))
 	if err != nil || publicID == uuid.Nil {
-		return 0, validation.New("user_public_id 无效")
+		return 0, validation.New(msgResolveAdminTaskUserID)
 	}
 	// The resolver is intentionally keyed by the internal id for read models;
 	// public-id parsing and lookup stay at the HTTP boundary.
@@ -34,7 +34,7 @@ type adminTaskPublicIDResolver interface {
 func (s *Service) resolveUserIDByPublicID(ctx context.Context, publicID uuid.UUID) (int64, error) {
 	resolver, ok := s.userResolver.(adminTaskPublicIDResolver)
 	if !ok {
-		return 0, validation.New("user_public_id 无效")
+		return 0, validation.New(msgResolveAdminTaskUserID)
 	}
 	return resolver.ResolvePublicID(ctx, publicID.String())
 }

@@ -153,27 +153,27 @@ func (h *contractV1Handler) libraryWorkspaceContext(c *gin.Context, identityPrin
 func renderLibraryError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, library.ErrV1FolderNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 	case errors.Is(err, library.ErrV1AssetNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 	case errors.Is(err, library.ErrV1ResolveTooMany):
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"单次最多解析 20 条", contract.FieldErrors{Fields: map[string]string{"items": "too_many"}})
+			msgRenderLibraryError, contract.FieldErrors{Fields: map[string]string{"items": "too_many"}})
 	case errors.Is(err, library.ErrV1FolderNameConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "同名文件夹已存在")
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict5)
 	case errors.Is(err, library.ErrSystemFolderImmutable):
-		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, "系统文件夹不可操作")
+		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict6)
 	case errors.Is(err, library.ErrInvalidFolderName):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"文件夹名称非法", contract.FieldErrors{Fields: map[string]string{"name": "invalid"}})
+			msgRenderLibraryError2, contract.FieldErrors{Fields: map[string]string{"name": "invalid"}})
 	case errors.Is(err, library.ErrInvalidProvider):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"素材来源非法", contract.FieldErrors{Fields: map[string]string{"provider": "invalid"}})
+			msgRenderLibraryError3, contract.FieldErrors{Fields: map[string]string{"provider": "invalid"}})
 	case errors.Is(err, library.ErrInvalidSource):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"素材引用非法", contract.FieldErrors{Fields: map[string]string{"asset": "invalid"}})
+			msgRenderLibraryError4, contract.FieldErrors{Fields: map[string]string{"asset": "invalid"}})
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "素材库服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable49)
 	}
 	c.Abort()
 }
@@ -189,7 +189,7 @@ func (h *contractV1Handler) libraryDo(c *gin.Context, userExternalID string, use
 	result, replayed, err := h.deps.Library.Idempotency.Do(c.Request.Context(), scope, userID, key, hash, fn)
 	if err != nil {
 		if contract.IsIdempotencyConflict(err) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeLibraryIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeLibraryIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return nil, false, nil, false
 		}
@@ -201,7 +201,7 @@ func (h *contractV1Handler) libraryDo(c *gin.Context, userExternalID string, use
 func requireLibraryIdempotencyKey(c *gin.Context) (string, bool) {
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return "", false
 	}
@@ -263,7 +263,7 @@ func toLibraryAssetDTO(workspacePublicID string, asset *library.V1Asset) v1Libra
 func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
 	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 		c.Abort()
 		return nil, contract.PageMeta{}, false
 	}
@@ -271,14 +271,14 @@ func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta,
 	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 			c.Abort()
 			return nil, contract.PageMeta{}, false
 		}
 		offset = cursor.Offset
 	}
 	if offset > len(items) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 		c.Abort()
 		return nil, contract.PageMeta{}, false
 	}
@@ -290,7 +290,7 @@ func libraryPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta,
 	if end < len(items) {
 		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
 		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "素材库服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable49)
 			c.Abort()
 			return nil, contract.PageMeta{}, false
 		}
@@ -373,7 +373,7 @@ type v1RenameLibraryFolderBody struct {
 func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy.Workspace, folderID string) (*library.V1Folder, bool) {
 	folderID = strings.TrimSpace(folderID)
 	if !library.IsV1FolderID(folderID) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 		c.Abort()
 		return nil, false
 	}
@@ -387,7 +387,7 @@ func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy
 			return folder, true
 		}
 	}
-	contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
+	contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 	c.Abort()
 	return nil, false
 }
@@ -422,7 +422,7 @@ func (h *contractV1Handler) deleteLibraryFolder(c *gin.Context) {
 		// already-deleted folder.
 		folderID := strings.TrimSpace(c.Param("folder_id"))
 		if !library.IsV1FolderID(folderID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, "文件夹不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 			c.Abort()
 			return
 		}
@@ -568,7 +568,7 @@ type v1SavedAsset struct {
 func (h *contractV1Handler) libraryAssetOr404(c *gin.Context, workspace *tenancy.Workspace) (*library.V1Asset, bool) {
 	raw := strings.TrimSpace(c.Param("asset_id"))
 	if !library.IsV1AssetID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 		c.Abort()
 		return nil, false
 	}
@@ -613,7 +613,7 @@ func (h *contractV1Handler) deleteLibraryAsset(c *gin.Context) {
 		workspace := wctx.Workspace
 		assetID := strings.TrimSpace(c.Param("asset_id"))
 		if !library.IsV1AssetID(assetID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 			c.Abort()
 			return
 		}

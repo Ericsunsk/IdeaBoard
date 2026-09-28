@@ -17,7 +17,7 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 - `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`.
 - `shared/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy; never depends on feature route components.
 - `shared/components` pure display components (account menu, balance button, confirm box, language picker, table frame, chart card); balance numbers are injected, never self-fetched; never depends on feature stores/resources.
-- `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables.
+- `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables. `useAsyncAction` is for plain async actions; ad-hoc flags stay where the semantics differ — reentrancy guards that must throw (`useRewardRedemption.pending`), overlay dismiss guards (`busy` wired into `useOverlayInteractionLifecycle`), and page-lifecycle `loading` states.
 - `shared/config` `API_BASE_URL` (production forces `/api`), `AUTH_BASE_URL` derivation, asset/upload ref normalization; `pagination` (`PAGE_SIZES` + `normalizePageSize` for all cursor lists) and `timing` (cross-cutting transport waits only); never depends on business constants.
 - `shared/constants` single source for route paths, legal links, media constants; never depends on i18n copy.
 - `shared/domain` workflow dictionary (8 slugs), generation primitives (`outputCount` 1-4 strictly rejects, never clamps), `outputResolution`; never depends on backend SKU/pricing.
@@ -43,12 +43,21 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 - `lint:user-copy` (`scripts/checkUserCopyLocale.ts` + `scripts/user-copy-locale-allowlist.json`) guards the boundary: CJK outside `features/admin` fails unless a reviewed allowlist entry marks it a true exception (protocol matchers, endonyms, backend-shaped test fixtures, admin-only shared helpers).
 - New user-surface strings ship with all four locale bundles in the same change; never land a partial translation.
 
+## Feedback Factory Map (per-surface split, intentional)
+- User surfaces own one `*Feedback` factory each over `useAppToast` + locale keys: account `useProfileFeedback`, auth `useAuthFeedback`, board `createBoardFeedback`/`useBoardFeedback`, canvas `createCanvasFeedback`/`useCanvasFeedback`, library delete/remove confirmations in `components/confirmations.ts` over `useUserConfirmDialog`.
+- Admin verticals own one factory each over `useAdminToast` + colocated zh messages: credits billing ops, reward codes, model catalog/gateway config, monitor task result/cancellation, admin login, stripe settings/payment orders, prompt config, settings (branding/access/media-upload/outbound/mail/search-provider/logo-file), storage, users.
+- Factories never cross surfaces (no shared generic factory, no user-copy in admin factories, no zh literals in user factories); confirm dialogs split the same way (`UserConfirmDialog` + `useUserConfirmDialog` for user surfaces, `AdminConfirmDialog` for admin).
+
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
 - Prefer the generated orval `getXQueryKey()` helper when the operation exists (workspace list, control users, model catalog); never hand-roll a key for a generated op.
 - Hand-rolled `*QueryKeys` factories (or `*_QUERY_ROOT` + cursor-index consts for cursor collections) exist only for composed queries with no generated key helper (account infra resources, admin health/monitor/statistics, run-detail, finding/run-history lists).
 - No inline array literals in `queryKey:` positions or invalidation/removal calls: reference the factory or root const (`adminStatisticsQueryKeys`, `ADMIN_TASK_LIST_QUERY_KEY`, `walletQueryRoot`, `RUN_HISTORY_QUERY_ROOT`).
 - Invalidation targets the narrowest stable root (prefix) for scope clears (`walletQueryRoot`, `[...RUN_HISTORY_QUERY_ROOT]`); composed keys append criteria/cursor after the root.
 - Freshness/polling options ride `shared/query/queryDefaults` presets (`noRetry` / `accountScoped` / `adminPolling` / `keepPrevious`); visibility-aware polling stays on `useQueryPolling`, never in a preset.
+
+## Query Scope Rule (which features use Query)
+- TanStack Query lives only in `account`, `admin/*`, `workspace` (selection snapshot), `shared` (client singleton, site branding), and `shared/api/generated-query` (orval hooks). `search`, `board`, `canvas`, and `library` use no TanStack Query: they coordinate through feature-owned stores, SSE subscriptions, and explicit fetch calls, so realtime canvas/board paths never inherit query-cache staleness semantics. New cached server state must justify Query in the feature `CONTEXT.md`; otherwise follow the feature-store pattern.
+- Polling choice: visibility-aware live lists use `useQueryPolling` (document-visibility cadence with hidden-tab backoff); fixed active/idle cadences without visibility gating use the `adminPolling` preset; raw `refetchInterval` literals appear only as named `ADMIN_*_REFRESH_INTERVAL_MS`-style consts for single-shot snapshots (e.g. the monitor page), never as inline numbers.
 
 ## Invariants
 - Prove three or more callers before adding a shared module; no generic layers for speculative reuse.

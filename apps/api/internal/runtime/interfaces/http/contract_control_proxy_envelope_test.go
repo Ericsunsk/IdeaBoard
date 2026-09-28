@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/aigateway"
-	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	storagedomain "ideaboard/api/internal/media/storage/domain"
+	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/response"
@@ -262,7 +262,7 @@ func TestControlProxyRewardsErrorsRenderContractEnvelope(t *testing.T) {
 	})
 	call := controlCall{
 		method: http.MethodPost, path: "/api/control/v1/rewards/codes/search",
-		body:   `{"query":"x"}`, userID: controlOperatorID, role: "admin",
+		body: `{"query":"x"}`, userID: controlOperatorID, role: "admin",
 	}
 	// Query strings are rejected by the legacy handler (400
 	// reward_invalid_input); the control boundary must reshape it into

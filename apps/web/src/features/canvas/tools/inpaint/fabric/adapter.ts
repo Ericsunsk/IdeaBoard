@@ -106,6 +106,15 @@ export class FabricMaskPainter implements MaskPainter {
   private live: LiveStrokeSession | null = null
   private baselineImage: FabricObject | undefined = undefined
   private baselineToken = 0
+  /**
+   * Painted-state flag: set when paint adds objects or a baseline attaches,
+   * cleared on clear/undo-to-empty. `true` implies paint (no pixel scan);
+   * `false` falls back to the pixel scan, so externally rendered pixels
+   * (baseline bitmaps, test doubles) are still detected. The flag is only
+   * ever cleared to a state the fallback scan can correct, never set for
+   * erase-only work.
+   */
+  private hasPaintFlag = false
   private brushSize: number
   private disposed = false
 
@@ -221,6 +230,7 @@ export class FabricMaskPainter implements MaskPainter {
     if (this.disposed) return
     if (!dataUrl) {
       this.baselineImage = undefined
+      if (this.undoStack.length === 0) this.hasPaintFlag = false
       try {
         this.setBackground(undefined)
         this.renderNow()
@@ -248,6 +258,7 @@ export class FabricMaskPainter implements MaskPainter {
           })
           const background = image as unknown as FabricObject
           this.baselineImage = background
+          this.hasPaintFlag = true
           this.setBackground(background)
           this.renderNow()
         } catch {
@@ -293,8 +304,11 @@ export class FabricMaskPainter implements MaskPainter {
         this.baselineImage = entry.background
         this.setBackground(entry.background)
       }
+      // A clear entry only exists when the pre-clear state was painted.
+      this.hasPaintFlag = true
     } else if (entry.objects.length > 0) {
       this.canvas.remove(...entry.objects)
+      if (this.undoStack.length === 0 && !this.baselineImage) this.hasPaintFlag = false
     }
     this.redoStack.push(entry)
     this.renderNow()
@@ -311,8 +325,13 @@ export class FabricMaskPainter implements MaskPainter {
         this.baselineImage = undefined
         this.setBackground(undefined)
       }
+      // A re-applied clear leaves no painted state behind; any newer
+      // baseline still renders, and the fallback scan in `hasPaint` stays
+      // correct even if this proves pessimistic.
+      this.hasPaintFlag = false
     } else if (entry.objects.length > 0) {
       this.canvas.add(...entry.objects)
+      this.hasPaintFlag = true
     }
     this.undoStack.push(entry)
     this.renderNow()
@@ -334,18 +353,27 @@ export class FabricMaskPainter implements MaskPainter {
       this.undoStack.splice(0, this.undoStack.length - INPAINT_HISTORY_LIMIT)
     }
     this.redoStack.length = 0
-    // Synchronous render: the pixel read in `hasPaint`/`commit` must observe
-    // the object removal immediately, not after the next animation frame.
+    this.hasPaintFlag = false
+    // Synchronous render: the pixel read in `commit` (and the fallback scan
+    // in `hasPaint`) must observe the object removal immediately, not after
+    // the next animation frame.
     this.renderNow()
   }
 
   hasPaint(): boolean {
+    // Fast path: the flag implies paint without a full-canvas pixel scan
+    // (the win for `clear()` right after painting). A cleared flag falls
+    // back to the scan so externally rendered pixels are still detected.
+    if (this.hasPaintFlag) return true
     const context = this.host.getContext('2d', { willReadFrequently: true })
     if (!context || !this.host.width || !this.host.height) return false
     const data = context.getImageData(0, 0, this.host.width, this.host.height).data
     const threshold = MASK_PAINTING_EMPTY_ALPHA_THRESHOLD * 255
     for (let index = 3; index < data.length; index += 4) {
-      if ((data[index] ?? 0) > threshold) return true
+      if ((data[index] ?? 0) > threshold) {
+        this.hasPaintFlag = true
+        return true
+      }
     }
     return false
   }
@@ -456,6 +484,11 @@ export class FabricMaskPainter implements MaskPainter {
       }
     }
     if (added.length > 0) {
+      // Only paint arms the painted-state flag: erase on an empty canvas
+      // adds objects without pixels, and erase over paint leaves the flag
+      // it found. A fully-erased canvas keeps a pessimistic `true` until
+      // the next clear/undo; the commit path still pixel-gates correctly.
+      if (!erase) this.hasPaintFlag = true
       this.undoStack.push({ kind: 'stroke', objects: added })
       if (this.undoStack.length > INPAINT_HISTORY_LIMIT) {
         this.undoStack.splice(0, this.undoStack.length - INPAINT_HISTORY_LIMIT)

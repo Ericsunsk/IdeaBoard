@@ -122,14 +122,14 @@ func (v *SubmitMediaValidator) ValidateSubmitMediaAssetIDs(ctx context.Context, 
 		return nil
 	}
 	if v == nil || v.assetAuthorizer == nil {
-		return fmt.Errorf("无法校验媒体资产权限")
+		return fmt.Errorf(msgValidateSubmitMediaAssetIDs)
 	}
 	for index, assetID := range assetIDs {
 		if assetID <= 0 {
-			return fmt.Errorf("媒体 AssetID 无效: index=%d", index)
+			return fmt.Errorf(msgValidateSubmitMediaAssetIDs2, index)
 		}
 		if err := v.assetAuthorizer.AuthorizeMediaAsset(ctx, userID, assetID); err != nil {
-			return fmt.Errorf("无权使用媒体 AssetID: index=%d", index)
+			return fmt.Errorf(msgValidateSubmitMediaAssetIDs3, index)
 		}
 	}
 	return nil
@@ -145,13 +145,13 @@ func (v *SubmitMediaValidator) ValidateSubmitMediaRef(ctx context.Context, userI
 		return nil
 	}
 	if !strings.HasPrefix(trimmed, canvasUploadPrefix) {
-		return fmt.Errorf("仅支持画布上传资源")
+		return fmt.Errorf(msgValidateSubmitMediaRef)
 	}
 	if v == nil || v.authorizer == nil {
-		return fmt.Errorf("无法校验画布上传资源权限")
+		return fmt.Errorf(msgValidateSubmitMediaRef2)
 	}
 	if err := v.authorizer.AuthorizeCanvasUpload(ctx, userID, trimmed); err != nil {
-		return fmt.Errorf("无权使用该画布上传资源")
+		return fmt.Errorf(msgValidateSubmitMediaRef3)
 	}
 	return nil
 }

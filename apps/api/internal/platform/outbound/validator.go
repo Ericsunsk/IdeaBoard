@@ -55,7 +55,7 @@ func ValidateConfiguredEndpoint(raw string, allowHosts ...string) (string, error
 	}
 	parsed, err := safehttp.ValidateURLWithAllowHosts(trimmed, allowHosts...)
 	if err != nil {
-		return "", fmt.Errorf("无效的服务地址")
+		return "", fmt.Errorf(msgValidateConfiguredEndpoint)
 	}
 	return strings.TrimRight(parsed.String(), "/"), nil
 }
@@ -63,7 +63,7 @@ func ValidateConfiguredEndpoint(raw string, allowHosts ...string) (string, error
 func ValidateMediaHTTPURL(raw string, allowHosts ...string) (*url.URL, error) {
 	parsed, err := safehttp.ValidateURLWithAllowHostsAndTimeout(strings.TrimSpace(raw), mediaValidationTimeout, allowHosts...)
 	if err != nil {
-		return nil, fmt.Errorf("媒体地址不可用")
+		return nil, fmt.Errorf(msgValidateMediaHTTPURL)
 	}
 	return parsed, nil
 }

@@ -11,6 +11,7 @@
     "contract:check": "node scripts/generate-internal-contract.mjs --check",
     "architecture:check": "node scripts/check-architecture.mjs",
     "test": "npm run contract:check && npm run architecture:check && tsx --test \"src/**/*.test.ts\"",
+    "lint": "prettier . --check",
     "start": "node dist/index.js",
     "migrate": "tsx src/migrate.ts",
     "migrate:dist": "node dist/migrate.js"
@@ -25,6 +26,7 @@
     "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "^22.20.1",
     "@types/pg": "^8.23.1",
+    "prettier": "^3.9.6",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3"
   },

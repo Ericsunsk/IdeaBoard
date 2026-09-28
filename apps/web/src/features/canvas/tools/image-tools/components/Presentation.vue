@@ -42,7 +42,7 @@
     @merge-layer="chromeCommands.mergeEditorLayer"
     @remove-layer="chromeCommands.removeEditorLayer"
     @update-param="chromeCommands.updateEditorParam"
-    @update-params="chromeCommands.updateEditorRetouchParams"
+    @update:params="chromeCommands.updateEditorRetouchParams"
     @apply-retouch="chromeCommands.applyRetouch"
   />
 </template>

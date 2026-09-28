@@ -2,7 +2,6 @@ package billingrecords
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -81,7 +80,7 @@ func (q repositoryQueryer) Query(query string, args ...any) (pgx.Rows, error) {
 
 func (r *Repository) List(ctx context.Context, userID, beforeSequence int64, fetchLimit int) ([]ledgerRecord, error) {
 	if r == nil || r.pool == nil {
-		return nil, errors.New("billing records repository: database pool not configured")
+		return nil, ErrPoolNotConfigured
 	}
 	rows, err := r.dbWithContext(ctx).Query(listRecordsSQL, userID, beforeSequence, fetchLimit)
 	if err != nil {

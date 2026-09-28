@@ -41,7 +41,7 @@ function createImageSnapshot(): ImageNodeItem {
 
 function createFlowImage(snapshot: ImageNodeItem): Node<FlowNodeData> {
   return {
-    id: 'image-1',
+    id: `image-${snapshot.id}`,
     type: 'canvas',
     selected: true,
     position: { x: snapshot.x, y: snapshot.y },
@@ -54,14 +54,14 @@ function createFlowImage(snapshot: ImageNodeItem): Node<FlowNodeData> {
   } as unknown as Node<FlowNodeData>
 }
 
-function createHarness() {
+function createHarness(images: ImageNodeItem[] = [createImageSnapshot()]) {
   const snapshot: BoardSnapshot = createEmptyBoardSnapshot()
-  const image = createImageSnapshot()
-  snapshot.imageNodes.push(image)
+  snapshot.imageNodes.push(...images.map((image) => ({ ...image })))
   const graphSession = CanvasGraphSession.hydrate('board-a', snapshot)
-  const nodes = shallowRef<Node[]>([createFlowImage(image)])
+  const flowNodes = images.map((image) => createFlowImage(image))
+  const nodes = shallowRef<Node[]>(flowNodes)
   const edges = shallowRef<Edge[]>([])
-  const selectedElements = shallowRef([nodes.value[0]] as unknown as Elements)
+  const selectedElements = shallowRef([...flowNodes] as unknown as Elements)
   const clear = vi.fn()
   const downloadImage = vi.fn()
   const openNodeImage = vi.fn(async () => undefined)
@@ -92,7 +92,7 @@ function createHarness() {
     openNodeImage,
     feedback,
     loading,
-    image,
+    image: images[0]!,
     graphSession,
     setAttached: (value: boolean) => {
       attached = value
@@ -205,5 +205,56 @@ describe('useCanvasGraphInteractions', () => {
     harness.setAttached(false)
 
     expect(harness.interactions.viewModel.hasSelectedNodes.value).toBe(false)
+  })
+
+  it('supersedes an in-flight export when a second export starts', async () => {
+    const secondImage: ImageNodeItem = {
+      ...createImageSnapshot(),
+      id: 2,
+      title: 'Second image',
+    }
+    const harness = createHarness([createImageSnapshot(), secondImage])
+    const resolvers: Array<(value: unknown) => void> = []
+    harness.downloadImage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve as (value: unknown) => void)
+        }),
+    )
+
+    const first = harness.interactions.commands.exportSelectedImages()
+    // Let the first run reach its first download await.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(harness.downloadImage).toHaveBeenCalledTimes(1)
+
+    const second = harness.interactions.commands.exportSelectedImages()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(harness.downloadImage).toHaveBeenCalledTimes(2)
+
+    // Drain every pending download until both runs settle.
+    for (let i = 0; i < 10; i += 1) {
+      resolvers.splice(0).forEach((resolve) => resolve(undefined))
+      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      if (harness.downloadImage.mock.calls.length >= 3) {
+        resolvers.splice(0).forEach((resolve) => resolve(undefined))
+        await Promise.resolve()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        break
+      }
+    }
+    await first
+    await second
+
+    // The superseded run downloaded once, then bailed: only the latest run
+    // completes all entries and reports success.
+    expect(harness.downloadImage).toHaveBeenCalledTimes(3)
+    expect(harness.feedback.operationSucceeded).toHaveBeenCalledTimes(1)
+    expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Images queued: 2')
+    // First handle destroyed by the second run's start, second handle
+    // destroyed by its own finally — the bailed run destroys nothing.
+    expect(harness.loading.destroy).toHaveBeenCalledTimes(2)
   })
 })

@@ -168,7 +168,7 @@ func v1AuthMiddleware(authDeps AuthDeps) gin.HandlerFunc {
 	}
 	return func(c *gin.Context) {
 		if _, ok := principal.From(c); !ok {
-			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+			contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, msgUnauthorized)
 			c.Abort()
 			return
 		}
@@ -235,7 +235,7 @@ func (h *contractV1Handler) requireStore(c *gin.Context) bool {
 func v1RequestPrincipal(c *gin.Context) (principal.Principal, bool) {
 	identityPrincipal, ok := principal.From(c)
 	if !ok {
-		contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, "未登录")
+		contract.RenderError(c, http.StatusUnauthorized, contract.CodeUnauthorized, msgUnauthorized)
 		c.Abort()
 		return principal.Principal{}, false
 	}
@@ -249,19 +249,19 @@ func v1RequestPrincipal(c *gin.Context) (principal.Principal, bool) {
 func (h *contractV1Handler) v1WorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
 	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
 	role, member, err := h.deps.Store.GetWorkspaceRole(c.Request.Context(), raw, identityPrincipal.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return nil, "", false
 	}
@@ -276,19 +276,19 @@ func (h *contractV1Handler) v1WorkspaceContext(c *gin.Context, identityPrincipal
 func (h *contractV1Handler) v1OrganizationContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Organization, string, bool) {
 	raw := strings.TrimSpace(c.Param("organization_id"))
 	if !contract.IsOrganizationID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	organization, err := h.deps.Store.GetOrganization(c.Request.Context(), raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	role, member, err := h.deps.Store.GetOrganizationRole(c.Request.Context(), raw, identityPrincipal.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 		c.Abort()
 		return nil, "", false
 	}
@@ -365,7 +365,7 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 	}
 	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 		c.Abort()
 		return
 	}
@@ -373,12 +373,12 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 		if decodeErr != nil || cursor == nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 			c.Abort()
 			return
 		}
 		if cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 			c.Abort()
 			return
 		}
@@ -387,7 +387,7 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 	ctx := c.Request.Context()
 	workspaces, err := h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
 	if err != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		c.Abort()
 		return
 	}
@@ -396,14 +396,14 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 		if personal, provisionErr := h.deps.Store.EnsurePersonalWorkspace(ctx, identityPrincipal.UserID()); provisionErr == nil && personal != nil {
 			workspaces, err = h.deps.Store.ListWorkspacesForUser(ctx, identityPrincipal.UserID())
 			if err != nil {
-				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 				c.Abort()
 				return
 			}
 		}
 	}
 	if offset > len(workspaces) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 		c.Abort()
 		return
 	}
@@ -419,7 +419,7 @@ func (h *contractV1Handler) listWorkspaces(c *gin.Context) {
 	if end < len(workspaces) {
 		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
 		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 			c.Abort()
 			return
 		}
@@ -442,7 +442,7 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	}
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return
 	}
@@ -454,7 +454,7 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	name := strings.TrimSpace(body.Data.Name)
 	if validateErr := tenancy.ValidateName(name); validateErr != nil {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+			msgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 		c.Abort()
 		return
 	}
@@ -463,7 +463,7 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 		candidate := strings.TrimSpace(*body.Data.OrganizationID)
 		if !contract.IsOrganizationID(candidate) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"组织标识非法", contract.FieldErrors{Fields: map[string]string{"organization_id": "invalid"}})
+				msgCreateWorkspace2, contract.FieldErrors{Fields: map[string]string{"organization_id": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -476,7 +476,7 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	if orgID != nil {
 		_, role, orgErr := h.orgRoleForCreate(ctx, *orgID, identityPrincipal.UserID())
 		if orgErr != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 			c.Abort()
 			return
 		}
@@ -502,22 +502,22 @@ func (h *contractV1Handler) createWorkspace(c *gin.Context) {
 	})
 	if doErr != nil {
 		if contract.IsIdempotencyConflict(doErr) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return
 		}
 		if errors.Is(doErr, tenancy.ErrNotFound) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, "组织不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeOrganizationNotFound, msgOrganizationNotFound)
 			c.Abort()
 			return
 		}
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		c.Abort()
 		return
 	}
 	created, ok := result.(*tenancy.Workspace)
 	if !ok || created == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "工作区服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable38)
 		c.Abort()
 		return
 	}
@@ -556,13 +556,13 @@ func (h *contractV1Handler) updateWorkspace(c *gin.Context) {
 		name := strings.TrimSpace(body.Data.Name)
 		if validateErr := tenancy.ValidateName(name); validateErr != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"工作区名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+				msgCreateWorkspace, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 			c.Abort()
 			return
 		}
 		updated, err := h.deps.Store.UpdateWorkspace(c.Request.Context(), wctx.Workspace.PublicID, name)
 		if err != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 			c.Abort()
 			return
 		}
@@ -574,7 +574,7 @@ func (h *contractV1Handler) archiveWorkspace(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
 		archived, err := h.deps.Store.ArchiveWorkspace(c.Request.Context(), wctx.Workspace.PublicID)
 		if err != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 			c.Abort()
 			return
 		}

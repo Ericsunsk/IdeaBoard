@@ -47,6 +47,9 @@ function assertLibraryId(
 }
 
 export function assertWorkspaceId(value: string): string {
+  // Intentional barrel pass-through (no message change): Canvas/Search must
+  // resolve workspace ids through the library barrel, never `shared/` deep
+  // imports; the canonical primitive stays `shared/utils/workspaceId`.
   return assertSharedWorkspaceId(value)
 }
 

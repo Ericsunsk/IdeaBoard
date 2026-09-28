@@ -35,9 +35,9 @@ export type SaveFeaturePromptOptions = {
   idempotencyKey?: string | undefined
 }
 
-export async function fetchAdminFeaturePrompts(): Promise<FeaturePrompt[]> {
+export async function fetchAdminFeaturePrompts(signal?: AbortSignal): Promise<FeaturePrompt[]> {
   try {
-    const body = await listControlFeaturePrompts()
+    const body = await listControlFeaturePrompts(signal == null ? undefined : { signal })
     const data = requireContractData<{ prompts: FeaturePrompt[] }>(body, '加载提示词失败')
     return data.prompts ?? []
   } catch (error) {

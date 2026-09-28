@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref, toRef } from 'vue'
+import { computed, onMounted, onScopeDispose, reactive, ref, toRef } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
@@ -49,11 +49,26 @@ export function useAdminPromptConfigWorkspace(options: UseAdminPromptConfigWorks
     runAsyncAction,
   })
 
+  // Page-leave cancellation: the mount fetch aborts with the page scope so a
+  // slow Control read cannot toast `loadFailed` after unmount.
+  const loadController = new AbortController()
+  onScopeDispose(() => loadController.abort())
+
   onMounted(() => {
-    void workspace.loadPrompts()
+    void workspace.loadPrompts({ signal: loadController.signal })
   })
 
   return workspace
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') ||
+    (typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: unknown }).name === 'AbortError')
+  )
 }
 
 export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorkspaceOptions) {
@@ -71,23 +86,27 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return Object.fromEntries([...slugs].map((slug) => [slug, resolveDraftValidation(slug)]))
   })
 
-  async function refreshPromptData(input: { preserveDirtyDraft: boolean }) {
-    const prompts = await resource.fetchPrompts()
+  async function refreshPromptData(input: { preserveDirtyDraft: boolean; signal?: AbortSignal }) {
+    const prompts = await resource.fetchPrompts(input.signal)
     loadFailed.value = false
     syncPromptConfigs(prompts, input)
     return prompts
   }
 
-  async function loadPrompts(input: { preserveDirtyDraft?: boolean } = {}) {
+  async function loadPrompts(input: { preserveDirtyDraft?: boolean; signal?: AbortSignal } = {}) {
     return options.runAsyncAction(
       () =>
         refreshPromptData({
           preserveDirtyDraft: input.preserveDirtyDraft ?? true,
+          ...(input.signal == null ? {} : { signal: input.signal }),
         }),
       {
         loading,
         feedback: {
           error: (error) => {
+            // Page-leave cancellation is silent: never toast or latch
+            // `loadFailed` for an aborted mount fetch.
+            if (isAbortError(error)) return
             loadFailed.value = true
             options.feedback.loadPromptsFailed(error)
           },

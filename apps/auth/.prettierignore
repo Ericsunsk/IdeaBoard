@@ -1,0 +1,8 @@
+dist
+package-lock.json
+src/generated
+*.gen.ts
+# Email HTML templates ship byte-for-byte into transactional mail (copied to
+# dist by scripts/copy-email-templates.mjs); formatter rewrites would alter
+# rendered email bytes, so they are intentionally outside prettier scope.
+src/transactional-mail/emailTemplates/templates

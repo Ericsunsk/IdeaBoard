@@ -2,6 +2,7 @@
 Auth owns the Better Auth session facts, login/register/OTP/OAuth/logout and impersonation exit, auth overlay chrome, and post-auth redirect intent.
 It caches the server session as a 5-minute client snapshot via a single store.
 It does NOT own workspace layout, account management UI, or per-page login modals.
+Shape: flat feature (`components/` + `session/` + `pages/`, no `domain/`/`application/`/`infrastructure` split) — session transport plus panels need no anti-corruption layering (see `docs/agents/new-feature.md` item 3).
 
 ## Domain Language
 

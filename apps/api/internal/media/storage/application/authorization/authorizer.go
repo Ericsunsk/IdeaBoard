@@ -36,7 +36,7 @@ func (a *TaskMediaAuthorizer) AuthorizeCanvasUpload(ctx context.Context, userID 
 		return err
 	}
 	if resource.Kind != domain.UploadResourceKindCanvas {
-		return fmt.Errorf("仅支持画布上传资源")
+		return fmt.Errorf(msgAuthorizeCanvasUpload)
 	}
 	_, err = a.readAccess.AuthorizeUploadResourceRead(ctx, userID, resource)
 	return err

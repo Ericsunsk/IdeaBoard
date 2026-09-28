@@ -149,7 +149,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 		limit = DefaultRechargeHistoryLimit
 	}
 	if limit < 1 || limit > MaxRechargeHistoryLimit {
-		return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf("%w：必须在 1 到 %d 之间", paymentcontracts.ErrRechargeHistoryLimit, MaxRechargeHistoryLimit)
+		return paymentcontracts.RechargeHistoryPage{}, fmt.Errorf(msgListRecharges, paymentcontracts.ErrRechargeHistoryLimit, MaxRechargeHistoryLimit)
 	}
 	parsedCursor, err := DecodeRechargeHistoryCursor(cursor)
 	if err != nil {

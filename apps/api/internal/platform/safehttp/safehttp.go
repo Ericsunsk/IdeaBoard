@@ -62,16 +62,16 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("%w: URL 格式错误", ErrPolicyViolation)
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout, ErrPolicyViolation)
 	}
 
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, fmt.Errorf("%w: 仅支持 http/https URL", ErrPolicyViolation)
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout2, ErrPolicyViolation)
 	}
 
 	host := parsed.Hostname()
 	if host == "" {
-		return nil, fmt.Errorf("%w: URL 缺少主机名", ErrPolicyViolation)
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout3, ErrPolicyViolation)
 	}
 
 	if resolveTimeout <= 0 {
@@ -88,10 +88,10 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 		if ctxErr := resolveCtx.Err(); ctxErr != nil {
 			return nil, ctxErr
 		}
-		return nil, fmt.Errorf("解析主机失败")
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, fmt.Errorf("主机未解析到有效地址")
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout5)
 	}
 
 	if _, err := filterAllowedIPs(host, defaultPort(parsed), addrs, normalizedAllowedHosts, normalizedAllowedHostPorts, allowedIPs, allowedIPPorts); err != nil {
@@ -131,7 +131,7 @@ func DoWithAllowHosts(
 
 	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("创建请求失败")
+		return nil, fmt.Errorf(msgDoWithAllowHosts)
 	}
 	if buildRequest != nil {
 		buildRequest(req)
@@ -147,7 +147,7 @@ func DoWithAllowHosts(
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return fmt.Errorf("重定向次数过多")
+				return fmt.Errorf(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(req.Context(), req.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -164,7 +164,7 @@ func DoRequestWithAllowHosts(
 	allowHosts ...string,
 ) (*http.Response, error) {
 	if req == nil || req.URL == nil {
-		return nil, fmt.Errorf("请求参数错误")
+		return nil, fmt.Errorf(msgDoRequestWithAllowHosts)
 	}
 	ctx = nonNilContext(ctx)
 	policy, err := resolvePolicy(ctx, req.URL.String(), allowHosts...)
@@ -184,7 +184,7 @@ func DoRequestWithAllowHosts(
 		Transport: transport,
 		CheckRedirect: func(next *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return fmt.Errorf("重定向次数过多")
+				return fmt.Errorf(msgDoWithAllowHosts2)
 			}
 			_, err := validateURLWithContext(next.Context(), next.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
@@ -229,7 +229,7 @@ func transportForRequest(ctx context.Context, req *http.Request, policy *resolve
 	actual, loaded := safeTransportPool.LoadOrStore(key, transport)
 	stored, ok := actual.(*http.Transport)
 	if !ok {
-		return nil, fmt.Errorf("HTTP 传输配置错误")
+		return nil, fmt.Errorf(msgTransportForRequest)
 	}
 	if !loaded {
 		pruneSafeTransportPoolIfNeeded()
@@ -516,7 +516,7 @@ func restrictedDialContext(allowedHosts map[string]bool, allowedHostPorts map[st
 		if lastErr != nil {
 			return nil, lastErr
 		}
-		return nil, fmt.Errorf("连接目标主机失败")
+		return nil, fmt.Errorf(msgRestrictedDialContext)
 	}
 }
 
@@ -527,10 +527,10 @@ func lookupDialIPs(ctx context.Context, host string) ([]net.IPAddr, error) {
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf("解析主机失败")
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout4)
 	}
 	if len(addrs) == 0 {
-		return nil, fmt.Errorf("主机未解析到有效地址")
+		return nil, fmt.Errorf(msgResolvePolicyWithTimeout5)
 	}
 	return addrs, nil
 }
@@ -541,7 +541,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	allowLoopback := allowedHosts["localhost"] || allowedHostPorts[hostPortKey("localhost", port)]
 
 	if strings.EqualFold(host, "localhost") && !hostAllowed {
-		return nil, fmt.Errorf("%w: 不允许访问本地地址", ErrPolicyViolation)
+		return nil, fmt.Errorf(msgFilterAllowedIPs, ErrPolicyViolation)
 	}
 
 	allowed := make([]net.IPAddr, 0, len(addrs))
@@ -558,7 +558,7 @@ func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts
 	}
 
 	if len(allowed) == 0 {
-		return nil, fmt.Errorf("%w: 不允许访问内网或本地地址", ErrPolicyViolation)
+		return nil, fmt.Errorf(msgFilterAllowedIPs2, ErrPolicyViolation)
 	}
 
 	return allowed, nil

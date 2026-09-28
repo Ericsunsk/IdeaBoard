@@ -55,7 +55,7 @@ func (s *RuntimeSettingsService) UpdateOutboundPolicy(ctx context.Context, setti
 		return OutboundPolicySetting{}, err
 	}
 	if actorID <= 0 {
-		return OutboundPolicySetting{}, validation.New("管理员身份无效")
+		return OutboundPolicySetting{}, validation.New(msgUpdateOutboundPolicy)
 	}
 	metadata, err := json.Marshal(normalized)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *RuntimeSettingsService) UpdateOutboundPolicy(ctx context.Context, setti
 
 func NormalizeOutboundPolicySetting(setting OutboundPolicySetting) (OutboundPolicySetting, error) {
 	if len(setting.AllowHosts) > maxOutboundAllowHosts {
-		return OutboundPolicySetting{}, validation.New("allow_hosts 最多支持 128 条")
+		return OutboundPolicySetting{}, validation.New(msgNormalizeOutboundPolicySetting)
 	}
 	normalized := make([]string, 0, len(setting.AllowHosts))
 	seen := make(map[string]struct{}, len(setting.AllowHosts))
@@ -103,7 +103,7 @@ func NormalizeOutboundPolicySetting(setting OutboundPolicySetting) (OutboundPoli
 func normalizeOutboundAllowHost(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || len(raw) > maxOutboundAllowHostLength || strings.Contains(raw, "://") || strings.ContainsAny(raw, " /?#@\\\\") {
-		return "", validation.New("allow_hosts 仅支持 hostname、IP 或 host:port")
+		return "", validation.New(msgNormalizeOutboundAllowHost)
 	}
 
 	host := raw
@@ -114,20 +114,20 @@ func normalizeOutboundAllowHost(raw string) (string, error) {
 		parsedPortValue, parseErr := strconv.Atoi(port)
 		portValue = parsedPortValue
 		if parseErr != nil || portValue < 1 || portValue > 65535 {
-			return "", validation.New("allow_hosts 端口必须在 1 到 65535 之间")
+			return "", validation.New(msgNormalizeOutboundAllowHost2)
 		}
 	} else if strings.HasPrefix(raw, "[") || strings.Count(raw, ":") > 1 {
 		if net.ParseIP(raw) == nil {
-			return "", validation.New("allow_hosts 包含无效 IP 地址")
+			return "", validation.New(msgNormalizeOutboundAllowHost3)
 		}
 	}
 
 	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
 	if host == "" {
-		return "", validation.New("allow_hosts 包含空主机")
+		return "", validation.New(msgNormalizeOutboundAllowHost4)
 	}
 	if net.ParseIP(host) == nil && !validOutboundHostname(host) {
-		return "", validation.New("allow_hosts 包含无效 hostname")
+		return "", validation.New(msgNormalizeOutboundAllowHost5)
 	}
 	if port != "" {
 		return net.JoinHostPort(host, strconv.Itoa(portValue)), nil

@@ -63,7 +63,7 @@ const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
 func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
 	feature = strings.TrimSpace(feature)
 	if feature == "" {
-		return "", validation.New("feature 不能为空")
+		return "", validation.New(msgCompileWorkspaceParams)
 	}
 	working := make(map[string]interface{}, len(params)+1)
 	for key, value := range params {
@@ -81,7 +81,7 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 		return "", err
 	}
 	if plan.PromptPolicy() == workflow.PromptPolicyRequired && prompt == "" {
-		return "", validation.New("prompt 不能为空")
+		return "", validation.New(msgCompileWorkspaceParams2)
 	}
 	if plan.PromptPolicy() == workflow.PromptPolicyIgnored {
 		prompt = ""
@@ -140,7 +140,7 @@ func validateWorkspaceMaskParam(params map[string]interface{}) error {
 	id, ok := raw.(string)
 	if !ok || !contract.IsAssetID(strings.TrimSpace(id)) ||
 		!contract.IsValidPublicID(contract.PrefixAsset, strings.TrimSpace(id)) {
-		return validation.New("mask_asset_id 非法")
+		return validation.New(msgValidateWorkspaceMaskParam)
 	}
 	return nil
 }
@@ -218,7 +218,7 @@ func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, no
 		return CanonicalTaskRequest{}, err
 	}
 	if billingRequest != nil && normalized.clientActionID == "" {
-		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
+		return CanonicalTaskRequest{}, validation.New(msgAssembleCanonicalTaskRequest)
 	}
 	execution.typedParams.Generation = &generationSnapshot
 	paramsJSON, err := marshalWorkflowTaskParams(execution.typedParams, normalized.params)
@@ -254,14 +254,14 @@ func compileFeatureExecutionParams(params map[string]interface{}, featureSlug st
 	if raw, ok := params[paramkeys.OutputCount]; ok {
 		value, ok := readExactIntParam(raw)
 		if !ok {
-			return result, validation.New("output_count 仅支持整数 1-4")
+			return result, validation.New(msgCompileFeatureExecutionParams)
 		}
 		result.RequestedOutputCount = &value
 	}
 	if raw, ok := params[paramkeys.OutputResolution]; ok {
 		value, ok := raw.(string)
 		if !ok {
-			return result, validation.New("output_resolution 必须是字符串")
+			return result, validation.New(msgCompileFeatureExecutionParams2)
 		}
 		result.OutputResolution = &value
 	}
@@ -284,15 +284,15 @@ func mapFeatureContractValidationError(err error) error {
 	}
 	switch contractErr.Code {
 	case workflow.FeatureContractUnknownFeature:
-		return validation.New("feature 不受支持")
+		return validation.New(msgMapFeatureContractValidationError)
 	case workflow.FeatureContractInvalidOutputCount:
-		return validation.New("output_count 不符合功能要求")
+		return validation.New(msgMapFeatureContractValidationError2)
 	case workflow.FeatureContractUnsupportedResolution:
-		return validation.New("该功能的 output_resolution 不受支持")
+		return validation.New(msgMapFeatureContractValidationError3)
 	case workflow.FeatureContractInvalidRuntimeInput:
-		return validation.New("该功能的图片输入不符合要求")
+		return validation.New(msgMapFeatureContractValidationError4)
 	default:
-		return validation.New("功能执行参数无效")
+		return validation.New(msgMapFeatureContractValidationError5)
 	}
 }
 
@@ -301,14 +301,14 @@ func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[stri
 		return "", nil
 	}
 	if source != nil && jsonlimit.ValueDepth(source) > maxSubmitTaskParamsDepth {
-		return "", fmt.Errorf("任务参数层级过深")
+		return "", fmt.Errorf(msgMarshalWorkflowTaskParams)
 	}
 	payload, err := json.Marshal(params)
 	if err != nil {
-		return "", fmt.Errorf("任务参数格式错误")
+		return "", fmt.Errorf(msgMarshalWorkflowTaskParams2)
 	}
 	if len(payload) > maxSubmitTaskParamsBytes {
-		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
+		return "", fmt.Errorf(msgMarshalWorkflowTaskParams3, maxSubmitTaskParamsBytes/1024/1024)
 	}
 	return string(payload), nil
 }
@@ -579,25 +579,25 @@ func normalizeFusionParams(params map[string]interface{}) error {
 	}
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) < 2 || len(imageURLs) > 4 {
-		return fmt.Errorf("fusion 节点需要 2 到 4 张输入图")
+		return fmt.Errorf(msgNormalizeFusionParams)
 	}
 	rawFusion, ok := params[paramkeys.Fusion]
 	if !ok {
-		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
+		return fmt.Errorf(msgNormalizeFusionParams2)
 	}
 	fusion, ok := rawFusion.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("fusion 参数格式错误")
+		return fmt.Errorf(msgNormalizeFusionParams3)
 	}
 	if _, ok := fusion[paramkeys.InputWeights]; !ok {
-		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
+		return fmt.Errorf(msgNormalizeFusionParams2)
 	}
 	weights, ok := workflow.ReadFusionInputWeights(params)
 	if !ok {
-		return fmt.Errorf("fusion 权重必须是数字数组")
+		return fmt.Errorf(msgNormalizeFusionParams4)
 	}
 	if len(weights) != len(imageURLs) {
-		return fmt.Errorf("fusion 权重数量必须与输入图数量一致")
+		return fmt.Errorf(msgNormalizeFusionParams5)
 	}
 	normalizedWeights, err := normalizeFusionInputWeights(weights)
 	if err != nil {
@@ -618,16 +618,16 @@ func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
 	total := 0.0
 	for _, weight := range weights {
 		if math.IsNaN(weight) || math.IsInf(weight, 0) {
-			return nil, fmt.Errorf("fusion 权重必须是有限数字")
+			return nil, fmt.Errorf(msgNormalizeFusionInputWeights)
 		}
 		if weight < 0 {
-			return nil, fmt.Errorf("fusion 权重不能为负数")
+			return nil, fmt.Errorf(msgNormalizeFusionInputWeights2)
 		}
 		out = append(out, weight)
 		total += weight
 	}
 	if total <= 0 {
-		return nil, fmt.Errorf("fusion 权重总和必须大于 0")
+		return nil, fmt.Errorf(msgNormalizeFusionInputWeights3)
 	}
 	for index := range out {
 		out[index] /= total

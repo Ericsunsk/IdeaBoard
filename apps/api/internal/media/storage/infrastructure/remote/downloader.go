@@ -114,17 +114,17 @@ func DownloadImageWithLimit(ctx context.Context, remoteURL string, allowHosts []
 	}
 	resp, err := remoteImageResponse(ctx, remoteURL, allowHosts)
 	if err != nil {
-		return nil, fmt.Errorf("下载图片失败: %w", err)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("下载图片返回 %d", resp.StatusCode)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit2, resp.StatusCode)
 	}
 
 	tmpFile, err := os.CreateTemp("", "ideaboard-remote-image-*")
 	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %w", err)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit3, err)
 	}
 	cleanupTemp := true
 	defer func() {
@@ -136,18 +136,18 @@ func DownloadImageWithLimit(ctx context.Context, remoteURL string, allowHosts []
 
 	size, err := copyWithBuffer(tmpFile, io.LimitReader(resp.Body, maxSize+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取图片数据失败: %w", err)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit4, err)
 	}
 	if size > maxSize {
-		return nil, fmt.Errorf("远程文件超过大小限制 (%d MB)", maxSize/1024/1024)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit5, maxSize/1024/1024)
 	}
 
 	facts, err := imageformat.InspectDetected(tmpFile)
 	if err != nil {
-		return nil, fmt.Errorf("远程图片校验失败: %w", err)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit6, err)
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("读取临时文件失败: %w", err)
+		return nil, fmt.Errorf(msgDownloadImageWithLimit7, err)
 	}
 
 	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), facts.Extension)

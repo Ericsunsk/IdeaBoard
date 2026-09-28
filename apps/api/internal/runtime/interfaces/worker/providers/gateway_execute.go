@@ -36,7 +36,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	correlationID := task.EnsureCorrelationID()
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
-		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf("任务未分配模型，请先在后台配置功能模型"))
+		return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, fmt.Errorf(msgCallGatewayAPI))
 	}
 	provider, modelName, pathOverride, err := runtimeports.SplitGatewayModel(model)
 	if err != nil {
@@ -48,7 +48,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	if pathOverride == "" && c != nil && c.modelRoutes != nil {
 		catalogPath, catalogParams, found, routeErr := c.modelRoutes.LookupRouteOverride(ctx, model)
 		if routeErr != nil {
-			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf("读取模型路由配置失败: %w", routeErr))
+			return runtimeports.ProviderCallOutput{}, runtimeports.NewExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryProviderError, fmt.Errorf(msgCallGatewayAPI2, routeErr))
 		}
 		if found {
 			pathOverride = catalogPath
@@ -105,7 +105,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
-			fmt.Errorf("调用 API 失败 (模型: %s): %w", model, err),
+			fmt.Errorf(msgCallGatewayAPI3, model, err),
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
@@ -113,7 +113,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 		return output, runtimeports.NewExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
-			fmt.Errorf("API 未返回图片"),
+			fmt.Errorf(msgCallGatewayAPI4),
 		)
 	}
 	finalizeStartedAt := time.Now()
@@ -143,7 +143,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	}
 	if len(imageURLs) == 0 {
 		markFinalizeFinished()
-		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf("finalizer 未返回图片"))
+		return output, runtimeports.NewExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf(msgCallGatewayAPI5))
 	}
 	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()
@@ -255,13 +255,13 @@ func (c *Executor) callGatewayAdapter(
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, "抠图", timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, msgBuildCutoutGatewayPayload, timeout)
 	case domain.ProviderRuntimeAdapterUpscale:
 		payload, err := buildUpscaleGatewayPayload(c, providerReq)
 		if err != nil {
 			return providerCallResult{}, err
 		}
-		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, "高清放大", timeout)
+		return c.callGatewayImageBytes(ctx, taskID, feature, provider, model, route, payload, msgBuildUpscaleGatewayPayload2, timeout)
 	default:
 		return providerCallResult{}, fmt.Errorf("unsupported provider runtime adapter %d", route.Adapter)
 	}

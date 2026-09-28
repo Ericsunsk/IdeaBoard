@@ -24,6 +24,12 @@ const shanghaiDateTimeOptions = {
   timeZone: 'Asia/Shanghai',
 } as const satisfies Intl.DateTimeFormatOptions
 
+const expiryDateTimeOptions = {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  hour12: false,
+} as const satisfies Intl.DateTimeFormatOptions
+
 export function formatAccountRechargeDateTime(value: Date): string {
   return formatLocaleDate(value, rechargeDateTimeOptions)
 }
@@ -34,4 +40,8 @@ export function formatAccountLocalDateTime(value: Date): string {
 
 export function formatAccountShanghaiDateTime(value: Date): string {
   return formatLocaleDate(value, shanghaiDateTimeOptions)
+}
+
+export function formatAccountExpiryDateTime(value: Date): string {
+  return formatLocaleDate(value, expiryDateTimeOptions)
 }

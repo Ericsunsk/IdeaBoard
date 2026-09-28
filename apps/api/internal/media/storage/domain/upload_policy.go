@@ -112,14 +112,14 @@ func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
 
 func TaskOutputUserUploadObjectPrefix(userID int64) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf("用户ID无效")
+		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
 	}
 	return path.Join(UploadObjectRoot, "tasks", fmt.Sprintf("%d", userID)) + "/", nil
 }
 
 func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf("用户ID无效")
+		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
 	}
 	taskSegment, err := NormalizeCanvasBoardSegment(taskID)
 	if err != nil {
@@ -130,14 +130,14 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 
 func LibraryAssetUploadDirPrefix(userID, libraryAssetID int64) (string, error) {
 	if userID <= 0 || libraryAssetID <= 0 {
-		return "", fmt.Errorf("素材库媒体标识无效")
+		return "", fmt.Errorf(msgLibraryAssetUploadDirPrefix)
 	}
 	return path.Join("library", fmt.Sprintf("%d", userID), fmt.Sprintf("%d", libraryAssetID)), nil
 }
 
 func LibraryAssetUploadObjectPrefix(userID int64) (string, error) {
 	if userID <= 0 {
-		return "", fmt.Errorf("用户ID无效")
+		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
 	}
 	return path.Join(UploadObjectRoot, "library", fmt.Sprintf("%d", userID)) + "/", nil
 }
@@ -183,7 +183,7 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 
 func parseUploadResourceParts(parts []string) (UploadResource, error) {
 	if len(parts) < 1 || parts[0] == "" {
-		return UploadResource{}, fmt.Errorf("文件路径不能为空")
+		return UploadResource{}, fmt.Errorf(msgParseUploadResourceParts)
 	}
 
 	var resource UploadResource
@@ -201,7 +201,7 @@ func parseUploadResourceParts(parts []string) (UploadResource, error) {
 		resource, ok = parseSiteAssetUploadResource(parts)
 	}
 	if !ok {
-		return UploadResource{}, fmt.Errorf("不支持的上传资源路径")
+		return UploadResource{}, fmt.Errorf(msgParseUploadResourceParts2)
 	}
 	return resource, nil
 }
@@ -291,12 +291,12 @@ func uploadRelativePath(parts []string, start int) (string, bool) {
 func NormalizeUploadObjectKey(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "", fmt.Errorf("文件路径不能为空")
+		return "", fmt.Errorf(msgParseUploadResourceParts)
 	}
 	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
 	if !strings.HasPrefix(cleaned, "/"+UploadObjectRoot+"/") &&
 		!strings.HasPrefix(cleaned, "/"+WorkspaceUploadObjectRoot+"/") {
-		return "", fmt.Errorf("仅允许操作 uploads 或 ws-uploads 目录下的文件")
+		return "", fmt.Errorf(msgNormalizeUploadObjectKey)
 	}
 	return strings.TrimPrefix(cleaned, "/"), nil
 }
@@ -304,7 +304,7 @@ func NormalizeUploadObjectKey(raw string) (string, error) {
 func NormalizeUploadObjectPrefix(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "", fmt.Errorf("文件前缀不能为空")
+		return "", fmt.Errorf(msgNormalizeUploadObjectPrefix)
 	}
 	normalized, err := NormalizeUploadObjectKey(strings.TrimSuffix(trimmed, "/"))
 	if err != nil {

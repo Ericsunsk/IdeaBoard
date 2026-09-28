@@ -41,22 +41,22 @@ func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
 
 func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
 	if len([]byte(prompt)) > maxBytes {
-		return fmt.Errorf("%s长度不能超过 %dKB", label, maxBytes/1024)
+		return fmt.Errorf(msgValidateSubmitTaskPrompt, label, maxBytes/1024)
 	}
 	return nil
 }
 
 func validateSubmitTaskImageURLsWithRefValidator(imageURLs []string, validateRef func(string) error) error {
 	if len(imageURLs) > maxSubmitTaskImageURLs {
-		return fmt.Errorf("图片数量不能超过 %d 张", maxSubmitTaskImageURLs)
+		return fmt.Errorf(msgValidateSubmitTaskImageURLsWithRefValidator, maxSubmitTaskImageURLs)
 	}
 	for _, raw := range imageURLs {
 		url := strings.TrimSpace(raw)
 		if url == "" {
-			return fmt.Errorf("图片地址不能为空")
+			return fmt.Errorf(msgValidateSubmitTaskImageURLsWithRefValidator2)
 		}
 		if len([]byte(url)) > maxSubmitTaskImageURLBytes {
-			return fmt.Errorf("图片地址长度不能超过 %d 字符", maxSubmitTaskImageURLBytes)
+			return fmt.Errorf(msgValidateSubmitTaskImageURLsWithRefValidator3, maxSubmitTaskImageURLBytes)
 		}
 		if err := validateRef(url); err != nil {
 			return err
@@ -75,12 +75,12 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 	for _, key := range mediarefs.CanonicalListKeys() {
 		values := mediarefs.CollectStringList(params[key])
 		if len(values) > maxSubmitTaskImageURLs {
-			return fmt.Errorf("%s 数量不能超过 %d 张", key, maxSubmitTaskImageURLs)
+			return fmt.Errorf(msgValidateSubmitTaskMediaParamsWithRefValidator, key, maxSubmitTaskImageURLs)
 		}
 	}
 	return mediarefs.ForEachParamMediaRef(params, func(key string, ref string) error {
 		if err := validateRef(ref); err != nil {
-			return fmt.Errorf("%s 无效: %w", key, err)
+			return fmt.Errorf(msgValidateSubmitTaskMediaParamsWithRefValidator2, key, err)
 		}
 		return nil
 	})
@@ -89,7 +89,7 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 func validateSubmitTaskContractKeys(params map[string]interface{}) error {
 	for _, key := range unsupportedSubmitTaskParamKeys {
 		if _, ok := params[key]; ok {
-			return fmt.Errorf("任务参数必须使用结构化字段")
+			return fmt.Errorf(msgValidateSubmitTaskContractKeys)
 		}
 	}
 	return nil

@@ -233,8 +233,21 @@ function createCanvasRuntimeDeletion(
   })
 }
 
+function createHistorySessionBinding(
+  options: UseFlowCanvasRuntimeOptions,
+  getRuntime: () => CanvasGraphSessionRuntime | null,
+): Pick<Parameters<typeof useCanvasRuntimeHistory>[1], 'isAttached' | 'getBoardId'> {
+  return {
+    isAttached: () => getRuntime()?.isAttached() ?? false,
+    getBoardId: () => options.boardSession.currentBoardId.value,
+  }
+}
+
 function useCanvasRuntimeHistory(
   readCanvasGraphStore: CanvasGraphSessionRuntime['readCanvasGraphStore'],
+  session: Pick<CanvasGraphSessionRuntime, 'isAttached'> & {
+    getBoardId: () => string | null | undefined
+  },
 ) {
   return useCanvasGraphHistory({
     maxSteps: 10,
@@ -245,6 +258,8 @@ function useCanvasRuntimeHistory(
       })
       return summary.didChange
     },
+    isAttached: () => session.isAttached(),
+    getBoardId: () => session.getBoardId(),
   })
 }
 
@@ -268,7 +283,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   const readCanvasGraphStore = () => requireGraphSessionRuntime().readCanvasGraphStore()
 
-  const canvasGraphHistory = useCanvasRuntimeHistory(readCanvasGraphStore)
+  const historyBinding = createHistorySessionBinding(options, () => graphSessionRuntime)
+  const canvasGraphHistory = useCanvasRuntimeHistory(readCanvasGraphStore, historyBinding)
 
   const boardSync = useCanvasRuntimeBoardSync(
     options,

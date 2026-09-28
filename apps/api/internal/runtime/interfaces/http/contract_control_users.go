@@ -93,7 +93,7 @@ func parseControlUserID(c *gin.Context) (uuid.UUID, bool) {
 	raw := strings.TrimSpace(c.Param("user_id"))
 	parsed, err := tenancy.ParseUserPublicID(raw)
 	if err != nil || parsed == uuid.Nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "无效的用户 id")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest9)
 		return uuid.Nil, false
 	}
 	return parsed, true
@@ -104,22 +104,22 @@ func parseControlUserID(c *gin.Context) (uuid.UUID, bool) {
 func writeControlIdentityCommandError(c *gin.Context, err error) {
 	var commandErr *identityports.IdentityAdminCommandError
 	if err == nil {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "管理员操作失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable29)
 		return
 	}
 	if !errors.As(err, &commandErr) {
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "管理员操作失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable29)
 		return
 	}
 	message := commandErr.Message
 	if message == "" {
-		message = "管理员操作失败"
+		message = msgServiceUnavailable29
 	}
 	switch commandErr.Kind {
 	case identityports.IdentityAdminInvalid:
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, message)
 	case identityports.IdentityAdminTargetNotFound, identityports.IdentityAdminAuthIdentityNotFound:
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 	case identityports.IdentityAdminConflict:
 		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, message)
 	case identityports.IdentityAdminForbidden:
@@ -131,14 +131,14 @@ func writeControlIdentityCommandError(c *gin.Context, err error) {
 
 func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext) {
 	if d == nil || d.Users == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用户服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable30)
 		return
 	}
 	page := 1
 	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
 		decoded, err := contract.DecodeCursor[controlUserCursor](raw)
 		if err != nil || decoded == nil || decoded.Page < 1 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid)
 			return
 		}
 		page = decoded.Page
@@ -147,7 +147,7 @@ func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext)
 	if raw := strings.TrimSpace(c.Query("page_size")); raw != "" {
 		parsed, err := contract.ParsePageSize(raw)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 无效")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest13)
 			return
 		}
 		pageSize = parsed
@@ -161,10 +161,10 @@ func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext)
 	})
 	if err != nil {
 		if validation.Is(err) {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "获取用户列表失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable31)
 		return
 	}
 	items := make([]controlUser, 0, len(result.List))
@@ -176,7 +176,7 @@ func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext)
 	if hasMore {
 		encoded, err := contract.EncodeCursor(controlUserCursor{Page: page + 1})
 		if err != nil {
-			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "获取用户列表失败")
+			contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable31)
 			return
 		}
 		nextCursor = encoded
@@ -186,7 +186,7 @@ func (d *ContractControlDeps) listControlUsers(c *gin.Context, _ controlContext)
 
 func (d *ContractControlDeps) getControlUser(c *gin.Context, _ controlContext) {
 	if d == nil || d.Users == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "用户服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable30)
 		return
 	}
 	id, ok := parseControlUserID(c)
@@ -196,14 +196,14 @@ func (d *ContractControlDeps) getControlUser(c *gin.Context, _ controlContext) {
 	user, err := d.Users.GetByPublicID(c.Request.Context(), id.String())
 	if err != nil {
 		if database.IsNotFound(err) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取用户失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable32)
 		return
 	}
 	if user == nil || user.ID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 		return
 	}
 	contract.RenderSuccess(c, newControlUser(user))
@@ -211,7 +211,7 @@ func (d *ContractControlDeps) getControlUser(c *gin.Context, _ controlContext) {
 
 func (d *ContractControlDeps) requireControlIdentityCommands(c *gin.Context) (identityports.IdentityAdminCommands, bool) {
 	if d == nil || d.Identity == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "身份管理命令未配置")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable33)
 		return nil, false
 	}
 	return d.Identity, true
@@ -232,7 +232,7 @@ func (d *ContractControlDeps) updateControlUserRole(c *gin.Context, ctx controlC
 	}
 	var req controlSetRoleRequest
 	if err := contract.BindStrictJSON(c, &req); err != nil || strings.TrimSpace(req.Role) == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	if err := commands.SetRole(c.Request.Context(), ctx.Operator, id.String(), strings.TrimSpace(req.Role)); err != nil {
@@ -260,11 +260,11 @@ func (d *ContractControlDeps) banControlUser(c *gin.Context, ctx controlContext)
 	}
 	var req controlBanUserRequest
 	if err := contract.BindStrictJSON(c, &req); err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "参数错误")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
 	if req.ExpiresInDays < 0 {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "expires_in_days 不能小于 0")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest25)
 		return
 	}
 	reason := strings.TrimSpace(req.Reason)
@@ -339,7 +339,7 @@ func (d *ContractControlDeps) deleteControlUser(c *gin.Context, ctx controlConte
 
 func (d *ContractControlDeps) impersonateControlUser(c *gin.Context, ctx controlContext) {
 	if d == nil || d.Users == nil || d.Impersonator == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "伪装登录服务未配置")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable34)
 		return
 	}
 	id, ok := parseControlUserID(c)
@@ -349,22 +349,22 @@ func (d *ContractControlDeps) impersonateControlUser(c *gin.Context, ctx control
 	target, err := d.Users.GetByPublicID(c.Request.Context(), id.String())
 	if err != nil {
 		if database.IsNotFound(err) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 			return
 		}
-		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, "读取用户失败")
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable32)
 		return
 	}
 	if target == nil || target.ID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, "用户不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeControlNotFound, msgControlNotFound5)
 		return
 	}
 	if ctx.Operator.UserID() == target.ID {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "不能模拟当前登录管理员自己")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest26)
 		return
 	}
 	if strings.ToLower(strings.TrimSpace(target.Role)) == domain.RoleAdmin {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "不能模拟管理员账号")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest27)
 		return
 	}
 	authUserID := ""
@@ -372,7 +372,7 @@ func (d *ContractControlDeps) impersonateControlUser(c *gin.Context, ctx control
 		authUserID = strings.TrimSpace(*target.AuthUserID)
 	}
 	if authUserID == "" {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "目标用户缺少 auth_user_id，无法模拟登录")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest28)
 		return
 	}
 	cookies, err := d.Impersonator.ImpersonateUser(c.Request.Context(), c.GetHeader("Cookie"), authUserID)
@@ -396,15 +396,15 @@ type controlImpersonationStatusError interface {
 func writeControlImpersonationError(c *gin.Context, err error) {
 	var statusErr controlImpersonationStatusError
 	if err == nil || !errors.As(err, &statusErr) {
-		contract.RenderError(c, http.StatusBadGateway, contract.CodeServiceUnavailable, "认证服务伪装登录失败")
+		contract.RenderError(c, http.StatusBadGateway, contract.CodeServiceUnavailable, msgServiceUnavailable35)
 		return
 	}
 	switch statusErr.StatusCode() {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, "认证服务拒绝伪装登录")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeForbidden, msgForbidden3)
 	case http.StatusBadRequest, http.StatusNotFound:
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "目标用户无法进行伪装登录")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest29)
 	default:
-		contract.RenderError(c, http.StatusBadGateway, contract.CodeServiceUnavailable, "认证服务伪装登录失败")
+		contract.RenderError(c, http.StatusBadGateway, contract.CodeServiceUnavailable, msgServiceUnavailable35)
 	}
 }

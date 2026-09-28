@@ -63,7 +63,7 @@ func (h *Handler) CreateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		writeStorageCommandError(c, "保存失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgCreateProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
@@ -86,7 +86,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		writeStorageCommandError(c, "保存失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgCreateProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
@@ -101,10 +101,10 @@ func (h *Handler) DeleteProfile(c *gin.Context) {
 		return
 	}
 	if err := h.service.DeleteProfile(c.Request.Context(), c.Param("id")); err != nil {
-		writeStorageCommandError(c, "删除失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgDeleteProfile, err)
 		return
 	}
-	response.SuccessDTO(c, storageMessageResponse{Message: "删除成功"})
+	response.SuccessDTO(c, storageMessageResponse{Message: msgDeleteProfile2})
 }
 
 func (h *Handler) ApplyProfile(c *gin.Context) {
@@ -114,12 +114,12 @@ func (h *Handler) ApplyProfile(c *gin.Context) {
 	}
 	profile, err := h.service.ApplyProfile(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		writeStorageCommandError(c, "设为当前失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgApplyProfile, err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageResponse{
 		Profile: profile,
-		Message: "已设为当前存储",
+		Message: msgApplyProfile2,
 	})
 }
 
@@ -129,10 +129,10 @@ func (h *Handler) TestProfile(c *gin.Context) {
 		return
 	}
 	if err := h.service.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
-		writeStorageCommandError(c, "连接测试失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgTestProfile, err)
 		return
 	}
-	response.SuccessDTO(c, storageMessageResponse{Message: "连接成功"})
+	response.SuccessDTO(c, storageMessageResponse{Message: msgTestProfile2})
 }
 
 func (h *Handler) GetBucketInfo(c *gin.Context) {
@@ -142,7 +142,7 @@ func (h *Handler) GetBucketInfo(c *gin.Context) {
 	}
 	info, err := h.service.GetBucketInfo(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		writeStorageCommandError(c, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, msgGetBucketInfo, err)
 		return
 	}
 	response.SuccessDTO(c, storageBucketInfoResponse{Info: info})
@@ -175,7 +175,7 @@ type userMessageError interface {
 
 func (h *Handler) saveProfile(c *gin.Context, req *domain.StorageProfile) (*domain.StorageProfile, error) {
 	if h.service == nil {
-		return nil, errors.New("存储服务未初始化")
+		return nil, errors.New(msgSaveProfile)
 	}
 	if storageShouldApplyProfile(c) {
 		return h.service.SaveAndApplyProfile(c.Request.Context(), req)
@@ -189,7 +189,7 @@ func storageShouldApplyProfile(c *gin.Context) bool {
 
 func storageSaveProfileMessage(c *gin.Context) string {
 	if storageShouldApplyProfile(c) {
-		return "已保存并设为当前存储"
+		return msgStorageSaveProfileMessage
 	}
-	return "保存成功"
+	return msgStorageSaveProfileMessage2
 }

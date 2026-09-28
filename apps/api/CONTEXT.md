@@ -64,10 +64,40 @@ Code under `apps/api` is organized as runtime/platform/business contexts. This f
 - Usage composes immutable Credit Captures with Task Billing snapshots in realtime, using a feature-local, capacity-2,048, ~30s TTL per-process LRU cache. The cache must isolate by `(user_id, range)` with copy-on-read/write; multi-instance deployments accept ~30s eventual freshness with no Redis invalidation or Daily Projection.
 - Billing Records composes Credits Ledger with immutable Task Billing Snapshots read-only: it uses authenticated `user_id` with Ledger sequence keyset pagination, hides internal or not-yet-displayed flows like Hold/Release/Refund, emits stable backend `kind/title`, and the frontend must not parse Ledger `source/reason`.
 - New routes render through the contract kernel: errors use `contract.Code` (callers branch on code, never message text; `StatusOf` owns the code-to-status mapping) with the single envelope (`contract.RenderSuccess` / `RenderCreated` / `RenderAccepted` / `RenderPaginated` for 2xx JSON, `contract.RenderError` / `RenderCode` for errors). The specs mirror this: 2xx JSON bodies are `{data, meta?}` (`meta` required on pages), errors are `ErrorEnvelope` / `ControlErrorEnvelope`, every response carries `Request-Id`. Frozen exceptions only: raw byte reads (media content/derivative `octet-stream`, control brand-logo SVG) and SSE streams (workspace events, control monitor) — never JSON outside the envelope.
+- HTTP envelopes are three layers, and `platform/response` is not deprecated. Layer 1 is `response.*` (numeric `{code,msg,message_safe}` successes plus `MachineError` `{code,msg,message_safe}`) as the control-proxy translator input: legacy domain handlers keep rendering it, and the Control Plane translates it at the boundary (pinned by `TestControlProxy*` in `internal/runtime/interfaces/http/contract_control_proxy_envelope_test.go`). Layer 2 is the wire-stable machine envelope `{code,msg,message_safe}` edge tables (per-domain sentinel→code tables rendered via `errorrender`), frozen per the kernel code registry in `internal/platform/contract`. Layer 3 is the blessed protocol exceptions that are never JSON envelopes (health/readiness probes, Stripe webhook bytes, static upload bytes, SSE streams, cross-cutting middleware), pinned by `TestContractInventory*` in `internal/runtime/interfaces/http/contract_inventory_test.go`. New v1/control JSON handlers render via `platform/contract`; only the documented exceptions live outside it (pinned by `TestContractV1EnvelopeUnification` / `TestContractControlEnvelopeUnification`).
 - Public feeds page with opaque cursor + `page_size` (`contract.ParsePageSize`: default 20, max 100; cursors come from `contract.EncodeCursor`, stay bound to principal/filters/sort, malformed input renders `pagination_cursor_invalid`). Admin/control lists bound size with `pagination.ParseLimit` (`limit`, default 50, max 200) plus an opaque `cursor`, or store-ordered `before_id` where the backing store is id-ordered (reconciliation runs/findings, reward redemptions). Never add `page` / `page_number` offsets or raw (non-opaque) cursors.
 - `Idempotency-Key` is header-only (no body key): required on ledger-writing creates (checkout sessions, credit grants/deductions/refunds/corrections, task submit, reward redemption, payment refunds) and on every control mutation; optional on naturally-idempotent writes (renames, role updates, idempotent restores/revokes, read-like POSTs such as quotes, batch reads, search, route-preview) — but every mutation documents its status in the spec (the shared `IdempotencyKey` parameter when required, else an explicit `No Idempotency-Key …` description). Key reuse with the same request hash replays the first result; reuse with a different hash renders 409 `*_idempotency_conflict`.
 - New ID scalar patterns must match the kernel alphabet `^<prefix>_[A-Za-z0-9_-]+$` (`contract.IsValidPublicID`) and pin the family in the `scripts/openapi-pattern-check.sh` canonical table. Reserved prefixes (`ba_`, `lmat_`, `rwd_`, `rdm_`, `rec_`) stay off the wire until their `public_id` columns land; rewards/reconciliation ids remain numeric by formal exception.
 - Structural spec guard: `scripts/openapi-pattern-check.sh` asserts every operation has an `operationId` and every mutation (`POST`/`PUT`/`PATCH`/`DELETE`) states its Idempotency-Key status. Grandfathered gaps live in that script's allowlist; current spec-side residuals are report-only (fix via spec PR, never silently).
+
+## Backend Copy Vocabulary
+
+Backend user-facing copy lives in per-context tables (`internal/**/message.go` plus Han-literal `internal/**/errors.go` extensions); storage stays distributed, wording is managed here. New copy MUST use the canonical wording below; the banned variants MUST NOT reappear (pinned by `scripts/check-backend-copy.sh`).
+
+| # | Concept | Canonical | Banned variants |
+| - | ------- | --------- | --------------- |
+| 1 | Service temporarily unavailable | `<Subject>暂不可用` (no `暂时`; ledger write drops it: `账本写入失败`) | `Stripe 服务暂时不可用`, `当前 Stripe 服务暂时不可用`, `搜索服务暂时不可用`, `视觉搜索暂时不可用`, `账本写入暂时失败` |
+| 2 | Generic bad params | `参数错误` | `请求参数错误` |
+| 3 | Invalid input | `<Subject>无效` | `分页游标非法`, `视觉搜索输入非法`, `page_size 非法` |
+| 4 | Rate limited | `操作过于频繁，请稍后重试` | `操作频繁，请稍后重试` |
+| 5 | Empty provider response | `供应商返回空响应` | `供应商返回为空响应` |
+| 6 | Auth service down | `认证服务暂不可用` | `认证服务不可用` |
+| 7 | Wallet restricted | `当前工作区钱包受限，暂不可用` (never truncate to `暂不可`) | `当前工作区钱包受限，暂不可` |
+| 8 | Stripe denial scope | `当前 Stripe API Key 权限不足`, `当前 Stripe 账户不可用`, `当前 Stripe 账户暂不具备收款能力` (internal detail strings align to the typed contract/domain canonicals) | `Stripe API Key 权限不足`, `Stripe 账户不可用`, `Stripe 账户暂不具备收款能力` |
+| 9 | System settings service missing | `系统设置服务未配置` | `系统设置服务未初始化` |
+| 10 | Gateway model-mapping read | `读取网关模型映射失败` | `读取模型映射失败` |
+| 11 | Terms acceptance | `请先同意服务条款与退款政策` (aligns to domain `ErrTermsAcceptanceRequired`) | `请先同意当前服务条款与退款政策` |
+| 12 | Idempotency mismatch | `幂等请求与原请求不一致` | `幂等请求与原创建参数不一致` |
+| 13 | Admin enum validation | `role 仅支持 admin 或 user`, `status 仅支持 0 或 1` (code-adjacent prefix, spaced digits) | `角色值无效，仅支持 admin 或 user`, `状态值无效，仅支持0或1` |
+
+Deliberately NOT converged (context-specific, different code/state/scope — do not "fix" these):
+- `未配置` vs `暂不可用` vs `不存在` (different states: never configured, transiently down, missing entity).
+- `认证服务拒绝伪装登录` (`Rejected`/`Forbidden`) vs `认证服务伪装登录失败` (`Unavailable`): different codes.
+- `不能操作…` (admin self-operation guard) vs `不能模拟…` (impersonation): different semantics.
+- `需要管理员权限` (admin-required) vs `权限不足` (generic forbidden): different nuance.
+- `*不存在` / `*失败` / `*不能为空` / `*无效` with different subjects: entity-specific, keep the subject.
+- `社区模型目录*` (detect/fetch operation) vs `models.dev *` (reference-load operation): different operations.
+- Suffix-shared but cause-specific strings (`请联系管理员`, `请检查配置或稍后重试`, `请稍后重试` with different verbs/subjects).
 
 ## When To Expand A Context
 

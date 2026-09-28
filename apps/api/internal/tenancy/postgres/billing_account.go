@@ -9,7 +9,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
@@ -61,7 +60,7 @@ func (s *BillingAccountStore) dbWithContext(ctx context.Context) repositoryQuery
 // GetBillingAccountByWorkspaceID reads LIMIT 1.
 func (s *BillingAccountStore) EnsureBillingAccountForWorkspace(ctx context.Context, workspaceInternalID int64, workspacePublicID string) (BillingAccount, error) {
 	if s == nil || s.q == nil {
-		return BillingAccount{}, errors.New("tenancy: billing account store not configured")
+		return BillingAccount{}, tenancy.ErrBillingStoreNotConfigured
 	}
 	created, err := ensureBillingAccountForWorkspace(ctx, s.dbWithContext(ctx).q, workspaceInternalID)
 	if err != nil {
@@ -80,7 +79,7 @@ func EnsureBillingAccountForWorkspaceWithQueries(ctx context.Context, queries *d
 
 func ensureBillingAccountForWorkspace(ctx context.Context, queries *dbsqlc.Queries, workspaceInternalID int64) (dbsqlc.BillingAccount, error) {
 	if queries == nil || workspaceInternalID <= 0 {
-		return dbsqlc.BillingAccount{}, errors.New("tenancy: billing account workspace is invalid")
+		return dbsqlc.BillingAccount{}, tenancy.ErrBillingWorkspaceInvalid
 	}
 	key := pgtype.Int8{Int64: workspaceInternalID, Valid: true}
 	if row, err := queries.GetBillingAccountByWorkspaceID(ctx, key); err == nil {

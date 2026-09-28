@@ -31,7 +31,7 @@ import (
 func (d *ContractControlDeps) controlProxy(route controlRoute, capability string, available bool, method func(*gin.Context)) gin.HandlerFunc {
 	return d.guard(capability, route, func(c *gin.Context, _ controlContext) {
 		if !available {
-			contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, "控制面服务未实现")
+			contract.RenderError(c, http.StatusNotImplemented, contract.CodeContractNotImplemented, msgContractNotImplemented)
 			return
 		}
 		translateControlProxyResponse(c, method)

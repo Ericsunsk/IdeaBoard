@@ -99,20 +99,20 @@ func (h *contractV1Handler) boardWorkspaceContext(c *gin.Context, identityPrinci
 func (h *contractV1Handler) boardAccess(c *gin.Context, workspace *tenancy.Workspace, workspaceRole string, userID int64) (*boards.V1Board, boards.AccessRole, bool) {
 	raw := strings.TrimSpace(c.Param("board_id"))
 	if !contract.IsBoardID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	ctx := c.Request.Context()
 	board, err := h.deps.Boards.GetBoard(ctx, workspace.PublicID, raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	role, ok, err := h.deps.Boards.GetBoardRole(ctx, workspace.PublicID, board.PublicID, userID, workspaceRole)
 	if err != nil || !ok {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 		c.Abort()
 		return nil, "", false
 	}
@@ -127,7 +127,7 @@ func requireBoardRole(c *gin.Context, role boards.AccessRole, allowed ...boards.
 			return true
 		}
 	}
-	contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, "权限不足")
+	contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, msgForbidden)
 	c.Abort()
 	return false
 }
@@ -135,36 +135,36 @@ func requireBoardRole(c *gin.Context, role boards.AccessRole, allowed ...boards.
 func renderBoardError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, boards.ErrNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound)
 	case errors.Is(err, boards.ErrRevisionConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeBoardRevisionConflict, "看板版本已变更，请刷新后重试")
+		contract.RenderError(c, http.StatusConflict, contract.CodeBoardRevisionConflict, msgBoardRevisionConflict)
 	case errors.Is(err, boards.ErrPermissionDenied):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBoardForbidden, msgForbidden)
 	case errors.Is(err, boards.ErrV1Archived):
-		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, "看板已归档")
+		contract.RenderError(c, contract.StatusOf(contract.CodeBoardArchived), contract.CodeBoardArchived, msgBoardArchived)
 	case errors.Is(err, boards.ErrMemberNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, msgWorkspaceMemberNotFound)
 	case errors.Is(err, boards.ErrMemberInviteSelf):
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"不能邀请或移除所有者", contract.FieldErrors{Fields: map[string]string{"user_id": "invalid"}})
+			msgRenderBoardError, contract.FieldErrors{Fields: map[string]string{"user_id": "invalid"}})
 	case errors.Is(err, boards.ErrMemberInvalidRole):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+			msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 	case errors.Is(err, boards.ErrIDConflict):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 	case errors.Is(err, boards.ErrV1LastOwner):
 		contract.RenderError(c, contract.StatusOf(contract.CodeMembershipTransitionForbidden),
-			contract.CodeMembershipTransitionForbidden, "最后一个所有者不能被移除或降级")
+			contract.CodeMembershipTransitionForbidden, msgMembershipTransitionForbidden2)
 	case errors.Is(err, boards.ErrShareTokenNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, "分享链接不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
 	case errors.Is(err, boards.ErrShareTokenRevoked),
 		errors.Is(err, boards.ErrShareTokenExpired),
 		errors.Is(err, boards.ErrV1ShareTokenExpired),
 		errors.Is(err, boards.ErrShareTokenInvalid):
 		contract.RenderError(c, contract.StatusOf(contract.CodeBoardShareTokenInvalid),
-			contract.CodeBoardShareTokenInvalid, "分享链接无效")
+			contract.CodeBoardShareTokenInvalid, msgBoardShareTokenInvalid)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 	}
 	c.Abort()
 }
@@ -179,7 +179,7 @@ func (h *contractV1Handler) boardDo(c *gin.Context, userExternalID string, userI
 	result, _, err := h.deps.Idempotency.Do(c.Request.Context(), scope, userID, key, hash, fn)
 	if err != nil {
 		if contract.IsIdempotencyConflict(err) {
-			contract.RenderError(c, http.StatusConflict, contract.CodeBoardIdempotencyConflict, "幂等请求与原请求不一致")
+			contract.RenderError(c, http.StatusConflict, contract.CodeBoardIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 			c.Abort()
 			return nil, nil, false
 		}
@@ -196,7 +196,7 @@ func renderJoinError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, boards.ErrInvalidInput):
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"分享令牌非法", contract.FieldErrors{Fields: map[string]string{"token": "invalid"}})
+			msgRenderJoinError, contract.FieldErrors{Fields: map[string]string{"token": "invalid"}})
 	case errors.Is(err, boards.ErrShareTokenNotFound),
 		errors.Is(err, boards.ErrShareTokenRevoked),
 		errors.Is(err, boards.ErrShareTokenExpired),
@@ -204,9 +204,9 @@ func renderJoinError(c *gin.Context, err error) {
 		errors.Is(err, boards.ErrShareTokenInvalid),
 		errors.Is(err, boards.ErrNotFound),
 		errors.Is(err, boards.ErrV1Archived):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, "分享链接不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 	}
 	c.Abort()
 }
@@ -214,7 +214,7 @@ func renderJoinError(c *gin.Context, err error) {
 func requireBoardIdempotencyKey(c *gin.Context) (string, bool) {
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return "", false
 	}
@@ -228,14 +228,14 @@ func parseBoardIfMatch(c *gin.Context) (int64, bool) {
 	raw := contract.IfMatch(c)
 	if strings.TrimSpace(raw) == "" {
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"缺少版本前提", contract.FieldErrors{Fields: map[string]string{"if_match": "required"}})
+			msgParseBoardIfMatch, contract.FieldErrors{Fields: map[string]string{"if_match": "required"}})
 		c.Abort()
 		return 0, false
 	}
 	revision, err := boards.ParseV1IfMatch(raw)
 	if err != nil {
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"版本前提非法", contract.FieldErrors{Fields: map[string]string{"if_match": "invalid"}})
+			msgParseBoardIfMatch2, contract.FieldErrors{Fields: map[string]string{"if_match": "invalid"}})
 		c.Abort()
 		return 0, false
 	}
@@ -286,7 +286,7 @@ func toBoardDTO(board *boards.V1Board) v1BoardDTO {
 func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, bool) {
 	pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 		c.Abort()
 		return nil, contract.PageMeta{}, false
 	}
@@ -294,14 +294,14 @@ func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, b
 	if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 		cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 		if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 			c.Abort()
 			return nil, contract.PageMeta{}, false
 		}
 		offset = cursor.Offset
 	}
 	if offset > len(items) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 		c.Abort()
 		return nil, contract.PageMeta{}, false
 	}
@@ -313,7 +313,7 @@ func boardPageSlice[T any](items []T, c *gin.Context) ([]T, contract.PageMeta, b
 	if end < len(items) {
 		next, encodeErr := contract.EncodeCursor(v1ListCursor{Offset: end})
 		if encodeErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 			c.Abort()
 			return nil, contract.PageMeta{}, false
 		}
@@ -372,7 +372,7 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 		name := strings.TrimSpace(body.Data.Name)
 		if err := boards.ValidateV1BoardName(name); err != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+				msgCreateBoard, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 			c.Abort()
 			return
 		}
@@ -443,7 +443,7 @@ func (h *contractV1Handler) renameBoard(c *gin.Context) {
 		name := strings.TrimSpace(body.Data.Name)
 		if err := boards.ValidateV1BoardName(name); err != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"看板名称非法", contract.FieldErrors{Fields: map[string]string{"name": "required"}})
+				msgCreateBoard, contract.FieldErrors{Fields: map[string]string{"name": "required"}})
 			c.Abort()
 			return
 		}
@@ -609,14 +609,14 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 		})
 		if marshalErr != nil {
 			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-				"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
+				msgReplaceBoardDocument, contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
 			c.Abort()
 			return
 		}
 		schemaVersion, _, validateErr := boards.ValidateV1DocumentStrict(rawEnvelope)
 		if validateErr != nil {
 			contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-				"文档快照非法", contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
+				msgReplaceBoardDocument, contract.FieldErrors{Fields: map[string]string{"document": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -728,7 +728,7 @@ func (h *contractV1Handler) getBoardRevision(c *gin.Context) {
 		// numbers converge to 404.
 		revisionNumber, parseErr := strconv.ParseInt(strings.TrimSpace(c.Param("revision_id")), 10, 64)
 		if parseErr != nil || revisionNumber <= 0 {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, "看板版本不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardNotFound, msgBoardNotFound2)
 			c.Abort()
 			return
 		}
@@ -759,7 +759,7 @@ func (h *contractV1Handler) toBoardMemberDTO(c *gin.Context, userID int64, role 
 	}
 	publicID, err := h.deps.Users.GetUserPublicID(c.Request.Context(), userID)
 	if err != nil || publicID == uuid.Nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "成员服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable47)
 		c.Abort()
 		return v1BoardMemberDTO{}, false
 	}
@@ -769,7 +769,7 @@ func (h *contractV1Handler) toBoardMemberDTO(c *gin.Context, userID int64, role 
 func (h *contractV1Handler) resolveBoardMemberUserID(c *gin.Context, raw string) (int64, bool) {
 	trimmed := strings.TrimSpace(raw)
 	if !contract.IsUserID(trimmed) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, false
 	}
@@ -781,13 +781,13 @@ func (h *contractV1Handler) resolveBoardMemberUserID(c *gin.Context, raw string)
 	}
 	parsed, err := tenancy.ParseUserPublicID(trimmed)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, false
 	}
 	userID, err := h.deps.Users.ResolveUserID(c.Request.Context(), parsed)
 	if err != nil || userID <= 0 {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, "成员不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBoardMemberNotFound, msgWorkspaceMemberNotFound)
 		c.Abort()
 		return 0, false
 	}
@@ -858,7 +858,7 @@ func (h *contractV1Handler) addBoardMember(c *gin.Context) {
 		targetRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
 		if err := boards.ValidateV1BoardRole(targetRole); err != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -933,7 +933,7 @@ func (h *contractV1Handler) updateBoardMember(c *gin.Context) {
 		newRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
 		if err := boards.ValidateV1BoardRole(newRole); err != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"成员角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgRenderBoardError2, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -1106,7 +1106,7 @@ func (h *contractV1Handler) createShareToken(c *gin.Context) {
 		shareRole := boards.AccessRole(strings.TrimSpace(body.Data.Role))
 		if shareRole != boards.RoleEditor && shareRole != boards.RoleViewer {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-				"分享角色非法", contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
+				msgCreateShareToken, contract.FieldErrors{Fields: map[string]string{"role": "invalid"}})
 			c.Abort()
 			return
 		}
@@ -1162,7 +1162,7 @@ func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
 		// lookup and read as 404 (tolerated read-only, never a distinct status).
 		tokenID := strings.TrimSpace(c.Param("token_id"))
 		if tokenID == "" {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, "分享链接不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBoardShareTokenNotFound, msgBoardShareTokenNotFound)
 			c.Abort()
 			return
 		}
@@ -1221,13 +1221,13 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	// explicit board rows still override.
 	rawWorkspace := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(rawWorkspace) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return
 	}
 	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), rawWorkspace)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, "工作区不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceNotFound, msgListControlBillingAccounts)
 		c.Abort()
 		return
 	}
@@ -1243,7 +1243,7 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	bearer := strings.TrimSpace(body.Data.Token)
 	if bearer == "" {
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
-			"分享令牌非法", contract.FieldErrors{Fields: map[string]string{"token": "required"}})
+			msgRenderJoinError, contract.FieldErrors{Fields: map[string]string{"token": "required"}})
 		c.Abort()
 		return
 	}
@@ -1255,7 +1255,7 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	// could not reach the workspace-rooted surface. On join failure the
 	// grant only confers the workspace viewer default (owners get owner).
 	if _, memberErr := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), tenancy.RoleMember); memberErr != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "看板服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
 		c.Abort()
 		return
 	}

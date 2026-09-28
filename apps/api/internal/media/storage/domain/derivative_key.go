@@ -14,7 +14,7 @@ func ImageDerivativeObjectKey(sourceKey, assetID, tier, format string) (string, 
 		return "", err
 	}
 	if assetID == "" || tier == "" || format == "" {
-		return "", fmt.Errorf("图片派生对象参数无效")
+		return "", fmt.Errorf(msgImageDerivativeObjectKey)
 	}
 	return NormalizeUploadObjectKey(path.Join(
 		path.Dir(normalized), ImageDerivativeDirectory, assetID, tier+"."+format,

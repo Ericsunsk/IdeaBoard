@@ -54,6 +54,7 @@ import (
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/applog"
+	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/contract"
 
 	"github.com/gin-gonic/gin"
@@ -72,12 +73,15 @@ const (
 )
 
 // ControlAuditOutcome classifies a guarded control call for the audit
-// record (mirrored in openapi.control.yaml AuditRecord.outcome).
+// record (mirrored in openapi.control.yaml AuditRecord.outcome). These
+// are aliases for the single platform/audit Outcome vocabulary: there is
+// exactly one failure spelling (failure), shared with the durable store
+// and the impersonation audit path.
 const (
-	ControlAuditRead   = "read"
-	ControlAuditOK     = "success"
-	ControlAuditDenied = "denied"
-	ControlAuditFailed = "failed"
+	ControlAuditRead   = audit.OutcomeRead
+	ControlAuditOK     = audit.OutcomeSuccess
+	ControlAuditDenied = audit.OutcomeDenied
+	ControlAuditFailed = audit.OutcomeFailure
 )
 
 // OperatorReasonHeader carries the operator note for mutating control
@@ -112,20 +116,20 @@ const maxControlBodyBytes = 64 << 10
 // target identifiers are public ids only (usr_*, ws_*, task_*, order
 // numbers); internal numeric ids never appear here.
 type ControlAuditRecord struct {
-	OperatorType   string    `json:"operator_type"`
-	OperatorID     string    `json:"operator_id"`
-	TargetType     string    `json:"target_type,omitempty"`
-	TargetID       string    `json:"target_id,omitempty"`
-	Capability     string    `json:"capability"`
-	Operation      string    `json:"operation"`
-	Route          string    `json:"route"`
-	RequestID      string    `json:"request_id"`
-	IdempotencyKey string    `json:"idempotency_key,omitempty"`
-	Reason         string    `json:"reason,omitempty"`
-	Outcome        string    `json:"outcome"`
-	Replayed       bool      `json:"replayed,omitempty"`
-	Status         int       `json:"status"`
-	OccurredAt     time.Time `json:"occurred_at"`
+	OperatorType   string        `json:"operator_type"`
+	OperatorID     string        `json:"operator_id"`
+	TargetType     string        `json:"target_type,omitempty"`
+	TargetID       string        `json:"target_id,omitempty"`
+	Capability     string        `json:"capability"`
+	Operation      string        `json:"operation"`
+	Route          string        `json:"route"`
+	RequestID      string        `json:"request_id"`
+	IdempotencyKey string        `json:"idempotency_key,omitempty"`
+	Reason         string        `json:"reason,omitempty"`
+	Outcome        audit.Outcome `json:"outcome"`
+	Replayed       bool          `json:"replayed,omitempty"`
+	Status         int           `json:"status"`
+	OccurredAt     time.Time     `json:"occurred_at"`
 }
 
 // ControlAuditSink receives audit records in tests. Production wires nil
@@ -242,12 +246,12 @@ func bufferControlBody(c *gin.Context) ([]byte, bool) {
 	}
 	raw, err := io.ReadAll(io.LimitReader(c.Request.Body, maxControlBodyBytes+1))
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体读取失败")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest)
 		return nil, false
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(raw))
 	if int64(len(raw)) > maxControlBodyBytes {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "请求体过大")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest2)
 		return nil, false
 	}
 	return raw, true

@@ -31,10 +31,7 @@ try {
   generateGo(tempGo)
 
   if (isCheck) {
-    const drift = [
-      ...compareDirectories(tsTarget, tempTS),
-      ...compareFiles(goTarget, tempGo),
-    ]
+    const drift = [...compareDirectories(tsTarget, tempTS), ...compareFiles(goTarget, tempGo)]
     if (drift.length > 0) {
       console.error(`Auth internal contract generated output is stale:\n${drift.join('\n')}`)
       process.exitCode = 1
@@ -55,9 +52,13 @@ function generateTypeScript(output) {
   execFileSync(
     executable,
     [
-      '--input', specPath,
-      '--output', output,
-      '--plugins', '@hey-api/typescript', 'fastify',
+      '--input',
+      specPath,
+      '--output',
+      output,
+      '--plugins',
+      '@hey-api/typescript',
+      'fastify',
       '--no-log-file',
       '--silent',
     ],
@@ -71,9 +72,12 @@ function generateGo(output) {
     [
       'tool',
       'oapi-codegen',
-      '-package', 'internalcontract',
-      '-generate', 'types,client',
-      '-o', output,
+      '-package',
+      'internalcontract',
+      '-generate',
+      'types,client',
+      '-o',
+      output,
       specPath,
     ],
     { cwd: apiRoot, stdio: 'inherit' },
@@ -97,14 +101,18 @@ function renderRouteContract() {
     }
   }
 
-  const properties = routes.map((route) => [
-    `  ${JSON.stringify(route.operationId)}: {`,
-    `    method: ${JSON.stringify(route.method)},`,
-    `    openapiPath: ${JSON.stringify(route.openapiPath)},`,
-    `    fastifyPath: ${JSON.stringify(route.fastifyPath)},`,
-    `    responseStatuses: ${JSON.stringify(route.responseStatuses)},`,
-    '  },',
-  ].join('\n')).join('\n')
+  const properties = routes
+    .map((route) =>
+      [
+        `  ${JSON.stringify(route.operationId)}: {`,
+        `    method: ${JSON.stringify(route.method)},`,
+        `    openapiPath: ${JSON.stringify(route.openapiPath)},`,
+        `    fastifyPath: ${JSON.stringify(route.fastifyPath)},`,
+        `    responseStatuses: ${JSON.stringify(route.responseStatuses)},`,
+        '  },',
+      ].join('\n'),
+    )
+    .join('\n')
 
   return [
     '// This file is auto-generated from contracts/auth-internal.openapi.json. Do not edit.',

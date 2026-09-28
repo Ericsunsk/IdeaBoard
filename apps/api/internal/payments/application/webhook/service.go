@@ -40,6 +40,22 @@ type ConvergenceStore interface {
 	ConvergePaymentDispute(context.Context, paymentports.StripeDispute, time.Time) (paymentsdomain.PaymentDispute, bool, error)
 }
 
+// WebhookProcessingResult is the closed inbox processing_result
+// vocabulary, verified against the SQL guard
+// ck_payment_webhook_processing_result
+// (processing_result IN ('received','ignored','processed','failed')).
+// The wire/DB words are unchanged; the type only documents the allowed
+// words at compile time. The inbox seam keeps string params (the
+// postgres boundary binds the words directly).
+type WebhookProcessingResult string
+
+const (
+	WebhookProcessingReceived  WebhookProcessingResult = "received"
+	WebhookProcessingIgnored   WebhookProcessingResult = "ignored"
+	WebhookProcessingProcessed WebhookProcessingResult = "processed"
+	WebhookProcessingFailed    WebhookProcessingResult = "failed"
+)
+
 type CredentialAccess func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
 
 type Dependencies struct {
@@ -114,10 +130,10 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 		return paymentports.StripeWebhookReceipt{}, paymentports.ErrMalformedWebhookPayload
 	}
 	recognized := paymentports.IsRecognizedStripeWebhookEvent(event.Type)
-	result := "received"
+	result := string(WebhookProcessingReceived)
 	var processedAt *time.Time
 	if !recognized {
-		result, processedAt = "ignored", &now
+		result, processedAt = string(WebhookProcessingIgnored), &now
 	}
 	duplicate, err := s.inbox.InsertStripeWebhookEvent(ctx, event, result, processedAt)
 	if err != nil {
@@ -154,17 +170,17 @@ func (s *Service) processEvent(ctx context.Context, event paymentports.StripeWeb
 	if !checkoutEvent {
 		if strings.HasPrefix(event.Type, "refund.") {
 			if err := s.processRefund(ctx, event, stored.CredentialID); err != nil {
-				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", paymentreconciliation.OperationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
+				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingFailed), paymentreconciliation.OperationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
 				return err
 			}
 		}
 		if strings.HasPrefix(event.Type, "charge.dispute.") {
 			if err := s.processDispute(ctx, event, stored.CredentialID); err != nil {
-				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", paymentreconciliation.OperationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
+				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingFailed), paymentreconciliation.OperationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
 				return err
 			}
 		}
-		return s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now)
+		return s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingProcessed), "", now)
 	}
 	return s.processCheckout(ctx, event, stored, signal, now)
 }
@@ -188,7 +204,7 @@ func (s *Service) processCheckout(ctx context.Context, event paymentports.Stripe
 	if _, err := s.checkout.ConvergeCheckoutSession(ctx, order, session, signal); err != nil {
 		return err
 	}
-	return s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now)
+	return s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingProcessed), "", now)
 }
 
 func (s *Service) processDispute(ctx context.Context, event paymentports.StripeWebhookEvent, credentialID string) error {

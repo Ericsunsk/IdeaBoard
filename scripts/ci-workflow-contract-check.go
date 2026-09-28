@@ -145,15 +145,10 @@ func checkReusableWorkflows(root string) {
 	ops := loadWorkflow(root, "ops.yml")
 	ciContracts := requireStep(object(object(ops, "jobs"), "verify"), "Verify CI orchestration contracts")
 	ciContractRun := stringValue(ciContracts["run"])
-	for _, command := range []string{
-		"bash scripts/ci-change-classifier-test.sh",
-		"bash scripts/ci-gate-test.sh",
-		"bash scripts/ci-media-package-boundary-test.sh",
-		"bash scripts/ci-legacy-media-zero-scan-test.sh",
-		"bash scripts/ci-workflow-contract-test.sh",
-	} {
-		requireContains(ciContractRun, command, "Ops must run "+command)
-	}
+	requireContains(ciContractRun, "bash scripts/run-all-self-tests.sh", "Ops must run the self-test manifest")
+	manifestBytes, err := os.ReadFile(filepath.Join(root, "scripts", "run-all-self-tests.sh"))
+	failIf(err)
+	requireContains(string(manifestBytes), "*-test.sh", "Self-test manifest must glob scripts/*-test.sh")
 }
 
 func checkRelease(root string, release workflow) {

@@ -4,7 +4,6 @@ package usage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -19,8 +18,6 @@ const MaxSafeInteger int64 = 9_007_199_254_740_991
 // a hard upper bound so a stalled database cannot leave singleflight work
 // running forever after every caller has disconnected.
 const sharedUsageLoadTimeout = 30 * time.Second
-
-var ErrUnsafeNumber = errors.New("usage value exceeds JavaScript safe integer range")
 
 type CaptureUsageReader interface {
 	GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error)
@@ -86,10 +83,10 @@ func NewService(
 
 func (s *Service) GetCurrent(ctx context.Context, userID int64, usageRange Range) (Usage, error) {
 	if s == nil || s.captures == nil || s.tasks == nil {
-		return Usage{}, fmt.Errorf("usage service: readers not configured")
+		return Usage{}, ErrReadersNotConfigured
 	}
 	if userID <= 0 {
-		return Usage{}, fmt.Errorf("usage service: invalid user id")
+		return Usage{}, ErrInvalidUserID
 	}
 	if !usageRange.Valid() {
 		return Usage{}, fmt.Errorf("usage service: %w: %q", ErrInvalidRange, usageRange)
@@ -137,7 +134,7 @@ func (s *Service) loadSingleflight(
 		}
 		result, ok := res.Val.(Usage)
 		if !ok {
-			return Usage{}, fmt.Errorf("usage service: unexpected cached value type")
+			return Usage{}, ErrCacheValueType
 		}
 		return result, nil
 	}
@@ -146,11 +143,11 @@ func (s *Service) loadSingleflight(
 func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange Range) (Usage, error) {
 	location, err := time.LoadLocation(ShanghaiTimezone)
 	if err != nil {
-		return Usage{}, fmt.Errorf("usage service: load timezone: %w", err)
+		return Usage{}, fmt.Errorf("%w: %w", ErrLoadTimezone, err)
 	}
 	totalCredits, peakDailyCredits, firstCaptureDay, err := s.captures.GetCaptureUsage(ctx, userID, location)
 	if err != nil {
-		return Usage{}, fmt.Errorf("usage service: read settled captures: %w", err)
+		return Usage{}, fmt.Errorf("%w: %w", ErrReadSettledCaptures, err)
 	}
 	if err := validateSafeInteger("total credits", totalCredits); err != nil {
 		return Usage{}, err
@@ -160,7 +157,7 @@ func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange Rang
 	}
 	taskCount, activeDays, err := s.tasks.GetTaskUsage(ctx, userID, location)
 	if err != nil {
-		return Usage{}, fmt.Errorf("usage service: read logical tasks: %w", err)
+		return Usage{}, fmt.Errorf("%w: %w", ErrReadLogicalTasks, err)
 	}
 	if err := validateSafeInteger("task count", taskCount); err != nil {
 		return Usage{}, err
@@ -198,7 +195,7 @@ func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange Rang
 		today.AddDate(0, 0, 1),
 	)
 	if err != nil {
-		return Usage{}, fmt.Errorf("usage service: read daily settled captures: %w", err)
+		return Usage{}, fmt.Errorf("%w: %w", ErrReadDailyCaptures, err)
 	}
 	result.Trend = make([]DailyUsage, 0, trendDays)
 	for dayIndex := 0; dayIndex < trendDays; dayIndex++ {
@@ -255,10 +252,10 @@ func ValidateUsage(value Usage, usageRange Range) error {
 		}
 	}
 	if value.Timezone != ShanghaiTimezone {
-		return fmt.Errorf("usage response: unsupported timezone %q", value.Timezone)
+		return fmt.Errorf("%w: %q", ErrUnsupportedTimezone, value.Timezone)
 	}
 	if len(value.Trend) != usageRange.Days() {
-		return fmt.Errorf("usage response: trend bucket count = %d, want %d", len(value.Trend), usageRange.Days())
+		return fmt.Errorf("%w: got %d, want %d", ErrTrendBucketCount, len(value.Trend), usageRange.Days())
 	}
 	return nil
 }

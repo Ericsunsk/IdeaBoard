@@ -38,6 +38,10 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via SCRIPT_DIR; scripts/lib/common.sh is linted directly in ops.yml.
+source "$SCRIPT_DIR/lib/common.sh"
+
 repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 specs=(
   "$repo_root/apps/api/openapi.public.yaml"
@@ -87,7 +91,7 @@ for spec in "${specs[@]}"; do
 done
 
 workdir="$(mktemp -d)"
-trap 'rm -rf "$workdir"' EXIT
+cleanup_path "$workdir"
 rows="$workdir/rows.tsv"
 
 # Extract file, line, normalized owner, owner, pattern per pattern: line.

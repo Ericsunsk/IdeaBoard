@@ -60,31 +60,54 @@ function updatePosition() {
   }
 }
 
-watch(
-  () => [props.visible, props.x, props.y, props.items.length] as const,
-  () => void nextTick(updatePosition),
-  { immediate: true },
-)
+function resolvePositionContainer(): HTMLElement | null {
+  const menu = menuRef.value
+  if (menu?.offsetParent instanceof HTMLElement) return menu.offsetParent
+  return null
+}
 
-onMounted(() => {
+function startPositionTracking() {
+  stopPositionTracking()
   window.addEventListener('resize', updatePosition)
   window.addEventListener('scroll', updatePosition, true)
-  positionContainer =
-    menuRef.value?.offsetParent instanceof HTMLElement ? menuRef.value.offsetParent : null
+  // Re-resolve on every show: the menu is v-if'd, so a mount-time snapshot
+  // can miss the container or hold a detached one.
+  positionContainer = resolvePositionContainer()
   positionContainer?.addEventListener('scroll', updatePosition)
   if (positionContainer && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(updatePosition)
     resizeObserver.observe(positionContainer)
   }
-})
-onBeforeUnmount(() => {
+}
+
+function stopPositionTracking() {
   window.removeEventListener('resize', updatePosition)
   window.removeEventListener('scroll', updatePosition, true)
   positionContainer?.removeEventListener('scroll', updatePosition)
   positionContainer = null
   resizeObserver?.disconnect()
   resizeObserver = null
+}
+
+watch(
+  () => [props.visible, props.x, props.y, props.items.length] as const,
+  () => void nextTick(updatePosition),
+  { immediate: true },
+)
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) void nextTick(startPositionTracking)
+    else stopPositionTracking()
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  if (props.visible) void nextTick(startPositionTracking)
 })
+onBeforeUnmount(stopPositionTracking)
 
 void props
 </script>

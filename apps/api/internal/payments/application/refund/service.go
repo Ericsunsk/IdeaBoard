@@ -110,14 +110,14 @@ func (s *Service) Converge(ctx context.Context, refund domain.PaymentRefund, pro
 	if err != nil {
 		return domain.PaymentRefund{}, err
 	}
-	switch strings.ToLower(strings.TrimSpace(providerRefund.Status)) {
-	case "succeeded":
+	switch ports.StripeRefundStatus(strings.ToLower(strings.TrimSpace(providerRefund.Status))) {
+	case ports.StripeRefundSucceeded:
 		settled, settleErr := s.store.MarkPaymentRefundSucceeded(ctx, updated.ID, s.now().UTC())
 		if settleErr == nil && updated.Status == domain.PaymentRefundPending {
 			s.publish(settled.UserID)
 		}
 		return settled, settleErr
-	case "failed", "canceled":
+	case ports.StripeRefundFailed, ports.StripeRefundCanceled:
 		failed, failErr := s.store.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", s.now().UTC())
 		if failErr == nil && updated.Status == domain.PaymentRefundPending {
 			s.publish(failed.UserID)

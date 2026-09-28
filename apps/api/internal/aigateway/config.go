@@ -164,19 +164,19 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 	accountID = strings.ToLower(strings.TrimSpace(input.AccountID))
 	gatewayID = strings.ToLower(strings.TrimSpace(input.GatewayID))
 	if accountID != "" && !gatewayAccountIDPattern.MatchString(accountID) {
-		return "", "", "", "", false, errors.New("网关 account id 必须是 32 位小写十六进制")
+		return "", "", "", "", false, errors.New(msgValidateUpdateInput)
 	}
 	if gatewayID != "" && !gatewayIDPattern.MatchString(gatewayID) {
-		return "", "", "", "", false, errors.New("网关 id 仅允许小写字母、数字与连字符")
+		return "", "", "", "", false, errors.New(msgValidateUpdateInput2)
 	}
 
 	if baseURL != "" {
 		parsed, err := url.Parse(baseURL)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
-			return "", "", "", "", false, errors.New("网关 Base URL 必须是合法的 http 或 https 地址")
+			return "", "", "", "", false, errors.New(msgValidateUpdateInput3)
 		}
 		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-			return "", "", "", "", false, errors.New("网关 Base URL 不得包含凭据、query 或 fragment")
+			return "", "", "", "", false, errors.New(msgValidateUpdateInput4)
 		}
 		parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
 		if len(parts) >= 3 && parts[0] == "v1" {
@@ -196,10 +196,10 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 		}
 	} else {
 		if !gatewayAccountIDPattern.MatchString(accountID) {
-			return "", "", "", "", false, errors.New("网关 account id 必须是 32 位小写十六进制")
+			return "", "", "", "", false, errors.New(msgValidateUpdateInput)
 		}
 		if !gatewayIDPattern.MatchString(gatewayID) {
-			return "", "", "", "", false, errors.New("网关 id 仅允许小写字母、数字与连字符")
+			return "", "", "", "", false, errors.New(msgValidateUpdateInput2)
 		}
 		baseURL = gatewayBaseURL(accountID, gatewayID)
 	}
@@ -207,7 +207,7 @@ func validateUpdateInput(input UpdateInput, actorID int64) (baseURL, accountID, 
 	if input.Token != nil {
 		token = strings.TrimSpace(*input.Token)
 		if token == "" {
-			return "", "", "", "", false, errors.New("网关 token 不能为空")
+			return "", "", "", "", false, errors.New(msgValidateUpdateInput5)
 		}
 		rotate = true
 	}

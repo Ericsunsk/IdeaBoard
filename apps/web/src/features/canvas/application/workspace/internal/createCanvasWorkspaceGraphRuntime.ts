@@ -1,4 +1,5 @@
 import type { ImageNodeItem } from '../../../../board'
+import { onScopeDispose, ref } from 'vue'
 import type { useBoardRuntime } from './useBoardRuntime'
 import type { CanvasFeedback } from '../useCanvasFeedback.ts'
 import type { CanvasVueFlowAdapter } from '../../../infrastructure/vue-flow-adapter'
@@ -34,6 +35,10 @@ export function createCanvasWorkspaceGraphRuntime(
   options: CreateCanvasWorkspaceGraphRuntimeOptions,
 ) {
   const { board, flowPaneAdapter } = options
+  // Reactive mirror of the pending-execution snapshot version. Lease state is
+  // non-reactive, so ui-state caches track this epoch to flip running labels
+  // without waiting for a graph change.
+  const executionEpoch = useExecutionEpoch(options.executionCore)
   const editing = useCanvasGraphEditing({
     nodes: board.flowPane.nodes,
     edges: board.flowPane.edges,
@@ -70,6 +75,7 @@ export function createCanvasWorkspaceGraphRuntime(
     feedback: options.feedback,
     isNodeExecutionActive: (nodeId) =>
       options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
+    executionEpoch,
   })
 
   return {
@@ -128,4 +134,13 @@ export function createCanvasWorkspaceGraphRuntime(
       refreshNodeInternals: editing.commands.scheduleNodeInternalsRefresh,
     },
   }
+}
+
+function useExecutionEpoch(executionCore: PendingImageExecutionCore) {
+  const epoch = ref(executionCore.snapshot().version)
+  const unsubscribe = executionCore.subscribe((snapshot) => {
+    epoch.value = snapshot.version
+  })
+  onScopeDispose(unsubscribe)
+  return epoch
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
-const StartupRecoveryFinalFailureReason = "服务重启，任务已停止"
+const StartupRecoveryFinalFailureReason = msgPackage
 
 // StartupRecoveredTask moved here from the deleted legacy taskstore
 // (#816 Phase 3b-07): startup recovery coordinates over this row

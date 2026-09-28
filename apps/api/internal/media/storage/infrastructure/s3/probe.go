@@ -30,7 +30,7 @@ type StorageCapabilityError struct {
 
 func (e *StorageCapabilityError) Error() string {
 	if e == nil || len(e.Missing) == 0 {
-		return "S3 权限探测失败"
+		return msgError
 	}
 	missing := make([]string, 0, len(e.Missing))
 	bucketActions := make([]string, 0, 1)
@@ -46,15 +46,15 @@ func (e *StorageCapabilityError) Error() string {
 	}
 	scope := make([]string, 0, 2)
 	if len(bucketActions) > 0 {
-		scope = append(scope, fmt.Sprintf("Bucket ARN 添加 %s", strings.Join(bucketActions, "、")))
+		scope = append(scope, fmt.Sprintf(msgError2, strings.Join(bucketActions, "、")))
 	}
 	if len(objectActions) > 0 {
-		scope = append(scope, fmt.Sprintf("Object ARN 添加 %s", strings.Join(objectActions, "、")))
+		scope = append(scope, fmt.Sprintf(msgError3, strings.Join(objectActions, "、")))
 	}
 	if isCloudflareR2Endpoint(e.Endpoint) {
-		return fmt.Sprintf("Cloudflare R2 凭证缺少权限：%s。请确认 R2 API Token 使用 Object Read & Write、包含当前 Bucket，且 Access Key ID 与 Secret Access Key 来自同一个 Token", strings.Join(missing, "、"))
+		return fmt.Sprintf(msgError4, strings.Join(missing, "、"))
 	}
-	return fmt.Sprintf("S3 凭证缺少权限：%s。请在%s策略中授予对应权限", strings.Join(missing, "、"), strings.Join(scope, "；"))
+	return fmt.Sprintf(msgError5, strings.Join(missing, "、"), strings.Join(scope, "；"))
 }
 
 func (e *StorageCapabilityError) UserMessage() string {
@@ -69,12 +69,12 @@ type StorageProbeError struct {
 
 func (e *StorageProbeError) Error() string {
 	if e == nil || e.Cause == nil {
-		return "S3 权限探测失败"
+		return msgError
 	}
 	if code := s3ErrorCode(e.Cause); code != "" {
-		return fmt.Sprintf("探测 %s 失败: %s: %v", e.Capability, code, e.Cause)
+		return fmt.Sprintf(msgError6, e.Capability, code, e.Cause)
 	}
-	return fmt.Sprintf("探测 %s 失败: %v", e.Capability, e.Cause)
+	return fmt.Sprintf(msgError7, e.Capability, e.Cause)
 }
 
 func (e *StorageProbeError) Unwrap() error {
@@ -90,21 +90,21 @@ func (e *StorageProbeError) UserMessage() string {
 		provider = "Cloudflare R2"
 	}
 	if e.Capability == StorageCapabilityPublicRead {
-		return fmt.Sprintf("%s 公开访问域名读取失败：请确认 Access Domain 已绑定当前 Bucket 且允许公网读取", provider)
+		return fmt.Sprintf(msgUserMessage, provider)
 	}
 	code := s3ErrorCode(e.Cause)
 	switch code {
 	case "AuthorizationHeaderMalformed":
 		if provider == "Cloudflare R2" {
-			return "Cloudflare R2 请求配置错误：Region 必须为 auto，Endpoint 必须为 <account-id>.r2.cloudflarestorage.com"
+			return msgUserMessage2
 		}
-		return "S3 请求配置错误：请检查 Region 与 Endpoint 是否匹配"
+		return msgUserMessage3
 	case "SignatureDoesNotMatch", "InvalidAccessKeyId", "InvalidToken":
-		return fmt.Sprintf("%s 凭证校验失败：请检查 Endpoint、Region，并确认 Access Key ID 与 Secret Access Key 匹配", provider)
+		return fmt.Sprintf(msgUserMessage4, provider)
 	case "NoSuchBucket":
-		return fmt.Sprintf("%s Bucket 不存在或不属于当前账号", provider)
+		return fmt.Sprintf(msgUserMessage5, provider)
 	default:
-		return fmt.Sprintf("%s 请求失败（%s），请检查 Endpoint、Region 和凭证配置", provider, e.Capability)
+		return fmt.Sprintf(msgUserMessage6, provider, e.Capability)
 	}
 }
 
@@ -210,7 +210,7 @@ func (s *S3CompatibleService) probeCapabilitiesOnce(ctx context.Context, cfg *S3
 			} else if deliveryErr != nil {
 				return newStorageProbeError(cfg, StorageCapabilityPublicRead, deliveryErr)
 			} else if delivered == nil || string(delivered.Data) != s3CapabilityProbePayload {
-				return newStorageProbeError(cfg, StorageCapabilityPublicRead, errors.New("公开访问域名返回的探测对象内容不一致"))
+				return newStorageProbeError(cfg, StorageCapabilityPublicRead, errors.New(msgProbeCapabilitiesOnce))
 			}
 		}
 	}
@@ -227,14 +227,14 @@ type s3BucketExistenceChecker interface {
 
 func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceChecker, bucketName string) error {
 	if client == nil {
-		return fmt.Errorf("S3 客户端未初始化")
+		return fmt.Errorf(msgEnsureS3BucketAccessible)
 	}
 	exists, err := client.BucketExists(ctx, bucketName)
 	if err != nil {
-		return fmt.Errorf("验证 Bucket 失败: %w", err)
+		return fmt.Errorf(msgEnsureS3BucketAccessible2, err)
 	}
 	if !exists {
-		return errors.New("bucket 不存在或当前凭证无权访问")
+		return errors.New(msgEnsureS3BucketAccessible3)
 	}
 	return nil
 }

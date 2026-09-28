@@ -304,12 +304,23 @@ function useGraphEditingImageUploads(
     setLocalUploadState,
   })
 
+  // The getter previously returned a fresh object (with a new Set) on every
+  // evaluation, so the watcher fired on every graph commit — including
+  // unrelated position/text edits. Watch the board id plus a cheap node
+  // id-join instead, and bail before allocating anything when no local
+  // uploads are in flight (the common case).
   watch(
-    () => ({
-      boardId: options.currentBoardId.value,
-      liveNodeIds: new Set(options.nodes.value.map((node) => node.id)),
-    }),
-    ({ boardId, liveNodeIds }) => uploadActions.releaseDetachedLocalUploads(liveNodeIds, boardId),
+    [
+      () => options.currentBoardId.value,
+      () => options.nodes.value.map((node) => node.id).join('|'),
+    ],
+    ([boardId]) => {
+      if (!uploadActions.hasLocalUploads()) return
+      uploadActions.releaseDetachedLocalUploads(
+        new Set(options.nodes.value.map((node) => node.id)),
+        boardId,
+      )
+    },
     { flush: 'sync' },
   )
   onScopeDispose(() => uploadActions.disposeLocalUploads())

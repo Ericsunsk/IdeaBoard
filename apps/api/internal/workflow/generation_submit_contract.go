@@ -17,17 +17,17 @@ func ValidateGenerationSubmitContract(params map[string]interface{}) error {
 	}
 	for _, key := range []string{"mode", "primitive"} {
 		if _, exists := params[key]; exists {
-			return fmt.Errorf("generation 不接受显式 %s，生成模式由参考图推导", key)
+			return fmt.Errorf(msgValidateGenerationSubmitContract, key)
 		}
 	}
 	for _, key := range []string{paramkeys.ReferenceImageURLs, paramkeys.MaskImageURL, paramkeys.UseMask} {
 		if _, exists := params[key]; exists {
-			return fmt.Errorf("generation 参考图必须只使用 image_urls")
+			return fmt.Errorf(msgValidateGenerationSubmitContract2)
 		}
 	}
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) > MaxGenerationReferenceImages {
-		return fmt.Errorf("generation 最多支持 %d 张参考图", MaxGenerationReferenceImages)
+		return fmt.Errorf(msgValidateGenerationSubmitContract3, MaxGenerationReferenceImages)
 	}
 	return nil
 }

@@ -9,7 +9,7 @@
         :effect-layer="selectedEffectLayer"
         :histogram-source="histogramSource"
         @update-param="(key, value) => emit('update-param', key, value)"
-        @update-params="emit('update-params', $event)"
+        @update:params="emit('update:params', $event)"
       />
       <RetouchLayersPanel
         :layers="layers"
@@ -73,7 +73,7 @@ const emit = defineEmits<{
   (e: 'merge-layer'): void
   (e: 'remove-layer', layerId: string): void
   (e: 'update-param', key: RetouchParamKey, value: RetouchParamValue): void
-  (e: 'update-params', params: RetouchEffectWholeParams): void
+  (e: 'update:params', params: RetouchEffectWholeParams): void
   (e: 'apply-retouch'): void
 }>()
 

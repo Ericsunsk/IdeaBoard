@@ -81,6 +81,7 @@ services:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
       APP_SECRETS_ENCRYPTION_KEY: ${APP_SECRETS_ENCRYPTION_KEY:?Set APP_SECRETS_ENCRYPTION_KEY}
       CREDITS_WELCOME_IDENTITY_KEY: ${CREDITS_WELCOME_IDENTITY_KEY:?Set CREDITS_WELCOME_IDENTITY_KEY}
+      # Intentionally omitted: REWARDS_CODE_HMAC_KEYS + AUTH_INTERNAL_KEY are runtime-only (composition.Migrate never parses the HMAC keyring or wires internal routes); NATS/IMGPROXY/API_INTERNAL_URL/BETTER_AUTH_SECRET never enter the migrate path.
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,6 +152,7 @@ services:
       DB_MIGRATION_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ideaboard
       DB_SSLMODE: ${DB_SSLMODE:-disable}
+      # Intentionally omitted: AUTH_HOST/PORT/TRUST_PROXY are listen-only and API_INTERNAL_URL defaults unused (the migrate path builds no login-metadata reporter); every loadEnv-required key above stays pinned.
     depends_on:
       postgres:
         condition: service_healthy

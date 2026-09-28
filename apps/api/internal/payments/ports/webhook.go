@@ -10,9 +10,9 @@ import (
 const StripeWebhookTolerance = 5 * time.Minute
 
 var (
-	ErrInvalidWebhookSignature = errors.New("无效的 Stripe Webhook 签名")
-	ErrWebhookSignatureExpired = errors.New("检测到 Stripe Webhook 签名已过期")
-	ErrMalformedWebhookPayload = errors.New("无效的 Stripe Webhook 数据")
+	ErrInvalidWebhookSignature = errors.New(msgInvalidWebhookSignature)
+	ErrWebhookSignatureExpired = errors.New(msgWebhookSignatureExpired)
+	ErrMalformedWebhookPayload = errors.New(msgMalformedWebhookPayload)
 )
 
 var stripeWebhookEventTypes = [...]string{

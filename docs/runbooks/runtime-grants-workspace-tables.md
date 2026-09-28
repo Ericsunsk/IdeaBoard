@@ -1,6 +1,11 @@
 # Workspace 新表 Runtime Grants 补授手册（#830）
 
-> 状态：AUDIT ONLY。`finalize-migrate` 的 7 个 privilege policy 未覆盖 16 张 #809 workspace 新表，
+> 状态（2026-09-28）：RESOLVED。durable fix 已合入：`apps/api/internal/platform/database/runtime_privileges.go`
+> 的 policy 已覆盖 workspace 表（含序列），`database_wiring_db_test.go`
+>（`workspaceRuntimeTableNames` / `workspaceRuntimeSequenceNames`）在启动测试中断言覆盖。
+> 本手册保留为 audit 证据与应急补授 SQL；新建表必须同步进 policy + 启动断言，否则 §2 所述静默遗漏会重演。
+
+> 历史状态：AUDIT ONLY。`finalize-migrate` 的 7 个 privilege policy 未覆盖 16 张 #809 workspace 新表，
 > runtime role（`DB_USER`，如 dev 的 `ideaboard_api`）对这些表零权限，首次读写即 `permission denied`。
 > 本手册给出 ops 可直接执行的补授 SQL（text，未执行）与验证方法。
 

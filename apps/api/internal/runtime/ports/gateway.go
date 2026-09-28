@@ -232,13 +232,13 @@ func SplitGatewayModel(raw string) (provider, model, pathOverride string, err er
 	if i := strings.Index(rest, "@"); i >= 0 {
 		rest, pathOverride = rest[:i], strings.TrimSpace(rest[i+1:])
 		if pathOverride == "" || strings.ContainsAny(pathOverride, " \t\n") {
-			return "", "", "", fmt.Errorf("模型网关路径无效")
+			return "", "", "", fmt.Errorf(msgSplitGatewayModel)
 		}
 	}
 	parts := strings.SplitN(strings.TrimSpace(rest), "/", 2)
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" ||
 		strings.ContainsAny(rest, " \t\n") {
-		return "", "", "", fmt.Errorf("模型必须是 provider/model 格式且不含空白")
+		return "", "", "", fmt.Errorf(msgSplitGatewayModel2)
 	}
 	return strings.ToLower(strings.TrimSpace(parts[0])), strings.TrimSpace(parts[1]), pathOverride, nil
 }

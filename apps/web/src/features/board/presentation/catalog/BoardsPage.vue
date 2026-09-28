@@ -19,7 +19,7 @@
     </header>
 
     <main :class="catalogClasses.main">
-      <h1 :class="catalogClasses.pageTitle">Welcome to IdeaBoard!</h1>
+      <h1 :class="catalogClasses.pageTitle">{{ t('workspace.boards.title') }}</h1>
       <p :class="catalogClasses.pageSubtitle">{{ t('workspace.boards.subtitle') }}</p>
 
       <section :class="catalogClasses.toolbar">

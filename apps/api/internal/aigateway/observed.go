@@ -279,7 +279,7 @@ func buildSKUMargin(feature string, skuBySKU map[string]SKUCatalogCard) ModelSKU
 		Feature:              feature,
 		UnitCreditsByVariant: map[string]int64{},
 		CostSource:           ObservedCostSourceUnavailable,
-		CostNote:             "暂无数据：网关回执与本地日志均无实际成本字段",
+		CostNote:             msgBuildSKUMargin,
 		MarginStatus:         ObservedMarginUnknownNoCost,
 	}
 	if card, ok := skuBySKU[sku]; ok {

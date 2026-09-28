@@ -18,6 +18,11 @@ import (
 
 const (
 	taskCancellationPollInterval = 2 * time.Second
+	// taskFailureStatus is the failure word embedded in the task result
+	// JSON payload (formatTaskFailureResult). The wire word is unchanged
+	// ("failed"); the constant only kills the raw literal duplicated in
+	// the marshal-fallback branch.
+	taskFailureStatus = "failed"
 )
 
 var (
@@ -417,23 +422,23 @@ func (s *Service) GetTaskRetryCount(ctx context.Context, taskID string) (int, er
 func validateTaskOutputs(taskID string, outputs []tasks.TaskOutput) error {
 	for _, output := range outputs {
 		if strings.TrimSpace(output.TaskID) != "" && strings.TrimSpace(output.TaskID) != taskID {
-			return fmt.Errorf("任务结果包含非本任务的输出")
+			return fmt.Errorf(msgValidateTaskOutputs)
 		}
 		outputKind := strings.TrimSpace(output.OutputKind)
 		if outputKind == "" {
 			outputKind = "asset"
 		}
 		if outputKind != "asset" && outputKind != "remote" {
-			return fmt.Errorf("任务结果输出类型不支持")
+			return fmt.Errorf(msgValidateTaskOutputs2)
 		}
 		if strings.TrimSpace(output.URL) == "" {
-			return fmt.Errorf("任务结果输出缺少 URL")
+			return fmt.Errorf(msgValidateTaskOutputs3)
 		}
 		if outputKind == "asset" && strings.TrimSpace(output.StorageKey) == "" {
-			return fmt.Errorf("任务结果输出缺少 storage_key")
+			return fmt.Errorf(msgValidateTaskOutputs4)
 		}
 		if outputKind == "remote" && strings.TrimSpace(output.StorageKey) != "" {
-			return fmt.Errorf("remote 任务结果不能包含 storage_key")
+			return fmt.Errorf(msgValidateTaskOutputs5)
 		}
 	}
 	return nil
@@ -442,12 +447,12 @@ func validateTaskOutputs(taskID string, outputs []tasks.TaskOutput) error {
 func formatTaskFailureResult(taskID string, reason string) string {
 	result := map[string]string{
 		"task_id": taskID,
-		"status":  "failed",
+		"status":  taskFailureStatus,
 		"error":   reason,
 	}
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
-		return fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"任务失败"}`, taskID)
+		return fmt.Sprintf(`{"task_id":"%s","status":"`+taskFailureStatus+msgFormatTaskFailureResult, taskID)
 	}
 	return string(resultJSON)
 }

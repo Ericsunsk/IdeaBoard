@@ -41,7 +41,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		response.InternalError(c, 500, "获取失败", err)
+		response.InternalError(c, 500, msgGet, err)
 		return
 	}
 	response.Success(c, config)
@@ -50,7 +50,7 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 func (h *FeaturePromptHandler) List(c *gin.Context) {
 	configs, err := h.promptRepo.ListConfigs(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, 500, "获取失败", err)
+		response.InternalError(c, 500, msgGet, err)
 		return
 	}
 	response.SuccessDTO(c, featurePromptListResponse{Prompts: configs})
@@ -70,7 +70,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 	}
 	var req featurePromptPayload
 	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxFeaturePromptRequestBytes, &req); err != nil || req.Prompt == nil {
-		response.Error(c, 400, "参数错误")
+		response.Error(c, 400, msgSave)
 		return
 	}
 	updatedBy := identityPrincipal.UserID()
@@ -80,7 +80,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		response.InternalError(c, 500, "保存失败", err)
+		response.InternalError(c, 500, msgSave2, err)
 		return
 	}
 	response.Success(c, config)
@@ -89,7 +89,7 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 func featurePromptSlugFromRequest(c *gin.Context) (string, error) {
 	rawSlug := c.Param("slug")
 	if rawSlug == "" {
-		return "", errors.New("缺少 slug 参数")
+		return "", errors.New(msgFeaturePromptSlugFromRequest)
 	}
 	return workflow.ValidateWorkflowFeatureSlug(rawSlug)
 }

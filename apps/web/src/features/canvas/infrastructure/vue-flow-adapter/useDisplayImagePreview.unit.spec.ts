@@ -209,9 +209,10 @@ describe('useDisplayImagePreview', () => {
       expect(preview.displayUrl.value).toBe('blob:7')
     })
 
-    expect(fetch).toHaveBeenCalledWith('/uploads/canvas/U123/board/content/image.png', {
-      credentials: 'include',
-    })
+    expect(fetch).toHaveBeenCalledWith(
+      '/uploads/canvas/U123/board/content/image.png',
+      expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
+    )
     expect(createImageBitmap).toHaveBeenCalled()
     expect(canvasMediaIOMocks.canvasToBlob).toHaveBeenCalled()
     scope.stop()
@@ -396,5 +397,51 @@ describe('useDisplayImagePreview', () => {
       expect(preview.displayUrl.value).toBe('/uploads/canvas/U123/board/content/local.png')
     })
     scope.stop()
+  })
+
+  it('never revokes the preview URL backing a displayed image during cache eviction', async () => {
+    let blobCounter = 0
+    vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:preview-${(blobCounter += 1)}`)
+    const { useDisplayImagePreview } = await importPreviewModule()
+
+    const heroSource = ref('https://example.com/hero.jpg')
+    const heroScope = effectScope()
+    const hero = heroScope.run(() => useDisplayImagePreview(heroSource, { maxSide: 640 }))
+    if (!hero) throw new Error('preview composable was not created')
+    await vi.waitFor(() => expect(hero.displayUrl.value).toMatch(/^blob:preview-\d+$/))
+    const heroUrl = hero.displayUrl.value
+
+    const fillerScopes: Array<ReturnType<typeof effectScope>> = []
+    for (let index = 0; index < 85; index += 1) {
+      const fillerScope = effectScope()
+      const fillerSource = ref(`https://example.com/filler-${index}.jpg`)
+      const filler = fillerScope.run(() =>
+        useDisplayImagePreview(fillerSource, { maxSide: 640 }),
+      )
+      if (!filler) throw new Error('preview composable was not created')
+      fillerScopes.push(fillerScope)
+    }
+    // 86 cached previews against a limit of 80 forces eviction.
+    await vi.waitFor(() => {
+      expect(vi.mocked(URL.revokeObjectURL).mock.calls.length).toBeGreaterThanOrEqual(6)
+    })
+    const revokedWhileDisplayed = vi
+      .mocked(URL.revokeObjectURL)
+      .mock.calls.map(([url]) => url)
+    expect(revokedWhileDisplayed).not.toContain(heroUrl)
+
+    // Once the image is no longer displayed, its URL becomes evictable again.
+    heroScope.stop()
+    const extraScope = effectScope()
+    const extraSource = ref('https://example.com/filler-extra.jpg')
+    const extra = extraScope.run(() => useDisplayImagePreview(extraSource, { maxSide: 640 }))
+    if (!extra) throw new Error('preview composable was not created')
+    await vi.waitFor(() => {
+      expect(
+        vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url),
+      ).toContain(heroUrl)
+    })
+    for (const fillerScope of fillerScopes) fillerScope.stop()
+    extraScope.stop()
   })
 })

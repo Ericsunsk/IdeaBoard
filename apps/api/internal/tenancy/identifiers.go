@@ -32,17 +32,17 @@ func FormatUserPublicID(id uuid.UUID) string {
 // It accepts dashed or undashed hex after the prefix.
 func ParseUserPublicID(external string) (uuid.UUID, error) {
 	if !strings.HasPrefix(external, UserPrefix) {
-		return uuid.Nil, fmt.Errorf("tenancy: not a user public id: %q", external)
+		return uuid.Nil, fmt.Errorf("%w: %q", ErrNotUserPublicID, external)
 	}
 	raw := strings.TrimPrefix(external, UserPrefix)
 	raw = strings.ReplaceAll(raw, "-", "")
 	if len(raw) != 32 {
-		return uuid.Nil, fmt.Errorf("tenancy: malformed user public id: %q", external)
+		return uuid.Nil, fmt.Errorf("%w: %q", ErrMalformedUserPublicID, external)
 	}
 	dashed := raw[:8] + "-" + raw[8:12] + "-" + raw[12:16] + "-" + raw[16:20] + "-" + raw[20:]
 	id, err := uuid.Parse(dashed)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("tenancy: malformed user public id: %q", external)
+		return uuid.Nil, fmt.Errorf("%w: %q", ErrMalformedUserPublicID, external)
 	}
 	return id, nil
 }

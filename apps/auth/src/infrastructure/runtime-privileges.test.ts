@@ -6,7 +6,7 @@ import {
   verifyAuthRuntimePrivileges,
 } from './runtime-privileges.js'
 
-test("configureAuthRuntimePrivileges grants only Better Auth tables atomically", async () => {
+test('configureAuthRuntimePrivileges grants only Better Auth tables atomically', async () => {
   const queries: string[] = []
   const client = {
     async query(sql: string) {
@@ -17,18 +17,15 @@ test("configureAuthRuntimePrivileges grants only Better Auth tables atomically",
       return { rows: [] }
     },
     release() {},
-  };
+  }
   const pool = { connect: async () => client } as unknown as Pool
 
   await configureAuthRuntimePrivileges(pool, 'ideaboard_auth')
 
   assert.equal(queries[0], 'BEGIN')
   assert.equal(queries[1], 'SELECT current_schema()')
-  assert.match(queries[2] || "", /GRANT USAGE ON SCHEMA "public"/);
-  assert.match(
-    queries[3] || "",
-    /"user", "session", "account", "verification"/,
-  )
+  assert.match(queries[2] || '', /GRANT USAGE ON SCHEMA "public"/)
+  assert.match(queries[3] || '', /"user", "session", "account", "verification"/)
   assert.match(
     queries[4] || '',
     /REVOKE ALL ON TABLE "public"\.system_configs FROM "ideaboard_auth"/,
@@ -39,12 +36,12 @@ test("configureAuthRuntimePrivileges grants only Better Auth tables atomically",
   )
   assert.equal(queries.at(-1), 'COMMIT')
   assert.equal(
-    queries.some((sql) => sql.includes("credit_")),
+    queries.some((sql) => sql.includes('credit_')),
     false,
   )
 })
 
-test("verifyAuthRuntimePrivileges rejects a role that can write Credits", async () => {
+test('verifyAuthRuntimePrivileges rejects a role that can write Credits', async () => {
   let inspectedFunctions: unknown
   const pool = {
     query: async (_sql: string, values: unknown[]) => {
@@ -64,10 +61,7 @@ test("verifyAuthRuntimePrivileges rejects a role that can write Credits", async 
     },
   } as unknown as Pool
 
-  await assert.rejects(
-    () => verifyAuthRuntimePrivileges(pool),
-    /Unsafe Auth runtime database role/,
-  )
+  await assert.rejects(() => verifyAuthRuntimePrivileges(pool), /Unsafe Auth runtime database role/)
   assert.ok(Array.isArray(inspectedFunctions))
   assert.ok(
     inspectedFunctions.includes(
@@ -96,10 +90,7 @@ test('verifyAuthRuntimePrivileges rejects a role without the typed Auth settings
     }),
   } as unknown as Pool
 
-  await assert.rejects(
-    () => verifyAuthRuntimePrivileges(pool),
-    /execute_auth_settings=false/,
-  )
+  await assert.rejects(() => verifyAuthRuntimePrivileges(pool), /execute_auth_settings=false/)
 })
 
 test('verifyAuthRuntimePrivileges rejects direct access to raw system settings', async () => {
@@ -118,10 +109,7 @@ test('verifyAuthRuntimePrivileges rejects direct access to raw system settings',
     }),
   } as unknown as Pool
 
-  await assert.rejects(
-    () => verifyAuthRuntimePrivileges(pool),
-    /read_system_configs=true/,
-  )
+  await assert.rejects(() => verifyAuthRuntimePrivileges(pool), /read_system_configs=true/)
 })
 
 test('verifyAuthRuntimePrivileges accepts the limited Auth runtime role', async () => {

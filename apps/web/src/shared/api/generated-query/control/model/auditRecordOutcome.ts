@@ -38,5 +38,5 @@ export const AuditRecordOutcome = {
   read: 'read',
   success: 'success',
   denied: 'denied',
-  failed: 'failed',
+  failure: 'failure',
 } as const

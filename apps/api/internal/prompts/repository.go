@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrFeaturePromptUnsupported = errors.New("该功能不支持 System Prompt")
+var ErrFeaturePromptUnsupported = errors.New(msgFeaturePromptUnsupported)
 
 type FeaturePromptRepository struct {
 	q *dbsqlc.Queries

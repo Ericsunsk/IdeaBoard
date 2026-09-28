@@ -182,26 +182,26 @@ func renderSearchError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, searchcatalog.ErrV1SearchQueryEmpty) || errors.Is(err, searchcatalog.ErrV1SearchQueryTooLong):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"搜索关键词非法", contract.FieldErrors{Fields: map[string]string{"q": "invalid"}})
+			msgRenderSearchError, contract.FieldErrors{Fields: map[string]string{"q": "invalid"}})
 	case errors.Is(err, searchcatalog.ErrV1SearchProviderInvalid):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"搜索来源非法", contract.FieldErrors{Fields: map[string]string{"provider": "invalid"}})
+			msgRenderSearchError2, contract.FieldErrors{Fields: map[string]string{"provider": "invalid"}})
 	case errors.Is(err, searchcatalog.ErrV1VisionInput):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"视觉搜索输入非法", contract.FieldErrors{Fields: map[string]string{"vision": "invalid"}})
+			msgRenderSearchError3, contract.FieldErrors{Fields: map[string]string{"vision": "invalid"}})
 	case errors.Is(err, errV1VisionUploadUnstaged):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
-			"视觉搜索输入非法", contract.FieldErrors{Fields: map[string]string{"upload_ids": "unstaged"}})
+			msgRenderSearchError3, contract.FieldErrors{Fields: map[string]string{"upload_ids": "unstaged"}})
 	case errors.Is(err, errV1SearchUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, "搜索服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, msgSearchProviderUnavailable)
 	case errors.Is(err, errV1VisionProviderError):
-		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchVisionProviderError, "视觉搜索暂时不可用")
+		contract.RenderError(c, http.StatusBadGateway, contract.CodeSearchVisionProviderError, msgSearchVisionProviderError)
 	case errors.Is(err, errV1VisionNotConfigured):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchVisionNotConfigured, "视觉搜索暂未配置")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchVisionNotConfigured, msgSearchVisionNotConfigured)
 	case errors.Is(err, errV1SearchUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, "搜索服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeSearchProviderUnavailable, msgSearchProviderUnavailable)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "搜索服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgSearchProviderUnavailable)
 	}
 	c.Abort()
 }
@@ -242,7 +242,7 @@ func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
 		}
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 			c.Abort()
 			return
 		}
@@ -257,7 +257,7 @@ func (h *contractV1Handler) searchWorkspace(c *gin.Context) {
 			// size, malformed bytes) converge to pagination_cursor_invalid
 			// (Baseline 5.5); backend outages stay 503.
 			if errors.Is(searchErr, errV1CursorInvalid) || contract.IsCursorInvalid(searchErr) {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 				c.Abort()
 				return
 			}
@@ -423,7 +423,7 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -466,7 +466,7 @@ func (h *contractV1Handler) createVisionQuery(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeSearchIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeSearchIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
@@ -498,11 +498,11 @@ func renderSearchBillingError(c *gin.Context, err error) {
 	}
 	switch {
 	case errors.Is(err, errV1BillingRestricted):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted2)
 	case errors.Is(err, errV1BillingQuoteUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "搜索服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgSearchProviderUnavailable)
 	}
 	c.Abort()
 }
@@ -515,7 +515,7 @@ func (h *contractV1Handler) resolveVisionReferences(c *gin.Context, workspace *t
 	for _, id := range assetIDs {
 		asset, err := h.deps.Search.Library.GetAsset(c.Request.Context(), workspace.PublicID, id)
 		if err != nil {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, "素材不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 			c.Abort()
 			return nil, false
 		}
@@ -553,7 +553,7 @@ func (h *contractV1Handler) resolveVisionUploads(c *gin.Context, workspace *tena
 		return nil, false
 	}
 	if h.deps.MediaObjects == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "视觉搜索暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable54)
 		c.Abort()
 		return nil, false
 	}
@@ -565,19 +565,19 @@ func (h *contractV1Handler) resolveVisionUploads(c *gin.Context, workspace *tena
 			switch {
 			case errors.Is(err, workspacemedia.ErrExpired):
 				contract.RenderError(c, contract.StatusOf(contract.CodeUploadExpired),
-					contract.CodeUploadExpired, "上传会话已过期，请重新创建")
+					contract.CodeUploadExpired, msgUploadExpired)
 			case errors.Is(err, workspacemedia.ErrStateConflict):
 				contract.RenderError(c, contract.StatusOf(contract.CodeUploadStateConflict),
-					contract.CodeUploadStateConflict, "上传会话状态不允许此操作")
+					contract.CodeUploadStateConflict, msgUploadStateConflict)
 			default:
-				contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, "上传会话不存在")
+				contract.RenderError(c, http.StatusNotFound, contract.CodeUploadNotFound, msgUploadNotFound)
 			}
 			c.Abort()
 			return nil, false
 		}
 		if session.Status == workspacemedia.StatusFailed {
 			contract.RenderError(c, contract.StatusOf(contract.CodeUploadStateConflict),
-				contract.CodeUploadStateConflict, "上传会话状态不允许此操作")
+				contract.CodeUploadStateConflict, msgUploadStateConflict)
 			c.Abort()
 			return nil, false
 		}

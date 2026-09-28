@@ -145,18 +145,18 @@ func NewWorkspaceTaskRenderer(deps WorkspaceTaskRendererDeps) (WorkspaceTaskRend
 // checks.
 func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspacetasks.WorkspaceTask, outputs []workspacetasks.OutputRef) ([]workspacetasks.OutputRef, error) {
 	if r == nil || r.media == nil || r.assets == nil {
-		return nil, errors.New("任务结果渲染器未配置")
+		return nil, errors.New(msgRenderOutputs)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
-		return nil, errors.New("任务标识缺失，无法渲染结果")
+		return nil, errors.New(msgRenderOutputs2)
 	}
 	if len(outputs) > workspacetasks.MaxOutputsPerTask {
-		return nil, fmt.Errorf("provider 输出过多: 最多 %d", workspacetasks.MaxOutputsPerTask)
+		return nil, fmt.Errorf(msgRenderOutputs3, workspacetasks.MaxOutputsPerTask)
 	}
 	rendered := make([]workspacetasks.OutputRef, 0, len(outputs))
 	for index, ref := range outputs {
 		if err := workspacetasks.ValidateOutputRef(ref); err != nil {
-			return nil, fmt.Errorf("provider 输出不合法: %w", err)
+			return nil, fmt.Errorf(msgRenderOutputs4, err)
 		}
 		switch ref.Kind {
 		case workspacetasks.OutputKindAsset:
@@ -172,7 +172,7 @@ func (r *workspaceTaskRenderer) RenderOutputs(ctx context.Context, task *workspa
 			}
 			rendered = append(rendered, ingested)
 		default:
-			return nil, fmt.Errorf("provider 输出类型不支持: %q", ref.Kind)
+			return nil, fmt.Errorf(msgRenderOutputs5, ref.Kind)
 		}
 	}
 	return rendered, nil
@@ -184,9 +184,9 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 	if _, err := r.assets.GetAsset(ctx, task.WorkspaceID, ref.AssetID); err != nil {
 		switch {
 		case errors.Is(err, workspacetasks.ErrMediaArchived):
-			return workspacetasks.OutputRef{}, fmt.Errorf("任务输出媒体已归档: %w", err)
+			return workspacetasks.OutputRef{}, fmt.Errorf(msgPassthroughAsset, err)
 		default:
-			return workspacetasks.OutputRef{}, fmt.Errorf("任务输出媒体不存在: %w", workspacetasks.ErrMediaNotFound)
+			return workspacetasks.OutputRef{}, fmt.Errorf(msgPassthroughAsset2, workspacetasks.ErrMediaNotFound)
 		}
 	}
 	verified := workspacetasks.OutputRef{
@@ -194,7 +194,7 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
 	}
 	if err := workspacetasks.ValidateOutputRef(verified); err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务输出不符合输出契约: %w", err)
+		return workspacetasks.OutputRef{}, fmt.Errorf(msgPassthroughAsset3, err)
 	}
 	return verified, nil
 }
@@ -204,14 +204,14 @@ func (r *workspaceTaskRenderer) passthroughAsset(ctx context.Context, task *work
 // returning the settlement-ready asset-kind ref.
 func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspacetasks.WorkspaceTask, ref workspacetasks.OutputRef, index int) (workspacetasks.OutputRef, error) {
 	if r.fetcher == nil {
-		return workspacetasks.OutputRef{}, errors.New("任务结果转存未配置: result ingestion unavailable")
+		return workspacetasks.OutputRef{}, errors.New(msgIngestRemote)
 	}
 	if r.objects == nil {
-		return workspacetasks.OutputRef{}, errors.New("任务结果转存未配置: object storage unavailable")
+		return workspacetasks.OutputRef{}, errors.New(msgIngestRemote2)
 	}
 	data, err := r.fetcher.FetchResultBytes(ctx, task, ref)
 	if err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务结果下载失败: %w", err)
+		return workspacetasks.OutputRef{}, fmt.Errorf(msgIngestRemote3, err)
 	}
 	asset, err := persistWorkspaceTaskResultAsset(ctx, r.media, r.objects, r.derivatives, task, data, index, strings.TrimSpace(ref.ChecksumSHA256))
 	if err != nil {
@@ -222,7 +222,7 @@ func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspac
 		Role: strings.TrimSpace(ref.Role), ResultIndex: ref.ResultIndex,
 	}
 	if err := workspacetasks.ValidateOutputRef(rendered); err != nil {
-		return workspacetasks.OutputRef{}, fmt.Errorf("任务输出不符合输出契约: %w", err)
+		return workspacetasks.OutputRef{}, fmt.Errorf(msgPassthroughAsset3, err)
 	}
 	return rendered, nil
 }
@@ -241,25 +241,25 @@ func (r *workspaceTaskRenderer) ingestRemote(ctx context.Context, task *workspac
 // asset because refs are built only from completed assets.
 func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.WorkspaceMediaStore, objects workspacemedia.DerivativeObjects, derivatives ports.Renderer, task *workspacetasks.WorkspaceTask, data []byte, index int, expectChecksum string) (*workspacemedia.Asset, error) {
 	if media == nil || objects == nil {
-		return nil, errors.New("任务结果转存未配置: result ingestion unavailable")
+		return nil, errors.New(msgIngestRemote)
 	}
 	if task == nil || strings.TrimSpace(task.ID) == "" || strings.TrimSpace(task.WorkspaceID) == "" {
-		return nil, errors.New("任务标识缺失，无法渲染结果")
+		return nil, errors.New(msgRenderOutputs2)
 	}
 	if len(data) == 0 {
-		return nil, errors.New("上游结果为空，无法转存")
+		return nil, errors.New(msgPersistWorkspaceTaskResultAsset)
 	}
 	if int64(len(data)) > workspacemedia.MaxUploadSizeBytes {
-		return nil, fmt.Errorf("上游结果过大: %d 字节", len(data))
+		return nil, fmt.Errorf(msgPersistWorkspaceTaskResultAsset2, len(data))
 	}
 	facts, err := imageformat.InspectDetectedBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf("上游结果不是受支持的图片: %w", err)
+		return nil, fmt.Errorf(msgPersistWorkspaceTaskResultAsset3, err)
 	}
 	sum := sha256.Sum256(data)
 	checksum := hex.EncodeToString(sum[:])
 	if strings.TrimSpace(expectChecksum) != "" && !strings.EqualFold(checksum, strings.TrimSpace(expectChecksum)) {
-		return nil, errors.New("上游结果校验失败: checksum mismatch")
+		return nil, errors.New(msgPersistWorkspaceTaskResultAsset4)
 	}
 	workspaceID := strings.TrimSpace(task.WorkspaceID)
 	filename := fmt.Sprintf("task-result-%d%s", index, facts.Extension)
@@ -269,11 +269,11 @@ func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.W
 		ChecksumSHA256: checksum, MediaKind: workspacemedia.MediaKindImage,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("任务结果落盘失败: %w", err)
+		return nil, fmt.Errorf(msgPersistWorkspaceTaskResultAsset5, err)
 	}
 	if err := objects.PutObjectAtProfile(ctx, workspacemedia.DefaultStorageProfile, session.StorageKey, data, facts.MIMEType); err != nil {
 		_, _ = media.FailSession(ctx, workspaceID, session.ID, "result byte ingest failed")
-		return nil, fmt.Errorf("任务结果字节写入失败: %w", err)
+		return nil, fmt.Errorf(msgPersistWorkspaceTaskResultAsset6, err)
 	}
 	_, asset, err := media.CompleteSession(ctx, workspaceID, session.ID, workspacemedia.CompleteFacts{
 		ChecksumSHA256: checksum, SizeBytes: int64(len(data)),
@@ -281,7 +281,7 @@ func persistWorkspaceTaskResultAsset(ctx context.Context, media workspacemedia.W
 		Width: int32(facts.Width), Height: int32(facts.Height),
 	}, workspacemedia.CreateAssetParams{})
 	if err != nil {
-		return nil, fmt.Errorf("任务结果落盘失败: %w", err)
+		return nil, fmt.Errorf(msgPersistWorkspaceTaskResultAsset5, err)
 	}
 	generateWorkspaceTaskDerivativesBestEffort(ctx, media, objects, derivatives, workspaceID, asset)
 	slog.Info("workspace task result ingested as media asset",

@@ -24,7 +24,7 @@ const (
 	maxSubmitTaskClientActionIDBytes = 128
 	maxSubmitTaskParamsBytes         = 2 * 1024 * 1024
 	maxSubmitTaskParamsDepth         = 24
-	providerUnavailableMessage       = "生图服务暂不可用，请稍后重试"
+	providerUnavailableMessage       = msgPackage3
 )
 
 var errNoAvailableAPIAccount = errors.New("no available API account")
@@ -85,7 +85,7 @@ func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 
 func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error) {
 	if req == nil {
-		return TaskReadinessCompilation{}, validation.New("请求参数错误")
+		return TaskReadinessCompilation{}, validation.New(msgCompileReadiness)
 	}
 	params := make(map[string]interface{}, len(req.Params)+1)
 	for key, value := range req.Params {
@@ -99,7 +99,7 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 		return TaskReadinessCompilation{}, err
 	}
 	if featureSlug == "" {
-		return TaskReadinessCompilation{}, validation.New("feature 不能为空")
+		return TaskReadinessCompilation{}, validation.New(msgCompileWorkspaceParams)
 	}
 	executionPlan, err := compileReadinessExecutionPlan(params, featureSlug)
 	if err != nil {
@@ -135,7 +135,7 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 
 func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error) {
 	if req == nil {
-		return CanonicalTaskRequest{}, validation.New("请求参数错误")
+		return CanonicalTaskRequest{}, validation.New(msgCompileReadiness)
 	}
 	normalized, err := i.normalizeCompileRequest(ctx, userID, req)
 	if err != nil {
@@ -165,9 +165,9 @@ func (i *taskIntake) normalizeCompileRequest(ctx context.Context, userID int64, 
 	}
 	priority := tasks.EffectiveTaskPriority(req.Priority)
 	if !tasks.IsValidTaskPriority(priority) {
-		return normalizedTaskCompile{}, validation.New("priority 仅支持 1-4")
+		return normalizedTaskCompile{}, validation.New(msgNormalizeCompileRequest)
 	}
-	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
+	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, msgNormalizeCompileRequest2); err != nil {
 		return normalizedTaskCompile{}, err
 	}
 	if err := i.validateImageURLs(ctx, userID, req.ImageURLs); err != nil {
@@ -206,7 +206,7 @@ func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req
 		return compiledTaskExecution{}, err
 	}
 	if featureSlug == "" {
-		return compiledTaskExecution{}, validation.New("feature 不能为空")
+		return compiledTaskExecution{}, validation.New(msgCompileWorkspaceParams)
 	}
 	if err := normalizeSubmitExecutionMap(params, featureSlug); err != nil {
 		return compiledTaskExecution{}, err
@@ -245,11 +245,11 @@ func (i *taskIntake) compileTaskPrompts(ctx context.Context, req *tasks.SubmitTa
 		var err error
 		promptConfig, err = i.prompts.GetRuntimeConfig(ctx, featureSlug)
 		if err != nil {
-			return compiledTaskPrompts{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+			return compiledTaskPrompts{}, newSubmissionError("prompt_unavailable", msgCompileTaskPrompts, err)
 		}
 	}
 	if requiresImageFillSystemPrompt(featureSlug) && strings.TrimSpace(promptConfig.Prompt) == "" {
-		return compiledTaskPrompts{}, validation.New("该功能未配置 System Prompt")
+		return compiledTaskPrompts{}, validation.New(msgCompileTaskPrompts2)
 	}
 	var fullPrompt, systemPrompt string
 	// Dedicated image transforms are binary media operations. Their Modal
@@ -259,9 +259,9 @@ func (i *taskIntake) compileTaskPrompts(ctx context.Context, req *tasks.SubmitTa
 		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
 	}
 	if executionPlan.PromptPolicy() == workflow.PromptPolicyRequired && fullPrompt == "" {
-		return compiledTaskPrompts{}, validation.New("Prompt Node 需要系统模板或用户描述")
+		return compiledTaskPrompts{}, validation.New(msgCompileTaskPrompts3)
 	}
-	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
+	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, msgCompileTaskPrompts4); err != nil {
 		return compiledTaskPrompts{}, err
 	}
 	return compiledTaskPrompts{fullPrompt: fullPrompt, systemPrompt: systemPrompt, config: promptConfig}, nil
@@ -296,54 +296,54 @@ func requiresImageFillSystemPrompt(featureSlug string) bool {
 
 func (i *taskIntake) requireSystemPrompt(ctx context.Context, featureSlug string) error {
 	if i.prompts == nil {
-		return validation.New("该功能未配置 System Prompt")
+		return validation.New(msgCompileTaskPrompts2)
 	}
 	config, err := i.prompts.GetRuntimeConfig(ctx, featureSlug)
 	if err != nil {
-		return newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+		return newSubmissionError("prompt_unavailable", msgCompileTaskPrompts, err)
 	}
 	if strings.TrimSpace(config.Prompt) == "" {
-		return validation.New("该功能未配置 System Prompt")
+		return validation.New(msgCompileTaskPrompts2)
 	}
 	return nil
 }
 
 func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical CanonicalTaskRequest) (CanonicalTaskRequest, error) {
 	if userID <= 0 || canonical.UserID() != userID {
-		return CanonicalTaskRequest{}, validation.New("请求用户与任务不匹配")
+		return CanonicalTaskRequest{}, validation.New(msgPrepareMedia)
 	}
 	typedParams, err := tasks.UnmarshalParams(canonical.Params())
 	if err != nil {
-		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, err)
 	}
 	updated := canonical
 	snapshot := canonical.GenerationSnapshot()
 	if snapshot != nil && len(snapshot.Media) > 0 {
 		if i.mediaPreparer == nil {
-			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("generation media preparer is unavailable"))
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, fmt.Errorf("generation media preparer is unavailable"))
 		}
 		prepared, prepareErr := i.mediaPreparer.PrepareGenerationMedia(ctx, userID, canonical.ClientActionID(), snapshot)
 		if prepareErr != nil {
-			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", prepareErr)
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, prepareErr)
 		}
 		updated, err = canonical.WithGenerationSnapshot(prepared)
 		if err != nil {
-			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, err)
 		}
 		typedParams, err = tasks.UnmarshalParams(updated.Params())
 		if err != nil {
-			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+			return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, err)
 		}
 	}
 	if typedParams.Media == nil || i.mediaManifest == nil {
 		if typedParams.Media == nil {
 			return updated, nil
 		}
-		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("task input manifest builder is unavailable"))
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", msgPrepareMedia2, fmt.Errorf("task input manifest builder is unavailable"))
 	}
 	manifest, err := i.mediaManifest.BuildTaskInputManifest(ctx, userID, typedParams.Media)
 	if err != nil {
-		return CanonicalTaskRequest{}, newSubmissionError("media_processing_input_not_ready", "参考图片仍在处理中，请稍后重试", err)
+		return CanonicalTaskRequest{}, newSubmissionError("media_processing_input_not_ready", msgPrepareMedia3, err)
 	}
 	return updated.WithInputManifest(manifest)
 }
@@ -353,7 +353,7 @@ func (i *taskIntake) validateProcessingInputReadiness(ctx context.Context, userI
 		return nil
 	}
 	if err := i.mediaReadiness.ValidateProcessingInputReadiness(ctx, userID, assetIDs); err != nil {
-		return newSubmissionError("media_processing_input_not_ready", "参考图片仍在处理中，请稍后重试", err)
+		return newSubmissionError("media_processing_input_not_ready", msgPrepareMedia3, err)
 	}
 	return nil
 }
@@ -372,7 +372,7 @@ func (i *taskIntake) validateImageAssetIDs(ctx context.Context, userID int64, as
 		ValidateSubmitMediaAssetIDs(context.Context, int64, []int64) error
 	})
 	if !ok {
-		return fmt.Errorf("媒体资产校验服务未配置")
+		return fmt.Errorf(msgValidateImageAssetIDs)
 	}
 	return validator.ValidateSubmitMediaAssetIDs(ctx, userID, assetIDs)
 }
@@ -385,7 +385,7 @@ func (i *taskIntake) validateMediaParams(ctx context.Context, userID int64, para
 
 func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw string) error {
 	if i == nil || i.media == nil {
-		return fmt.Errorf("任务媒体校验服务未配置")
+		return fmt.Errorf(msgValidateMediaRef)
 	}
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
@@ -407,7 +407,7 @@ func normalizeSubmitTaskClientActionID(raw string) (string, error) {
 		return "", nil
 	}
 	if len(value) > maxSubmitTaskClientActionIDBytes {
-		return "", fmt.Errorf("client_action_id 过长")
+		return "", fmt.Errorf(msgNormalizeSubmitTaskClientActionID)
 	}
 	for _, r := range value {
 		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
@@ -417,7 +417,7 @@ func normalizeSubmitTaskClientActionID(raw string) (string, error) {
 		case '-', '_', '.', ':':
 			continue
 		default:
-			return "", fmt.Errorf("client_action_id 只能包含字母、数字、横线、下划线、点或冒号")
+			return "", fmt.Errorf(msgNormalizeSubmitTaskClientActionID2)
 		}
 	}
 	return value, nil

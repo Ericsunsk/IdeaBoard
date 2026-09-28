@@ -15,6 +15,16 @@ import (
 	"ideaboard/api/internal/platform/secrets"
 )
 
+// paymentOrderReturnStatusWords are the user-facing return-status words
+// for PaymentOrderReturnStatus.Status. The wire words are unchanged
+// ("processing","credited","failed"); the constants only kill the raw
+// literals. The DTO field stays string with conversion at this boundary.
+const (
+	paymentOrderReturnProcessing = "processing"
+	paymentOrderReturnCredited   = "credited"
+	paymentOrderReturnFailed     = "failed"
+)
+
 // ListPendingOrders returns the user's unsettled checkout intents.
 func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (paymentcontracts.PendingPaymentOrderList, error) {
 	result := paymentcontracts.PendingPaymentOrderList{Items: make([]paymentcontracts.PendingPaymentOrder, 0)}
@@ -278,12 +288,12 @@ func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64,
 }
 
 func paymentOrderReturnStatus(order paymentsdomain.PaymentOrder) paymentcontracts.PaymentOrderReturnStatus {
-	status := "processing"
+	status := paymentOrderReturnProcessing
 	switch order.Status {
 	case paymentsdomain.PaymentOrderCredited:
-		status = "credited"
+		status = paymentOrderReturnCredited
 	case paymentsdomain.PaymentOrderCancelled, paymentsdomain.PaymentOrderExpired, paymentsdomain.PaymentOrderFailed:
-		status = "failed"
+		status = paymentOrderReturnFailed
 	}
 	return paymentcontracts.PaymentOrderReturnStatus{IdeaQuantity: order.IdeaQuantity, Status: status, UpdatedAt: order.UpdatedAt}
 }

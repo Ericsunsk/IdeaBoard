@@ -81,19 +81,19 @@ func (h *contractV1Handler) requireTaskStores(c *gin.Context) bool {
 func (h *contractV1Handler) taskWorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, bool) {
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 		c.Abort()
 		return nil, false
 	}
 	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 		c.Abort()
 		return nil, false
 	}
 	_, member, err := h.deps.Store.GetWorkspaceRole(c.Request.Context(), raw, identityPrincipal.UserID())
 	if err != nil || !member {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 		c.Abort()
 		return nil, false
 	}
@@ -116,7 +116,7 @@ func renderTaskError(c *gin.Context, err error) {
 			fields[field] = message
 		}
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-			contract.CodeValidationFailed, "任务参数非法",
+			contract.CodeValidationFailed, msgValidationFailed10,
 			contract.FieldErrors{Fields: fields})
 		c.Abort()
 		return
@@ -138,26 +138,26 @@ func renderTaskError(c *gin.Context, err error) {
 	}
 	switch {
 	case errors.Is(err, workspacetasks.ErrNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 	case errors.Is(err, workspacetasks.ErrForbidden):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, msgForbidden)
 	case errors.Is(err, workspacetasks.ErrStateConflict):
-		contract.RenderError(c, http.StatusConflict, contract.CodeTaskStateConflict, "任务状态不允许此操作")
+		contract.RenderError(c, http.StatusConflict, contract.CodeTaskStateConflict, msgTaskStateConflict)
 	case errors.Is(err, workspacetasks.ErrInsufficientCredits):
 		contract.RenderError(c, contract.StatusOf(contract.CodeTaskInsufficientCredits),
-			contract.CodeTaskInsufficientCredits, "Idea不足")
+			contract.CodeTaskInsufficientCredits, msgValidationFailed2)
 	case errors.Is(err, workspacetasks.ErrQuoteUnavailable):
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
 	case errors.Is(err, workspacetasks.ErrWalletRestricted):
-		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted2)
 	case errors.Is(err, workspacetasks.ErrMediaNotFound):
-		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, "媒体资源不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeMediaNotFound, msgMediaNotFound2)
 	case errors.Is(err, workspacetasks.ErrMediaNotReady):
-		contract.RenderError(c, http.StatusConflict, contract.CodeMediaNotReady, "媒体资源尚未就绪")
+		contract.RenderError(c, http.StatusConflict, contract.CodeMediaNotReady, msgMediaNotReady)
 	case errors.Is(err, workspacetasks.ErrMediaArchived):
-		contract.RenderError(c, contract.StatusOf(contract.CodeMediaArchived), contract.CodeMediaArchived, "媒体资源已归档")
+		contract.RenderError(c, contract.StatusOf(contract.CodeMediaArchived), contract.CodeMediaArchived, msgMediaArchived)
 	default:
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "任务服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
 	}
 	c.Abort()
 }
@@ -263,7 +263,7 @@ func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 func requireTaskIdempotencyKey(c *gin.Context) (string, bool) {
 	key, err := contract.IdempotencyKeyFromHeader(c)
 	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 		c.Abort()
 		return "", false
 	}
@@ -355,7 +355,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
@@ -377,7 +377,7 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 		workspace := wctx.Workspace
 		pageSize, err := contract.ParsePageSize(c.Query(contract.PageSizeParam))
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, "page_size 非法")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest31)
 			c.Abort()
 			return
 		}
@@ -385,7 +385,7 @@ func (h *contractV1Handler) listWorkspaceTasks(c *gin.Context) {
 		if raw := strings.TrimSpace(c.Query(contract.CursorParam)); raw != "" {
 			cursor, decodeErr := contract.DecodeCursor[v1ListCursor](raw)
 			if decodeErr != nil || cursor == nil || cursor.Offset < 0 {
-				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+				contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 				c.Abort()
 				return
 			}
@@ -422,7 +422,7 @@ func (h *contractV1Handler) getWorkspaceTask(c *gin.Context) {
 		workspace := wctx.Workspace
 		raw := strings.TrimSpace(c.Param("task_id"))
 		if !contract.IsTaskID(raw) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 			c.Abort()
 			return
 		}
@@ -447,7 +447,7 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 		workspace := wctx.Workspace
 		raw := strings.TrimSpace(c.Param("task_id"))
 		if !contract.IsTaskID(raw) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 			c.Abort()
 			return
 		}
@@ -497,7 +497,7 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
@@ -518,7 +518,7 @@ func (h *contractV1Handler) listWorkspaceTaskOutputs(c *gin.Context) {
 		workspace := wctx.Workspace
 		raw := strings.TrimSpace(c.Param("task_id"))
 		if !contract.IsTaskID(raw) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, "任务不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 			c.Abort()
 			return
 		}

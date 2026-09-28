@@ -179,4 +179,27 @@ describe('usePointerDragSession', () => {
     expect(onMove).toHaveBeenCalledWith({ event: moveEvent, payload })
     expect(onEnd).toHaveBeenCalledWith({ event: endEvent, payload })
   })
+
+  it('proceeds captureless when setPointerCapture throws and still ends cleanly', () => {
+    const payload = { id: 'drag-1' }
+    const onMove = vi.fn()
+    const onEnd = vi.fn()
+    const controller = usePointerDragSession<DragPayload>({ onMove, onEnd })
+    const target = createCaptureTarget()
+    target.setPointerCapture = vi.fn(() => {
+      throw new Error('capture unavailable')
+    })
+    target.releasePointerCapture = vi.fn(() => {
+      throw new Error('capture already lost')
+    })
+
+    beginDragFromTarget(controller, target, payload, { pointerId: 17 })
+    expect(controller.isDragging.value).toBe(true)
+    const moveEvent = dispatchPointerEvent(window, 'pointermove', { pointerId: 17 })
+    const endEvent = dispatchPointerEvent(window, 'pointerup', { pointerId: 17 })
+
+    expect(controller.isDragging.value).toBe(false)
+    expect(onMove).toHaveBeenCalledWith({ event: moveEvent, payload })
+    expect(onEnd).toHaveBeenCalledWith({ event: endEvent, payload })
+  })
 })

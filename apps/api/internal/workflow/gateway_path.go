@@ -59,17 +59,17 @@ const (
 func (s GatewayPathSource) Label() string {
 	switch s {
 	case GatewayPathSourceOverride:
-		return "Custom Target Route (自定义)"
+		return msgLabel
 	case GatewayPathSourceOpenRouter:
-		return "OpenRouter Chat (多模态消息)"
+		return msgLabel2
 	case GatewayPathSourceAnthropic:
-		return "Anthropic Messages (文本与视觉)"
+		return msgLabel3
 	case GatewayPathSourceFal:
-		return "Fal.ai Media Pipeline (图像/抠图)"
+		return msgLabel4
 	case GatewayPathSourceChat:
-		return "OpenAI Chat Completions (多模态)"
+		return msgLabel5
 	case GatewayPathSourceGenerations:
-		return "OpenAI Images API (生成)"
+		return msgLabel6
 	default:
 		return string(s)
 	}

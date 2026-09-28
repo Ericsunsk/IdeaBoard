@@ -125,14 +125,14 @@ func configBool(cfg map[string]interface{}, key string) bool {
 func parseS3Endpoint(raw string) (string, bool, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", true, fmt.Errorf("无效的 Endpoint")
+		return "", true, fmt.Errorf(msgParseS3Endpoint)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", true, fmt.Errorf("无效的 Endpoint")
+		return "", true, fmt.Errorf(msgParseS3Endpoint)
 	}
 	return parsed.Host, parsed.Scheme != "http", nil
 }
@@ -140,14 +140,14 @@ func parseS3Endpoint(raw string) (string, bool, error) {
 func normalizePublicDomain(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", fmt.Errorf("未配置访问域名")
+		return "", fmt.Errorf(msgNormalizePublicDomain)
 	}
 	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
-		return "", fmt.Errorf("无效的访问域名")
+		return "", fmt.Errorf(msgNormalizePublicDomain2)
 	}
 	basePath := strings.TrimSuffix(path.Clean(parsed.Path), "/")
 	if basePath == "." || basePath == "/" {
@@ -166,7 +166,7 @@ func validateS3EndpointPolicy(ctx context.Context, endpoint string) error {
 		endpointURL = "http://" + endpointHost
 	}
 	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHosts(ctx)...); err != nil {
-		return errors.New("endpoint 不可用，仅支持可达的公网 http(s) 地址")
+		return errors.New(msgValidateS3EndpointPolicy)
 	}
 	return nil
 }

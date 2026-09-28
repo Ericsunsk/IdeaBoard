@@ -6,6 +6,7 @@ import {
   requireBoardWorkspaceId,
   restoreWorkspaceBoard,
   saveWorkspaceBoard,
+  type BoardsRequestOptions,
   type SaveWorkspaceBoardResult,
   type WorkspaceBoardDocument,
   type WorkspaceBoardMeta,
@@ -387,10 +388,13 @@ export function isBoardArchivedError(error: unknown): boolean {
  * into the local catalog when the board is cached locally; returns the raw
  * `archivedAt` (string when archived, null when live).
  */
-export async function fetchBoardArchivedAt(boardId: string): Promise<string | null> {
+export async function fetchBoardArchivedAt(
+  boardId: string,
+  options: BoardsRequestOptions = {},
+): Promise<string | null> {
   const normalized = boardId.trim()
   if (!normalized) throw new Error('MISSING_BOARD_ID')
-  const meta = await fetchWorkspaceBoardMeta(requireBoardWorkspaceId(), normalized)
+  const meta = await fetchWorkspaceBoardMeta(requireBoardWorkspaceId(), normalized, options)
   const archivedAt = typeof meta.archivedAt === 'string' && meta.archivedAt ? meta.archivedAt : null
   if (getBoardById(normalized)) {
     setBoardArchivedAt(normalized, archivedAt)

@@ -20,7 +20,7 @@ func requireAdmin(c *gin.Context, serviceConfigured bool) (int64, bool) {
 		return 0, false
 	}
 	if !serviceConfigured {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "Idea服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable)
 		return 0, false
 	}
 	return identityPrincipal.UserID(), true

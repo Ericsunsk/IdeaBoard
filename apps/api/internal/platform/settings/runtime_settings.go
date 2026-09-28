@@ -145,10 +145,10 @@ func (s *RuntimeSettingsService) GetRateLimit(ctx context.Context) (RateLimitSet
 
 func (s *RuntimeSettingsService) UpdateRateLimit(ctx context.Context, setting RateLimitSetting) (RateLimitSetting, error) {
 	if setting.WindowSeconds < 1 || setting.WindowSeconds > maxRateLimitWindow {
-		return RateLimitSetting{}, validation.New("window_seconds 必须在 1 到 3600 秒之间")
+		return RateLimitSetting{}, validation.New(msgUpdateRateLimit)
 	}
 	if setting.MaxRequests < 1 || setting.MaxRequests > maxRateLimitRequests {
-		return RateLimitSetting{}, validation.New("max_requests 必须在 1 到 10000 之间")
+		return RateLimitSetting{}, validation.New(msgUpdateRateLimit2)
 	}
 	if err := s.setMany(ctx, []SystemConfigValue{
 		{Key: rateLimitWindowSecondsKey, Value: strconv.Itoa(setting.WindowSeconds)},
@@ -254,7 +254,7 @@ func (s *RuntimeSettingsService) writeCachedRateLimit(setting RateLimitSetting) 
 
 func NormalizeMediaUploadSetting(setting MediaUploadSetting) (MediaUploadSetting, error) {
 	if setting.UploadMaxConcurrent < minUploadMaxConcurrent || setting.UploadMaxConcurrent > maxUploadMaxConcurrent {
-		return MediaUploadSetting{}, validation.New("upload_max_concurrent 必须在 1 到 64 之间")
+		return MediaUploadSetting{}, validation.New(msgNormalizeMediaUploadSetting)
 	}
 	return setting, nil
 }
@@ -264,16 +264,16 @@ func normalizeBranding(setting BrandingSetting) (BrandingSetting, error) {
 	logoURL := strings.TrimSpace(setting.LogoURL)
 
 	if projectName == "" {
-		return BrandingSetting{}, validation.New("project_name 不能为空")
+		return BrandingSetting{}, validation.New(msgNormalizeBranding)
 	}
 	if len([]rune(projectName)) > maxBrandingProjectNameLen {
-		return BrandingSetting{}, validation.New("project_name 不能超过 40 个字符")
+		return BrandingSetting{}, validation.New(msgNormalizeBranding2)
 	}
 	if len(logoURL) > maxBrandingLogoURLLen {
-		return BrandingSetting{}, validation.New("logo_url 不能超过 2048 个字符")
+		return BrandingSetting{}, validation.New(msgNormalizeBranding3)
 	}
 	if !isValidBrandingLogoURL(logoURL) {
-		return BrandingSetting{}, validation.New("logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL")
+		return BrandingSetting{}, validation.New(msgNormalizeBranding4)
 	}
 	return BrandingSetting{ProjectName: projectName, LogoURL: logoURL}, nil
 }

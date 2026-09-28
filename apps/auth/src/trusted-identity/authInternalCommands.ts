@@ -7,101 +7,93 @@ import type {
   RevokeUserSessionsData,
   SetUserRoleData,
   UnbanUserData,
-} from "../generated/auth-internal/types.gen.js";
+} from '../generated/auth-internal/types.gen.js'
 import {
   normalizeAuthRole,
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
-} from "../infrastructure/authUtils.js";
+} from '../infrastructure/authUtils.js'
 import {
   type TrustedIdentityProvisioner,
   type TrustedIdentityProvisioningOutcome,
-} from "./trustedIdentity.js";
+} from './trustedIdentity.js'
 
 export type AuthSessionAPI = {
-  getSession(input: { headers: Headers }): Promise<unknown>;
-};
+  getSession(input: { headers: Headers }): Promise<unknown>
+}
 
 export type AuthIdentityMutationStore = {
   findUserEmailsByIDs?: (
     authUserIDs: string[],
-  ) => Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>;
-  removeAuthUserCascade(authUserID: string): Promise<boolean>;
-  updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>;
+  ) => Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>
+  removeAuthUserCascade(authUserID: string): Promise<boolean>
+  updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>
   updateAuthUserBanState(
     authUserID: string,
     banned: boolean,
     banReason: string | null,
     banExpiresIn: number | null,
-  ): Promise<boolean>;
-  deleteAuthUserSessions(authUserID: string): Promise<boolean>;
-};
+  ): Promise<boolean>
+  deleteAuthUserSessions(authUserID: string): Promise<boolean>
+}
 
 export type AuthInternalCommandFailureKind =
-  "invalid_input" | "not_found" | "conflict" | "repository_failure";
+  'invalid_input' | 'not_found' | 'conflict' | 'repository_failure'
 
 export type AuthInternalCommandResult<TData> =
   | {
-      ok: true;
-      data: TData;
+      ok: true
+      data: TData
     }
   | {
-      ok: false;
-      kind: AuthInternalCommandFailureKind;
-      message: string;
-    };
+      ok: false
+      kind: AuthInternalCommandFailureKind
+      message: string
+    }
 
 export type EnsureIdentityCommandInput = {
-  email?: unknown;
-  displayName?: unknown;
-  password?: unknown;
-  allowExisting?: unknown;
-  role?: unknown;
-};
+  email?: unknown
+  displayName?: unknown
+  password?: unknown
+  allowExisting?: unknown
+  role?: unknown
+}
 
 export type AuthUserIDCommandInput = {
-  authUserID?: unknown;
-};
+  authUserID?: unknown
+}
 
 export type GetUserEmailsCommandInput = {
-  userIDs?: unknown;
-};
+  userIDs?: unknown
+}
 
 export type BanIdentityCommandInput = AuthUserIDCommandInput & {
-  banReason?: unknown;
-  banExpiresIn?: unknown;
-};
+  banReason?: unknown
+  banExpiresIn?: unknown
+}
 
 export type SetRoleCommandInput = AuthUserIDCommandInput & {
-  role?: unknown;
-};
+  role?: unknown
+}
 
-export type TrustedIdentityData = EnsureUserEnvelope["data"];
+export type TrustedIdentityData = EnsureUserEnvelope['data']
 
 export type AuthInternalCommands = {
   getUserEmails(
     input: GetUserEmailsCommandInput,
-  ): Promise<AuthInternalCommandResult<GetUserEmailsData>>;
+  ): Promise<AuthInternalCommandResult<GetUserEmailsData>>
   ensureIdentity(
     input: EnsureIdentityCommandInput,
-  ): Promise<AuthInternalCommandResult<TrustedIdentityData>>;
-  deleteIdentity(
-    input: AuthUserIDCommandInput,
-  ): Promise<AuthInternalCommandResult<DeleteUserData>>;
-  banIdentity(
-    input: BanIdentityCommandInput,
-  ): Promise<AuthInternalCommandResult<BanUserData>>;
-  unbanIdentity(
-    input: AuthUserIDCommandInput,
-  ): Promise<AuthInternalCommandResult<UnbanUserData>>;
+  ): Promise<AuthInternalCommandResult<TrustedIdentityData>>
+  deleteIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<DeleteUserData>>
+  banIdentity(input: BanIdentityCommandInput): Promise<AuthInternalCommandResult<BanUserData>>
+  unbanIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<UnbanUserData>>
   revokeSessions(
     input: AuthUserIDCommandInput,
-  ): Promise<AuthInternalCommandResult<RevokeUserSessionsData>>;
-  setRole(
-    input: SetRoleCommandInput,
-  ): Promise<AuthInternalCommandResult<SetUserRoleData>>;
-};
+  ): Promise<AuthInternalCommandResult<RevokeUserSessionsData>>
+  setRole(input: SetRoleCommandInput): Promise<AuthInternalCommandResult<SetUserRoleData>>
+}
 
 export function createAuthInternalCommands(
   provisioner: TrustedIdentityProvisioner,
@@ -115,41 +107,27 @@ export function createAuthInternalCommands(
     unbanIdentity: (input) => unbanIdentity(input, mutationStore),
     revokeSessions: (input) => revokeSessions(input, mutationStore),
     setRole: (input) => setRole(input, mutationStore),
-  };
+  }
 }
 
 async function getUserEmails(
   input: GetUserEmailsCommandInput,
   repository: AuthIdentityMutationStore,
 ): Promise<AuthInternalCommandResult<GetUserEmailsData>> {
-  const rawIDs = Array.isArray(input.userIDs) ? input.userIDs : [];
-  const userIDs = [
-    ...new Set(
-      rawIDs.map((value) => String(value ?? "").trim()).filter(Boolean),
-    ),
-  ];
-  if (
-    userIDs.length === 0 ||
-    userIDs.length > 100 ||
-    userIDs.some((id) => id.length > 191)
-  ) {
-    return commandFailure(
-      "invalid_input",
-      "user_ids must contain 1 to 100 valid user ids",
-    );
+  const rawIDs = Array.isArray(input.userIDs) ? input.userIDs : []
+  const userIDs = [...new Set(rawIDs.map((value) => String(value ?? '').trim()).filter(Boolean))]
+  if (userIDs.length === 0 || userIDs.length > 100 || userIDs.some((id) => id.length > 191)) {
+    return commandFailure('invalid_input', 'user_ids must contain 1 to 100 valid user ids')
   }
   if (!repository.findUserEmailsByIDs) {
-    return commandFailure(
-      "repository_failure",
-      "auth user email reader is not configured",
-    );
+    return commandFailure('repository_failure', 'auth user email reader is not configured')
   }
   try {
     return commandSuccess({
       users: await repository.findUserEmailsByIDs(userIDs),
-    });
+    })
   } catch (error) {
-    return repositoryFailure(error, "failed to read auth user emails");
+    return repositoryFailure(error, 'failed to read auth user emails')
   }
 }
 
@@ -158,21 +136,21 @@ async function ensureIdentity(
   provisioner: TrustedIdentityProvisioner,
 ): Promise<AuthInternalCommandResult<TrustedIdentityData>> {
   try {
-    const outcome = await provisioner.provision(input);
-    if (outcome.kind === "invalid") {
-      return commandFailure("invalid_input", outcome.message);
+    const outcome = await provisioner.provision(input)
+    if (outcome.kind === 'invalid') {
+      return commandFailure('invalid_input', outcome.message)
     }
-    if (outcome.kind === "conflict") {
+    if (outcome.kind === 'conflict') {
       return commandFailure(
-        "conflict",
-        outcome.reason === "identity_mismatch"
-          ? "existing identity conflicts with requested trusted user"
-          : "auth identity already exists",
-      );
+        'conflict',
+        outcome.reason === 'identity_mismatch'
+          ? 'existing identity conflicts with requested trusted user'
+          : 'auth identity already exists',
+      )
     }
-    return commandSuccess(trustedIdentityData(outcome));
+    return commandSuccess(trustedIdentityData(outcome))
   } catch (error) {
-    return repositoryFailure(error, "failed to ensure user");
+    return repositoryFailure(error, 'failed to ensure user')
   }
 }
 
@@ -183,20 +161,20 @@ async function deleteIdentity(
   return runAuthUserMutation(
     input,
     (authUserID) => repository.removeAuthUserCascade(authUserID),
-    "failed to delete auth user",
+    'failed to delete auth user',
     (authUserID) => ({
       deleted: true as const,
       auth_user_id: authUserID,
     }),
-  );
+  )
 }
 
 async function banIdentity(
   input: BanIdentityCommandInput,
   repository: AuthIdentityMutationStore,
 ): Promise<AuthInternalCommandResult<BanUserData>> {
-  const authUserID = validateAuthUserID(input.authUserID);
-  if (!authUserID.ok) return authUserID.result;
+  const authUserID = validateAuthUserID(input.authUserID)
+  if (!authUserID.ok) return authUserID.result
 
   try {
     const banned = await repository.updateAuthUserBanState(
@@ -204,31 +182,27 @@ async function banIdentity(
       true,
       normalizeOptionalText(input.banReason, 500),
       normalizeOptionalPositiveInteger(input.banExpiresIn),
-    );
-    if (!banned) return commandFailure("not_found", "auth user not found");
+    )
+    if (!banned) return commandFailure('not_found', 'auth user not found')
 
-    const revoked = await repository.deleteAuthUserSessions(authUserID.value);
+    const revoked = await repository.deleteAuthUserSessions(authUserID.value)
     if (!revoked) {
-      throw new Error("auth user sessions were not revoked after ban");
+      throw new Error('auth user sessions were not revoked after ban')
     }
 
-    return commandSuccess({ auth_user_id: authUserID.value, banned: true });
+    return commandSuccess({ auth_user_id: authUserID.value, banned: true })
   } catch (error) {
-    return repositoryFailure(error, "failed to ban auth user");
+    return repositoryFailure(error, 'failed to ban auth user')
   }
 }
 
-async function unbanIdentity(
-  input: AuthUserIDCommandInput,
-  repository: AuthIdentityMutationStore,
-) {
+async function unbanIdentity(input: AuthUserIDCommandInput, repository: AuthIdentityMutationStore) {
   return runAuthUserMutation(
     input,
-    (authUserID) =>
-      repository.updateAuthUserBanState(authUserID, false, null, null),
-    "failed to unban auth user",
+    (authUserID) => repository.updateAuthUserBanState(authUserID, false, null, null),
+    'failed to unban auth user',
     (authUserID) => ({ auth_user_id: authUserID, banned: false as const }),
-  );
+  )
 }
 
 async function revokeSessions(
@@ -238,28 +212,27 @@ async function revokeSessions(
   return runAuthUserMutation(
     input,
     (authUserID) => repository.deleteAuthUserSessions(authUserID),
-    "failed to revoke auth user sessions",
+    'failed to revoke auth user sessions',
     (authUserID) => ({ auth_user_id: authUserID, revoked: true as const }),
-  );
+  )
 }
 
 async function setRole(
   input: SetRoleCommandInput,
   repository: AuthIdentityMutationStore,
 ): Promise<AuthInternalCommandResult<SetUserRoleData>> {
-  const authUserID = validateAuthUserID(input.authUserID);
-  if (!authUserID.ok) return authUserID.result;
+  const authUserID = validateAuthUserID(input.authUserID)
+  if (!authUserID.ok) return authUserID.result
 
-  const role = normalizeAuthRole(input.role);
-  if (!role)
-    return commandFailure("invalid_input", "role must be admin or user");
+  const role = normalizeAuthRole(input.role)
+  if (!role) return commandFailure('invalid_input', 'role must be admin or user')
 
   try {
-    const updated = await repository.updateAuthUserRole(authUserID.value, role);
-    if (!updated) return commandFailure("not_found", "auth user not found");
-    return commandSuccess({ auth_user_id: authUserID.value, role });
+    const updated = await repository.updateAuthUserRole(authUserID.value, role)
+    if (!updated) return commandFailure('not_found', 'auth user not found')
+    return commandSuccess({ auth_user_id: authUserID.value, role })
   } catch (error) {
-    return repositoryFailure(error, "failed to update auth user role");
+    return repositoryFailure(error, 'failed to update auth user role')
   }
 }
 
@@ -269,75 +242,68 @@ async function runAuthUserMutation<TData>(
   failureMessage: string,
   data: (authUserID: string) => TData,
 ): Promise<AuthInternalCommandResult<TData>> {
-  const authUserID = validateAuthUserID(input.authUserID);
-  if (!authUserID.ok) return authUserID.result;
+  const authUserID = validateAuthUserID(input.authUserID)
+  if (!authUserID.ok) return authUserID.result
 
   try {
-    const updated = await mutate(authUserID.value);
-    if (!updated) return commandFailure("not_found", "auth user not found");
-    return commandSuccess(data(authUserID.value));
+    const updated = await mutate(authUserID.value)
+    if (!updated) return commandFailure('not_found', 'auth user not found')
+    return commandSuccess(data(authUserID.value))
   } catch (error) {
-    return repositoryFailure(error, failureMessage);
+    return repositoryFailure(error, failureMessage)
   }
 }
 
 function trustedIdentityData(
-  outcome: Extract<
-    TrustedIdentityProvisioningOutcome,
-    { kind: "created" | "existing" }
-  >,
+  outcome: Extract<TrustedIdentityProvisioningOutcome, { kind: 'created' | 'existing' }>,
 ): TrustedIdentityData {
-  const { user, identity } = outcome;
+  const { user, identity } = outcome
   return {
     user: {
       auth_user_id: user.id,
       display_name: normalizeDisplayName(user.name || identity.displayName),
       email: identity.claimIdentity,
       claim_identity: identity.claimIdentity,
-      claim_identity_kind: "canonical_email",
+      claim_identity_kind: 'canonical_email',
       claim_identity_verified: true,
       role: identity.role,
-      existing: outcome.kind === "existing",
+      existing: outcome.kind === 'existing',
     },
-  };
+  }
 }
 
 type AuthUserIDValidation =
-  | { ok: true; value: string }
-  | { ok: false; result: AuthInternalCommandResult<never> };
+  { ok: true; value: string } | { ok: false; result: AuthInternalCommandResult<never> }
 
 function validateAuthUserID(raw: unknown): AuthUserIDValidation {
-  const value = String(raw ?? "").trim();
+  const value = String(raw ?? '').trim()
   if (!value) {
     return {
       ok: false,
-      result: commandFailure("invalid_input", "auth user id is required"),
-    };
+      result: commandFailure('invalid_input', 'auth user id is required'),
+    }
   }
   if (value.length > 191) {
     return {
       ok: false,
-      result: commandFailure("invalid_input", "auth user id is invalid"),
-    };
+      result: commandFailure('invalid_input', 'auth user id is invalid'),
+    }
   }
-  return { ok: true, value };
+  return { ok: true, value }
 }
 
 function commandSuccess<TData>(data: TData): AuthInternalCommandResult<TData> {
-  return { ok: true, data };
+  return { ok: true, data }
 }
 
 function commandFailure(
   kind: AuthInternalCommandFailureKind,
   message: string,
 ): AuthInternalCommandResult<never> {
-  return { ok: false, kind, message };
+  return { ok: false, kind, message }
 }
 
-function repositoryFailure(
-  error: unknown,
-  fallback: string,
-): AuthInternalCommandResult<never> {
-  console.error(`[auth] ${fallback}`, error);
-  return commandFailure("repository_failure", fallback);
+function repositoryFailure(error: unknown, fallback: string): AuthInternalCommandResult<never> {
+  console.error(`[auth] ${fallback}`, error)
+  return commandFailure('repository_failure', fallback)
 }

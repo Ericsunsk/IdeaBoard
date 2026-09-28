@@ -129,7 +129,7 @@ async function checkAccessibilityShape(page: Page, label: string): Promise<void>
   // Pass the function source as a browser expression. The smoke script runs
   // through esbuild/tsx, whose injected `__name` helper is not available in
   // the page context when a compiled callback is serialized by Playwright.
-  const raw = await page.evaluate(COLLECT_A11Y_SHAPE_SOURCE)
+  const raw = await page.evaluate<A11yShapeReport>(COLLECT_A11Y_SHAPE_SOURCE)
   const report: A11yShapeReport = raw
   if (report.headings === 0) violations.push('no named heading found')
   if (report.landmarks === 0) violations.push('no landmark (main/nav/banner/contentinfo/...) found')

@@ -83,19 +83,19 @@ func (h *contractV1Handler) registerEventRoutes(group *gin.RouterGroup) {
 func (h *contractV1Handler) eventWorkspaceContext(c *gin.Context, identityPrincipal principal.Principal) (*tenancy.Workspace, string, bool) {
 	raw := strings.TrimSpace(c.Param("workspace_id"))
 	if !contract.IsWorkspaceID(raw) {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, "事件不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, msgEventNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	workspace, err := h.deps.Store.GetWorkspace(c.Request.Context(), raw)
 	if err != nil {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, "事件不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, msgEventNotFound)
 		c.Abort()
 		return nil, "", false
 	}
 	role, member, err := h.deps.Store.GetWorkspaceRole(c.Request.Context(), raw, identityPrincipal.UserID())
 	if err != nil || !member {
-		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, "事件不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeEventNotFound, msgEventNotFound)
 		c.Abort()
 		return nil, "", false
 	}
@@ -107,7 +107,7 @@ func (h *contractV1Handler) eventWorkspaceContext(c *gin.Context, identityPrinci
 // member enumeration of delivery targets stays privileged.
 func requireEventSubscriptionAdmin(c *gin.Context, role string) bool {
 	if role != tenancy.RoleOwner && role != tenancy.RoleAdmin {
-		contract.RenderError(c, http.StatusForbidden, contract.CodeEventForbidden, "权限不足")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeEventForbidden, msgForbidden)
 		c.Abort()
 		return false
 	}
@@ -116,7 +116,7 @@ func requireEventSubscriptionAdmin(c *gin.Context, role string) bool {
 
 func (h *contractV1Handler) requireEventSinks(c *gin.Context) bool {
 	if h.deps.Events == nil || h.deps.Webhooks == nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "事件服务暂不可用")
+		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable48)
 		c.Abort()
 		return false
 	}
@@ -132,7 +132,7 @@ func parseEventTypesFilter(c *gin.Context) (events.WorkspaceEventFilter, bool) {
 	filter, err := events.NewWorkspaceEventFilter(names)
 	if err != nil {
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-			contract.CodeValidationFailed, "事件类型非法",
+			contract.CodeValidationFailed, msgValidationFailed6,
 			contract.FieldErrors{Fields: map[string]string{"types": "invalid"}})
 		c.Abort()
 		return events.WorkspaceEventFilter{}, false
@@ -146,7 +146,7 @@ func parseEventCursor(c *gin.Context) (string, bool) {
 		cursor = strings.TrimSpace(c.Query("last_event_id"))
 	}
 	if cursor != "" && !contract.IsEventID(cursor) {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, "分页游标非法")
+		contract.RenderError(c, http.StatusBadRequest, contract.CodePaginationCursorInvalid, msgPaginationCursorInvalid3)
 		c.Abort()
 		return "", false
 	}
@@ -250,7 +250,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 		}
 		key, err := contract.IdempotencyKeyFromHeader(c)
 		if err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
@@ -262,7 +262,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 		destination := strings.TrimSpace(body.Data.URL)
 		if validationErr := events.ValidateWebhookURL(destination); validationErr != nil {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-				contract.CodeValidationFailed, "回调地址非法",
+				contract.CodeValidationFailed, msgValidationFailed7,
 				contract.FieldErrors{Fields: map[string]string{"url": "invalid"}})
 			c.Abort()
 			return
@@ -270,7 +270,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 		for _, typ := range body.Data.EventTypes {
 			if strings.TrimSpace(typ) != "" && !events.IsV1EventType(typ) {
 				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-					contract.CodeValidationFailed, "事件类型非法",
+					contract.CodeValidationFailed, msgValidationFailed6,
 					contract.FieldErrors{Fields: map[string]string{"event_types": "invalid"}})
 				c.Abort()
 				return
@@ -281,7 +281,7 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 			secret = []byte(*body.Data.Secret)
 			if len(secret) > 0 && len(secret) < 16 {
 				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-					contract.CodeValidationFailed, "签名密钥过短",
+					contract.CodeValidationFailed, msgValidationFailed8,
 					contract.FieldErrors{Fields: map[string]string{"secret": "too_short"}})
 				c.Abort()
 				return
@@ -310,12 +310,12 @@ func (h *contractV1Handler) createEventSubscription(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, contract.CodeEventSubscriptionConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeEventSubscriptionConflict, msgWorkspaceIdempotencyConflict)
 				c.Abort()
 				return
 			}
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed),
-				contract.CodeValidationFailed, "订阅参数非法",
+				contract.CodeValidationFailed, msgValidationFailed9,
 				contract.FieldErrors{Fields: map[string]string{"data": "invalid"}})
 			c.Abort()
 			return
@@ -331,24 +331,24 @@ func (h *contractV1Handler) deleteEventSubscription(c *gin.Context) {
 			return
 		}
 		if _, err := contract.IdempotencyKeyFromHeader(c); err != nil {
-			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
 			c.Abort()
 			return
 		}
 		subscriptionID := strings.TrimSpace(c.Param("subscription_id"))
 		if !events.IsWebhookSubscriptionID(subscriptionID) {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, msgEventSubscriptionNotFound)
 			c.Abort()
 			return
 		}
 		deleted, err := h.deps.Webhooks.Delete(c.Request.Context(), workspace.PublicID, subscriptionID)
 		if err != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "事件服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable48)
 			c.Abort()
 			return
 		}
 		if !deleted {
-			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, "订阅不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeEventSubscriptionNotFound, msgEventSubscriptionNotFound)
 			c.Abort()
 			return
 		}

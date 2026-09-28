@@ -205,7 +205,7 @@ func isCatalogProvider(provider domain.Provider) bool {
 func normalizeQuery(raw string) (string, error) {
 	query := strings.Join(strings.Fields(strings.TrimSpace(raw)), " ")
 	if utf8.RuneCountInString(query) > MaxSearchQueryRunes {
-		return "", fmt.Errorf("搜索关键词不能超过 %d 个字符", MaxSearchQueryRunes)
+		return "", fmt.Errorf(msgNormalizeQuery, MaxSearchQueryRunes)
 	}
 	return query, nil
 }
@@ -216,11 +216,11 @@ func decodeCursor(raw string) (searchCursor, error) {
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return searchCursor{}, errors.New("分页游标无效")
+		return searchCursor{}, errors.New(msgDecodeCursor)
 	}
 	var cursor searchCursor
 	if err := json.Unmarshal(decoded, &cursor); err != nil || cursor.Unsplash < 1 || cursor.Pexels < 1 {
-		return searchCursor{}, errors.New("分页游标无效")
+		return searchCursor{}, errors.New(msgDecodeCursor)
 	}
 	return cursor, nil
 }

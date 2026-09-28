@@ -97,6 +97,35 @@ function createImageInputEdgesByTargetId(store: CanvasGraphReadPort) {
   return result
 }
 
+function excerptMediaSyncSnapshot(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== 'object') return ''
+  const record = snapshot as Record<string, unknown> & { type?: unknown }
+  if (record.type === 'image-node') {
+    const typed = record as unknown as {
+      sourceImageUrl?: unknown
+      sourceMediaRef?: unknown
+      sourceImageRatio?: unknown
+      outputImages?: unknown
+    }
+    return JSON.stringify({
+      type: 'image-node',
+      sourceImageUrl: typeof typed.sourceImageUrl === 'string' ? typed.sourceImageUrl : '',
+      sourceMediaRef: typed.sourceMediaRef ?? null,
+      sourceImageRatio: typed.sourceImageRatio ?? 1,
+      outputImages: Array.isArray(typed.outputImages) ? typed.outputImages : [],
+    })
+  }
+  if (record.type === 'prompt' || record.type === 'fusion') {
+    const typed = record as unknown as { inputImages?: unknown; outputImages?: unknown }
+    return JSON.stringify({
+      type: record.type,
+      inputImages: Array.isArray(typed.inputImages) ? typed.inputImages : [],
+      outputImages: Array.isArray(typed.outputImages) ? typed.outputImages : [],
+    })
+  }
+  return JSON.stringify({ type: typeof record.type === 'string' ? record.type : '' })
+}
+
 function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputImage[]) {
   return (
     current.length === next.length &&
@@ -143,23 +172,34 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const nodeParts = options.nodes.value.map((node) => {
       const snapshot = node.data?.snapshotNode
       if (!snapshot || typeof snapshot !== 'object') return node.id
-      const { x: _x, y: _y, ...domain } = snapshot as Record<string, unknown>
-      return `${node.id}:${JSON.stringify(domain)}`
+      return `${node.id}:${excerptMediaSyncSnapshot(snapshot)}`
     })
-    const edgeParts = options.edges.value.map(
-      (edge) =>
-        `${edge.id}:${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
-    )
+    const edgeParts = options.edges.value
+      .filter(
+        (edge) =>
+          (edge.targetHandle ?? '').includes('image') ||
+          (edge.sourceHandle ?? '').includes('image'),
+      )
+      .map(
+        (edge) =>
+          `${edge.id}:${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
+      )
     return [...nodeParts, ...edgeParts].sort().join('|')
   }
 
   function syncLinkedMediaInputs() {
     const store = options.readCanvasGraphStore()
+    const nodeById = createNodeById(store)
+    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(store)
     store.getNodeIds().forEach((nodeId) => {
-      const record = store.getNode(nodeId)
+      const record = nodeById.get(nodeId) ?? store.getNode(nodeId)
       if (!record || (record.kind !== 'prompt' && record.kind !== 'fusion')) return
       if (!isMediaInputSnapshotNode(record.snapshot)) return
-      const linkedImages = resolveLinkedImagesForTarget(nodeId)
+      const linkedImages = resolveLinkedImagesForTargetWithMaps(
+        nodeId,
+        nodeById,
+        imageInputEdgesByTargetId,
+      )
       const current = record.snapshot.inputImages
       const nextImages = createSyncedMediaInputImages(current, linkedImages, record.snapshot.type)
       if (areMediaInputImagesEqual(current, nextImages)) return
@@ -179,14 +219,16 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     })
   }
 
-  function resolveLinkedImagesForTarget(targetNodeId: string): LinkedNodePreviewImage[] {
-    const imageInputEdgesByTargetId = createImageInputEdgesByTargetId(
-      options.readCanvasGraphStore(),
-    )
+  function resolveLinkedImagesForTargetWithMaps(
+    targetNodeId: string,
+    nodeById: Map<string, CanvasGraphNodeRecord | undefined>,
+    imageInputEdgesByTargetId: Map<string, CanvasGraphEdgeRecord[]>,
+  ): LinkedNodePreviewImage[] {
     return (imageInputEdgesByTargetId.get(targetNodeId) ?? [])
       .map((edge) =>
-        resolveNodePreviewImageById(
+        resolveNodePreviewImageWithMaps(
           `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`,
+          nodeById,
         ),
       )
       .filter((item): item is LinkedNodePreviewImage => !!item && !!item.url)
@@ -227,8 +269,11 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     }
   }
 
-  function resolveNodePreviewImageById(nodeId: string): LinkedNodePreviewImage | null {
-    const record = createNodeById(options.readCanvasGraphStore()).get(nodeId)
+  function resolveNodePreviewImageWithMaps(
+    nodeId: string,
+    nodeById: Map<string, CanvasGraphNodeRecord | undefined>,
+  ): LinkedNodePreviewImage | null {
+    const record = nodeById.get(nodeId)
     const kind = record?.kind
     const snapshot = record?.snapshot as Record<string, unknown> | undefined
     if (!record || !kind || !snapshot) return null

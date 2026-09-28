@@ -171,6 +171,9 @@ export async function fetchWorkspaceBoards(
   const items: WorkspaceBoardMeta[] = []
   let cursor: string | undefined
   for (let page = 0; page < BOARD_LIST_MAX_PAGES; page += 1) {
+    // The per-page request already carries the signal; stop the loop itself
+    // promptly when the caller aborts between pages.
+    options.signal?.throwIfAborted()
     const response = await listBoards(
       workspace,
       {

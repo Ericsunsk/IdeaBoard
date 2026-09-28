@@ -62,8 +62,8 @@ func VisionSearchItem() billing.BillableItemDefinition {
 		SKU:             "ai-search:vision",
 		Namespace:       "ai-search",
 		ProductKind:     "search-feature",
-		DisplayName:     "视觉搜索",
-		Description:     "从参考图提取搜索意图。",
+		DisplayName:     msgVisionSearchItem,
+		Description:     msgVisionSearchItem2,
 		SortOrder:       10,
 		PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
 	}
