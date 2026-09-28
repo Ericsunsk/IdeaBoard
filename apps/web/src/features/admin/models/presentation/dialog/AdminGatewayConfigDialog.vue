@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    header="添加网关"
-    description="填写网关连接配置后保存。"
+    :header="MODELS_MESSAGES.gatewayHeader"
+    :description="MODELS_MESSAGES.gatewayDescription"
     size="compact"
     content-layout="plain"
     @update:visible="emit('update:visible', $event)"
@@ -21,20 +21,20 @@
             class="text-admin-caption font-semibold text-admin-text-1"
             for="gateway-base-url-input"
           >
-            网关 Base URL
+            {{ MODELS_MESSAGES.gatewayBaseUrlLabel }}
           </label>
           <span
             v-if="summary?.is_first_party"
             class="inline-flex items-center gap-1 text-admin-caption text-admin-accent font-medium"
           >
             <Check class="size-3.5" />
-            已识别 Cloudflare 网关
+            {{ MODELS_MESSAGES.gatewayRecognized }}
           </span>
         </div>
         <AdminInput
           id="gateway-base-url-input"
           v-model="form.values.base_url"
-          placeholder="例如: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}"
+          :placeholder="MODELS_MESSAGES.gatewayBaseUrlPlaceholder"
           :disabled="loading || saving"
           class="w-full"
         />
@@ -47,21 +47,21 @@
             class="text-admin-caption font-semibold text-admin-text-1"
             for="gateway-token-input"
           >
-            API 密钥
+            {{ MODELS_MESSAGES.gatewayTokenLabel }}
           </label>
           <span
             v-if="isTokenConfigured"
             class="inline-flex items-center gap-1 text-admin-caption text-admin-success font-medium"
           >
             <ShieldCheck class="size-3.5" />
-            已配置 (留空保持不变)
+            {{ MODELS_MESSAGES.gatewayTokenConfigured }}
           </span>
         </div>
         <AdminInput
           id="gateway-token-input"
           v-model="form.values.token"
           type="password"
-          placeholder="输入网关鉴权 Token（若开启鉴权）"
+          :placeholder="MODELS_MESSAGES.gatewayTokenPlaceholder"
           autocomplete="off"
           :disabled="loading || saving"
           class="w-full"
@@ -74,12 +74,12 @@
           class="text-admin-caption font-semibold text-admin-text-1"
           for="gateway-account-id-input"
         >
-          Account ID <span class="font-normal text-admin-text-3">（自定义域名探测选填）</span>
+          Account ID <span class="font-normal text-admin-text-3">{{ MODELS_MESSAGES.gatewayCustomDomainHint }}</span>
         </label>
         <AdminInput
           id="gateway-account-id-input"
           v-model="form.values.account_id"
-          placeholder="32 位小写十六进制"
+          :placeholder="MODELS_MESSAGES.gatewayAccountPlaceholder"
           autocomplete="off"
           :disabled="loading || saving"
           class="w-full font-mono"
@@ -87,12 +87,12 @@
       </div>
       <div class="flex flex-col gap-1.5">
         <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-id-input">
-          Gateway ID <span class="font-normal text-admin-text-3">（自定义域名探测选填）</span>
+          Gateway ID <span class="font-normal text-admin-text-3">{{ MODELS_MESSAGES.gatewayCustomDomainHint }}</span>
         </label>
         <AdminInput
           id="gateway-id-input"
           v-model="form.values.gateway_id"
-          placeholder="网关标识"
+          :placeholder="MODELS_MESSAGES.gatewayIdPlaceholder"
           autocomplete="off"
           :disabled="loading || saving"
           class="w-full font-mono"
@@ -108,7 +108,7 @@
         :disabled="saving || testing"
         @click="emit('update:visible', false)"
       >
-        取消
+        {{ MODELS_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         variant="outline"
@@ -117,7 +117,7 @@
         :disabled="loading || saving || testing"
         @click="handleTestConnection"
       >
-        测试连接
+        {{ MODELS_MESSAGES.gatewayTest }}
       </AdminButton>
       <AdminButton
         variant="default"
@@ -126,7 +126,7 @@
         :disabled="loading || saving || testing"
         @click="handleSave"
       >
-        添加网关
+        {{ MODELS_MESSAGES.gatewayHeader }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -149,6 +149,7 @@ import {
   confirmSettingsSave,
 } from '../../../shared/lib/confirmSettingsSave'
 import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
+import { MODELS_MESSAGES } from '../pages/messages'
 import {
   createAdminGatewayResource,
   type AdminGatewayConnection,
@@ -181,10 +182,10 @@ const form = useForm({
     base_url: v.pipe(
       v.string(),
       v.trim(),
-      v.minLength(1, '请输入网关 Base URL'),
+      v.minLength(1, MODELS_MESSAGES.gatewayBaseUrlRequired),
       v.check(
         (value) => /^https?:\/\//i.test(value),
-        '网关 Base URL 必须以 http:// 或 https:// 开头',
+        MODELS_MESSAGES.gatewayBaseUrlScheme,
       ),
     ),
   }),
@@ -215,7 +216,7 @@ async function loadGatewayConfig() {
       gateway_id: data.gateway_id ?? '',
     })
   } catch (err) {
-    error.value = formatAdminDisplayError(err, '读取网关配置失败')
+    error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayLoadFailed)
   } finally {
     loading.value = false
   }
@@ -241,11 +242,11 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     if (res.success) {
       feedback.testPassed(res.message)
     } else {
-      error.value = res.message || '网关连接测试失败'
+      error.value = res.message || MODELS_MESSAGES.gatewayTestFailed
       feedback.testFailed(res.message)
     }
   } catch (err) {
-    const msg = formatAdminDisplayError(err, '网关连接测试失败')
+    const msg = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayTestFailed)
     error.value = msg
     feedback.testFailed(msg)
   } finally {
@@ -258,9 +259,9 @@ const handleSave = form.handleSubmit(async (values) => {
   // shell (reversible tier: note optional, empty falls back to a default);
   // a cancelled dialog aborts the save silently.
   const operatorReason = await confirmSettingsSave(adminConfirm, {
-    title: '保存 AI 网关配置',
-    message: '确定保存 AI 网关连接配置吗？该操作将记录操作人与原因。',
-    confirmLabel: '保存配置',
+    title: MODELS_MESSAGES.gatewaySaveTitle,
+    message: MODELS_MESSAGES.gatewaySaveMessage,
+    confirmLabel: MODELS_MESSAGES.gatewaySaveConfirm,
   })
   if (!operatorReason) return
   saving.value = true
@@ -291,12 +292,12 @@ const handleSave = form.handleSubmit(async (values) => {
     try {
       emit('saved', await resource.value.get())
     } catch (err) {
-      error.value = formatAdminDisplayError(err, '配置已保存，但重读网关状态失败，请重试')
+      error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewayRereadFailed)
       return
     }
     emit('update:visible', false)
   } catch (err) {
-    error.value = formatAdminDisplayError(err, '保存网关配置失败')
+    error.value = formatAdminDisplayError(err, MODELS_MESSAGES.gatewaySaveFailed)
   } finally {
     saving.value = false
   }

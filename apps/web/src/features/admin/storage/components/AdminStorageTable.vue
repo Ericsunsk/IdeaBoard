@@ -3,7 +3,7 @@
   <div
     v-if="loading && rows.length === 0"
     class="flex min-h-[260px] items-center justify-center rounded-xl border border-admin-border-soft bg-white text-admin-text-3"
-    aria-label="加载存储配置中"
+    :aria-label="STORAGE_MESSAGES.tableLoadingAria"
   >
     <AdminSpinner class="size-9 text-admin-accent" />
   </div>
@@ -20,14 +20,10 @@
       <Search v-else class="size-6" />
     </div>
     <h3 class="text-base font-semibold text-admin-title-color">
-      {{ !hasActiveFilter ? '暂无存储配置' : '未找到匹配的存储配置' }}
+      {{ STORAGE_MESSAGES.tableEmptyTitle(hasActiveFilter) }}
     </h3>
     <p class="mt-1 max-w-sm text-xs text-admin-text-3">
-      {{
-        !hasActiveFilter
-          ? '当前没有已注册的对象存储配置。点击右上角新增存储开始配置。'
-          : '未找到符合当前搜索或筛选条件的存储。请尝试调整关键词或清空筛选。'
-      }}
+      {{ STORAGE_MESSAGES.tableEmptyHint(hasActiveFilter) }}
     </p>
     <button
       v-if="hasActiveFilter"
@@ -36,15 +32,15 @@
       @click="emit('clear-filters')"
     >
       <Xmark class="size-3.5" />
-      <span>清空筛选条件</span>
+      <span>{{ STORAGE_MESSAGES.tableClearFilters }}</span>
     </button>
   </div>
 
   <!-- 存储配置表格 (1:1 对齐功能定价页 BillingPricingTable 规范，预设厂商平铺展示) -->
-  <section v-else aria-label="对象存储">
+  <section v-else :aria-label="STORAGE_MESSAGES.tableSectionAria">
     <div class="mb-2 flex items-center gap-2">
-      <h3 class="text-sm font-bold text-admin-title-color">对象存储</h3>
-      <span class="text-xs text-admin-text-3">共 {{ rows.length }} 个配置</span>
+      <h3 class="text-sm font-bold text-admin-title-color">{{ STORAGE_MESSAGES.tableSectionAria }}</h3>
+      <span class="text-xs text-admin-text-3">{{ STORAGE_MESSAGES.tableSectionCount(rows.length) }}</span>
     </div>
 
     <div :class="adminTableCardClass">
@@ -56,17 +52,17 @@
         :frame-class="adminTableFrameClass"
         :table-style="adminTableStyle"
         :class="adminTableClass"
-        table-aria-label="对象存储配置列表"
-        scroll-aria-label="对象存储配置列表横向滚动区域"
+        :table-aria-label="STORAGE_MESSAGES.tableAria"
+        :scroll-aria-label="STORAGE_MESSAGES.tableScrollAria"
       >
         <template #empty>
-          <AdminEmptyState title="暂无匹配存储" />
+          <AdminEmptyState :title="STORAGE_MESSAGES.tableEmptyMatch" />
         </template>
 
         <!-- 存储服务列 (图标/Logo + 名称 + 供应商标签) -->
         <AdminColumn
           field="service"
-          header="存储服务"
+          :header="STORAGE_MESSAGES.serviceColumn"
           :style="{ width: '240px', minWidth: '200px' }"
         >
           <template #body="{ data }">
@@ -77,8 +73,8 @@
                 :class="[adminLogoButtonClass, 'size-8 p-1.5 shrink-0 rounded-lg shadow-xs']"
                 :data-control-state="activeLogoTargetId === data.storage.id ? 'selected' : 'idle'"
                 :aria-expanded="activeLogoTargetId === data.storage.id ? 'true' : 'false'"
-                title="点击切换存储 Logo"
-                aria-label="切换存储 Logo"
+                :title="STORAGE_MESSAGES.switchLogoTitle"
+                :aria-label="STORAGE_MESSAGES.switchLogoAria"
                 @click="emit('open-logo-picker', $event, data)"
               >
                 <img
@@ -92,7 +88,10 @@
                   v-else-if="data.vendorIcon"
                   class="size-4 text-admin-text-2"
                 />
-                <span v-else class="text-[11px] font-bold text-admin-accent uppercase select-none">
+                <span
+                  v-else
+                  class="text-admin-caption font-bold text-admin-accent uppercase select-none"
+                >
                   {{ data.avatarLabel }}
                 </span>
               </button>
@@ -111,7 +110,10 @@
                   v-else-if="data.vendorIcon"
                   class="size-4 text-admin-text-3"
                 />
-                <span v-else class="text-[11px] font-bold text-admin-text-3 uppercase select-none">
+                <span
+                  v-else
+                  class="text-admin-caption font-bold text-admin-text-3 uppercase select-none"
+                >
                   {{ data.avatarLabel }}
                 </span>
               </div>
@@ -122,7 +124,7 @@
                 >
                   {{ data.name }}
                 </span>
-                <span class="truncate text-[11px] font-medium text-admin-text-3">{{
+                <span class="truncate text-admin-caption font-medium text-admin-text-3">{{
                   data.subtitle
                 }}</span>
               </div>
@@ -131,34 +133,34 @@
         </AdminColumn>
 
         <!-- 状态列 (对齐 BillingStatusCell 胶囊 + 圆点规范) -->
-        <AdminColumn field="status" header="状态" :style="{ width: '110px' }">
+        <AdminColumn field="status" :header="STORAGE_MESSAGES.statusColumn" :style="{ width: '110px' }">
           <template #body="{ data }">
             <span
               v-if="data.isCurrent"
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium leading-none bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
             >
               <span class="size-1.5 rounded-full bg-emerald-500" />
-              <span>使用中</span>
+              <span>{{ STORAGE_MESSAGES.current }}</span>
             </span>
             <span
               v-else-if="data.statusType === 'configured'"
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium leading-none bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-sky-50 text-sky-700 ring-1 ring-sky-200"
             >
               <span class="size-1.5 rounded-full bg-sky-500" />
-              <span>已配置</span>
+              <span>{{ STORAGE_MESSAGES.configured }}</span>
             </span>
             <span
               v-else
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium leading-none bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-slate-100 text-slate-600 ring-1 ring-slate-200"
             >
               <span class="size-1.5 rounded-full bg-slate-400" />
-              <span>未配置</span>
+              <span>{{ STORAGE_MESSAGES.unconfigured }}</span>
             </span>
           </template>
         </AdminColumn>
 
         <!-- 存储桶 / 路径 -->
-        <AdminColumn field="bucket" header="存储桶 / 路径" :style="{ width: '180px' }">
+        <AdminColumn field="bucket" :header="STORAGE_MESSAGES.bucketColumn" :style="{ width: '180px' }">
           <template #body="{ data }">
             <span
               class="truncate font-mono text-xs"
@@ -170,7 +172,7 @@
         </AdminColumn>
 
         <!-- 访问端点 / 域名 -->
-        <AdminColumn field="endpoint" header="访问端点 / 域名" :style="{ width: '220px' }">
+        <AdminColumn field="endpoint" :header="STORAGE_MESSAGES.endpointColumn" :style="{ width: '220px' }">
           <template #body="{ data }">
             <span
               class="truncate font-mono text-xs"
@@ -183,14 +185,14 @@
         </AdminColumn>
 
         <!-- 当前生效状态控制 -->
-        <AdminColumn field="current" header="当前生效" :style="{ width: '110px' }">
+        <AdminColumn field="current" :header="STORAGE_MESSAGES.currentColumn" :style="{ width: '110px' }">
           <template #body="{ data }">
             <span
               v-if="data.isCurrent"
               class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-admin-success"
             >
               <Check class="size-3.5" />
-              当前生效
+              {{ STORAGE_MESSAGES.currentEffective }}
             </span>
             <AdminButton
               v-else-if="!data.isPresetOnly && data.storage"
@@ -201,14 +203,14 @@
               :disabled="!data.canApply || applyingId !== null"
               @click="emit('apply-storage', data.storage)"
             >
-              设为当前
+              {{ STORAGE_MESSAGES.applyCurrent }}
             </AdminButton>
             <span v-else class="text-xs font-mono text-admin-text-3">—</span>
           </template>
         </AdminColumn>
 
         <!-- 操作列 (未配置显示“配置”，已配置显示“编辑/测试/删除”) -->
-        <AdminColumn field="actions" header="操作" :style="{ width: '160px' }">
+        <AdminColumn field="actions" :header="STORAGE_MESSAGES.actionsColumn" :style="{ width: '160px' }">
           <template #body="{ data }">
             <div v-if="data.isPresetOnly" class="flex items-center gap-1.5">
               <AdminButton
@@ -216,7 +218,7 @@
                 :class="adminActionButtonClass"
                 @click="emit('configure-preset', data.presetKey)"
               >
-                配置
+                {{ STORAGE_MESSAGES.configureAction }}
               </AdminButton>
             </div>
             <div v-else-if="data.storage" class="flex items-center gap-1.5">
@@ -226,7 +228,7 @@
                 :class="adminActionButtonClass"
                 @click="emit('open-edit', data.storage.id)"
               >
-                编辑
+                {{ STORAGE_MESSAGES.editAction }}
               </AdminButton>
               <AdminButton
                 v-if="data.supportsTest"
@@ -237,7 +239,7 @@
                 :disabled="!data.canTest || testingId !== null"
                 @click="emit('test-storage', data.storage)"
               >
-                测试连接
+                {{ STORAGE_MESSAGES.testAction }}
               </AdminButton>
               <AdminButton
                 v-if="!data.storage.isCurrent && !data.storage.builtin"
@@ -246,7 +248,7 @@
                 :class="adminActionButtonClass"
                 @click="emit('remove-storage', data.storage)"
               >
-                删除
+                {{ STORAGE_MESSAGES.deleteAction }}
               </AdminButton>
             </div>
           </template>
@@ -272,6 +274,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
+import { STORAGE_MESSAGES } from '../pages/messages'
 import type { StorageCard } from '../profiles'
 
 export interface StorageTableRow {

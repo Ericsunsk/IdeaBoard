@@ -1,108 +1,48 @@
 <template>
   <AccountPane :title="t('account.tabs.security')">
     <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
-      <IbFormField
-        v-slot="{
-          ariaInvalid,
-          describedbyId,
-          fieldId,
-          inlineError,
-          inlineErrorText,
-          invalid,
-          required,
-        }"
+      <PasswordField
+        v-model="pwdForm.oldPassword"
         :label="t('account.security.currentPassword')"
         :error="pwdErrors.oldPassword"
         field-id="profile-old-password"
-        required
-        inline-required
         :field-class="passwordFieldClass"
-      >
-        <PasswordInput
-          :id="fieldId"
-          v-model="pwdForm.oldPassword"
-          autocomplete="current-password"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-          :required="required"
-          :invalid="invalid"
-          :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="
-            inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
-          "
-          @blur="validatePasswordField('oldPassword')"
-          @update:model-value="clearPasswordFieldError('oldPassword')"
-        />
-      </IbFormField>
+        :input-class="passwordInputClass"
+        :input-error-class="passwordInputErrorClass"
+        autocomplete="current-password"
+        :placeholder="t('account.security.currentPasswordPlaceholder')"
+        @blur="validatePasswordField('oldPassword')"
+        @update:model-value="clearPasswordFieldError('oldPassword')"
+      />
 
-      <div class="grid grid-cols-2 gap-5 max-[720px]:grid-cols-1">
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+      <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <PasswordField
+          v-model="pwdForm.newPassword"
           :label="t('account.security.newPassword')"
           :error="pwdErrors.newPassword"
           field-id="profile-new-password"
-          required
-          inline-required
           :field-class="passwordFieldClass"
-        >
-          <PasswordInput
-            :id="fieldId"
-            v-model="pwdForm.newPassword"
-            autocomplete="new-password"
-            :aria-invalid="ariaInvalid"
-            :aria-describedby="describedbyId"
-            :required="required"
-            :invalid="invalid"
-            :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="
-              inlineError ? inlineErrorText : t('account.security.newPasswordPlaceholder')
-            "
-            @blur="validatePasswordField('newPassword')"
-            @update:model-value="handleNewPasswordInput"
-          />
-        </IbFormField>
+          :input-class="passwordInputClass"
+          :input-error-class="passwordInputErrorClass"
+          autocomplete="new-password"
+          :placeholder="t('account.security.newPasswordPlaceholder')"
+          @blur="validatePasswordField('newPassword')"
+          @update:model-value="handleNewPasswordInput"
+        />
 
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+        <PasswordField
+          v-model="pwdForm.confirmPassword"
           :label="t('account.security.confirmPassword')"
           :error="pwdErrors.confirmPassword"
           field-id="profile-confirm-password"
-          required
-          inline-required
           :field-class="passwordFieldClass"
-        >
-          <PasswordInput
-            :id="fieldId"
-            v-model="pwdForm.confirmPassword"
-            autocomplete="new-password"
-            :aria-invalid="ariaInvalid"
-            :aria-describedby="describedbyId"
-            :required="required"
-            :invalid="invalid"
-            :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-            :placeholder="
-              inlineError ? inlineErrorText : t('account.security.confirmPasswordPlaceholder')
-            "
-            @blur="validatePasswordField('confirmPassword')"
-            @update:model-value="clearPasswordFieldError('confirmPassword')"
-          />
-        </IbFormField>
+          :input-class="passwordInputClass"
+          :input-error-class="passwordInputErrorClass"
+          autocomplete="new-password"
+          :placeholder="t('account.security.confirmPasswordPlaceholder')"
+          @blur="validatePasswordField('confirmPassword')"
+          @update:model-value="clearPasswordFieldError('confirmPassword')"
+        />
       </div>
 
       <Button
@@ -124,67 +64,29 @@
       novalidate
       @submit.prevent="handleRequestEmailChange"
     >
-      <IbFormField
-        v-slot="{
-          ariaInvalid,
-          describedbyId,
-          fieldId,
-          inlineError,
-          inlineErrorText,
-          invalid,
-          required,
-        }"
+      <PasswordField
+        v-model="emailForm.currentPassword"
         :label="t('account.security.reauthCurrentPassword')"
         :error="emailErrors.currentPassword"
         field-id="email-current-password"
-        required
-        inline-required
         :field-class="passwordFieldClass"
-      >
-        <PasswordInput
-          :id="fieldId"
-          v-model="emailForm.currentPassword"
-          autocomplete="current-password"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-          :required="required"
-          :invalid="invalid"
-          :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :placeholder="
-            inlineError ? inlineErrorText : t('account.security.currentPasswordPlaceholder')
-          "
-        />
-      </IbFormField>
-      <IbFormField
-        v-slot="{
-          ariaInvalid,
-          describedbyId,
-          fieldId,
-          inlineError,
-          inlineErrorText,
-          invalid,
-          required,
-        }"
+        :input-class="passwordInputClass"
+        :input-error-class="passwordInputErrorClass"
+        autocomplete="current-password"
+        :placeholder="t('account.security.currentPasswordPlaceholder')"
+      />
+      <EmailField
+        v-model="emailForm.newEmail"
         :label="t('account.security.newEmail')"
         :error="emailErrors.newEmail"
         field-id="new-email"
-        required
-        inline-required
         :field-class="passwordFieldClass"
-      >
-        <Input
-          :id="fieldId"
-          v-model="emailForm.newEmail"
-          type="email"
-          autocomplete="email"
-          :required="required"
-          :class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :invalid="invalid"
-          :placeholder="inlineError ? inlineErrorText : t('account.security.newEmailPlaceholder')"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-        />
-      </IbFormField>
+        :input-class="passwordInputClass"
+        :input-error-class="passwordInputErrorClass"
+        input-type="email"
+        autocomplete="email"
+        :placeholder="t('account.security.newEmailPlaceholder')"
+      />
       <Button
         type="submit"
         :loading="emailLoading"
@@ -198,37 +100,16 @@
       <p class="text-sm text-ib-text-subtle">
         {{ t('account.security.otpSentTo', { email: emailForm.newEmail }) }}
       </p>
-      <IbFormField
-        v-slot="{
-          ariaInvalid,
-          describedbyId,
-          fieldId,
-          inlineError,
-          inlineErrorText,
-          invalid,
-          required,
-        }"
+      <OtpField
+        v-model="emailForm.otp"
         :label="t('account.security.emailOtp')"
         :error="emailErrors.otp"
         field-id="email-otp"
-        required
-        inline-required
         :field-class="passwordFieldClass"
-      >
-        <Input
-          :id="fieldId"
-          v-model="emailForm.otp"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="6"
-          :required="required"
-          :class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
-          :invalid="invalid"
-          :placeholder="inlineError ? inlineErrorText : t('account.security.otpPlaceholder')"
-          :aria-invalid="ariaInvalid"
-          :aria-describedby="describedbyId"
-        />
-      </IbFormField>
+        :input-class="passwordInputClass"
+        :input-error-class="passwordInputErrorClass"
+        :placeholder="t('account.security.otpPlaceholder')"
+      />
       <Button
         type="submit"
         :loading="emailLoading"
@@ -246,14 +127,21 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import { Input, PasswordInput } from '@/components/ui/input'
 import {
   ibFormFieldClass,
   ibFormInputClass,
   ibFormInputErrorClass,
 } from '../../../../shared/theme/formControls'
-import IbFormField from '../../../../shared/components/IbFormField.vue'
-import { useUserStore } from '../../../auth'
+import {
+  EmailField,
+  OtpField,
+  PasswordField,
+  emailFormatError,
+  otpFieldError,
+  requiredFieldError,
+  useAuthForm,
+  useUserStore,
+} from '../../../auth'
 import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
@@ -281,16 +169,20 @@ const { runAsyncAction } = useAsyncAction()
 const appToast = useAppToast()
 const emailLoading = ref(false)
 const emailOtpSent = ref(false)
-const emailForm = ref({ currentPassword: '', newEmail: '', otp: '' })
-const emailErrors = ref({ currentPassword: '', newEmail: '', otp: '' })
+const emailFormApi = useAuthForm(['currentPassword', 'newEmail', 'otp'] as const)
+const emailForm = emailFormApi.values
+const emailErrors = emailFormApi.errors
 
 async function handleRequestEmailChange() {
-  emailErrors.value.currentPassword = emailForm.value.currentPassword
-    ? ''
-    : t('account.security.errors.enterCurrentPassword')
-  emailErrors.value.newEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.value.newEmail.trim())
-    ? ''
-    : t('account.security.errors.invalidEmail')
+  emailErrors.value.currentPassword = requiredFieldError(
+    emailForm.value.currentPassword,
+    t('account.security.errors.enterCurrentPassword'),
+    { sentinel: false },
+  )
+  emailErrors.value.newEmail = emailFormatError(
+    emailForm.value.newEmail.trim(),
+    t('account.security.errors.invalidEmail'),
+  )
   if (emailErrors.value.currentPassword || emailErrors.value.newEmail) return
   const sent = await runAsyncAction(
     async () => {
@@ -317,9 +209,10 @@ async function handleRequestEmailChange() {
 }
 
 async function handleConfirmEmailChange() {
-  emailErrors.value.otp = /^\d{6}$/.test(emailForm.value.otp.trim())
-    ? ''
-    : t('account.security.errors.sixDigitCode')
+  emailErrors.value.otp = otpFieldError(
+    emailForm.value.otp,
+    t('account.security.errors.sixDigitCode'),
+  )
   if (emailErrors.value.otp) return
   const changed = await runAsyncAction(
     () => userStore.changeEmailWithOTP(emailForm.value.newEmail, emailForm.value.otp),

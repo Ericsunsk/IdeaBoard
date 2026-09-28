@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	runtimeports "ideaboard/api/internal/runtime/ports"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"ideaboard/api/internal/platform/outboundhttp"
 
@@ -437,8 +438,8 @@ func TestGatewayClientCapsResponseBody(t *testing.T) {
 }
 
 func TestGatewayLiveSmoke(t *testing.T) {
-	baseURL := strings.TrimSpace(os.Getenv("CF_AI_GATEWAY_SMOKE_BASE_URL"))
-	token := strings.TrimSpace(os.Getenv("CF_AI_GATEWAY_SMOKE_TOKEN"))
+	baseURL := testenv.Get("CF_AI_GATEWAY_SMOKE_BASE_URL")
+	token := testenv.Get("CF_AI_GATEWAY_SMOKE_TOKEN")
 	if baseURL == "" || token == "" {
 		t.Skipf("set CF_AI_GATEWAY_SMOKE_BASE_URL and CF_AI_GATEWAY_SMOKE_TOKEN to run the live gateway smoke test")
 	}

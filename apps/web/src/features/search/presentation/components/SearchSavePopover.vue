@@ -31,7 +31,7 @@
             <span class="truncate">{{
               t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
             }}</span>
-            <span class="font-mono text-[10px] text-board-primary">↵</span>
+            <span class="font-mono text-ib-micro text-board-primary">↵</span>
           </button>
         </div>
 

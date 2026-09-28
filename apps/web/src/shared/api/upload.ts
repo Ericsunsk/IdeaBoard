@@ -12,12 +12,10 @@ import type {
 } from './generated-query/public/model'
 import {
   buildContractRequestHeaders,
-  isOpaqueId,
   newRequestId,
-  opaqueIdPrefix,
   requireContractData,
-  type OpaqueIdPrefix,
 } from './contractKernel'
+import { assertOpaqueId } from '../utils/opaqueIds'
 import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../i18n'
 
@@ -158,14 +156,6 @@ export function mapWorkspaceUploadSessionStatus(value: unknown): WorkspaceUpload
     return value as WorkspaceUploadSessionStatus
   }
   throw new Error(`Unknown upload session status: ${String(value)}`)
-}
-
-function assertOpaqueId(value: string, prefix: OpaqueIdPrefix, label: string): string {
-  const trimmed = value.trim()
-  if (!isOpaqueId(trimmed) || opaqueIdPrefix(trimmed) !== prefix) {
-    throw new Error(`Invalid ${label}: expected ${prefix}_...`)
-  }
-  return trimmed
 }
 
 export function assertWorkspaceId(value: string): string {

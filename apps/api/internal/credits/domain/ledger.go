@@ -82,15 +82,56 @@ type LedgerTransaction struct {
 	Charge                *ChargeReference  `json:"charge,omitempty"`
 }
 
+// HoldStatus is the durable credit-hold settlement state. The wire and
+// database words are unchanged ("held", "captured", "released"); the
+// type only documents the allowed transitions at compile time (see
+// CanHoldTransition). SQL literals stay byte-identical.
+type HoldStatus string
+
+const (
+	HoldStatusHeld     HoldStatus = "held"
+	HoldStatusCaptured HoldStatus = "captured"
+	HoldStatusReleased HoldStatus = "released"
+)
+
+// allowedHoldTransitions mirrors the durable guards in
+// execute_credit_command_v2
+// (internal/db/schema/fragments/credits.sql): a hold opens held;
+// partial capture/release settlements keep it held (amounts accumulate
+// until captured + released == amount); full settlement flips it to
+// captured (captured > 0) or released (captured == 0). Terminal states
+// (captured/released) have no outgoing transitions; settled holds
+// reject further commands with IB006 (already settled).
+var allowedHoldTransitions = map[HoldStatus]map[HoldStatus]struct{}{
+	HoldStatusHeld: {
+		HoldStatusHeld:     {},
+		HoldStatusCaptured: {},
+		HoldStatusReleased: {},
+	},
+}
+
+// CanHoldTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanHoldTransition(from, to HoldStatus) bool {
+	nexts, ok := allowedHoldTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
 // HoldReference and ChargeReference make settlement facts explicit in Admin
 // ledger reads; related_transaction_id remains the immutable audit link.
 type HoldReference struct {
-	Amount               int64  `json:"amount_credits"`
-	CapturedAmount       int64  `json:"captured_credits"`
-	ReleasedAmount       int64  `json:"released_credits"`
-	Status               string `json:"status"`
-	CaptureTransactionID string `json:"capture_transaction_id,omitempty"`
-	ReleaseTransactionID string `json:"release_transaction_id,omitempty"`
+	Amount               int64      `json:"amount_credits"`
+	CapturedAmount       int64      `json:"captured_credits"`
+	ReleasedAmount       int64      `json:"released_credits"`
+	Status               HoldStatus `json:"status"`
+	CaptureTransactionID string     `json:"capture_transaction_id,omitempty"`
+	ReleaseTransactionID string     `json:"release_transaction_id,omitempty"`
 }
 
 type ChargeReference struct {

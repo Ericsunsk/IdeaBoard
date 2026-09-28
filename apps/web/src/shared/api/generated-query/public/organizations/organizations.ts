@@ -331,6 +331,7 @@ export const getUpdateOrganizationUrl = (organizationId: string) => {
 }
 
 /**
+ * Renames the organization. No Idempotency-Key is required.
  * @summary Rename an organization (owner/admin only)
  */
 export const updateOrganization = async (

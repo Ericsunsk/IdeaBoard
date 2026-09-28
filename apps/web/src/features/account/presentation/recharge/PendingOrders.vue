@@ -37,9 +37,9 @@
         v-for="item in items"
         :key="item.public_token"
         :data-testid="`pending-payment-order-${item.public_token}`"
-        class="rounded-ib-panel border border-ib-border-soft bg-ib-surface p-4 shadow-ib-control max-[640px]:p-3.5"
+        class="rounded-ib-panel border border-ib-border-soft bg-ib-surface p-3.5 shadow-ib-control sm:p-4"
       >
-        <div class="flex min-w-0 items-start justify-between gap-4 max-[640px]:flex-col">
+        <div class="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
           <div class="min-w-0">
             <p class="m-0 font-mono text-lg font-bold text-ib-text">
               {{ formatIdeaAmount(item.idea_quantity) }}
@@ -47,15 +47,12 @@
             <p class="mt-1 mb-0 text-sm font-semibold" :class="statusTone(item.status)">
               {{ statusText(item) }}
             </p>
-            <p class="mt-1 mb-0 text-[13px] text-ib-text-muted">
+            <p class="mt-1 mb-0 text-ib-body text-ib-text-muted">
               {{ expiryText(item) }}
             </p>
           </div>
 
-          <div
-            v-if="item.status === 'checkout_open'"
-            class="grid w-36 shrink-0 gap-2 max-[640px]:w-full"
-          >
+          <div v-if="item.status === 'checkout_open'" class="grid w-full shrink-0 gap-2 sm:w-36">
             <Button
               :loading="isActionPending(item.public_token, 'continue')"
               :disabled="actionPending"

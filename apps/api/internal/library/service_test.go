@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
+
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -206,10 +207,7 @@ func libraryTestAssetInput(sourceID string) AssetInput {
 
 func openLibraryTestEnv(t *testing.T) *libraryTestEnv {
 	t.Helper()
-	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
-	if raw == "" {
-		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
-	}
+	raw := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	ctx := context.Background()
 	cfg, err := pgxpool.ParseConfig(raw)
 	if err != nil {
@@ -643,7 +641,7 @@ func TestLibraryServiceResolve(t *testing.T) {
 	got := map[string]string{}
 	for _, result := range results {
 		key := result.Provider + "\x00" + result.SourceID
-		got[key] = result.Status
+		got[key] = string(result.Status)
 	}
 	if got["unsplash\x00r1"] != "resolved" || got["unsplash\x00missing"] != "unresolved" || got["bogus\x00x"] != "unresolved" {
 		t.Fatalf("resolve statuses = %v", got)

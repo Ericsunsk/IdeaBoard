@@ -1,13 +1,13 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { LibraryMutationPublisher } from '../folderFacts'
+import type { LibraryMutationPublisher } from '../application/folderFacts'
 import {
   libraryAssetKey,
   requireWorkspaceId,
-  saveWorkspaceSearchReference,
   type LibrarySearchReference,
-} from '../workspace'
-import type { LibraryAssetView } from '../transfer'
+} from '../domain/validators'
+import { saveWorkspaceSearchReference } from '../application/libraryUseCases'
+import type { LibraryAssetView } from '../domain/transfer'
 import {
   toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
@@ -15,14 +15,14 @@ import {
   readSearchReferenceTransfer,
   writeCanvasLibraryImportTransfer,
   writeLibraryFolderMoveTransfer,
-} from '../transfer'
+} from '../domain/transfer'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 import {
   LIBRARY_ALL_FOLDER_KEY,
   type LibraryFolderTab,
   type useLibraryWorkspace,
-} from '../useLibraryWorkspace'
+} from '../application/useLibraryWorkspace'
 
 export interface LibraryIslandDnDOptions {
   workspace: ReturnType<typeof useLibraryWorkspace>

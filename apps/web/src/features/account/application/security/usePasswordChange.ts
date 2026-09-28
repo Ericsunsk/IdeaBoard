@@ -6,7 +6,10 @@ import {
   type AsyncActionFeedback,
   useAsyncAction,
 } from '../../../../shared/composables/useAsyncAction'
-import { getPasswordLengthError } from '../../../../shared/auth/passwordPolicy'
+import {
+  getPasswordLengthError,
+  PASSWORD_LENGTH_LIMIT,
+} from '../../../../shared/auth/passwordPolicy'
 import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
 import { markRequiredError } from '../../../../shared/utils/formValidation'
 import { i18n } from '../../../../shared/i18n'
@@ -65,7 +68,13 @@ export function usePasswordChange(deps: PasswordChangeDependencies = {}) {
       if (!value.trim()) {
         return markRequiredError(i18n.global.t('account.security.errors.enterNewPassword'))
       }
-      return getPasswordLengthError(value)
+      return getPasswordLengthError(
+        value,
+        i18n.global.t('account.security.errors.passwordLength', {
+          min: PASSWORD_LENGTH_LIMIT.min,
+          max: PASSWORD_LENGTH_LIMIT.max,
+        }),
+      )
     }
     if (field === 'confirmPassword') {
       if (!value.trim()) {

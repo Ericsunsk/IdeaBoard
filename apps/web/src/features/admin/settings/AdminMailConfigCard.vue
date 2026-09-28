@@ -1,6 +1,6 @@
 <template>
   <SettingEditorCard
-    title="邮件发送"
+    :title="SETTINGS_MESSAGES.mailRowTitle"
     :status="statusLabel"
     :status-severity="statusSeverity"
     :class="props.class"
@@ -16,28 +16,28 @@
               size="small"
               @click="load"
             >
-              重试
+              {{ SETTINGS_MESSAGES.retry }}
             </AdminButton>
           </div>
         </AdminAlert>
-        <AdminAlert v-else-if="loading" severity="secondary"> 正在加载邮件配置… </AdminAlert>
+        <AdminAlert v-else-if="loading" severity="secondary">{{ SETTINGS_MESSAGES.mailLoading }}</AdminAlert>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <AdminFormField label="发件人名称" for="admin-mail-from-name" required>
+          <AdminFormField :label="SETTINGS_MESSAGES.mailFromNameLabel" for="admin-mail-from-name" required>
             <AdminInput
               id="admin-mail-from-name"
               v-model="form.values.from_name"
-              aria-label="发件人名称"
+              :aria-label="SETTINGS_MESSAGES.mailFromNameLabel"
               :disabled="controlsDisabled"
               class="w-full"
             />
           </AdminFormField>
-          <AdminFormField label="发件人 Email" for="admin-mail-from-email" required>
+          <AdminFormField :label="SETTINGS_MESSAGES.mailFromEmailLabel" for="admin-mail-from-email" required>
             <AdminInput
               id="admin-mail-from-email"
               v-model="form.values.from_email"
               type="email"
-              aria-label="发件人 Email"
+              :aria-label="SETTINGS_MESSAGES.mailFromEmailLabel"
               :disabled="controlsDisabled"
               class="w-full"
             />
@@ -46,7 +46,7 @@
         <AdminFormField
           label="Resend API Key"
           for="admin-mail-api-key"
-          hint="已配置时留空即可保持不变。"
+          :hint="SETTINGS_MESSAGES.mailApiKeyHint"
         >
           <AdminInput
             id="admin-mail-api-key"
@@ -76,15 +76,15 @@
           class="grid gap-3 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
         >
           <AdminFormField
-            label="测试收件地址"
+            :label="SETTINGS_MESSAGES.mailTestRecipientLabel"
             for="admin-mail-test-recipient"
-            hint="保存后发送一封真实 Test Email 以启用邮件发送。"
+            :hint="SETTINGS_MESSAGES.mailTestHint"
           >
             <AdminInput
               id="admin-mail-test-recipient"
               v-model="recipient"
               type="email"
-              aria-label="测试收件地址"
+              :aria-label="SETTINGS_MESSAGES.mailTestRecipientLabel"
               :disabled="controlsDisabled || testing || !summary?.configured"
               class="w-full"
             />
@@ -96,7 +96,7 @@
             :disabled="testDisabled"
             @click="sendTest"
           >
-            发送 Test Email
+            {{ SETTINGS_MESSAGES.mailSendTest }}
           </AdminButton>
         </div>
         <AdminAlert v-if="testError" severity="error">
@@ -112,7 +112,7 @@
           :disabled="controlsDisabled || !summary?.configured"
           @click="clear"
         >
-          删除配置
+          {{ SETTINGS_MESSAGES.mailDelete }}
         </AdminButton>
         <div class="flex items-center gap-2">
           <AdminButton
@@ -121,7 +121,7 @@
             :disabled="controlsDisabled"
             @click="reset"
           >
-            重置
+            {{ SETTINGS_MESSAGES.reset }}
           </AdminButton>
           <AdminButton
             :class="adminActionButtonClass"
@@ -129,7 +129,7 @@
             :loading="saving"
             @click="save"
           >
-            保存邮件配置
+            {{ SETTINGS_MESSAGES.mailSave }}
           </AdminButton>
         </div>
       </div>
@@ -155,6 +155,7 @@ import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import { useAdminMailSettingsFeedback } from './useSettingsFeedback'
 import SettingEditorCard from './SettingEditorCard.vue'
+import { SETTINGS_MESSAGES } from './pages/messages'
 import { createAdminMailConfigResource } from './mailConfigResource'
 import type { AdminMailConfigResource } from './mailConfigResource'
 import type { MailConfigSummary } from './mailConfigTypes'
@@ -179,17 +180,17 @@ const form = useForm({
   initialValues: { from_name: '', from_email: '', api_key: '', reply_to: '' },
   schema: () =>
     v.object({
-      from_name: v.pipe(v.string(), v.trim(), v.minLength(1, '发件人名称不能为空')),
+      from_name: v.pipe(v.string(), v.trim(), v.minLength(1, SETTINGS_MESSAGES.mailFromNameRequired)),
       from_email: v.pipe(
         v.string(),
         v.trim(),
-        v.check((value) => value.includes('@'), '请输入有效的发件人 Email'),
+        v.check((value) => value.includes('@'), SETTINGS_MESSAGES.mailFromEmailInvalid),
       ),
-      api_key: secretField(!summary.value?.api_key_configured, '请输入 Resend API Key'),
+      api_key: secretField(!summary.value?.api_key_configured, SETTINGS_MESSAGES.mailApiKeyRequired),
       reply_to: v.pipe(
         v.string(),
         v.trim(),
-        v.check((value) => value === '' || value.includes('@'), '请输入有效的 Reply-To Email'),
+        v.check((value) => value === '' || value.includes('@'), SETTINGS_MESSAGES.mailReplyToInvalid),
       ),
     }),
 })
@@ -205,11 +206,11 @@ const testDisabled = computed(
   () => controlsDisabled.value || !summary.value?.configured || !recipient.value.trim(),
 )
 const statusLabel = computed(() => {
-  if (error.value) return '加载失败'
-  if (loading.value && !summary.value) return '加载中'
+  if (error.value) return SETTINGS_MESSAGES.providerLoadFailed
+  if (loading.value && !summary.value) return SETTINGS_MESSAGES.providerLoading
   if (summary.value?.readiness === 'ready') return 'Ready'
-  if (summary.value?.readiness === 'not_tested') return '未测试'
-  return '未配置'
+  if (summary.value?.readiness === 'not_tested') return SETTINGS_MESSAGES.mailStatusUntested
+  return SETTINGS_MESSAGES.mailStatusUnconfigured
 })
 const statusSeverity = computed(() => {
   if (error.value) return 'danger'
@@ -236,7 +237,7 @@ async function load() {
     const data = await resource.value.get()
     populate(data)
   } catch (err) {
-    error.value = formatAdminDisplayError(err, '加载邮件配置失败')
+    error.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.mailLoadFailed)
   } finally {
     loading.value = false
   }
@@ -254,9 +255,9 @@ const save = form.handleSubmit(async (values) => {
   // Control Plane writes require an operator reason (audit); a cancelled
   // dialog aborts the save silently.
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: '保存邮件配置',
-    message: '确定保存邮件发送配置吗？该操作将记录操作人与原因。',
-    confirmLabel: '保存邮件配置',
+    title: SETTINGS_MESSAGES.mailSave,
+    message: SETTINGS_MESSAGES.mailSaveMessage,
+    confirmLabel: SETTINGS_MESSAGES.mailSave,
   })
   if (!operatorReason) return
   saving.value = true
@@ -288,9 +289,9 @@ const save = form.handleSubmit(async (values) => {
 
 async function clear() {
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: '删除邮件配置',
-    message: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人与原因。',
-    confirmLabel: '删除配置',
+    title: SETTINGS_MESSAGES.mailDeleteTitle,
+    message: SETTINGS_MESSAGES.mailDeleteMessage,
+    confirmLabel: SETTINGS_MESSAGES.mailDelete,
     risk: 'destructive',
   })
   if (!operatorReason) return
@@ -309,7 +310,7 @@ async function clear() {
 async function sendTest() {
   const target = recipient.value.trim()
   if (!target || !target.includes('@')) {
-    testError.value = '请输入有效的测试收件地址'
+    testError.value = SETTINGS_MESSAGES.mailTestRecipientInvalid
     return
   }
   // Connectivity probes skip the confirm dialog (backend POST read-guard:
@@ -321,7 +322,7 @@ async function sendTest() {
     await load()
     feedback.testSent()
   } catch (err) {
-    testError.value = formatAdminDisplayError(err, '发送 Test Email 失败')
+    testError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.mailTestFailed)
   } finally {
     testing.value = false
   }

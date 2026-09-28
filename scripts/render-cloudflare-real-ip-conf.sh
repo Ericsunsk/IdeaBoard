@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via SCRIPT_DIR; scripts/lib/common.sh is linted directly in ops.yml.
+source "$SCRIPT_DIR/lib/common.sh"
+
 OUTPUT_PATH="${1:-}"
 
 if [[ -z "$OUTPUT_PATH" ]]; then
@@ -18,11 +22,7 @@ OUTPUT_DIR="$(dirname "$OUTPUT_PATH")"
 mkdir -p "$OUTPUT_DIR"
 TMP_FILE="$(mktemp "$OUTPUT_DIR/.cloudflare-real-ip.XXXXXX")"
 TMP_RANGES="$(mktemp)"
-
-cleanup() {
-  rm -f "$TMP_FILE" "$TMP_RANGES"
-}
-trap cleanup EXIT
+cleanup_path "$TMP_FILE" "$TMP_RANGES"
 
 is_valid_cidr() {
   local cidr="$1"

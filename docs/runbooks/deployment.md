@@ -461,7 +461,7 @@ ideaboard delete --yes
 
 单实例连接预算 = `DB_POOL_MAX_OPEN + RIVER_POOL_MAX_CONNS`（默认 35），必须留出 migrations / CLI / fixtures 余量，远低于 PostgreSQL `max_connections`（默认 100）。改动重启 API 后生效；非法值回退默认并在生产启动期直接失败（`Config.InvalidEnv`），开发环境仅 warning。
 
-启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → `APP_SECRETS_ENCRYPTION_KEY` → runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
+启动期 fail-fast 链（按顺序，任一失败进程直接退出）：`Config.Validate`（DB 口令/SSL、非法 env、PUBLIC_ORIGIN、`APP_SECRETS_ENCRYPTION_KEY` presence）→ `AUTH_INTERNAL_KEY`（生产 32+ 字符非占位）→ imgproxy 配置 → secrets key 格式校验（base64 32-byte）→ runtime 权限校验。`PUBLIC_ORIGIN` 缺失不再等到首次拼 URL 才暴露。
 
 River 重试矩阵是代码持有的 typed policy（事实源 `internal/tasking/infrastructure/queue.RiverRetryMatrix`，insert 点引用同包常量，改预算只改一处）：
 

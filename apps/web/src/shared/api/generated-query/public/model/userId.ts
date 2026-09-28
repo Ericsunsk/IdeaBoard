@@ -16,6 +16,6 @@
 
 /**
  * Opaque public user identifier.
- * @pattern ^usr_[A-Za-z0-9]+$
+ * @pattern ^usr_[A-Za-z0-9_-]+$
  */
 export type UserId = string

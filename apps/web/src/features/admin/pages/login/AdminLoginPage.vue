@@ -1,7 +1,7 @@
 <template>
-  <div class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text max-[520px]:p-4">
+  <div class="grid min-h-screen place-items-center bg-ib-page p-4 text-ib-text sm:p-6">
     <div :class="loginCardClass">
-      <div class="flex justify-center px-8 pt-8 pb-2 max-[520px]:px-6 max-[520px]:pt-[26px]">
+      <div class="flex justify-center px-6 pt-[26px] pb-2 sm:px-8 sm:pt-8">
         <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
           <SiteBrandLogo
             :src="logoURL"
@@ -11,10 +11,10 @@
         </router-link>
       </div>
 
-      <div class="px-8 pt-0 pb-7 max-[520px]:px-6 max-[520px]:pb-6">
+      <div class="px-6 pt-0 pb-6 sm:px-8 sm:pb-7">
         <div class="p-0 text-center">
           <h1 class="m-0 text-admin-modal-title leading-[1.2] font-bold text-admin-title-color">
-            管理员登录
+            {{ ADMIN_LOGIN_MESSAGES.title }}
           </h1>
         </div>
 
@@ -41,7 +41,7 @@
             </label>
 
             <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
-              <span>密码</span>
+              <span>{{ ADMIN_LOGIN_MESSAGES.passwordLabel }}</span>
               <div class="relative flex items-center">
                 <AdminInput
                   id="admin-login-password"
@@ -55,7 +55,7 @@
                 <button
                   type="button"
                   class="absolute right-3 flex items-center text-admin-text-3 hover:text-admin-text-1 cursor-pointer transition-colors"
-                  :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                  :aria-label="showPassword ? ADMIN_LOGIN_MESSAGES.hidePassword : ADMIN_LOGIN_MESSAGES.showPassword"
                   @click="showPassword = !showPassword"
                 >
                   <Eye v-if="!showPassword" class="size-4" />
@@ -74,7 +74,7 @@
               :loading="loading"
               class="w-full !h-11 font-bold shadow-sm"
             >
-              {{ loading ? '登录中' : '进入后台' }}
+              {{ loading ? ADMIN_LOGIN_MESSAGES.loggingIn : ADMIN_LOGIN_MESSAGES.enterAdmin }}
             </AdminButton>
           </form>
         </div>
@@ -86,7 +86,7 @@
             :class="adminTextButtonClass"
             @click="goUserLogin"
           >
-            用户登录
+            {{ ADMIN_LOGIN_MESSAGES.userLogin }}
           </AdminButton>
         </div>
       </div>
@@ -117,6 +117,7 @@ import { stringParam } from '../../../../shared/router/queryParams'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import { useAdminLoginFeedback } from './useAdminLoginFeedback'
+import { ADMIN_LOGIN_MESSAGES } from './messages'
 
 const router = useRouter()
 const route = useRoute()
@@ -169,7 +170,7 @@ async function handleLogin() {
   const email = formValue.value.email.trim()
   const password = formValue.value.password
   if (!email || !password) {
-    formError.value = !email ? '请输入 Email' : '请输入密码'
+    formError.value = !email ? ADMIN_LOGIN_MESSAGES.emailRequired : ADMIN_LOGIN_MESSAGES.passwordRequired
     return
   }
 

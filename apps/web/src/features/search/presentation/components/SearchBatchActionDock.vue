@@ -10,7 +10,7 @@
         <!-- 已选计数 -->
         <div class="flex items-center gap-2 pl-3 pr-2 border-r border-board-card-border">
           <div
-            class="size-5 rounded-full bg-board-primary text-ib-text-inverse flex items-center justify-center text-[11px] font-bold font-mono"
+            class="size-5 rounded-full bg-board-primary text-ib-text-inverse flex items-center justify-center text-ib-caption font-bold font-mono"
           >
             {{ selectedCount }}
           </div>

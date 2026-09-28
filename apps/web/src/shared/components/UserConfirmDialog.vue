@@ -1,7 +1,7 @@
 <template>
   <DialogRoot :open="props.visible" @update:open="handleOpenUpdate">
     <DialogPortal>
-      <DialogOverlay :class="ibDialogMaskClass" />
+      <DialogOverlay :class="ibDialogMaskClass" @click="handleMaskClick" />
       <DialogContent
         :class="dialogContentBaseClass"
         :style="{ width: 'min(420px, calc(100vw - 32px))' }"
@@ -61,6 +61,10 @@ import {
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { ibDialogMaskClass } from '../theme/dialogMask'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../composables/useOverlayInteractionLifecycle'
 
 const props = withDefaults(
   defineProps<{
@@ -85,12 +89,28 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+// Unified dialog contract: mask/Escape/close-control dismiss while idle; the
+// irreversible confirm commit (loading) locks every path. Promise settlement
+// on parent unmount stays in useUserConfirmDialog.dispose.
+const { canDismiss, requestClose } = useOverlayInteractionLifecycle({
+  visible: () => props.visible,
+  busy: () => props.loading,
+  surface: defineDialogSurfaceIntent(),
+  onVisibilityChange: (visible) => {
+    if (!visible) emit('update:visible', false)
+  },
+})
+
 function handleOpenUpdate(open: boolean) {
-  if (!open && !props.loading) emit('update:visible', false)
+  if (!open) requestClose('close-control')
+}
+
+function handleMaskClick() {
+  requestClose('mask')
 }
 
 function handleEscape(event: KeyboardEvent) {
-  if (props.loading) event.preventDefault()
+  if (!canDismiss('escape')) event.preventDefault()
 }
 
 function blockOutsideDismiss(event: Event) {

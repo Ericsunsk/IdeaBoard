@@ -163,7 +163,7 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		return nil, err
 	}
 	completed := dbutil.TimePtr(row.CompletedAt)
-	if row.Status == workspacetasks.StatusCancelled && completed == nil {
+	if row.Status == string(workspacetasks.StatusCancelled) && completed == nil {
 		completed = dbutil.TimePtr(row.CancelledAt)
 	}
 	task := &workspacetasks.WorkspaceTask{
@@ -175,7 +175,7 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		Params:          envelope.Params,
 		CanonicalParams: envelope.CanonicalParams,
 		ResolvedModel:   envelope.ResolvedModel,
-		Status:          row.Status,
+		Status:          workspacetasks.Status(row.Status),
 		RetryCount:      int(row.RetryCount),
 		ExecutionToken:  envelope.ExecutionToken,
 		OutputRefs:      append([]workspacetasks.OutputRef(nil), outputs...),

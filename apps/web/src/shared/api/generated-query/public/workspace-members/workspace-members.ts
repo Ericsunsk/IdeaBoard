@@ -32,6 +32,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   AddWorkspaceMemberRequest,
   BadRequestResponse,
+  ConflictResponse,
   DeletedEnvelope,
   ForbiddenResponse,
   NotFoundResponse,
@@ -132,6 +133,7 @@ export const getAddWorkspaceMemberUrl = (workspaceId: string) => {
 }
 
 /**
+ * Requires the Idempotency-Key header. Re-adding an existing member keeps the current role. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Add a workspace member (owner/admin only; owner-only promotion)
  */
 export const addWorkspaceMember = async (
@@ -174,6 +176,7 @@ export const getAddWorkspaceMemberMutationOptions = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
+    | ConflictResponse
     | UnprocessableEntityResponse,
   TContext = unknown,
 >(options?: {
@@ -218,6 +221,7 @@ export type AddWorkspaceMemberMutationError =
   | UnauthorizedResponse
   | ForbiddenResponse
   | NotFoundResponse
+  | ConflictResponse
   | UnprocessableEntityResponse
 export type AddWorkspaceMemberMutationVariables = {
   workspaceId: string
@@ -233,6 +237,7 @@ export const useAddWorkspaceMember = <
     | UnauthorizedResponse
     | ForbiddenResponse
     | NotFoundResponse
+    | ConflictResponse
     | UnprocessableEntityResponse,
   TContext = unknown,
 >(
@@ -259,6 +264,7 @@ export const getUpdateWorkspaceMemberUrl = (workspaceId: string, memberId: strin
 }
 
 /**
+ * Changes a member role. No Idempotency-Key is required.
  * @summary Change a member role (last owner cannot be demoted)
  */
 export const updateWorkspaceMember = async (
@@ -391,6 +397,7 @@ export const getRemoveWorkspaceMemberUrl = (workspaceId: string, memberId: strin
 }
 
 /**
+ * Removes a workspace member. Requires the Idempotency-Key header. Reusing a key with a different request renders 409 workspace_idempotency_conflict.
  * @summary Remove a workspace member (last owner cannot be removed)
  */
 export const removeWorkspaceMember = async (
@@ -407,7 +414,12 @@ export const removeWorkspaceMember = async (
 export const getRemoveWorkspaceMemberMutationKey = () => ['removeWorkspaceMember'] as const
 
 export const getRemoveWorkspaceMemberMutationOptions = <
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -447,14 +459,23 @@ export type RemoveWorkspaceMemberMutationResult = NonNullable<
 >
 
 export type RemoveWorkspaceMemberMutationError =
-  UnauthorizedResponse | ForbiddenResponse | NotFoundResponse
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | NotFoundResponse
+  | ConflictResponse
 export type RemoveWorkspaceMemberMutationVariables = { workspaceId: string; memberId: string }
 
 /**
  * @summary Remove a workspace member (last owner cannot be removed)
  */
 export const useRemoveWorkspaceMember = <
-  TError = UnauthorizedResponse | ForbiddenResponse | NotFoundResponse,
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | NotFoundResponse
+    | ConflictResponse,
   TContext = unknown,
 >(
   options?: {

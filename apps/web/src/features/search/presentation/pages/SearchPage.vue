@@ -175,7 +175,7 @@
         <input
           ref="fileInput"
           type="file"
-          accept="image/*"
+          :accept="VISION_REFERENCE_ACCEPT"
           multiple
           class="hidden"
           :aria-label="t('search.tooltips.addReferences')"
@@ -192,7 +192,7 @@
 
       <div class="mt-6 flex items-center justify-between gap-3">
         <div>
-          <h2 class="m-0 text-[22px] font-semibold">
+          <h2 class="m-0 text-ib-modal-title-mobile font-semibold">
             {{ searchResultsHeading }}
           </h2>
           <div
@@ -336,6 +336,7 @@ import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { stringParam } from '../../../../shared/router/queryParams'
+import { VISION_REFERENCE_ACCEPT } from '../../../../shared/media/visionIngressPolicy'
 import { useAuthOverlay, useUserStore } from '../../../auth'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'

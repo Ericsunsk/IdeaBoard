@@ -31,12 +31,10 @@ import type {
 } from './generated-query/public/model'
 import {
   buildContractRequestHeaders,
-  isOpaqueId,
   newRequestId,
-  opaqueIdPrefix,
   requireContractData,
-  type OpaqueIdPrefix,
 } from './contractKernel'
+import { assertOpaqueId } from '../utils/opaqueIds'
 import { createPollDelay, sleep } from '../utils/polling'
 import { PAGE_SIZES } from '../config/pagination'
 import {
@@ -70,14 +68,6 @@ export function mapWorkspaceTaskStatus(value: unknown): WorkspaceTaskStatus {
 
 export function isWorkspaceTaskTerminal(status: WorkspaceTaskStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled'
-}
-
-function assertOpaqueId(value: string, prefix: OpaqueIdPrefix, label: string): string {
-  const trimmed = value.trim()
-  if (!isOpaqueId(trimmed) || opaqueIdPrefix(trimmed) !== prefix) {
-    throw new Error(`Invalid ${label}: expected ${prefix}_...`)
-  }
-  return trimmed
 }
 
 export function assertWorkspaceTaskWorkspaceId(value: string): string {

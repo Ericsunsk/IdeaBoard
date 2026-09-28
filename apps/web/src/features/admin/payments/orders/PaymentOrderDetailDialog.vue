@@ -1,22 +1,24 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :header="detail ? `支付订单 · ${detail.publicOrderNumber}` : '支付订单详情'"
-    description="查看支付订单的完整详情与对账信息。"
+    :header="
+      detail ? PAYMENT_ORDERS_MESSAGES.detailHeader(detail.publicOrderNumber) : PAYMENT_ORDERS_MESSAGES.detailHeaderFallback
+    "
+    :description="PAYMENT_ORDERS_MESSAGES.detailDescription"
     size="wide"
     content-layout="scrollable"
     :busy="loading"
     @update:visible="$emit('update:visible', $event)"
   >
     <div v-if="loading" class="grid min-h-56 place-items-center" role="status">
-      <span class="text-admin-body text-admin-text-3">正在加载订单详情…</span>
+      <span class="text-admin-body text-admin-text-3">{{ PAYMENT_ORDERS_MESSAGES.detailLoading }}</span>
     </div>
 
     <AdminAlert v-else-if="error" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>支付订单详情加载失败，请重试。</span>
+        <span>{{ PAYMENT_ORDERS_MESSAGES.detailLoadFailed }}</span>
         <AdminButton variant="outline" :class="adminActionButtonClass" @click="$emit('retry')">
-          重试
+          {{ PAYMENT_ORDERS_MESSAGES.retry }}
         </AdminButton>
       </div>
     </AdminAlert>
@@ -34,7 +36,7 @@
             {{ getPaymentOrderStatusPresentation(detail.status).label }}
           </AdminBadge>
         </div>
-        <dl class="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
+        <dl class="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in overviewRows" :key="row.label" class="min-w-0">
             <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
             <dd class="mt-0.5 break-words text-admin-body font-semibold text-admin-text-1">
@@ -46,9 +48,9 @@
 
       <section aria-labelledby="payment-stripe-identities">
         <h3 id="payment-stripe-identities" class="text-admin-body font-bold text-admin-title-color">
-          Stripe 安全摘要
+          {{ PAYMENT_ORDERS_MESSAGES.stripeSummaryTitle }}
         </h3>
-        <dl class="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
+        <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in stripeRows" :key="row.label" class="min-w-0">
             <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
             <dd class="mt-0.5 break-all font-mono text-admin-meta text-admin-text-1">
@@ -61,13 +63,13 @@
       <section aria-labelledby="payment-reconciliation">
         <div class="flex flex-wrap items-center gap-2">
           <h3 id="payment-reconciliation" class="text-admin-body font-bold text-admin-title-color">
-            对账与异常
+            {{ PAYMENT_ORDERS_MESSAGES.reconciliationTitle }}
           </h3>
           <AdminBadge :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'">
-            {{ detail.reconciliation.anomalous ? '超过 24 小时未收敛' : '无异常标记' }}
+            {{ PAYMENT_ORDERS_MESSAGES.anomalyState(detail.reconciliation.anomalous) }}
           </AdminBadge>
         </div>
-        <dl class="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
+        <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in reconciliationRows" :key="row.label" class="min-w-0">
             <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
             <dd class="mt-0.5 break-words text-admin-body text-admin-text-1">{{ row.value }}</dd>
@@ -75,13 +77,13 @@
         </dl>
       </section>
 
-      <section class="grid grid-cols-2 gap-5 max-[720px]:grid-cols-1">
+      <section class="grid grid-cols-1 gap-5 md:grid-cols-2">
         <div aria-labelledby="payment-refunds">
           <h3 id="payment-refunds" class="text-admin-body font-bold text-admin-title-color">
-            退款
+            {{ PAYMENT_ORDERS_MESSAGES.refundsTitle }}
           </h3>
           <p v-if="detail.refunds.length === 0" class="mt-2 text-admin-meta text-admin-text-3">
-            暂无退款记录
+            {{ PAYMENT_ORDERS_MESSAGES.refundsEmpty }}
           </p>
           <ul v-else class="mt-2 flex flex-col gap-2">
             <li
@@ -108,7 +110,7 @@
             Dispute
           </h3>
           <p v-if="detail.disputes.length === 0" class="mt-2 text-admin-meta text-admin-text-3">
-            暂无 Dispute
+            {{ PAYMENT_ORDERS_MESSAGES.disputesEmpty }}
           </p>
           <ul v-else class="mt-2 flex flex-col gap-2">
             <li
@@ -142,11 +144,11 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 id="payment-refund-action" class="text-admin-body font-bold text-admin-title-color">
-              发起退款
+              {{ PAYMENT_ORDERS_MESSAGES.refundActionTitle }}
             </h3>
           </div>
           <AdminBadge severity="info">
-            {{ `${formatIdeas(refundableIdeas)} 可退` }}
+            {{ PAYMENT_ORDERS_MESSAGES.refundableBadge(formatIdeas(refundableIdeas)) }}
           </AdminBadge>
         </div>
         <form class="mt-3 flex flex-wrap items-end gap-3" novalidate @submit.prevent="submitRefund">
@@ -154,11 +156,11 @@
             for="admin-payment-refund-ideas"
             class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
           >
-            <span>退款 Idea 数量</span>
+            <span>{{ PAYMENT_ORDERS_MESSAGES.refundQuantityLabel }}</span>
             <AdminNumberInput
               id="admin-payment-refund-ideas"
               v-model="refundIdeaQuantity"
-              aria-label="退款 Idea 数量"
+              :aria-label="PAYMENT_ORDERS_MESSAGES.refundQuantityLabel"
               :min="1"
               :max="refundableIdeas"
               :disabled="refunding"
@@ -176,7 +178,7 @@
             :loading="refunding"
             :disabled="refunding || !canSubmitRefund"
           >
-            确认退款
+            {{ PAYMENT_ORDERS_MESSAGES.refundSubmit }}
           </AdminButton>
         </form>
         <AdminAlert v-if="refundError" class="mt-3" severity="error">
@@ -191,7 +193,7 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          打开 Stripe 收据
+          {{ PAYMENT_ORDERS_MESSAGES.receiptLink }}
         </AdminButton>
       </div>
     </div>
@@ -214,6 +216,7 @@ import {
   getStripeStatusLabel,
 } from './paymentOrderPresentation'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
+import { PAYMENT_ORDERS_MESSAGES } from './messages'
 import type {
   AdminPaymentDisputeSummary,
   AdminPaymentOrderDetail,
@@ -264,10 +267,10 @@ const canRefund = computed(() => {
 const refundValidationError = computed(() => {
   const quantity = refundIdeaQuantity.value
   if (quantity === null || quantity === undefined || !Number.isInteger(quantity) || quantity <= 0) {
-    return '请输入正整数 Idea 数量'
+    return PAYMENT_ORDERS_MESSAGES.refundQuantityInvalid
   }
   if (quantity > refundableIdeas.value)
-    return `最多可退 ${formatIdeas(refundableIdeas.value)} Ideas`
+    return PAYMENT_ORDERS_MESSAGES.refundQuantityExceeded(formatIdeas(refundableIdeas.value))
   return ''
 })
 const canSubmitRefund = computed(() => canRefund.value && !refundValidationError.value)
@@ -276,23 +279,23 @@ const overviewRows = computed(() => {
   const detail = props.detail
   if (!detail) return []
   return [
-    { label: 'Idea 数量', value: formatLocaleNumber(detail.ideaQuantity) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewIdeaLabel, value: formatLocaleNumber(detail.ideaQuantity) },
     {
-      label: '原始实付',
+      label: PAYMENT_ORDERS_MESSAGES.overviewPaidTotalLabel,
       value: formatPaymentMoney(detail.paidTotalMinor, detail.paidCurrency),
     },
-    { label: '商品金额', value: formatPaymentMoney(detail.paidSubtotalMinor, detail.paidCurrency) },
-    { label: '税费', value: formatPaymentMoney(detail.paidTaxMinor, detail.paidCurrency) },
-    { label: '基准金额', value: formatPaymentMoney(detail.baseAmountMinor, detail.baseCurrency) },
-    { label: 'Stripe 状态', value: getStripeStatusLabel(detail.stripeStatus) },
-    { label: '本地到账状态', value: getCreditStatusLabel(detail.creditStatus) },
-    { label: '条款版本', value: detail.termsVersion || '—' },
-    { label: '退款政策版本', value: detail.refundPolicyVersion || '—' },
-    { label: '创建时间', value: formatPaymentDateTime(detail.createdAt) },
-    { label: '支付时间', value: formatPaymentDateTime(detail.paidAt) },
-    { label: '到账时间', value: formatPaymentDateTime(detail.creditedAt) },
-    { label: '过期时间', value: formatPaymentDateTime(detail.expiresAt) },
-    { label: '最近更新', value: formatPaymentDateTime(detail.updatedAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewSubtotalLabel, value: formatPaymentMoney(detail.paidSubtotalMinor, detail.paidCurrency) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewTaxLabel, value: formatPaymentMoney(detail.paidTaxMinor, detail.paidCurrency) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewBaseAmountLabel, value: formatPaymentMoney(detail.baseAmountMinor, detail.baseCurrency) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewStripeStatusLabel, value: getStripeStatusLabel(detail.stripeStatus) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewCreditStatusLabel, value: getCreditStatusLabel(detail.creditStatus) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewTermsLabel, value: detail.termsVersion || '—' },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewRefundPolicyLabel, value: detail.refundPolicyVersion || '—' },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewCreatedLabel, value: formatPaymentDateTime(detail.createdAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewPaidLabel, value: formatPaymentDateTime(detail.paidAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewCreditedLabel, value: formatPaymentDateTime(detail.creditedAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewExpiresLabel, value: formatPaymentDateTime(detail.expiresAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.overviewUpdatedLabel, value: formatPaymentDateTime(detail.updatedAt) },
   ]
 })
 
@@ -312,20 +315,23 @@ const reconciliationRows = computed(() => {
   const reconciliation = props.detail?.reconciliation
   if (!reconciliation) return []
   return [
-    { label: '异常标记时间', value: formatPaymentDateTime(reconciliation.anomalousAt) },
-    { label: '最近对账时间', value: formatPaymentDateTime(reconciliation.lastCheckedAt) },
-    { label: '下次尝试时间', value: formatPaymentDateTime(reconciliation.nextAttemptAt) },
-    { label: '错误代码', value: reconciliation.lastErrorCode || '—' },
-    { label: '脱敏错误摘要', value: reconciliation.lastErrorSummary || '—' },
+    { label: PAYMENT_ORDERS_MESSAGES.reconciliationAnomalousLabel, value: formatPaymentDateTime(reconciliation.anomalousAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.reconciliationCheckedLabel, value: formatPaymentDateTime(reconciliation.lastCheckedAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.reconciliationNextLabel, value: formatPaymentDateTime(reconciliation.nextAttemptAt) },
+    { label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorCodeLabel, value: reconciliation.lastErrorCode || '—' },
+    { label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorSummaryLabel, value: reconciliation.lastErrorSummary || '—' },
   ]
 })
 
 function formatRefund(refund: AdminPaymentRefundSummary): string {
   const ideas =
     refund.ideaQuantity === undefined
-      ? 'Idea 数量未知'
-      : `${formatLocaleNumber(refund.ideaQuantity)} Ideas`
-  return `${ideas} / ${formatPaymentMoney(refund.amountMinor, refund.currency)}`
+      ? PAYMENT_ORDERS_MESSAGES.refundUnknownQuantity
+      : PAYMENT_ORDERS_MESSAGES.refundQuantityIdeas(formatLocaleNumber(refund.ideaQuantity))
+  return PAYMENT_ORDERS_MESSAGES.refundSummary(
+    ideas,
+    formatPaymentMoney(refund.amountMinor, refund.currency),
+  )
 }
 
 function refundStatusLabel(status: string): string {
@@ -353,14 +359,29 @@ function formatDispute(dispute: AdminPaymentDisputeSummary): string {
   const amount = formatPaymentMoney(dispute.amountMinor, dispute.currency)
   const ratio =
     dispute.ratioBasisPoints !== undefined
-      ? ` / 比例 ${formatLocaleNumber(dispute.ratioBasisPoints / 100, { maximumFractionDigits: 2 })}%`
+      ? PAYMENT_ORDERS_MESSAGES.disputeRatio(
+          formatLocaleNumber(dispute.ratioBasisPoints / 100, { maximumFractionDigits: 2 }),
+        )
       : ''
   const target = formatIdeas(dispute.targetIdeaQuantity ?? 0)
   const debited = formatIdeas(dispute.debitedIdeaQuantity ?? 0)
   const unrecovered = formatIdeas(dispute.unrecoveredCredits ?? 0)
-  const provider = dispute.providerStatus ? ` / Stripe ${dispute.providerStatus}` : ''
-  const opened = `开启 ${formatPaymentDateTime(dispute.openedAt)}`
-  const closed = dispute.closedAt ? ` / 关闭 ${formatPaymentDateTime(dispute.closedAt)}` : ''
-  return `${amount}${ratio} / 目标 ${target} Ideas / 已扣回 ${debited} Ideas / 未追回 ${unrecovered} Ideas${provider} / ${opened}${closed}`
+  const provider = dispute.providerStatus
+    ? PAYMENT_ORDERS_MESSAGES.disputeStripeProvider(dispute.providerStatus)
+    : ''
+  const opened = PAYMENT_ORDERS_MESSAGES.disputeOpened(formatPaymentDateTime(dispute.openedAt))
+  const closed = dispute.closedAt
+    ? PAYMENT_ORDERS_MESSAGES.disputeClosed(formatPaymentDateTime(dispute.closedAt))
+    : ''
+  return PAYMENT_ORDERS_MESSAGES.disputeSummary(
+    amount,
+    ratio,
+    target,
+    debited,
+    unrecovered,
+    provider,
+    opened,
+    closed,
+  )
 }
 </script>

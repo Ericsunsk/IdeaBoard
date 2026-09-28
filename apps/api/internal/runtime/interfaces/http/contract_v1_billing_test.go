@@ -332,11 +332,11 @@ func TestV1BillingRestrictedWalletDenied(t *testing.T) {
 	engine := fx.engine()
 
 	status, _, payload := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/credits/balance", userID: 11})
-	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(CodeBillingWalletRestricted) {
+	if status != http.StatusForbidden || v1ErrorCode(t, payload) != string(contract.CodeBillingWalletRestricted) {
 		t.Fatalf("restricted balance = %d %v, want 403 billing_wallet_restricted", status, payload)
 	}
 	status, _, ledger := doV1(t, engine, v1Call{method: http.MethodGet, path: "/api/v1/workspaces/" + ws.PublicID + "/credits/ledger", userID: 11})
-	if status != http.StatusForbidden || v1ErrorCode(t, ledger) != string(CodeBillingWalletRestricted) {
+	if status != http.StatusForbidden || v1ErrorCode(t, ledger) != string(contract.CodeBillingWalletRestricted) {
 		t.Fatalf("restricted ledger = %d %v, want 403 billing_wallet_restricted", status, ledger)
 	}
 }
@@ -432,7 +432,7 @@ func TestV1BillingCheckoutIdempotency(t *testing.T) {
 	}
 
 	status, conflict := call(billingCheckoutBody(2000), "checkout-key-1")
-	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(CodeBillingCheckoutConflict) {
+	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(contract.CodeBillingCheckoutConflict) {
 		t.Fatalf("hash conflict = %d %v, want 409 billing_checkout_conflict", status, conflict)
 	}
 
@@ -470,7 +470,7 @@ func TestV1BillingCheckoutSessionGet(t *testing.T) {
 		t.Fatalf("session = %v, want %s", got, sessionID)
 	}
 	status, _, missing := doV1(t, engine, v1Call{method: http.MethodGet, path: createPath + "/sess_missing", userID: 11})
-	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(CodeBillingSessionNotFound) {
+	if status != http.StatusNotFound || v1ErrorCode(t, missing) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("missing session = %d %v, want 404 billing_session_not_found", status, missing)
 	}
 }

@@ -10,8 +10,8 @@
     <template #toolbar-start>
       <AdminToolbarSearch
         v-model="searchKeyword"
-        input-label="搜索用户"
-        placeholder="搜索用户姓名、邮箱、IP..."
+        :input-label="USERS_MESSAGES.searchLabel"
+        :placeholder="USERS_MESSAGES.searchPlaceholder"
         class="w-full sm:w-80"
         @enter="loadUsers"
         @clear="clearSearch"
@@ -20,20 +20,20 @@
 
     <template #toolbar-end>
       <AdminButton
-        title="OAuth Provider 设置"
+        :title="USERS_MESSAGES.oauthSettings"
         variant="ghost"
         size="sm"
         :class="adminFramedIconButtonClass"
-        aria-label="OAuth Provider 设置"
+        :aria-label="USERS_MESSAGES.oauthSettings"
         aria-haspopup="dialog"
         @click="oauthSettingsVisible = true"
       >
         <Settings class="size-4 text-admin-text-2" />
       </AdminButton>
 
-      <AdminFilterPopover :active="hasUserFilter" filter-label="筛选用户" @reset="resetUserFilters">
+      <AdminFilterPopover :active="hasUserFilter" :filter-label="USERS_MESSAGES.filterUsers" @reset="resetUserFilters">
         <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-          <span>角色</span>
+          <span>{{ USERS_MESSAGES.role }}</span>
           <AdminSelect
             v-model="userRoleFilter"
             :options="userRoleFilterOptions"
@@ -44,7 +44,7 @@
         </label>
 
         <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-          <span>状态</span>
+          <span>{{ USERS_MESSAGES.status }}</span>
           <AdminSelect
             v-model="userStatusFilter"
             :options="userStatusFilterOptions"
@@ -58,7 +58,7 @@
       <AdminButton
         variant="ghost"
         :class="adminFramedIconButtonClass"
-        aria-label="刷新用户"
+        :aria-label="USERS_MESSAGES.refreshUsers"
         :loading="loading"
         @click="loadUsers"
       >
@@ -80,7 +80,7 @@
       </template>
 
       <!-- 用户列：头像 + 姓名 -->
-      <AdminColumn field="displayName" header="用户" :style="{ minWidth: '240px' }">
+      <AdminColumn field="displayName" :header="USERS_MESSAGES.userColumn" :style="{ minWidth: '240px' }">
         <template #body="{ data: user }">
           <div class="flex items-center gap-2.5 font-sans">
             <div class="relative shrink-0">
@@ -123,7 +123,7 @@
               <Mail v-if="provider === 'email'" class="size-4" aria-hidden="true" />
               <Google v-else-if="provider === 'google'" class="size-4" aria-hidden="true" />
               <Discord v-else-if="provider === 'discord'" class="size-4" aria-hidden="true" />
-              <span v-else class="text-[10px] font-bold uppercase" aria-hidden="true">
+              <span v-else class="text-admin-micro font-bold uppercase" aria-hidden="true">
                 {{ provider.slice(0, 1) }}
               </span>
             </span>
@@ -163,14 +163,14 @@
       </AdminColumn>
 
       <!-- 角色列：语义化 Badge 徽标 -->
-      <AdminColumn field="role" header="角色" :style="{ width: '105px' }">
+      <AdminColumn field="role" :header="USERS_MESSAGES.role" :style="{ width: '105px' }">
         <template #body="{ data: user }">
           <AdminBadge :value="user.roleLabel" :severity="user.roleSeverity" rounded />
         </template>
       </AdminColumn>
 
       <!-- 加入时间列：等宽字体日期 -->
-      <AdminColumn field="createdDateLabel" header="加入时间" :style="{ width: '130px' }">
+      <AdminColumn field="createdDateLabel" :header="USERS_MESSAGES.joinedAtColumn" :style="{ width: '130px' }">
         <template #body="{ data: user }">
           <span class="whitespace-nowrap font-mono text-xs text-admin-text-1">
             {{ user.createdDateLabel }}
@@ -179,20 +179,20 @@
       </AdminColumn>
 
       <!-- 状态列：语义化 Badge 状态 -->
-      <AdminColumn field="status" header="状态" :style="{ width: '105px' }">
+      <AdminColumn field="status" :header="USERS_MESSAGES.status" :style="{ width: '105px' }">
         <template #body="{ data: user }">
           <AdminBadge :value="user.statusLabel" :severity="user.statusSeverity" rounded />
         </template>
       </AdminColumn>
 
       <!-- 账户余额列：可交互打开钱包详情 -->
-      <AdminColumn field="availableCredits" header="账户余额" :style="{ width: '140px' }">
+      <AdminColumn field="availableCredits" :header="USERS_MESSAGES.balanceColumn" :style="{ width: '140px' }">
         <template #body="{ data: user }">
           <button
             type="button"
             class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
             aria-haspopup="dialog"
-            :aria-label="`打开 ${user.displayName} 的账户详情`"
+            :aria-label="USERS_MESSAGES.openWalletAria(user.displayName)"
             @click="openWalletDialog(user)"
           >
             {{ user.availableCreditsLabel }}
@@ -208,7 +208,7 @@
               type="button"
               :class="adminTableRowActionButtonClass"
               aria-haspopup="dialog"
-              :aria-label="`${user.displayName} 操作菜单`"
+              :aria-label="USERS_MESSAGES.actionsMenuAria(user.displayName)"
               @click="toggleUserActionMenu($event, user)"
             >
               <MoreHoriz class="size-4" />
@@ -277,6 +277,7 @@ import { banDurationOptions } from './commands'
 import { useAdminUsersContext } from './context'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { useUsersFeedback } from './useUsersFeedback'
+import { USERS_MESSAGES } from './messages'
 import { getCountryFlag, getCountryLabel, type AdminUserRowView, type UserActionKey } from './view'
 
 type ActionPopupPanel = {

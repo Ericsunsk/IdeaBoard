@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminTextarea from '../../shared/components/AdminTextarea.vue'
+import { CREDITS_SHARED_MESSAGES } from './messages'
 
 withDefaults(
   defineProps<{
@@ -37,7 +38,7 @@ withDefaults(
   }>(),
   {
     error: '',
-    label: '操作原因',
+    label: CREDITS_SHARED_MESSAGES.actionReasonLabel,
     hint: '',
     rows: 3,
     bodyClass: '',

@@ -96,8 +96,8 @@ function onSubmit(prompt: string) {
 
 .image-node-outpaint-frame {
   --outpaint-frame-stroke: 2px;
-  --outpaint-frame-accent: #9278e6;
-  --outpaint-frame-grid: #9278e6;
+  --outpaint-frame-accent: var(--color-canvas-accent);
+  --outpaint-frame-grid: var(--color-canvas-accent);
   --outpaint-frame-contrast: rgba(255, 255, 255, 0.74);
   --outpaint-handle-center-inset: calc(var(--outpaint-frame-stroke) / 2);
   position: absolute;
@@ -150,7 +150,7 @@ function onSubmit(prompt: string) {
 
 .image-node-outpaint-handle {
   position: absolute;
-  border: 1.5px solid #9278e6;
+  border: 1.5px solid var(--outpaint-frame-accent);
   background: #ffffff;
   border-radius: 999px;
   padding: 0;

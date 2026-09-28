@@ -111,7 +111,13 @@ type V1Asset struct {
 }
 
 // V1MaterializationStatus is the durable-job lifecycle. Records only
-// move forward; completed/failed are terminal and immutable.
+// move forward; completed/failed are terminal and immutable. The
+// underlying wire and database words are unchanged (the public API
+// exposes pending/running/completed/failed; the table stores
+// processing for running per chk_library_materializations_status);
+// the type only documents the allowed transitions at compile time
+// (see CanTransition). SQL literals in
+// internal/db/queries/workspace_library.sql stay byte-identical.
 type V1MaterializationStatus string
 
 const (
@@ -120,6 +126,42 @@ const (
 	V1MaterializationCompleted V1MaterializationStatus = "completed"
 	V1MaterializationFailed    V1MaterializationStatus = "failed"
 )
+
+// allowedV1MaterializationTransitions mirrors the durable guards in
+// internal/db/queries/workspace_library.sql: StartLibraryMaterialization
+// fences pending -> processing (public running); Complete/Fail flip a
+// live (pending/processing) job to completed/failed, so direct
+// pending -> completed|failed is allowed. Terminal states
+// (completed/failed) have no outgoing transitions; guarded misses read
+// back the stored snapshot so idempotent replays converge instead of
+// resurrecting jobs. Failed jobs stay retryable only by claiming a new
+// job (ClaimMaterialization returns the existing pending/running/
+// completed record, never flips a failed row), so failed has no
+// outgoing transition here.
+var allowedV1MaterializationTransitions = map[V1MaterializationStatus]map[V1MaterializationStatus]struct{}{
+	V1MaterializationPending: {
+		V1MaterializationRunning:   {},
+		V1MaterializationCompleted: {},
+		V1MaterializationFailed:    {},
+	},
+	V1MaterializationRunning: {
+		V1MaterializationCompleted: {},
+		V1MaterializationFailed:    {},
+	},
+}
+
+// CanTransition reports whether a from -> to flip is durably allowed.
+// It is documentation, not a gate: every transition it reports true
+// for was already possible through the SQL guards, and no previously
+// possible transition reports false.
+func CanTransition(from, to V1MaterializationStatus) bool {
+	nexts, ok := allowedV1MaterializationTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
 
 // V1Materialization is one separate durable materialization job: an
 // owned library reference turned into a managed Media Asset. Result
@@ -154,11 +196,22 @@ type V1ResolveItem struct {
 	SourceURL string
 }
 
+// V1ResolveStatus is one batch-resolve outcome. The wire words are
+// unchanged ("resolved", "unresolved"); the type only documents the
+// closed vocabulary at compile time. Resolve outcomes are lookup
+// results, not a lifecycle: there is no transition table.
+type V1ResolveStatus string
+
+const (
+	V1ResolveResolved   V1ResolveStatus = "resolved"
+	V1ResolveUnresolved V1ResolveStatus = "unresolved"
+)
+
 // V1ResolveResult is one resolved/unresolved outcome. Asset is set only
 // for resolved items.
 type V1ResolveResult struct {
 	Provider string
 	SourceID string
-	Status   string
+	Status   V1ResolveStatus
 	Asset    *V1Asset
 }

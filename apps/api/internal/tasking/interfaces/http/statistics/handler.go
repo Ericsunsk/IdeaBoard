@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
 	"ideaboard/api/internal/platform/validation"
@@ -75,7 +76,7 @@ func (h *Handler) StreamMonitor(c *gin.Context) {
 	}
 	if count := h.monitorStreamCount.Add(1); count > monitorStreamMaxConcurrent {
 		h.monitorStreamCount.Add(-1)
-		response.MachineError(c, http.StatusTooManyRequests, "task_monitor_concurrency_limited", "监控连接数已达上限，请稍后重试")
+		response.MachineError(c, http.StatusTooManyRequests, string(contract.CodeTaskMonitorConcurrencyLimited), "监控连接数已达上限，请稍后重试")
 		return
 	}
 	defer h.monitorStreamCount.Add(-1)
@@ -176,7 +177,7 @@ func (h *Handler) GetStatistics(c *gin.Context) {
 	stats, err := h.service.GetStatistics(c.Request.Context(), c.Query("range"))
 	if err != nil {
 		if validation.Is(err) {
-			response.MachineError(c, http.StatusBadRequest, "task_statistics_request_invalid", validationMessage(err))
+			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
 		response.InternalError(c, 500, "获取统计数据失败", err)
@@ -191,7 +192,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			response.MachineError(c, http.StatusBadRequest, "task_statistics_request_invalid", "请求参数错误")
+			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), "请求参数错误")
 			return
 		}
 	}
@@ -203,7 +204,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 	result, err := h.service.BackfillStatistics(c.Request.Context(), req.Range)
 	if err != nil {
 		if validation.Is(err) {
-			response.MachineError(c, http.StatusBadRequest, "task_statistics_request_invalid", validationMessage(err))
+			response.MachineError(c, http.StatusBadRequest, string(contract.CodeTaskStatisticsRequestInvalid), validationMessage(err))
 			return
 		}
 		response.InternalError(c, 500, "补录统计失败", err)

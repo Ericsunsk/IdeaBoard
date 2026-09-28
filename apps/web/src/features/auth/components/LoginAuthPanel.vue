@@ -44,94 +44,55 @@
           </Button>
         </div>
 
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+        <EmailField
+          v-model="formValue.identifier"
           :label="t('auth.fields.email')"
           :error="errors.identifier"
           field-id="login-identifier"
-          required
-          inline-required
           :field-class="authFieldClass"
+          :input-class="authInputClass"
+          :input-error-class="authInputErrorClass"
+          :icon-class="authInputIconClass"
+          autocomplete="email"
+          :disabled="loading"
+          :placeholder="t('auth.placeholders.email')"
+          @blur="handleFieldBlur('identifier')"
+          @update:model-value="clearFieldError('identifier')"
         >
-          <div class="relative w-full">
-            <span :class="authInputIconClass">
-              <UserIcon class="size-4.5" />
-            </span>
-            <Input
-              :id="fieldId"
-              v-model="formValue.identifier"
-              v-bind="resolveFieldControlState(invalid)"
-              autocomplete="email"
-              :required="required"
-              :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
-              :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.email')"
-              :aria-invalid="ariaInvalid"
-              :aria-describedby="describedbyId"
-              @blur="handleFieldBlur('identifier')"
-              @update:model-value="clearFieldError('identifier')"
-            />
-          </div>
-        </IbFormField>
+          <template #prefix>
+            <UserIcon class="size-4.5" />
+          </template>
+        </EmailField>
 
-        <IbFormField
+        <PasswordField
+          v-model="formValue.password"
           :label="t('auth.fields.password')"
           :error="errors.password"
           field-id="login-password"
-          required
-          inline-required
           :field-class="authFieldClass"
+          :input-class="authInputClass"
+          :input-error-class="authInputErrorClass"
+          :icon-class="authInputIconClass"
+          autocomplete="current-password"
+          :disabled="loading"
+          :placeholder="t('auth.placeholders.password')"
+          @blur="handleFieldBlur('password')"
+          @update:model-value="clearFieldError('password')"
         >
+          <template #prefix>
+            <LockIcon class="size-4.5" />
+          </template>
           <template #header-extra>
             <button
               type="button"
-              class="border-0 bg-transparent p-0 text-[11px] font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
+              class="border-0 bg-transparent p-0 text-ib-caption font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
               :disabled="loading"
               @click="resetMode = true"
             >
               {{ t('auth.forgotPassword') }}
             </button>
           </template>
-          <template
-            #default="{
-              ariaInvalid,
-              describedbyId,
-              fieldId,
-              inlineError,
-              inlineErrorText,
-              invalid,
-              required,
-            }"
-          >
-            <div class="relative w-full">
-              <span :class="authInputIconClass">
-                <LockIcon class="size-4.5" />
-              </span>
-              <PasswordInput
-                :id="fieldId"
-                v-model="formValue.password"
-                autocomplete="current-password"
-                :required="required"
-                :disabled="loading"
-                :aria-invalid="ariaInvalid"
-                :aria-describedby="describedbyId"
-                :invalid="invalid"
-                :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
-                :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.password')"
-                @blur="handleFieldBlur('password')"
-                @update:model-value="clearFieldError('password')"
-              />
-            </div>
-          </template>
-        </IbFormField>
+        </PasswordField>
 
         <Button
           :class="authPrimaryButtonClass"
@@ -149,35 +110,17 @@
         @submit.prevent="handleResetPassword"
       >
         <p class="text-xs text-ib-text-subtle">{{ t('auth.resetPasswordInstructions') }}</p>
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+        <EmailField
+          v-model="resetForm.email"
           :label="t('auth.fields.email')"
           :error="resetErrors.email"
           field-id="reset-email"
-          required
-          inline-required
           :field-class="authFieldClass"
-        >
-          <Input
-            :id="fieldId"
-            v-model="resetForm.email"
-            autocomplete="email"
-            :required="required"
-            :class="[authInputClass, inlineError ? authInputErrorClass : '']"
-            :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.email')"
-            :aria-invalid="ariaInvalid"
-            :aria-describedby="describedbyId"
-          />
-        </IbFormField>
+          :input-class="authInputClass"
+          :input-error-class="authInputErrorClass"
+          autocomplete="email"
+          :placeholder="t('auth.placeholders.email')"
+        />
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
@@ -201,65 +144,26 @@
         novalidate
         @submit.prevent="handleResetPasswordConfirm"
       >
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+        <OtpField
+          v-model="resetForm.otp"
           :label="t('auth.fields.otp')"
           :error="resetErrors.otp"
           field-id="reset-otp"
-          required
-          inline-required
           :field-class="authFieldClass"
-        >
-          <Input
-            :id="fieldId"
-            v-model="resetForm.otp"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
-            :required="required"
-            :class="[authInputClass, inlineError ? authInputErrorClass : '']"
-            :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.otp')"
-            :aria-invalid="ariaInvalid"
-            :aria-describedby="describedbyId"
-          />
-        </IbFormField>
-        <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
+          :input-class="authInputClass"
+          :input-error-class="authInputErrorClass"
+          :placeholder="t('auth.placeholders.otp')"
+        />
+        <PasswordField
+          v-model="resetForm.password"
           :label="t('auth.fields.newPassword')"
           :error="resetErrors.password"
           field-id="reset-password"
-          required
-          inline-required
           :field-class="authFieldClass"
-        >
-          <PasswordInput
-            :id="fieldId"
-            v-model="resetForm.password"
-            :required="required"
-            :aria-invalid="ariaInvalid"
-            :aria-describedby="describedbyId"
-            :invalid="invalid"
-            :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.newPassword')"
-          />
-        </IbFormField>
+          :input-class="authInputClass"
+          :input-error-class="authInputErrorClass"
+          :placeholder="t('auth.placeholders.newPassword')"
+        />
         <Button
           :class="authPrimaryButtonClass"
           type="submit"
@@ -287,16 +191,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Input, PasswordInput } from '@/components/ui/input'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
 import { authTransport } from '../session/transport'
-import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
+import { PASSWORD_LENGTH_LIMIT } from '../../../shared/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
-import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
-import { getEmailError, getRequiredError } from './formUtils'
+import {
+  EmailField,
+  OtpField,
+  PasswordField,
+  emailFormatError,
+  otpFieldError,
+  passwordLengthFieldError,
+  requiredFieldError,
+  useAuthForm,
+} from './auth-fields'
 import { useAuthPanelControls } from './panelControls'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 import {
@@ -326,15 +237,7 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
-const {
-  t,
-  userStore,
-  authFeedback,
-  loading,
-  runAsyncAction,
-  submitControlState,
-  secondaryControlState,
-} = useAuthPanelControls()
+const { t, userStore, authFeedback } = useAuthPanelControls()
 
 type LoginField = 'identifier' | 'password'
 
@@ -342,18 +245,21 @@ const loginFieldLabels = computed<Record<LoginField, string>>(() => ({
   identifier: t('auth.fields.email'),
   password: t('auth.fields.password'),
 }))
-const formValue = ref({
-  identifier: '',
-  password: '',
-})
-const errors = ref<Record<LoginField, string>>({
-  identifier: '',
-  password: '',
-})
+const loginForm = useAuthForm(['identifier', 'password'] as const)
+const resetFormState = useAuthForm(['email', 'otp', 'password'] as const)
+const formValue = loginForm.values
+const errors = loginForm.errors
+const resetForm = resetFormState.values
+const resetErrors = resetFormState.errors
+const loading = computed(() => loginForm.isSubmitting.value || resetFormState.isSubmitting.value)
+const submitControlState = computed(() =>
+  resolveInteractiveControlState({ pending: loading.value }),
+)
+const secondaryControlState = computed(() =>
+  resolveInteractiveControlState({ disabled: loading.value }),
+)
 const resetMode = ref(false)
 const resetOtpSent = ref(false)
-const resetForm = ref({ email: '', otp: '', password: '' })
-const resetErrors = ref({ email: '', otp: '', password: '' })
 const socialCapabilities = ref<Record<OAuthProviderCode, boolean>>({})
 const providerLogoUrls: Record<string, string> = {
   google: googleLogoUrl,
@@ -370,24 +276,21 @@ onMounted(async () => {
   socialCapabilities.value = (await authTransport.getCapabilities()).social
 })
 
-function resolveFieldControlState(invalid: boolean) {
-  return resolveInteractiveControlState({
-    disabled: loading.value,
-    tone: invalid ? 'danger' : 'default',
-  })
+function requiredMessage(label: string) {
+  return t('auth.errors.requiredField', { field: label })
 }
 
 function handleFieldBlur(field: LoginField) {
   const value = formValue.value[field].trim()
   if (!value) return
   if (field === 'identifier' && value.includes('@')) {
-    errors.value.identifier = getEmailError(value, t('auth.errors.invalidEmail'))
+    errors.value.identifier = emailFormatError(value, t('auth.errors.invalidEmail'))
   }
 }
 
 function validateField(field: LoginField) {
   const value = formValue.value[field].trim()
-  errors.value[field] = getRequiredError(value, loginFieldLabels.value[field])
+  errors.value[field] = requiredFieldError(value, requiredMessage(loginFieldLabels.value[field]))
   return !errors.value[field]
 }
 
@@ -398,13 +301,20 @@ function validateForm() {
 }
 
 function clearFieldError(field: LoginField) {
-  if (errors.value[field]) errors.value[field] = ''
+  loginForm.clearFieldError(field)
+}
+
+function passwordLengthMessage() {
+  return t('auth.errors.passwordLength', {
+    min: PASSWORD_LENGTH_LIMIT.min,
+    max: PASSWORD_LENGTH_LIMIT.max,
+  })
 }
 
 async function handleLogin() {
   if (!validateForm()) return
 
-  const loggedIn = await runAsyncAction(
+  const loggedIn = await loginForm.runAsyncAction(
     async () => {
       await userStore.login(formValue.value.identifier, formValue.value.password)
       return true
@@ -417,7 +327,7 @@ async function handleLogin() {
 }
 
 async function handleSocialLogin(provider: OAuthProviderCode) {
-  await runAsyncAction(
+  await loginForm.runAsyncAction(
     async () => {
       if (props.oauthRedirectPath) {
         await authTransport.signInWithOAuth(provider, props.oauthRedirectPath)
@@ -432,23 +342,24 @@ async function handleSocialLogin(provider: OAuthProviderCode) {
 
 async function handleResetPassword() {
   const email = resetForm.value.email.trim()
-  resetErrors.value.email = getEmailError(email, t('auth.errors.invalidEmail'))
+  resetErrors.value.email = emailFormatError(email, t('auth.errors.invalidEmail'))
   if (resetErrors.value.email) return
 
-  const sent = await runAsyncAction(() => userStore.requestPasswordResetOTP(email), {
+  const sent = await resetFormState.runAsyncAction(() => userStore.requestPasswordResetOTP(email), {
     feedback: authFeedback.login,
   })
   if (sent) resetOtpSent.value = true
 }
 
 async function handleResetPasswordConfirm() {
-  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim())
-    ? ''
-    : t('auth.errors.sixDigitCode')
-  resetErrors.value.password = getPasswordLengthError(resetForm.value.password)
+  resetErrors.value.otp = otpFieldError(resetForm.value.otp, t('auth.errors.sixDigitCode'))
+  resetErrors.value.password = passwordLengthFieldError(
+    resetForm.value.password,
+    passwordLengthMessage(),
+  )
   if (resetErrors.value.otp || resetErrors.value.password) return
 
-  const reset = await runAsyncAction(
+  const reset = await resetFormState.runAsyncAction(
     () =>
       userStore.resetPasswordWithOTP(
         resetForm.value.email,

@@ -3,11 +3,11 @@
     <!-- 顶栏：左侧标题与状态切换，右侧刷新（与用户管理页/订单页同源） -->
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div class="text-base font-bold text-admin-title-color">异常队列</div>
+        <div class="text-base font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.queueTitle }}</div>
         <div
           class="inline-flex items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-0.5"
           role="group"
-          aria-label="异常队列视图"
+          :aria-label="CREDIT_HEALTH_MESSAGES.queueViewAria"
         >
           <button
             v-for="opt in statusOptions"
@@ -30,7 +30,7 @@
         <AdminButton
           variant="ghost"
           :class="adminFramedIconButtonClass"
-          aria-label="刷新异常队列"
+          :aria-label="CREDIT_HEALTH_MESSAGES.queueRefreshAria"
           :loading="loading"
           :disabled="loading"
           @click="refreshFindings"
@@ -44,7 +44,7 @@
     <div :class="adminTableCardClass">
       <AdminAlert v-if="backgroundError" class="mx-4 mt-4" severity="secondary">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>异常队列刷新失败，当前显示上次加载的数据。</span>
+          <span>{{ CREDIT_HEALTH_MESSAGES.queueStaleNotice }}</span>
           <AdminButton
             variant="ghost"
             size="small"
@@ -52,14 +52,14 @@
             :loading="loading"
             @click="refreshFindings"
           >
-            重试刷新
+            {{ CREDIT_HEALTH_MESSAGES.retryRefresh }}
           </AdminButton>
         </div>
       </AdminAlert>
 
       <AdminAlert v-if="initialError" class="m-4" severity="error">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>异常队列加载失败。</span>
+          <span>{{ CREDIT_HEALTH_MESSAGES.queueLoadFailed }}</span>
           <AdminButton
             variant="outline"
             size="small"
@@ -67,7 +67,7 @@
             :loading="loading"
             @click="refreshFindings"
           >
-            重新加载异常队列
+            {{ CREDIT_HEALTH_MESSAGES.queueReload }}
           </AdminButton>
         </div>
       </AdminAlert>
@@ -79,8 +79,8 @@
         data-key="id"
         scrollable
         :frame-class="adminTableFrameClass"
-        table-aria-label="账本异常队列"
-        scroll-aria-label="账本异常队列横向滚动区域"
+        :table-aria-label="CREDIT_HEALTH_MESSAGES.queueTableAria"
+        :scroll-aria-label="CREDIT_HEALTH_MESSAGES.queueScrollAria"
         :table-style="adminTableStyle"
         :class="adminTableClass"
       >
@@ -88,12 +88,12 @@
           <AdminEmptyState :title="emptyTitle" />
         </template>
 
-        <AdminColumn header="异常摘要" :style="{ minWidth: '260px' }">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueSummaryColumn" :style="{ minWidth: '260px' }">
           <template #body="{ data }">
             <button
               type="button"
               class="group block max-w-[34rem] rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent cursor-pointer"
-              :aria-label="`查看${getFindingTypePresentation(data.finding_type).title}诊断`"
+              :aria-label="CREDIT_HEALTH_MESSAGES.queueViewDiagnosis(getFindingTypePresentation(data.finding_type).title)"
               @click="openFinding(data)"
             >
               <span
@@ -108,7 +108,7 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn header="影响对象" :style="{ width: '28%', minWidth: '190px' }">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueSubjectColumn" :style="{ width: '28%', minWidth: '190px' }">
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col gap-1">
               <span v-if="data.wallet_public_id" class="text-xs font-semibold text-admin-text-1">
@@ -124,7 +124,7 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn header="风险" :style="{ width: '18%', minWidth: '140px' }">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueRiskColumn" :style="{ width: '18%', minWidth: '140px' }">
           <template #body="{ data }">
             <AdminBadge
               :value="getFindingRiskPresentation(data).label"
@@ -135,7 +135,7 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn header="最近发现" :style="{ width: '18%', minWidth: '170px' }">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueLastSeenColumn" :style="{ width: '18%', minWidth: '170px' }">
           <template #body="{ data }">
             <span class="whitespace-nowrap font-mono text-xs text-admin-text-3">
               {{ formatAdminDateTimeWithSeconds(data.last_seen_at) }}
@@ -143,13 +143,13 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn header="详情" :style="{ width: '64px' }">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueDetailColumn" :style="{ width: '64px' }">
           <template #body="{ data }">
             <div class="flex items-center justify-start">
               <button
                 type="button"
                 :class="adminTableRowActionButtonClass"
-                :aria-label="`查看${getFindingTypePresentation(data.finding_type).title}诊断详情`"
+                :aria-label="CREDIT_HEALTH_MESSAGES.queueViewDiagnosisDetail(getFindingTypePresentation(data.finding_type).title)"
                 @click="openFinding(data)"
               >
                 <Eye class="size-4" />
@@ -161,7 +161,7 @@
 
       <div :class="adminTableFooterClass">
         <span class="text-xs font-normal text-admin-text-3">
-          {{ status === 'open' ? '待处理异常' : '已解决异常' }} ({{ findings.length }})
+          {{ CREDIT_HEALTH_MESSAGES.queueFooterCount(status, findings.length) }}
         </span>
         <div class="flex items-center gap-2">
           <AdminPagerControls
@@ -188,14 +188,14 @@
       >
         <div class="flex items-center justify-between border-b border-admin-border-soft px-6 py-4">
           <DialogTitle class="text-admin-title-sm font-bold text-admin-title-color">
-            异常诊断
+            {{ CREDIT_HEALTH_MESSAGES.queueDiagnosisTitle }}
           </DialogTitle>
           <DialogDescription class="sr-only">
-            查看选中异常的类型说明、影响对象与处置建议。
+            {{ CREDIT_HEALTH_MESSAGES.queueDiagnosisDescription }}
           </DialogDescription>
           <DialogClose
             class="rounded-lg p-1.5 text-admin-text-subtle hover:bg-admin-surface-hover hover:text-admin-text transition-colors cursor-pointer"
-            aria-label="关闭"
+            :aria-label="CREDIT_HEALTH_MESSAGES.close"
           >
             <Xmark class="size-5" />
           </DialogClose>
@@ -221,31 +221,31 @@
               class="grid gap-x-5 gap-y-4 border-y border-admin-border-soft py-5 sm:grid-cols-2"
             >
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">影响对象</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}</div>
                 <div class="mt-1 break-all text-admin-body font-[680] text-admin-text-1">
                   {{ selectedFinding.subject_type }} · {{ selectedFinding.subject_id }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">出现次数</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerOccurrences }}</div>
                 <div class="mt-1 font-mono text-admin-body font-[680] text-admin-text-1">
                   {{ selectedFinding.occurrence_count }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">首次发现</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerFirstSeen }}</div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.first_seen_at) }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">最近发现</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueLastSeenColumn }}</div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.last_seen_at) }}
                 </div>
               </div>
               <div v-if="selectedFinding.resolved_at">
-                <div class="text-admin-caption font-[700] text-admin-text-3">解决时间</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerResolvedAt }}</div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.resolved_at) }}
                 </div>
@@ -253,7 +253,7 @@
             </section>
 
             <section v-if="selectedFinding.wallet_public_id">
-              <div class="text-admin-caption font-[700] text-admin-text-3">关联 Wallet</div>
+              <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}</div>
               <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
                 Wallet ·
                 {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
@@ -261,7 +261,7 @@
             </section>
 
             <section class="min-w-0">
-              <div class="text-admin-caption font-[700] text-admin-text-3">完整 Details</div>
+              <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerDetails }}</div>
               <dl v-if="detailEntries.length > 0" class="mt-2 grid min-w-0 gap-2">
                 <div
                   v-for="entry in detailEntries"
@@ -276,7 +276,7 @@
                   </dd>
                 </div>
               </dl>
-              <div v-else class="mt-2 text-admin-body text-admin-text-3">无附加 details</div>
+              <div v-else class="mt-2 text-admin-body text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerNoDetails }}</div>
             </section>
 
             <section class="min-w-0">
@@ -339,10 +339,11 @@ import {
   getFindingRiskPresentation,
   getFindingTypePresentation,
 } from './reconciliationFindingPresentation'
+import { CREDIT_HEALTH_MESSAGES } from './messages'
 
 const statusOptions = [
-  { label: '待处理', value: 'open' },
-  { label: '已解决', value: 'resolved' },
+  { label: CREDIT_HEALTH_MESSAGES.queueStatusOpen, value: 'open' },
+  { label: CREDIT_HEALTH_MESSAGES.queueStatusResolved, value: 'resolved' },
 ] satisfies Array<{ label: string; value: AdminCreditFindingStatus }>
 
 const status = ref<AdminCreditFindingStatus>('open')
@@ -389,7 +390,11 @@ const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount
 const canAdvance = pagination.canAdvance
 const canRetreat = pagination.canRetreat
-const emptyTitle = computed(() => (status.value === 'open' ? '暂无待处理异常' : '暂无已解决异常'))
+const emptyTitle = computed(() =>
+  status.value === 'open'
+    ? CREDIT_HEALTH_MESSAGES.queueEmptyOpen
+    : CREDIT_HEALTH_MESSAGES.queueEmptyResolved,
+)
 const detailEntries = computed(() =>
   selectedFinding.value ? formatFindingDetailsEntries(selectedFinding.value.details) : [],
 )

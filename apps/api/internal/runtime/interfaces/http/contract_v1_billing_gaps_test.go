@@ -427,7 +427,7 @@ func TestV1GapsPendingContinue(t *testing.T) {
 
 	// Same key + different order conflicts.
 	status, _, conflict := doV1(t, engine, gapsContinueCall(base, gapOrderTokenB, "continue-key-1", "", 11))
-	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(CodeBillingCheckoutConflict) {
+	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(contract.CodeBillingCheckoutConflict) {
 		t.Fatalf("hash conflict = %d %v, want 409 billing_checkout_conflict", status, conflict)
 	}
 
@@ -437,11 +437,11 @@ func TestV1GapsPendingContinue(t *testing.T) {
 		t.Fatalf("missing key = %d %v, want 400 idempotency_key_required", status, missing)
 	}
 	status, _, unknown := doV1(t, engine, gapsContinueCall(base, "0198cd29-f457-7e4b-b95e-6cfde41b7999", "continue-key-2", "", 11))
-	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(CodeBillingSessionNotFound) {
+	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("unknown token = %d %v, want 404 billing_session_not_found", status, unknown)
 	}
 	status, _, malformed := doV1(t, engine, gapsContinueCall(base, "not-a-uuid", "continue-key-3", "", 11))
-	if status != http.StatusNotFound || v1ErrorCode(t, malformed) != string(CodeBillingSessionNotFound) {
+	if status != http.StatusNotFound || v1ErrorCode(t, malformed) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("malformed token = %d %v, want 404 billing_session_not_found (no oracle)", status, malformed)
 	}
 	status, _, bodied := doV1(t, engine, gapsContinueCall(base, gapOrderTokenA, "continue-key-4", `{"data":{}}`, 11))
@@ -452,7 +452,7 @@ func TestV1GapsPendingContinue(t *testing.T) {
 	// Wallet gate maps to the frozen billing code.
 	fx.pending.continueErr = paymentsdomain.ErrWalletNotRechargeable
 	status, _, gated := doV1(t, engine, gapsContinueCall(base, gapOrderTokenA, "continue-key-5", "", 11))
-	if status != http.StatusForbidden || v1ErrorCode(t, gated) != string(CodeBillingWalletRestricted) {
+	if status != http.StatusForbidden || v1ErrorCode(t, gated) != string(contract.CodeBillingWalletRestricted) {
 		t.Fatalf("wallet gate = %d %v, want 403 billing_wallet_restricted", status, gated)
 	}
 	fx.pending.continueErr = nil
@@ -493,7 +493,7 @@ func TestV1GapsPendingAbandon(t *testing.T) {
 		t.Fatalf("abandon replay = %d %v, want replayed cancelled", status, replayed)
 	}
 	status, unknown := call("0198cd29-f457-7e4b-b95e-6cfde41b7999", "abandon-key-2")
-	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(CodeBillingSessionNotFound) {
+	if status != http.StatusNotFound || v1ErrorCode(t, unknown) != string(contract.CodeBillingSessionNotFound) {
 		t.Fatalf("unknown abandon = %d %v, want 404 billing_session_not_found", status, unknown)
 	}
 }
@@ -599,7 +599,7 @@ func TestV1GapsBillingQuote(t *testing.T) {
 			method: http.MethodPost, path: base,
 			body: fmt.Sprintf(`{"data":{"sku":%q}}`, sku), userID: 11,
 		})
-		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, priced) != string(CodeBillingPricingUnavailable) {
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, priced) != string(contract.CodeBillingPricingUnavailable) {
 			t.Fatalf("unpriced sku %s = %d %v, want 422 billing_pricing_unavailable", sku, status, priced)
 		}
 	}
@@ -610,7 +610,7 @@ func TestV1GapsBillingQuote(t *testing.T) {
 		method: http.MethodPost, path: base,
 		body: `{"data":{"sku":"ai-search:vision"}}`, userID: 11,
 	})
-	if status != http.StatusServiceUnavailable || v1ErrorCode(t, transient) != string(CodeBillingQuoteUnavailable) {
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, transient) != string(contract.CodeBillingQuoteUnavailable) {
 		t.Fatalf("transient quote = %d %v, want 503 billing_quote_unavailable", status, transient)
 	}
 	delete(fx.quoter.errFor, "ai-search:vision")
@@ -686,7 +686,7 @@ func TestV1GapsRewardRedeem(t *testing.T) {
 
 	// Same key + different code conflicts.
 	status, _, conflict := doV1(t, engine, gapsRedeemCall(wsID, "IDEA-2027", "redeem-key-1", 11))
-	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(CodeRewardRedeemConflict) {
+	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(contract.CodeRewardRedeemConflict) {
 		t.Fatalf("hash conflict = %d %v, want 409 reward_redeem_conflict", status, conflict)
 	}
 
@@ -696,7 +696,7 @@ func TestV1GapsRewardRedeem(t *testing.T) {
 		t.Fatalf("missing key = %d %v, want 400 idempotency_key_required", status, missing)
 	}
 	status, _, invalid := doV1(t, engine, gapsRedeemCall(wsID, "EXPIRED-CODE", "redeem-key-2", 11))
-	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, invalid) != string(CodeRewardCodeUnavailable) {
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, invalid) != string(contract.CodeRewardCodeUnavailable) {
 		t.Fatalf("invalid code = %d %v, want 422 reward_code_unavailable", status, invalid)
 	}
 	status, _, empty := doV1(t, engine, gapsRedeemCall(wsID, "   ", "redeem-key-3", 11))
@@ -704,7 +704,7 @@ func TestV1GapsRewardRedeem(t *testing.T) {
 		t.Fatalf("empty code = %d %v, want 422 validation_failed", status, empty)
 	}
 	status, _, frozen := doV1(t, engine, gapsRedeemCall(wsID, "FROZEN-CODE", "redeem-key-4", 11))
-	if status != http.StatusConflict || v1ErrorCode(t, frozen) != string(CodeRewardWalletLocked) {
+	if status != http.StatusConflict || v1ErrorCode(t, frozen) != string(contract.CodeRewardWalletLocked) {
 		t.Fatalf("frozen wallet = %d %v, want 409 reward_wallet_locked", status, frozen)
 	}
 
@@ -791,7 +791,7 @@ func TestV1GapsFailClosedWithoutSeams(t *testing.T) {
 		method: http.MethodPost, path: "/api/v1/workspaces/" + ws.PublicID + "/billing-quotes",
 		body: `{"data":{"sku":"ai-search:vision"}}`, userID: 11,
 	})
-	if status != http.StatusServiceUnavailable || v1ErrorCode(t, quoted) != string(CodeBillingQuoteUnavailable) {
+	if status != http.StatusServiceUnavailable || v1ErrorCode(t, quoted) != string(contract.CodeBillingQuoteUnavailable) {
 		t.Fatalf("unwired quote = %d %v, want 503 billing_quote_unavailable", status, quoted)
 	}
 	posts := []v1Call{

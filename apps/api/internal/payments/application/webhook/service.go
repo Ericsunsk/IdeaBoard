@@ -214,7 +214,7 @@ func (s *Service) processDispute(ctx context.Context, event paymentports.StripeW
 		return err
 	}
 	if changed && s.events != nil {
-		s.events.Publish(dispute.UserID, paymentports.PaymentEvent{Status: "dispute_updated"})
+		s.events.Publish(dispute.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventDisputeUpdated})
 	}
 	return s.dispute.ExpireDisputeCheckoutSessions(ctx, dispute)
 }
@@ -258,7 +258,7 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 		if errors.Is(createErr, domain.ErrInsufficientCredits) || errors.Is(createErr, paymentcontracts.ErrRefundAmountExceeds) {
 			userID, anomalyErr := s.convergence.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
 			if anomalyErr == nil && s.events != nil {
-				s.events.Publish(userID, paymentports.PaymentEvent{Status: "refund_updated"})
+				s.events.Publish(userID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
 			}
 			return anomalyErr
 		}
@@ -272,7 +272,7 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 		return err
 	}
 	if s.events != nil {
-		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: "refund_updated"})
+		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
 	}
 	providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
 	_, err = s.refund.Converge(ctx, refund, providerRefund)

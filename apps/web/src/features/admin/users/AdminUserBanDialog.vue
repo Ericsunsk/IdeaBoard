@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    aria-label="封禁用户"
-    description="设置封禁时长与原因后确认封禁。"
+    :aria-label="USERS_MESSAGES.banAria"
+    :description="USERS_MESSAGES.banDescription"
     size="compact"
     :busy="loading"
     @update:visible="handleVisibleUpdate"
@@ -10,10 +10,10 @@
     <template #header>
       <div :class="[adminDialogHeaderContentClass, 'pr-4']">
         <div class="mb-3 flex flex-wrap gap-2">
-          <AdminBadge severity="secondary">访问控制</AdminBadge>
-          <AdminBadge severity="danger">强制限制</AdminBadge>
+          <AdminBadge severity="secondary">{{ USERS_MESSAGES.banAccessBadge }}</AdminBadge>
+          <AdminBadge severity="danger">{{ USERS_MESSAGES.banForceBadge }}</AdminBadge>
         </div>
-        <h2 :class="adminDialogTitleClass">高级访问限制</h2>
+        <h2 :class="adminDialogTitleClass">{{ USERS_MESSAGES.banTitle }}</h2>
         <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
           {{ description }}
         </p>
@@ -24,7 +24,7 @@
       for="admin-ban-duration-select"
       class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
     >
-      <span>封禁时长 (Duration)</span>
+      <span>{{ USERS_MESSAGES.banDurationLabel }}</span>
       <AdminSelect
         id="admin-ban-duration-select"
         :model-value="expiresInDays"
@@ -37,11 +37,11 @@
       for="admin-ban-reason-textarea"
       class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
     >
-      <span>封禁原因 (内部记录)</span>
+      <span>{{ USERS_MESSAGES.banReasonLabel }}</span>
       <AdminTextarea
         id="admin-ban-reason-textarea"
         :model-value="reason"
-        placeholder="例如：发表违规内容、恶意刷量..."
+        :placeholder="USERS_MESSAGES.banReasonPlaceholder"
         :rows="3"
         class="w-full"
         @update:model-value="handleReasonUpdate"
@@ -51,7 +51,7 @@
     <template #footer>
       <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div class="max-w-[480px] text-admin-meta leading-6 text-admin-text-3">
-          封禁会立即断开该用户所有连接，封禁期间无法重新登录。
+          {{ USERS_MESSAGES.banFooterNote }}
         </div>
         <div :class="adminDialogFooterActionsClass">
           <AdminButton
@@ -60,7 +60,7 @@
             :disabled="loading"
             @click="$emit('cancel')"
           >
-            取消
+            {{ USERS_MESSAGES.cancel }}
           </AdminButton>
           <AdminButton
             variant="destructive"
@@ -68,7 +68,7 @@
             :loading="loading"
             @click="$emit('confirm')"
           >
-            确认封禁
+            {{ USERS_MESSAGES.banConfirm }}
           </AdminButton>
         </div>
       </div>
@@ -88,6 +88,7 @@ import {
   adminDialogTitleClass,
   adminActionButtonClass,
 } from '../shared/lib/uiClasses'
+import { USERS_MESSAGES } from './messages'
 
 type BanDurationOption = {
   label: string

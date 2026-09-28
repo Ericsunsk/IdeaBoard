@@ -216,7 +216,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^sub_[A-Za-z0-9]+$'
+        pattern: '^sub_[A-Za-z0-9_-]+$'
     LastEventId:
       name: last_event_id
       in: query
@@ -224,7 +224,7 @@ components:
       description: Resume cursor (evt_ id). The Last-Event-ID request header takes precedence.
       schema:
         type: string
-        pattern: '^evt_[A-Za-z0-9]+$'
+        pattern: '^evt_[A-Za-z0-9_-]+$'
     EventTypesFilter:
       name: types
       in: query
@@ -322,7 +322,7 @@ components:
           type: boolean
         id:
           type: string
-          pattern: '^sub_[A-Za-z0-9]+$'
+          pattern: '^sub_[A-Za-z0-9_-]+$'
     EventEnvelope:
       type: object
       required: [id, type, version, occurred_at, actor, resource, workspace_id, data]
@@ -330,7 +330,7 @@ components:
       properties:
         id:
           type: string
-          pattern: '^evt_[A-Za-z0-9]+$'
+          pattern: '^evt_[A-Za-z0-9_-]+$'
           description: Opaque event identifier, also used for SSE Last-Event-ID replay.
         type:
           type: string
@@ -435,7 +435,7 @@ components:
       properties:
         asset_id:
           type: string
-          pattern: '^asset_[A-Za-z0-9]+$'
+          pattern: '^asset_[A-Za-z0-9_-]+$'
     MediaAssetArchivedData:
       type: object
       required: [asset_id]
@@ -443,7 +443,7 @@ components:
       properties:
         asset_id:
           type: string
-          pattern: '^asset_[A-Za-z0-9]+$'
+          pattern: '^asset_[A-Za-z0-9_-]+$'
     BoardDocumentReplacedData:
       type: object
       required: [board_id, revision]
@@ -451,7 +451,7 @@ components:
       properties:
         board_id:
           type: string
-          pattern: '^board_[A-Za-z0-9]+$'
+          pattern: '^board_[A-Za-z0-9_-]+$'
         revision:
           type: integer
           minimum: 1
@@ -462,10 +462,10 @@ components:
       properties:
         board_id:
           type: string
-          pattern: '^board_[A-Za-z0-9]+$'
+          pattern: '^board_[A-Za-z0-9_-]+$'
         member_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
     BoardShareRevokedData:
       type: object
       required: [board_id, share_token_id]
@@ -473,7 +473,7 @@ components:
       properties:
         board_id:
           type: string
-          pattern: '^board_[A-Za-z0-9]+$'
+          pattern: '^board_[A-Za-z0-9_-]+$'
         share_token_id:
           type: string
           description: Token id only; the bearer never leaves the server.
@@ -500,7 +500,7 @@ components:
       properties:
         id:
           type: string
-          pattern: '^sub_[A-Za-z0-9]+$'
+          pattern: '^sub_[A-Za-z0-9_-]+$'
         workspace_id:
           type: string
           pattern: '^ws_[A-Za-z0-9_-]+$'

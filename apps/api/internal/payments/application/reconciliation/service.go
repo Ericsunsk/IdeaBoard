@@ -58,7 +58,7 @@ type Service struct {
 	orderLifecycle   *paymentorder.PaymentOrderLifecycle
 	credentialAccess func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
 	orderAccess      func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
-	publish          func(int64, string)
+	publish          func(int64, paymentports.PaymentEventStatus)
 	now              func() time.Time
 }
 
@@ -74,7 +74,7 @@ type Dependencies struct {
 	OrderLifecycle   *paymentorder.PaymentOrderLifecycle
 	CredentialAccess func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
 	OrderAccess      func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error)
-	Publish          func(int64, string)
+	Publish          func(int64, paymentports.PaymentEventStatus)
 	Now              func() time.Time
 }
 
@@ -240,7 +240,7 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, now time.Time
 			continue
 		}
 		if changed && s.publish != nil {
-			s.publish(updated.UserID, "dispute_updated")
+			s.publish(updated.UserID, paymentports.PaymentEventDisputeUpdated)
 		}
 		if s.disputeExpiry != nil {
 			if err := s.disputeExpiry.ExpireDisputeCheckoutSessions(ctx, updated); err != nil {

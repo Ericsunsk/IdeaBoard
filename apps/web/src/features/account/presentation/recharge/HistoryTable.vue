@@ -20,7 +20,7 @@
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
-            class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted"
+            class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted"
             >{{ formatDateTime(data.occurred_at) }}</time
           ></template
         >

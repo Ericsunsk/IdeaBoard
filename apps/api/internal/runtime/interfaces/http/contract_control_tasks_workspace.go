@@ -155,7 +155,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 	envelope := parseControlTaskEnvelope(row.WorkflowInput)
 	publicID, displayName := a.resolveControlTaskIdentity(ctx, row.SubmitterUserID)
 	completed := dbutil.TimePtr(row.CompletedAt)
-	if row.Status == workspacetasks.StatusCancelled && completed == nil {
+	if row.Status == string(workspacetasks.StatusCancelled) && completed == nil {
 		completed = dbutil.TimePtr(row.CancelledAt)
 	}
 	detail := &taskapp.AdminMonitorDetail{
@@ -174,7 +174,7 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 		CompletedAt:     completed,
 		CancelReason:    envelope.CancelReason,
 	}
-	if row.Status == workspacetasks.StatusCancelled {
+	if row.Status == string(workspacetasks.StatusCancelled) {
 		detail.CancelledAt = dbutil.TimePtr(row.CancelledAt)
 	}
 	if outputs, err := a.loadControlTaskOutputs(ctx, row.WorkspacePublicID, row.PublicID); err == nil {
@@ -221,8 +221,8 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 	}
 	status := strings.ToLower(strings.TrimSpace(req.Status))
 	switch status {
-	case "", workspacetasks.StatusPending, workspacetasks.StatusRunning,
-		workspacetasks.StatusCompleted, workspacetasks.StatusFailed, workspacetasks.StatusCancelled:
+	case "", string(workspacetasks.StatusPending), string(workspacetasks.StatusRunning),
+		string(workspacetasks.StatusCompleted), string(workspacetasks.StatusFailed), string(workspacetasks.StatusCancelled):
 	default:
 		return nil, tasksdomain.TaskListCounts{}, workspacetasks.ErrNotFound
 	}
@@ -251,15 +251,15 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 	for _, countRow := range countRows {
 		counts.Total += countRow.Count
 		switch countRow.Status {
-		case workspacetasks.StatusPending:
+		case string(workspacetasks.StatusPending):
 			counts.PendingCount += countRow.Count
-		case workspacetasks.StatusRunning:
+		case string(workspacetasks.StatusRunning):
 			counts.RunningCount += countRow.Count
-		case workspacetasks.StatusCompleted:
+		case string(workspacetasks.StatusCompleted):
 			counts.CompletedCount += countRow.Count
-		case workspacetasks.StatusFailed:
+		case string(workspacetasks.StatusFailed):
 			counts.FailedCount += countRow.Count
-		case workspacetasks.StatusCancelled:
+		case string(workspacetasks.StatusCancelled):
 			counts.CancelledCount += countRow.Count
 		default:
 			counts.OtherCount += countRow.Count
@@ -270,7 +270,7 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 		envelope := parseControlTaskEnvelope(row.WorkflowInput)
 		publicID, displayName := a.resolveControlTaskIdentity(ctx, row.SubmitterUserID)
 		completed := dbutil.TimePtr(row.CompletedAt)
-		if row.Status == workspacetasks.StatusCancelled && completed == nil {
+		if row.Status == string(workspacetasks.StatusCancelled) && completed == nil {
 			completed = dbutil.TimePtr(row.CancelledAt)
 		}
 		item := taskapp.AdminMonitorListItem{
@@ -482,7 +482,7 @@ ORDER BY attempt_no ASC`, taskPublicID)
 			if attempt.TotalLatencyMS < 0 {
 				attempt.TotalLatencyMS = 0
 			}
-			if strings.TrimSpace(attempt.Status) == workspacetasks.StatusCancelled {
+			if strings.TrimSpace(attempt.Status) == string(workspacetasks.StatusCancelled) {
 				completed := *attempt.CompletedAt
 				attempt.CancelledAt = &completed
 			}

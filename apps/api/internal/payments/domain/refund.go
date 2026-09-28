@@ -17,6 +17,38 @@ const (
 	PaymentRefundAnomaly   PaymentRefundStatus = "anomaly"
 )
 
+// allowedPaymentRefundTransitions mirrors the durable guards in
+// enforce_payment_refund_transition
+// (internal/db/schema/fragments/payments.sql): pending advances to
+// succeeded/failed (pending -> pending replays converge at the service
+// layer without a database flip, matching the workspacetasks.Cancel
+// precedent). Terminal states (succeeded/failed/anomaly) have no
+// outgoing transitions. anomaly is insert-only (dashboard refunds that
+// need manual recovery): it is never a transition target from pending
+// via UPDATE, so it has no incoming edge here. The type only
+// documents the allowed transitions at compile time (see
+// CanRefundTransition); SQL literals stay byte-identical.
+var allowedPaymentRefundTransitions = map[PaymentRefundStatus]map[PaymentRefundStatus]struct{}{
+	PaymentRefundPending: {
+		PaymentRefundPending:   {},
+		PaymentRefundSucceeded: {},
+		PaymentRefundFailed:    {},
+	},
+}
+
+// CanRefundTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanRefundTransition(from, to PaymentRefundStatus) bool {
+	nexts, ok := allowedPaymentRefundTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
 type PaymentRefund struct {
 	ID                      string              `json:"id"`
 	PaymentOrderID          string              `json:"payment_order_id"`

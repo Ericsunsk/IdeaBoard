@@ -11,7 +11,6 @@ const DialogRootStub = defineComponent({
   emits: ['update:open'],
   template: `
     <div v-if="open" @keydown.escape="$emit('update:open', false)">
-      <div data-testid="account-dialog-mask"></div>
       <slot />
     </div>
   `,
@@ -19,6 +18,12 @@ const DialogRootStub = defineComponent({
 
 const PassthroughStub = defineComponent({
   template: '<slot />',
+})
+
+const DialogOverlayStub = defineComponent({
+  inheritAttrs: false,
+  emits: ['click'],
+  template: '<div data-testid="account-dialog-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
 })
 
 const DialogContentStub = defineComponent({
@@ -87,7 +92,7 @@ function renderAccountDialog(
         stubs: {
           DialogRoot: DialogRootStub,
           DialogPortal: PassthroughStub,
-          DialogOverlay: PassthroughStub,
+          DialogOverlay: DialogOverlayStub,
           DialogContent: DialogContentStub,
           DialogDescription: PassthroughStub,
           DialogTitle: PassthroughStub,
@@ -158,24 +163,31 @@ describe('AccountDialog', () => {
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })
 
-  it('closes from Escape and the close button, but not from the mask', async () => {
+  it('closes from the mask, Escape, and the close button while idle', async () => {
     const { user, onVisibleUpdate } = renderAccountDialog(true)
-    const dialog = screen.getByRole('dialog', { name: 'Account' })
 
     await user.click(screen.getByTestId('account-dialog-mask'))
-    expect(onVisibleUpdate).not.toHaveBeenCalled()
+    expect(onVisibleUpdate).toHaveBeenCalledWith(false)
+  })
+
+  it('closes from Escape and the close button', async () => {
+    const { user, onVisibleUpdate } = renderAccountDialog(true)
+    const dialog = screen.getByRole('dialog', { name: 'Account' })
 
     dialog.focus()
     await user.keyboard('{Escape}')
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })
 
-  it('lets canonical pending state lock Escape and the content close control', async () => {
+  it('lets canonical pending state lock the mask, Escape, and the content close control', async () => {
     const { user, onVisibleUpdate } = renderAccountDialog(true)
     const dialog = screen.getByRole('dialog', { name: 'Account' })
 
     await user.click(screen.getByRole('button', { name: '开始异步操作' }))
     expect(dialog).toHaveAttribute('aria-busy', 'true')
+
+    await user.click(screen.getByTestId('account-dialog-mask'))
+    expect(onVisibleUpdate).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: '关闭账户管理' }))
     dialog.focus()

@@ -3,22 +3,15 @@ package auth
 import (
 	"context"
 	"errors"
-	"os"
-	"strings"
 	"testing"
 
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/testsupport/testenv"
 )
 
 func TestServiceClientAgainstFastify(t *testing.T) {
-	baseURL := strings.TrimSpace(os.Getenv("AUTH_FASTIFY_CONTRACT_URL"))
-	if baseURL == "" {
-		t.Skip("AUTH_FASTIFY_CONTRACT_URL is only set by the Auth contract harness")
-	}
-	internalKey := strings.TrimSpace(os.Getenv("AUTH_FASTIFY_CONTRACT_INTERNAL_KEY"))
-	if internalKey == "" {
-		t.Fatal("AUTH_FASTIFY_CONTRACT_INTERNAL_KEY is required by the Auth contract harness")
-	}
+	baseURL := testenv.GetOrSkip(t, "AUTH_FASTIFY_CONTRACT_URL", "AUTH_FASTIFY_CONTRACT_URL is only set by the Auth contract harness")
+	internalKey := testenv.Require(t, "AUTH_FASTIFY_CONTRACT_INTERNAL_KEY", "AUTH_FASTIFY_CONTRACT_INTERNAL_KEY is required by the Auth contract harness")
 
 	client := NewServiceClient(config.AuthServiceConfig{
 		BaseURL:        baseURL,

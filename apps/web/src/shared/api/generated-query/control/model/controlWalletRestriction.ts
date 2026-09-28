@@ -36,7 +36,7 @@ import type { ControlWalletRestrictionRelatedObject } from './controlWalletRestr
 
 export interface ControlWalletRestriction {
   restriction_id: string
-  /** @pattern ^usr_[A-Za-z0-9]+$ */
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   user_id: string
   display_name?: string
   type: string

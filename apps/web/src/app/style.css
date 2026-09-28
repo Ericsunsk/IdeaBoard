@@ -348,7 +348,18 @@
 
   --text-ib-micro: 10px;
   --text-ib-caption: 11px;
+  --text-ib-meta: 12px;
   --text-ib-body: 13px;
+  --text-ib-content: 14px;
+  --text-ib-title-sm: 15px;
+  --text-ib-heading: 18px;
+  --text-ib-icon: 20px;
+  --text-ib-modal-title-mobile: 22px;
+  --text-ib-modal-title: 26px;
+  --text-ib-summary-value: 28px;
+
+  --font-ib-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
+  --font-ib-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
 }
 
 @media (prefers-reduced-motion: reduce) {

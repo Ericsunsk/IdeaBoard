@@ -2,11 +2,11 @@
   <AdminDialogShell
     :visible="visible"
     :header="header"
-    description="完整 Code 仅在此展示一次，请立即复制保存。"
+    :description="REWARD_CODES_MESSAGES.plaintextDescription"
     size="compact"
     @update:visible="emit('update:visible', $event)"
   >
-    <p class="m-0 text-admin-body text-admin-text-2">关闭后将无法再次查看完整 Code。</p>
+    <p class="m-0 text-admin-body text-admin-text-2">{{ REWARD_CODES_MESSAGES.plaintextWarning }}</p>
     <div
       class="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-surface-muted p-3"
     >
@@ -16,13 +16,13 @@
         {{ plaintext }}
       </code>
       <AdminButton variant="outline" :class="adminActionButtonClass" @click="copy">
-        {{ copied ? '已复制' : '复制' }}
+        {{ REWARD_CODES_MESSAGES.plaintextCopyLabel(copied) }}
       </AdminButton>
     </div>
-    <AdminAlert v-if="copyError" severity="error"> 复制失败，请手动选择并复制 Code。 </AdminAlert>
+    <AdminAlert v-if="copyError" severity="error">{{ REWARD_CODES_MESSAGES.plaintextCopyFailed }}</AdminAlert>
     <template #footer>
       <AdminButton :class="adminActionButtonClass" @click="emit('update:visible', false)">
-        我已保存
+        {{ REWARD_CODES_MESSAGES.plaintextAcknowledged }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -35,10 +35,11 @@ import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { REWARD_CODES_MESSAGES } from './messages'
 
 const props = withDefaults(
   defineProps<{ visible: boolean; plaintext: string; header?: string }>(),
-  { header: '保存兑换码' },
+  { header: REWARD_CODES_MESSAGES.plaintextHeader },
 )
 const emit = defineEmits<{ 'update:visible': [visible: boolean] }>()
 const copied = ref(false)

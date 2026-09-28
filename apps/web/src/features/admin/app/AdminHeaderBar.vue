@@ -142,7 +142,7 @@
                 <span class="truncate text-xs font-semibold text-admin-title-color">
                   {{ userEmail }}
                 </span>
-                <span class="truncate text-[11px] text-admin-text-3 font-mono"> admin </span>
+                <span class="truncate text-admin-caption text-admin-text-3 font-mono"> admin </span>
               </div>
             </DropdownMenuLabel>
 

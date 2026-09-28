@@ -7,7 +7,7 @@
     >
       <div class="flex items-center gap-2">
         <Settings class="size-4 text-admin-text-3" />
-        <span>高级网关适配与参数微调 (可选)</span>
+        <span>{{ MODELS_MESSAGES.gatewayAdvancedTitle }}</span>
       </div>
       <NavArrowDown class="size-4 transition-transform" :class="isOpen ? 'rotate-180' : ''" />
     </button>
@@ -20,14 +20,14 @@
             class="text-admin-caption font-semibold text-admin-text-1"
             for="model-custom-path-input"
           >
-            自定义网关端点路径 (Path Override)
+            {{ MODELS_MESSAGES.gatewayPathLabel }}
           </label>
-          <span class="text-[11px] text-admin-text-3">留空则由系统智能推导</span>
+          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.gatewayPathHint }}</span>
         </div>
         <AdminInput
           id="model-custom-path-input"
           :model-value="customPath"
-          placeholder="例如: api/v1/chat/completions 或 fal-ai/birefnet"
+          :placeholder="MODELS_MESSAGES.gatewayPathPlaceholder"
           @update:model-value="emit('update:customPath', String($event))"
         />
         <div class="flex flex-wrap gap-1">
@@ -35,7 +35,7 @@
             v-for="pathOpt in commonGatewayPaths"
             :key="pathOpt"
             type="button"
-            class="rounded bg-white border border-admin-border-soft px-1.5 py-0.5 text-[10px] text-admin-text-2 hover:text-admin-accent cursor-pointer"
+            class="rounded bg-white border border-admin-border-soft px-1.5 py-0.5 text-admin-micro text-admin-text-2 hover:text-admin-accent cursor-pointer"
             @click="emit('update:customPath', pathOpt)"
           >
             {{ pathOpt }}
@@ -50,25 +50,25 @@
             class="text-admin-caption font-semibold text-admin-text-1"
             for="model-custom-params-input"
           >
-            额外自定义请求参数 (Custom JSON)
+            {{ MODELS_MESSAGES.gatewayParamsLabel }}
           </label>
           <button
             v-if="customParams"
             type="button"
-            class="text-[11px] text-admin-accent hover:underline cursor-pointer"
+            class="text-admin-caption text-admin-accent hover:underline cursor-pointer"
             @click="formatCustomParamsJSON"
           >
-            格式化 JSON
+            {{ MODELS_MESSAGES.gatewayFormatJson }}
           </button>
         </div>
         <AdminInput
           id="model-custom-params-input"
           :model-value="customParams"
-          placeholder='例如: {"guidance_scale": 7.5, "output_format": "png"}'
+          :placeholder="MODELS_MESSAGES.gatewayParamsPlaceholder"
           @update:model-value="emit('update:customParams', String($event))"
         />
-        <span class="text-[11px] text-admin-text-3">
-          必须为合法 JSON 键值对对象。调用网关时将自动与基础 Payload 进行深度合并注入。
+        <span class="text-admin-caption text-admin-text-3">
+          {{ MODELS_MESSAGES.gatewayParamsHint }}
         </span>
       </div>
     </div>
@@ -79,6 +79,7 @@
 import { ref, watch } from 'vue'
 import { NavArrowDown, Settings } from '@iconoir/vue'
 import AdminInput from '../../../../shared/components/AdminInput.vue'
+import { MODELS_MESSAGES } from '../../pages/messages'
 
 const props = withDefaults(
   defineProps<{

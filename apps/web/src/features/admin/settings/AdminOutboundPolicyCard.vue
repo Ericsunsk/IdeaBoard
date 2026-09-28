@@ -1,6 +1,6 @@
 <template>
   <SettingEditorCard
-    title="私有地址访问"
+    :title="SETTINGS_MESSAGES.outboundTitle"
     :status="statusLabel"
     :status-severity="statusSeverity"
     :class="props.class"
@@ -9,26 +9,26 @@
       <div class="flex flex-col gap-5">
         <AdminAlert v-if="error" severity="error">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <span>私有地址访问策略加载失败，请重试。</span>
+            <span>{{ SETTINGS_MESSAGES.outboundLoadFailed }}</span>
             <AdminButton
               :class="adminActionButtonClass"
               variant="outline"
               size="small"
               @click="refetch()"
             >
-              重试
+              {{ SETTINGS_MESSAGES.retry }}
             </AdminButton>
           </div>
         </AdminAlert>
         <AdminAlert v-else-if="loading && !setting" severity="secondary">
-          正在加载私有地址访问策略…
+          {{ SETTINGS_MESSAGES.outboundLoading }}
         </AdminAlert>
 
         <AdminFormField
           v-slot="{ describedbyId }"
-          label="允许访问的私有主机"
+          :label="SETTINGS_MESSAGES.outboundHostsLabel"
           for="outbound-policy-allow-hosts"
-          hint="每行一个 hostname、IP 或 host:port。公网 Endpoint 无需添加。"
+          :hint="SETTINGS_MESSAGES.outboundHostsHint"
         >
           <AdminTextarea
             id="outbound-policy-allow-hosts"
@@ -53,7 +53,7 @@
         :loading="saving"
         @click="save"
       >
-        保存访问策略
+        {{ SETTINGS_MESSAGES.outboundSave }}
       </AdminButton>
       <AdminButton
         :class="adminActionButtonClass"
@@ -61,7 +61,7 @@
         :disabled="controlsDisabled"
         @click="reset"
       >
-        重置
+        {{ SETTINGS_MESSAGES.reset }}
       </AdminButton>
     </template>
   </SettingEditorCard>
@@ -75,6 +75,7 @@ import AdminTextarea from '../shared/components/AdminTextarea.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import SettingEditorCard from './SettingEditorCard.vue'
+import { SETTINGS_MESSAGES } from './pages/messages'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { useAdminOutboundPolicyFeedback } from './useSettingsFeedback'
@@ -88,10 +89,10 @@ const { error, form, loading, refetch, reset, save, saving, setting, validationE
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
 const statusLabel = computed(() => {
-  if (error.value) return '加载失败'
-  if (!setting.value) return '加载中'
+  if (error.value) return SETTINGS_MESSAGES.providerLoadFailed
+  if (!setting.value) return SETTINGS_MESSAGES.providerLoading
   const count = setting.value.allow_hosts.length
-  return count ? `已额外放行 ${count} 项` : '未额外放行'
+  return count ? SETTINGS_MESSAGES.outboundExtraAllowed(count) : SETTINGS_MESSAGES.outboundNoneExtra
 })
 const statusSeverity = computed(() => {
   if (error.value) return 'danger'

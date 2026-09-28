@@ -18,8 +18,9 @@ import {
   assertWorkspaceId as assertSharedWorkspaceId,
   requireWorkspaceId as requireSharedWorkspaceId,
 } from '../../../shared/utils/workspaceId'
+import { opaqueIdPattern } from '../../../shared/utils/opaqueIds'
 
-const LIBRARY_ID_RE = /^(?:lfolder|lasset)_[A-Za-z0-9_-]+$/
+const LIBRARY_ID_RE = opaqueIdPattern(['lfolder', 'lasset'])
 
 function isLibraryId(value: unknown): value is string {
   return typeof value === 'string' && LIBRARY_ID_RE.test(value)

@@ -15,6 +15,64 @@ const (
 	PaymentOrderFailed              PaymentOrderStatus = "payment_failed"
 )
 
+// allowedPaymentOrderTransitions mirrors the durable guards in
+// guard_payment_order_lifecycle (internal/db/schema/fragments/payments.sql):
+// creating fans out to checkout_open/paid_pending_credit/expired/
+// payment_failed; checkout_open fans out to async_payment_pending/
+// paid_pending_credit/cancelled/expired/payment_failed;
+// async_payment_pending converges to paid_pending_credit/expired/
+// payment_failed; paid_pending_credit credits exactly once; terminal
+// unpaid states (cancelled/expired/payment_failed) resurrect only to
+// paid_pending_credit for late webhooks (RecordPaymentOrderPaid).
+// credited is terminal. The type only documents the allowed
+// transitions at compile time (see CanOrderTransition); SQL literals
+// in internal/db/queries/payments.sql stay byte-identical.
+var allowedPaymentOrderTransitions = map[PaymentOrderStatus]map[PaymentOrderStatus]struct{}{
+	PaymentOrderCreating: {
+		PaymentOrderCheckoutOpen:      {},
+		PaymentOrderPaidPendingCredit: {},
+		PaymentOrderExpired:           {},
+		PaymentOrderFailed:            {},
+	},
+	PaymentOrderCheckoutOpen: {
+		PaymentOrderAsyncPaymentPending: {},
+		PaymentOrderPaidPendingCredit:   {},
+		PaymentOrderCancelled:           {},
+		PaymentOrderExpired:             {},
+		PaymentOrderFailed:              {},
+	},
+	PaymentOrderAsyncPaymentPending: {
+		PaymentOrderPaidPendingCredit: {},
+		PaymentOrderExpired:           {},
+		PaymentOrderFailed:            {},
+	},
+	PaymentOrderPaidPendingCredit: {
+		PaymentOrderCredited: {},
+	},
+	PaymentOrderCancelled: {
+		PaymentOrderPaidPendingCredit: {},
+	},
+	PaymentOrderExpired: {
+		PaymentOrderPaidPendingCredit: {},
+	},
+	PaymentOrderFailed: {
+		PaymentOrderPaidPendingCredit: {},
+	},
+}
+
+// CanOrderTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanOrderTransition(from, to PaymentOrderStatus) bool {
+	nexts, ok := allowedPaymentOrderTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
 type PaymentOrder struct {
 	ID                      string
 	PublicOrderNumber       string

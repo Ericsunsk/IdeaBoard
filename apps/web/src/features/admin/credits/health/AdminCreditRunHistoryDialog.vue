@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    header="检查记录"
-    description="查看账本检查的历史运行记录。"
+    :header="CREDIT_HEALTH_MESSAGES.history"
+    :description="CREDIT_HEALTH_MESSAGES.runHistoryDescription"
     size="wide"
     content-layout="scrollable"
     @update:visible="$emit('update:visible', $event)"
@@ -12,14 +12,14 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">账本检查历史</div>
+              <div class="text-admin-title-sm font-[740] text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.runHistoryTitle }}</div>
             </div>
           </template>
           <template #actions="{ iconButtonClass }">
             <AdminButton
               variant="ghost"
               :class="iconButtonClass"
-              aria-label="刷新检查记录"
+              :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryRefreshAria"
               :loading="runsLoading"
               @click="refreshRuns"
             >
@@ -41,9 +41,9 @@
 
       <AdminAlert v-if="backgroundError" class="m-4" severity="secondary">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>检查记录刷新失败，当前显示上次加载的数据。</span>
+          <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryStaleNotice }}</span>
           <AdminButton
-            label="重试刷新"
+            :label="CREDIT_HEALTH_MESSAGES.retryRefresh"
             severity="secondary"
             size="small"
             variant="ghost"
@@ -56,9 +56,9 @@
 
       <AdminAlert v-if="initialError" class="m-5" severity="error">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>检查记录加载失败。</span>
+          <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryLoadFailed }}</span>
           <AdminButton
-            label="重新加载检查记录"
+            :label="CREDIT_HEALTH_MESSAGES.runHistoryReload"
             :class="adminActionButtonClass"
             severity="secondary"
             variant="outline"
@@ -78,24 +78,24 @@
         :frame-class="adminTableFrameClass"
         :table-style="{ minWidth: '820px' }"
         :class="adminTableClass"
-        table-aria-label="账本检查记录"
-        scroll-aria-label="横向滚动查看账本检查记录"
+        :table-aria-label="CREDIT_HEALTH_MESSAGES.runHistoryTableAria"
+        :scroll-aria-label="CREDIT_HEALTH_MESSAGES.runHistoryScrollAria"
         @row-expand="expandRun"
         @row-collapse="collapseRun"
       >
         <template #empty>
-          <AdminEmptyState title="暂无检查记录" description="运行一次检查后，记录会显示在这里" />
+          <AdminEmptyState :title="CREDIT_HEALTH_MESSAGES.emptyRuns" :description="CREDIT_HEALTH_MESSAGES.runHistoryEmptyHint" />
         </template>
 
         <AdminColumn expander style="width: 52px" />
-        <AdminColumn header="时间" style="width: 190px">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryTimeColumn" style="width: 190px">
           <template #body="{ data }">
             <span class="whitespace-nowrap">{{
               formatAdminDateTimeWithSeconds(data.requested_at)
             }}</span>
           </template>
         </AdminColumn>
-        <AdminColumn header="状态" style="width: 110px">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryStatusColumn" style="width: 110px">
           <template #body="{ data }">
             <AdminBadge
               :value="getRunStatusLabel(data.status)"
@@ -109,10 +109,10 @@
             {{ getReconciliationTriggerLabel(data) }}
           </template>
         </AdminColumn>
-        <AdminColumn header="结果" style="min-width: 240px">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryResultColumn" style="min-width: 240px">
           <template #body="{ data }">{{ formatReconciliationRunResult(data) }}</template>
         </AdminColumn>
-        <AdminColumn header="耗时" style="width: 120px">
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryDurationColumn" style="width: 120px">
           <template #body="{ data }">{{ formatReconciliationRunDuration(data) }}</template>
         </AdminColumn>
 
@@ -121,15 +121,15 @@
             <div
               v-if="runDetailLoading && selectedRunId === data.id"
               class="flex min-h-24 items-center justify-center"
-              aria-label="加载 Run 详情"
+              :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria"
             >
-              <AdminSpinner class="h-7 w-7" aria-label="加载 Run 详情" />
+              <AdminSpinner class="h-7 w-7" :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria" />
             </div>
             <AdminAlert v-else-if="runDetailError && selectedRunId === data.id" severity="error">
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <span>Run 详情加载失败。</span>
+                <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadFailed }}</span>
                 <AdminButton
-                  label="重试 Run 详情"
+                  :label="CREDIT_HEALTH_MESSAGES.runHistoryDetailRetry"
                   variant="ghost"
                   :class="adminTextButtonClass"
                   :loading="runDetailLoading"
@@ -142,25 +142,25 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">技术 ID</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryTechId }}</dt>
                 <dd class="mt-1 mb-0 font-mono text-admin-body text-admin-text-1">
                   Run #{{ selectedRun.id }}
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">尝试次数</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryAttempts }}</dt>
                 <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
                   {{ selectedRun.attempt_count }}
                 </dd>
               </div>
               <div class="sm:col-span-2">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">审计原因</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}</dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-admin-text-1">
-                  {{ selectedRun.reason || '每日账本健康检查' }}
+                  {{ selectedRun.reason || CREDIT_HEALTH_MESSAGES.runHistoryDefaultReason }}
                 </dd>
               </div>
               <div v-if="selectedRun.error_message" class="sm:col-span-2 xl:col-span-4">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">错误信息</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryError }}</dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-admin-danger">
                   {{ formatReconciliationRunError(selectedRun.error_message) }}
                 </dd>
@@ -177,7 +177,7 @@
         :class="adminActionButtonClass"
         @click="$emit('update:visible', false)"
       >
-        关闭
+        {{ CREDIT_HEALTH_MESSAGES.close }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -223,6 +223,7 @@ import {
   getReconciliationTriggerLabel,
 } from './reconciliationRunPresentation'
 import { useCreditRunDetail } from './useCreditRunDetail'
+import { CREDIT_HEALTH_MESSAGES } from './messages'
 
 const props = defineProps<{ visible: boolean }>()
 defineEmits<{ 'update:visible': [visible: boolean] }>()

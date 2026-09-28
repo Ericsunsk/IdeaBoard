@@ -8,7 +8,7 @@
         aria-disabled="true"
         tabindex="-1"
         class="relative flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-white text-admin-text-2"
-        title="切换侧边导航"
+        :title="MONITOR_MESSAGES.sidebarToggleTitle"
       >
         <SidebarCollapse class="size-4" />
         <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-blue-500"></span>
@@ -71,7 +71,7 @@
             class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
             :aria-expanded="timeRangePopoverOpen"
             aria-haspopup="listbox"
-            aria-label="选择时间范围"
+            :aria-label="MONITOR_MESSAGES.timeRangeAria"
           >
             <Calendar class="size-3.5 text-admin-text-2" />
             <span>{{ selectedPreset.label }}</span>
@@ -112,7 +112,7 @@
       <AdminButton
         variant="ghost"
         class="size-9 rounded-lg border border-admin-border-soft bg-white p-0 text-admin-text-2"
-        aria-label="更多操作"
+        :aria-label="MONITOR_MESSAGES.moreActionsAria"
         aria-disabled="true"
         tabindex="-1"
       >
@@ -142,6 +142,7 @@ import {
   Table,
 } from '@iconoir/vue'
 import type { TimeRangePreset, TimeRangePresetKey } from '../../domain/timeRange'
+import { MONITOR_MESSAGES } from '../pages/messages'
 
 defineProps<{
   searchKeyword: string

@@ -2,7 +2,7 @@
   <div class="flex h-screen w-full flex-col overflow-hidden">
     <div
       v-if="isImpersonating"
-      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-ib-panel border border-ib-creative-accent/25 bg-ib-creative-accent-soft/90 px-2.5 py-1.5 text-ib-text backdrop-blur-[10px] max-[720px]:top-2 max-[720px]:max-w-[calc(100vw-12px)] max-[720px]:rounded-ib-control max-[720px]:px-2 max-[720px]:py-1"
+      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-ib-panel border border-ib-creative-accent/25 bg-ib-creative-accent-soft/90 px-2.5 py-1.5 text-ib-text backdrop-blur-[10px] top-2 max-w-[calc(100vw-12px)] rounded-ib-control px-2 py-1 md:top-2.5 md:max-w-[calc(100vw-20px)] md:rounded-ib-panel md:px-2.5 md:py-1.5"
     >
       <div class="inline-flex min-w-0 items-center gap-2">
         <span
@@ -18,13 +18,13 @@
         type="button"
         variant="ghost"
         size="icon"
-        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-wait disabled:opacity-70 max-[720px]:size-6 max-[720px]:min-w-6"
+        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-wait disabled:opacity-70 size-6 min-w-6 md:size-[26px] md:min-w-[26px]"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :disabled="stopImpersonatingLoading"
         @click="handleStopImpersonating"
       >
-        <Xmark class="size-3.5 max-[720px]:size-[13px]" aria-hidden="true" />
+        <Xmark class="size-[13px] md:size-3.5" aria-hidden="true" />
       </Button>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden bg-transparent">

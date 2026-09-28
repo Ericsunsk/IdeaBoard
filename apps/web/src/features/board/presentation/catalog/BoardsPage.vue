@@ -199,7 +199,7 @@ import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
-import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
 import { useUserStore } from '../../../auth'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
@@ -277,13 +277,11 @@ const {
   canDismiss: canDismissDeleteDialog,
   completeClose: completeDeleteDialogClose,
   handleVisibilityChange: handleDeleteDialogVisibilityChange,
+  requestClose: requestDeleteDialogClose,
 } = useOverlayInteractionLifecycle({
   visible: deleteDialogVisible,
   busy: isDeletePending,
-  surface: {
-    dismissibleBy: ['close-control', 'escape', 'mask'],
-    restoreFocus: true,
-  },
+  surface: defineDialogSurfaceIntent(),
   onVisibilityChange: (visible) => {
     if (!visible) closeDeleteDialog()
   },
@@ -298,7 +296,7 @@ function handleDeleteDialogOpenUpdate(open: boolean) {
 }
 
 function handleDeleteDialogMaskClick() {
-  closeDeleteDialogView()
+  if (requestDeleteDialogClose('mask')) handleDeleteDialogAfterHide()
 }
 
 function handleDeleteDialogEscape(event: KeyboardEvent) {

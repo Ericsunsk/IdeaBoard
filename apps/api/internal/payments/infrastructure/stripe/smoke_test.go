@@ -1,23 +1,23 @@
 package stripe_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/payments/infrastructure/stripe"
 	paymentports "ideaboard/api/internal/payments/ports"
+	"ideaboard/api/internal/testsupport/testenv"
 )
 
 func TestStripeTestModeSmoke(t *testing.T) {
-	if os.Getenv("API_TEST_STRIPE_SMOKE") != "1" {
+	if testenv.Get("API_TEST_STRIPE_SMOKE") != "1" {
 		t.Skip("set API_TEST_STRIPE_SMOKE=1 to run the Stripe Test Mode smoke")
 	}
-	apiKey := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_SECRET_KEY"))
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("API_TEST_STRIPE_BASE_URL")), "/")
-	taxCode := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_TAX_CODE"))
-	paymentMethodConfigurationID := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID"))
+	apiKey := testenv.Get("API_TEST_STRIPE_SECRET_KEY")
+	baseURL := strings.TrimRight(testenv.Get("API_TEST_STRIPE_BASE_URL"), "/")
+	taxCode := testenv.Get("API_TEST_STRIPE_TAX_CODE")
+	paymentMethodConfigurationID := testenv.Get("API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID")
 	if apiKey == "" || baseURL == "" || taxCode == "" || paymentMethodConfigurationID == "" {
 		t.Fatal("API_TEST_STRIPE_SECRET_KEY, API_TEST_STRIPE_BASE_URL, API_TEST_STRIPE_TAX_CODE, and API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID are required")
 	}

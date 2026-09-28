@@ -16,6 +16,6 @@
 
 /**
  * Opaque public vision query operation identifier.
- * @pattern ^visq_[A-Za-z0-9]+$
+ * @pattern ^visq_[A-Za-z0-9_-]+$
  */
 export type VisionQueryId = string

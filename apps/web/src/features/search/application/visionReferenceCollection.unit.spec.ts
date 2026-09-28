@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createVisionReferenceCollection, MAX_REFERENCE_COUNT } from './visionReferenceCollection'
+import {
+  VISION_REFERENCE_MAX_BYTES,
+  VISION_REFERENCE_MAX_COUNT,
+} from '../../../shared/media/visionIngressPolicy'
+import { MAX_REFERENCE_BYTES } from '../domain/visionReferencePolicy'
 
 function reference(key: string, file?: File) {
   return { key, previewUrl: `https://example.com/${key}.jpg`, file }
 }
 
 describe('visionReferenceCollection', () => {
+  it('sources its budgets from the shared vision ingress policy (no drift)', () => {
+    expect(MAX_REFERENCE_COUNT).toBe(VISION_REFERENCE_MAX_COUNT)
+    expect(MAX_REFERENCE_BYTES).toBe(VISION_REFERENCE_MAX_BYTES)
+  })
+
   it('deduplicates references and tracks slot count and capacity', () => {
     const collection = createVisionReferenceCollection()
     expect(collection.add(reference('a'))).toBe(true)

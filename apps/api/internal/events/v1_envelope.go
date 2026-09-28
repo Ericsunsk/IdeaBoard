@@ -402,8 +402,8 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 // taskStatusToV1 maps workspacetasks staged statuses to v1 types:
 // pending (fresh submit) -> task.created; running -> task.running;
 // completed/failed/cancelled map 1:1. Unknown statuses fail closed.
-func taskStatusToV1(status string) (string, bool) {
-	switch strings.TrimSpace(status) {
+func taskStatusToV1(status TaskStatus) (string, bool) {
+	switch strings.TrimSpace(string(status)) {
 	case "pending":
 		return EventV1TaskCreated, true
 	case "running":
@@ -422,7 +422,7 @@ func taskStatusToV1(status string) (string, bool) {
 // TaskStatusV1Type maps a staged task status to its v1 event type
 // (exported for the HTTP emission seam and the #809 worker flush; the
 // table itself stays frozen here).
-func TaskStatusV1Type(status string) (string, bool) {
+func TaskStatusV1Type(status TaskStatus) (string, bool) {
 	return taskStatusToV1(status)
 }
 

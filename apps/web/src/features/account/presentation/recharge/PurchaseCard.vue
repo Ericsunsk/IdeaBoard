@@ -45,10 +45,10 @@
           <h3 id="recharge-purchase-heading" class="m-0 text-base font-bold text-ib-text">
             {{ t('account.topUp.chooseQuantity') }}
           </h3>
-          <span class="text-[12px] font-semibold text-ib-text-subtle">$1.00 USD = 100 Ideas</span>
+          <span class="text-ib-meta font-semibold text-ib-text-subtle">$1.00 USD = 100 Ideas</span>
         </div>
         <div
-          class="mt-3 grid grid-cols-5 gap-2.5 max-[900px]:grid-cols-3 max-[640px]:grid-cols-2"
+          class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5"
           :aria-label="t('account.topUp.packagesAria')"
         >
           <button
@@ -65,7 +65,7 @@
             @click="selectPackage(quantity)"
           >
             <span class="text-sm font-bold">{{ formatLocaleNumber(quantity) }} Ideas</span>
-            <span class="mt-1 font-mono text-[12px] text-ib-text-muted">{{
+            <span class="mt-1 font-mono text-ib-meta text-ib-text-muted">{{
               formatUsdForIdeas(quantity)
             }}</span>
           </button>
@@ -77,9 +77,9 @@
         :label="t('account.topUp.customQuantity')"
         field-id="account-recharge-custom"
         field-class="grid gap-2"
-        label-class="text-[13px] font-semibold text-ib-text-muted"
+        label-class="text-ib-body font-semibold text-ib-text-muted"
       >
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 max-[640px]:grid-cols-1">
+        <div class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <input
             :id="fieldId"
             v-model="customQuantity"
@@ -108,7 +108,7 @@
           :class="accountPrimaryActionButtonClass"
           >{{ t('account.topUp.payNow') }}</Button
         >
-        <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
+        <p class="mt-2 mb-0 text-center text-ib-meta leading-5 text-ib-text-subtle">
           {{ t('account.topUp.termsPrefix') }}
           <a
             :href="options.terms.url"
@@ -127,7 +127,7 @@
         </p>
         <p
           v-if="checkoutError"
-          class="mt-2 mb-0 text-center text-[13px] font-semibold text-ib-danger"
+          class="mt-2 mb-0 text-center text-ib-body font-semibold text-ib-danger"
           role="alert"
         >
           {{ errorMessage(checkoutError) }}

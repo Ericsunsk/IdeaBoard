@@ -220,7 +220,7 @@ func toUploadSessionDTO(session *workspacemedia.Session) v1UploadSessionDTO {
 	dto := v1UploadSessionDTO{
 		ID:             session.ID,
 		WorkspaceID:    session.WorkspaceID,
-		Status:         session.Status,
+		Status:         string(session.Status),
 		Filename:       session.Filename,
 		MIMEType:       session.MIMEType,
 		SizeBytes:      session.SizeBytes,

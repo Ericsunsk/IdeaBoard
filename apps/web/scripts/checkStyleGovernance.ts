@@ -142,6 +142,300 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
   },
 }
 
+// ── Token budgets (repo-wide) ─────────────────────────────────────────────
+// Hex colors and font stacks live in the token source of truth
+// (`src/app/style.css`, `src/shared/theme/**`, `src/shared/domain/taskMetricTokens.ts`);
+// call sites reference tokens. Type sizes use the type scale (`text-ib-*` /
+// `text-admin-*`); display/optical one-offs outside the scale carry explicit
+// waivers with reasons instead of forced mappings. Breakpoints use the named
+// mobile-first system (`sm/md/lg`, plus `xl` where already established);
+// arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode is out of
+// scope: the app ships a single light system with no dark tokens, selectors,
+// or queries, so `dark:` variants are banned outright.
+
+function isTokenOwnerFile(file: SourceFile): boolean {
+  return (
+    file.sourcePath === 'src/app/style.css' ||
+    file.sourcePath === 'src/shared/domain/taskMetricTokens.ts' ||
+    file.sourcePath.startsWith('src/shared/theme/')
+  )
+}
+
+function isStyleSpecFile(file: SourceFile): boolean {
+  return file.sourcePath.includes('.spec.') || file.sourcePath.includes('.test.')
+}
+
+const tokenCountRules = [
+  {
+    id: 'hex-color',
+    pattern: /#[0-9A-Fa-f]{3,8}\b/g,
+    message: 'Use shared theme tokens instead of raw hex colors.',
+  },
+  {
+    id: 'font-stack',
+    pattern: /font-family\s*:|\[font-family:[^\]]*\]/g,
+    message: 'Use shared font tokens (font-ib-*) instead of inline font stacks.',
+  },
+  {
+    id: 'text-px',
+    pattern: /!?text-\[\d+\.?\d*(?:px|rem)\]/g,
+    message: 'Use the type scale (text-ib-*/text-admin-*) instead of text-[Npx].',
+  },
+  {
+    id: 'arbitrary-breakpoint',
+    pattern: /(?:max|min)-\[[^\]]*\]:/g,
+    message: 'Use the named mobile-first breakpoints (sm/md/lg/xl) instead of arbitrary variants.',
+  },
+  {
+    id: 'dark-variant',
+    pattern: /dark:/g,
+    message:
+      'Dark mode is out of scope: the app ships a single light system, so dark: variants are forbidden.',
+  },
+] as const satisfies readonly CountRule<string>[]
+
+type TokenCountRuleId = (typeof tokenCountRules)[number]['id']
+
+const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/account/domain/usage/chart.ts': {
+    counts: {
+      'hex-color': 6,
+    },
+    reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
+  },
+  'src/features/admin/shared/styles/admin-user-avatar-button.css': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Avatar CSS contract keeps a fallback color for the cross-feature avatar bridge.',
+  },
+  'src/features/board/infrastructure/preview/boardPreviewSerializer.ts': {
+    counts: {
+      'hex-color': 16,
+    },
+    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
+  },
+  'src/features/board/infrastructure/preview/boardPreviewStyle.ts': {
+    counts: {
+      'hex-color': 4,
+    },
+    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
+  },
+  'src/features/canvas/application/image-workflow/components/ImageOutpaintOverlay.vue': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Outpaint handle fill is a canvas drawing constant.',
+  },
+  'src/features/canvas/presentation/nodes/FlowCanvasNode.vue': {
+    counts: {
+      'hex-color': 2,
+    },
+    reason: 'Canvas node drop-target outline is a canvas drawing constant.',
+  },
+  'src/features/canvas/presentation/nodes/home/ImageActionMenu.vue': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Node tool icon color is a canvas drawing constant.',
+  },
+  'src/features/canvas/presentation/nodes/primitives/NodeActionButton.vue': {
+    counts: {
+      'hex-color': 2,
+    },
+    reason: 'Stage ghost/primary button ink colors are canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/nodes/styles/node-input-thumbnails.css': {
+    counts: {
+      'hex-color': 4,
+    },
+    reason: 'Canvas node thumbnail chrome uses canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/nodes/styles/node-shared.css': {
+    counts: {
+      'hex-color': 2,
+    },
+    reason: 'Canvas node chrome uses canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/nodes/styles/node-tool-buttons.css': {
+    counts: {
+      'hex-color': 4,
+    },
+    reason: 'Canvas node tool buttons use canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'hex-color': 7,
+    },
+    reason: 'Marketing landing page owns a bespoke one-off palette outside app surfaces.',
+  },
+  'src/features/canvas/presentation/screens/CanvasScreen.vue': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason:
+      'Canvas surface intentionally overrides the page-dot token for the workspace background.',
+  },
+  'src/features/canvas/presentation/styles/canvas-chrome.css': {
+    counts: {
+      'hex-color': 2,
+    },
+    reason: 'Canvas chrome overlay uses canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/styles/canvas-surface-skin.css': {
+    counts: {
+      'hex-color': 9,
+    },
+    reason: 'Canvas surface skin uses canvas drawing constants.',
+  },
+  'src/features/canvas/presentation/styles/editing-controls.css': {
+    counts: {
+      'hex-color': 10,
+    },
+    reason: 'Retouch editing controls use the documented iOS system palette fallback.',
+  },
+  'src/features/canvas/tools/inpaint/fabric/adapter.ts': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Fabric canvas object default is a canvas drawing constant.',
+  },
+  'src/features/canvas/tools/retouch/components/LayerActions.vue': {
+    counts: {
+      'hex-color': 2,
+    },
+    reason: 'Retouch layer action icons use canvas drawing constants.',
+  },
+  'src/features/canvas/tools/retouch/components/styles/retouch-control-points.css': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Retouch control-point overlay uses canvas drawing constants.',
+  },
+  'src/features/canvas/tools/retouch/components/styles/retouch-histogram-plot.css': {
+    counts: {
+      'hex-color': 1,
+    },
+    reason: 'Retouch histogram plot uses canvas drawing constants.',
+  },
+}
+
+const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'font-stack': 2,
+    },
+    reason:
+      'Landing page system stacks are marketing one-offs; display/handwriting stacks use font-ib-* tokens.',
+  },
+}
+
+const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/components/ui/form/FormDescription.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'shadcn-vue standard microcopy size; matches the upstream primitive contract.',
+  },
+  'src/components/ui/form/FormMessage.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'shadcn-vue standard microcopy size; matches the upstream primitive contract.',
+  },
+  'src/features/account/presentation/dialog/AccountDialogContent.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Account brand wordmark optical size; no type-scale tier.',
+  },
+  'src/features/account/presentation/profile/ProfilePane.vue': {
+    counts: {
+      'text-px': 3,
+    },
+    reason: 'Profile hero numerals sit outside the type scale (30/34/24 display sizes).',
+  },
+  'src/features/account/presentation/usage/UsagePane.vue': {
+    counts: {
+      'text-px': 2,
+    },
+    reason: 'Usage hero numeral responsive tiers sit outside the type scale.',
+  },
+  'src/features/auth/components/modalUi.ts': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Auth kicker optical size; no type-scale tier.',
+  },
+  'src/features/board/presentation/catalog/skin.ts': {
+    counts: {
+      'text-px': 3,
+    },
+    reason: 'Board catalog hero/display sizes sit outside the type scale.',
+  },
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Landing hero display size; marketing one-off.',
+  },
+  'src/features/legal/components/PublicLegalPage.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Legal page title display size; no type-scale tier.',
+  },
+  'src/features/search/presentation/pages/SearchPage.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Search result optical size; no type-scale tier.',
+  },
+}
+
+const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/admin/shared/lib/uiClasses.ts': {
+    counts: {
+      'arbitrary-breakpoint': 1,
+    },
+    reason:
+      'Account shell viewport height uses a computed 1081px geometry breakpoint, not a standard tier.',
+  },
+}
+
+function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
+  if (isStyleSpecFile(file)) return []
+
+  const code = stripCommentsForStyle(content, path.extname(file.absolutePath))
+  const violations: Violation[] = []
+  const pushOver = (
+    ruleId: TokenCountRuleId,
+    allowances: Record<string, CountAllowance<TokenCountRuleId>>,
+  ) => {
+    const rule = tokenCountRules.find((item) => item.id === ruleId)
+    if (!rule) return
+    const count = countMatches(code, rule.pattern)
+    const allowed = allowances[file.sourcePath]?.counts[ruleId] ?? 0
+    if (count <= allowed) return
+    violations.push({
+      file: file.sourcePath,
+      rule: rule.id,
+      message: `${rule.message} Found ${count}, allowed ${allowed}.`,
+      details: matchDetails(code, rule.pattern),
+    })
+  }
+
+  if (!isTokenOwnerFile(file)) {
+    pushOver('hex-color', hexColorAllowances)
+    pushOver('font-stack', fontStackAllowances)
+  }
+  pushOver('text-px', textPxAllowances)
+  pushOver('arbitrary-breakpoint', arbitraryBreakpointAllowances)
+  pushOver('dark-variant', {})
+
+  return violations
+}
+
 async function listSourceFiles(dir: string, baseDir = dir): Promise<SourceFile[]> {
   if (!existsSync(dir)) return []
 
@@ -236,9 +530,7 @@ function stripCommentsForStyle(content: string, extension: string): string {
   // in comments read as hex colors, and prose about selectors reads as
   // selector usage. Line comments are stripped only outside CSS, where
   // `//` can appear inside `url(...)`.
-  const withoutBlocks = content
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+  const withoutBlocks = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '')
   if (extension === '.css') return withoutBlocks
   return withoutBlocks.replace(/(^|\s)\/\/.*$/gm, '$1')
 }
@@ -355,6 +647,10 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
   const violations: Violation[] = [
     ...checkAllowanceReasons(rawStyleAllowances, 'rawStyleAllowances'),
     ...checkAllowanceReasons(selectorAllowances, 'selectorAllowances'),
+    ...checkAllowanceReasons(hexColorAllowances, 'hexColorAllowances'),
+    ...checkAllowanceReasons(fontStackAllowances, 'fontStackAllowances'),
+    ...checkAllowanceReasons(textPxAllowances, 'textPxAllowances'),
+    ...checkAllowanceReasons(arbitraryBreakpointAllowances, 'arbitraryBreakpointAllowances'),
   ]
 
   for (const file of files) {
@@ -365,6 +661,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       ...checkCanvasTokenBoundaries(file, content),
       ...checkSearchTokenBoundaries(file, content),
       ...checkPageDotBackgroundUtilityBoundary(file, content),
+      ...checkTokenBudgets(file, content),
       ...checkCountRules(file, content, selectorCountRules, selectorAllowances),
       ...findMotionPolicyViolations(file.sourcePath, content).map((violation) => ({
         file: file.sourcePath,
@@ -393,6 +690,25 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       selectorCountRules,
       selectorAllowances,
       'stale-selector-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      hexColorAllowances,
+      'stale-hex-color-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      fontStackAllowances,
+      'stale-font-stack-allowance',
+    ),
+    ...checkStaleAllowances(contents, tokenCountRules, textPxAllowances, 'stale-text-px-allowance'),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      arbitraryBreakpointAllowances,
+      'stale-arbitrary-breakpoint-allowance',
     ),
   )
 

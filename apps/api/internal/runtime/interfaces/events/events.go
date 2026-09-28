@@ -31,7 +31,7 @@ func (p TaskEventHubPublisher) PublishTaskStatus(ctx context.Context, event even
 		return nil
 	}
 	event = events.NormalizeTaskStatusEvent(event)
-	taskEvent := taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status}
+	taskEvent := taskservice.TaskEvent{TaskID: event.TaskID, Status: string(event.Status)}
 	if p.Resolver != nil {
 		if task, err := p.Resolver.GetByTaskID(ctx, event.TaskID); err == nil && task != nil {
 			p.Hub.Publish(event.TaskID, taskEvent)

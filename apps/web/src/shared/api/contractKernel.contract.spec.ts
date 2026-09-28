@@ -156,6 +156,13 @@ describe('contract kernel opaque IDs', () => {
     }
   })
 
+  it('accepts the backend dash/underscore payload alphabet', () => {
+    for (const id of ['ws_a-b_c', 'task_x-y_z', 'upload_up-01_x']) {
+      expect(isOpaqueId(id)).toBe(true)
+      expect(opaqueIdPrefix(id)).toBe(id.slice(0, id.indexOf('_')))
+    }
+  })
+
   it('rejects legacy numeric IDs and malformed values', () => {
     for (const value of [
       '123',

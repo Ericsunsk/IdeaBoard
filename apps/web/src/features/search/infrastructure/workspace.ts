@@ -7,7 +7,8 @@ import {
   requireContractData,
 } from '../../../shared/api/contractKernel'
 import { i18n } from '../../../shared/i18n'
-import { assertWorkspaceId as assertSharedWorkspaceId } from '../../../shared/utils/workspaceId'
+import { assertWorkspaceId } from '../../../shared/utils/workspaceId'
+import { assertOpaqueId, isOpaqueIdWithPrefix } from '../../../shared/utils/opaqueIds'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
 
 // Workspace-scoped search resource (issue #806).
@@ -36,26 +37,12 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // params in the generated URL helper. Single/empty filters ride the hook
 // wire-identical to the retired transport.
 
-const LIBRARY_ASSET_ID_RE = /^lasset_[A-Za-z0-9_-]+$/
-
-function assertWorkspaceId(value: string): string {
-  return assertSharedWorkspaceId(value)
-}
-
 export function assertWorkspaceLibraryAssetId(value: string): string {
-  const trimmed = value.trim()
-  if (!LIBRARY_ASSET_ID_RE.test(trimmed)) {
-    throw new Error('Invalid library asset id: expected lasset_...')
-  }
-  return trimmed
+  return assertOpaqueId(value, 'lasset', 'library asset id')
 }
 
 function assertWorkspaceUploadId(value: string): string {
-  const trimmed = value.trim()
-  if (!/^upload_[A-Za-z0-9_-]+$/.test(trimmed)) {
-    throw new Error('Invalid workspace upload id: expected upload_...')
-  }
-  return trimmed
+  return assertOpaqueId(value, 'upload', 'workspace upload id')
 }
 
 function toGeneratedOptions(options: WorkspaceSearchRequestOptions): {
@@ -139,7 +126,7 @@ export type WorkspaceVisionQuery = {
 export function toWorkspaceVisionQuery(raw: unknown): WorkspaceVisionQuery {
   if (!isRecord(raw)) throw new Error('Invalid vision query payload')
   const operationId = requiredString(raw.operation_id, 'operation_id')
-  if (!/^visq_[A-Za-z0-9_-]+$/.test(operationId)) {
+  if (!isOpaqueIdWithPrefix(operationId, 'visq')) {
     throw new Error('Invalid vision query payload: operation_id')
   }
   return {

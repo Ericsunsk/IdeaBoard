@@ -1,7 +1,11 @@
 import type { VisionReference } from './models'
+import {
+  VISION_REFERENCE_MAX_BYTES,
+  VISION_REFERENCE_MAX_COUNT,
+} from '../../../shared/media/visionIngressPolicy'
 
-export const MAX_REFERENCE_COUNT = 4
-export const MAX_REFERENCE_BYTES = 10 * 1024 * 1024
+export const MAX_REFERENCE_COUNT = VISION_REFERENCE_MAX_COUNT
+export const MAX_REFERENCE_BYTES = VISION_REFERENCE_MAX_BYTES
 
 export function partitionVisionReferences(initial: VisionReference[]) {
   const accepted: VisionReference[] = []

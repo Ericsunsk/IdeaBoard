@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ideaboard/api/internal/library/domain"
 )
 
 // InMemoryWorkspaceLibraryStore is a mutex-guarded
@@ -309,7 +311,7 @@ func (s *InMemoryWorkspaceLibraryStore) ResolveAssets(ctx context.Context, works
 		provider := strings.ToLower(strings.TrimSpace(item.Provider))
 		sourceID := strings.TrimSpace(item.SourceID)
 		sourceURL := strings.TrimSpace(item.SourceURL)
-		result := V1ResolveResult{Provider: provider, SourceID: sourceID, Status: "unresolved"}
+		result := V1ResolveResult{Provider: provider, SourceID: sourceID, Status: domain.V1ResolveUnresolved}
 		if provider != ProviderUnsplash && provider != ProviderPexels {
 			results = append(results, result)
 			continue
@@ -317,7 +319,7 @@ func (s *InMemoryWorkspaceLibraryStore) ResolveAssets(ctx context.Context, works
 		if sourceID != "" {
 			if id, ok := s.assetIndex[v1LibraryAssetDedupKey(workspacePublicID, provider, sourceID)]; ok {
 				if asset := s.assets[workspacePublicID][id]; asset != nil {
-					result.Status = "resolved"
+					result.Status = domain.V1ResolveResolved
 					result.Asset = copyV1Asset(asset)
 				}
 			}
@@ -333,7 +335,7 @@ func (s *InMemoryWorkspaceLibraryStore) ResolveAssets(ctx context.Context, works
 				continue
 			}
 			if asset.SourceURL == sourceURL || asset.PreviewURL == sourceURL || asset.OriginalURL == sourceURL {
-				result.Status = "resolved"
+				result.Status = domain.V1ResolveResolved
 				result.SourceID = asset.SourceID
 				result.Asset = copyV1Asset(asset)
 				break

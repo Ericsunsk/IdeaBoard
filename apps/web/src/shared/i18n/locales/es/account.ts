@@ -58,6 +58,7 @@ export default {
       enterNewPassword: 'Introduce una nueva contraseña',
       confirmNewPassword: 'Confirma tu nueva contraseña',
       mismatch: 'Las contraseñas no coinciden',
+      passwordLength: 'La contraseña debe tener entre {min} y {max} caracteres',
       logoutAfterChangeFailed:
         'Tu contraseña se actualizó, pero no se pudo cerrar la sesión. Cierra la sesión manualmente y vuelve a iniciar sesión.',
       invalidEmail: 'Introduce un correo electrónico válido',

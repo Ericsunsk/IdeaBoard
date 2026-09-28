@@ -1,9 +1,9 @@
 <template>
   <AdminSettingsTable
-    title="安全与网络"
-    subtitle="用户准入限制、API 访问速率与私网出网策略"
-    table-aria-label="安全与网络设置列表"
-    scroll-aria-label="安全与网络设置列表横向滚动区域"
+    :title="SETTINGS_MESSAGES.securityTitle"
+    :subtitle="SETTINGS_MESSAGES.securitySubtitle"
+    :table-aria-label="SETTINGS_MESSAGES.securityTableAria"
+    :scroll-aria-label="SETTINGS_MESSAGES.securityTableScrollAria"
     :rows="settingRows"
   >
     <template #quick-switch="{ data }">
@@ -12,7 +12,7 @@
           id="admin-table-registration-enabled"
           v-model="registrationEnabled"
           :disabled="registrationSettingLoading"
-          aria-label="快速切换开放注册"
+          :aria-label="SETTINGS_MESSAGES.quickToggleRegistration"
           @update:model-value="handleToggleRegistration"
         />
       </div>
@@ -24,8 +24,8 @@
         <!-- 1. 注册与 API 限流编辑表单 -->
         <SettingEditorCard
           v-if="data.id === 'registration_ratelimit'"
-          title="注册准入与 API 限流"
-          :status="registrationEnabled ? '开放注册' : '关闭注册'"
+          :title="SETTINGS_MESSAGES.registrationTitle"
+          :status="registrationEnabled ? SETTINGS_MESSAGES.registrationOpen : SETTINGS_MESSAGES.registrationClosed"
           :status-severity="registrationEnabled ? 'success' : 'warn'"
           class="mb-0"
         >
@@ -34,22 +34,22 @@
               class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
             >
               <div class="flex flex-col">
-                <span class="text-admin-body font-bold text-admin-text-1">开放注册</span>
+                <span class="text-admin-body font-bold text-admin-text-1">{{ SETTINGS_MESSAGES.registrationOpen }}</span>
                 <span class="text-admin-caption text-admin-text-3"
-                  >允许新用户自行注册账号；关闭后仅系统管理员可创建用户</span
+                  >{{ SETTINGS_MESSAGES.registrationHint }}</span
                 >
               </div>
               <AdminSwitch
                 id="admin-registration-enabled"
                 v-model="registrationEnabled"
                 :disabled="registrationSettingLoading"
-                aria-label="开放注册"
+                :aria-label="SETTINGS_MESSAGES.registrationOpen"
                 @update:model-value="handleToggleRegistration"
               />
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <AdminFormField label="最大请求 (次)" for="admin-rate-limit-max-requests">
+              <AdminFormField :label="SETTINGS_MESSAGES.maxRequestsLabel" for="admin-rate-limit-max-requests">
                 <AdminInput
                   id="admin-rate-limit-max-requests"
                   v-model="rateLimitForm.max_requests"
@@ -60,7 +60,7 @@
                 />
               </AdminFormField>
 
-              <AdminFormField label="窗口周期 (秒)" for="admin-rate-limit-window-seconds">
+              <AdminFormField :label="SETTINGS_MESSAGES.windowSecondsLabel" for="admin-rate-limit-window-seconds">
                 <AdminInput
                   id="admin-rate-limit-window-seconds"
                   v-model="rateLimitForm.window_seconds"
@@ -79,7 +79,7 @@
               :disabled="rateLimitLoading || rateLimitSaving"
               @click="resetRateLimit"
             >
-              重置
+              {{ SETTINGS_MESSAGES.reset }}
             </AdminButton>
             <AdminButton
               :class="adminActionButtonClass"
@@ -87,7 +87,7 @@
               :loading="rateLimitSaving"
               @click="saveRateLimit"
             >
-              保存
+              {{ SETTINGS_MESSAGES.save }}
             </AdminButton>
           </template>
         </SettingEditorCard>
@@ -119,6 +119,7 @@ import {
 import { useAdminAccessSettingsFeedback } from '../useSettingsFeedback'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { SETTINGS_MESSAGES } from './messages'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 
@@ -146,23 +147,27 @@ function buildRegistrationRow(
   const windowSeconds = form?.window_seconds ?? 60
   return {
     id: 'registration_ratelimit',
-    title: '注册准入与 API 限流',
-    description: '开放注册开关与全局请求速率保护',
+    title: SETTINGS_MESSAGES.registrationTitle,
+    description: SETTINGS_MESSAGES.registrationDescription,
     icon: ShieldCheck,
-    status: enabled ? '开放注册' : '关闭注册',
+    status: enabled ? SETTINGS_MESSAGES.registrationOpen : SETTINGS_MESSAGES.registrationClosed,
     statusSeverity: enabled ? 'success' : 'warn',
-    summary: `准入: ${enabled ? '开放注册' : '关闭注册'} · 限流: 最大 ${maxRequests} 次 / ${windowSeconds} 秒`,
+    summary: SETTINGS_MESSAGES.registrationSummary(
+      enabled ? SETTINGS_MESSAGES.registrationOpen : SETTINGS_MESSAGES.registrationClosed,
+      maxRequests,
+      windowSeconds,
+    ),
   }
 }
 
 const staticOutboundRow: AdminSettingsTableRow = {
   id: 'outbound_policy',
-  title: '私有地址访问',
-  description: '安全出网私有网络与专有主机放行白名单',
+  title: SETTINGS_MESSAGES.outboundTitle,
+  description: SETTINGS_MESSAGES.outboundDescription,
   icon: Server,
-  status: '私网放行策略',
+  status: SETTINGS_MESSAGES.outboundStatus,
   statusSeverity: 'secondary',
-  summary: '配置允许服务端直接发起的内部 IP / 域名访问策略',
+  summary: SETTINGS_MESSAGES.outboundSummary,
 }
 
 const settingRows = computed<AdminSettingsTableRow[]>(() => [

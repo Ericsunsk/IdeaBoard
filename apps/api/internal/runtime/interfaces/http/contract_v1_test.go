@@ -24,9 +24,10 @@ import (
 // maps to the same UUID testsupport derives, so injected principals and
 // member identifiers agree. Only ensured ids resolve; unknown uuids 404.
 type staticUserDirectory struct {
-	mu     sync.Mutex
-	byID   map[int64]uuid.UUID
-	byUUID map[uuid.UUID]int64
+	mu                 sync.Mutex
+	byID               map[int64]uuid.UUID
+	byUUID             map[uuid.UUID]int64
+	failPublicIDLookup atomic.Bool
 }
 
 func newStaticUserDirectory() *staticUserDirectory {
@@ -59,6 +60,9 @@ func (d *staticUserDirectory) ResolveUserID(ctx context.Context, publicID uuid.U
 }
 
 func (d *staticUserDirectory) GetUserPublicID(ctx context.Context, userID int64) (uuid.UUID, error) {
+	if d.failPublicIDLookup.Load() {
+		return uuid.Nil, tenancy.ErrNotFound
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if id, ok := d.byID[userID]; ok {
@@ -343,28 +347,37 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 	})
 
 	t.Run("add matrix", func(t *testing.T) {
-		addAs := func(actor, target int64, role string) (int, map[string]any) {
-			status, _, payload := doV1(t, engine, v1Call{
+		addAs := func(actor, target int64, role, key string) (int, map[string]any) {
+			call := v1Call{
 				method: http.MethodPost, path: membersPath, userID: actor,
 				body: fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, usr(target), role),
-			})
+			}
+			if key != "" {
+				call.headers = map[string]string{contract.IdempotencyKeyHeader: key}
+			}
+			status, _, payload := doV1(t, engine, call)
 			return status, payload
 		}
-		if status, payload := addAs(owner, 5, "member"); status != 201 {
+		if status, payload := addAs(owner, 5, "member", "add-owner-member"); status != 201 {
 			t.Fatalf("owner add = %d %v, want 201", status, payload)
 		}
-		if status, payload := addAs(admin, 6, "admin"); status != 201 {
+		if status, payload := addAs(admin, 6, "admin", "add-admin-admin"); status != 201 {
 			t.Fatalf("admin add admin = %d %v, want 201", status, payload)
 		}
-		if status, payload := addAs(admin, 7, "owner"); status != 403 ||
+		if status, payload := addAs(admin, 7, "owner", "add-admin-owner"); status != 403 ||
 			v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
 			t.Fatalf("admin add owner = %d %v, want 403 transition forbidden", status, payload)
 		}
-		if status, payload := addAs(member, 7, "member"); status != 403 {
+		if status, payload := addAs(member, 7, "member", "add-member-member"); status != 403 {
 			t.Fatalf("member add = %d %v, want 403", status, payload)
 		}
-		if status, payload := addAs(outsider, 7, "member"); status != 404 {
+		if status, payload := addAs(outsider, 7, "member", "add-outsider-member"); status != 404 {
 			t.Fatalf("outsider add = %d %v, want 404", status, payload)
+		}
+		// Missing Idempotency-Key fails closed even for authorized adds.
+		if status, payload := addAs(owner, 5, "member", ""); status != 400 ||
+			v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
+			t.Fatalf("add without key = %d %v, want 400 idempotency_key_required", status, payload)
 		}
 	})
 
@@ -389,7 +402,8 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 			v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
 			t.Fatalf("demote last owner = %d %v, want 403", status, payload)
 		}
-		status, _, payload := doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(owner), userID: owner})
+		status, _, payload := doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(owner), userID: owner,
+			headers: map[string]string{contract.IdempotencyKeyHeader: "remove-last-owner"}})
 		if status != 403 || v1ErrorCode(t, payload) != string(contract.CodeMembershipTransitionForbidden) {
 			t.Fatalf("remove last owner = %d %v, want 403", status, payload)
 		}
@@ -400,9 +414,15 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 		if status, _ := patchRole(owner, 5, "member"); status != 200 {
 			t.Fatalf("demote with backup owner = %d, want 200", status)
 		}
-		status, _, payload = doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(5), userID: 5})
+		status, _, payload = doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(5), userID: 5,
+			headers: map[string]string{contract.IdempotencyKeyHeader: "self-leave-5"}})
 		if status != 200 {
 			t.Fatalf("self leave = %d %v, want 200", status, payload)
+		}
+		// Missing Idempotency-Key fails closed on remove.
+		status, _, payload = doV1(t, engine, v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(member), userID: owner})
+		if status != 400 || v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
+			t.Fatalf("remove without key = %d %v, want 400 idempotency_key_required", status, payload)
 		}
 		// Unknown and malformed member ids are invisible (404).
 		unknown := tenancy.FormatUserPublicID(uuid.New())
@@ -415,6 +435,93 @@ func TestV1MemberAuthorizationAndTransitions(t *testing.T) {
 			t.Fatalf("malformed member = %d, want 404", status)
 		}
 	})
+}
+
+func TestV1WorkspaceMemberIdempotency(t *testing.T) {
+	ctx := context.Background()
+	store := tenancy.NewInMemoryStoreForTests()
+	dir := newStaticUserDirectory()
+	engine := newV1TestEngine(store, dir)
+
+	const owner int64 = 1
+	ws := v1WorkspaceFixture(t, ctx, store, "member-idem", owner)
+	for _, id := range []int64{owner, 5, 6, 7} {
+		dir.ensure(id)
+	}
+	membersPath := "/api/v1/workspaces/" + ws.PublicID + "/members"
+	usr := func(userID int64) string { return tenancy.FormatUserPublicID(dir.ensure(userID)) }
+
+	add := func(key string, target int64, role string) (int, map[string]any) {
+		call := v1Call{method: http.MethodPost, path: membersPath, userID: owner,
+			body: fmt.Sprintf(`{"data":{"user_id":%q,"role":%q}}`, usr(target), role)}
+		if key != "" {
+			call.headers = map[string]string{contract.IdempotencyKeyHeader: key}
+		}
+		status, _, payload := doV1(t, engine, call)
+		return status, payload
+	}
+	remove := func(key string, target int64) (int, map[string]any) {
+		call := v1Call{method: http.MethodDelete, path: membersPath + "/" + usr(target), userID: owner}
+		if key != "" {
+			call.headers = map[string]string{contract.IdempotencyKeyHeader: key}
+		}
+		status, _, payload := doV1(t, engine, call)
+		return status, payload
+	}
+
+	// Missing keys fail closed on both ops.
+	if status, payload := add("", 5, "member"); status != 400 ||
+		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
+		t.Fatalf("add without key = %d %v, want 400 idempotency_key_required", status, payload)
+	}
+	if status, payload := remove("", 5); status != 400 ||
+		v1ErrorCode(t, payload) != string(contract.CodeIdempotencyKeyRequired) {
+		t.Fatalf("remove without key = %d %v, want 400 idempotency_key_required", status, payload)
+	}
+
+	// Same key+request replays the first add; same user with a
+	// different role under the same key conflicts instead of
+	// silently returning the old row.
+	status, first := add("member-add-1", 5, "member")
+	if status != 201 {
+		t.Fatalf("add = %d %v, want 201", status, first)
+	}
+	firstDTO := v1Data(t, first).(map[string]any)
+	status, replay := add("member-add-1", 5, "member")
+	if status != 201 {
+		t.Fatalf("add replay = %d %v, want 201", status, replay)
+	}
+	replayDTO := v1Data(t, replay).(map[string]any)
+	if replayDTO["user_id"] != firstDTO["user_id"] || replayDTO["role"] != "member" {
+		t.Fatalf("add replay = %v, want same member %v", replayDTO, firstDTO)
+	}
+	status, conflict := add("member-add-1", 5, "admin")
+	if status != 409 || v1ErrorCode(t, conflict) != string(contract.CodeWorkspaceIdempotencyConflict) {
+		t.Fatalf("add divergent = %d %v, want 409 workspace_idempotency_conflict", status, conflict)
+	}
+
+	// Remove converges on replay; a different target under the same
+	// key conflicts, and the untouched member stays removable.
+	if status, _ := add("member-add-6", 6, "member"); status != 201 {
+		t.Fatalf("seed 6 = %d, want 201", status)
+	}
+	if status, _ := add("member-add-7", 7, "member"); status != 201 {
+		t.Fatalf("seed 7 = %d, want 201", status)
+	}
+	if status, payload := remove("member-remove-1", 6); status != 200 {
+		t.Fatalf("remove = %d %v, want 200", status, payload)
+	}
+	dir.failPublicIDLookup.Store(true)
+	if status, payload := remove("member-remove-1", 6); status != 200 {
+		t.Fatalf("remove replay with public ID lookup unavailable = %d %v, want 200 replayed", status, payload)
+	}
+	status, conflict = remove("member-remove-1", 7)
+	if status != 409 || v1ErrorCode(t, conflict) != string(contract.CodeWorkspaceIdempotencyConflict) {
+		t.Fatalf("remove divergent = %d %v, want 409 workspace_idempotency_conflict", status, conflict)
+	}
+	if status, payload := remove("member-remove-2", 7); status != 200 {
+		t.Fatalf("remove untouched = %d %v, want 200", status, payload)
+	}
 }
 
 func TestV1WorkspaceIdempotency(t *testing.T) {

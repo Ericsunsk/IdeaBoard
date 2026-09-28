@@ -341,7 +341,7 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 		provider := strings.ToLower(strings.TrimSpace(item.Provider))
 		sourceID := strings.TrimSpace(item.SourceID)
 		sourceURL := strings.TrimSpace(item.SourceURL)
-		result := domain.V1ResolveResult{Provider: provider, SourceID: sourceID, Status: "unresolved"}
+		result := domain.V1ResolveResult{Provider: provider, SourceID: sourceID, Status: domain.V1ResolveUnresolved}
 		if provider != domain.ProviderUnsplash && provider != domain.ProviderPexels {
 			results = append(results, result)
 			continue
@@ -352,7 +352,7 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 					WorkspaceID: workspaceInternalID, Provider: provider, SourceID: sourceID,
 				})
 				if err == nil {
-					result.Status = "resolved"
+					result.Status = domain.V1ResolveResolved
 					result.Asset = assetFromWorkspaceSourceRow(trimmedWorkspace, row)
 				} else if !database.IsNotFound(err) {
 					return nil, err
@@ -374,7 +374,7 @@ func (s *Service) ResolveAssets(ctx context.Context, workspacePublicID string, i
 			}
 			for _, row := range rows {
 				if row.SourceUrl == sourceURL || row.PreviewUrl == sourceURL || row.OriginalUrl == sourceURL {
-					result.Status = "resolved"
+					result.Status = domain.V1ResolveResolved
 					result.SourceID = row.SourceID
 					result.Asset = assetFromProviderRow(trimmedWorkspace, row)
 					break

@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { opaqueIdPattern } from '../../../../shared/utils/opaqueIds'
 import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import {
   DEFAULT_FUSION_BLEND_POINT,
@@ -60,7 +61,7 @@ const imageNodeOutputItemSchema = v.strictObject({
 
 const libraryAssetOpaqueIdSchema = v.pipe(
   v.string(),
-  v.regex(/^lasset_[A-Za-z0-9_-]+$/),
+  v.regex(opaqueIdPattern('lasset')),
 )
 
 const libraryAssetIdSchema = libraryAssetOpaqueIdSchema

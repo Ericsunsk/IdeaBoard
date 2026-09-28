@@ -15,16 +15,59 @@ import (
 	"ideaboard/api/internal/workflow/paramkeys"
 )
 
+// Status is the workspace task lifecycle state. The underlying wire and
+// database words are unchanged ("pending", "running", "completed",
+// "failed", "cancelled"); the type only documents the allowed transitions
+// at compile time (see CanTransition). SQL literals in
+// internal/db/queries/workspace_tasks.sql stay byte-identical.
+type Status string
+
 // Task statuses (subset of the durable task lifecycle; pending -> running
 // -> completed/failed/cancelled). cancelled_with_results converges to
 // cancelled for the v1 surface (outputs carry the results).
 const (
-	StatusPending   = "pending"
-	StatusRunning   = "running"
-	StatusCompleted = "completed"
-	StatusFailed    = "failed"
-	StatusCancelled = "cancelled"
+	StatusPending   Status = "pending"
+	StatusRunning   Status = "running"
+	StatusCompleted Status = "completed"
+	StatusFailed    Status = "failed"
+	StatusCancelled Status = "cancelled"
 )
+
+// allowedTaskTransitions mirrors the durable guards in
+// internal/db/queries/workspace_tasks.sql (and the chk_tasks_status CHECK):
+// Claim fences pending -> running; Complete/Fail/Cancel flip a live
+// (pending/running) task to completed/failed/cancelled; Retry returns a
+// live task to pending. Terminal states (completed/failed/cancelled) have
+// no outgoing transitions; Cancel replays idempotently at the service
+// layer (already=true) without a database flip.
+var allowedTaskTransitions = map[Status]map[Status]struct{}{
+	StatusPending: {
+		StatusRunning:   {},
+		StatusPending:   {},
+		StatusCompleted: {},
+		StatusFailed:    {},
+		StatusCancelled: {},
+	},
+	StatusRunning: {
+		StatusPending:   {},
+		StatusCompleted: {},
+		StatusFailed:    {},
+		StatusCancelled: {},
+	},
+}
+
+// CanTransition reports whether a from -> to flip is durably allowed. It
+// is documentation, not a gate: every transition it reports true for was
+// already possible through the SQL guards, and no previously possible
+// transition reports false.
+func CanTransition(from, to Status) bool {
+	nexts, ok := allowedTaskTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
 
 // MaxProviderRequeues bounds worker-level retries for transient provider
 // failures (429/5xx/timeout/network) after gateway-internal retries. It
@@ -164,7 +207,7 @@ type WorkspaceTask struct {
 	Params          map[string]any  `json:"params,omitempty"`
 	CanonicalParams string          `json:"canonical_params,omitempty"`
 	ResolvedModel   string          `json:"resolved_model,omitempty"`
-	Status          string          `json:"status"`
+	Status          Status          `json:"status"`
 	RetryCount      int             `json:"retry_count"`
 	ExecutionToken  string          `json:"execution_token"`
 	OutputRefs      []OutputRef     `json:"output_refs,omitempty"`
@@ -191,7 +234,7 @@ func (t *WorkspaceTask) IsTerminal() bool {
 type TaskEvent struct {
 	TaskID      string    `json:"task_id"`
 	WorkspaceID string    `json:"workspace_id"`
-	Status      string    `json:"status"`
+	Status      Status    `json:"status"`
 	OccurredAt  time.Time `json:"occurred_at"`
 }
 
@@ -485,7 +528,7 @@ func ShouldRetry(retryCount int, retryable bool) bool {
 }
 
 // IsTerminalStatus reports whether status is terminal.
-func IsTerminalStatus(status string) bool {
+func IsTerminalStatus(status Status) bool {
 	switch status {
 	case StatusCompleted, StatusFailed, StatusCancelled:
 		return true

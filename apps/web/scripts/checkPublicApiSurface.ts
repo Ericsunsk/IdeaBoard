@@ -34,6 +34,14 @@ import { fileURLToPath } from 'node:url'
  * something people regenerate instead of review. Promote a barrel here once its
  * fan-in grows; the count is the criterion, not the directory.
  *
+ * ## Barrel presence
+ *
+ * The same gate also ratchets feature shape: every directory under
+ * `src/features` must either ship a root `index.ts` barrel or be recorded in
+ * `INTENTIONAL_FLATS` with its reason (`admin` verticals, `canvas`
+ * intra-feature seams). A new feature without a barrel fails this check until
+ * it gains one or documents its exception.
+ *
  * ## Note on scope
  *
  * A barrel that re-exports only an explicit `export { ... }` list does not
@@ -146,6 +154,59 @@ function collectSurface(): Record<string, string[]> {
   return surface
 }
 
+const FEATURES_ROOT = path.join(webRoot, 'src', 'features')
+
+/** Feature roots expected to expose an `index.ts` public entrypoint. */
+const EXPECTED_FEATURE_BARRELS = [
+  'account',
+  'auth',
+  'board',
+  'legal',
+  'library',
+  'search',
+  'workspace',
+]
+
+/**
+ * Feature roots that intentionally ship without a root barrel, with the
+ * reason recorded. `admin` is a set of vertical contexts with no single
+ * public seam (each area owns its resource boundary); `canvas` crosses its
+ * intra-feature seams (the canvas barrels listed in `knip.jsonc` `entry`)
+ * instead of a root barrel. Light flats such as `legal` need no exception:
+ * they ship a root barrel despite their flat interior.
+ */
+const INTENTIONAL_FLATS: Record<string, string> = {
+  admin: 'vertical contexts own per-area resource boundaries; no single feature barrel',
+  canvas: 'intra-feature seams are the knip.jsonc entry barrels; no root barrel by design',
+}
+
+/** Flag feature roots missing a barrel without a documented exception. */
+function collectFeatureBarrelProblems(): string[] {
+  const found = new Set(
+    fs
+      .readdirSync(FEATURES_ROOT, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+  )
+  const barrelProblems: string[] = []
+  for (const name of [...found].sort()) {
+    if (fs.existsSync(path.join(FEATURES_ROOT, name, 'index.ts'))) continue
+    if (!(name in INTENTIONAL_FLATS)) {
+      barrelProblems.push(
+        `Feature "${name}" has no index.ts barrel and no INTENTIONAL_FLATS exception — add a barrel or document the exception.`,
+      )
+    }
+  }
+  for (const name of EXPECTED_FEATURE_BARRELS) {
+    if (!found.has(name)) {
+      barrelProblems.push(`Expected feature "${name}" is missing from src/features.`)
+    } else if (!fs.existsSync(path.join(FEATURES_ROOT, name, 'index.ts'))) {
+      barrelProblems.push(`Feature "${name}" lost its index.ts barrel.`)
+    }
+  }
+  return barrelProblems
+}
+
 const current = collectSurface()
 
 if (process.argv.includes('--update')) {
@@ -195,6 +256,8 @@ for (const [entrypoint, names] of Object.entries(current)) {
     )
   }
 }
+
+problems.push(...collectFeatureBarrelProblems())
 
 if (problems.length > 0) {
   console.error('✗ Public API surface drift detected:')

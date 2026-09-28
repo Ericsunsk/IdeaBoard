@@ -1,11 +1,11 @@
 <template>
   <AdminSettingsDialogFrame
     :visible="visible"
-    header="OAuth Provider 设置"
-    description="配置 OAuth 登录渠道后保存。"
+    :header="USERS_MESSAGES.oauthSettings"
+    :description="USERS_MESSAGES.oauthDescription"
     :busy="isSaving"
     :loading="isLoading && !summary"
-    loading-label="加载 OAuth Provider 设置"
+    :loading-label="USERS_MESSAGES.oauthLoading"
     :error="loadError"
     @reset="resetAndLoad"
     @update:visible="emit('update:visible', $event)"
@@ -13,7 +13,7 @@
   >
     <form v-if="summary" class="flex flex-col gap-3.5 py-1" novalidate @submit.prevent="submit">
       <!-- 1. 顶部 Provider 选择与启用卡片网格 -->
-      <div class="grid grid-cols-2 gap-3" role="group" aria-label="OAuth 登录方式">
+      <div class="grid grid-cols-2 gap-3" role="group" :aria-label="USERS_MESSAGES.oauthGroupAria">
         <div
           v-for="provider in oauthLoginProviders"
           :key="provider.value"
@@ -29,7 +29,7 @@
             <button
               type="button"
               class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-admin-border-soft bg-white p-1.5 shadow-2xs"
-              :aria-label="`选择 ${provider.label} Logo`"
+              :aria-label="USERS_MESSAGES.oauthSelectLogoAria(provider.label)"
               @click.stop="openLogoPicker($event, provider.value)"
             >
               <img
@@ -49,7 +49,7 @@
               :id="`admin-oauth-enabled-${provider.value}`"
               :name="`oauth_enabled_${provider.value}`"
               :model-value="providerEnabled[provider.value] ?? false"
-              :aria-label="`${provider.label} 登录`"
+              :aria-label="USERS_MESSAGES.oauthProviderLoginAria(provider.label)"
               :disabled="isBusy"
               @update:model-value="setProviderEnabled(provider.value, $event)"
             />
@@ -81,7 +81,7 @@
             <button
               type="button"
               class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-admin-border-soft bg-admin-surface-muted p-1"
-              :aria-label="`选择 ${providerLabel} Logo`"
+              :aria-label="USERS_MESSAGES.oauthSelectLogoAria(providerLabel)"
               @click="openLogoPicker($event, selectedProvider)"
             >
               <img
@@ -92,11 +92,11 @@
               />
             </button>
             <h3 class="m-0 text-admin-body-sm font-bold text-admin-title-color">
-              {{ providerLabel }} 凭据配置
+              {{ USERS_MESSAGES.oauthCredentialsTitle(providerLabel) }}
             </h3>
           </div>
           <AdminStatusPill
-            :label="form.values.enabled ? '已启用' : '未启用'"
+            :label="USERS_MESSAGES.oauthEnabledLabel(form.values.enabled)"
             :variant="form.values.enabled ? 'success' : 'neutral'"
           />
         </div>
@@ -115,7 +115,7 @@
             class="w-full"
             autocomplete="off"
             aria-label="Client ID"
-            placeholder="请输入 OAuth Client ID"
+            :placeholder="USERS_MESSAGES.oauthClientIdPlaceholder"
             :disabled="isBusy"
             :invalid="invalid"
             :aria-describedby="describedbyId"
@@ -163,13 +163,15 @@
               class="!absolute right-1 !h-7 !px-2.5 text-admin-caption font-semibold"
               @click="copyCallbackUrl"
             >
-              复制
+              {{ USERS_MESSAGES.oauthCopyCallback }}
             </AdminButton>
           </div>
           <p class="m-0 mt-1 text-admin-micro text-admin-text-3">
-            请在
-            {{ providerLabel === 'Google' ? 'Google Cloud Console' : 'Discord Developer Portal' }}
-            将此 URL 添加为重定向白名单 URI
+            {{
+              USERS_MESSAGES.oauthCallbackHint(
+                providerLabel === 'Google' ? 'Google Cloud Console' : 'Discord Developer Portal',
+              )
+            }}
           </p>
         </AdminFormField>
       </div>
@@ -184,7 +186,7 @@
         :disabled="isBusy"
         @click="requestClose"
       >
-        取消
+        {{ USERS_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         variant="default"
@@ -193,7 +195,7 @@
         :disabled="isLoading || Boolean(loadError) || !summary"
         @click="submit"
       >
-        保存设置
+        {{ USERS_MESSAGES.oauthSave }}
       </AdminButton>
     </template>
   </AdminSettingsDialogFrame>
@@ -234,6 +236,7 @@ import {
   type OAuthProviderSettingsSummary,
 } from './oauthProviderSettingsResource'
 import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
+import { USERS_MESSAGES } from './messages'
 
 const props = withDefaults(
   defineProps<{
@@ -269,10 +272,10 @@ const form = useForm({
   schema: () =>
     v.object({
       enabled: v.boolean(),
-      clientId: secretField(form.values.enabled, '请输入 Client ID'),
+      clientId: secretField(form.values.enabled, USERS_MESSAGES.oauthClientIdRequired),
       clientSecret: secretField(
         form.values.enabled && !summary.value?.clientSecretConfigured,
-        '请输入 Client Secret',
+        USERS_MESSAGES.oauthClientSecretRequired,
       ),
     }),
 })
@@ -280,7 +283,7 @@ let providerLoadEpoch = 0
 const isBusy = computed(() => isSaving.value || (isLoading.value && !summary.value))
 const providerLabel = computed(() => getOAuthProviderLabel(selectedProvider.value))
 const secretPlaceholder = computed(() =>
-  summary.value?.clientSecretConfigured ? '已配置，留空则保持不变' : '输入 Client Secret',
+  USERS_MESSAGES.oauthSecretPlaceholder(Boolean(summary.value?.clientSecretConfigured)),
 )
 
 function oauthProviderLogo(provider: OAuthProviderCode): string {
@@ -326,7 +329,7 @@ async function load() {
     applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
     applyProviderSummaries(state.summaries)
   } catch (error) {
-    loadError.value = formatAdminDisplayError(error, '加载 OAuth Provider 设置失败，请重试')
+    loadError.value = formatAdminDisplayError(error, USERS_MESSAGES.oauthLoadFailed)
   } finally {
     isLoading.value = false
   }
@@ -344,7 +347,7 @@ async function loadSelectedProvider(provider: OAuthProviderCode) {
     initialProviderEnabled[provider] = nextSummary.enabled
   } catch (error) {
     if (epoch === providerLoadEpoch) {
-      loadError.value = formatAdminDisplayError(error, '加载 OAuth Provider 设置失败，请重试')
+      loadError.value = formatAdminDisplayError(error, USERS_MESSAGES.oauthLoadFailed)
     }
   } finally {
     if (epoch === providerLoadEpoch) providerSwitching.value = false
@@ -369,7 +372,9 @@ const submit = form.handleSubmit(async (values) => {
     (provider) => providerEnabled[provider] && !providerSummaries.value[provider]?.configured,
   )
   if (incompleteProvider) {
-    saveError.value = `请先配置 ${getOAuthProviderLabel(incompleteProvider)} 的 Client ID 和 Client Secret`
+    saveError.value = USERS_MESSAGES.oauthIncompleteProvider(
+      getOAuthProviderLabel(incompleteProvider),
+    )
     return
   }
   isSaving.value = true
@@ -393,18 +398,18 @@ const submit = form.handleSubmit(async (values) => {
     const [savedSummary] = await Promise.all(saveRequests)
     clearSensitiveState()
     if (savedSummary) applySummary(savedSummary)
-    toast.success(`${providerLabel.value} OAuth 设置已保存`)
+    toast.success(USERS_MESSAGES.oauthSaved(providerLabel.value))
     try {
       const state = await fetchProviderState()
       applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
       applyProviderSummaries(state.summaries)
       emit('update:visible', false)
     } catch {
-      loadError.value = '设置已保存，但状态刷新失败，请重新加载'
+      loadError.value = USERS_MESSAGES.oauthRefreshFailed
     }
   } catch (error) {
     clearSensitiveState()
-    saveError.value = formatAdminDisplayError(error, '保存 OAuth Provider 设置失败，请重试')
+    saveError.value = formatAdminDisplayError(error, USERS_MESSAGES.oauthSaveFailed)
   } finally {
     isSaving.value = false
   }
@@ -418,7 +423,7 @@ async function fetchProviderState() {
   )
   const summaries = Object.fromEntries(entries)
   const firstSummary = summaries[selectedProvider.value] ?? entries[0]?.[1]
-  if (!firstSummary) throw new Error('未找到 OAuth Provider 配置')
+  if (!firstSummary) throw new Error(USERS_MESSAGES.oauthConfigMissing)
   return { summaries, firstSummary }
 }
 
@@ -452,7 +457,7 @@ const { copyText } = useAppClipboard()
 async function copyCallbackUrl() {
   if (!summary.value?.callbackUrl) return
   const ok = await copyText(summary.value.callbackUrl)
-  if (ok) toast.success('Callback URL 已复制到剪贴板')
-  else toast.error('复制失败，请手动选择复制')
+  if (ok) toast.success(USERS_MESSAGES.oauthCallbackCopied)
+  else toast.error(USERS_MESSAGES.oauthCopyFailed)
 }
 </script>

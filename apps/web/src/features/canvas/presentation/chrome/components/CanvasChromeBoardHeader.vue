@@ -13,7 +13,7 @@
       <div class="relative flex min-w-0 flex-1 items-center gap-2">
         <span
           :ref="bindBoardNameInputRef"
-          class="m-0 w-full max-w-none cursor-text overflow-hidden truncate rounded-sm p-0 text-[15px] leading-[1.2] font-normal text-[var(--canvas-text-strong)] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)]"
+          class="m-0 w-full max-w-none cursor-text overflow-hidden truncate rounded-sm p-0 text-ib-title-sm leading-[1.2] font-normal text-[var(--canvas-text-strong)] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)]"
           :class="{ 'text-clip': board.isRenaming }"
           :contenteditable="board.isRenaming && !board.isRenamePending ? 'plaintext-only' : 'false'"
           role="textbox"

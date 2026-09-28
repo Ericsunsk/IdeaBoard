@@ -55,6 +55,7 @@ It does NOT own user-facing pages, domain ledger semantics (backend Credits Ledg
 - Prompt draft: `refresh({preserveDirtyDraft: true})` never overwrites dirty drafts; empty template is a warning (savable), not an error.
 - User side never shows `hold` / `capture` intermediate states; amount `+` only for grant/release/refund; `system_adjustment` is ledger vocabulary unrelated to image retouch and must not be renamed.
 - Only `shared/lib/toast.ts` may touch `useAppToast`.
+- Admin messages are zh-only and colocated with their feedback factory (pattern: `payments/messages.ts`); never `t()`-wrapped. Cross-surface rules live in `shared/CONTEXT.md` (Copy Policy).
 
 ## Non-goals
 

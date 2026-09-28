@@ -1,8 +1,8 @@
 <template>
   <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
-      <h4 class="text-xs font-semibold text-admin-text-1">规格参数与卡片视觉</h4>
-      <span class="text-[11px] text-admin-text-3">前台市场呈现配置</span>
+      <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.specsTitle }}</h4>
+      <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsSubtitle }}</span>
     </div>
 
     <div class="flex flex-col gap-3.5">
@@ -14,12 +14,12 @@
             class="text-admin-caption font-semibold text-admin-text-1"
             for="model-resolution-input"
           >
-            分辨率 / 最大上下文
+            {{ MODELS_MESSAGES.specsResolutionLabel }}
           </label>
           <AdminInput
             id="model-resolution-input"
             :model-value="contextOrResolution"
-            placeholder="例如: 2048×2048 或 128K"
+            :placeholder="MODELS_MESSAGES.specsResolutionPlaceholder"
             @update:model-value="emit('update:contextOrResolution', String($event))"
           />
           <div class="flex gap-1 pt-0.5">
@@ -27,7 +27,7 @@
               v-for="res in ['1024×1024', '2048×2048', '4096×4096', '128K']"
               :key="res"
               type="button"
-              class="rounded bg-admin-surface-muted px-1.5 py-0.5 text-[10px] text-admin-text-2 hover:bg-admin-surface-muted/80 cursor-pointer"
+              class="rounded bg-admin-surface-muted px-1.5 py-0.5 text-admin-micro text-admin-text-2 hover:bg-admin-surface-muted/80 cursor-pointer"
               @click="emit('update:contextOrResolution', res)"
             >
               {{ res }}
@@ -37,7 +37,7 @@
 
         <!-- 托管类型 (Hosting) -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-admin-caption font-semibold text-admin-text-1"> 托管类型 </label>
+          <label class="text-admin-caption font-semibold text-admin-text-1">{{ MODELS_MESSAGES.specsHostingLabel }}</label>
           <div
             class="flex h-9 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 p-1"
           >
@@ -45,25 +45,25 @@
               type="button"
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
-                hosting === 'Cloudflare 托管'
+                hosting === MODEL_HOSTING_CLOUDFLARE
                   ? 'bg-white text-emerald-700 shadow-xs font-semibold'
                   : 'text-admin-text-2 hover:text-admin-text-1'
               "
-              @click="emit('update:hosting', 'Cloudflare 托管')"
+              @click="emit('update:hosting', MODEL_HOSTING_CLOUDFLARE)"
             >
-              Cloudflare 托管
+              {{ MODELS_MESSAGES.specsHostingCloudflare }}
             </button>
             <button
               type="button"
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
-                hosting === '第三方'
+                hosting === MODEL_HOSTING_THIRD_PARTY
                   ? 'bg-white text-admin-text-1 shadow-xs font-semibold'
                   : 'text-admin-text-2 hover:text-admin-text-1'
               "
-              @click="emit('update:hosting', '第三方')"
+              @click="emit('update:hosting', MODEL_HOSTING_THIRD_PARTY)"
             >
-              第三方托管
+              {{ MODELS_MESSAGES.specsHostingThirdParty }}
             </button>
           </div>
         </div>
@@ -73,23 +73,23 @@
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label class="text-admin-caption font-semibold text-admin-text-1" for="model-caps-input">
-            能力标签
+            {{ MODELS_MESSAGES.specsCapabilitiesLabel }}
           </label>
-          <span class="text-[11px] text-admin-text-3">支持英文逗号分隔或点击预设</span>
+          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsCapabilitiesHint }}</span>
         </div>
         <AdminInput
           id="model-caps-input"
           :model-value="capabilitiesDraft"
-          placeholder="例如: 垫图生图, 透明通道, 提示词微调"
+          :placeholder="MODELS_MESSAGES.specsCapabilitiesPlaceholder"
           @update:model-value="emit('update:capabilitiesDraft', String($event))"
         />
         <div class="flex flex-wrap items-center gap-1 pt-0.5">
-          <span class="text-[11px] text-admin-text-3">快速添加:</span>
+          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsQuickAdd }}</span>
           <button
-            v-for="tag in popularCapabilities"
+            v-for="tag in MODELS_MESSAGES.specsPopularCapabilities"
             :key="tag"
             type="button"
-            class="rounded-md border border-dashed border-admin-border-soft px-1.5 py-0.5 text-[11px] font-medium text-admin-text-2 hover:border-admin-accent/40 hover:text-admin-accent cursor-pointer"
+            class="rounded-md border border-dashed border-admin-border-soft px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2 hover:border-admin-accent/40 hover:text-admin-accent cursor-pointer"
             @click="addCapabilityTag(tag)"
           >
             + {{ tag }}
@@ -102,7 +102,12 @@
 
 <script setup lang="ts">
 import AdminInput from '../../../../shared/components/AdminInput.vue'
+import {
+  MODEL_HOSTING_CLOUDFLARE,
+  MODEL_HOSTING_THIRD_PARTY,
+} from '../../../domain/catalogData'
 import { splitCapabilities } from '../../../domain/modelForm'
+import { MODELS_MESSAGES } from '../../pages/messages'
 
 const props = defineProps<{
   contextOrResolution: string
@@ -115,17 +120,6 @@ const emit = defineEmits<{
   'update:hosting': [value: string]
   'update:capabilitiesDraft': [value: string]
 }>()
-
-const popularCapabilities = [
-  '高精细节',
-  '垫图生图',
-  '种子控制',
-  '透明通道',
-  '发丝羽化',
-  '多尺寸延展',
-  '商用合规',
-  '提示词微调',
-]
 
 function addCapabilityTag(tag: string) {
   const current = splitCapabilities(props.capabilitiesDraft)

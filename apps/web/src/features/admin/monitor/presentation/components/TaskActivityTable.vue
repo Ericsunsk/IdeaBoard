@@ -10,15 +10,15 @@
       :class="adminTableClass"
     >
       <template #empty>
-        <AdminEmptyState title="暂无事件日志" />
+        <AdminEmptyState :title="MONITOR_MESSAGES.tableEmpty" />
       </template>
 
       <!-- 第 1 列：时间戳 GMT+8 ↓ [✏ 字段] -->
       <AdminColumn :style="{ width: adminMonitorColumnWidths.timestamp }">
         <template #header>
           <div class="flex items-center gap-1.5 font-sans">
-            <span class="font-semibold text-admin-text-2 text-xs">时间戳</span>
-            <span class="font-mono text-[11px] text-admin-text-3 font-normal">GMT+8</span>
+            <span class="font-semibold text-admin-text-2 text-xs">{{ MONITOR_MESSAGES.timestampColumn }}</span>
+            <span class="font-mono text-admin-caption text-admin-text-3 font-normal">GMT+8</span>
           </div>
         </template>
         <template #body="{ data }">
@@ -121,9 +121,9 @@
               size="sm"
               severity="warn"
               :class="adminTextButtonClass"
-              label="取消"
+              :label="MONITOR_MESSAGES.cancelAction"
               :loading="isCancellingTask(data.task_id)"
-              aria-label="取消任务"
+              :aria-label="MONITOR_MESSAGES.cancelTaskAria"
               @click="emit('cancelTask', data)"
             />
           </div>
@@ -137,7 +137,7 @@
             <button
               type="button"
               class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-admin-border-soft bg-white text-admin-text-2 transition-colors hover:bg-admin-surface-muted"
-              aria-label="更多任务详情"
+              :aria-label="MONITOR_MESSAGES.moreDetailAria"
               @click="emit('showDetail', data)"
             >
               <MoreHoriz class="size-4" />
@@ -151,7 +151,7 @@
     <div
       class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg px-4 py-2.5"
     >
-      <span class="text-xs font-normal text-admin-text-3"> 共 {{ totalCount }} 条记录 </span>
+      <span class="text-xs font-normal text-admin-text-3"> {{ MONITOR_MESSAGES.totalRecords(totalCount) }} </span>
 
       <div class="flex items-center gap-2">
         <AdminPagerControls
@@ -183,6 +183,7 @@ import {
 } from '../../../shared/lib/uiClasses'
 import TaskResultCell from '../TaskResultCell.vue'
 import TaskStatusCell from '../TaskStatusCell.vue'
+import { MONITOR_MESSAGES } from '../pages/messages'
 import {
   adminMonitorColumnWidths,
   formatTaskExactTimestamp,

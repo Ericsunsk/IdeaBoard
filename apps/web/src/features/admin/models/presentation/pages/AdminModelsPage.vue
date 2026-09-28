@@ -2,7 +2,7 @@
   <div :class="adminDashboardRootClass">
     <AdminAlert v-if="isListError" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <span>模型库加载失败，请重试。</span>
+        <span>{{ MODELS_MESSAGES.listLoadFailed }}</span>
         <AdminButton
           variant="outline"
           size="small"
@@ -10,12 +10,12 @@
           :disabled="isLoading"
           @click="refetchCatalog"
         >
-          重试
+          {{ MODELS_MESSAGES.retry }}
         </AdminButton>
       </div>
     </AdminAlert>
     <AdminAlert v-else-if="isListStale" severity="warning">
-      模型库后台刷新失败，当前显示上次成功数据。
+      {{ MODELS_MESSAGES.listStale }}
     </AdminAlert>
 
     <!-- 1. 顶栏筛选器与搜索区 (1:1 复刻 Cloudflare AI Models 交互，统一使用项目 Token) -->
@@ -26,27 +26,27 @@
           <AdminToolbarSearch
             v-model="searchKeyword"
             fluid
-            input-label="搜索模型"
-            placeholder="搜索模型名称、标识或提供商..."
+            :input-label="MODELS_MESSAGES.searchLabel"
+            :placeholder="MODELS_MESSAGES.searchPlaceholder"
           />
 
           <!-- 筛选器：模型 mode / 提供商 / 托管方式（mode 取数据去重，无预定义分类） -->
           <AdminModelFilter
             v-model="selectedMode"
-            label="模型类型"
-            all-label="全部类型"
+            :label="MODELS_MESSAGES.modeLabel"
+            :all-label="MODELS_MESSAGES.modeAll"
             :options="modeOptions"
           />
           <AdminModelFilter
             v-model="selectedProvider"
-            label="提供商"
-            all-label="全部提供商"
+            :label="MODELS_MESSAGES.providerLabel"
+            :all-label="MODELS_MESSAGES.providerAll"
             :options="providerOptions"
           />
           <AdminModelFilter
             v-model="selectedHosting"
-            label="托管方式"
-            all-label="全部托管"
+            :label="MODELS_MESSAGES.hostingLabel"
+            :all-label="MODELS_MESSAGES.hostingAll"
             :options="hostingOptions"
           />
         </div>
@@ -55,7 +55,7 @@
         <div class="flex shrink-0 items-center gap-2">
           <AdminRefreshButton
             :loading="isRefreshing"
-            aria-label="刷新模型"
+            :aria-label="MODELS_MESSAGES.refresh"
             @click="handleRefresh"
           />
 
@@ -63,22 +63,22 @@
           <button
             type="button"
             class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
-            aria-label="新增网关"
+            :aria-label="MODELS_MESSAGES.addGateway"
             @click="gatewayDialogVisible = true"
           >
             <Globe class="size-3.5 text-admin-text-2" />
-            <span>新增网关</span>
+            <span>{{ MODELS_MESSAGES.addGateway }}</span>
           </button>
 
           <!-- 主按钮：添加模型 (使用项目品牌紫 Token) -->
           <button
             type="button"
             class="flex h-9 items-center gap-1.5 rounded-lg bg-admin-accent px-3.5 text-xs font-semibold text-white transition-colors hover:bg-admin-accent-hover cursor-pointer"
-            aria-label="添加模型"
+            :aria-label="MODELS_MESSAGES.createModel"
             @click="handleCreateModel"
           >
             <Plus class="size-4" />
-            <span>添加模型</span>
+            <span>{{ MODELS_MESSAGES.createModel }}</span>
           </button>
         </div>
       </div>
@@ -87,10 +87,10 @@
       <div class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
           <span class="font-medium text-admin-text-1"
-            >我们找到了 {{ filteredModels.length }} 个模型</span
+            >{{ MODELS_MESSAGES.foundCount(filteredModels.length) }}</span
           >
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
-            (共 {{ allModels.length }} 个)
+            {{ MODELS_MESSAGES.totalCount(allModels.length) }}
           </span>
         </div>
       </div>
@@ -124,9 +124,9 @@
               :href="model.termsUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex items-center gap-1 text-[11px] font-medium text-admin-text-3 hover:text-admin-accent hover:underline transition-colors"
+              class="inline-flex items-center gap-1 text-admin-caption font-medium text-admin-text-3 hover:text-admin-accent hover:underline transition-colors"
             >
-              <span>条款与文档</span>
+              <span>{{ MODELS_MESSAGES.termsAndDocs }}</span>
               <OpenNewWindow class="size-3" />
             </a>
           </div>
@@ -136,30 +136,30 @@
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-admin-text-2 hover:bg-white hover:text-admin-text-1 cursor-pointer transition-colors"
-              :aria-label="`复制 ${model.id} 标识`"
+              :aria-label="MODELS_MESSAGES.copyIdAria(model.id)"
               @click="copyModelId(model.id)"
             >
               <Check v-if="copiedModelId === model.id" class="size-3.5 text-emerald-600" />
               <Copy v-else class="size-3.5 text-admin-text-3" />
               <span :class="copiedModelId === model.id ? 'text-emerald-600 font-semibold' : ''">
-                {{ copiedModelId === model.id ? '已复制' : '复制' }}
+                {{ copiedModelId === model.id ? MODELS_MESSAGES.copied : MODELS_MESSAGES.copy }}
               </span>
             </button>
 
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-admin-text-2 hover:bg-white hover:text-admin-text-1 cursor-pointer transition-colors"
-              :aria-label="`编辑 ${model.name}`"
+              :aria-label="MODELS_MESSAGES.editAria(model.name)"
               @click="handleEditModel(model)"
             >
               <EditPencil class="size-3.5 text-admin-text-3" />
-              <span>编辑</span>
+              <span>{{ MODELS_MESSAGES.edit }}</span>
             </button>
 
             <button
               type="button"
               class="inline-flex items-center justify-center rounded-md p-1 text-xs font-medium text-admin-text-3 hover:bg-white hover:text-admin-danger cursor-pointer transition-colors"
-              :aria-label="`删除 ${model.name}`"
+              :aria-label="MODELS_MESSAGES.deleteAria(model.name)"
               @click="handleDeleteModel(model)"
             >
               <Trash class="size-3.5" />
@@ -181,24 +181,24 @@
         <Search v-else class="size-6" />
       </div>
       <h3 class="text-base font-semibold text-admin-title-color">
-        {{ !hasActiveFilter && allModels.length === 0 ? '模型库暂无模型' : '未找到匹配的模型' }}
+        {{ !hasActiveFilter && allModels.length === 0 ? MODELS_MESSAGES.emptyLibrary : MODELS_MESSAGES.emptyNoMatch }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{
           !hasActiveFilter && allModels.length === 0
-            ? '当前模型库为空，请点击下方或右上角按钮自动探测网关模型并一键入库。'
-            : '未找到符合当前条件的模型。请尝试调整搜索关键词或重置筛选器。'
+            ? MODELS_MESSAGES.emptyLibraryHint
+            : MODELS_MESSAGES.emptyNoMatchHint
         }}
       </p>
       <button
         v-if="!hasActiveFilter && allModels.length === 0"
         type="button"
         class="mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-admin-accent px-3.5 text-xs font-semibold text-white transition-colors hover:bg-admin-accent-hover cursor-pointer"
-        aria-label="从空状态添加模型"
+        :aria-label="MODELS_MESSAGES.emptyCreateAria"
         @click="handleCreateModel"
       >
         <Plus class="size-3.5" />
-        <span>立即添加模型</span>
+        <span>{{ MODELS_MESSAGES.createNow }}</span>
       </button>
       <button
         v-else
@@ -207,7 +207,7 @@
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />
-        <span>清空筛选条件</span>
+        <span>{{ MODELS_MESSAGES.clearFilters }}</span>
       </button>
     </div>
 
@@ -256,6 +256,7 @@ import AdminModelFilter from '../controls/AdminModelFilter.vue'
 import AdminModelCardBody from '../controls/AdminModelCardBody.vue'
 import AdminToolbarSearch from '../../../shared/components/AdminToolbarSearch.vue'
 import AdminRefreshButton from '../../../shared/components/AdminRefreshButton.vue'
+import { MODELS_MESSAGES } from './messages'
 import { useAdminModelCatalogWorkspace } from '../../application/useAdminModelCatalogWorkspace'
 
 // Page 只做布局与绑定：目录用例编排归 workspace，query key 归 workspace 所有。

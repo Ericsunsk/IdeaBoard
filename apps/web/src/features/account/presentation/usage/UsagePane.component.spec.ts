@@ -139,10 +139,10 @@ describe('UsagePane', () => {
     const panel = screen.getByRole('region', { name: 'Usage summary' })
     const cells = panel.querySelectorAll('article')
     expect(cells).toHaveLength(5)
-    expect(cells[0]).toHaveClass('max-[640px]:border-b')
-    expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
+    expect(cells[0]).toHaveClass('border-b', 'sm:border-b-0')
+    expect(cells[4]).toHaveClass('col-span-2', 'sm:col-span-1')
     const value = cells[0]?.querySelector('p')
-    expect(value).toHaveClass('text-[34px]', 'max-[900px]:text-[30px]', 'max-[640px]:text-[28px]')
+    expect(value).toHaveClass('text-ib-summary-value', 'sm:text-[30px]', 'lg:text-[34px]')
     expect(value).toHaveClass('break-all', 'whitespace-normal', 'leading-tight')
     expect(value).not.toHaveClass('overflow-hidden', 'text-ellipsis', 'whitespace-nowrap')
     expect(value).toHaveTextContent('9,007,199,254,740,991')
@@ -195,14 +195,8 @@ describe('UsagePane', () => {
     expect(skeleton).toBeVisible()
     const cells = skeleton.querySelectorAll('article')
     expect(cells).toHaveLength(5)
-    expect(cells[0]).toHaveClass(
-      'min-h-[108px]',
-      'min-w-0',
-      'p-5',
-      'max-[640px]:min-h-[100px]',
-      'max-[640px]:p-4',
-    )
-    expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
+    expect(cells[0]).toHaveClass('min-h-[100px]', 'min-w-0', 'p-4', 'sm:min-h-[108px]', 'sm:p-5')
+    expect(cells[4]).toHaveClass('col-span-2', 'sm:col-span-1')
     expect(screen.getByLabelText('Loading ideas-used trend…')).toBeVisible()
     const trendSkeleton = screen.getByTestId('usage-trend-skeleton')
     expect(trendSkeleton).toHaveClass('h-full')
@@ -238,8 +232,8 @@ describe('UsagePane', () => {
     ).map((cell) => cell.className)
 
     expect(loadedClasses).toEqual(loadingClasses)
-    expect(loadedClasses[0]).toContain('min-h-[108px]')
-    expect(loadedClasses[0]).toContain('max-[640px]:min-h-[100px]')
+    expect(loadedClasses[0]).toContain('min-h-[100px]')
+    expect(loadedClasses[0]).toContain('sm:min-h-[108px]')
   })
 
   it('renders the server-owned monthly credit trend below the lifetime summary', () => {

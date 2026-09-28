@@ -34,7 +34,7 @@
 import type { ControlWorkspaceMemberRole } from './controlWorkspaceMemberRole'
 
 export interface ControlWorkspaceMember {
-  /** @pattern ^usr_[A-Za-z0-9]+$ */
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   user_id: string
   role: ControlWorkspaceMemberRole
   created_at: string

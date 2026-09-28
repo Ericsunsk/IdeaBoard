@@ -16,6 +16,7 @@ import (
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -264,7 +265,7 @@ func newStartupDatabaseFixture(t *testing.T) startupDatabaseFixture {
 		t.Fatalf("migrate River schema: %v", err)
 	}
 
-	rawDSN := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
+	rawDSN := testenv.Require(t, "API_TEST_DATABASE_DSN")
 	parsed, err := pgx.ParseConfig(rawDSN)
 	if err != nil {
 		t.Fatalf("parse API_TEST_DATABASE_DSN: %v", err)

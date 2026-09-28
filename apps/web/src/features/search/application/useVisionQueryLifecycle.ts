@@ -1,8 +1,9 @@
+import { createRequestFingerprint } from '../domain/visionReferencePolicy'
 import {
-  MAX_REFERENCE_BYTES,
-  MAX_REFERENCE_COUNT,
-  createRequestFingerprint,
-} from '../domain/visionReferencePolicy'
+  VISION_REFERENCE_MAX_BYTES,
+  VISION_REFERENCE_MAX_COUNT,
+  isVisionReferenceFile,
+} from '../../../shared/media/visionIngressPolicy'
 import { computed, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRouter, type Router } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
@@ -261,19 +262,19 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
     const files = Array.from(input.files ?? [])
     input.value = ''
     if (files.length === 0) return
-    const room = MAX_REFERENCE_COUNT - referenceSlotCount.value
+    const room = VISION_REFERENCE_MAX_COUNT - referenceSlotCount.value
     if (files.length > room) {
       toast.warning(i18n.global.t('search.errors.maxReferenceImages'))
       return
     }
     let totalBytes = collection.currentBytes()
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isVisionReferenceFile(file)) {
         toast.warning(i18n.global.t('search.errors.onlyImageFilesSupported'))
         return
       }
       totalBytes += file.size
-      if (totalBytes > MAX_REFERENCE_BYTES) {
+      if (totalBytes > VISION_REFERENCE_MAX_BYTES) {
         toast.warning(i18n.global.t('search.errors.maxReferenceSizeExceeded'))
         return
       }

@@ -178,7 +178,11 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 }
 
 func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontracts.RechargeHistoryItem, error) {
-	status, paidAmountMinor, paidCurrency := row.Status, int64(0), ""
+	// The history status is a read-model derivation, not a durable
+	// lifecycle: credited/cancelled mirror the order row, refunded
+	// overlays full settlement. The wire words stay identical; the
+	// contract DTO keeps its string field (converted below).
+	status, paidAmountMinor, paidCurrency := RechargeHistoryStatus(row.Status), int64(0), ""
 	switch row.Status {
 	case string(paymentsdomain.PaymentOrderCredited):
 		if !row.PaidTotalMinor.Valid || row.PaidCurrency == "" {
@@ -186,7 +190,7 @@ func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontr
 		}
 		paidAmountMinor, paidCurrency = row.PaidTotalMinor.Int64, strings.ToLower(row.PaidCurrency)
 		if row.RefundedIdeaQuantity >= row.IdeaQuantity {
-			status = "refunded"
+			status = RechargeHistoryRefunded
 		}
 	case string(paymentsdomain.PaymentOrderCancelled):
 		if row.PaidTotalMinor.Valid || row.PaidCurrency != "" || row.ReceiptUrl != "" {
@@ -195,5 +199,5 @@ func rechargeHistoryItem(row dbsqlc.ListPaymentRechargeHistoryRow) (paymentcontr
 	default:
 		return paymentcontracts.RechargeHistoryItem{}, fmt.Errorf("invalid payment order history status %q", row.Status)
 	}
-	return paymentcontracts.RechargeHistoryItem{OccurredAt: dbutil.TimeValue(row.OccurredAt), IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
+	return paymentcontracts.RechargeHistoryItem{OccurredAt: dbutil.TimeValue(row.OccurredAt), IdeaQuantity: row.IdeaQuantity, PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency, Status: string(status), RefundedIdeaQuantity: row.RefundedIdeaQuantity, RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl}, nil
 }

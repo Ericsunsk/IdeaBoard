@@ -502,7 +502,7 @@ func scanRewardCode(row rowScanner, rewardCode *RewardCode, now time.Time) error
 	); err != nil {
 		return err
 	}
-	rewardCode.MaskedCodeHint = maskedCodeHintPrefix + hint
+	rewardCode.MaskedCodeHint = rewardsdomain.MaskedCodeHintPrefix + hint
 	rewardCode.Status = deriveRewardCodeStatus(*rewardCode, now)
 	return nil
 }
@@ -517,7 +517,7 @@ func scanRewardCodeWithFingerprint(row rowScanner, rewardCode *RewardCode, finge
 	); err != nil {
 		return err
 	}
-	rewardCode.MaskedCodeHint = maskedCodeHintPrefix + hint
+	rewardCode.MaskedCodeHint = rewardsdomain.MaskedCodeHintPrefix + hint
 	rewardCode.Status = deriveRewardCodeStatus(*rewardCode, now)
 	return nil
 }

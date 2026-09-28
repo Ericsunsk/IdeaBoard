@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockAppToast } from '../../test/toast'
+import { mockAppToast } from '../../../test/toast'
 import { useLibraryWorkspace } from './useLibraryWorkspace'
 import { createLibraryFolderFacts } from './folderFacts'
-import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from './workspace'
+import type { WorkspaceLibraryAsset, WorkspaceLibraryFolder } from '../domain/validators'
 
 const WORKSPACE_ID = 'ws_test123'
 
@@ -23,13 +23,20 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 
-vi.mock('../../shared/composables/useAppToast')
+vi.mock('../../../shared/composables/useAppToast')
 
-vi.mock('./workspace', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./workspace')>()
+vi.mock('./libraryUseCases', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./libraryUseCases')>()
   return {
     ...actual,
     listAllWorkspaceLibraryFolders: mocks.listFolders,
+  }
+})
+
+vi.mock('../infrastructure/resource', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../infrastructure/resource')>()
+  return {
+    ...actual,
     workspaceLibraryApi: {
       listFolders: vi.fn(),
       createFolder: mocks.createFolder,

@@ -11,7 +11,7 @@
         :class="adminActionButtonClass"
         @click="toggleAllRows"
       >
-        {{ isAllExpanded ? '全部收起' : '全部展开' }}
+        {{ SETTINGS_MESSAGES.tableExpandAll(isAllExpanded) }}
       </AdminButton>
     </div>
 
@@ -28,24 +28,24 @@
         :scroll-aria-label="scrollAriaLabel"
       >
         <template #empty>
-          <AdminEmptyState title="暂无配置项" />
+          <AdminEmptyState :title="SETTINGS_MESSAGES.emptyConfigs" />
         </template>
 
         <AdminColumn expander :style="{ width: '48px' }" />
 
-        <AdminColumn field="title" header="设置模块" :style="{ width: '280px', minWidth: '220px' }">
+        <AdminColumn field="title" :header="SETTINGS_MESSAGES.tableModuleColumn" :style="{ width: '280px', minWidth: '220px' }">
           <template #body="{ data }">
             <AdminItemCell :icon="data.icon" :title="data.title" :description="data.description" />
           </template>
         </AdminColumn>
 
-        <AdminColumn field="status" header="状态" :style="{ width: '140px' }">
+        <AdminColumn field="status" :header="SETTINGS_MESSAGES.statusColumn" :style="{ width: '140px' }">
           <template #body="{ data }">
             <AdminBadge :value="data.status" :severity="data.statusSeverity" rounded />
           </template>
         </AdminColumn>
 
-        <AdminColumn field="summary" header="当前配置" :style="{ minWidth: '280px' }">
+        <AdminColumn field="summary" :header="SETTINGS_MESSAGES.tableSummaryColumn" :style="{ minWidth: '280px' }">
           <template #body="{ data }">
             <slot name="summary" :data="data">
               <span class="text-admin-body text-admin-text-2">{{ data.summary }}</span>
@@ -53,13 +53,13 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn v-if="hasQuickSwitchSlot" header="快速切换" :style="{ width: '100px' }">
+        <AdminColumn v-if="hasQuickSwitchSlot" :header="SETTINGS_MESSAGES.tableQuickSwitchColumn" :style="{ width: '100px' }">
           <template #body="{ data }">
             <slot name="quick-switch" :data="data" />
           </template>
         </AdminColumn>
 
-        <AdminColumn header="操作" :style="{ width: '90px' }">
+        <AdminColumn :header="SETTINGS_MESSAGES.actionsColumn" :style="{ width: '90px' }">
           <template #body="{ data }">
             <AdminButton
               size="small"
@@ -68,7 +68,7 @@
               :aria-expanded="expandedRows[data.id] ? 'true' : 'false'"
               @click="toggleRow(data.id)"
             >
-              {{ expandedRows[data.id] ? '收起' : '配置' }}
+              {{ SETTINGS_MESSAGES.tableRowAction(Boolean(expandedRows[data.id])) }}
             </AdminButton>
           </template>
         </AdminColumn>
@@ -101,6 +101,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
+import { SETTINGS_MESSAGES } from '../pages/messages'
 
 export interface AdminSettingsTableRow {
   id: string

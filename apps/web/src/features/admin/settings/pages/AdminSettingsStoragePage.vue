@@ -4,16 +4,16 @@
     <AdminStoragePage />
 
     <!-- 2. 上传并发设置表格 (平铺展开为标准表格，行内配置与操作) -->
-    <section aria-label="上传并发设置" class="flex flex-col gap-2">
+    <section :aria-label="SETTINGS_MESSAGES.uploadSectionAria" class="flex flex-col gap-2">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
-          <h3 class="text-admin-title font-bold text-admin-title-color">上传并发设置</h3>
+          <h3 class="text-admin-title font-bold text-admin-title-color">{{ SETTINGS_MESSAGES.uploadTitle }}</h3>
           <span class="text-admin-meta text-admin-subtitle-color"
-            >媒体资产文件并发上传连接数上限控制</span
+            >{{ SETTINGS_MESSAGES.uploadSubtitle }}</span
           >
         </div>
         <span class="text-admin-meta text-admin-text-3"
-          >共 {{ settingRows.length }} 个参数配置</span
+          >{{ SETTINGS_MESSAGES.paramCount(settingRows.length) }}</span
         >
       </div>
 
@@ -26,15 +26,15 @@
           :frame-class="adminTableFrameClass"
           :table-style="adminTableStyle"
           :class="adminTableClass"
-          table-aria-label="上传并发设置列表"
-          scroll-aria-label="上传并发设置列表横向滚动区域"
+          :table-aria-label="SETTINGS_MESSAGES.uploadTableAria"
+          :scroll-aria-label="SETTINGS_MESSAGES.uploadTableScrollAria"
         >
           <template #empty>
-            <AdminEmptyState title="暂无配置项" />
+            <AdminEmptyState :title="SETTINGS_MESSAGES.emptyConfigs" />
           </template>
 
           <!-- 配置项列 -->
-          <AdminColumn field="title" header="配置项" :style="{ width: '280px', minWidth: '220px' }">
+          <AdminColumn field="title" :header="SETTINGS_MESSAGES.itemColumn" :style="{ width: '280px', minWidth: '220px' }">
             <template #body="{ data }">
               <AdminItemCell
                 :icon="data.icon"
@@ -45,7 +45,7 @@
           </AdminColumn>
 
           <!-- 参数键名列 -->
-          <AdminColumn field="key" header="参数键名" :style="{ width: '220px', minWidth: '180px' }">
+          <AdminColumn field="key" :header="SETTINGS_MESSAGES.keyColumn" :style="{ width: '220px', minWidth: '180px' }">
             <template #body="{ data }">
               <span
                 class="inline-block rounded border border-admin-border-soft bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2"
@@ -58,7 +58,7 @@
           <!-- 取值范围列 -->
           <AdminColumn
             field="range"
-            header="取值范围"
+            :header="SETTINGS_MESSAGES.rangeColumn"
             :style="{ width: '120px', minWidth: '100px' }"
           >
             <template #body="{ data }">
@@ -71,7 +71,7 @@
           <!-- 默认值列 -->
           <AdminColumn
             field="defaultValue"
-            header="默认值"
+            :header="SETTINGS_MESSAGES.defaultColumn"
             :style="{ width: '100px', minWidth: '80px' }"
           >
             <template #body="{ data }">
@@ -84,7 +84,7 @@
           <!-- 并发数设置列 -->
           <AdminColumn
             field="upload_max_concurrent"
-            header="并发数设置"
+            :header="SETTINGS_MESSAGES.concurrentColumn"
             :style="{ width: '180px', minWidth: '160px' }"
           >
             <template #body>
@@ -99,18 +99,18 @@
                   :disabled="mediaUploadLoading || mediaUploadSaving"
                   :invalid="!!mediaUploadValidationError"
                   class="w-24 font-mono text-admin-body text-center"
-                  aria-label="上传并发上限"
+                  :aria-label="SETTINGS_MESSAGES.concurrentLimitAria"
                 />
-                <span class="text-admin-body text-admin-text-3 select-none">任务</span>
+                <span class="text-admin-body text-admin-text-3 select-none">{{ SETTINGS_MESSAGES.tasksUnit }}</span>
               </div>
             </template>
           </AdminColumn>
 
           <!-- 状态列 -->
-          <AdminColumn field="status" header="状态" :style="{ width: '120px' }">
+          <AdminColumn field="status" :header="SETTINGS_MESSAGES.statusColumn" :style="{ width: '120px' }">
             <template #body>
               <AdminBadge
-                :value="mediaUploadIsDirty ? '已修改' : '已生效'"
+                :value="mediaUploadIsDirty ? SETTINGS_MESSAGES.modifiedStatus : SETTINGS_MESSAGES.activeStatus"
                 :severity="mediaUploadIsDirty ? 'warn' : 'success'"
                 rounded
               />
@@ -118,7 +118,7 @@
           </AdminColumn>
 
           <!-- 操作列 -->
-          <AdminColumn header="操作" :style="{ width: '160px', minWidth: '150px' }">
+          <AdminColumn :header="SETTINGS_MESSAGES.actionsColumn" :style="{ width: '160px', minWidth: '150px' }">
             <template #body>
               <div class="flex items-center gap-2">
                 <AdminButton
@@ -133,7 +133,7 @@
                   :loading="mediaUploadSaving"
                   @click="saveMediaUpload"
                 >
-                  保存
+                  {{ SETTINGS_MESSAGES.save }}
                 </AdminButton>
                 <AdminButton
                   size="small"
@@ -142,7 +142,7 @@
                   :disabled="mediaUploadLoading || mediaUploadSaving || !mediaUploadIsDirty"
                   @click="resetMediaUpload"
                 >
-                  重置
+                  {{ SETTINGS_MESSAGES.reset }}
                 </AdminButton>
               </div>
             </template>
@@ -185,6 +185,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
+import { SETTINGS_MESSAGES } from './messages'
 
 const mediaUpload = useMediaUploadSettings({
   feedback: useAdminMediaUploadSettingsFeedback(),
@@ -215,8 +216,8 @@ interface SettingTableRow {
 function buildMediaUploadRow(): SettingTableRow {
   return {
     id: 'media_upload',
-    title: '上传并发',
-    description: '媒体资产文件并发上传连接数上限',
+    title: SETTINGS_MESSAGES.uploadRowTitle,
+    description: SETTINGS_MESSAGES.uploadRowDescription,
     key: 'upload_max_concurrent',
     icon: Upload,
     min: MEDIA_UPLOAD_MIN_CONCURRENT,

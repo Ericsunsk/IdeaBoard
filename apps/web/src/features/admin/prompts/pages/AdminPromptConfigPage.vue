@@ -8,21 +8,21 @@
           <AdminToolbarSearch
             v-model="searchKeyword"
             fluid
-            input-label="搜索提示词"
-            placeholder="搜索功能模块、节点标识或提示词内容..."
+            :input-label="PROMPTS_MESSAGES.searchLabel"
+            :placeholder="PROMPTS_MESSAGES.searchPlaceholder"
           />
 
           <AdminOptionFilter
             v-model="statusFilter"
             :options="statusFilterOptions"
             all-value="all"
-            label="筛选提示词状态"
+            :label="PROMPTS_MESSAGES.filterLabel"
           />
         </div>
 
         <!-- 右侧：刷新操作 -->
         <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton :loading="loading" aria-label="刷新提示词" @click="loadPrompts()" />
+          <AdminRefreshButton :loading="loading" :aria-label="PROMPTS_MESSAGES.refresh" @click="loadPrompts()" />
         </div>
       </div>
 
@@ -30,10 +30,10 @@
       <div class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
           <span class="font-medium text-admin-text-1">
-            共 {{ filteredFeatureGroups.length }} 个工作流模块
+            {{ PROMPTS_MESSAGES.moduleCount(filteredFeatureGroups.length) }}
           </span>
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
-            (共 {{ featureGroups.length }} 个)
+            {{ PROMPTS_MESSAGES.totalCount(featureGroups.length) }}
           </span>
         </div>
       </div>
@@ -41,13 +41,13 @@
 
     <!-- 2. 错误告警状态 -->
     <div v-if="loadFailed && prompts.length === 0" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">系统提示词加载失败</div>
+      <div class="text-admin-title font-semibold text-admin-title-color">{{ PROMPTS_MESSAGES.loadFailedTitle }}</div>
       <div class="mt-2 text-admin-meta text-admin-subtitle-color">
-        未能从服务端加载配置，请重试。
+        {{ PROMPTS_MESSAGES.loadFailedHint }}
       </div>
       <AdminButton class="mt-4" variant="outline" :disabled="loading" @click="loadPrompts()">
         <Refresh class="size-4" />
-        重新加载
+        {{ PROMPTS_MESSAGES.reload }}
       </AdminButton>
     </div>
 
@@ -63,13 +63,13 @@
         <Search v-else class="size-6" />
       </div>
       <h3 class="text-base font-semibold text-admin-title-color">
-        {{ !hasActiveFilter ? '暂无系统提示词配置' : '未找到匹配的提示词模块' }}
+        {{ !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfig : PROMPTS_MESSAGES.emptyNoMatch }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{
           !hasActiveFilter
-            ? '当前没有可用的工作流节点系统提示词配置。'
-            : '未找到符合当前搜索或筛选条件的功能节点。请尝试调整关键词或清空筛选。'
+            ? PROMPTS_MESSAGES.emptyNoConfigHint
+            : PROMPTS_MESSAGES.emptyNoMatchHint
         }}
       </p>
       <button
@@ -79,7 +79,7 @@
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />
-        <span>清空筛选条件</span>
+        <span>{{ PROMPTS_MESSAGES.clearFilters }}</span>
       </button>
     </div>
 
@@ -88,12 +88,12 @@
       <section
         v-for="group in filteredFeatureGroups"
         :key="group.key"
-        :aria-label="`${group.title}提示词配置`"
+        :aria-label="PROMPTS_MESSAGES.groupAria(group.title)"
       >
         <!-- 分组标题栏 (1:1 对齐 BillingPricingTable section header) -->
         <div class="mb-2 flex items-center gap-2">
           <h3 class="text-sm font-bold text-admin-title-color">{{ group.title }}</h3>
-          <span class="text-xs text-admin-text-3">共 {{ group.items.length }} 个功能</span>
+          <span class="text-xs text-admin-text-3">{{ PROMPTS_MESSAGES.featureCount(group.items.length) }}</span>
         </div>
 
         <!-- 数据表格壳体 -->
@@ -108,7 +108,7 @@
             :class="adminTableClass"
           >
             <template #empty>
-              <div class="p-6 text-center text-xs text-admin-text-3">该模块暂无匹配项</div>
+              <div class="p-6 text-center text-xs text-admin-text-3">{{ PROMPTS_MESSAGES.groupEmpty }}</div>
             </template>
 
             <!-- 1. Service (1:1 对齐功能定价页 Service 规范) -->
@@ -121,7 +121,9 @@
                   />
                   <div class="flex min-w-0 flex-col">
                     <span class="truncate text-slate-700">{{ data.slug }}</span>
-                    <span class="truncate text-[11px] text-admin-text-3">{{ group.title }}</span>
+                    <span class="truncate text-admin-caption text-admin-text-3">{{
+                      group.title
+                    }}</span>
                   </div>
                 </div>
               </template>
@@ -132,12 +134,12 @@
               <template #body="{ data }">
                 <span
                   :class="[
-                    'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] font-medium leading-none',
+                    'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none',
                     rowView(data.slug).metric.activePillClass,
                   ]"
                 >
                   <span :class="['size-1.5 rounded-full', rowView(data.slug).metric.dotClass]" />
-                  <span>{{ rowView(data.slug).configured ? '已配置' : '未配置' }}</span>
+                  <span>{{ rowView(data.slug).configured ? PROMPTS_MESSAGES.configured : PROMPTS_MESSAGES.unconfigured }}</span>
                 </span>
               </template>
             </AdminColumn>
@@ -145,7 +147,7 @@
             <!-- 3. 可用变量 (Variables) -->
             <AdminColumn
               field="variables"
-              header="可用变量"
+              :header="PROMPTS_MESSAGES.variablesColumn"
               :style="{ width: '220px', minWidth: '180px' }"
             >
               <template #body="{ data }">
@@ -153,7 +155,7 @@
                   <span
                     v-for="variable in rowView(data.slug).vars"
                     :key="variable.key"
-                    class="inline-flex items-center rounded bg-admin-surface-muted/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-admin-text-2"
+                    class="inline-flex items-center rounded bg-admin-surface-muted/80 px-1.5 py-0.5 font-mono text-admin-micro font-medium text-admin-text-2"
                   >
                     {{ variable.key }}
                   </span>
@@ -161,14 +163,14 @@
                     v-if="rowView(data.slug).vars.length === 0"
                     class="text-xs text-admin-text-3 font-mono"
                   >
-                    无变量
+                    {{ PROMPTS_MESSAGES.noVariables }}
                   </span>
                 </div>
               </template>
             </AdminColumn>
 
             <!-- 4. 提示词内容预览 (Prompt Preview, 只读已保存值, draft 仅弹窗内可见) -->
-            <AdminColumn field="prompt" header="系统提示词预览">
+            <AdminColumn field="prompt" :header="PROMPTS_MESSAGES.previewColumn">
               <template #body="{ data }">
                 <div
                   v-if="rowView(data.slug).saved?.trim()"
@@ -177,22 +179,22 @@
                 >
                   {{ rowView(data.slug).saved }}
                 </div>
-                <span v-else class="text-xs text-admin-text-3 font-mono">未设置</span>
+                <span v-else class="text-xs text-admin-text-3 font-mono">{{ PROMPTS_MESSAGES.unset }}</span>
               </template>
             </AdminColumn>
 
             <!-- 5. 操作 (Actions, 1:1 对齐功能定价表规范) -->
-            <AdminColumn field="actions" header="操作" :style="{ width: '120px' }">
+            <AdminColumn field="actions" :header="PROMPTS_MESSAGES.actionsColumn" :style="{ width: '120px' }">
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
                   <AdminButton
                     size="small"
                     :class="adminActionButtonClass"
-                    :aria-label="`配置 ${data.title} 提示词`"
+                    :aria-label="PROMPTS_MESSAGES.configureAria(data.title)"
                     :disabled="isInitialLoading"
                     @click="openEditor(data)"
                   >
-                    {{ rowView(data.slug).configured ? '调整' : '设置' }}
+                    {{ rowView(data.slug).configured ? PROMPTS_MESSAGES.adjust : PROMPTS_MESSAGES.setup }}
                   </AdminButton>
                 </div>
               </template>
@@ -251,6 +253,7 @@ import {
   type FeatureItem,
   type FeatureSlug,
 } from '../featurePromptMeta'
+import { PROMPTS_MESSAGES } from './messages'
 
 const feedback = usePromptConfigFeedback()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
@@ -282,7 +285,7 @@ function formatServiceName(slug: string): string {
 
 const editorHeader = computed(() => {
   if (!activeItem.value) return ''
-  return `编辑 · ${formatServiceName(activeItem.value.slug)}`
+  return PROMPTS_MESSAGES.editorHeader(formatServiceName(activeItem.value.slug))
 })
 
 function isConfigured(slug: FeatureSlug): boolean {

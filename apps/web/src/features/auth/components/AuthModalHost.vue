@@ -37,7 +37,7 @@ import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
 import { useI18n } from 'vue-i18n'
 import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
-import { useOverlayInteractionLifecycle } from '../../../shared/composables/useOverlayInteractionLifecycle'
+import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../shared/composables/useOverlayInteractionLifecycle'
 import { authDialogContentClass } from './modalUi'
 
 const props = withDefaults(
@@ -58,10 +58,7 @@ const { t } = useI18n()
 const { canDismiss, handleVisibilityChange } = useOverlayInteractionLifecycle({
   visible: () => true,
   busy: () => props.busy,
-  surface: {
-    dismissibleBy: ['close-control', 'escape', 'mask'],
-    restoreFocus: true,
-  },
+  surface: defineDialogSurfaceIntent(),
   onVisibilityChange: (visible) => {
     if (!visible) emit('close')
   },

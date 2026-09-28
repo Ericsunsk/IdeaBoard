@@ -21,7 +21,6 @@ const DialogRootStub = defineComponent({
   emits: ['update:open'],
   template: `
     <div v-if="open" @keydown.escape="$emit('update:open', false)">
-      <div data-testid="auth-dialog-mask"></div>
       <slot />
     </div>
   `,
@@ -34,7 +33,8 @@ const PassthroughStub = defineComponent({
 const DialogOverlayStub = defineComponent({
   inheritAttrs: false,
   emits: ['click'],
-  template: '<div v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
+  template:
+    '<div data-testid="auth-dialog-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
 })
 
 const DialogContentStub = defineComponent({
@@ -218,6 +218,21 @@ describe('AuthModalHost motion', () => {
     renderAuthHost(true)
 
     expect(screen.getByRole('dialog')).toBeVisible()
+  })
+
+  it('dismisses from the mask while idle', async () => {
+    const view = renderAuthHost(false)
+
+    await view.user.click(screen.getByTestId('auth-dialog-mask'))
+    expect(view.emitted().close).toHaveLength(1)
+  })
+
+  it('dismisses from Escape while idle', async () => {
+    const view = renderAuthHost(false)
+
+    screen.getByRole('dialog').focus()
+    await view.user.keyboard('{Escape}')
+    expect(view.emitted().close).toHaveLength(1)
   })
 
   it('locks overlay close paths while an auth request is loading', async () => {

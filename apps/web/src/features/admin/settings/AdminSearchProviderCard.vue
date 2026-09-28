@@ -9,13 +9,17 @@
       <div class="flex flex-col gap-5">
         <div class="flex flex-wrap items-center gap-2">
           <AdminBadge
-            :value="config.api_key_configured ? 'API Key 已配置' : 'API Key 未配置'"
+            :value="
+              config.api_key_configured
+                ? SETTINGS_MESSAGES.searchApiKeyConfigured
+                : SETTINGS_MESSAGES.searchApiKeyMissing
+            "
             :severity="config.api_key_configured ? 'success' : 'secondary'"
             rounded
           />
           <AdminBadge :value="testStateLabel" :severity="testStateSeverity" rounded />
           <AdminBadge
-            :value="config.enabled ? '已启用' : '已停用'"
+            :value="SETTINGS_MESSAGES.searchEnableState(config.enabled)"
             :severity="config.enabled ? 'success' : 'secondary'"
             rounded
           />
@@ -26,15 +30,15 @@
         </AdminAlert>
 
         <AdminFormField
-          :label="`${providerLabel} API Key`"
+          :label="SETTINGS_MESSAGES.searchApiKeyLabel(providerLabel)"
           :for="`admin-search-${provider}-api-key`"
-          hint="已配置时留空即可保持不变，输入新 Key 后需重新保存并测试。"
+          :hint="SETTINGS_MESSAGES.searchApiKeyHint"
         >
           <AdminInput
             :id="`admin-search-${provider}-api-key`"
             v-model="form.values.apiKey"
             type="password"
-            :aria-label="`${providerLabel} API Key`"
+            :aria-label="SETTINGS_MESSAGES.searchApiKeyLabel(providerLabel)"
             :invalid="Boolean(form.errors.value.apiKey)"
             autocomplete="off"
             :disabled="controlsDisabled"
@@ -50,10 +54,15 @@
           class="rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 p-4"
         >
           <div class="text-admin-caption text-admin-text-3">
-            <span v-if="config.failure_category">失败分类：{{ config.failure_category }}</span>
+            <span v-if="config.failure_category">{{
+              SETTINGS_MESSAGES.searchFailureCategory(config.failure_category)
+            }}</span>
             <span v-if="config.tested_at">
-              {{ config.failure_category ? ' · ' : '' }}测试时间：{{
-                formatAdminDateTime(config.tested_at)
+              {{
+                SETTINGS_MESSAGES.searchTestedAt(
+                  Boolean(config.failure_category),
+                  formatAdminDateTime(config.tested_at),
+                )
               }}
             </span>
           </div>
@@ -65,7 +74,7 @@
           v-else-if="config.test_state === 'passed' && config.tested_at"
           class="text-admin-caption text-admin-text-3"
         >
-          上次测试通过：{{ formatAdminDateTime(config.tested_at) }}
+          {{ SETTINGS_MESSAGES.searchLastTestPassed(formatAdminDateTime(config.tested_at)) }}
         </div>
       </div>
     </template>
@@ -82,7 +91,7 @@
             :loading="testing"
             @click="runTest"
           >
-            测试连接
+            {{ SETTINGS_MESSAGES.searchTestConnection }}
           </AdminButton>
           <AdminButton
             :class="adminActionButtonClass"
@@ -90,7 +99,7 @@
             :loading="saving"
             @click="saveKey"
           >
-            保存 Key
+            {{ SETTINGS_MESSAGES.searchSaveKey }}
           </AdminButton>
           <AdminButton
             v-if="config.enabled"
@@ -100,7 +109,7 @@
             :loading="saving"
             @click="setEnabled(false)"
           >
-            停用
+            {{ SETTINGS_MESSAGES.searchDisable }}
           </AdminButton>
           <AdminButton
             v-else
@@ -109,7 +118,7 @@
             :loading="saving"
             @click="setEnabled(true)"
           >
-            启用
+            {{ SETTINGS_MESSAGES.searchEnable }}
           </AdminButton>
         </div>
       </div>
@@ -135,6 +144,7 @@ import {
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import SettingEditorCard from './SettingEditorCard.vue'
+import { SETTINGS_MESSAGES } from './pages/messages'
 import { createAdminSearchProviderResource } from './searchProviderResource'
 import type { AdminSearchProviderResource } from './searchProviderResource'
 import { useAdminSearchProviderFeedback } from './useSettingsFeedback'
@@ -163,7 +173,7 @@ const resource = computed(() => props.resource ?? defaultResource)
 const form = useForm({
   initialValues: { apiKey: '' },
   schema: v.object({
-    apiKey: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入 API Key 后再保存')),
+    apiKey: v.pipe(v.string(), v.trim(), v.minLength(1, SETTINGS_MESSAGES.searchApiKeyRequired)),
   }),
 })
 const saving = ref(false)
@@ -185,9 +195,9 @@ const TEST_STATE_META: Record<
 const testStateLabel = computed(() => TEST_STATE_META[props.config.test_state].label)
 const testStateSeverity = computed(() => TEST_STATE_META[props.config.test_state].severity)
 const statusLabel = computed(() => {
-  if (props.config.enabled) return '已启用'
-  if (props.config.api_key_configured) return '已停用'
-  return '未配置'
+  if (props.config.enabled) return SETTINGS_MESSAGES.providerEnabled
+  if (props.config.api_key_configured) return SETTINGS_MESSAGES.providerDisabled
+  return SETTINGS_MESSAGES.providerUnconfigured
 })
 const statusSeverity = computed(() => (props.config.enabled ? 'success' : 'secondary'))
 
@@ -201,15 +211,15 @@ const testDisabled = computed(
 )
 const sequenceHint = computed(() => {
   if (!props.config.api_key_configured && form.values.apiKey.trim() === '') {
-    return '先输入 API Key 并保存。'
+    return SETTINGS_MESSAGES.searchSequenceApiKeyMissing
   }
   if (form.values.apiKey.trim() !== '') {
-    return 'Key 已修改，先保存再测试。'
+    return SETTINGS_MESSAGES.searchSequenceKeyChanged
   }
   if (props.config.test_state !== 'passed') {
-    return '保存后请先测试连接，通过后才能启用。'
+    return SETTINGS_MESSAGES.searchSequenceTestFirst
   }
-  return '连接正常，可以启用或停用。'
+  return SETTINGS_MESSAGES.searchSequenceReady
 })
 
 function resetDraft() {
@@ -222,9 +232,9 @@ const saveKey = form.handleSubmit(async (values) => {
   // Control Plane writes require an operator reason (audit); a cancelled
   // dialog aborts the save silently.
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: `保存 ${providerLabel.value} API Key`,
-    message: '保存新 Key 会重置测试状态并停用该供应商，保存后需重新测试。该操作将记录操作人与原因。',
-    confirmLabel: '保存 Key',
+    title: SETTINGS_MESSAGES.searchSaveKeyTitle(providerLabel.value),
+    message: SETTINGS_MESSAGES.searchSaveKeyMessage,
+    confirmLabel: SETTINGS_MESSAGES.searchSaveKey,
   })
   if (!operatorReason) return
   saving.value = true
@@ -242,7 +252,7 @@ const saveKey = form.handleSubmit(async (values) => {
     emit('change')
     feedback.keySaved(providerLabel.value, wasEnabled)
   } catch (err) {
-    operationError.value = formatAdminDisplayError(err, '保存 API Key 失败')
+    operationError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchSaveKeyFailed)
   } finally {
     saving.value = false
   }
@@ -260,7 +270,7 @@ async function runTest() {
   } catch (err) {
     // 测试失败状态已由后端落盘，刷新列表以展示失败分类与时间。
     emit('change')
-    operationError.value = formatAdminDisplayError(err, '连接测试失败')
+    operationError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchTestFailed)
   } finally {
     testing.value = false
   }
@@ -268,11 +278,11 @@ async function runTest() {
 
 async function setEnabled(enabled: boolean) {
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: `${enabled ? '启用' : '停用'}${providerLabel.value}`,
+    title: SETTINGS_MESSAGES.searchToggleTitle(enabled, providerLabel.value),
     message: enabled
-      ? '启用后该供应商将承接图片搜索流量。该操作将记录操作人与原因。'
-      : '停用后该供应商不再承接图片搜索流量。该操作将记录操作人与原因。',
-    confirmLabel: enabled ? '启用' : '停用',
+      ? SETTINGS_MESSAGES.searchToggleEnableMessage
+      : SETTINGS_MESSAGES.searchToggleDisableMessage,
+    confirmLabel: SETTINGS_MESSAGES.searchEnableState(enabled),
   })
   if (!operatorReason) return
   saving.value = true
@@ -282,7 +292,7 @@ async function setEnabled(enabled: boolean) {
     emit('change')
     feedback.toggled(providerLabel.value, enabled)
   } catch (err) {
-    operationError.value = formatAdminDisplayError(err, enabled ? '启用失败' : '停用失败')
+    operationError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchToggleFailed(enabled))
   } finally {
     saving.value = false
   }

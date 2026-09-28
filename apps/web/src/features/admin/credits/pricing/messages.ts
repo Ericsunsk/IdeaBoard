@@ -1,0 +1,71 @@
+// Colocated admin messages for the billing-pricing page (zh-only, no `t()` wrapping).
+//
+// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// to the page that owns them instead of locale bundles. Column/namespace labels
+// stay in `billingPricingColumns.ts` / `groups.ts`; status labels stay in
+// `BillingStatusCell.vue`.
+
+export const BILLING_PRICING_MESSAGES = {
+  searchLabel: '搜索定价功能',
+  searchPlaceholder: '搜索功能名称、SKU 或映射模型...',
+  filterLabel: '筛选功能状态',
+  refresh: '刷新功能定价',
+  billingCount: (count: number) => `共 ${count} 个计费功能`,
+  totalCount: (count: number) => `(共 ${count} 个)`,
+  loadingAria: '加载功能定价中',
+  loadFailedTitle: '功能定价加载失败',
+  reload: '重新加载',
+  emptyNone: '暂无可定价功能',
+  emptyNoMatch: '未找到匹配的计费功能',
+  emptyNoneHint: '当前没有已注册的可计费功能 SKU。',
+  emptyNoMatchHint: '未找到符合当前搜索或筛选条件的功能。请尝试调整关键词或清空筛选。',
+  clearFilters: '清空筛选条件',
+  statusAll: '全部状态',
+  statusActive: '生效中',
+  statusUnpriced: '未定价',
+  statusDisabled: '已停用',
+  statusArchived: '已归档',
+  modelUnset: '未配置',
+  mappingCollision: (features: string) =>
+    `模型映射存在同名冲突：${features}，保存会影响多行，请确认后端 key 空间`,
+  retryLater: '请稍后重试。',
+  deleteTitle: '删除已归档功能',
+  deleteMessage: (displayName: string) =>
+    `确定彻底删除“${displayName}”及其价格配置吗？此操作不可撤销，且将记录操作人与原因。`,
+  deleteConfirm: '确认删除',
+  deleted: '已归档功能已删除',
+  deleteFailed: '删除已归档功能失败，请重试',
+  publishTitle: '发布价格',
+  publishMessage: (displayName: string) =>
+    `确定发布“${displayName}”的价格配置吗？该操作将记录操作人与原因。`,
+  publishConfirm: '发布价格',
+  published: '价格已发布',
+  publishFailed: '发布价格失败，请重试',
+  enableTitle: '启用功能',
+  disableTitle: '停用功能',
+  availabilityMessage: (enabled: boolean, displayName: string) =>
+    `确定${enabled ? '启用' : '停用'}“${displayName}”吗？该操作将记录操作人与原因。`,
+  enable: '启用',
+  disable: '停用',
+  enabledToast: '功能已启用',
+  disabledToast: '功能已停用',
+  enableFailed: '启用功能失败，请重试',
+  disableFailed: '停用功能失败，请重试',
+  cancel: '取消',
+  save: '保存',
+  priceHeader: (displayName: string | undefined) => `编辑 · ${displayName ?? ''}`,
+  priceDescription: '调整该计费项的价格配置后保存。',
+  priceModelLabel: '模型',
+  pricePlaceholder: (required: boolean) =>
+    required ? '必填' : BILLING_PRICING_MESSAGES.modelUnset,
+  priceRequired: '请输入价格',
+  priceRange: (max: string) => `价格必须是 0 到 ${max} 之间的整数`,
+  priceVariantLabel: (variant: string) => (variant === 'default' ? '固定' : variant.toUpperCase()),
+  tableAria: (title: string | undefined) => (title ? `${title}定价` : '功能定价'),
+  tableCount: (count: number) => `共 ${count} 个功能`,
+  tableEmpty: '该分组暂无功能',
+  tableActionsColumn: '操作',
+  tablePublishLabel: (status: string) => (status === 'unpriced' ? '设置' : '调整'),
+  tableDelete: '删除',
+  tableStatusAria: (displayName: string) => `${displayName}功能状态`,
+} as const

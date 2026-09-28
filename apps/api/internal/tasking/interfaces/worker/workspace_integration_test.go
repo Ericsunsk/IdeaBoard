@@ -50,6 +50,7 @@ import (
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -298,10 +299,7 @@ const workspaceIntegrationChecksum = "abcdef0123456789abcdef0123456789abcdef0123
 
 func openWorkspaceIntegrationEnv(t *testing.T) *workspaceIntegrationEnv {
 	t.Helper()
-	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
-	if raw == "" {
-		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
-	}
+	raw := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	ctx := context.Background()
 	cfg, err := pgxpool.ParseConfig(raw)
 	if err != nil {

@@ -123,12 +123,12 @@ func TestValidateV1BillingSettledCarriesRefsNotAmounts(t *testing.T) {
 }
 
 func TestTaskStatusToV1Mapping(t *testing.T) {
-	cases := map[string]string{
-		"pending":   EventV1TaskCreated,
-		"running":   EventV1TaskRunning,
-		"completed": EventV1TaskCompleted,
-		"failed":    EventV1TaskFailed,
-		"cancelled": EventV1TaskCancelled,
+	cases := map[TaskStatus]string{
+		TaskStatusPending:   EventV1TaskCreated,
+		TaskStatusRunning:   EventV1TaskRunning,
+		TaskStatusCompleted: EventV1TaskCompleted,
+		TaskStatusFailed:    EventV1TaskFailed,
+		TaskStatusCancelled: EventV1TaskCancelled,
 	}
 	for status, want := range cases {
 		got, ok := taskStatusToV1(status)

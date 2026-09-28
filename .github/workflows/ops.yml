@@ -35,6 +35,8 @@ jobs:
           bash scripts/ci-legacy-media-zero-scan-test.sh
           bash scripts/ci-workflow-contract-test.sh
           bash scripts/sql-workspace-scope-check-test.sh
+          bash scripts/openapi-pattern-check-test.sh
+          bash scripts/adr-template-check-test.sh
 
       - name: Check shell syntax
         shell: bash
@@ -75,6 +77,11 @@ jobs:
           bash -n scripts/ci-workflow-contract-test.sh
           bash -n scripts/sql-workspace-scope-check.sh
           bash -n scripts/sql-workspace-scope-check-test.sh
+          bash -n scripts/openapi-pattern-check.sh
+          bash -n scripts/openapi-pattern-check-test.sh
+          bash -n scripts/adr-template-check.sh
+          bash -n scripts/adr-template-check-test.sh
+          bash -n scripts/lib/common.sh
 
       - name: Install ShellCheck
         shell: bash
@@ -124,7 +131,12 @@ jobs:
             scripts/ci-legacy-media-zero-scan-test.sh \
             scripts/ci-workflow-contract-test.sh \
             scripts/sql-workspace-scope-check.sh \
-            scripts/sql-workspace-scope-check-test.sh
+            scripts/sql-workspace-scope-check-test.sh \
+            scripts/openapi-pattern-check.sh \
+            scripts/openapi-pattern-check-test.sh \
+            scripts/adr-template-check.sh \
+            scripts/adr-template-check-test.sh \
+            scripts/lib/common.sh
 
       - name: Lint Dockerfiles
         run: |

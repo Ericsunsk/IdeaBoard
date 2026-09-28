@@ -71,10 +71,7 @@ func (p *PostgresWebhookPersistence) LoadSubscriptions(ctx context.Context) ([]*
 	if err := p.valid(); err != nil {
 		return nil, err
 	}
-	rows, err := p.db.Query(ctx, `
-SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.signing_secret_material_kind, s.signing_secret_key_version, s.event_types,
-       s.status, s.created_at, s.updated_at
-FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id
+	rows, err := p.db.Query(ctx, subscriptionSelectSQL+`
 ORDER BY s.created_at, s.public_id`)
 	if err != nil {
 		return nil, err
@@ -104,16 +101,21 @@ ORDER BY s.created_at, s.public_id`)
 	return result, rows.Err()
 }
 
+// subscriptionSelectSQL is the single definition of the subscription
+// readmodel projection (subscription facts joined to the owning
+// workspace), shared by the list and single-load paths.
+const subscriptionSelectSQL = `
+SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.signing_secret_material_kind, s.signing_secret_key_version, s.event_types,
+       s.status, s.created_at, s.updated_at
+FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id`
+
 func (p *PostgresWebhookPersistence) LoadSubscription(ctx context.Context, id string) (*WebhookSubscription, error) {
 	if err := p.valid(); err != nil {
 		return nil, err
 	}
 	var sub WebhookSubscription
 	var payload, materialKind, keyVersion string
-	err := p.db.QueryRow(ctx, `
-SELECT s.public_id, w.public_id, s.endpoint_url, s.signing_secret, s.signing_secret_material_kind, s.signing_secret_key_version, s.event_types,
-       s.status, s.created_at, s.updated_at
-FROM event_subscriptions s JOIN workspaces w ON w.internal_id = s.workspace_id
+	err := p.db.QueryRow(ctx, subscriptionSelectSQL+`
 	WHERE s.public_id = $1`, id).Scan(&sub.ID, &sub.WorkspaceID, &sub.URL, &payload, &materialKind, &keyVersion, &sub.EventTypes, &sub.Status, &sub.CreatedAt, &sub.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -165,6 +167,11 @@ WHERE public_id = $1 AND signing_secret_material_kind = $5`,
 	}
 }
 
+// deliveryLookupSQL is the single definition of the delivery JOIN spine
+// (delivery facts joined to subscription and event identity), shared by
+// the dead-letter detail lookup and the delivery internal-ID resolution.
+const deliveryLookupSQL = `FROM event_deliveries d JOIN event_subscriptions s ON s.internal_id=d.subscription_id JOIN workspace_events e ON e.internal_id=d.event_id WHERE s.public_id=$1 AND e.public_id=$2`
+
 func (p *PostgresWebhookPersistence) hydrateSubscription(ctx context.Context, sub *WebhookSubscription) error {
 	rows, err := p.db.Query(ctx, `
 SELECT e.public_id, e.event_type, d.status, e.event_data
@@ -178,18 +185,19 @@ ORDER BY d.created_at DESC`, sub.ID)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var deliveryID, typ, status string
+		var deliveryID, typ string
+		var status DeliveryStatus
 		var payload []byte
 		if err := rows.Scan(&deliveryID, &typ, &status, &payload); err != nil {
 			return err
 		}
-		if status == "delivered" {
+		if status == DeliveryStatusDelivered {
 			sub.Delivered[deliveryID] = struct{}{}
 		}
-		if status == "dead_letter" && sub.Status != WebhookStatusDeadLetter {
+		if status == DeliveryStatusDeadLetter && sub.Status != WebhookStatusDeadLetter {
 			sub.Status = WebhookStatusDeadLetter
 		}
-		if status == "failed" && sub.Status == WebhookStatusActive {
+		if status == DeliveryStatusFailed && sub.Status == WebhookStatusActive {
 			sub.Status = WebhookStatusDegraded
 		}
 		var envelope V1Envelope
@@ -199,7 +207,7 @@ ORDER BY d.created_at DESC`, sub.ID)
 		if status == "dead_letter" {
 			var attempts int
 			var lastError string
-			_ = p.db.QueryRow(ctx, `SELECT attempt_count, response_body FROM event_deliveries d JOIN event_subscriptions s ON s.internal_id=d.subscription_id JOIN workspace_events e ON e.internal_id=d.event_id WHERE s.public_id=$1 AND e.public_id=$2`, sub.ID, deliveryID).Scan(&attempts, &lastError)
+			_ = p.db.QueryRow(ctx, `SELECT attempt_count, response_body `+deliveryLookupSQL, sub.ID, deliveryID).Scan(&attempts, &lastError)
 			sub.DeadLetter = append(sub.DeadLetter, WebhookDeadLetter{DeliveryID: deliveryID, EventType: typ, Attempts: attempts, LastError: lastError, At: envelope.OccurredAt})
 		}
 	}
@@ -285,7 +293,7 @@ ORDER BY d.created_at`)
 
 func (p *PostgresWebhookPersistence) deliveryID(ctx context.Context, subscriptionID string, envelope V1Envelope) (int64, error) {
 	var id int64
-	err := p.db.QueryRow(ctx, `SELECT d.internal_id FROM event_deliveries d JOIN event_subscriptions s ON s.internal_id=d.subscription_id JOIN workspace_events e ON e.internal_id=d.event_id WHERE s.public_id=$1 AND e.public_id=$2`, subscriptionID, envelope.ID).Scan(&id)
+	err := p.db.QueryRow(ctx, `SELECT d.internal_id `+deliveryLookupSQL, subscriptionID, envelope.ID).Scan(&id)
 	return id, err
 }
 
@@ -297,22 +305,22 @@ func (p *PostgresWebhookPersistence) RecordAttempt(ctx context.Context, subscrip
 	if err != nil {
 		return err
 	}
-	status := "retrying"
+	status := DeliveryStatusRetrying
 	completedAt := any(nil)
-	if attempt.Outcome == "delivered" {
-		status = "delivered"
+	if attempt.Outcome == AttemptOutcomeDelivered {
+		status = DeliveryStatusDelivered
 		completedAt = attempt.At
 	} else if final {
-		status = "dead_letter"
+		status = DeliveryStatusDeadLetter
 		completedAt = attempt.At
 	}
 	_, err = p.db.Exec(ctx, `
 INSERT INTO event_delivery_attempts (delivery_id, attempt_number, status_code, outcome, error_message, attempted_at)
-VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (delivery_id, attempt_number) DO UPDATE SET status_code=EXCLUDED.status_code, outcome=EXCLUDED.outcome, error_message=EXCLUDED.error_message, attempted_at=EXCLUDED.attempted_at`, deliveryID, attempt.Attempt, attempt.StatusCode, attempt.Outcome, attempt.Error, attempt.At)
+VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (delivery_id, attempt_number) DO UPDATE SET status_code=EXCLUDED.status_code, outcome=EXCLUDED.outcome, error_message=EXCLUDED.error_message, attempted_at=EXCLUDED.attempted_at`, deliveryID, attempt.Attempt, attempt.StatusCode, string(attempt.Outcome), attempt.Error, attempt.At)
 	if err != nil {
 		return err
 	}
-	_, err = p.db.Exec(ctx, `UPDATE event_deliveries SET attempt_count=GREATEST(attempt_count,$2), status=$3, last_attempted_at=$4, response_status=$5, response_body=$6, completed_at=$7 WHERE internal_id=$1`, deliveryID, attempt.Attempt, status, attempt.At, attempt.StatusCode, attempt.Error, completedAt)
+	_, err = p.db.Exec(ctx, `UPDATE event_deliveries SET attempt_count=GREATEST(attempt_count,$2), status=$3, last_attempted_at=$4, response_status=$5, response_body=$6, completed_at=$7 WHERE internal_id=$1`, deliveryID, attempt.Attempt, string(status), attempt.At, attempt.StatusCode, attempt.Error, completedAt)
 	return err
 }
 

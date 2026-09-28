@@ -3,8 +3,8 @@
     :visible="visible"
     size="slim"
     content-layout="scrollable"
-    aria-label="任务详情控制台"
-    description="查看任务执行的完整快照与结果。"
+    :aria-label="MONITOR_MESSAGES.detailAria"
+    :description="MONITOR_MESSAGES.detailDescription"
     @update:visible="handleVisibleUpdate"
   >
     <template #header>
@@ -29,7 +29,7 @@
           </span>
           <div class="flex min-w-0 flex-col">
             <DialogTitle class="text-sm font-semibold text-admin-text-1">
-              任务详情控制台
+              {{ MONITOR_MESSAGES.detailAria }}
             </DialogTitle>
             <div class="flex items-center gap-1.5 font-mono text-xs text-admin-text-3">
               <span class="truncate">ID: {{ detailTask?.task_id || taskId || '-' }}</span>
@@ -37,7 +37,7 @@
                 v-if="detailTask?.task_id || taskId"
                 type="button"
                 class="flex size-5 cursor-pointer items-center justify-center rounded text-admin-text-3 transition-colors hover:bg-admin-surface-muted hover:text-admin-text-1"
-                aria-label="复制任务 ID"
+                :aria-label="MONITOR_MESSAGES.copyTaskIdAria"
                 @click="copyToClipboard(detailTask?.task_id || taskId || '')"
               >
                 <Copy class="size-3" />
@@ -62,7 +62,7 @@
       class="flex min-h-40 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 text-xs text-admin-text-3"
       role="status"
     >
-      正在加载任务详情…
+      {{ MONITOR_MESSAGES.detailLoading }}
     </div>
 
     <div
@@ -77,7 +77,7 @@
         variant="outline"
         @click="emit('retry')"
       >
-        重试
+        {{ MONITOR_MESSAGES.retry }}
       </AdminButton>
     </div>
 
@@ -85,7 +85,7 @@
       v-else-if="!detailTask"
       class="flex min-h-40 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 text-xs text-admin-text-3"
     >
-      任务详情不可用
+      {{ MONITOR_MESSAGES.detailUnavailable }}
     </div>
 
     <!-- 主信息单页极简流 -->
@@ -99,17 +99,17 @@
         <WarningTriangle class="mt-0.5 size-3.5 shrink-0" />
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <div class="flex items-center justify-between">
-            <span class="font-semibold">执行失败</span>
+            <span class="font-semibold">{{ MONITOR_MESSAGES.detailFailedTitle }}</span>
             <button
               type="button"
-              class="h-5 cursor-pointer rounded border border-admin-danger/30 px-1.5 text-[11px] font-medium text-admin-danger transition-colors hover:bg-admin-danger/10"
+              class="h-5 cursor-pointer rounded border border-admin-danger/30 px-1.5 text-admin-caption font-medium text-admin-danger transition-colors hover:bg-admin-danger/10"
               @click="emit('retry')"
             >
-              重试
+              {{ MONITOR_MESSAGES.retry }}
             </button>
           </div>
           <span class="text-admin-danger/90">
-            {{ getErrorReason(detailTask) || '处理过程中发生未知错误' }}
+            {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailUnknownError }}
           </span>
         </div>
       </div>
@@ -120,9 +120,9 @@
       >
         <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-admin-text-3" />
         <div class="flex min-w-0 flex-1 flex-col">
-          <span class="font-semibold">任务已停止</span>
+          <span class="font-semibold">{{ MONITOR_MESSAGES.detailStoppedTitle }}</span>
           <span class="text-admin-text-2">
-            {{ getErrorReason(detailTask) || '任务已停止，未继续执行。' }}
+            {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailStoppedFallback }}
           </span>
         </div>
       </div>
@@ -132,13 +132,13 @@
         class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-3.5 py-2 text-xs"
       >
         <div class="flex items-center gap-1.5">
-          <span class="text-admin-text-3">总耗时:</span>
+          <span class="text-admin-text-3">{{ MONITOR_MESSAGES.detailDurationLabel }}</span>
           <span class="font-mono font-medium text-admin-text-1">{{
             calcDuration(detailTask)
           }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="text-admin-text-3">创建于:</span>
+          <span class="text-admin-text-3">{{ MONITOR_MESSAGES.detailCreatedLabel }}</span>
           <span class="font-mono font-medium text-admin-text-1">
             {{ formatDateTime(detailTask.created_at) }}
           </span>
@@ -149,13 +149,13 @@
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-identity">
         <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
           <Fingerprint class="size-3.5 text-admin-text-2" />
-          <span id="task-detail-identity">身份与归属</span>
+          <span id="task-detail-identity">{{ MONITOR_MESSAGES.identityTitle }}</span>
         </div>
         <div
           class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">用户</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.userLabel }}</span>
             <div class="flex items-center gap-1">
               <span class="font-mono text-admin-text-1">
                 {{ detailTask.user_display_name || detailTask.user_public_id }}
@@ -163,7 +163,7 @@
               <button
                 type="button"
                 class="flex size-4 cursor-pointer items-center justify-center rounded text-admin-text-3 transition-colors hover:text-admin-text-1"
-                aria-label="复制用户 Public ID"
+                :aria-label="MONITOR_MESSAGES.copyUserIdAria"
                 @click="copyToClipboard(String(detailTask.user_public_id))"
               >
                 <Copy class="size-3" />
@@ -171,31 +171,31 @@
             </div>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">优先级</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.priorityLabel }}</span>
             <span class="font-medium text-admin-text-1">{{
               getTaskPriorityLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">供应商</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.providerLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               getDetailExecutionProviderLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">模型</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.modelLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               getDetailExecutionModelLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">创建时间</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.createdAtLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               formatDateTime(detailTask.created_at)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">完成时间</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.completedAtLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               formatDateTime(detailTask.completed_at)
             }}</span>
@@ -208,15 +208,15 @@
         <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
           <div class="flex items-center gap-1.5">
             <ChatBubble class="size-3.5 text-admin-text-2" />
-            <span id="task-detail-prompt">任务指令 (Prompt)</span>
+            <span id="task-detail-prompt">{{ MONITOR_MESSAGES.promptTitle }}</span>
           </div>
           <button
             type="button"
-            class="cursor-pointer text-[11px] font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
             :disabled="!detailTask.prompt"
             @click="copyToClipboard(detailTask.prompt || '')"
           >
-            复制全文
+            {{ MONITOR_MESSAGES.copyPrompt }}
           </button>
         </div>
         <div
@@ -225,7 +225,7 @@
           <div
             class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-slate-800"
           >
-            {{ detailTask.prompt || '无提示词' }}
+            {{ detailTask.prompt || MONITOR_MESSAGES.promptEmpty }}
           </div>
         </div>
       </section>
@@ -234,7 +234,7 @@
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-result">
         <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
           <MediaImage class="size-3.5 text-admin-text-2" />
-          <span id="task-detail-result">生成结果</span>
+          <span id="task-detail-result">{{ MONITOR_MESSAGES.resultTitle }}</span>
         </div>
         <div
           v-if="resultImageUrl"
@@ -242,7 +242,7 @@
         >
           <img
             :src="resultImageUrl"
-            alt="任务生成结果图片"
+            :alt="MONITOR_MESSAGES.resultImageAlt"
             class="block max-h-[240px] w-full rounded-lg object-contain"
           />
           <AdminButton
@@ -251,7 +251,7 @@
             class="!absolute !right-3 !bottom-3 !opacity-0 transition-opacity group-hover:!opacity-100 group-focus-within:!opacity-100 focus-visible:!opacity-100"
             @click="openResultImage(resultImageUrl)"
           >
-            在新窗口打开
+            {{ MONITOR_MESSAGES.openResultImage }}
           </AdminButton>
         </div>
         <div
@@ -260,10 +260,10 @@
         >
           {{
             isResultImageDeletedByUser
-              ? '图片已由用户删除。'
+              ? MONITOR_MESSAGES.resultDeleted
               : hasResultImageCandidate
-                ? '结果图片链接不安全，已拒绝预览。'
-                : '没有可预览的图片结果。'
+                ? MONITOR_MESSAGES.resultUnsafe
+                : MONITOR_MESSAGES.resultEmpty
           }}
         </div>
       </section>
@@ -273,10 +273,10 @@
         <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
           <div class="flex items-center gap-1.5">
             <Clock class="size-3.5 text-admin-text-2" />
-            <span id="task-detail-execution-trace">执行轨迹</span>
+            <span id="task-detail-execution-trace">{{ MONITOR_MESSAGES.attemptsTitle }}</span>
           </div>
-          <span class="text-[11px] font-normal text-admin-text-3">
-            {{ detailTask.execution_attempts?.length || 0 }} 次尝试
+          <span class="text-admin-caption font-normal text-admin-text-3">
+            {{ MONITOR_MESSAGES.attemptsCount(detailTask.execution_attempts?.length || 0) }}
           </span>
         </div>
 
@@ -293,7 +293,7 @@
                   getAttemptProviderLabel(attempt)
                 }}</span>
                 <span class="text-admin-text-3">/</span>
-                <span class="truncate font-mono text-[11px] text-admin-text-2">
+                <span class="truncate font-mono text-admin-caption text-admin-text-2">
                   {{ attempt.resolved_model || '-' }}
                 </span>
               </div>
@@ -304,24 +304,24 @@
               />
             </div>
             <div
-              class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-admin-text-2 pt-1 border-t border-admin-border-soft/50"
+              class="grid grid-cols-2 gap-x-3 gap-y-1 text-admin-caption text-admin-text-2 pt-1 border-t border-admin-border-soft/50"
             >
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">阶段:</span>
+                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptStageLabel }}</span>
                 <span>{{ getAttemptStageLabel(attempt.stage) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">失败分类:</span>
+                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptFailureLabel }}</span>
                 <span>{{ getAttemptFailureLabel(attempt.failure_category) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">Provider 耗时:</span>
+                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptProviderLatencyLabel }}</span>
                 <span class="font-mono">{{
                   formatAttemptLatency(attempt.provider_latency_ms)
                 }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">总耗时:</span>
+                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptTotalLatencyLabel }}</span>
                 <span class="font-mono">{{ formatAttemptLatency(attempt.total_latency_ms) }}</span>
               </div>
             </div>
@@ -331,7 +331,7 @@
           v-else
           class="rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 py-3 text-center text-xs text-admin-text-3"
         >
-          暂无执行记录
+          {{ MONITOR_MESSAGES.attemptsEmpty }}
         </div>
       </section>
 
@@ -344,20 +344,20 @@
         <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
           <div class="flex items-center gap-1.5">
             <LightBulb class="size-3.5 text-admin-text-2" />
-            <span id="task-detail-billing">计费快照</span>
+            <span id="task-detail-billing">{{ MONITOR_MESSAGES.billingTitle }}</span>
           </div>
           <span
             v-if="!detailTask.billing.feature_exists"
-            class="text-[11px] font-normal text-admin-text-3"
+            class="text-admin-caption font-normal text-admin-text-3"
           >
-            功能已删除
+            {{ MONITOR_MESSAGES.billingFeatureGone }}
           </span>
         </div>
         <div
           class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">功能</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingFeatureLabel }}</span>
             <span class="font-medium text-admin-text-1">{{ detailTask.billing.display_name }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
@@ -365,35 +365,35 @@
             <span class="font-mono text-admin-text-1">{{ detailTask.billing.sku }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">单价</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingUnitLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               formatIdeaAmount(detailTask.billing.unit_credits)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">调用数量</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingQuantityLabel }}</span>
             <span class="font-mono text-admin-text-1">{{ detailTask.billing.quantity }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">总消耗</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingTotalLabel }}</span>
             <span class="font-mono font-semibold text-admin-text-1">
               {{ formatIdeaAmount(detailTask.billing.total_credits) }}
             </span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">结算状态</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingSettlementLabel }}</span>
             <span class="font-medium text-admin-text-1">
               {{ getBillingSettlementLabel(detailTask.billing.settlement_state) }}
             </span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">报价时间</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingQuotedLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               formatDateTime(detailTask.billing.quoted_at)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">结算时间</span>
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingSettledLabel }}</span>
             <span class="font-mono text-admin-text-1">{{
               formatDateTime(detailTask.billing.settled_at)
             }}</span>
@@ -406,22 +406,22 @@
         <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
           <div class="flex items-center gap-1.5">
             <CodeBrackets class="size-3.5 text-admin-text-2" />
-            <span id="task-detail-api-result">API 响应摘要</span>
+            <span id="task-detail-api-result">{{ MONITOR_MESSAGES.apiResultTitle }}</span>
           </div>
           <button
             type="button"
-            class="cursor-pointer text-[11px] font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
             :disabled="!hasResultPayload"
             @click="copyToClipboard(resultSummaryText)"
           >
-            复制 JSON
+            {{ MONITOR_MESSAGES.copyJson }}
           </button>
         </div>
         <div
           class="max-h-[140px] overflow-x-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5 font-mono text-xs"
         >
           <pre class="m-0 leading-relaxed text-slate-800">{{
-            resultSummaryText || '暂无 API 响应结果'
+            resultSummaryText || MONITOR_MESSAGES.apiResultEmpty
           }}</pre>
         </div>
 
@@ -439,7 +439,7 @@
           >
             <div class="flex items-center gap-1.5">
               <Terminal class="size-3.5 text-admin-text-3" />
-              <span>{{ `原始调试详情 (脱敏) · ${showDebugResult ? '隐藏' : '展开'}` }}</span>
+              <span>{{ MONITOR_MESSAGES.debugToggle(showDebugResult) }}</span>
             </div>
             <NavArrowDown
               class="size-3 text-admin-text-3 transition-transform"
@@ -485,6 +485,7 @@ import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from '../domain/status'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'
 import { useAdminTaskResultFeedback } from '../application/useAdminMonitorFeedback'
+import { MONITOR_MESSAGES } from './pages/messages'
 import { useTaskResultDetail } from '../application/useTaskResultDetail'
 import {
   formatAttemptLatency,

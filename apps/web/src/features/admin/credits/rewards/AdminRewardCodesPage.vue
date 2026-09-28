@@ -10,25 +10,25 @@
     <template #toolbar-start>
       <AdminToolbarSearch
         v-model="searchKeyword"
-        input-label="搜索兑换码"
-        placeholder="搜索名称或完整 Code"
+        :input-label="REWARD_CODES_MESSAGES.searchLabel"
+        :placeholder="REWARD_CODES_MESSAGES.searchPlaceholder"
         class="w-full sm:w-80"
         @enter="searchRewardCodes"
         @clear="clearSearch"
       />
       <AdminButton :class="adminActionButtonClass" :disabled="saving" @click="openCreateDialog">
-        创建兑换码
+        {{ REWARD_CODES_MESSAGES.create }}
       </AdminButton>
     </template>
 
     <template #toolbar-end>
       <AdminFilterPopover
         :active="statusFilter !== REWARD_CODE_STATUS_FILTER_ALL"
-        filter-label="筛选兑换码状态"
+        :filter-label="REWARD_CODES_MESSAGES.filterLabel"
         @reset="resetStatusFilter"
       >
         <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-          <span>有效状态</span>
+          <span>{{ REWARD_CODES_MESSAGES.activeStateLabel }}</span>
           <AdminSelect v-model="statusFilter" :options="statusOptions" size="small" />
         </label>
       </AdminFilterPopover>
@@ -36,7 +36,7 @@
       <AdminButton
         variant="ghost"
         :class="adminFramedIconButtonClass"
-        aria-label="刷新兑换码"
+        :aria-label="REWARD_CODES_MESSAGES.refresh"
         :loading="loading"
         :disabled="loading"
         @click="refreshRewardCodes"
@@ -48,7 +48,7 @@
     <template #alerts>
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>兑换码加载失败，请重试。</span>
+          <span>{{ REWARD_CODES_MESSAGES.initialError }}</span>
           <AdminButton
             variant="outline"
             size="small"
@@ -56,13 +56,13 @@
             :disabled="loading"
             @click="refreshRewardCodes"
           >
-            重试
+            {{ REWARD_CODES_MESSAGES.retry }}
           </AdminButton>
         </div>
       </AdminAlert>
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>刷新兑换码失败，正在显示上次成功的数据。</span>
+          <span>{{ REWARD_CODES_MESSAGES.backgroundError }}</span>
           <AdminButton
             variant="outline"
             size="small"
@@ -70,7 +70,7 @@
             :disabled="loading"
             @click="refreshRewardCodes"
           >
-            重试
+            {{ REWARD_CODES_MESSAGES.retry }}
           </AdminButton>
         </div>
       </AdminAlert>
@@ -83,8 +83,8 @@
       data-key="id"
       scrollable
       :frame-class="adminTableFrameClass"
-      table-aria-label="兑换码列表"
-      scroll-aria-label="兑换码列表横向滚动区域"
+      :table-aria-label="REWARD_CODES_MESSAGES.tableAria"
+      :scroll-aria-label="REWARD_CODES_MESSAGES.tableScrollAria"
       :table-style="adminTableStyle"
       :class="adminTableClass"
     >
@@ -93,7 +93,7 @@
       </template>
 
       <!-- 兑换码列：名称 + 掩码 Code -->
-      <AdminColumn field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
+      <AdminColumn field="displayName" :header="REWARD_CODES_MESSAGES.codeColumn" :style="{ minWidth: '220px' }">
         <template #body="{ data }">
           <div class="min-w-0">
             <div class="truncate font-medium text-admin-text-1">
@@ -107,7 +107,7 @@
       </AdminColumn>
 
       <!-- 奖励 Idea 列：等宽字体金额 -->
-      <AdminColumn field="creditAmount" header="奖励 Idea" :style="{ width: '140px' }">
+      <AdminColumn field="creditAmount" :header="REWARD_CODES_MESSAGES.ideaColumn" :style="{ width: '140px' }">
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
             {{ formatIdeaAmount(data.creditAmount) }}
@@ -116,7 +116,7 @@
       </AdminColumn>
 
       <!-- 状态列：Badge + 开关 -->
-      <AdminColumn field="status" header="状态" :style="{ width: '180px' }">
+      <AdminColumn field="status" :header="REWARD_CODES_MESSAGES.statusColumn" :style="{ width: '180px' }">
         <template #body="{ data }">
           <div class="flex items-center gap-3">
             <AdminBadge
@@ -128,7 +128,7 @@
               :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
               :model-value="data.enabled"
               :disabled="Boolean(enabledPending[data.id])"
-              :aria-label="`${data.displayName}启用状态`"
+              :aria-label="REWARD_CODES_MESSAGES.enabledAria(data.displayName)"
               @update:model-value="setRewardCodeEnabled(data, $event)"
             />
           </div>
@@ -136,7 +136,7 @@
       </AdminColumn>
 
       <!-- 兑换进度列：等宽字体分子分母 -->
-      <AdminColumn header="兑换进度" :style="{ width: '150px' }">
+      <AdminColumn :header="REWARD_CODES_MESSAGES.progressColumn" :style="{ width: '150px' }">
         <template #body="{ data }">
           <span class="font-mono text-xs text-admin-text-1">
             {{ data.redemptionCount }} / {{ data.maxRedemptions === 0 ? '∞' : data.maxRedemptions }}
@@ -145,7 +145,7 @@
       </AdminColumn>
 
       <!-- 过期时间列：等宽日期 -->
-      <AdminColumn field="expiresAt" header="过期时间" :style="{ width: '180px' }">
+      <AdminColumn field="expiresAt" :header="REWARD_CODES_MESSAGES.expiresColumn" :style="{ width: '180px' }">
         <template #body="{ data }">
           <span class="whitespace-nowrap font-mono text-xs text-admin-text-2">
             {{ formatExpiresAt(data.expiresAt) }}
@@ -161,7 +161,7 @@
               type="button"
               :class="adminTableRowActionButtonClass"
               aria-haspopup="dialog"
-              :aria-label="`${data.displayName} 操作菜单`"
+              :aria-label="REWARD_CODES_MESSAGES.actionsMenuAria(data.displayName)"
               @click="toggleActionMenu($event, data)"
             >
               <MoreHoriz class="size-4" />
@@ -239,6 +239,7 @@ import { useRewardCodeList } from './useRewardCodeList'
 import { useRewardCodeRowActions } from './useRewardCodeRowActions'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
+import { REWARD_CODES_MESSAGES } from './messages'
 
 const resource = createAdminRewardCodeResource()
 const confirm = useAdminConfirm()
@@ -271,17 +272,17 @@ const createDialogVisible = ref(false)
 const editingRewardCode = ref<RewardCode | null>(null)
 const plaintextDialogVisible = ref(false)
 const createdPlaintext = ref('')
-const plaintextHeader = ref('保存兑换码')
+const plaintextHeader = ref<string>(REWARD_CODES_MESSAGES.plaintextHeader)
 const activeRewardCode = ref<RewardCode | null>(null)
 const redemptionsRewardCode = ref<RewardCode | null>(null)
 const redemptionsDialogVisible = ref(false)
 const actionPopoverRef = ref<ActionPopupPanel | null>(null)
 const rewardCodeActionItems = computed(() => [
-  { key: 'redemptions', label: '兑换记录' },
-  { key: 'edit', label: '编辑' },
+  { key: 'redemptions', label: REWARD_CODES_MESSAGES.redemptionsAction },
+  { key: 'edit', label: REWARD_CODES_MESSAGES.editAction },
   {
     key: 'delete',
-    label: '删除',
+    label: REWARD_CODES_MESSAGES.deleteAction,
     danger: true,
     disabled: Boolean(deletePending[activeRewardCode.value?.id ?? 0]),
   },
@@ -300,11 +301,11 @@ async function confirmRewardCodeSave(editing: RewardCode | null, displayName: st
   // and an empty field falls back to a default so one click proceeds.
   // Returns null only when the operator cancels.
   return confirmSettingsSave(confirm, {
-    title: editing ? '确认更新兑换码' : '确认创建兑换码',
+    title: editing ? REWARD_CODES_MESSAGES.confirmUpdateTitle : REWARD_CODES_MESSAGES.confirmCreateTitle,
     message: editing
-      ? `确定更新“${editing.displayName}”吗？该操作将记录审计。`
-      : `确定创建兑换码“${displayName}”吗？该操作将记录审计。`,
-    confirmLabel: editing ? '确认更新' : '确认创建',
+      ? REWARD_CODES_MESSAGES.confirmUpdateMessage(editing.displayName)
+      : REWARD_CODES_MESSAGES.confirmCreateMessage(displayName),
+    confirmLabel: editing ? REWARD_CODES_MESSAGES.confirmUpdate : REWARD_CODES_MESSAGES.confirmCreate,
   })
 }
 
@@ -316,9 +317,9 @@ async function persistRewardCode(
   if (!editing) {
     const created = await resource.create(input, { operatorReason })
     createdPlaintext.value = created.plaintext || input.code
-    plaintextHeader.value = '保存兑换码'
+    plaintextHeader.value = REWARD_CODES_MESSAGES.plaintextHeader
     plaintextDialogVisible.value = true
-    toast.success('兑换码已创建')
+    toast.success(REWARD_CODES_MESSAGES.created)
   } else {
     const updated = await resource.update(
       editing.id,
@@ -334,10 +335,10 @@ async function persistRewardCode(
     replaceRewardCode(updated.rewardCode)
     if (input.code) {
       createdPlaintext.value = updated.plaintext || input.code
-      plaintextHeader.value = '保存新 Code'
+      plaintextHeader.value = REWARD_CODES_MESSAGES.newCodeHeader
       plaintextDialogVisible.value = true
     }
-    toast.success(input.code ? '兑换码与 Code 已更新' : '兑换码已更新')
+    toast.success(input.code ? REWARD_CODES_MESSAGES.updatedWithCode : REWARD_CODES_MESSAGES.updated)
   }
 }
 
@@ -359,7 +360,7 @@ async function saveRewardCode(input: RewardCodeFormSubmit) {
   } catch (error) {
     saveError.value = formatAdminDisplayError(
       error,
-      editingRewardCode.value ? '更新兑换码失败' : '创建兑换码失败',
+      editingRewardCode.value ? REWARD_CODES_MESSAGES.updateFailed : REWARD_CODES_MESSAGES.createFailed,
     )
   } finally {
     saving.value = false
@@ -395,7 +396,7 @@ function handlePlaintextDialogVisible(visible: boolean) {
 }
 
 function formatExpiresAt(value?: string): string {
-  if (!value) return '永不过期'
+  if (!value) return REWARD_CODES_MESSAGES.neverExpires
   return formatLocaleDate(new Date(value), {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
@@ -410,13 +411,13 @@ function formatExpiresAt(value?: string): string {
 function statusPresentation(status: RewardCode['status']) {
   switch (status) {
     case 'expired':
-      return { label: '已过期', severity: 'secondary' as const }
+      return { label: REWARD_CODES_MESSAGES.statusExpired, severity: 'secondary' as const }
     case 'exhausted':
-      return { label: '已耗尽', severity: 'warn' as const }
+      return { label: REWARD_CODES_MESSAGES.statusExhausted, severity: 'warn' as const }
     case 'disabled':
-      return { label: '已停用', severity: 'secondary' as const }
+      return { label: REWARD_CODES_MESSAGES.statusDisabled, severity: 'secondary' as const }
     case 'enabled':
-      return { label: '可兑换', severity: 'success' as const }
+      return { label: REWARD_CODES_MESSAGES.statusEnabled, severity: 'success' as const }
   }
 }
 </script>

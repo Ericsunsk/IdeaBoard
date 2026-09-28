@@ -58,6 +58,7 @@ export default {
       enterNewPassword: 'Enter a new password',
       confirmNewPassword: 'Confirm your new password',
       mismatch: 'Passwords do not match',
+      passwordLength: 'Password must be {min}-{max} characters',
       logoutAfterChangeFailed:
         'Your password was updated, but sign-out failed. Sign out manually and sign in again.',
       invalidEmail: 'Enter a valid email address',

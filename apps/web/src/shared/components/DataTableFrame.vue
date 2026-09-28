@@ -273,16 +273,16 @@ const scrollContainerClass = computed(() =>
 // size 只有 small/large 显式档位，其余（含 undefined）走 default：新增档位只加表项。
 const headerCellClasses = {
   small:
-    'border-b border-ib-border-soft px-3 py-2 text-left align-middle text-[13px] font-semibold text-ib-text',
+    'border-b border-ib-border-soft px-3 py-2 text-left align-middle text-ib-body font-semibold text-ib-text',
   large:
-    'border-b border-ib-border-soft px-5 py-4 text-left align-middle text-[15px] font-semibold text-ib-text',
+    'border-b border-ib-border-soft px-5 py-4 text-left align-middle text-ib-title-sm font-semibold text-ib-text',
   default:
-    'border-b border-ib-border-soft px-4 py-3 text-left align-middle text-[13px] font-semibold text-ib-text',
+    'border-b border-ib-border-soft px-4 py-3 text-left align-middle text-ib-body font-semibold text-ib-text',
 } as const
 const headerCellClass = computed(() => headerCellClasses[props.size ?? 'default'])
 const bodyCellClasses = {
-  small: 'border-b border-ib-border-soft px-3 py-2 align-middle text-[13px] text-ib-text',
-  large: 'border-b border-ib-border-soft px-5 py-4 align-middle text-[15px] text-ib-text',
+  small: 'border-b border-ib-border-soft px-3 py-2 align-middle text-ib-body text-ib-text',
+  large: 'border-b border-ib-border-soft px-5 py-4 align-middle text-ib-title-sm text-ib-text',
   default: 'border-b border-ib-border-soft px-4 py-3 align-middle text-sm text-ib-text',
 } as const
 const bodyCellClass = computed(() => bodyCellClasses[props.size ?? 'default'])

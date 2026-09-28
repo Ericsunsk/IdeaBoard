@@ -13,7 +13,7 @@
             <span class="text-admin-caption font-bold text-admin-title-color"> 选择品牌 Logo </span>
             <button
               type="button"
-              class="cursor-pointer border-0 bg-transparent p-0 text-[11px] font-semibold text-admin-accent hover:underline"
+              class="cursor-pointer border-0 bg-transparent p-0 text-admin-caption font-semibold text-admin-accent hover:underline"
               :disabled="isSaving"
               @click="selectLogo('auto')"
             >
@@ -29,7 +29,7 @@
               v-for="cat in ADMIN_BRAND_CATEGORIES"
               :key="cat.key"
               type="button"
-              class="shrink-0 cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors"
+              class="shrink-0 cursor-pointer rounded-full px-2 py-0.5 text-admin-caption font-medium transition-colors"
               :class="
                 currentCategory === cat.key
                   ? 'bg-admin-accent text-admin-text-inverse font-semibold shadow-xs'

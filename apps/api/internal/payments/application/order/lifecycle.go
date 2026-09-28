@@ -75,7 +75,7 @@ func (l *PaymentOrderLifecycle) ExpireOrder(ctx context.Context, order paymentsd
 	}
 	expired, changed, err := l.repo.MarkPaymentOrderExpired(ctx, order.ID)
 	if err == nil && changed {
-		l.Publish(expired.UserID, paymentports.PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
+		l.Publish(expired.UserID, paymentports.PaymentEvent{PublicToken: expired.PublicToken, Status: paymentports.PaymentEventFailed})
 	}
 	return expired, err
 }
@@ -99,20 +99,20 @@ func (l *PaymentOrderLifecycle) ConvergeCheckoutExpiration(ctx context.Context, 
 	case paymentports.CheckoutSessionExpirationOutcomeExpired:
 		cancelled, changed, err := l.repo.MarkPaymentOrderCancelled(ctx, order.UserID, order.ID)
 		if err == nil && changed {
-			l.Publish(cancelled.UserID, paymentports.PaymentEvent{PublicToken: cancelled.PublicToken, Status: "failed"})
+			l.Publish(cancelled.UserID, paymentports.PaymentEvent{PublicToken: cancelled.PublicToken, Status: paymentports.PaymentEventFailed})
 		}
 		return cancelled, err
 	case paymentports.CheckoutSessionExpirationOutcomePaid:
 		result, err := l.repo.ConvergePaidPaymentOrder(ctx, PaidCheckoutFactsFromSession(order.StripeAccountID, expiration.Session, now), now)
 		if err == nil && !result.Replayed {
-			l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
+			l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: paymentports.PaymentEventCredited})
 		}
 		return result.Order, err
 	case paymentports.CheckoutSessionExpirationOutcomeAsyncPaymentPending:
 		previous := order.Status
 		pending, err := l.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
 		if err == nil && pending.Status != previous {
-			l.Publish(pending.UserID, paymentports.PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+			l.Publish(pending.UserID, paymentports.PaymentEvent{PublicToken: pending.PublicToken, Status: paymentports.PaymentEventProcessing})
 		}
 		return pending, err
 	case paymentports.CheckoutSessionExpirationOutcomeOpen:
@@ -132,7 +132,7 @@ func (l *PaymentOrderLifecycle) ConvergePaidCheckoutSession(ctx context.Context,
 		return order, err
 	}
 	if !result.Replayed {
-		l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
+		l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: paymentports.PaymentEventCredited})
 	}
 	return result.Order, nil
 }
@@ -143,7 +143,7 @@ func (l *PaymentOrderLifecycle) CreditPaidOrder(ctx context.Context, order payme
 	}
 	result, err := l.repo.CreditPaidPaymentOrder(ctx, order.ID, creditedAt)
 	if err == nil && !result.Replayed {
-		l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
+		l.Publish(result.Order.UserID, paymentports.PaymentEvent{PublicToken: result.Order.PublicToken, Status: paymentports.PaymentEventCredited})
 	}
 	return result.Order, err
 }
@@ -180,7 +180,7 @@ func (l *PaymentOrderLifecycle) convergeCompletedCheckoutSession(ctx context.Con
 			return order, err
 		}
 		if failed.Status == paymentsdomain.PaymentOrderFailed && failed.Status != order.Status {
-			l.Publish(failed.UserID, paymentports.PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
+			l.Publish(failed.UserID, paymentports.PaymentEvent{PublicToken: failed.PublicToken, Status: paymentports.PaymentEventFailed})
 		}
 		return failed, nil
 	}
@@ -189,7 +189,7 @@ func (l *PaymentOrderLifecycle) convergeCompletedCheckoutSession(ctx context.Con
 		return order, err
 	}
 	if order.Status != pending.Status {
-		l.Publish(pending.UserID, paymentports.PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+		l.Publish(pending.UserID, paymentports.PaymentEvent{PublicToken: pending.PublicToken, Status: paymentports.PaymentEventProcessing})
 	}
 	return pending, nil
 }

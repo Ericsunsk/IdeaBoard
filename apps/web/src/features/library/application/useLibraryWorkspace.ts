@@ -9,18 +9,18 @@ import {
   type Ref,
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAppToast } from '../../shared/composables/useAppToast'
-import { stringParam } from '../../shared/router/queryParams'
-import { userFacingErrorCopy } from '../../shared/errors/errorCatalog'
-import { i18n } from '../../shared/i18n'
+import { useAppToast } from '../../../shared/composables/useAppToast'
+import { stringParam } from '../../../shared/router/queryParams'
+import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
+import { i18n } from '../../../shared/i18n'
 import {
   assertLibraryFolderId,
   libraryAssetKey,
-  listAllWorkspaceLibraryFolders,
   requireWorkspaceId,
-  workspaceLibraryApi,
   type WorkspaceLibraryAsset,
-} from './workspace'
+} from '../domain/validators'
+import { workspaceLibraryApi } from '../infrastructure/resource'
+import { listAllWorkspaceLibraryFolders } from './libraryUseCases'
 import {
   createLibraryFolderFacts,
   createLibraryMutationPublisher,
@@ -28,7 +28,7 @@ import {
   type LibraryFolderView,
   type LibraryMutationPublisher,
 } from './folderFacts'
-import type { LibraryAssetView } from './transfer'
+import type { LibraryAssetView } from '../domain/transfer'
 
 export type LibraryFolderTab = {
   queryKey: string

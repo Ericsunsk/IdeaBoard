@@ -42,7 +42,7 @@
             :class="[summaryCellClass, metric.cellClass]"
           >
             <p
-              class="m-0 break-all whitespace-normal font-mono text-[34px] leading-tight font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
+              class="m-0 break-all whitespace-normal font-mono text-ib-summary-value leading-tight font-bold text-ib-text sm:text-[30px] lg:text-[34px]"
             >
               {{ metric.value }}
             </p>
@@ -77,14 +77,14 @@
         <template v-if="!isInitialPending">
           <p
             v-if="isSwitching"
-            class="mt-3 mb-0 text-[12px] font-semibold text-ib-text-subtle"
+            class="mt-3 mb-0 text-ib-meta font-semibold text-ib-text-subtle"
             aria-live="polite"
           >
             {{ t('account.usage.loadingRangeTrend', { range: selectedRangeText }) }}
           </p>
           <div
             v-if="error"
-            class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
+            class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 sm:flex-row sm:items-center"
             role="alert"
           >
             <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
@@ -156,8 +156,8 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
 )
 const summaryPanelClass =
   'overflow-hidden rounded-ib-panel border border-ib-border-soft bg-ib-surface shadow-ib-control'
-const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
-const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
+const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
+const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
 const trendChartTheme = resolveUsageChartTheme()
 const trendChartPlugins = markRaw(createUsageChartPlugins(trendChartTheme))
 const trendDetailsCaptionId = useId()
@@ -176,23 +176,23 @@ const summaryCellDefinitions = computed(
     [
       {
         label: t('account.usage.metricTotalUsed'),
-        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
+        cellClass: 'border-r border-b border-ib-border-soft sm:border-b-0',
       },
       {
         label: t('account.usage.metricPeakDaily'),
-        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+        cellClass: 'border-b border-ib-border-soft sm:border-r sm:border-b-0',
       },
       {
         label: t('account.usage.metricAvgDaily'),
-        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
+        cellClass: 'border-r border-b border-ib-border-soft sm:border-b-0',
       },
       {
         label: t('account.usage.metricTasks'),
-        cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+        cellClass: 'border-b border-ib-border-soft sm:border-r sm:border-b-0',
       },
       {
         label: t('account.usage.metricActiveDays'),
-        cellClass: 'max-[640px]:col-span-2',
+        cellClass: 'col-span-2 sm:col-span-1',
       },
     ] as const,
 )

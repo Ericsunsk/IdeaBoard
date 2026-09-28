@@ -33,7 +33,7 @@
  */
 
 export interface ControlCreditCommandRequest {
-  /** @pattern ^usr_[A-Za-z0-9]+$ */
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   user_id: string
   /** @minimum 1 */
   amount_credits: number

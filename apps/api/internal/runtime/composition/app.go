@@ -63,15 +63,7 @@ func runServe() {
 func runMigrate() {
 	cfg := loadConfigOrFatal()
 	configureRuntimeLogging(cfg)
-	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
-	if atlasBinary == "" {
-		atlasBinary = "atlas"
-	}
-	migrationsDirectory := strings.TrimSpace(os.Getenv("ATLAS_MIGRATIONS_DIR"))
-	if migrationsDirectory == "" {
-		migrationsDirectory = defaultMigrationDirectory
-	}
-	if err := Migrate(context.Background(), cfg, atlasBinary, migrationsDirectory); err != nil {
+	if err := Migrate(context.Background(), cfg, cfg.Migration.AtlasBinary, cfg.Migration.MigrationsDir); err != nil {
 		fatal("failed to migrate database schema", "err", err)
 	}
 	slog.Info("database migration completed")
@@ -147,9 +139,9 @@ func runInitAdmin() {
 	if err := lifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
-	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
-	adminEmail := strings.TrimSpace(os.Getenv("INIT_ADMIN_EMAIL"))
-	adminDisplayName := strings.TrimSpace(os.Getenv("INIT_ADMIN_DISPLAY_NAME"))
+	adminPassword := cfg.AdminSeed.Password
+	adminEmail := cfg.AdminSeed.Email
+	adminDisplayName := cfg.AdminSeed.DisplayName
 	if adminEmail == "" {
 		fatal("INIT_ADMIN_EMAIL is required")
 	}

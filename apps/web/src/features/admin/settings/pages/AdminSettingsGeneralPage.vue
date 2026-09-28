@@ -1,9 +1,9 @@
 <template>
   <AdminSettingsTable
-    title="网站设置"
-    subtitle="站点名称、品牌标识与图片搜索供应商配置"
-    table-aria-label="网站设置列表"
-    scroll-aria-label="网站设置列表横向滚动区域"
+    :title="SETTINGS_MESSAGES.siteTitle"
+    :subtitle="SETTINGS_MESSAGES.siteSubtitle"
+    :table-aria-label="SETTINGS_MESSAGES.siteTableAria"
+    :scroll-aria-label="SETTINGS_MESSAGES.siteTableScrollAria"
     :rows="settingRows"
   >
     <template #summary="{ data }">
@@ -14,21 +14,21 @@
       <div class="border-t border-admin-border-soft bg-admin-bg p-4 md:p-5">
         <SettingEditorCard
           v-if="data.id === 'branding'"
-          title="站点设置"
-          :status="brandingForm.logo_url ? '自定义 Logo' : '默认标识'"
+          :title="SETTINGS_MESSAGES.brandingTitle"
+          :status="brandingForm.logo_url ? SETTINGS_MESSAGES.customLogo : SETTINGS_MESSAGES.defaultBrand"
           :status-severity="brandingForm.logo_url ? 'info' : 'secondary'"
           class="mb-0"
         >
           <div :class="settingCardBodyClass">
             <div class="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)]">
               <div class="flex min-w-0 flex-col gap-2">
-                <span class="text-admin-meta font-[680] text-admin-text-2">站点 Logo</span>
+                <span class="text-admin-meta font-[680] text-admin-text-2">{{ SETTINGS_MESSAGES.logoLabel }}</span>
                 <div class="group/logo relative size-28">
                   <button
                     :class="brandingLogoButtonClass"
                     type="button"
                     :disabled="brandingLoading || brandingSaving || uploading"
-                    aria-label="上传站点 Logo"
+                    :aria-label="SETTINGS_MESSAGES.uploadLogo"
                     @click="openLogoPicker"
                   >
                     <SiteBrandLogo
@@ -48,8 +48,8 @@
                         : 'opacity-0 group-hover/logo:opacity-100 group-focus-within/logo:opacity-100 focus-visible:opacity-100'
                     "
                     type="button"
-                    title="清除 Logo"
-                    aria-label="清除 Logo"
+                    :title="SETTINGS_MESSAGES.clearLogo"
+                    :aria-label="SETTINGS_MESSAGES.clearLogo"
                     :disabled="brandingLoading || brandingSaving || uploading"
                     @mousedown.stop
                     @pointerdown.stop
@@ -59,7 +59,7 @@
                   </button>
                 </div>
 
-                <p class="text-admin-caption text-admin-text-3">支持 PNG、SVG、JPG，透明底为佳</p>
+                <p class="text-admin-caption text-admin-text-3">{{ SETTINGS_MESSAGES.logoHint }}</p>
 
                 <input
                   id="admin-branding-logo-file"
@@ -73,7 +73,7 @@
               </div>
 
               <div class="grid content-start gap-4">
-                <AdminFormField label="站点名称" for="admin-branding-project-name">
+                <AdminFormField :label="SETTINGS_MESSAGES.projectNameLabel" for="admin-branding-project-name">
                   <AdminInput
                     id="admin-branding-project-name"
                     v-model="brandingForm.project_name"
@@ -85,7 +85,7 @@
                   />
                 </AdminFormField>
 
-                <AdminFormField label="Logo 地址" for="admin-branding-logo-url">
+                <AdminFormField :label="SETTINGS_MESSAGES.logoUrlLabel" for="admin-branding-logo-url">
                   <AdminInput
                     id="admin-branding-logo-url"
                     v-model="brandingForm.logo_url"
@@ -106,7 +106,7 @@
               :loading="brandingSaving"
               @click="saveBranding"
             >
-              保存
+              {{ SETTINGS_MESSAGES.save }}
             </AdminButton>
             <AdminButton
               :class="adminActionButtonClass"
@@ -114,7 +114,7 @@
               :disabled="brandingLoading || brandingSaving || uploading"
               @click="resetBranding"
             >
-              重置
+              {{ SETTINGS_MESSAGES.reset }}
             </AdminButton>
           </template>
         </SettingEditorCard>
@@ -136,7 +136,7 @@
               size="small"
               @click="loadSearchProviders"
             >
-              重试
+              {{ SETTINGS_MESSAGES.retry }}
             </AdminButton>
           </div>
         </AdminAlert>
@@ -191,6 +191,7 @@ import {
 } from '../useSettingsFeedback'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminLogoButtonClass, adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { SETTINGS_MESSAGES } from './messages'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 const brandingLogoButtonClass = [adminLogoButtonClass, 'size-28 relative'].join(' ')
@@ -219,15 +220,18 @@ const {
 
 function buildBrandingRow(form: typeof brandingForm.value): AdminSettingsTableRow {
   const hasCustomLogo = Boolean(form?.logo_url)
-  const projectName = form?.project_name || '默认 (IdeaBoard)'
+  const projectName = form?.project_name || SETTINGS_MESSAGES.defaultProjectName
   return {
     id: 'branding',
-    title: '站点设置',
-    description: '站点名称与主品牌 Logo 标识',
+    title: SETTINGS_MESSAGES.brandingTitle,
+    description: SETTINGS_MESSAGES.brandingDescription,
     icon: Globe,
-    status: hasCustomLogo ? '自定义 Logo' : '默认标识',
+    status: hasCustomLogo ? SETTINGS_MESSAGES.customLogo : SETTINGS_MESSAGES.defaultBrand,
     statusSeverity: hasCustomLogo ? 'info' : 'secondary',
-    summary: `名称: ${projectName} · Logo: ${hasCustomLogo ? '已配置' : '默认'}`,
+    summary: SETTINGS_MESSAGES.brandingSummary(
+      projectName,
+      hasCustomLogo ? SETTINGS_MESSAGES.logoConfigured : SETTINGS_MESSAGES.logoUnset,
+    ),
   }
 }
 
@@ -254,9 +258,9 @@ function resolveSearchConfig(id: string): SearchProviderConfig | null {
 }
 
 function searchProviderSummary(config: SearchProviderConfig): string {
-  if (config.test_state === 'passed') return '连接正常，可启用或停用'
-  if (config.test_state === 'failed') return '上次连接测试失败，请检查后重试'
-  return '尚未通过连接测试，启用前需先测试'
+  if (config.test_state === 'passed') return SETTINGS_MESSAGES.searchPassed
+  if (config.test_state === 'failed') return SETTINGS_MESSAGES.searchFailedHint
+  return SETTINGS_MESSAGES.searchUntested
 }
 
 function buildSearchProviderRows(): AdminSettingsTableRow[] {
@@ -265,33 +269,39 @@ function buildSearchProviderRows(): AdminSettingsTableRow[] {
     if (!config) {
       return {
         id: provider,
-        title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
-        description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+        title: SETTINGS_MESSAGES.imageSourceTitle(SEARCH_PROVIDER_LABELS[provider]),
+        description: SETTINGS_MESSAGES.imageSourceDescription(SEARCH_PROVIDER_LABELS[provider]),
         icon: Search,
-        status: searchLoadError.value ? '加载失败' : '加载中',
+        status: searchLoadError.value ? SETTINGS_MESSAGES.providerLoadFailed : SETTINGS_MESSAGES.providerLoading,
         statusSeverity: searchLoadError.value ? 'danger' : 'secondary',
-        summary: searchLoadError.value ? '读取供应商配置失败' : '正在读取供应商配置',
+        summary: searchLoadError.value
+          ? SETTINGS_MESSAGES.providerConfigLoadFailed
+          : SETTINGS_MESSAGES.providerConfigLoading,
       }
     }
     if (config.enabled) {
       return {
         id: provider,
-        title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
-        description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+        title: SETTINGS_MESSAGES.imageSourceTitle(SEARCH_PROVIDER_LABELS[provider]),
+        description: SETTINGS_MESSAGES.imageSourceDescription(SEARCH_PROVIDER_LABELS[provider]),
         icon: Search,
-        status: '已启用',
+        status: SETTINGS_MESSAGES.providerEnabled,
         statusSeverity: 'success',
         summary: searchProviderSummary(config),
       }
     }
     return {
       id: provider,
-      title: `${SEARCH_PROVIDER_LABELS[provider]} 图片源`,
-      description: `${SEARCH_PROVIDER_LABELS[provider]} 官方 API 接入与可用状态`,
+      title: SETTINGS_MESSAGES.imageSourceTitle(SEARCH_PROVIDER_LABELS[provider]),
+      description: SETTINGS_MESSAGES.imageSourceDescription(SEARCH_PROVIDER_LABELS[provider]),
       icon: Search,
-      status: config.api_key_configured ? '已停用' : '未配置',
+      status: config.api_key_configured
+        ? SETTINGS_MESSAGES.providerDisabled
+        : SETTINGS_MESSAGES.providerUnconfigured,
       statusSeverity: config.api_key_configured ? 'secondary' : 'warn',
-      summary: config.api_key_configured ? searchProviderSummary(config) : '尚未配置 API Key',
+      summary: config.api_key_configured
+        ? searchProviderSummary(config)
+        : SETTINGS_MESSAGES.apiKeyMissing,
     }
   })
 }
@@ -305,7 +315,7 @@ async function loadSearchProviders() {
         SEARCH_PROVIDERS.indexOf(left.provider) - SEARCH_PROVIDERS.indexOf(right.provider),
     )
   } catch (err) {
-    searchLoadError.value = formatAdminDisplayError(err, '加载图片搜索供应商配置失败')
+    searchLoadError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchProvidersLoadFailed)
   }
 }
 

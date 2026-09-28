@@ -58,6 +58,7 @@ export default {
       enterNewPassword: '请输入新密码',
       confirmNewPassword: '请确认新密码',
       mismatch: '两次输入的密码不一致',
+      passwordLength: '密码长度必须为 {min}-{max} 个字符',
       logoutAfterChangeFailed: '密码已更新，但退出登录失败，请手动退出并重新登录。',
       invalidEmail: '请输入有效的邮箱地址',
       sixDigitCode: '请输入 6 位验证码',

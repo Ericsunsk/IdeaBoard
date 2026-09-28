@@ -1,4 +1,5 @@
 import Compressor from 'compressorjs'
+import { VISION_HEIC_EXTENSIONS, VISION_HEIC_MIME_TYPES } from './visionIngressPolicy'
 import { getFileExtension, isSupportedUploadImageFile } from '../utils/imageUploadSupport'
 import { userFacingErrorCopy } from '../errors/errorCatalog'
 import { i18n } from '../i18n'
@@ -88,8 +89,8 @@ type DetectedImageFormat = {
   requiresJPEGConversion?: boolean
 }
 
-const HEIC_UPLOAD_MIME_TYPES = new Set(['image/heic', 'image/heif'])
-const HEIC_UPLOAD_EXTENSIONS = new Set(['.heic', '.heif'])
+const HEIC_UPLOAD_MIME_TYPES = new Set<string>(VISION_HEIC_MIME_TYPES)
+const HEIC_UPLOAD_EXTENSIONS = new Set<string>(VISION_HEIC_EXTENSIONS)
 
 function hasBytes(data: Uint8Array, offset: number, expected: readonly number[]): boolean {
   if (data.length < offset + expected.length) return false

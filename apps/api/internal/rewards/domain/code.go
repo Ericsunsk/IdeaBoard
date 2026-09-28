@@ -21,6 +21,11 @@ const (
 	MaxCreditAmount int64 = 9_000_000_000_000_000
 )
 
+// MaskedCodeHintPrefix is the single display prefix for masked reward-code
+// hints ("•••• " + trailing hint suffix). It is defined once here so the
+// admin (rewardcodes) and redemption (redemptions) flows cannot drift.
+const MaskedCodeHintPrefix = "•••• "
+
 func ValidateCreditAmount(value int64) error {
 	if value <= 0 || value > MaxCreditAmount {
 		return fmt.Errorf("credit amount must be between 1 and %d", MaxCreditAmount)

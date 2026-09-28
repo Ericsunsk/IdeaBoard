@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via SCRIPT_DIR; scripts/lib/common.sh is linted directly in ops.yml.
+source "$SCRIPT_DIR/lib/common.sh"
+
 STACK_DIR="${IDEABOARD_STACK_DIR:-/opt/stacks/ideaboard}"
 COMPOSE_FILE="${COMPOSE_FILE:-$STACK_DIR/docker/compose.yml}"
 ENV_FILE="${ENV_FILE:-$STACK_DIR/docker/.env}"
@@ -45,11 +49,8 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-die() {
-  echo "Error: $*" >&2
-  exit 1
-}
-
+# die() comes from scripts/lib/common.sh (identical contract: "Error: ..." on
+# stderr, exit 1).
 is_enabled() {
   local value="$1"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" ]]

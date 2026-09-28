@@ -1,5 +1,5 @@
-import type { LibrarySearchReference, WorkspaceLibraryAsset } from './workspace'
-import { assertLibraryAssetId } from './workspace'
+import type { LibrarySearchReference, WorkspaceLibraryAsset } from './validators'
+import { assertLibraryAssetId } from './validators'
 
 export type LibraryAssetView = WorkspaceLibraryAsset
 

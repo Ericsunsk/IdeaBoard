@@ -12,11 +12,29 @@ const (
 	DefaultPublishTimeout      = 2 * time.Second
 )
 
+// TaskStatus is the workspace task lifecycle word carried by
+// TaskStatusEvent. The wire words are unchanged
+// ("pending","running","completed","failed","cancelled") and mirror
+// workspacetasks.Status; the type only documents the closed vocabulary
+// at compile time. The canonical transition table lives in the
+// workspacetasks package (see CanTransition there, verified against
+// internal/db/queries/workspace_tasks.sql); events only transports the
+// words and never gates them, so no second table is kept here.
+type TaskStatus string
+
+const (
+	TaskStatusPending   TaskStatus = "pending"
+	TaskStatusRunning   TaskStatus = "running"
+	TaskStatusCompleted TaskStatus = "completed"
+	TaskStatusFailed    TaskStatus = "failed"
+	TaskStatusCancelled TaskStatus = "cancelled"
+)
+
 type TaskStatusEvent struct {
-	Type       string    `json:"type"`
-	TaskID     string    `json:"task_id"`
-	Status     string    `json:"status"`
-	OccurredAt time.Time `json:"occurred_at"`
+	Type       string     `json:"type"`
+	TaskID     string     `json:"task_id"`
+	Status     TaskStatus `json:"status"`
+	OccurredAt time.Time  `json:"occurred_at"`
 }
 
 type TaskStatusPublisher interface {
@@ -29,14 +47,14 @@ func NewTaskStatusEvent(taskID, status string) TaskStatusEvent {
 	return TaskStatusEvent{
 		Type:       EventTypeTaskStatusChanged,
 		TaskID:     strings.TrimSpace(taskID),
-		Status:     strings.TrimSpace(status),
+		Status:     TaskStatus(strings.TrimSpace(status)),
 		OccurredAt: time.Now().UTC(),
 	}
 }
 
 func NormalizeTaskStatusEvent(event TaskStatusEvent) TaskStatusEvent {
 	event.TaskID = strings.TrimSpace(event.TaskID)
-	event.Status = strings.TrimSpace(event.Status)
+	event.Status = TaskStatus(strings.TrimSpace(string(event.Status)))
 	if strings.TrimSpace(event.Type) == "" {
 		event.Type = EventTypeTaskStatusChanged
 	}

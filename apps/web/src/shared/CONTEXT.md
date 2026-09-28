@@ -33,6 +33,16 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 - `shared/seo` route SEO meta and static HTML; never depends on business data.
 - `shared/assets` provider/storage/oauth pure static assets; never referenced except by code import.
 
+## Copy Policy (User vs Admin Surfaces)
+
+| Surface | Rule |
+| ------- | ---- |
+| User surfaces (workspace, account, auth, canvas, search, library, legal, public-site) | User-visible copy lives only in `shared/i18n` locale bundles and is referenced by key. `en` is canonical; `zh-CN` / `es` / `ko` must match it exactly in keys and shape (`localeParity`, enforced by `lint:locale-parity`). |
+| Admin/ops surfaces (`features/admin/*`) | zh-only colocated messages: literals live next to the feedback factory or presenter that owns them (pattern: `features/admin/payments/messages.ts`); never wrapped in fake `t()` calls and never added to locale bundles. Toasts still exit only through `shared/lib/toast.ts`. |
+
+- `lint:user-copy` (`scripts/checkUserCopyLocale.ts` + `scripts/user-copy-locale-allowlist.json`) guards the boundary: CJK outside `features/admin` fails unless a reviewed allowlist entry marks it a true exception (protocol matchers, endonyms, backend-shaped test fixtures, admin-only shared helpers).
+- New user-surface strings ship with all four locale bundles in the same change; never land a partial translation.
+
 ## Query Key Conventions (`QUERY_KEY_CONVENTIONS`)
 - Prefer the generated orval `getXQueryKey()` helper when the operation exists (workspace list, control users, model catalog); never hand-roll a key for a generated op.
 - Hand-rolled `*QueryKeys` factories (or `*_QUERY_ROOT` + cursor-index consts for cursor collections) exist only for composed queries with no generated key helper (account infra resources, admin health/monitor/statistics, run-detail, finding/run-history lists).

@@ -1,38 +1,38 @@
 <template>
   <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
-      <h4 class="text-xs font-semibold text-admin-text-1">models.dev 参照信息</h4>
+      <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.referenceTitle }}</h4>
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-admin-text-2 hover:text-admin-accent cursor-pointer disabled:opacity-50"
+        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2 hover:text-admin-accent cursor-pointer disabled:opacity-50"
         :disabled="loading || !hasIdentity || isFal"
         @click="refreshReference"
       >
         <Refresh class="size-3.5" :class="{ 'animate-spin': loading }" />
-        刷新
+        {{ MODELS_MESSAGES.referenceRefresh }}
       </button>
     </div>
 
     <!-- 无身份：等用户输入模型标识 -->
-    <p v-if="!hasIdentity" class="text-[11px] leading-relaxed text-admin-text-3">
-      输入模型标识后自动查询参照价（经后端透传，不直连外部）。
+    <p v-if="!hasIdentity" class="text-admin-caption leading-relaxed text-admin-text-3">
+      {{ MODELS_MESSAGES.referenceNoIdentity }}
     </p>
 
     <!-- fal 优雅缺省：models.dev 未收录 fal provider，恒为 miss；短路展示，不发参照请求 -->
-    <p v-else-if="isFal" class="text-[11px] leading-relaxed text-admin-text-2">
-      fal 模型暂无 models.dev 数据（上游未收录），以网关侧配置为准。
+    <p v-else-if="isFal" class="text-admin-caption leading-relaxed text-admin-text-2">
+      {{ MODELS_MESSAGES.referenceFalNotice }}
     </p>
 
-    <p v-else-if="loading" class="text-[11px] text-admin-text-2">正在查询 models.dev 参照价...</p>
+    <p v-else-if="loading" class="text-admin-caption text-admin-text-2">{{ MODELS_MESSAGES.referenceLoading }}</p>
 
     <div v-else-if="loadError" class="flex items-center justify-between gap-2">
-      <span class="text-[11px] text-admin-danger">{{ loadError }}</span>
+      <span class="text-admin-caption text-admin-danger">{{ loadError }}</span>
       <button
         type="button"
-        class="text-[11px] font-semibold underline hover:no-underline cursor-pointer"
+        class="text-admin-caption font-semibold underline hover:no-underline cursor-pointer"
         @click="refreshReference"
       >
-        重试
+        {{ MODELS_MESSAGES.retry }}
       </button>
     </div>
 
@@ -61,19 +61,19 @@
           <span class="truncate text-xs font-semibold text-admin-text-1">
             {{ snapshot.name || snapshot.modelId }}
           </span>
-          <span class="truncate font-mono text-[11px] text-admin-text-3">
+          <span class="truncate font-mono text-admin-caption text-admin-text-3">
             {{ snapshot.modelId }}
           </span>
         </div>
         <span
-          class="ml-auto inline-flex shrink-0 items-center rounded bg-admin-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-admin-text-2"
+          class="ml-auto inline-flex shrink-0 items-center rounded bg-admin-surface-muted px-1.5 py-0.5 text-admin-micro font-medium text-admin-text-2"
         >
           source: {{ snapshot.source }}
         </span>
       </div>
 
       <!-- miss / 上游降级：found=false，HTTP 仍 200，按 error_code 解释 -->
-      <p v-if="!snapshot.found" class="text-[11px] leading-relaxed text-admin-text-2">
+      <p v-if="!snapshot.found" class="text-admin-caption leading-relaxed text-admin-text-2">
         {{ missHint }}
       </p>
 
@@ -81,27 +81,27 @@
         <div
           class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">输入 / 输出 (USD/MTok):</span>
+          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referencePricingLabel }}</span>
           <span class="font-medium text-admin-text-1">
-            {{ pricingText || '未知' }}
+            {{ pricingText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
         <div
           class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">上下文上限:</span>
+          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referenceContextLabel }}</span>
           <span class="font-medium text-admin-text-1">
-            {{ contextText || '未知' }}
+            {{ contextText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
         <div
           class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">上游更新时间:</span>
-          <span class="font-mono text-[11px] text-admin-text-1">
-            {{ snapshot.lastUpdated || '未知' }}
+          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referenceUpdatedLabel }}</span>
+          <span class="font-mono text-admin-caption text-admin-text-1">
+            {{ snapshot.lastUpdated || MODELS_MESSAGES.referenceUnknown }}
             <span v-if="freshnessText" class="text-admin-text-3">({{ freshnessText }})</span>
           </span>
         </div>
@@ -111,15 +111,15 @@
             （网关侧运营文案优先）。 -->
         <div
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
-          title="models.dev 能力原样透传（缺失即未知）"
+          :title="MODELS_MESSAGES.referenceCapabilitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">能力:</span>
-          <span v-if="!hasCapabilityData" class="font-medium text-admin-text-3">暂无数据</span>
+          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceCapabilitiesLabel }}</span>
+          <span v-if="!hasCapabilityData" class="font-medium text-admin-text-3">{{ MODELS_MESSAGES.referenceNoData }}</span>
           <span v-else class="flex flex-wrap justify-end gap-1">
             <span
               v-for="capability in capabilities"
               :key="capability.key"
-              class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
+              class="inline-flex items-center rounded px-1.5 py-0.5 text-admin-caption font-medium"
               :class="
                 capability.supported === true
                   ? 'bg-emerald-50 text-emerald-700'
@@ -136,50 +136,50 @@
 
         <div
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
-          title="models.dev modalities 原样透传"
+          :title="MODELS_MESSAGES.referenceModalitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">输入 / 输出模态:</span>
+          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceModalitiesLabel }}</span>
           <span class="text-right font-medium text-admin-text-1">
-            {{ modalitiesText || '暂无数据' }}
+            {{ modalitiesText || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <div
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
-          title="models.dev release_date / knowledge 透传"
+          :title="MODELS_MESSAGES.referenceReleaseTitle"
         >
-          <span class="shrink-0 text-admin-text-3">发布 / 知识截止:</span>
-          <span class="font-mono text-[11px] text-admin-text-1">
-            {{ releaseKnowledgeText || '暂无数据' }}
+          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceReleaseLabel }}</span>
+          <span class="font-mono text-admin-caption text-admin-text-1">
+            {{ releaseKnowledgeText || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <div
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
-          title="models.dev family 透传"
+          :title="MODELS_MESSAGES.referenceFamilyTitle"
         >
-          <span class="shrink-0 text-admin-text-3">模型家族:</span>
+          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceFamilyLabel }}</span>
           <span class="font-medium text-admin-text-1">
-            {{ snapshot.family || '暂无数据' }}
+            {{ snapshot.family || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <!-- 上游状态：deprecated 红色预警，beta 普通徽标；缺失即无预警，绝不误报。 -->
         <div
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
-          title="models.dev status 透传（deprecated 红色预警）"
+          :title="MODELS_MESSAGES.referenceStatusTitle"
         >
-          <span class="shrink-0 text-admin-text-3">上游状态:</span>
-          <span v-if="statusKind === 'unknown'" class="font-medium text-admin-text-3">暂无数据</span>
+          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceStatusLabel }}</span>
+          <span v-if="statusKind === 'unknown'" class="font-medium text-admin-text-3">{{ MODELS_MESSAGES.referenceNoData }}</span>
           <span
             v-else-if="statusKind === 'deprecated'"
-            class="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700"
+            class="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-admin-caption font-semibold text-red-700"
           >
-            {{ snapshot.status }} · 已下线预警
+            {{ MODELS_MESSAGES.referenceDeprecated(snapshot.status) }}
           </span>
           <span
             v-else-if="statusKind === 'beta'"
-            class="inline-flex items-center rounded border border-admin-border-soft bg-white px-1.5 py-0.5 text-[11px] font-medium text-admin-text-2"
+            class="inline-flex items-center rounded border border-admin-border-soft bg-white px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2"
           >
             {{ snapshot.status }}
           </span>
@@ -188,8 +188,8 @@
       </div>
 
       <!-- 非结算声明：后端 note 恒为“参照价，非结算依据” -->
-      <p class="text-[11px] leading-relaxed text-admin-text-3">
-        ※ {{ snapshot.note || '参照价，非结算依据' }}；结算唯一依据 billing SKU UnitCredits。
+      <p class="text-admin-caption leading-relaxed text-admin-text-3">
+        {{ MODELS_MESSAGES.referenceDisclaimer(snapshot.note) }}
       </p>
     </div>
   </div>
@@ -213,6 +213,7 @@ import {
   referenceStatusKind,
   type ModelReferenceSnapshot,
 } from '../../../domain/catalogData'
+import { MODELS_MESSAGES } from '../../pages/messages'
 
 const props = withDefaults(
   defineProps<{
@@ -282,7 +283,7 @@ async function fetchReference(refresh: boolean) {
   } catch (err) {
     if (version !== requestVersion) return
     snapshot.value = null
-    loadError.value = err instanceof Error ? err.message : '加载参照价失败'
+    loadError.value = err instanceof Error ? err.message : MODELS_MESSAGES.referenceLoadFailed
   } finally {
     if (version === requestVersion) loading.value = false
   }
@@ -371,13 +372,13 @@ const missHint = computed(() => {
   if (current.message) return current.message
   switch (current.errorCode) {
     case 'not_found':
-      return 'models.dev 未收录该模型，请确认标识或改用 provider/model 完整写法。'
+      return MODELS_MESSAGES.referenceMissNotFound
     case 'upstream_error':
-      return '参照上游暂不可用，稍后可点右上刷新重试。'
+      return MODELS_MESSAGES.referenceMissUpstream
     case 'allowlist_missing':
-      return '服务端未放行 models.dev，参照价不可用。'
+      return MODELS_MESSAGES.referenceMissAllowlist
     default:
-      return '暂无该模型参照价。'
+      return MODELS_MESSAGES.referenceMissDefault
   }
 })
 </script>

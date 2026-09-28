@@ -26,6 +26,17 @@ type Config struct {
 	Rewards       RewardsConfig
 	Storage       StorageConfig
 	Imgproxy      ImgproxyConfig
+	// AdminSeed carries the init-admin provisioning inputs. They are
+	// command-scoped (only the init-admin command requires them), so
+	// Validate leaves them unchecked; the command fails fast instead.
+	AdminSeed AdminSeedConfig
+	// Migration carries the Atlas tooling knobs for the migrate path.
+	// Empty values resolve to DefaultAtlasBinary/DefaultMigrationDirectory.
+	Migration MigrationToolingConfig
+	// Secrets carries the raw at-rest encryption key material. Presence is
+	// enforced by Validate; format (base64, 32 bytes) stays with the
+	// secrets package so there is a single format validator.
+	Secrets SecretsConfig
 	// InvalidEnv lists env keys whose raw values failed parsing and fell
 	// back to defaults (e.g. RIVER_WORKER_CONCURRENCY="lots"). Development
 	// tolerates them with a warning; LoadAndValidate rejects them in
@@ -288,6 +299,35 @@ type ImgproxyConfig struct {
 	SaltHex string
 }
 
+// AdminSeedConfig carries the init-admin provisioning inputs read from
+// INIT_ADMIN_EMAIL, INIT_ADMIN_PASSWORD and INIT_ADMIN_DISPLAY_NAME.
+type AdminSeedConfig struct {
+	Email       string
+	Password    string
+	DisplayName string
+}
+
+// MigrationToolingConfig carries the Atlas tooling knobs read from
+// ATLAS_BINARY and ATLAS_MIGRATIONS_DIR.
+type MigrationToolingConfig struct {
+	AtlasBinary   string
+	MigrationsDir string
+}
+
+// SecretsConfig carries the raw at-rest encryption key material read from
+// APP_SECRETS_ENCRYPTION_KEY.
+type SecretsConfig struct {
+	EncryptionKey string
+}
+
+const (
+	// DefaultAtlasBinary is the Atlas executable used when ATLAS_BINARY is unset.
+	DefaultAtlasBinary = "atlas"
+	// DefaultMigrationDirectory is the Atlas migration directory used when
+	// ATLAS_MIGRATIONS_DIR is unset.
+	DefaultMigrationDirectory = "file://internal/db/migrations"
+)
+
 type envConfig struct {
 	DBHost              string `env:"DB_HOST"`
 	DBPort              string `env:"DB_PORT"`
@@ -326,6 +366,13 @@ type envConfig struct {
 	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
 	ImgproxyKeyHex            string `env:"IMGPROXY_KEY"`
 	ImgproxySaltHex           string `env:"IMGPROXY_SALT"`
+
+	InitAdminEmail       string `env:"INIT_ADMIN_EMAIL"`
+	InitAdminPassword    string `env:"INIT_ADMIN_PASSWORD"`
+	InitAdminDisplayName string `env:"INIT_ADMIN_DISPLAY_NAME"`
+	AtlasBinary          string `env:"ATLAS_BINARY"`
+	AtlasMigrationsDir   string `env:"ATLAS_MIGRATIONS_DIR"`
+	SecretsEncryptionKey string `env:"APP_SECRETS_ENCRYPTION_KEY"`
 }
 
 var loadEnvOnce sync.Once
@@ -463,6 +510,18 @@ func Load() *Config {
 			KeyHex:  strings.TrimSpace(raw.ImgproxyKeyHex),
 			SaltHex: strings.TrimSpace(raw.ImgproxySaltHex),
 		},
+		AdminSeed: AdminSeedConfig{
+			Email:       strings.TrimSpace(raw.InitAdminEmail),
+			Password:    strings.TrimSpace(raw.InitAdminPassword),
+			DisplayName: strings.TrimSpace(raw.InitAdminDisplayName),
+		},
+		Migration: MigrationToolingConfig{
+			AtlasBinary:   stringEnvDefault(raw.AtlasBinary, DefaultAtlasBinary),
+			MigrationsDir: stringEnvDefault(raw.AtlasMigrationsDir, DefaultMigrationDirectory),
+		},
+		Secrets: SecretsConfig{
+			EncryptionKey: strings.TrimSpace(raw.SecretsEncryptionKey),
+		},
 		InvalidEnv: invalidEnv,
 	}
 }
@@ -475,6 +534,8 @@ func Load() *Config {
 // RIVER_WORKER_CONCURRENCY="lots" cannot silently run with defaults.
 // Public origins are validated here as well so a missing PUBLIC_ORIGIN fails
 // fast at boot instead of surfacing from the first URL-building call site.
+// APP_SECRETS_ENCRYPTION_KEY presence is required in every environment,
+// matching the unconditional wiring requirement for at-rest secret encryption.
 func LoadAndValidate() (*Config, error) {
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
@@ -484,9 +545,9 @@ func LoadAndValidate() (*Config, error) {
 }
 
 // Validate runs every startup fail-fast check in one place: database
-// settings, malformed env fallbacks (production only), and public origins.
-// Callers booting the process must fail on the returned error before opening
-// any connection or listener.
+// settings, malformed env fallbacks (production only), public origins, and
+// the at-rest secrets encryption key. Callers booting the process must fail
+// on the returned error before opening any connection or listener.
 func (c *Config) Validate() error {
 	if c == nil {
 		return fmt.Errorf("config is required")
@@ -495,6 +556,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.ValidateEnvStrict(); err != nil {
+		return err
+	}
+	if err := c.ValidateSecrets(); err != nil {
 		return err
 	}
 	if max := c.Database.Pool.EffectiveMaxOpenConns() + c.Database.Pool.EffectiveRiverMaxConns(); max > maxRuntimePoolBudget {
@@ -533,6 +597,20 @@ func (c *Config) ValidateDatabase() error {
 	}
 	if isUnsafeProductionSecret(c.Database.Password) {
 		return fmt.Errorf("DB_PASSWORD must be set to a non-placeholder value when APP_ENV=%s", c.App.Env)
+	}
+	return nil
+}
+
+// ValidateSecrets enforces the APP_SECRETS_ENCRYPTION_KEY presence check in
+// every environment, matching the unconditional wiring requirement in
+// runtime/composition (secrets.LoadEncryptionKey). Format validation
+// (base64, exactly 32 bytes) stays in the secrets package.
+func (c *Config) ValidateSecrets() error {
+	if c == nil {
+		return fmt.Errorf("config is required")
+	}
+	if strings.TrimSpace(c.Secrets.EncryptionKey) == "" {
+		return fmt.Errorf("APP_SECRETS_ENCRYPTION_KEY is required")
 	}
 	return nil
 }

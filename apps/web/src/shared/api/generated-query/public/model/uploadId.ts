@@ -16,6 +16,6 @@
 
 /**
  * Opaque public upload session identifier.
- * @pattern ^upload_[A-Za-z0-9]+$
+ * @pattern ^upload_[A-Za-z0-9_-]+$
  */
 export type UploadId = string

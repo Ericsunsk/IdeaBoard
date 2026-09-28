@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/media/storage/ports"
+	"ideaboard/api/internal/testsupport/testenv"
 )
 
 const (
@@ -108,9 +108,7 @@ func s3CompatibleSmokeConfigFromEnv() (*S3CompatibleConfig, []string, error) {
 		s3SmokeAccessDomainEnv,
 	}
 	missing := make([]string, 0, len(required))
-	env := func(name string) string {
-		return strings.TrimSpace(os.Getenv(name))
-	}
+	env := testenv.Get
 	for _, name := range required {
 		if env(name) == "" {
 			missing = append(missing, name)
@@ -139,7 +137,7 @@ func s3CompatibleSmokeConfigFromEnv() (*S3CompatibleConfig, []string, error) {
 }
 
 func optionalBoolEnv(name string) (bool, error) {
-	raw := strings.TrimSpace(os.Getenv(name))
+	raw := testenv.Get(name)
 	switch strings.ToLower(raw) {
 	case "":
 		return false, nil

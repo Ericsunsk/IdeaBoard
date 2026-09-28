@@ -14,5 +14,9 @@
   {
     "path": "src/features/board/testing/factories.ts",
     "reason": "Mock rejection payloads mimic backend Chinese safe messages (server-authored user copy, not frontend copy); tests branch on error code, never on this text."
+  },
+  {
+    "path": "src/test/factories/admin.ts",
+    "reason": "Backend-shaped Stripe mock payload (server-authored user copy, not frontend copy); tests branch on status, never on this text."
   }
 ]

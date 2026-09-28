@@ -35,6 +35,7 @@ func run() error {
 		APIRoot: *apiRoot, ManifestPath: *manifest, OutputPath: *output,
 		WriteArtifact: *writeArtifact,
 		BaseSHA:       *baseSHA, HeadSHA: *headSHA, DatabaseDSN: os.Getenv("API_TEST_DATABASE_DSN"),
+		AtlasBinary: os.Getenv("ATLAS_BINARY"),
 	})
 }
 

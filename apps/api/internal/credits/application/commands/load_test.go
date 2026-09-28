@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
-	"os"
 	"runtime"
 	"strconv"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -29,7 +29,7 @@ const minimumCreditLoadTransactions = 1_000_000
 // API_TEST_DATABASE_DSN set. It bulk-seeds immutable, balanced facts, verifies
 // them independently, then exercises the public read and contention seams.
 func TestCreditMillionTransactionDataset(t *testing.T) {
-	if os.Getenv("CREDITS_LOAD_TEST") != "1" {
+	if testenv.Get("CREDITS_LOAD_TEST") != "1" {
 		t.Skip("set CREDITS_LOAD_TEST=1 to run the million-transaction Credits harness")
 	}
 	transactionCount := creditLoadTransactionCount(t)
@@ -220,7 +220,7 @@ FROM (
 
 func creditLoadTransactionCount(t *testing.T) int {
 	t.Helper()
-	raw := os.Getenv("CREDITS_LOAD_TEST_TRANSACTIONS")
+	raw := testenv.Get("CREDITS_LOAD_TEST_TRANSACTIONS")
 	if raw == "" {
 		return minimumCreditLoadTransactions
 	}

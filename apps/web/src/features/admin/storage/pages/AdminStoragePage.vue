@@ -8,21 +8,21 @@
           <AdminToolbarSearch
             v-model="searchKeyword"
             fluid
-            input-label="搜索存储对象"
-            placeholder="搜索存储名称、供应商或存储桶..."
+            :input-label="STORAGE_MESSAGES.searchLabel"
+            :placeholder="STORAGE_MESSAGES.searchPlaceholder"
           />
 
           <AdminOptionFilter
             v-model="statusFilter"
             :options="statusFilterOptions"
             all-value="all"
-            label="筛选存储状态"
+            :label="STORAGE_MESSAGES.filterLabel"
           />
         </div>
 
         <!-- 右侧：刷新同步与新增操作 -->
         <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton :loading="loading" aria-label="刷新存储" @click="refreshData" />
+          <AdminRefreshButton :loading="loading" :aria-label="STORAGE_MESSAGES.refresh" @click="refreshData" />
 
           <AdminButton
             :class="adminActionButtonClass"
@@ -30,7 +30,7 @@
             @click="handleOpenCreate"
           >
             <Plus class="size-4" />
-            新增存储
+            {{ STORAGE_MESSAGES.create }}
           </AdminButton>
         </div>
       </div>
@@ -39,10 +39,10 @@
       <div v-if="!loading" class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
           <span class="font-medium text-admin-text-1">
-            共 {{ filteredStorageRows.length }} 个存储服务
+            {{ STORAGE_MESSAGES.storageCount(filteredStorageRows.length) }}
           </span>
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
-            (共 {{ allStorageRows.length }} 个)
+            {{ STORAGE_MESSAGES.totalCount(allStorageRows.length) }}
           </span>
         </div>
       </div>
@@ -116,6 +116,7 @@ import AdminRefreshButton from '../../shared/components/AdminRefreshButton.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { vendorPresetCatalog } from '../meta'
+import { STORAGE_MESSAGES } from './messages'
 import { useStorageContext } from '../useStorageContext'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import type { StorageCard } from '../profiles'
@@ -163,10 +164,10 @@ const searchKeyword = ref('')
 type StatusFilterValue = 'all' | 'current' | 'configured' | 'unconfigured'
 const statusFilter = ref<StatusFilterValue>('all')
 const statusFilterOptions: { label: string; value: StatusFilterValue }[] = [
-  { label: '全部状态', value: 'all' },
-  { label: '使用中', value: 'current' },
-  { label: '已配置', value: 'configured' },
-  { label: '未配置', value: 'unconfigured' },
+  { label: STORAGE_MESSAGES.allStatuses, value: 'all' },
+  { label: STORAGE_MESSAGES.current, value: 'current' },
+  { label: STORAGE_MESSAGES.configured, value: 'configured' },
+  { label: STORAGE_MESSAGES.unconfigured, value: 'unconfigured' },
 ]
 
 const hasActiveFilter = computed(() => {
@@ -185,7 +186,7 @@ function getBucketDisplay(card: (typeof cards.items.value)[number]): string {
 }
 
 function getEndpointDisplay(card: (typeof cards.items.value)[number]): string {
-  if (card.storage.provider === 'local') return '服务器本地'
+  if (card.storage.provider === 'local') return STORAGE_MESSAGES.localEndpoint
   const domain = card.storage.config?.access_domain
   if (typeof domain === 'string' && domain.trim()) return domain.trim()
   const ep = card.storage.config?.endpoint
@@ -212,7 +213,7 @@ function buildConfiguredRow(
   presetKey?: string,
 ): StorageTableRow {
   const isCur = card.storage.isCurrent
-  const isConf = card.statusText === '已配置'
+  const isConf = card.statusText === STORAGE_MESSAGES.configured
   return {
     id: card.storage.id,
     isPresetOnly: false,
@@ -225,7 +226,7 @@ function buildConfiguredRow(
     vendorIcon: card.vendorIcon,
     avatarLabel: card.avatarLabel,
     isCurrent: isCur,
-    statusText: isCur ? '使用中' : (card.statusText as '使用中' | '已配置' | '未配置'),
+    statusText: isCur ? STORAGE_MESSAGES.current : (card.statusText as '使用中' | '已配置' | '未配置'),
     statusType: isCur ? 'current' : isConf ? 'configured' : 'unconfigured',
     bucket: getBucketDisplay(card),
     endpoint: getEndpointDisplay(card),
@@ -246,7 +247,7 @@ function buildUnconfiguredPresetRow(preset: (typeof vendorPresetCatalog)[number]
     vendorLogo: preset.logoSrc,
     avatarLabel: preset.label.slice(0, 2),
     isCurrent: false,
-    statusText: '未配置',
+    statusText: STORAGE_MESSAGES.unconfigured,
     statusType: 'unconfigured',
     bucket: '—',
     endpoint: String(preset.defaultConfig?.endpoint ?? '—'),

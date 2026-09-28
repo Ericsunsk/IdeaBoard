@@ -6,12 +6,12 @@
 
     <AdminAlert v-if="isMonitorStale" severity="warning">
       <div class="flex flex-wrap items-center gap-2">
-        <span>任务监控连接不稳定，当前显示上次成功数据。</span>
+        <span>{{ MONITOR_MESSAGES.staleNotice }}</span>
         <AdminButton
           variant="ghost"
           size="sm"
           :class="adminTextButtonClass"
-          label="重试连接"
+          :label="MONITOR_MESSAGES.retryConnection"
           @click="retryMonitorSnapshot"
         />
       </div>
@@ -108,6 +108,7 @@ import {
 } from '../../../../../shared/domain/taskMetricTokens'
 import { keepPrevious } from '../../../../../shared/query/queryDefaults'
 import { stringParam } from '../../../../../shared/router/queryParams'
+import { MONITOR_MESSAGES } from './messages'
 
 const adminConfirm = useAdminConfirm()
 const taskCancellationFeedback = useAdminTaskCancellationFeedback()
@@ -141,7 +142,7 @@ const isDetailLoading = computed(
 )
 const detailErrorMessage = computed(() =>
   detailQuery.isError.value
-    ? formatDisplayErrorMessage(detailQuery.error.value, '加载任务详情失败')
+    ? formatDisplayErrorMessage(detailQuery.error.value, MONITOR_MESSAGES.detailLoadFailed)
     : '',
 )
 
@@ -275,10 +276,10 @@ const {
 } = useAdminTaskRuntimeSnapshot()
 
 const taskListErrorMessage = computed(() =>
-  formatDisplayErrorMessage(taskListError.value, '加载任务列表失败'),
+  formatDisplayErrorMessage(taskListError.value, MONITOR_MESSAGES.listLoadFailed),
 )
 const monitorErrorMessage = computed(() =>
-  formatDisplayErrorMessage(monitorError.value, '加载任务运行监控失败'),
+  formatDisplayErrorMessage(monitorError.value, MONITOR_MESSAGES.snapshotLoadFailed),
 )
 function handleTaskSearch() {
   resetDemoPage()

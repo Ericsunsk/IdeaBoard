@@ -3,7 +3,7 @@
   <AdminDialogShell
     :visible="Boolean(item)"
     :header="header"
-    description="编辑该功能的系统提示词模板后保存。"
+    :description="PROMPTS_MESSAGES.editorDescription"
     size="form"
     content-layout="plain"
     :busy="saving"
@@ -17,17 +17,17 @@
             class="text-admin-meta font-[680] text-admin-text-2"
             :for="`prompt-textarea-${item.slug}`"
           >
-            系统提示词
+            {{ PROMPTS_MESSAGES.editorSystemLabel }}
           </label>
           <!-- 变量快捷填充标签 -->
           <div v-if="variables.length > 0" class="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span class="text-[11px] font-medium text-admin-text-3">插入变量:</span>
+            <span class="text-admin-caption font-medium text-admin-text-3">{{ PROMPTS_MESSAGES.editorInsertVariables }}</span>
             <button
               v-for="variable in variables"
               :key="variable.key"
               type="button"
               :disabled="saving"
-              class="rounded-md border border-admin-border-soft bg-admin-surface-muted/50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-admin-text-2 transition-colors hover:border-admin-accent/40 hover:bg-admin-accent/5 hover:text-admin-accent cursor-pointer disabled:opacity-50"
+              class="rounded-md border border-admin-border-soft bg-admin-surface-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2 transition-colors hover:border-admin-accent/40 hover:bg-admin-accent/5 hover:text-admin-accent cursor-pointer disabled:opacity-50"
               @click="insertVariable(variable.key)"
             >
               {{ variable.key }}
@@ -42,8 +42,8 @@
           class="w-full text-xs font-mono min-h-[160px] max-h-96"
           :rows="6"
           auto-grow
-          :aria-label="item.title + ' 提示词模板'"
-          placeholder="输入系统提示词模板，可点击上方变量按钮插入..."
+          :aria-label="PROMPTS_MESSAGES.editorTemplateAria(item.title)"
+          :placeholder="PROMPTS_MESSAGES.editorPlaceholder"
           :disabled="saving"
           @update:model-value="emit('update:draft', $event)"
         />
@@ -51,7 +51,7 @@
 
       <!-- 字符统计与校验提示信息 -->
       <div class="flex items-center justify-between text-admin-meta text-admin-text-3 font-mono">
-        <span>{{ draft.length }} 字符</span>
+        <span>{{ PROMPTS_MESSAGES.editorCharCount(draft.length) }}</span>
         <span
           v-if="validation?.severity === 'error' && validation?.message"
           class="text-admin-danger font-sans text-xs"
@@ -74,7 +74,7 @@
         :disabled="saving"
         @click="emit('close')"
       >
-        取消
+        {{ PROMPTS_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         v-if="item"
@@ -83,7 +83,7 @@
         :disabled="saving || !validation?.canSave || !validation?.isDirty"
         @click="emit('save')"
       >
-        保存
+        {{ PROMPTS_MESSAGES.save }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -95,6 +95,7 @@ import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminTextarea from '../../shared/components/AdminTextarea.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { PROMPTS_MESSAGES } from '../pages/messages'
 import type { FeaturePromptVariable, PromptDraftValidation } from '../workspace'
 import type { FeatureItem } from '../featurePromptMeta'
 

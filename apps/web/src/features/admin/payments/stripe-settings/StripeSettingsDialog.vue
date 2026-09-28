@@ -1,11 +1,11 @@
 <template>
   <AdminSettingsDialogFrame
     :visible="visible"
-    header="Stripe 设置"
-    description="配置 Stripe 密钥与税务编码后保存。"
+    :header="PAYMENTS_MESSAGES.stripeHeader"
+    :description="PAYMENTS_MESSAGES.stripeDescription"
     :busy="isBusy"
     :loading="isLoading && !summary"
-    loading-label="加载 Stripe 设置"
+    :loading-label="PAYMENTS_MESSAGES.stripeLoading"
     :error="loadError"
     @reset="resetAndLoad"
     @update:visible="emit('update:visible', $event)"
@@ -16,13 +16,13 @@
       class="grid grid-cols-1 gap-2 rounded-xl border border-admin-border bg-admin-surface-muted p-3 sm:grid-cols-2"
     >
       <div class="min-w-0">
-        <div class="text-admin-caption text-admin-text-3">账户</div>
+        <div class="text-admin-caption text-admin-text-3">{{ PAYMENTS_MESSAGES.accountLabel }}</div>
         <div class="truncate text-admin-body font-semibold text-admin-title-color">
-          {{ summary.accountId || '尚未配置' }}
+          {{ summary.accountId || PAYMENTS_MESSAGES.accountUnset }}
         </div>
       </div>
       <div class="min-w-0">
-        <div class="text-admin-caption text-admin-text-3">模式</div>
+        <div class="text-admin-caption text-admin-text-3">{{ PAYMENTS_MESSAGES.modeLabel }}</div>
         <div class="text-admin-body font-semibold text-admin-title-color">
           {{ modeLabel }}
         </div>
@@ -32,14 +32,14 @@
           class="size-1.5 rounded-full"
           :class="summary.productReady ? 'bg-admin-success' : 'bg-admin-warning'"
         />
-        {{ summary.productReady ? 'Product 已就绪' : 'Product 未就绪' }}
+        {{ PAYMENTS_MESSAGES.productReadyState(summary.productReady) }}
       </div>
       <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
         <span
           class="size-1.5 rounded-full"
           :class="summary.webhookReady ? 'bg-admin-success' : 'bg-admin-warning'"
         />
-        {{ summary.webhookReady ? 'Webhook 已就绪' : 'Webhook 未就绪' }}
+        {{ PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady) }}
       </div>
     </div>
 
@@ -70,7 +70,7 @@
         label="Stripe API Key"
         for="admin-stripe-api-key"
         :error="form.errors.value.apiKey"
-        hint="支持 sk_ 或 rk_ 格式。"
+        :hint="PAYMENTS_MESSAGES.apiKeyHint"
         :required="!summary?.apiKeyConfigured"
       >
         <AdminInput
@@ -99,7 +99,7 @@
           id="admin-stripe-product-tax-code"
           v-model="form.values.productTaxCode"
           class="w-full"
-          placeholder="例如：txcd_10105001"
+          :placeholder="PAYMENTS_MESSAGES.taxCodePlaceholder"
           aria-label="Product Tax Code"
           :disabled="isBusy"
           :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
@@ -108,17 +108,17 @@
         />
       </AdminFormField>
 
-      <AdminFormField label="充值开放" for="admin-stripe-purchases-enabled">
+      <AdminFormField :label="PAYMENTS_MESSAGES.purchasesLabel" for="admin-stripe-purchases-enabled">
         <div
           class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
         >
           <span class="text-admin-body text-admin-text-2">
-            {{ form.values.purchasesEnabled ? '已开放' : '已关闭' }}
+            {{ PAYMENTS_MESSAGES.purchasesState(form.values.purchasesEnabled) }}
           </span>
           <AdminSwitch
             id="admin-stripe-purchases-enabled"
             v-model="form.values.purchasesEnabled"
-            aria-label="充值开放"
+            :aria-label="PAYMENTS_MESSAGES.purchasesLabel"
             :disabled="isBusy"
           />
         </div>
@@ -134,7 +134,7 @@
         :disabled="isBusy"
         @click="requestClose"
       >
-        取消
+        {{ PAYMENTS_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         :class="adminActionButtonClass"
@@ -142,7 +142,7 @@
         :disabled="isLoading || Boolean(loadError)"
         @click="submit"
       >
-        保存设置
+        {{ PAYMENTS_MESSAGES.saveSettings }}
       </AdminButton>
     </template>
   </AdminSettingsDialogFrame>
@@ -165,6 +165,7 @@ import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
+import { PAYMENTS_MESSAGES } from '../messages'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './types'
 
 const props = withDefaults(
@@ -195,22 +196,22 @@ const form = useForm({
   },
   schema: () =>
     v.object({
-      apiKey: secretField(!summary.value?.apiKeyConfigured, '请输入 Stripe API Key'),
+      apiKey: secretField(!summary.value?.apiKeyConfigured, PAYMENTS_MESSAGES.apiKeyRequired),
       paymentMethodConfigurationId: v.pipe(
         v.string(),
         v.trim(),
-        v.check((value) => value.length > 0, '请输入 Payment Method Configuration ID'),
+        v.check((value) => value.length > 0, PAYMENTS_MESSAGES.pmcRequired),
         v.check(
           (value) => value.length === 0 || paymentMethodConfigurationIdPattern.test(value),
-          '请输入有效的 pmc_... ID',
+          PAYMENTS_MESSAGES.pmcInvalid,
         ),
       ),
-      productTaxCode: v.pipe(v.string(), v.trim(), v.minLength(1, '请输入 Product Tax Code')),
+      productTaxCode: v.pipe(v.string(), v.trim(), v.minLength(1, PAYMENTS_MESSAGES.productTaxCodeRequired)),
     }),
 })
 const isBusy = computed(() => isLoading.value || isSaving.value)
 const apiKeyPlaceholder = computed(() =>
-  summary.value?.apiKeyConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
+  PAYMENTS_MESSAGES.apiKeyPlaceholder(Boolean(summary.value?.apiKeyConfigured)),
 )
 const paymentMethodConfigurationIdPattern = /^pmc_[A-Za-z0-9]+$/
 const modeLabel = computed(() =>
@@ -242,7 +243,7 @@ async function load() {
       purchasesEnabled: nextSummary.purchasesEnabled,
     })
   } catch (error) {
-    loadError.value = formatAdminDisplayError(error, '加载 Stripe 设置失败，请重试')
+    loadError.value = formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeLoadFailed)
   } finally {
     isLoading.value = false
   }
@@ -258,9 +259,9 @@ const submit = form.handleSubmit(async (values) => {
   // shell (reversible tier: note optional, empty falls back to a default);
   // a cancelled dialog aborts the save silently.
   const operatorReason = await confirmSettingsSave(adminConfirm, {
-    title: '保存 Stripe 设置',
-    message: '确定保存 Stripe 密钥与税务配置吗？该操作将记录操作人与原因。',
-    confirmLabel: '保存设置',
+    title: PAYMENTS_MESSAGES.stripeSaveTitle,
+    message: PAYMENTS_MESSAGES.stripeSaveMessage,
+    confirmLabel: PAYMENTS_MESSAGES.stripeSaveConfirm,
   })
   if (!operatorReason) return
   isSaving.value = true
@@ -287,7 +288,7 @@ const submit = form.handleSubmit(async (values) => {
     emit('update:visible', false)
   } catch (error) {
     clearSensitiveState()
-    saveError.value = formatAdminDisplayError(error, '保存 Stripe 设置失败，请重试')
+    saveError.value = formatAdminDisplayError(error, PAYMENTS_MESSAGES.stripeSaveFailed)
   } finally {
     isSaving.value = false
   }

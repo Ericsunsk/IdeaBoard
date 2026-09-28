@@ -46,33 +46,33 @@ func (h *contractV1Handler) toMemberDTO(c *gin.Context, m *tenancy.WorkspaceMemb
 	return dto, true
 }
 
-func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int64, bool) {
+func (h *contractV1Handler) resolveMemberUserID(c *gin.Context, raw string) (int64, uuid.UUID, bool) {
 	trimmed := strings.TrimSpace(raw)
 	if !contract.IsUserID(trimmed) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
 		c.Abort()
-		return 0, false
+		return 0, uuid.Nil, false
 	}
 	if h.deps.Users == nil {
 		contract.RenderError(c, http.StatusNotImplemented,
 			contract.CodeContractNotImplemented, "The v1 contract surface is not implemented yet")
 		c.Abort()
-		return 0, false
+		return 0, uuid.Nil, false
 	}
 	parsed, err := tenancy.ParseUserPublicID(trimmed)
 	if err != nil {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
 		c.Abort()
-		return 0, false
+		return 0, uuid.Nil, false
 	}
 	userID, err := h.deps.Users.ResolveUserID(c.Request.Context(), parsed)
 	if err != nil || userID <= 0 {
 		// Unknown users are invisible (404), never 403, per anti-enumeration.
 		contract.RenderError(c, http.StatusNotFound, contract.CodeWorkspaceMemberNotFound, "成员不存在")
 		c.Abort()
-		return 0, false
+		return 0, uuid.Nil, false
 	}
-	return userID, true
+	return userID, parsed, true
 }
 
 func renderMemberTransitionError(c *gin.Context, err error) {
@@ -118,8 +118,51 @@ type v1AddMemberBody struct {
 	} `json:"data"`
 }
 
+// workspaceDo runs fn under the header-only Idempotency-Key scope
+// workspace:<op>: missing keys render 400 idempotency_key_required,
+// key reuse with a different request hash renders 409
+// workspace_idempotency_conflict (aborted), same key+hash replays the
+// first result. Domain errors from fn are returned for the caller to
+// map (they must not collapse to 503 here). Mirrors boardDo.
+func (h *contractV1Handler) workspaceDo(c *gin.Context, userExternalID string, userID int64, op, key, hash string, fn func() (any, error)) (any, error, bool) {
+	scope := contract.IdempotencyScope(userExternalID, "workspace:"+op)
+	result, _, err := h.deps.Idempotency.Do(c.Request.Context(), scope, userID, key, hash, fn)
+	if err != nil {
+		if contract.IsIdempotencyConflict(err) {
+			contract.RenderError(c, http.StatusConflict, contract.CodeWorkspaceIdempotencyConflict, "幂等请求与原请求不一致")
+			c.Abort()
+			return nil, nil, false
+		}
+		return nil, err, true
+	}
+	return result, nil, true
+}
+
+func requireWorkspaceIdempotencyKey(c *gin.Context) (string, bool) {
+	key, err := contract.IdempotencyKeyFromHeader(c)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, "缺少幂等键，请重试此次操作")
+		c.Abort()
+		return "", false
+	}
+	return key, true
+}
+
 func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
-	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx, body v1AddMemberBody) {
+	// Key before bind (board add precedent): a missing key fails closed
+	// with 400 even when the body is also malformed, so this handler
+	// uses withWorkspace plus a manual bind instead of
+	// withV1WorkspaceBody.
+	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
+		key, ok := requireWorkspaceIdempotencyKey(c)
+		if !ok {
+			return
+		}
+		var body v1AddMemberBody
+		if bindErr := contract.BindStrictJSON(c, &body); bindErr != nil {
+			writeV1InputError(c)
+			return
+		}
 		newRole := strings.TrimSpace(body.Data.Role)
 		if !tenancy.IsValidRole(newRole) {
 			contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
@@ -131,13 +174,25 @@ func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
 			renderMemberTransitionError(c, err)
 			return
 		}
-		targetUserID, ok := h.resolveMemberUserID(c, body.Data.UserID)
+		targetUserID, _, ok := h.resolveMemberUserID(c, body.Data.UserID)
 		if !ok {
 			return
 		}
-		added, err := h.deps.Store.AddWorkspaceMember(c.Request.Context(), wctx.Workspace.PublicID, targetUserID, newRole)
-		if err != nil {
-			renderMemberTransitionError(c, err)
+		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
+		hash := contract.HashIdempotencyRequest("workspace:member-add", wctx.Workspace.PublicID, body.Data.UserID, newRole)
+		result, fnErr, ok := h.workspaceDo(c, externalUser, wctx.Principal.UserID(), "member-add", key, hash, func() (any, error) {
+			return h.deps.Store.AddWorkspaceMember(c.Request.Context(), wctx.Workspace.PublicID, targetUserID, newRole)
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderMemberTransitionError(c, fnErr)
+			return
+		}
+		added, ok := result.(*tenancy.WorkspaceMember)
+		if !ok || added == nil {
+			renderMemberTransitionError(c, errors.New("tenancy: member-add type mismatch"))
 			return
 		}
 		dto, ok := h.toMemberDTO(c, added)
@@ -165,7 +220,7 @@ func (h *contractV1Handler) updateWorkspaceMember(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
+		targetUserID, _, ok := h.resolveMemberUserID(c, c.Param("member_id"))
 		if !ok {
 			return
 		}
@@ -185,15 +240,38 @@ func (h *contractV1Handler) updateWorkspaceMember(c *gin.Context) {
 
 func (h *contractV1Handler) removeWorkspaceMember(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
-		targetUserID, ok := h.resolveMemberUserID(c, c.Param("member_id"))
+		// Resolve before the key (board remove precedent): unknown
+		// member ids stay invisible with 404 even when the key is
+		// also missing.
+		targetUserID, targetExternal, ok := h.resolveMemberUserID(c, c.Param("member_id"))
 		if !ok {
 			return
 		}
-		if err := h.deps.Store.RemoveWorkspaceMember(
-			c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID); err != nil {
-			renderMemberTransitionError(c, err)
+		key, ok := requireWorkspaceIdempotencyKey(c)
+		if !ok {
 			return
 		}
-		contract.RenderSuccess(c, v1DeletedDTO{Deleted: true})
+		externalUser := tenancy.FormatUserPublicID(wctx.Principal.PublicID())
+		hash := contract.HashIdempotencyRequest("workspace:member-remove", wctx.Workspace.PublicID, tenancy.FormatUserPublicID(targetExternal))
+		result, fnErr, ok := h.workspaceDo(c, externalUser, wctx.Principal.UserID(), "member-remove", key, hash, func() (any, error) {
+			if err := h.deps.Store.RemoveWorkspaceMember(
+				c.Request.Context(), wctx.Workspace.PublicID, wctx.Principal.UserID(), targetUserID); err != nil {
+				return nil, err
+			}
+			return &v1DeletedDTO{Deleted: true}, nil
+		})
+		if !ok {
+			return
+		}
+		if fnErr != nil {
+			renderMemberTransitionError(c, fnErr)
+			return
+		}
+		deleted, ok := result.(*v1DeletedDTO)
+		if !ok || deleted == nil {
+			renderMemberTransitionError(c, errors.New("tenancy: member-remove type mismatch"))
+			return
+		}
+		contract.RenderSuccess(c, *deleted)
 	})
 }

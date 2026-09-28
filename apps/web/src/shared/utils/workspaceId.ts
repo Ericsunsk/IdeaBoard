@@ -8,13 +8,11 @@
  * feature locale keys.
  */
 
+import { assertOpaqueId } from './opaqueIds'
+
 /** Pure `ws_...` validation: trims and returns the id, throws otherwise. */
 export function assertWorkspaceId(value: string): string {
-  const trimmed = value.trim()
-  if (!/^ws_[A-Za-z0-9_-]+$/.test(trimmed)) {
-    throw new Error('Invalid workspace id: expected ws_...')
-  }
-  return trimmed
+  return assertOpaqueId(value, 'ws', 'workspace id')
 }
 
 /**

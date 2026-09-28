@@ -98,6 +98,8 @@ export default {
     invalidEmail: 'Introduzca una dirección de correo electrónico válida',
     sixDigitCode: 'Introduzca el código de verificación de 6 dígitos',
     passwordMismatch: 'Las contraseñas no coinciden',
+    passwordLength: 'La contraseña debe tener entre {min} y {max} caracteres',
+    lengthRange: '{label} debe tener entre {min} y {max} caracteres',
     requiredField: '{field} es obligatorio',
   },
   toasts: {

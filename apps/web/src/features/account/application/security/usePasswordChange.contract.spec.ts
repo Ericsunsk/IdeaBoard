@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import { USER_LOGIN_PATH } from '../../../../shared/constants/routePaths'
+import { PASSWORD_LENGTH_LIMIT } from '../../../../shared/auth/passwordPolicy'
+import { i18n } from '../../../../shared/i18n'
 import { markRequiredError } from '../../../../shared/utils/formValidation'
 import { usePasswordChange, type PasswordChangeDependencies } from './usePasswordChange'
+
+function passwordLengthMessage() {
+  return i18n.global.t('account.security.errors.passwordLength', {
+    min: PASSWORD_LENGTH_LIMIT.min,
+    max: PASSWORD_LENGTH_LIMIT.max,
+  })
+}
 
 describe('usePasswordChange', () => {
   it('validates required fields, password length, and confirmation match', () => {
@@ -12,11 +21,11 @@ describe('usePasswordChange', () => {
 
     workflow.form.value.newPassword = '123456789'
     expect(workflow.validateField('newPassword')).toBe(false)
-    expect(workflow.errors.value.newPassword).toBe('Password must be 10-128 characters')
+    expect(workflow.errors.value.newPassword).toBe(passwordLengthMessage())
 
     workflow.form.value.newPassword = 'x'.repeat(129)
     expect(workflow.validateField('newPassword')).toBe(false)
-    expect(workflow.errors.value.newPassword).toBe('Password must be 10-128 characters')
+    expect(workflow.errors.value.newPassword).toBe(passwordLengthMessage())
 
     workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdef'

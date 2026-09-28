@@ -1,5 +1,5 @@
-import type { UserConfirmRequest } from '../../shared/composables/useUserConfirmDialog'
-import { i18n } from '../../shared/i18n'
+import type { UserConfirmRequest } from '../../../shared/composables/useUserConfirmDialog'
+import { i18n } from '../../../shared/i18n'
 
 export function deleteFolderConfirmation(folderName: string): UserConfirmRequest {
   return {

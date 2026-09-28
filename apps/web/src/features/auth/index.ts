@@ -15,6 +15,21 @@ export { default as UserAuthModals } from './components/UserAuthModals.vue'
 export { default as AuthModalHost } from './components/AuthModalHost.vue'
 export { default as LoginAuthPanel } from './components/LoginAuthPanel.vue'
 export { default as RegisterAuthPanel } from './components/RegisterAuthPanel.vue'
+export {
+  EmailField,
+  PasswordField,
+  OtpField,
+  useAuthForm,
+  AUTH_DISPLAY_NAME_LIMIT,
+  emailFieldError,
+  emailFormatError,
+  lengthRangeError,
+  otpFieldError,
+  passwordFieldError,
+  passwordLengthFieldError,
+  requiredFieldError,
+} from './components/auth-fields'
+export type { AuthFieldMessages } from './components/auth-fields'
 
 /**
  * Lazily loads the OAuth callback page through the auth entrypoint so route

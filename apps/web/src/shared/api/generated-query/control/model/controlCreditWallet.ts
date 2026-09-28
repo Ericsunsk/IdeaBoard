@@ -35,7 +35,7 @@ import type { ControlCreditWalletStatus } from './controlCreditWalletStatus'
 import type { ControlWalletRestriction } from './controlWalletRestriction'
 
 export interface ControlCreditWallet {
-  /** @pattern ^usr_[A-Za-z0-9]+$ */
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   user_id: string
   display_name: string
   available_credits: number

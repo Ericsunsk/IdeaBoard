@@ -325,6 +325,16 @@ const (
 	CodeVisionSearchQuota            Code = "vision_search_quota"
 	CodeVisionSearchTimeout          Code = "vision_search_timeout"
 	CodeVisionSearchNetwork          Code = "vision_search_network"
+
+	// Task monitor + statistics codes (tasking statistics edge, reused
+	// verbatim by the control proxy on the platform monitor/statistics
+	// routes). Wire-stable: do not rename without coordinating the
+	// control-plane callers that branch on them. The monitor stream is
+	// an SSE protocol exception (never a JSON envelope); its
+	// concurrency limit still renders this 429 machine code so callers
+	// branch on one value on both surfaces.
+	CodeTaskMonitorConcurrencyLimited Code = "task_monitor_concurrency_limited"
+	CodeTaskStatisticsRequestInvalid  Code = "task_statistics_request_invalid"
 )
 
 // StatusOf maps a kernel code to its HTTP status (Baseline 5.4). Unknown
@@ -349,7 +359,8 @@ func StatusOf(code Code) int {
 		CodeSearchLimitInvalid, CodeSearchQueryInvalid, CodeSearchCursorInvalid,
 		CodeSearchProviderTestFailed,
 		CodeVisionSearchInputInvalid, CodeVisionSearchImageInvalid,
-		CodeVisionSearchImageUnavailable:
+		CodeVisionSearchImageUnavailable,
+		CodeTaskStatisticsRequestInvalid:
 		return http.StatusBadRequest
 	case CodeUnauthorized, CodeIdentityUnauthorized:
 		return http.StatusUnauthorized
@@ -394,7 +405,8 @@ func StatusOf(code Code) int {
 		CodeStripeConfigurationUnprocessable,
 		CodePaymentAlreadyCompleted, CodeCheckoutSessionExpired, CodeCheckoutRequestRejected:
 		return http.StatusUnprocessableEntity
-	case CodeRateLimited, CodeRewardRateLimited:
+	case CodeRateLimited, CodeRewardRateLimited,
+		CodeTaskMonitorConcurrencyLimited:
 		return http.StatusTooManyRequests
 	case CodeServiceUnavailable, CodeBillingQuoteUnavailable,
 		CodeSearchProviderUnavailable, CodeSearchVisionNotConfigured,

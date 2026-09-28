@@ -17,30 +17,30 @@
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-[860px] px-6 py-12 max-[640px]:px-4 max-[640px]:py-8">
+    <main class="mx-auto w-full max-w-[860px] px-4 py-8 sm:px-6 sm:py-12">
       <article
-        class="rounded-ib-overlay border border-ib-border-soft bg-ib-surface px-10 py-9 shadow-ib-control max-[640px]:rounded-ib-panel max-[640px]:px-5 max-[640px]:py-6"
+        class="rounded-ib-panel border border-ib-border-soft bg-ib-surface px-5 py-6 shadow-ib-control sm:rounded-ib-overlay sm:px-10 sm:py-9"
       >
         <header class="border-b border-ib-border-soft pb-7">
-          <p class="m-0 text-[12px] font-semibold tracking-wide text-ib-text-subtle">
+          <p class="m-0 text-ib-meta font-semibold tracking-wide text-ib-text-subtle">
             {{ projectName }}
           </p>
           <h1
-            class="mt-2 mb-0 text-[34px] leading-tight font-bold text-ib-text max-[640px]:text-[28px]"
+            class="mt-2 mb-0 text-ib-summary-value leading-tight font-bold text-ib-text sm:text-[34px]"
           >
             {{ title }}
           </h1>
           <p class="mt-3 mb-0 text-sm text-ib-text-muted">Effective date: {{ version }}</p>
         </header>
 
-        <div class="legal-copy pt-7 text-[15px] leading-7 text-ib-text-muted">
+        <div class="legal-copy pt-7 text-ib-title-sm leading-7 text-ib-text-muted">
           <slot />
         </div>
       </article>
 
       <nav
         aria-label="Legal links"
-        class="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-[13px] font-medium text-ib-text-muted"
+        class="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-ib-body font-medium text-ib-text-muted"
       >
         <RouterLink
           v-for="link in legalLinks"

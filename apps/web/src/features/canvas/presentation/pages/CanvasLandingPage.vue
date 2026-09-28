@@ -23,20 +23,20 @@
         >
           <h1
             data-home-hero-safe
-            class="home-hero-title m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
+            class="home-hero-title m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] font-ib-display"
           >
             {{ projectName }}
           </h1>
           <p
             data-home-hero-safe
-            class="home-hero-tagline mt-4 text-[15px] font-normal uppercase tracking-[0.1em] text-[#202124] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
+            class="home-hero-tagline mt-4 text-ib-title-sm font-normal uppercase tracking-[0.1em] text-[#202124] font-ib-hand"
           >
             AI CANVAS FOR VISUAL DESIGNERS
           </p>
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
               data-home-hero-safe
-              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-board-primary px-10 text-[15px] font-medium text-ib-text-inverse shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-board-primary-hover"
+              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-board-primary px-10 text-ib-title-sm font-medium text-ib-text-inverse shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-board-primary-hover"
               @click="startJourney"
             >
               Get started
@@ -48,7 +48,7 @@
         <div class="home-hero-decorations pointer-events-none absolute inset-0 z-[5] h-full w-full">
           <div
             data-home-hero-safe
-            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-[12px] leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
+            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-ib-meta leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
             {{ projectName }} is an AI Canvas for Visual Designers to explore, compare, and refine
             image directions in one connected workspace.
@@ -86,7 +86,7 @@
 
       <nav
         :aria-label="t('canvas.homeHero.legalNavAria')"
-        class="absolute right-6 bottom-5 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-5 gap-y-1 text-[13px] font-medium text-[#5f6368] max-[640px]:right-4 max-[640px]:bottom-4 max-[640px]:gap-x-3 max-[640px]:text-[12px]"
+        class="absolute right-4 bottom-4 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-3 gap-y-1 text-ib-meta font-medium text-[#5f6368] sm:right-6 sm:bottom-5 sm:gap-x-5 sm:text-ib-body"
       >
         <RouterLink
           v-for="link in PUBLIC_LEGAL_LINKS"

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLibraryFolderFacts, createLibraryMutationPublisher } from './folderFacts'
-import type { WorkspaceLibraryFolder } from './workspace'
+import type { WorkspaceLibraryFolder } from '../domain/validators'
 
 const fetchFolders = vi.fn<() => Promise<WorkspaceLibraryFolder[]>>()
 

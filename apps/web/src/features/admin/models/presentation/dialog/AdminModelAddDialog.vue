@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    header="添加模型"
-    description="勾选需要接入的模型后提交添加。"
+    :header="MODELS_MESSAGES.addHeader"
+    :description="MODELS_MESSAGES.addDescription"
     size="wide"
     @update:visible="emit('update:visible', $event)"
     @close="handleClose"
@@ -19,15 +19,15 @@
               v-model="selectedProvider"
               :options="providerOptions"
               size="small"
-              placeholder="全部供应商"
+              :placeholder="MODELS_MESSAGES.addProviderAll"
             />
           </div>
 
           <!-- 关键词搜索（共享搜索框：图标 + 清空 + 统一输入框 chrome） -->
           <AdminToolbarSearch
             v-model="searchQuery"
-            input-label="搜索模型名称或标识"
-            placeholder="搜索模型名称或标识..."
+            :input-label="MODELS_MESSAGES.addSearchLabel"
+            :placeholder="MODELS_MESSAGES.addSearchPlaceholder"
             class="min-w-[200px] max-w-xs flex-1"
           />
         </div>
@@ -40,7 +40,7 @@
           @click="loadDetectedModels"
         >
           <Refresh class="size-3.5" :class="{ 'animate-spin': loading }" />
-          <span>重新探测</span>
+          <span>{{ MODELS_MESSAGES.addRedetect }}</span>
         </button>
       </div>
 
@@ -53,7 +53,7 @@
             class="text-xs font-semibold underline hover:no-underline cursor-pointer"
             @click="loadDetectedModels"
           >
-            重试
+            {{ MODELS_MESSAGES.retry }}
           </button>
         </div>
       </AdminAlert>
@@ -61,7 +61,7 @@
       <!-- 探测加载中：单行文案，避免与副标题重复造成“两个状态”观感 -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-16 text-admin-text-3">
         <Refresh class="size-6 animate-spin text-admin-accent mb-2.5" />
-        <p class="text-xs font-medium text-admin-text-2">正在比对社区模型目录...</p>
+        <p class="text-xs font-medium text-admin-text-2">{{ MODELS_MESSAGES.addDetecting }}</p>
       </div>
 
       <!-- 结果区与 loading 互斥：必须包在 template v-else 里 -->
@@ -75,7 +75,7 @@
           <p class="text-xs font-medium text-admin-text-2">
             {{ emptyDetectionTitle }}
           </p>
-          <p class="text-[11px] text-admin-text-3 mt-1 max-w-sm">
+          <p class="text-admin-caption text-admin-text-3 mt-1 max-w-sm">
             {{ emptyDetectionHint }}
           </p>
         </div>
@@ -97,13 +97,13 @@
                     :checked="isAllSelected"
                     :indeterminate="isIndeterminate"
                     :disabled="availableFilteredCount === 0"
-                    aria-label="全选本页可用模型"
+                    :aria-label="MODELS_MESSAGES.addSelectAllAria"
                     @change="toggleSelectAll"
                   />
                 </th>
-                <th class="px-3 py-2.5">模型信息</th>
-                <th class="px-3 py-2.5 w-32">供应商</th>
-                <th class="px-3 py-2.5 w-24 text-right">状态</th>
+                <th class="px-3 py-2.5">{{ MODELS_MESSAGES.addColumnInfo }}</th>
+                <th class="px-3 py-2.5 w-32">{{ MODELS_MESSAGES.addColumnProvider }}</th>
+                <th class="px-3 py-2.5 w-24 text-right">{{ MODELS_MESSAGES.addColumnStatus }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-admin-border-soft/60">
@@ -126,7 +126,7 @@
                     class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer disabled:cursor-not-allowed"
                     :checked="selectedModelIds.has(model.id)"
                     :disabled="isModelExisting(model.id)"
-                    :aria-label="`选择 ${model.name || model.id}`"
+                    :aria-label="MODELS_MESSAGES.addSelectAria(model.name || model.id)"
                     @change="toggleModelSelection(model.id)"
                   />
                 </td>
@@ -156,7 +156,7 @@
                       <span class="font-medium text-admin-text-1 truncate">
                         {{ model.name || model.id }}
                       </span>
-                      <span class="font-mono text-[11px] text-admin-text-3 truncate">
+                      <span class="font-mono text-admin-caption text-admin-text-3 truncate">
                         {{ model.id }}
                       </span>
                     </div>
@@ -166,7 +166,7 @@
                 <!-- 供应商 -->
                 <td class="px-3 py-2.5">
                   <span
-                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                    class="inline-flex items-center rounded-md px-1.5 py-0.5 text-admin-caption font-medium"
                     :class="modelProviderBadgeClass(model.provider)"
                   >
                     {{ model.provider }}
@@ -177,22 +177,22 @@
                 <td class="px-3 py-2.5 text-right">
                   <span
                     v-if="isModelExisting(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-admin-surface-muted px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
+                    class="inline-flex items-center gap-1 rounded-full bg-admin-surface-muted px-2 py-0.5 text-admin-micro font-medium text-admin-text-3"
                   >
-                    已在库中
+                    {{ MODELS_MESSAGES.addExisting }}
                   </span>
                   <span
                     v-else-if="selectedModelIds.has(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-admin-accent/10 px-2 py-0.5 text-[10px] font-medium text-admin-accent"
+                    class="inline-flex items-center gap-1 rounded-full bg-admin-accent/10 px-2 py-0.5 text-admin-micro font-medium text-admin-accent"
                   >
                     <Check class="size-3" />
-                    已勾选
+                    {{ MODELS_MESSAGES.addSelected }}
                   </span>
                   <span
                     v-else
-                    class="inline-flex items-center rounded-full bg-admin-border-soft/40 px-2 py-0.5 text-[10px] font-medium text-admin-text-3"
+                    class="inline-flex items-center rounded-full bg-admin-border-soft/40 px-2 py-0.5 text-admin-micro font-medium text-admin-text-3"
                   >
-                    未添加
+                    {{ MODELS_MESSAGES.addNotAdded }}
                   </span>
                 </td>
               </tr>
@@ -206,16 +206,16 @@
     <template #footer>
       <div class="flex w-full items-center justify-between">
         <div class="text-xs text-admin-text-3">
-          <span v-if="selectedCount > 0">已选 {{ selectedCount }} 个模型</span>
+          <span v-if="selectedCount > 0">{{ MODELS_MESSAGES.addPickedCount(selectedCount) }}</span>
         </div>
 
         <div class="flex items-center gap-2">
           <AdminButton variant="outline" :disabled="pending" @click="emit('create')">
-            手动新增
+            {{ MODELS_MESSAGES.addManual }}
           </AdminButton>
 
           <AdminButton variant="secondary" :disabled="pending" @click="handleClose">
-            取消
+            {{ MODELS_MESSAGES.cancel }}
           </AdminButton>
 
           <AdminButton
@@ -224,7 +224,7 @@
             :loading="pending"
             @click="handleImportSelected"
           >
-            导入所选模型{{ selectedCount > 0 ? ` (${selectedCount})` : '' }}
+            {{ MODELS_MESSAGES.addImport(selectedCount) }}
           </AdminButton>
         </div>
       </div>
@@ -248,6 +248,7 @@ import { resolveModelBrandLogo } from '../../../shared/logos/brandLogos'
 import type { AdminModelItem } from '../../domain/catalogData'
 import { modelProviderBadgeClass } from '../../domain/catalogData'
 import { buildModelItemFromDetected } from '../../domain/modelForm'
+import { MODELS_MESSAGES } from '../pages/messages'
 
 const props = withDefaults(
   defineProps<{
@@ -304,7 +305,7 @@ function markBrandLogoFailed(modelId: string): void {
 // 供应商下拉项
 const providerOptions = computed(() => {
   const providers = Array.from(new Set(detectedModels.value.map((m) => m.provider))).filter(Boolean)
-  return [{ label: '全部供应商', value: 'all' }, ...providers.map((p) => ({ label: p, value: p }))]
+  return [{ label: MODELS_MESSAGES.addProviderAll, value: 'all' }, ...providers.map((p) => ({ label: p, value: p }))]
 })
 
 // 过滤后的模型
@@ -386,7 +387,7 @@ async function loadDetectedModels() {
       configured: detection.configured_providers,
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '探测网关模型失败'
+    error.value = err instanceof Error ? err.message : MODELS_MESSAGES.addDetectFailed
   } finally {
     loading.value = false
   }
@@ -394,19 +395,19 @@ async function loadDetectedModels() {
 
 // 空结果文案：按后端元信息区分“未配置”与“扫过无可用”，不再统一显示空列表。
 const emptyDetectionTitle = computed(() => {
-  if (searchQuery.value.trim()) return '未找到匹配的模型'
+  if (searchQuery.value.trim()) return MODELS_MESSAGES.emptyNoMatch
   const meta = detectedMeta.value
-  if (meta && meta.configured === 0) return '网关未配置任何 Provider'
-  if (meta) return `已配置 ${meta.configured} 家 Provider，社区目录中未发现可用模型`
-  return '未探测到可用的网关模型'
+  if (meta && meta.configured === 0) return MODELS_MESSAGES.addEmptyUnconfigured
+  if (meta) return MODELS_MESSAGES.addEmptyNoneAvailable(meta.configured)
+  return MODELS_MESSAGES.addEmptyNone
 })
 
 const emptyDetectionHint = computed(() => {
   const meta = detectedMeta.value
   if (meta && meta.configured === 0 && !searchQuery.value.trim()) {
-    return '请先在 Cloudflare AI Gateway 控制台启用 Provider（BYOK 存密钥），再回来探测入库。'
+    return MODELS_MESSAGES.addHintEnableFirst
   }
-  return '请检查 Cloudflare AI Gateway 是否已配置相应 Provider 的 API Key (BYOK)。仍无结果请用下方「手动新增」入库。'
+  return MODELS_MESSAGES.addHintCheckProviders
 })
 
 // 监听弹窗打开自动触发探测

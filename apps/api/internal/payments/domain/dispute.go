@@ -14,6 +14,36 @@ const (
 	PaymentDisputeLost PaymentDisputeStatus = "lost"
 )
 
+// allowedPaymentDisputeTransitions mirrors the durable guards in
+// guard_payment_dispute_lifecycle
+// (internal/db/schema/fragments/integrity.sql): open closes to
+// won/lost; lost reopens only to won (provider reversal); won is
+// terminal. The type only documents the allowed transitions at
+// compile time (see CanDisputeTransition); SQL literals stay
+// byte-identical.
+var allowedPaymentDisputeTransitions = map[PaymentDisputeStatus]map[PaymentDisputeStatus]struct{}{
+	PaymentDisputeOpen: {
+		PaymentDisputeWon:  {},
+		PaymentDisputeLost: {},
+	},
+	PaymentDisputeLost: {
+		PaymentDisputeWon: {},
+	},
+}
+
+// CanDisputeTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanDisputeTransition(from, to PaymentDisputeStatus) bool {
+	nexts, ok := allowedPaymentDisputeTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
 type PaymentDispute struct {
 	ID                    string
 	PaymentOrderID        string

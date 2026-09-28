@@ -16,6 +16,6 @@
 
 /**
  * Opaque public library folder identifier.
- * @pattern ^lfolder_[A-Za-z0-9]+$
+ * @pattern ^lfolder_[A-Za-z0-9_-]+$
  */
 export type LibraryFolderId = string

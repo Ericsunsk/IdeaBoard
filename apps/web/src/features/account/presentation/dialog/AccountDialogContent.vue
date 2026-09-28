@@ -13,7 +13,7 @@
     </Button>
 
     <aside
-      class="flex min-h-0 flex-col overflow-y-auto bg-white px-4 py-5 [scrollbar-width:none] max-[820px]:max-h-[48dvh] max-[820px]:px-4 max-[820px]:py-4"
+      class="flex min-h-0 max-h-[48dvh] flex-col overflow-y-auto bg-white px-4 py-4 [scrollbar-width:none] md:max-h-none md:py-5"
     >
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
         <span :class="accountBrandMarkClass">
@@ -31,7 +31,7 @@
       </div>
 
       <nav
-        class="grid min-w-0 gap-5 max-[820px]:grid-cols-3 max-[820px]:gap-3 max-[640px]:grid-cols-1"
+        class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3 md:grid-cols-1 md:gap-5"
         :aria-label="t('account.dialog.navigation')"
       >
         <section
@@ -42,11 +42,11 @@
         >
           <p
             :id="`account-nav-${group.key}`"
-            class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-muted"
+            class="mb-2 px-2 text-ib-meta leading-5 font-semibold tracking-normal text-ib-text-muted"
           >
             {{ t(group.labelKey) }}
           </p>
-          <div class="grid gap-1.5 max-[640px]:grid-cols-2">
+          <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-1">
             <Button
               v-for="item in group.tabs"
               :key="item.key"

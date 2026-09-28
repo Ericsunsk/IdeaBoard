@@ -1,9 +1,9 @@
 <template>
   <AccountPane :title="t('account.tabs.profile')">
     <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
-      <div class="flex min-w-0 items-center gap-5 max-[520px]:items-start">
+      <div class="flex min-w-0 items-start gap-5 sm:items-center">
         <div
-          class="relative size-[88px] shrink-0 overflow-visible rounded-ib-pill bg-ib-surface-raised shadow-ib-control max-[520px]:size-20"
+          class="relative size-20 shrink-0 overflow-visible rounded-ib-pill bg-ib-surface-raised shadow-ib-control sm:size-[88px]"
         >
           <button
             type="button"
@@ -22,7 +22,7 @@
                 class="rounded-full object-cover"
               />
               <AvatarFallback
-                class="bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-[34px] font-bold text-ib-text-inverse max-[520px]:text-[28px]"
+                class="bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-ib-summary-value font-bold text-ib-text-inverse sm:text-[34px]"
               >
                 {{ userInitial }}
               </AvatarFallback>
@@ -53,7 +53,7 @@
 
         <div class="min-w-0">
           <p
-            class="m-0 truncate text-[30px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[24px]"
+            class="m-0 truncate text-[24px] leading-tight font-bold tracking-normal text-ib-text sm:text-[30px]"
           >
             {{ userStore.user?.display_name }}
           </p>
@@ -82,15 +82,15 @@
         <div
           v-for="field in profileFields"
           :key="field.label"
-          class="grid min-h-14 grid-cols-[148px_minmax(0,1fr)] items-center gap-4 border-b border-ib-border-soft py-3 last:border-b-0 max-[640px]:grid-cols-1 max-[640px]:gap-1"
+          class="grid min-h-14 grid-cols-1 items-center gap-1 border-b border-ib-border-soft py-3 last:border-b-0 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4"
         >
-          <dt class="text-[13px] font-semibold text-ib-text-subtle">
+          <dt class="text-ib-body font-semibold text-ib-text-subtle">
             {{ field.label }}
           </dt>
           <dd class="m-0 min-w-0">
             <span
-              class="block truncate text-[15px] font-semibold text-ib-text"
-              :class="field.mono ? 'font-mono text-[14px]' : ''"
+              class="block truncate text-ib-title-sm font-semibold text-ib-text"
+              :class="field.mono ? 'font-mono text-ib-content' : ''"
               :title="field.value"
             >
               {{ field.value }}

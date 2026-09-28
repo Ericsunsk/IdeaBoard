@@ -84,7 +84,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui'
-import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import {
   adminDialogChromeClass,
   adminDialogChromeCloseClass,
@@ -153,10 +153,7 @@ const contentLayoutClasses: Record<AdminDialogContentLayout, string> = {
   plain: 'flex flex-col',
 }
 const contentClass = computed(() => contentLayoutClasses[props.contentLayout])
-const adminDialogSurfaceIntent = {
-  dismissibleBy: ['close-control', 'escape', 'mask'],
-  restoreFocus: true,
-} as const
+const adminDialogSurfaceIntent = defineDialogSurfaceIntent()
 const { ariaBusy, canDismiss, completeClose, handleVisibilityChange, requestClose } =
   useOverlayInteractionLifecycle({
     visible: () => props.visible,
@@ -202,8 +199,10 @@ function handleEscape(event: KeyboardEvent) {
   if (!canDismiss('escape')) event.preventDefault()
 }
 
-// Mask dismissal is never in the surface intent: block reka's outside
-// dismiss so overlay clicks only reach the explicit (blocked) mask path.
+// Mask dismissal follows the unified dialog contract (close-control, Escape,
+// mask while idle; all paths locked while an irreversible commit is busy).
+// Reka's outside dismiss stays blocked so overlay clicks only reach the
+// explicit mask path gated by the lifecycle.
 function blockOutsideDismiss(event: Event) {
   event.preventDefault()
 }

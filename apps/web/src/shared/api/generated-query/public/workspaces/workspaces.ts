@@ -332,6 +332,7 @@ export const getUpdateWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
+ * Renames the workspace. No Idempotency-Key is required.
  * @summary Rename a workspace (owner/admin only)
  */
 export const updateWorkspace = async (
@@ -454,6 +455,7 @@ export const getArchiveWorkspaceUrl = (workspaceId: string) => {
 }
 
 /**
+ * Archives the workspace. No Idempotency-Key is required.
  * @summary Archive a workspace (owner/admin only)
  */
 export const archiveWorkspace = async (

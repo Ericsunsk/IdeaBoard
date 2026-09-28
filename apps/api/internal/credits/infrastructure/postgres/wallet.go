@@ -20,11 +20,11 @@ func BindIdentityKey(ctx context.Context, tx pgx.Tx, fingerprint string) error {
 }
 
 func SetWalletFrozen(ctx context.Context, tx pgx.Tx, userID int64, frozen bool) error {
-	status := "active"
+	status := domain.WalletStatusActive
 	if frozen {
-		status = "frozen"
+		status = domain.WalletStatusFrozen
 	}
-	_, err := tx.Exec(ctx, `SELECT set_credit_wallet_status($1, $2)`, userID, status)
+	_, err := tx.Exec(ctx, `SELECT set_credit_wallet_status($1, $2)`, userID, string(status))
 	return err
 }
 

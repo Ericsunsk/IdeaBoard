@@ -16,6 +16,6 @@
 
 /**
  * Opaque public media asset identifier.
- * @pattern ^asset_[A-Za-z0-9]+$
+ * @pattern ^asset_[A-Za-z0-9_-]+$
  */
 export type MediaAssetId = string

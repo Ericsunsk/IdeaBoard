@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  clampInteger,
   extractAuthUser,
   extractErrorMessage,
   getAuthSubpath,
@@ -61,13 +60,6 @@ describe("auth input normalization", () => {
     assert.equal(normalizeOptionalPositiveInteger("60"), 60);
     assert.equal(normalizeOptionalPositiveInteger("-1"), null);
     assert.equal(normalizeOptionalPositiveInteger("abc"), null);
-  });
-
-  it("clamps integer settings to the accepted range", () => {
-    assert.equal(clampInteger("30", 1, 60, 10), 30);
-    assert.equal(clampInteger("0", 1, 60, 10), 10);
-    assert.equal(clampInteger("61", 1, 60, 10), 10);
-    assert.equal(clampInteger("abc", 1, 60, 10), 10);
   });
 });
 

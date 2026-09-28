@@ -200,7 +200,7 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 		DisputeGateway: deps.DisputeGateway, DisputeExpiry: disputeService, OrderLifecycle: deps.Transitions.orderLifecycle,
 		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
 		OrderAccess:      credentialAccess(deps.Configuration.GetStripeCredentialForOrder),
-		Publish: func(userID int64, status string) {
+		Publish: func(userID int64, status paymentports.PaymentEventStatus) {
 			deps.Transitions.runtime.events.Publish(userID, paymentports.PaymentEvent{Status: status})
 		}, Now: deps.Transitions.runtime.now,
 	})

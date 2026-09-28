@@ -110,6 +110,72 @@ const (
 	ReconciliationRiskHigh                              ReconciliationRisk          = "high"
 )
 
+// allowedReconciliationRunTransitions mirrors the durable guards in
+// start/execute/fail_credit_reconciliation
+// (internal/db/schema/fragments/credits.sql): runs open queued;
+// execute flips queued/failed to running; fail flips queued/running
+// to failed; a finished scan flips running to completed; an overdue
+// scheduled requeue flips failed back to queued. completed is
+// terminal. The type only documents the allowed transitions at
+// compile time (see CanRunTransition); SQL literals stay
+// byte-identical.
+var allowedReconciliationRunTransitions = map[ReconciliationRunStatus]map[ReconciliationRunStatus]struct{}{
+	ReconciliationRunQueued: {
+		ReconciliationRunRunning: {},
+		ReconciliationRunFailed:  {},
+	},
+	ReconciliationRunRunning: {
+		ReconciliationRunCompleted: {},
+		ReconciliationRunFailed:    {},
+	},
+	ReconciliationRunFailed: {
+		ReconciliationRunRunning: {},
+		ReconciliationRunQueued:  {},
+	},
+}
+
+// CanRunTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanRunTransition(from, to ReconciliationRunStatus) bool {
+	nexts, ok := allowedReconciliationRunTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
+// allowedReconciliationFindingTransitions mirrors the durable guards in
+// execute_credit_reconciliation
+// (internal/db/schema/fragments/credits.sql): unseen findings resolve
+// (open -> resolved); a re-observed fingerprint reopens unconditionally
+// (resolved -> open, occurrence_count + 1, resolved_at cleared). The
+// type only documents the allowed transitions at compile time (see
+// CanFindingTransition); SQL literals stay byte-identical.
+var allowedReconciliationFindingTransitions = map[ReconciliationFindingStatus]map[ReconciliationFindingStatus]struct{}{
+	ReconciliationFindingOpen: {
+		ReconciliationFindingResolved: {},
+	},
+	ReconciliationFindingResolved: {
+		ReconciliationFindingOpen: {},
+	},
+}
+
+// CanFindingTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible through the SQL guards, and no
+// previously possible transition reports false.
+func CanFindingTransition(from, to ReconciliationFindingStatus) bool {
+	nexts, ok := allowedReconciliationFindingTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
 type ReconciliationRunPage struct {
 	Runs         []ReconciliationRun `json:"runs"`
 	NextBeforeID int64               `json:"next_before_id,omitempty"`

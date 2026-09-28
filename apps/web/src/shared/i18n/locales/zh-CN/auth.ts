@@ -93,6 +93,8 @@ export default {
     invalidEmail: '请输入有效的邮箱地址',
     sixDigitCode: '请输入 6 位验证码',
     passwordMismatch: '两次输入的密码不一致',
+    passwordLength: '密码长度必须为 {min}-{max} 个字符',
+    lengthRange: '{label}长度必须在 {min} 到 {max} 个字符之间',
     requiredField: '请输入{field}',
   },
   toasts: {

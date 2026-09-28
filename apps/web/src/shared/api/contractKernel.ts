@@ -16,6 +16,7 @@
 // - SSE: resume via withSseResumeParam / buildSseResumeHeaders (Last-Event-ID).
 
 import { formatDisplayErrorMessage } from '../utils/errorMessages'
+import { opaqueIdPattern } from '../utils/opaqueIds'
 
 export type ContractMeta = {
   request_id?: string | undefined
@@ -158,7 +159,17 @@ function contextualizeContractError(error: unknown, fallback: string): Error {
 }
 
 // Opaque public IDs: usr_|org_|ws_|board_|task_|asset_|upload_|evt_ + payload.
-const OPAQUE_ID_RE = /^(?:usr|org|ws|board|task|asset|upload|evt)_[A-Za-z0-9]+$/
+// Payload alphabet mirrors backend `contract.IsValidPublicID` ([A-Za-z0-9_-]).
+const OPAQUE_ID_RE = opaqueIdPattern([
+  'usr',
+  'org',
+  'ws',
+  'board',
+  'task',
+  'asset',
+  'upload',
+  'evt',
+])
 
 export type OpaqueIdPrefix = 'usr' | 'org' | 'ws' | 'board' | 'task' | 'asset' | 'upload' | 'evt'
 

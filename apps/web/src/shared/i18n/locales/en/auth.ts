@@ -95,6 +95,8 @@ export default {
     invalidEmail: 'Please enter a valid email address',
     sixDigitCode: 'Please enter a 6-digit code',
     passwordMismatch: 'Passwords do not match',
+    passwordLength: 'Password must be {min}-{max} characters',
+    lengthRange: '{label} must be between {min} and {max} characters',
     requiredField: '{field} is required',
   },
   toasts: {

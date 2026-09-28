@@ -195,7 +195,7 @@ func (h *contractV1Handler) streamWorkspaceEvents(c *gin.Context) {
 	}
 	stream, unsubscribe, accepted := h.deps.Events.Subscribe(workspace.PublicID, filter)
 	if !accepted || stream == nil {
-		if err := sse.WriteIDEvent(c, cursor, "error", map[string]any{"code": "rate_limited"}); err != nil {
+		if err := sse.WriteIDEvent(c, cursor, "error", map[string]any{"code": string(contract.CodeRateLimited)}); err != nil {
 			return
 		}
 		return

@@ -154,7 +154,7 @@ func (s *Service) RefundAPIKeyForOrder(ctx context.Context, orderID string) (str
 
 func (s *Service) publish(userID int64) {
 	if s != nil && s.events != nil {
-		s.events.Publish(userID, ports.PaymentEvent{Status: "refund_updated"})
+		s.events.Publish(userID, ports.PaymentEvent{Status: ports.PaymentEventRefundUpdated})
 	}
 }
 

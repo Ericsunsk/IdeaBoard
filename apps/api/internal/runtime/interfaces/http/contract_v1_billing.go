@@ -77,19 +77,14 @@ import (
 // workspace_forbidden (403 visible-but-forbidden), pagination_cursor_invalid,
 // bad_request, validation_failed (422), idempotency_key_required (400),
 // service_unavailable.
-const (
-	CodeBillingWalletRestricted   contract.Code = contract.CodeBillingWalletRestricted
-	CodeBillingCheckoutConflict   contract.Code = contract.CodeBillingCheckoutConflict
-	CodeBillingSessionNotFound    contract.Code = contract.CodeBillingSessionNotFound
-	CodeBillingQuoteUnavailable   contract.Code = contract.CodeBillingQuoteUnavailable
-	CodeBillingPricingUnavailable contract.Code = contract.CodeBillingPricingUnavailable
-)
+// Render sites reference the canonical contract.Code* values directly;
+// no v1-local aliases (single registration in platform/contract).
 
 func renderBillingPricingUnavailable(c *gin.Context, err error) bool {
 	if !errors.Is(err, billing.ErrPricingUnavailable) && !errors.Is(err, billing.ErrSKUNotFound) {
 		return false
 	}
-	contract.RenderError(c, http.StatusUnprocessableEntity, CodeBillingPricingUnavailable, "当前功能暂未定价，暂不可用")
+	contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeBillingPricingUnavailable, "当前功能暂未定价，暂不可用")
 	return true
 }
 
@@ -329,9 +324,9 @@ func billingToBalanceDTO(workspacePublicID string, wallet domain.WalletDetails) 
 func billingRenderWalletGate(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrWalletRestricted), errors.Is(err, domain.ErrWalletFrozen):
-		contract.RenderError(c, http.StatusForbidden, CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可用")
 	case errors.Is(err, domain.ErrWalletNotFound):
-		contract.RenderError(c, http.StatusNotFound, CodeBillingWalletRestricted, "当前工作区钱包不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingWalletRestricted, "当前工作区钱包不存在")
 	default:
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "余额服务暂不可用")
 	}
@@ -595,7 +590,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		// uses the fixed IdeasPerUSD PurchaseQuote inside Payments; Billing SKU
 		// quotes stay reserved for task settlement (#805).
 		if _, quoteErr := paymentsdomain.NewPurchaseQuote(quantity); quoteErr != nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
 			c.Abort()
 			return
 		}
@@ -614,12 +609,12 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
 				c.Abort()
 				return
 			}
 			if errors.Is(doErr, paymentsdomain.ErrWalletNotRechargeable) {
-				contract.RenderError(c, http.StatusForbidden, CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可充值")
+				contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可充值")
 				c.Abort()
 				return
 			}
@@ -630,7 +625,7 @@ func (h *contractV1BillingHandler) createCheckoutSession(c *gin.Context) {
 				return
 			}
 			if errors.Is(doErr, paymentsdomain.ErrCheckoutIdempotencyConflict) {
-				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
 				c.Abort()
 				return
 			}
@@ -666,14 +661,14 @@ func (h *contractV1BillingHandler) getCheckoutSession(c *gin.Context) {
 		}
 		sessionID := strings.TrimSpace(c.Param("session_id"))
 		if sessionID == "" {
-			contract.RenderError(c, http.StatusNotFound, CodeBillingSessionNotFound, "充值会话不存在")
+			contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值会话不存在")
 			c.Abort()
 			return
 		}
 		status, err := h.deps.Checkout.GetWorkspaceCheckout(c.Request.Context(), p.UserID(), workspace.PublicID, sessionID)
 		if err != nil {
 			if errors.Is(err, errBillingSessionNotFound) {
-				contract.RenderError(c, http.StatusNotFound, CodeBillingSessionNotFound, "充值会话不存在")
+				contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值会话不存在")
 			} else {
 				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "充值服务暂不可用")
 			}

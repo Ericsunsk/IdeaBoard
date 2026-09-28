@@ -28,5 +28,3 @@ func splitCodeDigestCandidates(candidates []codeDigest) (codeDigest, codeDigest)
 	}
 	return current, candidates[1]
 }
-
-const maskedCodeHintPrefix = "•••• "

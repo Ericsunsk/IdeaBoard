@@ -26,9 +26,17 @@ var (
 	EncryptionKey []byte
 )
 
-// LoadEncryptionKey reads the base64-encoded AES-256-GCM master key.
+// LoadEncryptionKey reads the base64-encoded AES-256-GCM master key from the
+// process environment. Prefer LoadEncryptionKeyFromValue with the key carried
+// by platform/config when a Config is available.
 func LoadEncryptionKey() error {
-	raw := strings.TrimSpace(os.Getenv(EncryptionKeyEnv))
+	return LoadEncryptionKeyFromValue(os.Getenv(EncryptionKeyEnv))
+}
+
+// LoadEncryptionKeyFromValue validates and installs the base64-encoded
+// AES-256-GCM master key passed by the caller (normally Config.Secrets).
+func LoadEncryptionKeyFromValue(raw string) error {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		EncryptionKey = nil
 		return fmt.Errorf("%s is required", EncryptionKeyEnv)

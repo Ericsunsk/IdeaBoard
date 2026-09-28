@@ -45,22 +45,6 @@ export function isRateLimitedAuthPath(path: string): boolean {
   );
 }
 
-export function clampInteger(
-  value: unknown,
-  min: number,
-  max: number,
-  fallback: number,
-): number {
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  if (parsed < min || parsed > max) {
-    return fallback;
-  }
-  return parsed;
-}
-
 export function normalizeDisplayName(raw: unknown): string {
   const text = String(raw ?? "")
     .replace(/[\u0000-\u001f\u007f]/g, " ")

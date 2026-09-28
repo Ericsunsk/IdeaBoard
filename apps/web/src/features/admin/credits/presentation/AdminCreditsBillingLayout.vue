@@ -18,8 +18,8 @@
       <AdminButton
         variant="outline"
         size="icon"
-        title="Stripe 设置"
-        aria-label="Stripe 设置"
+        :title="CREDITS_BILLING_LAYOUT_MESSAGES.stripeSettings"
+        :aria-label="CREDITS_BILLING_LAYOUT_MESSAGES.stripeSettings"
         class="size-8 shrink-0 rounded-lg"
         @click="stripeSettingsVisible = true"
       >
@@ -46,6 +46,7 @@ import {
 import { useAdminCreditHealthResource } from '../health/resource'
 import { getCreditHealthPresentation } from '../health/creditHealthPresentation'
 import StripeSettingsDialog from '../../payments/stripe-settings/StripeSettingsDialog.vue'
+import { CREDITS_BILLING_LAYOUT_MESSAGES } from './messages'
 
 type NavigationPath =
   | typeof ADMIN_CREDIT_PRICING_PATH
@@ -54,10 +55,26 @@ type NavigationPath =
   | typeof ADMIN_PAYMENT_ORDERS_PATH
 
 const navigationItems: Array<{ key: string; path: NavigationPath; label: string }> = [
-  { key: 'pricing', path: ADMIN_CREDIT_PRICING_PATH, label: '功能定价' },
-  { key: 'health', path: ADMIN_CREDIT_HEALTH_PATH, label: '账本健康' },
-  { key: 'rewards', path: ADMIN_REWARD_CODES_PATH, label: '兑换码' },
-  { key: 'payments', path: ADMIN_PAYMENT_ORDERS_PATH, label: '支付订单' },
+  {
+    key: 'pricing',
+    path: ADMIN_CREDIT_PRICING_PATH,
+    label: CREDITS_BILLING_LAYOUT_MESSAGES.navPricing,
+  },
+  {
+    key: 'health',
+    path: ADMIN_CREDIT_HEALTH_PATH,
+    label: CREDITS_BILLING_LAYOUT_MESSAGES.navHealth,
+  },
+  {
+    key: 'rewards',
+    path: ADMIN_REWARD_CODES_PATH,
+    label: CREDITS_BILLING_LAYOUT_MESSAGES.navRewards,
+  },
+  {
+    key: 'payments',
+    path: ADMIN_PAYMENT_ORDERS_PATH,
+    label: CREDITS_BILLING_LAYOUT_MESSAGES.navPayments,
+  },
 ]
 
 const route = useRoute()
@@ -81,7 +98,7 @@ const healthBadge = computed(() => {
     }
   }
   return healthResource.query.isError.value
-    ? { label: '未知', className: 'border-admin-border text-admin-text-3' }
+    ? { label: CREDITS_BILLING_LAYOUT_MESSAGES.navUnknownBadge, className: 'border-admin-border text-admin-text-3' }
     : null
 })
 const activeNavigationPath = computed<NavigationPath>(

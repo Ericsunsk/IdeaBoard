@@ -95,6 +95,8 @@ export default {
     invalidEmail: '올바른 이메일 주소를 입력해 주세요',
     sixDigitCode: '6자리 코드를 입력해 주세요',
     passwordMismatch: '비밀번호가 일치하지 않습니다',
+    passwordLength: '비밀번호는 {min}-{max}자여야 합니다',
+    lengthRange: '{label}은(는) {min}-{max}자여야 합니다',
     requiredField: '{field}을(를) 입력해 주세요',
   },
   toasts: {

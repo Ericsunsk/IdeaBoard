@@ -5,11 +5,11 @@
         <label
           id="reward-code-heading"
           for="account-reward-code"
-          class="text-[13px] font-semibold text-ib-text-muted"
+          class="text-ib-body font-semibold text-ib-text-muted"
         >
           {{ t('account.rewards.codeLabel') }}
         </label>
-        <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-3 max-[640px]:grid-cols-1">
+        <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_112px]">
           <Input
             id="account-reward-code"
             v-model="code"
@@ -54,7 +54,7 @@
         >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
-            <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
+            <time v-else class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted">
               {{ formatShanghaiDateTime(data.redeemed_at) }}
             </time>
           </template>
@@ -97,7 +97,7 @@
         >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
-            <span v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
+            <span v-else class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted">
               {{ data.masked_code_hint }}
             </span>
           </template>

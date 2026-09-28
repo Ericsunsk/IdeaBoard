@@ -80,7 +80,7 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	body, err := json.Marshal(envelope)
 	s.mu.Unlock()
 	if err != nil {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, "failed", err.Error())
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, err.Error())
 		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, err.Error())
 	}
 	s.mu.Lock()
@@ -90,14 +90,14 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	headers := SignWebhook(secret, body, envelope.ID, s.clock())
 	sender := s.sender
 	if sender == nil {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, "failed", "no sender configured")
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, "no sender configured")
 		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, "no sender configured")
 	}
 	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	status, sendErr := sender.Send(sendCtx, destination, headers, body)
 	cancel()
 	if sendErr == nil && status >= 200 && status < 300 {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, "delivered", "")
+		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeDelivered, "")
 		if persistence != nil {
 			if err := persistence.MarkDelivered(ctx, subscriptionID, envelope); err != nil {
 				return fmt.Errorf("events: persist delivered webhook: %w", err)
@@ -120,7 +120,7 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	} else {
 		detail = fmt.Sprintf("unexpected status %d", status)
 	}
-	s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, "failed", detail)
+	s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeFailed, detail)
 	return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, detail)
 }
 
@@ -163,7 +163,7 @@ func (s *WebhookStore) parkDeadLetterOnce(subscriptionID string, envelope V1Enve
 	sub.UpdatedAt = s.clock()
 }
 
-func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts, status int, outcome, detail string) {
+func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts, status int, outcome AttemptOutcome, detail string) {
 	s.mu.Lock()
 	sub, ok := s.subs[subscriptionID]
 	if !ok {
@@ -178,7 +178,7 @@ func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string,
 	for len(sub.Attempts) > webhookAttemptLogCap {
 		sub.Attempts = append([]WebhookAttempt(nil), sub.Attempts[1:]...)
 	}
-	if outcome != "delivered" && sub.Status == WebhookStatusActive {
+	if outcome != AttemptOutcomeDelivered && sub.Status == WebhookStatusActive {
 		sub.Status = WebhookStatusDegraded
 	}
 	sub.UpdatedAt = s.clock()

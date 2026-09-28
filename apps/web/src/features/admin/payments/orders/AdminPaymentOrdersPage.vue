@@ -10,7 +10,7 @@
     <template #toolbar-start>
       <AdminToolbarSearch
         v-model="orderNumberSearch"
-        input-label="搜索公开订单号"
+        :input-label="PAYMENT_ORDERS_MESSAGES.orderSearchLabel"
         placeholder="IBP-YYYYMMDD-…"
         class="w-full sm:w-64"
         @enter="applySearch"
@@ -18,8 +18,8 @@
       />
       <AdminToolbarSearch
         v-model="userSearch"
-        input-label="搜索支付用户"
-        placeholder="用户 ID 或用户名"
+        :input-label="PAYMENT_ORDERS_MESSAGES.userSearchLabel"
+        :placeholder="PAYMENT_ORDERS_MESSAGES.userSearchPlaceholder"
         class="w-full sm:w-56"
         @enter="applySearch"
         @clear="clearUserSearch"
@@ -29,20 +29,20 @@
     <template #toolbar-end>
       <AdminFilterPopover
         :active="hasFilters"
-        filter-label="筛选支付订单"
-        title="订单状态与异常"
+        :filter-label="PAYMENT_ORDERS_MESSAGES.filterLabel"
+        :title="PAYMENT_ORDERS_MESSAGES.filterTitle"
         @reset="resetFilters"
       >
         <div class="flex min-w-0 flex-col gap-3.5">
           <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-            <span>订单状态</span>
+            <span>{{ PAYMENT_ORDERS_MESSAGES.statusLabel }}</span>
             <AdminSelect v-model="statusFilter" :options="paymentOrderStatusOptions" size="small" />
           </label>
           <label
             class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
           >
-            <span>仅看 24 小时异常</span>
-            <AdminSwitch v-model="anomalyOnly" class="shrink-0" aria-label="仅看 24 小时异常" />
+            <span>{{ PAYMENT_ORDERS_MESSAGES.anomalyOnly }}</span>
+            <AdminSwitch v-model="anomalyOnly" class="shrink-0" :aria-label="PAYMENT_ORDERS_MESSAGES.anomalyOnly" />
           </label>
         </div>
       </AdminFilterPopover>
@@ -50,7 +50,7 @@
       <AdminButton
         variant="ghost"
         :class="adminFramedIconButtonClass"
-        aria-label="刷新支付订单"
+        :aria-label="PAYMENT_ORDERS_MESSAGES.refresh"
         :loading="loading"
         :disabled="loading"
         @click="refreshOrders"
@@ -62,7 +62,7 @@
     <template #alerts>
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>支付订单加载失败，请重试。</span>
+          <span>{{ PAYMENT_ORDERS_MESSAGES.initialError }}</span>
           <AdminButton
             variant="outline"
             size="small"
@@ -70,14 +70,14 @@
             :disabled="loading"
             @click="refreshOrders"
           >
-            重试
+            {{ PAYMENT_ORDERS_MESSAGES.retry }}
           </AdminButton>
         </div>
       </AdminAlert>
 
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>刷新支付订单失败，正在显示上次成功的数据。</span>
+          <span>{{ PAYMENT_ORDERS_MESSAGES.backgroundError }}</span>
           <AdminButton
             variant="outline"
             size="small"
@@ -85,7 +85,7 @@
             :disabled="loading"
             @click="refreshOrders"
           >
-            重试
+            {{ PAYMENT_ORDERS_MESSAGES.retry }}
           </AdminButton>
         </div>
       </AdminAlert>
@@ -98,8 +98,8 @@
       data-key="publicOrderNumber"
       scrollable
       :frame-class="adminTableFrameClass"
-      table-aria-label="支付订单列表"
-      scroll-aria-label="支付订单列表横向滚动区域"
+      :table-aria-label="PAYMENT_ORDERS_MESSAGES.tableAria"
+      :scroll-aria-label="PAYMENT_ORDERS_MESSAGES.tableScrollAria"
       :table-style="adminTableStyle"
       :class="adminTableClass"
     >
@@ -108,7 +108,7 @@
       </template>
 
       <!-- 订单时间列：等宽日期 -->
-      <AdminColumn field="createdAt" header="订单时间" :style="{ width: '160px' }">
+      <AdminColumn field="createdAt" :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn" :style="{ width: '160px' }">
         <template #body="{ data }">
           <time
             :datetime="data.createdAt"
@@ -120,12 +120,12 @@
       </AdminColumn>
 
       <!-- 公开订单号列：等宽可点击链接 -->
-      <AdminColumn field="publicOrderNumber" header="公开订单号" :style="{ minWidth: '220px' }">
+      <AdminColumn field="publicOrderNumber" :header="PAYMENT_ORDERS_MESSAGES.orderNumberColumn" :style="{ minWidth: '220px' }">
         <template #body="{ data }">
           <button
             type="button"
             class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
-            :aria-label="`查看订单 ${data.publicOrderNumber}`"
+            :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
             @click="openDetail(data.publicOrderNumber)"
           >
             {{ data.publicOrderNumber }}
@@ -134,7 +134,7 @@
       </AdminColumn>
 
       <!-- 用户列：姓名 -->
-      <AdminColumn header="用户" :style="{ width: '160px' }">
+      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.userColumn" :style="{ width: '160px' }">
         <template #body="{ data }">
           <div class="truncate font-medium text-admin-text-1">
             {{ data.user.displayName }}
@@ -143,7 +143,7 @@
       </AdminColumn>
 
       <!-- Idea 数量列：等宽数字 -->
-      <AdminColumn field="ideaQuantity" header="Idea 数量" :style="{ width: '120px' }">
+      <AdminColumn field="ideaQuantity" :header="PAYMENT_ORDERS_MESSAGES.ideaColumn" :style="{ width: '120px' }">
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
             {{ formatLocaleNumber(data.ideaQuantity) }}
@@ -152,7 +152,7 @@
       </AdminColumn>
 
       <!-- 原始实付列：等宽金额 -->
-      <AdminColumn header="原始实付" :style="{ width: '130px' }">
+      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.paidColumn" :style="{ width: '130px' }">
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
             {{ formatPaymentMoney(data.paidAmountMinor, data.paidCurrency) }}
@@ -161,7 +161,7 @@
       </AdminColumn>
 
       <!-- Stripe 状态列：圆角徽标 -->
-      <AdminColumn field="stripeStatus" header="Stripe 状态" :style="{ width: '120px' }">
+      <AdminColumn field="stripeStatus" :header="PAYMENT_ORDERS_MESSAGES.stripeColumn" :style="{ width: '120px' }">
         <template #body="{ data }">
           <AdminBadge
             :value="getStripeStatusLabel(data.stripeStatus)"
@@ -172,7 +172,7 @@
       </AdminColumn>
 
       <!-- 本地到账列：圆角徽标 -->
-      <AdminColumn field="creditStatus" header="本地到账" :style="{ width: '120px' }">
+      <AdminColumn field="creditStatus" :header="PAYMENT_ORDERS_MESSAGES.creditColumn" :style="{ width: '120px' }">
         <template #body="{ data }">
           <AdminBadge
             :value="getCreditStatusLabel(data.creditStatus)"
@@ -183,21 +183,21 @@
       </AdminColumn>
 
       <!-- 异常列：Badge 或横线 -->
-      <AdminColumn header="异常" :style="{ width: '110px' }">
+      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.anomalyColumn" :style="{ width: '110px' }">
         <template #body="{ data }">
-          <AdminBadge v-if="data.anomalousAt" value="24h 未收敛" severity="danger" rounded />
+          <AdminBadge v-if="data.anomalousAt" :value="PAYMENT_ORDERS_MESSAGES.anomalyBadge" severity="danger" rounded />
           <span v-else class="text-xs text-admin-text-3">—</span>
         </template>
       </AdminColumn>
 
       <!-- 详情操作列 (1:1 对齐用户管理页操作列样式) -->
-      <AdminColumn header="详情" :style="{ width: '64px' }">
+      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.detailColumn" :style="{ width: '64px' }">
         <template #body="{ data }">
           <div class="flex items-center justify-start">
             <button
               type="button"
               :class="adminTableRowActionButtonClass"
-              :aria-label="`查看订单 ${data.publicOrderNumber}`"
+              :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
               @click="openDetail(data.publicOrderNumber)"
             >
               <Eye class="size-4" />
@@ -207,7 +207,7 @@
       </AdminColumn>
     </AdminTable>
 
-    <template #footer-label>筛选结果 {{ totalLabel }}</template>
+    <template #footer-label>{{ PAYMENT_ORDERS_MESSAGES.footerLabel(totalLabel) }}</template>
   </AdminCollectionPageShell>
 
   <PaymentOrderDetailDialog
@@ -262,6 +262,7 @@ import {
   type PaymentOrderStatusFilter,
 } from './paymentOrderPresentation'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
+import { PAYMENT_ORDERS_MESSAGES } from './messages'
 import type { AdminPaymentOrderDetail, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 const resource = createAdminPaymentOrderResource()
@@ -323,7 +324,7 @@ const {
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 
-const totalLabel = computed(() => `${formatLocaleNumber(total.value)} 笔`)
+const totalLabel = computed(() => PAYMENT_ORDERS_MESSAGES.totalUnit(formatLocaleNumber(total.value)))
 const hasFilters = computed(
   () => statusFilter.value !== ORDER_STATUS_FILTER_ALL || anomalyOnly.value,
 )
@@ -335,7 +336,9 @@ const hasCriteria = computed(() =>
     anomalyOnly.value,
   ),
 )
-const emptyTitle = computed(() => (hasCriteria.value ? '未找到匹配的支付订单' : '暂无支付订单'))
+const emptyTitle = computed(() =>
+  hasCriteria.value ? PAYMENT_ORDERS_MESSAGES.emptyNoMatch : PAYMENT_ORDERS_MESSAGES.emptyNone,
+)
 
 // The query fetches on mount and cancels on unmount by itself; only the
 // detail request (still hand-rolled, out of pilot scope) needs teardown here.
@@ -407,9 +410,12 @@ async function requestRefund(ideaQuantity: number) {
   // Control refunds require an operator reason (audit); a cancelled dialog
   // aborts silently.
   const confirmed = await adminConfirm.confirm({
-    title: '确认退款',
-    message: `将为订单 ${publicOrderNumber} 发起 ${formatLocaleNumber(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？该操作将记录操作人与原因。`,
-    confirmLabel: '发起退款',
+    title: PAYMENT_ORDERS_MESSAGES.refundTitle,
+    message: PAYMENT_ORDERS_MESSAGES.refundMessage(
+      publicOrderNumber,
+      formatLocaleNumber(ideaQuantity),
+    ),
+    confirmLabel: PAYMENT_ORDERS_MESSAGES.refundConfirm,
     intent: 'danger',
     reason: { required: true },
   })
@@ -442,7 +448,7 @@ async function executeRefund(
     feedback.refundSubmitted()
     refreshOrders()
   } catch (error) {
-    refundError.value = formatAdminDisplayError(error, '发起退款失败，请稍后重试')
+    refundError.value = formatAdminDisplayError(error, PAYMENT_ORDERS_MESSAGES.refundFailed)
   } finally {
     refundLoading.value = false
   }

@@ -86,14 +86,41 @@ func findPendingRefundReplay(ctx context.Context, tx refundQueryer, order paymen
 }
 
 func loadPendingRefundBalances(ctx context.Context, tx refundQueryer, orderID string) (int64, int64, error) {
-	var alreadyRefunded, disputedIdeas int64
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(idea_quantity), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, orderID).Scan(&alreadyRefunded); err != nil {
-		return 0, 0, fmt.Errorf("sum existing refunds: %w", err)
+	exposure, err := queryPaymentOrderExposure(ctx, tx, orderID)
+	if err != nil {
+		return 0, 0, err
 	}
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, orderID).Scan(&disputedIdeas); err != nil {
-		return 0, 0, fmt.Errorf("sum active Disputes: %w", err)
+	return exposure.refundedIdeas, exposure.disputedIdeas, nil
+}
+
+// paymentOrderExposureSQL aggregates the occupied Ideas/amounts for one
+// payment order in a single round trip: refunds in a provisional/terminal
+// state plus open/lost disputes. It is the single definition of the
+// "occupied Ideas" shape shared by pending-refund validation,
+// external-refund intake, and dispute sizing so the three readmodels
+// cannot drift on status predicates.
+const paymentOrderExposureSQL = `
+SELECT
+  COALESCE((SELECT SUM(idea_quantity) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')), 0),
+  COALESCE((SELECT SUM(amount_minor) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')), 0),
+  COALESCE((SELECT SUM(target_idea_quantity) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')), 0),
+  COALESCE((SELECT SUM(amount_minor) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')), 0)`
+
+type paymentOrderExposure struct {
+	refundedIdeas  int64
+	refundedAmount int64
+	disputedIdeas  int64
+	disputedAmount int64
+}
+
+func queryPaymentOrderExposure(ctx context.Context, q refundQueryer, orderID string) (paymentOrderExposure, error) {
+	var exposure paymentOrderExposure
+	if err := q.QueryRow(ctx, paymentOrderExposureSQL, orderID).Scan(
+		&exposure.refundedIdeas, &exposure.refundedAmount, &exposure.disputedIdeas, &exposure.disputedAmount,
+	); err != nil {
+		return paymentOrderExposure{}, fmt.Errorf("sum occupied payment ideas: %w", err)
 	}
-	return alreadyRefunded, disputedIdeas, nil
+	return exposure, nil
 }
 
 func (r *Repository) GetPaymentRefundByID(ctx context.Context, refundID string) (paymentsdomain.PaymentRefund, error) {

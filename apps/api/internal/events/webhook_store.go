@@ -49,12 +49,115 @@ const (
 	webhookSubscriptionPrefix = "sub_"
 )
 
-// Subscription delivery states.
+// Subscription delivery states. These words are the process-local
+// projection owned by WebhookStore (see CanWebhookTransition), NOT the
+// durable event_subscriptions.status column: that column stays 'active'
+// (chk_event_subscriptions_status allows active/paused/disabled, but no
+// Go writer emits paused/disabled and this store never persists
+// degraded/dead_letter). The wire words are unchanged.
+type WebhookStatus string
+
 const (
-	WebhookStatusActive     = "active"
-	WebhookStatusDegraded   = "degraded"
-	WebhookStatusDeadLetter = "dead_letter"
+	WebhookStatusActive     WebhookStatus = "active"
+	WebhookStatusDegraded   WebhookStatus = "degraded"
+	WebhookStatusDeadLetter WebhookStatus = "dead_letter"
 )
+
+// allowedWebhookTransitions mirrors the in-memory guards in
+// webhook_delivery.go and postgres_store.go hydrateSubscription: a
+// failed attempt degrades an active subscription; a delivered envelope
+// with no remaining failures restores a degraded subscription to
+// active; budget exhaustion parks any live subscription as
+// dead_letter. dead_letter is terminal (Dispatch and
+// executeDeliveryAttempt drop it). The type only documents the allowed
+// transitions at compile time (see CanWebhookTransition); no SQL
+// literals change.
+var allowedWebhookTransitions = map[WebhookStatus]map[WebhookStatus]struct{}{
+	WebhookStatusActive: {
+		WebhookStatusDegraded:   {},
+		WebhookStatusDeadLetter: {},
+	},
+	WebhookStatusDegraded: {
+		WebhookStatusActive:     {},
+		WebhookStatusDeadLetter: {},
+	},
+}
+
+// CanWebhookTransition reports whether a from -> to flip is allowed in
+// the process-local projection. It is documentation, not a gate.
+func CanWebhookTransition(from, to WebhookStatus) bool {
+	nexts, ok := allowedWebhookTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
+
+// AttemptOutcome is one per-attempt delivery fact. The wire and
+// database words are unchanged ("delivered", "failed"); the type only
+// documents the closed vocabulary at compile time. Attempts are
+// INSERT-only facts, not a lifecycle: there is no transition table.
+type AttemptOutcome string
+
+const (
+	AttemptOutcomeDelivered AttemptOutcome = "delivered"
+	AttemptOutcomeFailed    AttemptOutcome = "failed"
+)
+
+// DeliveryStatus is the durable event_deliveries.status word. The wire
+// and database words are unchanged
+// ("pending","retrying","delivered","failed","dead_letter"); the type
+// only documents the allowed transitions at compile time (see
+// CanDeliveryTransition). SQL literals stay byte-identical.
+//
+// 'failed' is a legacy read-only word: the current RecordAttempt only
+// writes retrying/delivered/dead_letter (a non-final failure stays
+// retrying; the per-attempt outcome carries failed), but hydrate still
+// honors a stored 'failed' delivery by degrading the subscription, so
+// the word stays in the vocabulary.
+type DeliveryStatus string
+
+const (
+	DeliveryStatusPending    DeliveryStatus = "pending"
+	DeliveryStatusRetrying   DeliveryStatus = "retrying"
+	DeliveryStatusDelivered  DeliveryStatus = "delivered"
+	DeliveryStatusFailed     DeliveryStatus = "failed"
+	DeliveryStatusDeadLetter DeliveryStatus = "dead_letter"
+)
+
+// allowedDeliveryTransitions mirrors the durable writes in
+// postgres_store.go (EnsureDelivery inserts pending; RecordAttempt
+// flips to retrying/delivered/dead_letter; MarkDelivered flips to
+// delivered) and chk_event_deliveries_status: pending fans out to
+// retrying/delivered/dead_letter; retrying repeats until delivered or
+// dead_letter; delivered/dead_letter/failed are terminal (failed is
+// legacy read-only and has no writer).
+var allowedDeliveryTransitions = map[DeliveryStatus]map[DeliveryStatus]struct{}{
+	DeliveryStatusPending: {
+		DeliveryStatusRetrying:   {},
+		DeliveryStatusDelivered:  {},
+		DeliveryStatusDeadLetter: {},
+	},
+	DeliveryStatusRetrying: {
+		DeliveryStatusRetrying:   {},
+		DeliveryStatusDelivered:  {},
+		DeliveryStatusDeadLetter: {},
+	},
+}
+
+// CanDeliveryTransition reports whether a from -> to flip is durably
+// allowed. It is documentation, not a gate: every transition it
+// reports true for was already possible, and no previously possible
+// transition reports false.
+func CanDeliveryTransition(from, to DeliveryStatus) bool {
+	nexts, ok := allowedDeliveryTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
 
 // WebhookSubscription is the stored subscription (secret never serialized).
 type WebhookSubscription struct {
@@ -63,7 +166,7 @@ type WebhookSubscription struct {
 	URL         string
 	EventTypes  []string
 	Secret      []byte
-	Status      string
+	Status      WebhookStatus
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Delivered   map[string]struct{}
@@ -73,12 +176,12 @@ type WebhookSubscription struct {
 
 // WebhookAttempt is one delivery attempt fact.
 type WebhookAttempt struct {
-	DeliveryID string    `json:"delivery_id"`
-	Attempt    int       `json:"attempt"`
-	StatusCode int       `json:"status_code"`
-	Outcome    string    `json:"outcome"`
-	Error      string    `json:"error,omitempty"`
-	At         time.Time `json:"at"`
+	DeliveryID string         `json:"delivery_id"`
+	Attempt    int            `json:"attempt"`
+	StatusCode int            `json:"status_code"`
+	Outcome    AttemptOutcome `json:"outcome"`
+	Error      string         `json:"error,omitempty"`
+	At         time.Time      `json:"at"`
 }
 
 // WebhookDeadLetter is an envelope parked after budget exhaustion.
@@ -421,14 +524,14 @@ func (s *WebhookStore) Delete(ctx context.Context, workspaceID, id string) (bool
 func maskSubscription(sub *WebhookSubscription) WebhookView {
 	failures := 0
 	for _, attempt := range sub.Attempts {
-		if attempt.Outcome != "delivered" {
+		if attempt.Outcome != AttemptOutcomeDelivered {
 			failures++
 		}
 	}
 	return WebhookView{
 		ID: sub.ID, WorkspaceID: sub.WorkspaceID, URL: sub.URL,
 		EventTypes: append([]string(nil), sub.EventTypes...), HasSecret: len(sub.Secret) > 0,
-		Status: sub.Status, FailureCount: failures, DeadLetterSize: len(sub.DeadLetter),
+		Status: string(sub.Status), FailureCount: failures, DeadLetterSize: len(sub.DeadLetter),
 		RecentAttempts: append([]WebhookAttempt(nil), sub.Attempts...),
 		DeadLetter:     append([]WebhookDeadLetter(nil), sub.DeadLetter...),
 		CreatedAt:      sub.CreatedAt.UTC().Format(time.RFC3339),
@@ -464,7 +567,7 @@ func appendIfMissing(ids []string, id string) []string {
 func failureCount(sub *WebhookSubscription) int {
 	count := 0
 	for _, attempt := range sub.Attempts {
-		if attempt.Outcome != "delivered" {
+		if attempt.Outcome != AttemptOutcomeDelivered {
 			count++
 		}
 	}

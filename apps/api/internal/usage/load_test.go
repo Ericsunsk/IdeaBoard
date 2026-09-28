@@ -3,7 +3,6 @@ package usage
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"runtime"
 	"sort"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	"ideaboard/api/internal/credits"
 	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,7 +30,7 @@ const (
 // It is intentionally excluded from the default suite because it seeds one
 // million immutable Capture facts and matching durable Task Billing snapshots.
 func TestUsageMillionTransactionDataset(t *testing.T) {
-	if os.Getenv("CREDITS_LOAD_TEST") != "1" {
+	if testenv.Get("CREDITS_LOAD_TEST") != "1" {
 		t.Skip("set CREDITS_LOAD_TEST=1 to run the million-transaction Usage harness")
 	}
 	transactionCount := usageLoadTransactionCount(t)
@@ -139,7 +139,7 @@ func TestUsageMillionTransactionDataset(t *testing.T) {
 
 func usageLoadTransactionCount(t *testing.T) int {
 	t.Helper()
-	raw := os.Getenv("CREDITS_LOAD_TEST_TRANSACTIONS")
+	raw := testenv.Get("CREDITS_LOAD_TEST_TRANSACTIONS")
 	if raw == "" {
 		return minimumUsageLoadTransactions
 	}

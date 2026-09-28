@@ -16,7 +16,7 @@ import (
 
 // sessionExpiryDeadline computes the lazy-expiry deadline from the
 // creation timestamp and current status.
-func sessionExpiryDeadline(createdAt time.Time, status string) time.Time {
+func sessionExpiryDeadline(createdAt time.Time, status SessionStatus) time.Time {
 	if status == StatusTransferring {
 		return createdAt.Add(UploadTransferTTL)
 	}
@@ -51,12 +51,12 @@ func sessionFromRow(workspacePublicID string, row dbsqlc.UploadSession) *Session
 		SizeBytes:      row.DeclaredSizeBytes,
 		ChecksumSHA256: checksum,
 		MediaKind:      MediaKindForMIME(row.DeclaredMimeType),
-		Status:         row.Status,
+		Status:         SessionStatus(row.Status),
 		StorageKey:     slot,
 		CreatedAt:      createdAt,
 		CompletedAt:    completedAt,
 		ExpiredAt:      expiredAt,
-		ExpiresAt:      sessionExpiryDeadline(createdAt, row.Status),
+		ExpiresAt:      sessionExpiryDeadline(createdAt, SessionStatus(row.Status)),
 		UpdatedAt:      updatedAt,
 	}
 }
@@ -155,10 +155,10 @@ func getSessionRow(ctx context.Context, q *dbsqlc.Queries, workspacePublicID, up
 // and expires rows past their TTL. It returns the current row plus a
 // terminal marker: expired rows report ErrExpired.
 func applyLazySessionEffects(ctx context.Context, q *dbsqlc.Queries, workspacePublicID string, row dbsqlc.UploadSession, now time.Time) (dbsqlc.UploadSession, error) {
-	switch row.Status {
+	switch SessionStatus(row.Status) {
 	case StatusPending, StatusTransferring:
 		createdAt := dbutil.TimeValue(row.CreatedAt)
-		if !createdAt.IsZero() && !now.Before(sessionExpiryDeadline(createdAt, row.Status)) {
+		if !createdAt.IsZero() && !now.Before(sessionExpiryDeadline(createdAt, SessionStatus(row.Status))) {
 			expired, err := q.ExpireUploadSession(ctx, dbsqlc.ExpireUploadSessionParams{
 				PublicID:          row.PublicID,
 				WorkspacePublicID: strings.TrimSpace(workspacePublicID),
@@ -171,7 +171,7 @@ func applyLazySessionEffects(ctx context.Context, q *dbsqlc.Queries, workspacePu
 			}
 			return expired, ErrExpired
 		}
-		if row.Status == StatusPending {
+		if SessionStatus(row.Status) == StatusPending {
 			moved, err := q.MarkUploadSessionTransferring(ctx, dbsqlc.MarkUploadSessionTransferringParams{
 				PublicID:          row.PublicID,
 				WorkspacePublicID: strings.TrimSpace(workspacePublicID),
@@ -274,7 +274,7 @@ func (s *Service) CompleteSession(ctx context.Context, workspaceID, uploadID str
 			return effectErr
 		}
 		row = live
-		if row.Status != StatusPending && row.Status != StatusTransferring {
+		if SessionStatus(row.Status) != StatusPending && SessionStatus(row.Status) != StatusTransferring {
 			return ErrStateConflict
 		}
 		session := sessionFromRow(trimmedWorkspace, row)
@@ -397,7 +397,7 @@ func (s *Service) FailSession(ctx context.Context, workspaceID, uploadID, reason
 		if getErr != nil {
 			return nil, getErr
 		}
-		if current.Status == StatusFailed {
+		if SessionStatus(current.Status) == StatusFailed {
 			return sessionFromRow(trimmedWorkspace, current), nil
 		}
 		return nil, ErrStateConflict

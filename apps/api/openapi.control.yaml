@@ -3468,7 +3468,7 @@ components:
       description: User public id (usr_...).
       schema:
         type: string
-        pattern: '^usr_[A-Za-z0-9]+$'
+        pattern: '^usr_[A-Za-z0-9_-]+$'
     ControlWorkspaceId:
       name: workspace_id
       in: path
@@ -3484,7 +3484,7 @@ components:
       description: Member user public id (usr_...).
       schema:
         type: string
-        pattern: '^usr_[A-Za-z0-9]+$'
+        pattern: '^usr_[A-Za-z0-9_-]+$'
     ControlTaskId:
       name: task_id
       in: path
@@ -3789,7 +3789,7 @@ components:
       properties:
         id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         display_name:
           type: string
         email:
@@ -3847,7 +3847,7 @@ components:
       properties:
         user_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         role:
           type: string
           enum: [owner, admin, member]
@@ -3875,7 +3875,7 @@ components:
       properties:
         user_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         display_name:
           type: string
         available_credits:
@@ -3898,7 +3898,7 @@ components:
           type: string
         user_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         display_name:
           type: string
         type:
@@ -4021,7 +4021,7 @@ components:
       properties:
         user_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         role:
           type: string
           enum: [owner, admin, member]
@@ -4064,7 +4064,7 @@ components:
       properties:
         user_id:
           type: string
-          pattern: '^usr_[A-Za-z0-9]+$'
+          pattern: '^usr_[A-Za-z0-9_-]+$'
         amount_credits:
           type: integer
           minimum: 1

@@ -38,7 +38,7 @@ func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
 	}
 
 	for index := range 8 {
-		hub.Publish(42, PaymentEvent{PublicToken: "latest", Status: string(rune('0' + index))})
+		hub.Publish(42, PaymentEvent{PublicToken: "latest", Status: paymentports.PaymentEventStatus(string(rune('0' + index)))})
 	}
 	deadline := time.After(time.Second)
 	for {

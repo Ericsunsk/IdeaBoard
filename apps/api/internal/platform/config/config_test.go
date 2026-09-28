@@ -39,6 +39,15 @@ var configEnvKeys = []string{
 	"NATS_PORT",
 	"NATS_EVENT_BUS_ENABLED",
 	"REWARDS_CODE_HMAC_KEYS",
+	"STORAGE_LOCAL_ROOT",
+	"IMGPROXY_KEY",
+	"IMGPROXY_SALT",
+	"INIT_ADMIN_EMAIL",
+	"INIT_ADMIN_PASSWORD",
+	"INIT_ADMIN_DISPLAY_NAME",
+	"ATLAS_BINARY",
+	"ATLAS_MIGRATIONS_DIR",
+	"APP_SECRETS_ENCRYPTION_KEY",
 }
 
 func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
@@ -453,10 +462,67 @@ func TestLoadTaskRetentionConfig(t *testing.T) {
 	}
 }
 
+func TestLoadAdminSeedAndMigrationTooling(t *testing.T) {
+	resetConfigEnv(t)
+	cfg := Load()
+	if cfg.AdminSeed.Email != "" || cfg.AdminSeed.Password != "" || cfg.AdminSeed.DisplayName != "" {
+		t.Fatalf("default admin seed = %+v, want empty", cfg.AdminSeed)
+	}
+	if cfg.Migration.AtlasBinary != DefaultAtlasBinary {
+		t.Fatalf("default atlas binary = %q, want %q", cfg.Migration.AtlasBinary, DefaultAtlasBinary)
+	}
+	if cfg.Migration.MigrationsDir != DefaultMigrationDirectory {
+		t.Fatalf("default migrations dir = %q, want %q", cfg.Migration.MigrationsDir, DefaultMigrationDirectory)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("INIT_ADMIN_EMAIL", " admin@example.com ")
+	t.Setenv("INIT_ADMIN_PASSWORD", "admin-secret")
+	t.Setenv("INIT_ADMIN_DISPLAY_NAME", " Admin ")
+	t.Setenv("ATLAS_BINARY", " /tmp/atlas ")
+	t.Setenv("ATLAS_MIGRATIONS_DIR", " file:///app/migrations ")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", " test-secrets-encryption-key ")
+	got := Load()
+	if got.AdminSeed.Email != "admin@example.com" || got.AdminSeed.Password != "admin-secret" || got.AdminSeed.DisplayName != "Admin" {
+		t.Fatalf("admin seed = %+v, want trimmed init-admin values", got.AdminSeed)
+	}
+	if got.Migration.AtlasBinary != "/tmp/atlas" {
+		t.Fatalf("atlas binary = %q, want /tmp/atlas", got.Migration.AtlasBinary)
+	}
+	if got.Migration.MigrationsDir != "file:///app/migrations" {
+		t.Fatalf("migrations dir = %q, want file:///app/migrations", got.Migration.MigrationsDir)
+	}
+	if got.Secrets.EncryptionKey != "test-secrets-encryption-key" {
+		t.Fatalf("secrets encryption key = %q, want trimmed value", got.Secrets.EncryptionKey)
+	}
+}
+
+func TestValidateSecretsRequiresEncryptionKey(t *testing.T) {
+	var nilConfig *Config
+	if err := nilConfig.ValidateSecrets(); err == nil {
+		t.Fatal("ValidateSecrets succeeded on nil config, want error")
+	}
+	if err := (&Config{}).ValidateSecrets(); err == nil {
+		t.Fatal("ValidateSecrets succeeded without APP_SECRETS_ENCRYPTION_KEY, want error")
+	}
+	if err := (&Config{Secrets: SecretsConfig{EncryptionKey: "test-secrets-encryption-key"}}).ValidateSecrets(); err != nil {
+		t.Fatalf("ValidateSecrets() error = %v", err)
+	}
+}
+
+func TestValidateRejectsMissingSecretsEncryptionKey(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("PUBLIC_ORIGIN", "https://app.example.com")
+	cfg := Load()
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate succeeded without APP_SECRETS_ENCRYPTION_KEY, want error")
+	}
+}
 func TestValidateRejectsExcessiveDatabasePoolBudget(t *testing.T) {
 	resetConfigEnv(t)
 	t.Setenv("PUBLIC_ORIGIN", "https://app.example.com")
 	t.Setenv("DB_PASSWORD", "runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	t.Setenv("DB_POOL_MAX_OPEN", "64")
 	t.Setenv("RIVER_POOL_MAX_CONNS", "32")
 	if err := Load().Validate(); err == nil {
@@ -467,6 +533,7 @@ func TestValidateRejectsExcessiveDatabasePoolBudget(t *testing.T) {
 func TestValidateFailsFastOnMissingPublicOrigin(t *testing.T) {
 	resetConfigEnv(t)
 	t.Setenv("PUBLIC_ORIGIN", "")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	cfg := Load()
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate succeeded without PUBLIC_ORIGIN, want error")
@@ -476,6 +543,7 @@ func TestValidateFailsFastOnMissingPublicOrigin(t *testing.T) {
 func TestValidatePassesWithCanonicalOrigins(t *testing.T) {
 	resetConfigEnv(t)
 	t.Setenv("PUBLIC_ORIGIN", "https://app.example.com")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
@@ -487,6 +555,7 @@ func TestValidateRejectsProductionInvalidEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("PUBLIC_ORIGIN", "https://app.example.com")
 	t.Setenv("DB_PASSWORD", "production-runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	t.Setenv("RIVER_WORKER_CONCURRENCY", "12")
 	cfg := Load()
 	if err := cfg.Validate(); err != nil {
@@ -497,6 +566,7 @@ func TestValidateRejectsProductionInvalidEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("PUBLIC_ORIGIN", "https://app.example.com")
 	t.Setenv("DB_PASSWORD", "production-runtime-secret-value")
+	t.Setenv("APP_SECRETS_ENCRYPTION_KEY", "test-secrets-encryption-key")
 	t.Setenv("DB_POOL_MAX_OPEN", "lots")
 	bad := Load()
 	if err := bad.Validate(); err == nil {

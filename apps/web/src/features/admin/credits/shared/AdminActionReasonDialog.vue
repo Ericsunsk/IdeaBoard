@@ -2,7 +2,7 @@
   <AdminDialogShell
     :visible="visible"
     :header="title"
-    description="请填写本次操作的内部原因后确认提交。"
+    :description="CREDITS_SHARED_MESSAGES.actionReasonDescription"
     size="compact"
     :busy="loading"
     @reset="resetTransientState"
@@ -27,7 +27,7 @@
         :disabled="loading"
         @click="requestClose"
       >
-        取消
+        {{ CREDITS_SHARED_MESSAGES.actionReasonCancel }}
       </AdminButton>
       <AdminButton
         :class="adminActionButtonClass"
@@ -49,6 +49,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { validateAdminActionReason } from '../../shared/validation/actionReasonContract'
 import AdminActionReasonField from './AdminActionReasonField.vue'
+import { CREDITS_SHARED_MESSAGES } from './messages'
 
 withDefaults(
   defineProps<{

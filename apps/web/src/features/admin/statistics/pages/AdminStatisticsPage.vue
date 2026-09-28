@@ -6,20 +6,20 @@
 
     <template v-else>
       <div :class="adminSummaryGridClass">
-        <AdminSummaryCard label="今日调用" :value="todayCalls" :footer="todayCallsFoot" />
-        <AdminSummaryCard label="今日失败" :value="todayFailed" :footer="todayFailedFoot" />
+        <AdminSummaryCard :label="STATISTICS_MESSAGES.todayCalls" :value="todayCalls" :footer="todayCallsFoot" />
+        <AdminSummaryCard :label="STATISTICS_MESSAGES.todayFailed" :value="todayFailed" :footer="todayFailedFoot" />
         <AdminSummaryCard
-          label="今日成功率"
+          :label="STATISTICS_MESSAGES.todaySuccessRate"
           :value="todaySuccessRate"
           :footer="todaySuccessRateFoot"
         />
-        <AdminSummaryCard label="本月调用" :value="monthCalls" :footer="monthCallsFoot" />
+        <AdminSummaryCard :label="STATISTICS_MESSAGES.monthCalls" :value="monthCalls" :footer="monthCallsFoot" />
       </div>
 
       <div :class="adminChartGridClass">
         <RangedLineChartCard
           v-model="timeRange"
-          title="调用量与消耗趋势"
+          :title="STATISTICS_MESSAGES.trendTitle"
           variant="admin"
           class="xl:col-span-12"
           :ranges="rangeOptions"
@@ -30,7 +30,7 @@
           size="hero"
         />
 
-        <AdminChartCard title="模型风险矩阵" span-class="xl:col-span-7">
+        <AdminChartCard :title="STATISTICS_MESSAGES.riskMatrixTitle" span-class="xl:col-span-7">
           <ChartRenderer
             v-if="isChartReady"
             type="scatter"
@@ -43,7 +43,7 @@
 
         <RangedLineChartCard
           v-model="timeRange"
-          title="服务质量趋势"
+          :title="STATISTICS_MESSAGES.qualityTrendTitle"
           variant="admin"
           class="xl:col-span-5"
           :ranges="rangeOptions"
@@ -53,7 +53,7 @@
           :show-chart="isChartReady"
         />
 
-        <AdminChartCard title="瓶颈来源" chart-size="compact" span-class="xl:col-span-4">
+        <AdminChartCard :title="STATISTICS_MESSAGES.bottleneckTitle" chart-size="compact" span-class="xl:col-span-4">
           <ChartRenderer
             v-if="isChartReady"
             type="polarArea"
@@ -85,6 +85,7 @@ import {
 } from '../../shared/lib/uiClasses'
 import { useUsageStatisticsCharts } from '../useUsageStatisticsCharts'
 import { useUsageStatisticsData } from '../useUsageStatisticsData'
+import { STATISTICS_MESSAGES } from './messages'
 
 const {
   adminStatistics,
@@ -98,7 +99,7 @@ const areStatisticsChartsSettled = computed(() => isStatisticsSettled.value)
 const isChartReady = useAdminChartReady(areStatisticsChartsSettled)
 const hasStatisticsError = computed(() => isStatisticsError.value)
 const statisticsErrorMessage = computed(() =>
-  formatDisplayErrorMessage(statisticsError.value, '加载统计数据失败'),
+  formatDisplayErrorMessage(statisticsError.value, STATISTICS_MESSAGES.loadFailed),
 )
 
 const {

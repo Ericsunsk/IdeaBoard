@@ -81,7 +81,7 @@ import (
 
 // Frozen v1 reward error codes (wire-stable). Promoted into
 // internal/platform/contract: the kernel registry is the single source
-// of truth, these v1-local names keep the render-site diffs trivial.
+// of truth, render sites use the canonical contract.Code* values.
 // Explicit statuses are rendered at each site (never via StatusOf);
 // StatusOf still documents the exact status for each code.
 //
@@ -90,11 +90,8 @@ import (
 //   - reward_wallet_locked (409): frozen wallet cannot redeem.
 //   - reward_redeem_conflict (409): Idempotency-Key reused with a different
 //     redeem request (hash mismatch); replay otherwise.
-const (
-	CodeRewardCodeUnavailable contract.Code = contract.CodeRewardCodeUnavailable
-	CodeRewardWalletLocked    contract.Code = contract.CodeRewardWalletLocked
-	CodeRewardRedeemConflict  contract.Code = contract.CodeRewardRedeemConflict
-)
+// Render sites reference the canonical contract.Code* values directly;
+// no v1-local aliases (single registration in platform/contract).
 
 // v1PurchaseOptionsService is the caller-owned read over the Payments
 // purchase-eligibility projection (static quantities + terms versions +
@@ -211,7 +208,7 @@ func v1PendingOrderToken(c *gin.Context) (string, bool) {
 	raw := strings.TrimSpace(c.Param("order_id"))
 	parsed, err := uuid.Parse(raw)
 	if err != nil || parsed.String() != strings.ToLower(raw) {
-		contract.RenderError(c, http.StatusNotFound, CodeBillingSessionNotFound, "充值订单不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值订单不存在")
 		c.Abort()
 		return "", false
 	}
@@ -241,9 +238,9 @@ func requireEmptyV1BillingActionBody(c *gin.Context) bool {
 func renderPendingOrderError(c *gin.Context, err error, action string) {
 	switch {
 	case errors.Is(err, paymentcontracts.ErrPaymentOrderNotFound):
-		contract.RenderError(c, http.StatusNotFound, CodeBillingSessionNotFound, "充值订单不存在")
+		contract.RenderError(c, http.StatusNotFound, contract.CodeBillingSessionNotFound, "充值订单不存在")
 	case errors.Is(err, paymentsdomain.ErrWalletNotRechargeable):
-		contract.RenderError(c, http.StatusForbidden, CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可"+action)
+		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, "当前工作区钱包受限，暂不可"+action)
 	case errors.Is(err, paymentcontracts.ErrStripeProviderUnavailable),
 		errors.Is(err, paymentsdomain.ErrPurchasesUnavailable):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "支付服务暂不可用")
@@ -284,7 +281,7 @@ func (h *contractV1BillingHandler) continuePendingOrder(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
 				c.Abort()
 				return
 			}
@@ -332,7 +329,7 @@ func (h *contractV1BillingHandler) abandonPendingOrder(c *gin.Context) {
 		})
 		if doErr != nil {
 			if contract.IsIdempotencyConflict(doErr) {
-				contract.RenderError(c, http.StatusConflict, CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeBillingCheckoutConflict, "幂等请求与原请求不一致")
 				c.Abort()
 				return
 			}
@@ -436,7 +433,7 @@ type v1BillingQuoteDTO struct {
 func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{}, func(wctx v1WorkspaceCtx) {
 		if h.deps.Quoter == nil {
-			contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
 			c.Abort()
 			return
 		}
@@ -492,7 +489,7 @@ func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 				contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 					"报价超过允许上限", contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
 			case errors.Is(err, billing.ErrServiceUnavailable):
-				contract.RenderError(c, http.StatusServiceUnavailable, CodeBillingQuoteUnavailable, "价格服务暂不可用")
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, "价格服务暂不可用")
 			default:
 				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "计费服务暂不可用")
 			}
@@ -592,12 +589,12 @@ func (h *contractV1BillingHandler) redeemReward(c *gin.Context) {
 		if doErr != nil {
 			switch {
 			case contract.IsIdempotencyConflict(doErr):
-				contract.RenderError(c, http.StatusConflict, CodeRewardRedeemConflict, "幂等请求与原请求不一致")
+				contract.RenderError(c, http.StatusConflict, contract.CodeRewardRedeemConflict, "幂等请求与原请求不一致")
 			case errors.Is(doErr, rewardsdomain.ErrInvalidCode),
 				errors.Is(doErr, rewardsdomain.ErrCodeUnavailable):
-				contract.RenderError(c, http.StatusUnprocessableEntity, CodeRewardCodeUnavailable, "兑换码无效或已失效")
+				contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeRewardCodeUnavailable, "兑换码无效或已失效")
 			case errors.Is(doErr, rewardsdomain.ErrWalletFrozen):
-				contract.RenderError(c, http.StatusConflict, CodeRewardWalletLocked, "当前账户无法兑换奖励")
+				contract.RenderError(c, http.StatusConflict, contract.CodeRewardWalletLocked, "当前账户无法兑换奖励")
 			default:
 				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, "奖励服务暂不可用")
 			}

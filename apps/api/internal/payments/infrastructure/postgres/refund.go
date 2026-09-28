@@ -103,13 +103,12 @@ func (r *Repository) attachExternalProviderRefund(ctx context.Context, tx pgx.Tx
 }
 
 func (r *Repository) createExternalRefundFact(ctx context.Context, tx pgx.Tx, order paymentRefundOrderFacts, provider paymentports.StripeRefund, key string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	var already, alreadyAmount, disputedIdeas, disputedAmount int64
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&already, &alreadyAmount); err != nil {
+	exposure, err := queryPaymentOrderExposure(ctx, tx, order.ID)
+	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas, &disputedAmount); err != nil {
-		return paymentsdomain.PaymentRefund{}, err
-	}
+	already, alreadyAmount := exposure.refundedIdeas, exposure.refundedAmount
+	disputedIdeas, disputedAmount := exposure.disputedIdeas, exposure.disputedAmount
 	already += disputedIdeas
 	qty := paymentsdomain.ProportionalRefundIdeas(provider.AmountMinor, order.PaidTotal, order.IdeaQuantity)
 	if qty > order.IdeaQuantity {

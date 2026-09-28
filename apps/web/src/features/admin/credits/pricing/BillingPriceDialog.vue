@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :header="`编辑 · ${item?.displayName ?? ''}`"
-    description="调整该计费项的价格配置后保存。"
+    :header="BILLING_PRICING_MESSAGES.priceHeader(item?.displayName)"
+    :description="BILLING_PRICING_MESSAGES.priceDescription"
     size="compact"
     content-layout="plain"
     :busy="pending"
@@ -15,7 +15,7 @@
             class="text-admin-meta font-[680] text-admin-text-2"
             for="model-select-dialog-model"
           >
-            模型
+            {{ BILLING_PRICING_MESSAGES.priceModelLabel }}
           </label>
         </div>
         <ModelMappingRow
@@ -34,7 +34,7 @@
           v-for="variant in resolutions"
           :key="variant"
           v-slot="{ describedbyId, invalid }"
-          :label="variantLabel(variant)"
+          :label="BILLING_PRICING_MESSAGES.priceVariantLabel(variant)"
           :for="`billing-feature-price-${variant}`"
           :error="showError ? validationErrors[variant] : ''"
           :required="variant === requiredVariant"
@@ -45,7 +45,7 @@
             :min="0"
             :max="maxPriceCredits"
             :suffix="prices[variant] === 1 ? ' Idea' : ' Ideas'"
-            :placeholder="variant === requiredVariant ? '必填' : '未配置'"
+            :placeholder="BILLING_PRICING_MESSAGES.pricePlaceholder(variant === requiredVariant)"
             :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
             :aria-describedby="describedbyId"
             @update:model-value="showError = false"
@@ -65,7 +65,7 @@
         :disabled="pending"
         @click="close"
       >
-        取消
+        {{ BILLING_PRICING_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         :class="adminActionButtonClass"
@@ -73,7 +73,7 @@
         :disabled="pending"
         @click="submit"
       >
-        保存
+        {{ BILLING_PRICING_MESSAGES.save }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -92,6 +92,7 @@ import { pricingMappingFeature } from './groups'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import type { AdminModelItem } from '../../models/domain/catalogData'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
+import { BILLING_PRICING_MESSAGES } from './messages'
 
 const props = withDefaults(
   defineProps<{
@@ -141,19 +142,17 @@ const validationErrors = computed<Record<PricingVariant, string>>(() => {
   const errors = {} as Record<PricingVariant, string>
   for (const variant of resolutions.value) {
     const value = prices.value[variant]
-    if (variant === requiredVariant.value && value == null) errors[variant] = '请输入价格'
+    if (variant === requiredVariant.value && value == null)
+      errors[variant] = BILLING_PRICING_MESSAGES.priceRequired
     else if (
       value != null &&
       (!Number.isSafeInteger(value) || value < 0 || value > maxPriceCredits)
     ) {
-      errors[variant] = `价格必须是 0 到 ${formatLocaleNumber(maxPriceCredits)} 之间的整数`
+      errors[variant] = BILLING_PRICING_MESSAGES.priceRange(formatLocaleNumber(maxPriceCredits))
     } else errors[variant] = ''
   }
   return errors
 })
-function variantLabel(variant: PricingVariant) {
-  return variant === 'default' ? '固定' : variant.toUpperCase()
-}
 
 watch(
   () => props.visible,

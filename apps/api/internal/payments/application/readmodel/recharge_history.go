@@ -97,3 +97,18 @@ func DecodeRechargeHistoryCursor(value string) (*RechargeHistoryCursor, error) {
 func EncodeRechargeHistoryCursor(occurredAt time.Time, orderID uuid.UUID) (string, error) {
 	return pagination.EncodeCursor(RechargeHistoryCursor{OccurredAt: occurredAt.UTC().Format(time.RFC3339Nano), OrderID: orderID.String()})
 }
+
+// RechargeHistoryStatus is the user-facing recharge history vocabulary.
+// The wire words are unchanged ("credited", "cancelled", "refunded");
+// the type only documents the closed derivation at compile time.
+// History rows are a read-model overlay (refunded marks a fully
+// settled credited order), not a durable lifecycle: there is no
+// transition table. The contract DTO keeps its string field;
+// writers convert with string(...).
+type RechargeHistoryStatus string
+
+const (
+	RechargeHistoryCredited  RechargeHistoryStatus = "credited"
+	RechargeHistoryCancelled RechargeHistoryStatus = "cancelled"
+	RechargeHistoryRefunded  RechargeHistoryStatus = "refunded"
+)

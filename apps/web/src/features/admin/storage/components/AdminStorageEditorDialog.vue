@@ -1,8 +1,12 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :aria-label="editorMode === 'create' ? '添加对象存储' : form.name || '存储配置'"
-    description="填写对象存储配置后保存。"
+    :aria-label="
+      editorMode === 'create'
+        ? STORAGE_MESSAGES.editorCreateTitle
+        : form.name || STORAGE_MESSAGES.editorFallbackTitle
+    "
+    :description="STORAGE_MESSAGES.editorDescription"
     size="form"
     content-layout="scrollable"
     :busy="saving || savingAndApplying"
@@ -14,8 +18,8 @@
           <button
             type="button"
             :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 rounded-xl shadow-xs']"
-            :title="editorMode === 'edit' ? '点击切换存储 Logo' : undefined"
-            :aria-label="editorMode === 'edit' ? '切换存储 Logo' : undefined"
+            :title="editorMode === 'edit' ? STORAGE_MESSAGES.switchLogoTitle : undefined"
+            :aria-label="editorMode === 'edit' ? STORAGE_MESSAGES.switchLogoAria : undefined"
             :data-control-state="activeLogoTargetId === form.id ? 'selected' : 'idle'"
             :aria-expanded="activeLogoTargetId === form.id ? 'true' : 'false'"
             @click="editorMode === 'edit' && emit('open-logo-picker', $event)"
@@ -34,19 +38,19 @@
           </button>
           <div>
             <h2 class="m-0 text-admin-title-sm font-bold text-admin-title-color">
-              {{ editorMode === 'create' ? '添加对象存储' : form.name }}
+              {{ editorMode === 'create' ? STORAGE_MESSAGES.editorCreateTitle : form.name }}
             </h2>
             <p class="m-0 text-admin-caption text-admin-subtitle-color">
               {{
                 editorMode === 'create'
-                  ? '选择云存储厂商预设或自定义 S3 兼容接入'
-                  : `供应商：${providerLabel(form.provider)}`
+                  ? STORAGE_MESSAGES.editorCreateSubtitle
+                  : STORAGE_MESSAGES.editorProviderSubtitle(providerLabel(form.provider))
               }}
             </p>
           </div>
         </div>
 
-        <AdminBadge v-if="form.isCurrent" value="当前生效存储" severity="success" rounded />
+        <AdminBadge v-if="form.isCurrent" :value="STORAGE_MESSAGES.editorCurrentBadge" severity="success" rounded />
       </div>
     </template>
 
@@ -78,7 +82,7 @@
       <!-- 2. 云厂商多字段分页导航 Tab -->
       <div v-if="textFields.length > 0">
         <nav
-          aria-label="存储配置分页"
+          :aria-label="STORAGE_MESSAGES.editorTabsAria"
           class="inline-flex h-9 items-center justify-center rounded-lg bg-admin-surface-muted p-1 text-admin-text-2"
         >
           <button
@@ -104,7 +108,7 @@
         <div
           class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
         >
-          <span class="text-admin-body font-semibold text-admin-title-color">启用该存储配置</span>
+          <span class="text-admin-body font-semibold text-admin-title-color">{{ STORAGE_MESSAGES.editorEnableLabel }}</span>
           <div class="flex items-center gap-2.5">
             <span
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -118,23 +122,23 @@
                 class="size-1.5 rounded-full"
                 :class="form.enabled ? 'bg-admin-success animate-pulse' : 'bg-admin-text-3'"
               />
-              {{ form.enabled ? '已启用' : '已关闭' }}
+              {{ STORAGE_MESSAGES.editorEnableState(form.enabled) }}
             </span>
             <AdminSwitch
               :model-value="form.enabled"
-              aria-label="存储启用状态"
+              :aria-label="STORAGE_MESSAGES.editorEnableAria"
               @update:model-value="emit('update-form-field', 'enabled', Boolean($event))"
             />
           </div>
         </div>
 
         <!-- 存储名称 -->
-        <AdminFormField label="存储配置名称" for="admin-storage-name" required>
+        <AdminFormField :label="STORAGE_MESSAGES.editorNameLabel" for="admin-storage-name" required>
           <AdminInput
             id="admin-storage-name"
             :model-value="form.name"
             class="w-full !text-xs"
-            placeholder="例如：生产环境主存储 / 阿里云 OSS"
+            :placeholder="STORAGE_MESSAGES.editorNamePlaceholder"
             @update:model-value="emit('update-form-field', 'name', String($event ?? ''))"
           />
         </AdminFormField>
@@ -156,8 +160,8 @@
                 :type="field.type === 'password' ? 'password' : 'text'"
                 :placeholder="
                   field.secret && form.secretConfigured && !configTextValue(field.key)
-                    ? '已配置，留空则保持不变'
-                    : field.placeholder || `请输入${field.label}`
+                    ? STORAGE_MESSAGES.secretKeptPlaceholder
+                    : field.placeholder || STORAGE_MESSAGES.fieldPlaceholder(field.label)
                 "
                 @update:model-value="updateConfigValue(field.key, String($event ?? ''))"
               />
@@ -185,7 +189,7 @@
                 :loading="fetching"
                 @click="emit('fetch-bucket-domains')"
               >
-                一键自动探测域名
+                {{ STORAGE_MESSAGES.editorDetectDomains }}
               </AdminButton>
             </div>
             <AdminInput
@@ -195,8 +199,8 @@
               :type="field.type === 'password' ? 'password' : 'text'"
               :placeholder="
                 field.secret && form.secretConfigured && !configTextValue(field.key)
-                  ? '已配置，留空则保持不变'
-                  : field.placeholder || `请输入${field.label}`
+                  ? STORAGE_MESSAGES.secretKeptPlaceholder
+                  : field.placeholder || STORAGE_MESSAGES.fieldPlaceholder(field.label)
               "
               @update:model-value="updateConfigValue(field.key, String($event ?? ''))"
             />
@@ -206,12 +210,12 @@
               v-if="field.key === 'access_domain' && bucketDomains.length > 0"
               class="flex items-center gap-1.5 flex-wrap pt-1"
             >
-              <span class="text-[11px] font-semibold text-admin-text-3">探测到域名：</span>
+              <span class="text-admin-caption font-semibold text-admin-text-3">{{ STORAGE_MESSAGES.editorDomainsFound }}</span>
               <button
                 v-for="domain in bucketDomains"
                 :key="domain"
                 type="button"
-                class="cursor-pointer rounded-md border border-admin-border-soft bg-white px-2 py-0.5 text-[11px] font-mono font-medium text-admin-accent hover:border-admin-accent transition-colors"
+                class="cursor-pointer rounded-md border border-admin-border-soft bg-white px-2 py-0.5 text-admin-caption font-mono font-medium text-admin-accent hover:border-admin-accent transition-colors"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 https://{{ domain }}
@@ -231,7 +235,9 @@
           >
             <div class="flex flex-col">
               <span class="text-xs font-semibold text-admin-title-color">{{ field.label }}</span>
-              <span v-if="field.hint" class="text-[11px] text-admin-text-3">{{ field.hint }}</span>
+              <span v-if="field.hint" class="text-admin-caption text-admin-text-3">{{
+                field.hint
+              }}</span>
             </div>
             <AdminSwitch
               :model-value="configBoolValue(field.key)"
@@ -249,7 +255,7 @@
         :disabled="saving || savingAndApplying"
         @click="emit('cancel')"
       >
-        取消
+        {{ STORAGE_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton
         v-if="!form.isCurrent"
@@ -259,7 +265,7 @@
         :disabled="savingAndApplying"
         @click="emit('save-draft')"
       >
-        保存
+        {{ STORAGE_MESSAGES.save }}
       </AdminButton>
       <AdminButton
         :class="adminActionButtonClass"
@@ -267,7 +273,7 @@
         :disabled="saving"
         @click="emit('save-and-apply')"
       >
-        {{ form.isCurrent ? '保存' : '设为当前' }}
+        {{ STORAGE_MESSAGES.editorSaveApply(form.isCurrent) }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -288,6 +294,7 @@ import {
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'
 import { storageVendorLogo, vendorIconMap, vendorPresetCatalog } from '../meta'
+import { STORAGE_MESSAGES } from '../pages/messages'
 import type {
   StorageCard,
   StorageProvider,
@@ -350,11 +357,11 @@ watch(
 
 const configTabOptions = computed<{ label: string; value: StorageConfigTab }[]>(() => {
   const options: { label: string; value: StorageConfigTab }[] = [
-    { label: '基础与凭据', value: 'basic' },
-    { label: '端点与网络', value: 'endpoint' },
+    { label: STORAGE_MESSAGES.editorTabBasic, value: 'basic' },
+    { label: STORAGE_MESSAGES.editorTabEndpoint, value: 'endpoint' },
   ]
   if (props.switchFields.length > 0) {
-    options.push({ label: '高级选项', value: 'advanced' })
+    options.push({ label: STORAGE_MESSAGES.editorTabAdvanced, value: 'advanced' })
   }
   return options
 })

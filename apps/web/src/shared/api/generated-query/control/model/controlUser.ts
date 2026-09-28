@@ -34,7 +34,7 @@
 import type { ControlUserRole } from './controlUserRole'
 
 export interface ControlUser {
-  /** @pattern ^usr_[A-Za-z0-9]+$ */
+  /** @pattern ^usr_[A-Za-z0-9_-]+$ */
   id: string
   display_name: string
   email?: string

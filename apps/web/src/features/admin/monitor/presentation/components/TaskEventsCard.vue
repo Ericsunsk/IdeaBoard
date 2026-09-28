@@ -8,7 +8,7 @@
       <div class="flex items-center gap-1.5">
         <span class="text-sm font-semibold text-admin-text-1">Events</span>
         <span
-          title="查看事件时序概览"
+          :title="MONITOR_MESSAGES.eventsInfoTitle"
           class="flex size-4 cursor-pointer items-center justify-center rounded-full text-admin-text-3 hover:text-admin-text-1"
         >
           <InfoCircle class="size-3.5" />
@@ -38,8 +38,8 @@
         <button
           type="button"
           :class="adminCompactIconButtonClass"
-          :title="chartsCollapsed ? '展开图表' : '折叠图表'"
-          :aria-label="chartsCollapsed ? '展开图表' : '折叠图表'"
+          :title="MONITOR_MESSAGES.chartsToggle(chartsCollapsed)"
+          :aria-label="MONITOR_MESSAGES.chartsToggle(chartsCollapsed)"
           @click="emit('update:chartsCollapsed', !chartsCollapsed)"
         >
           <NavArrowUp v-if="!chartsCollapsed" class="size-4" />
@@ -74,6 +74,7 @@ import {
   type TaskMetricStatsSnapshot,
 } from '../../../../../shared/domain/taskMetricTokens'
 import type { useMonitorTimeline } from '../../application/useMonitorTimeline'
+import { MONITOR_MESSAGES } from '../pages/messages'
 
 type TimelineState = ReturnType<typeof useMonitorTimeline>
 

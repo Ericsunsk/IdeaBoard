@@ -241,10 +241,10 @@ import {
   ReportColumns,
   Xmark,
 } from '@iconoir/vue'
-import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
-import type { LibraryFolderFacts, LibraryMutationPublisher } from '../folderFacts'
-import type { LibraryAssetView } from '../transfer'
-import type { CanvasLibraryImportDescriptor } from '../transfer'
+import { useLibraryWorkspace, type LibraryFolderTab } from '../application/useLibraryWorkspace'
+import type { LibraryFolderFacts, LibraryMutationPublisher } from '../application/folderFacts'
+import type { LibraryAssetView } from '../domain/transfer'
+import type { CanvasLibraryImportDescriptor } from '../domain/transfer'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
 import {
@@ -252,7 +252,7 @@ import {
   appOverlayMenuItemClass,
   appOverlayMenuSurfaceClass,
 } from '../../../shared/theme/appOverlayMenu'
-import { deleteFolderConfirmation, removeAssetConfirmation } from '../confirmations'
+import { deleteFolderConfirmation, removeAssetConfirmation } from './confirmations'
 import LibraryAssetGallery from './LibraryAssetGallery.vue'
 import LibraryAssetLightbox from './LibraryAssetLightbox.vue'
 import LibraryFolderDialogs from './LibraryFolderDialogs.vue'

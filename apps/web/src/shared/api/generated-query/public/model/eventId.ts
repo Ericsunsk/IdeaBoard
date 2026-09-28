@@ -16,6 +16,6 @@
 
 /**
  * Opaque public event identifier.
- * @pattern ^evt_[A-Za-z0-9]+$
+ * @pattern ^evt_[A-Za-z0-9_-]+$
  */
 export type EventId = string

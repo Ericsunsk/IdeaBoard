@@ -3,6 +3,10 @@
 set -euo pipefail
 umask 077
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091 # Resolved at runtime via SCRIPT_DIR; scripts/lib/common.sh is linted directly in ops.yml.
+source "$SCRIPT_DIR/lib/common.sh"
+
 usage() {
   echo "Usage: $0 <sops-output.json>" >&2
 }
@@ -21,8 +25,7 @@ recipient="${SOPS_AGE_RECIPIENT:-}"
 [[ -n "$recipient" ]] || { echo "SOPS_AGE_RECIPIENT is required" >&2; exit 1; }
 
 work_dir="$(mktemp -d)"
-cleanup() { rm -rf "$work_dir"; }
-trap cleanup EXIT
+cleanup_path "$work_dir"
 
 random_hex() { openssl rand -hex 32; }
 random_base64() { openssl rand -base64 32 | tr -d '\n'; }

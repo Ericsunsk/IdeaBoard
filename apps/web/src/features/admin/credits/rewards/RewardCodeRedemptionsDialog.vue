@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :header="`${rewardCode.displayName} · 兑换记录`"
-    description="查看该兑换码的全部兑换记录。"
+    :header="REWARD_CODES_MESSAGES.redemptionsHeader(rewardCode.displayName)"
+    :description="REWARD_CODES_MESSAGES.redemptionsDescription"
     size="wide"
     content-layout="scrollable"
     @update:visible="emit('update:visible', $event)"
@@ -12,7 +12,7 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">兑换历史</div>
+              <div class="text-admin-title-sm font-[740] text-admin-title-color">{{ REWARD_CODES_MESSAGES.redemptionsTitle }}</div>
             </div>
           </template>
           <template #pager>
@@ -31,7 +31,7 @@
               size="icon"
               :class="iconButtonClass"
               :loading="loading"
-              aria-label="刷新兑换记录"
+              :aria-label="REWARD_CODES_MESSAGES.redemptionsRefreshAria"
               @click="refreshRedemptions"
             >
               <Refresh class="size-4 text-admin-text-2" />
@@ -42,7 +42,7 @@
 
       <AdminAlert v-if="initialError" severity="error">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>兑换记录加载失败，请重试。</span>
+          <span>{{ REWARD_CODES_MESSAGES.redemptionsLoadFailed }}</span>
           <AdminButton
             variant="ghost"
             size="small"
@@ -50,14 +50,14 @@
             :loading="loading"
             @click="refreshRedemptions"
           >
-            重试加载兑换记录
+            {{ REWARD_CODES_MESSAGES.redemptionsReload }}
           </AdminButton>
         </div>
       </AdminAlert>
 
       <AdminAlert v-if="backgroundError" severity="secondary">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>刷新兑换记录失败，正在显示上次成功的数据。</span>
+          <span>{{ REWARD_CODES_MESSAGES.redemptionsStaleNotice }}</span>
           <AdminButton
             variant="ghost"
             size="small"
@@ -65,7 +65,7 @@
             :loading="loading"
             @click="refreshRedemptions"
           >
-            重试刷新兑换记录
+            {{ REWARD_CODES_MESSAGES.redemptionsRefreshRetry }}
           </AdminButton>
         </div>
       </AdminAlert>
@@ -77,24 +77,24 @@
         :loading="loading"
         data-key="id"
         scrollable
-        table-aria-label="兑换记录列表"
-        scroll-aria-label="兑换记录列表横向滚动区域"
-        empty-title="暂无兑换记录"
+        :table-aria-label="REWARD_CODES_MESSAGES.redemptionsTableAria"
+        :scroll-aria-label="REWARD_CODES_MESSAGES.redemptionsScrollAria"
+        :empty-title="REWARD_CODES_MESSAGES.redemptionsEmpty"
         :table-style="{ minWidth: '620px' }"
         @row-expand="expandRedemption"
         @row-collapse="collapseRedemption"
       >
         <AdminColumn expander :style="{ width: '52px' }" />
-        <AdminColumn field="userPublicId" header="用户" :style="{ minWidth: '240px' }">
+        <AdminColumn field="userPublicId" :header="REWARD_CODES_MESSAGES.redemptionsUserColumn" :style="{ minWidth: '240px' }">
           <template #body="{ data }">
             <span class="font-semibold text-admin-text-1">{{ data.displayName }}</span>
             <span class="block text-admin-caption text-admin-text-3">{{ data.userPublicId }}</span>
           </template>
         </AdminColumn>
-        <AdminColumn field="creditedAmount" header="获得 Idea" :style="{ width: '180px' }">
+        <AdminColumn field="creditedAmount" :header="REWARD_CODES_MESSAGES.redemptionsAmountColumn" :style="{ width: '180px' }">
           <template #body="{ data }">{{ formatIdeaAmount(data.creditedAmount) }}</template>
         </AdminColumn>
-        <AdminColumn field="redeemedAt" header="兑换时间" :style="{ width: '220px' }">
+        <AdminColumn field="redeemedAt" :header="REWARD_CODES_MESSAGES.redemptionsTimeColumn" :style="{ width: '220px' }">
           <template #body="{ data }">{{
             formatAdminDateTimeWithSeconds(data.redeemedAt)
           }}</template>
@@ -106,14 +106,14 @@
               v-if="detailLoading && selectedRedemptionId === data.id"
               class="flex min-h-24 items-center justify-center"
             >
-              <AdminSpinner class="size-7" aria-label="加载兑换详情" />
+              <AdminSpinner class="size-7" :aria-label="REWARD_CODES_MESSAGES.redemptionsDetailLoadingAria" />
             </div>
             <AdminAlert
               v-else-if="detailError && selectedRedemptionId === data.id"
               severity="error"
             >
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <span>兑换详情加载失败。</span>
+                <span>{{ REWARD_CODES_MESSAGES.redemptionsDetailLoadFailed }}</span>
                 <AdminButton
                   variant="ghost"
                   size="small"
@@ -121,7 +121,7 @@
                   :loading="detailLoading"
                   @click="loadRedemptionDetail(data.id)"
                 >
-                  重试兑换详情
+                  {{ REWARD_CODES_MESSAGES.redemptionsDetailRetry }}
                 </AdminButton>
               </div>
             </AdminAlert>
@@ -167,7 +167,7 @@
         :class="adminActionButtonClass"
         @click="emit('update:visible', false)"
       >
-        关闭
+        {{ REWARD_CODES_MESSAGES.close }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -195,6 +195,7 @@ import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { formatAdminDateTimeWithSeconds } from '../shared/format'
 import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import type { RewardCode } from './resource'
+import { REWARD_CODES_MESSAGES } from './messages'
 import {
   createRewardCodeRedemptionResource,
   type RewardCodeRedemption,

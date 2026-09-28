@@ -181,7 +181,7 @@ FROM reward_codes WHERE id = $1`, rewardCodeID).Scan(
 	if err != nil {
 		return RewardCode{}, fmt.Errorf("load reward Code: %w", err)
 	}
-	rc.MaskedCodeHint = maskedCodeHintPrefix + hint
+	rc.MaskedCodeHint = rewardsdomain.MaskedCodeHintPrefix + hint
 	rc.Status = deriveStatus(rc, s.currentTime())
 	return rc, nil
 }
@@ -334,17 +334,17 @@ LIMIT $3`
 
 // --- Status derivation ---
 
-func deriveStatus(rc RewardCode, now time.Time) Status {
+func deriveStatus(rc RewardCode, now time.Time) ports.RewardCodeStatus {
 	if rc.ExpiresAt != nil && !now.Before(*rc.ExpiresAt) {
-		return StatusExpired
+		return ports.RewardCodeStatusExpired
 	}
 	if rc.MaxRedemptions > 0 && rc.RedemptionCount >= rc.MaxRedemptions {
-		return StatusExhausted
+		return ports.RewardCodeStatusExhausted
 	}
 	if !rc.Enabled {
-		return StatusDisabled
+		return ports.RewardCodeStatusDisabled
 	}
-	return StatusEnabled
+	return ports.RewardCodeStatusEnabled
 }
 
 // --- Lock and lookup helpers ---

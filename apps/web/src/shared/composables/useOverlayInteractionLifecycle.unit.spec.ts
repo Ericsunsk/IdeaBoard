@@ -1,6 +1,9 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { useOverlayInteractionLifecycle } from './useOverlayInteractionLifecycle'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from './useOverlayInteractionLifecycle'
 
 describe('useOverlayInteractionLifecycle', () => {
   it('resets on every open and restores focus once after close completes', async () => {
@@ -54,7 +57,48 @@ describe('useOverlayInteractionLifecycle', () => {
     }
   })
 
-  it('blocks all dismissal paths while busy and preserves the surface dismissal policy', () => {
+  it('shares mask dismissal across dialog surfaces by default', () => {
+    const intent = defineDialogSurfaceIntent()
+
+    expect(intent.dismissibleBy).toEqual(['close-control', 'escape', 'mask'])
+    expect(intent.restoreFocus).toBe(true)
+    expect(defineDialogSurfaceIntent({ restoreFocus: false })).toMatchObject({
+      dismissibleBy: ['close-control', 'escape', 'mask'],
+      restoreFocus: false,
+    })
+  })
+
+  it('aborts a cancellable operation instead of blocking dismissal while busy', () => {
+    const visible = ref(true)
+    const busy = ref(true)
+    const onAbort = vi.fn()
+    const onVisibilityChange = vi.fn((nextVisible: boolean) => {
+      visible.value = nextVisible
+    })
+    const scope = effectScope()
+    const lifecycle = scope.run(() =>
+      useOverlayInteractionLifecycle({
+        visible,
+        busy,
+        busyMode: 'abort',
+        onAbort,
+        surface: defineDialogSurfaceIntent(),
+        onVisibilityChange,
+      }),
+    )!
+
+    try {
+      expect(lifecycle.canDismiss('mask')).toBe(true)
+      expect(lifecycle.canDismiss('escape')).toBe(true)
+      expect(lifecycle.requestClose('mask')).toBe(true)
+      expect(onAbort).toHaveBeenCalledTimes(1)
+      expect(visible.value).toBe(false)
+    } finally {
+      scope.stop()
+    }
+  })
+
+  it('blocks every dismissal path while an irreversible commit is busy', () => {
     const visible = ref(true)
     const busy = ref(false)
     const onVisibilityChange = vi.fn()

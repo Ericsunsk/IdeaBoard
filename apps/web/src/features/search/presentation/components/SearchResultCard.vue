@@ -77,7 +77,7 @@
           <p class="m-0 truncate text-xs font-medium text-white leading-tight">
             {{ result.title || t('search.lightbox.untitledReference') }}
           </p>
-          <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
+          <p class="mt-1 mb-0 truncate text-ib-caption text-white/70 leading-tight">
             {{
               t('search.attribution.byAuthorProvider', {
                 author: result.author,

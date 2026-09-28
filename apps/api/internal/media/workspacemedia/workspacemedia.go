@@ -49,14 +49,63 @@ import (
 	"ideaboard/api/internal/platform/contract"
 )
 
+// SessionStatus is the upload session lifecycle state. The underlying
+// wire and database words are unchanged ("pending", "transferring",
+// "completed", "failed", "expired"); the type only documents the
+// allowed transitions at compile time (see CanTransition). SQL
+// literals in internal/db/queries/workspace_media.sql stay
+// byte-identical.
+//
+// Session and asset lifecycles are DISTINCT: media_assets carries no
+// status column (existence means ready), so asset readiness stays the
+// untyped AssetStatusReady string below and never becomes a
+// SessionStatus.
+type SessionStatus string
+
 // Session states (Baseline 6.3 uploads tree).
 const (
-	StatusPending      = "pending"
-	StatusTransferring = "transferring"
-	StatusCompleted    = "completed"
-	StatusFailed       = "failed"
-	StatusExpired      = "expired"
+	StatusPending      SessionStatus = "pending"
+	StatusTransferring SessionStatus = "transferring"
+	StatusCompleted    SessionStatus = "completed"
+	StatusFailed       SessionStatus = "failed"
+	StatusExpired      SessionStatus = "expired"
 )
+
+// allowedSessionTransitions mirrors the durable guards in
+// internal/db/queries/workspace_media.sql: CreateUploadSession inserts
+// pending; MarkUploadSessionTransferring fences pending ->
+// transferring (first read); Complete/Fail/Expire flip a live
+// (pending/transferring) session to completed/failed/expired.
+// Terminal states (completed/failed/expired) have no outgoing
+// transitions; FailSession replays an already-failed session
+// idempotently at the service layer (returned row, no database flip),
+// mirroring the workspacetasks.Cancel precedent.
+var allowedSessionTransitions = map[SessionStatus]map[SessionStatus]struct{}{
+	StatusPending: {
+		StatusTransferring: {},
+		StatusCompleted:    {},
+		StatusFailed:       {},
+		StatusExpired:      {},
+	},
+	StatusTransferring: {
+		StatusCompleted: {},
+		StatusFailed:    {},
+		StatusExpired:   {},
+	},
+}
+
+// CanTransition reports whether a from -> to flip is durably allowed.
+// It is documentation, not a gate: every transition it reports true
+// for was already possible through the SQL guards, and no previously
+// possible transition reports false.
+func CanTransition(from, to SessionStatus) bool {
+	nexts, ok := allowedSessionTransitions[from]
+	if !ok {
+		return false
+	}
+	_, ok = nexts[to]
+	return ok
+}
 
 // Asset readiness. Created assets are ready: completion accepted
 // declarations only, so the durable row itself is the readiness gate
@@ -149,7 +198,7 @@ type Session struct {
 	SizeBytes      int64
 	ChecksumSHA256 string
 	MediaKind      string
-	Status         string
+	Status         SessionStatus
 	StorageKey     string
 	AssetID        string
 	CreatedAt      time.Time

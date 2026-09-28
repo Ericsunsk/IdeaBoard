@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/testsupport/testenv"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -59,7 +61,7 @@ type isolatedEnv struct {
 func createIsolatedEnv(t testing.TB) isolatedEnv {
 	t.Helper()
 
-	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
+	raw := testenv.Get("API_TEST_DATABASE_DSN")
 	if raw == "" {
 		if isRequiredDatabase() {
 			t.Fatal("API_TEST_DATABASE_DSN is required for PostgreSQL integration tests")
@@ -101,7 +103,7 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 }
 
 func isRequiredDatabase() bool {
-	required, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("API_TEST_DATABASE_REQUIRED")))
+	required, err := strconv.ParseBool(testenv.Get("API_TEST_DATABASE_REQUIRED"))
 	return err == nil && required
 }
 

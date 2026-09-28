@@ -682,7 +682,7 @@ func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 		}
 		dto := v1ResolveLibraryResponseDTO{Items: make([]v1ResolveLibraryResultDTO, 0, len(results))}
 		for _, result := range results {
-			entry := v1ResolveLibraryResultDTO{Provider: result.Provider, SourceID: result.SourceID, Status: result.Status}
+			entry := v1ResolveLibraryResultDTO{Provider: result.Provider, SourceID: result.SourceID, Status: string(result.Status)}
 			if result.Asset != nil {
 				asset := toLibraryAssetDTO(workspace.PublicID, result.Asset)
 				entry.Asset = &asset

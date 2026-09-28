@@ -1,5 +1,5 @@
 <template>
-  <span class="inline-flex min-w-0 items-center gap-2 text-[18px] font-bold tracking-normal">
+  <span class="inline-flex min-w-0 items-center gap-2 text-ib-heading font-bold tracking-normal">
     <img
       :src="studioLogo"
       alt=""

@@ -8,7 +8,7 @@
             :class="
               variant === 'admin'
                 ? 'text-base font-bold text-admin-text-1'
-                : 'text-[1.25rem] font-medium text-ib-text'
+                : 'text-ib-icon font-medium text-ib-text'
             "
           >
             {{ title }}

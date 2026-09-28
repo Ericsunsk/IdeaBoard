@@ -16,8 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const defaultMigrationDirectory = "file://internal/db/migrations"
-
 // Migrate applies Atlas migrations with the schema-owner role, then performs
 // the runtime-only River and privilege finalization step.
 func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDirectory string) error {
@@ -32,10 +30,10 @@ func Migrate(ctx context.Context, cfg *config.Config, atlasBinary, migrationsDir
 		return err
 	}
 	if strings.TrimSpace(atlasBinary) == "" {
-		atlasBinary = "atlas"
+		atlasBinary = config.DefaultAtlasBinary
 	}
 	if strings.TrimSpace(migrationsDirectory) == "" {
-		migrationsDirectory = defaultMigrationDirectory
+		migrationsDirectory = config.DefaultMigrationDirectory
 	}
 	if err := reconcileCleanBreakDatabase(ctx, migrationConfig, migrationsDirectory); err != nil {
 		return fmt.Errorf("clean break reconciliation failed: %w", err)

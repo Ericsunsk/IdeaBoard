@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,16 +12,14 @@ import (
 	eventinterfaces "ideaboard/api/internal/runtime/interfaces/events"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
+	"ideaboard/api/internal/testsupport/testenv"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
 func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
-	natsURL := strings.TrimSpace(os.Getenv("API_TEST_NATS_URL"))
-	if natsURL == "" {
-		t.Skip("set API_TEST_NATS_URL to run NATS JetStream smoke test")
-	}
+	natsURL := testenv.GetOrSkip(t, "API_TEST_NATS_URL", "set API_TEST_NATS_URL to run NATS JetStream smoke test")
 
 	suffix := time.Now().UnixNano()
 	streamName := fmt.Sprintf("IDEABOARD_EVENTS_TEST_%d", suffix)

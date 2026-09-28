@@ -44,7 +44,7 @@ import {
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
 import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
-import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { defaultAccountTab, type AccountTab, type PaymentReturnContext } from '../../domain'
 import AccountDialogContent from './AccountDialogContent.vue'
 import { accountDialogContentClass } from '../common/ui'
@@ -72,10 +72,7 @@ const {
 } = useOverlayInteractionLifecycle({
   visible: () => props.visible,
   busy,
-  surface: {
-    dismissibleBy: ['close-control', 'escape'],
-    restoreFocus: true,
-  },
+  surface: defineDialogSurfaceIntent(),
   onReset: () => {
     busy.value = false
   },

@@ -10,8 +10,8 @@
           stroke-width="4"
           :label="t('account.shareJoin.spinnerAria')"
         />
-        <h1 class="m-0 text-[22px] font-bold text-ib-text">{{ titleText }}</h1>
-        <p class="m-0 text-[15px] leading-7 text-ib-text-muted">{{ statusText }}</p>
+        <h1 class="m-0 text-ib-modal-title-mobile font-bold text-ib-text">{{ titleText }}</h1>
+        <p class="m-0 text-ib-title-sm leading-7 text-ib-text-muted">{{ statusText }}</p>
         <Button v-if="failed" variant="outline" @click="goBoards">
           {{ t('account.shareJoin.backToBoards') }}
         </Button>

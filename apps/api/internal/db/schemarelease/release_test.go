@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/testsupport/testenv"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -140,17 +142,14 @@ func TestExecRunnerFailureDoesNotExposeArguments(t *testing.T) {
 func TestVerifyCatalogSemanticsRejectsSingleConnectionPool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	err := verifyCatalogSemantics(ctx, t.TempDir(), "postgres://audit@127.0.0.1:1/test?pool_max_conns=1", []byte("SELECT 1;"))
+	err := verifyCatalogSemantics(ctx, t.TempDir(), "postgres://audit@127.0.0.1:1/test?pool_max_conns=1", []byte("SELECT 1;"), "")
 	if err == nil || !strings.Contains(err.Error(), "at least two connections") {
 		t.Fatalf("expected pool capacity validation before database I/O: %v", err)
 	}
 }
 
 func TestIsolatedSchemaCleanupAfterCancellation(t *testing.T) {
-	dsn := os.Getenv("API_TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
-	}
+	dsn := testenv.GetOrSkip(t, "API_TEST_DATABASE_DSN", "set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		t.Fatal(err)

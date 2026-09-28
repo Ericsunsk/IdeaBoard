@@ -32,7 +32,15 @@ type Options struct {
 	BaseSHA       string
 	HeadSHA       string
 	DatabaseDSN   string
+	// AtlasBinary overrides the Atlas executable resolved from ATLAS_BINARY.
+	// Empty resolves to DefaultAtlasBinary ("atlas").
+	AtlasBinary string
 }
+
+const (
+	// DefaultAtlasBinary is the Atlas executable used when Options.AtlasBinary is empty.
+	DefaultAtlasBinary = "atlas"
+)
 
 type migrationChange struct {
 	status string
@@ -99,7 +107,7 @@ func check(ctx context.Context, options Options, runner commandRunner) error {
 	if err := checkSQLCGeneration(ctx, runner, apiRoot, assembled); err != nil {
 		return fmt.Errorf("schema release sqlc generation: %w", err)
 	}
-	if err := verifyCatalogSemantics(ctx, apiRoot, strings.TrimSpace(options.DatabaseDSN), assembled); err != nil {
+	if err := verifyCatalogSemantics(ctx, apiRoot, strings.TrimSpace(options.DatabaseDSN), assembled, atlasBinary(options)); err != nil {
 		return fmt.Errorf("schema release semantic verification: %w", err)
 	}
 	if options.WriteArtifact {
@@ -108,6 +116,15 @@ func check(ctx context.Context, options Options, runner commandRunner) error {
 		}
 	}
 	return nil
+}
+
+// atlasBinary resolves the Atlas executable for Options, keeping env reads
+// at the CLI boundary (cmd/schemarelease) instead of inside the library.
+func atlasBinary(options Options) string {
+	if binary := strings.TrimSpace(options.AtlasBinary); binary != "" {
+		return binary
+	}
+	return DefaultAtlasBinary
 }
 
 func normalizeOptions(options Options) (string, string, string, error) {
@@ -395,7 +412,7 @@ func readTree(root string) (map[string][]byte, error) {
 	return result, nil
 }
 
-func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot []byte) (err error) {
+func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot []byte, binary string) (err error) {
 	poolConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return fmt.Errorf("parse PostgreSQL DSN: %w", err)
@@ -426,12 +443,12 @@ func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot [
 		migrationConn,
 		snapshot,
 		func(ctx context.Context, conn *pgxpool.Conn) error {
-			return applyAtlasMigration(ctx, apiRoot, dsn, conn)
+			return applyAtlasMigration(ctx, apiRoot, dsn, binary, conn)
 		},
 	)
 }
 
-func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *pgxpool.Conn) error {
+func applyAtlasMigration(ctx context.Context, apiRoot, dsn, binary string, conn *pgxpool.Conn) error {
 	if conn == nil {
 		return errors.New("migration connection is nil")
 	}
@@ -446,9 +463,9 @@ func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *pgxpool
 	query := parsed.Query()
 	query.Set("search_path", schemaName+",public")
 	parsed.RawQuery = query.Encode()
-	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
+	atlasBinary := strings.TrimSpace(binary)
 	if atlasBinary == "" {
-		atlasBinary = "atlas"
+		atlasBinary = DefaultAtlasBinary
 	}
 	migrationDir := "file://" + filepath.ToSlash(filepath.Join(apiRoot, "internal/db/migrations"))
 	if _, err := (execRunner{}).Run(ctx, apiRoot, atlasBinary, "migrate", "apply", "--allow-dirty", "--revisions-schema", schemaName, "--dir", migrationDir, "--url", parsed.String()); err != nil {

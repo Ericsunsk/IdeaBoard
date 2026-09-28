@@ -1,8 +1,8 @@
 <template>
-  <section :aria-label="props.title ? `${props.title}定价` : '功能定价'">
+  <section :aria-label="BILLING_PRICING_MESSAGES.tableAria(props.title)">
     <div v-if="props.title" class="mb-2 flex items-center gap-2">
       <h3 class="text-sm font-bold text-admin-title-color">{{ props.title }}</h3>
-      <span class="text-xs text-admin-text-3">共 {{ props.items.length }} 个功能</span>
+      <span class="text-xs text-admin-text-3">{{ BILLING_PRICING_MESSAGES.tableCount(props.items.length) }}</span>
     </div>
     <div :class="adminTableCardClass">
       <AdminTable
@@ -15,7 +15,7 @@
         :class="adminTableClass"
       >
         <template #empty>
-          <AdminEmptyState title="该分组暂无功能" />
+          <AdminEmptyState :title="BILLING_PRICING_MESSAGES.tableEmpty" />
         </template>
 
         <AdminColumn
@@ -41,7 +41,7 @@
         <!-- 价格档位列必须显式展开：AdminTable 只认直系 AdminColumn vnode，v-for 会被 Fragment 包一层整体过滤。 -->
         <AdminColumn
           field="price-default"
-          header="固定"
+          :header="BILLING_PRICING_MESSAGES.priceVariantLabel('default')"
           :style="{ width: billingPricingColumnWidths.variant }"
         >
           <template #body="{ data }">
@@ -99,7 +99,7 @@
 
         <AdminColumn
           field="actions"
-          header="操作"
+          :header="BILLING_PRICING_MESSAGES.tableActionsColumn"
           :style="{ width: billingPricingColumnWidths.actions }"
         >
           <template #body="{ data }">
@@ -109,7 +109,7 @@
                 :class="adminActionButtonClass"
                 @click="emit('publish', data)"
               >
-                {{ data.status === 'unpriced' ? '设置' : '调整' }}
+                {{ BILLING_PRICING_MESSAGES.tablePublishLabel(data.status) }}
               </AdminButton>
             </div>
             <div v-else>
@@ -121,7 +121,7 @@
                 :disabled="props.deletePending[data.sku] === true"
                 @click="emit('delete', data)"
               >
-                删除
+                {{ BILLING_PRICING_MESSAGES.tableDelete }}
               </AdminButton>
             </div>
           </template>
@@ -129,7 +129,7 @@
 
         <AdminColumn
           field="enabled"
-          header="启用"
+          :header="BILLING_PRICING_MESSAGES.enable"
           :style="{ width: billingPricingColumnWidths.enabled }"
         >
           <template #body="{ data }">
@@ -139,7 +139,7 @@
                 (data.status !== 'active' && data.status !== 'disabled') ||
                 props.availabilityPending[data.sku] === true
               "
-              :aria-label="`${data.displayName}功能状态`"
+              :aria-label="BILLING_PRICING_MESSAGES.tableStatusAria(data.displayName)"
               @update:model-value="emit('availability', data, $event)"
             />
           </template>
@@ -166,6 +166,7 @@ import BillingStatusCell from './BillingStatusCell.vue'
 import { billingPricingColumnWidths, formatPricingCellValue } from './billingPricingColumns'
 import BillingServiceCell from './BillingServiceCell.vue'
 import type { AdminBillableItemCard } from './billableCatalogTypes'
+import { BILLING_PRICING_MESSAGES } from './messages'
 
 // 对齐任务监控页事件表：同壳、同列模式；分组与状态语义归 pricingColumns 单源。
 const props = withDefaults(

@@ -21,6 +21,7 @@ It does NOT own workspace layout, account management UI, or per-page login modal
 - `authTransport` — signIn/signUp/signOut/getSession adapter in `session/transport.ts`; sole owner of the Better Auth client instance.
 - `UserAuthModals` — modal router mounted by route path or overlay mode in `components`.
 - `Login` / `Register` panels — submit panels with local pending/locked and field validation in `components`.
+- Auth fields kit — `EmailField` / `PasswordField` / `OtpField` plus `useAuthForm` (valibot-backed validators, required-sentinel wiring, submit pending) in `components/auth-fields`; re-exported by the barrel for cross-feature use (account `SecurityPane`).
 - `AuthModalHost` — modal shell in `components`.
 - `useAuthPanelControls` — shared panel controls and form utilities in `components`.
 - `UserAuthCallbackPage` — sole route page for OAuth callback (`loading` / `failed`); lazy-loaded by `workspaceRoutes` in `pages`.
@@ -36,6 +37,7 @@ It does NOT own workspace layout, account management UI, or per-page login modal
 - OAuth callback: `loading` to `ensureSession(fresh)` plus `replace(redirect)`; provider error or session failure to `logout/clear` plus `replace` to param-free callback to `failed` (shows back-to-login button).
 - Overlay: `closed` to `open(mode, postAuthPath?)` to `login|register` to `close` / `overlay-success` (consumes post-auth path and `router.push`); overlay close also clears pending search auth action.
 - Panel submit: `idle` to submitting (`runAsyncAction.pending`, submit disabled, mask/esc cannot close) to `success` (emit) / `error` (toast); register adds `form` to `otpPending` to `success`.
+- Email/password/OTP validation converges on the auth-fields kit over `shared/auth/passwordPolicy`; panels carry no hand-rolled regex and no English-only validation strings (copy resolves through locale keys at call time).
 - Callback failure must clear the session and return to the param-free callback page; never leave provider error params behind.
 - Copy keys converge on errorCatalog; no scattered copy.
 - `localStorage['user']` goes only through `shared/utils/auth.ts`.

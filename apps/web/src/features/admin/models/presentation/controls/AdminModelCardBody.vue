@@ -33,7 +33,7 @@
       <span class="font-semibold text-admin-text-1">{{ model.provider }}</span>
       <span
         v-if="model.mode"
-        class="inline-flex items-center rounded-full border border-admin-border-soft bg-admin-surface-muted/60 px-2.5 py-0.5 text-[11px] font-medium text-admin-text-2"
+        class="inline-flex items-center rounded-full border border-admin-border-soft bg-admin-surface-muted/60 px-2.5 py-0.5 text-admin-caption font-medium text-admin-text-2"
       >
         {{ model.mode }}
       </span>
@@ -49,7 +49,7 @@
       <!-- 上下文 / 分辨率胶囊 (有值才展示，避免空灰色长条) -->
       <span
         v-if="model.contextOrResolution"
-        class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+        class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-admin-caption font-medium text-slate-700"
       >
         {{ model.contextOrResolution }}
       </span>
@@ -58,7 +58,7 @@
       <span
         v-for="cap in model.capabilities"
         :key="cap"
-        class="inline-flex items-center rounded-md bg-admin-surface-muted/80 px-2 py-0.5 text-[11px] font-medium text-admin-text-2"
+        class="inline-flex items-center rounded-md bg-admin-surface-muted/80 px-2 py-0.5 text-admin-caption font-medium text-admin-text-2"
       >
         {{ cap }}
       </span>
@@ -66,15 +66,15 @@
       <!-- prompt cache 徽标 (支持才展示；目录仅保留能力位，价格走参照接口) -->
       <span
         v-if="model.supportsPromptCaching"
-        class="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700"
-        title="支持 prompt caching"
+        class="inline-flex items-center rounded-md bg-sky-50 px-2 py-0.5 text-admin-caption font-medium text-sky-700"
+        :title="MODELS_MESSAGES.cardCacheTitle"
       >
         cache √
       </span>
 
       <!-- 托管类型标签 (Cloudflare 托管使用翡翠绿，第三方使用浅灰) -->
       <span
-        class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
+        class="inline-flex items-center rounded-md px-2 py-0.5 text-admin-caption font-medium"
         :class="
           model.hosting === MODEL_HOSTING_CLOUDFLARE
             ? 'bg-emerald-50 text-emerald-700'
@@ -96,6 +96,7 @@ import { Cube } from '@iconoir/vue'
 import { resolveModelBrandLogo } from '../../../shared/logos/brandLogos'
 import { MODEL_HOSTING_CLOUDFLARE } from '../../domain/catalogData'
 import type { AdminModelItem, ModelObservedSnapshot } from '../../domain/catalogData'
+import { MODELS_MESSAGES } from '../pages/messages'
 import ObservedStatsPanel from './ObservedStatsPanel.vue'
 
 const props = withDefaults(

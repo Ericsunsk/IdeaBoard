@@ -41,7 +41,7 @@ const shouldPulse = computed(() => {
 
 const sizeClasses = computed(() => {
   if (props.size === 'small') {
-    return 'h-5 px-2 gap-1 text-[11px]'
+    return 'h-5 px-2 gap-1 text-admin-caption'
   }
   return 'h-6 px-2.5 gap-1.5 text-xs'
 })

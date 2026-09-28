@@ -1,8 +1,8 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :header="isEditing ? '编辑模型' : '新增模型'"
-    description="填写模型配置后保存。"
+    :header="MODELS_MESSAGES.editHeader(isEditing)"
+    :description="MODELS_MESSAGES.editDescription"
     size="wide"
     @update:visible="emit('update:visible', $event)"
     @close="emit('update:visible', false)"
@@ -63,10 +63,10 @@
         :disabled="pending"
         @click="emit('update:visible', false)"
       >
-        取消
+        {{ MODELS_MESSAGES.cancel }}
       </AdminButton>
       <AdminButton :class="adminActionButtonClass" :loading="pending" @click="handleSubmit">
-        {{ isEditing ? '保存修改' : '确认新增' }}
+        {{ MODELS_MESSAGES.editSubmit(isEditing) }}
       </AdminButton>
     </template>
   </AdminDialogShell>
@@ -97,6 +97,7 @@ import CatalogReferencePanel from './components/CatalogReferencePanel.vue'
 import CatalogPreviewCard, {
   type GatewayRoutePreviewState,
 } from './components/CatalogPreviewCard.vue'
+import { MODELS_MESSAGES } from '../pages/messages'
 
 const props = defineProps<{
   visible: boolean
@@ -145,15 +146,17 @@ const firstValidationError = computed(() =>
 // 实时预览标签列表
 const previewCapabilities = computed(() => {
   const list = splitCapabilities(capabilitiesDraft.value)
-  return list.length > 0 ? list : ['标准推理', '云端加速']
+  return list.length > 0
+    ? list
+    : [MODELS_MESSAGES.editDefaultCapabilityPrimary, MODELS_MESSAGES.editDefaultCapabilityFallback]
 })
 
 // 预览用合成模型
 const previewModel = computed<AdminModelItem>(() => ({
   id: form.values.id,
-  name: form.values.name || '模型名称',
-  provider: form.values.provider || '供应商',
-  description: form.values.description || '暂无描述。保存后将在前台模型库中完整展示。',
+  name: form.values.name || MODELS_MESSAGES.editPreviewName,
+  provider: form.values.provider || MODELS_MESSAGES.addColumnProvider,
+  description: form.values.description || MODELS_MESSAGES.editPreviewDescription,
   descriptionEnriched: form.values.descriptionEnriched ?? false,
   contextOrResolution: form.values.contextOrResolution || '2048×2048',
   capabilities: previewCapabilities.value,
@@ -167,7 +170,7 @@ const previewModel = computed<AdminModelItem>(() => ({
 
 // 路由透视
 const gatewayRoutePreview = ref<GatewayRoutePreviewState>({
-  providerSlug: '未指定',
+  providerSlug: MODELS_MESSAGES.editRouteUnspecified,
   isFirstParty: false,
   targetPath: '-',
   protocol: '-',
@@ -179,7 +182,7 @@ async function refreshGatewayRoutePreview() {
   const modelId = form.values.id.trim()
   if (!modelId) {
     gatewayRoutePreview.value = {
-      providerSlug: '未指定',
+      providerSlug: MODELS_MESSAGES.editRouteUnspecified,
       isFirstParty: false,
       targetPath: '-',
       protocol: '-',
@@ -194,7 +197,7 @@ async function refreshGatewayRoutePreview() {
     })
     if (version !== routePreviewVersion) return
     gatewayRoutePreview.value = {
-      providerSlug: preview.provider_slug || '未指定',
+      providerSlug: preview.provider_slug || MODELS_MESSAGES.editRouteUnspecified,
       isFirstParty: preview.is_first_party,
       targetPath: preview.target_path,
       protocol: preview.path_source_label || preview.path_source,
@@ -202,10 +205,10 @@ async function refreshGatewayRoutePreview() {
   } catch {
     if (version !== routePreviewVersion) return
     gatewayRoutePreview.value = {
-      providerSlug: '未指定',
+      providerSlug: MODELS_MESSAGES.editRouteUnspecified,
       isFirstParty: false,
       targetPath: '-',
-      protocol: '预览不可用',
+      protocol: MODELS_MESSAGES.editRouteUnavailable,
     }
   }
 }

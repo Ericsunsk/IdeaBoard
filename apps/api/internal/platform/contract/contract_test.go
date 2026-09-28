@@ -3,8 +3,13 @@ package contract
 import (
 	"context"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -429,5 +434,186 @@ func TestMintPublicID(t *testing.T) {
 		if !IsValidPublicID(prefix, first) {
 			t.Errorf("MintPublicID(%q) = %q, want valid shape", prefix, first)
 		}
+	}
+}
+
+func TestStatusMatrixWorkspaceKernelCodes(t *testing.T) {
+	// Every workspace-surface kernel code (#801-#808, tasking statistics)
+	// pins its exact HTTP status here, so a registry edit that re-maps
+	// a status fails loudly (wire freeze). Follows the
+	// TestStatusMatrixPromotedEdgeCodes idiom.
+	cases := map[Code]int{
+		CodeWorkspaceNotFound:               http.StatusNotFound,
+		CodeWorkspaceForbidden:              http.StatusForbidden,
+		CodeWorkspaceIdempotencyConflict:    http.StatusConflict,
+		CodeOrganizationNotFound:            http.StatusNotFound,
+		CodeOrganizationForbidden:           http.StatusForbidden,
+		CodeOrganizationIdempotencyConflict: http.StatusConflict,
+		CodeWorkspaceMemberNotFound:         http.StatusNotFound,
+		CodeMembershipTransitionForbidden:   http.StatusForbidden,
+
+		CodeBoardNotFound:            http.StatusNotFound,
+		CodeBoardForbidden:           http.StatusForbidden,
+		CodeBoardArchived:            http.StatusConflict,
+		CodeBoardRevisionConflict:    http.StatusConflict,
+		CodeBoardIdempotencyConflict: http.StatusConflict,
+		CodeBoardMemberNotFound:      http.StatusNotFound,
+		CodeBoardShareTokenNotFound:  http.StatusNotFound,
+		CodeBoardShareTokenInvalid:   http.StatusBadRequest,
+
+		CodeUploadNotFound:            http.StatusNotFound,
+		CodeUploadExpired:             http.StatusGone,
+		CodeUploadStateConflict:       http.StatusConflict,
+		CodeUploadIdempotencyConflict: http.StatusConflict,
+		CodeUploadValidationFailed:    http.StatusUnprocessableEntity,
+		CodeMediaNotFound:             http.StatusNotFound,
+		CodeMediaNotReady:             http.StatusConflict,
+		CodeMediaArchived:             http.StatusGone,
+		CodeMediaIdempotencyConflict:  http.StatusConflict,
+		CodeMediaValidationFailed:     http.StatusUnprocessableEntity,
+
+		CodeBillingWalletRestricted:   http.StatusForbidden,
+		CodeBillingCheckoutConflict:   http.StatusConflict,
+		CodeBillingSessionNotFound:    http.StatusNotFound,
+		CodeBillingQuoteUnavailable:   http.StatusServiceUnavailable,
+		CodeBillingPricingUnavailable: http.StatusUnprocessableEntity,
+
+		CodeTaskNotFound:            http.StatusNotFound,
+		CodeTaskForbidden:           http.StatusForbidden,
+		CodeTaskStateConflict:       http.StatusConflict,
+		CodeTaskInsufficientCredits: http.StatusPaymentRequired,
+
+		CodeLibraryFolderNotFound:          http.StatusNotFound,
+		CodeLibraryAssetNotFound:           http.StatusNotFound,
+		CodeLibraryMaterializationNotFound: http.StatusNotFound,
+		CodeLibraryIdempotencyConflict:     http.StatusConflict,
+
+		CodeSearchProviderUnavailable: http.StatusServiceUnavailable,
+		CodeSearchVisionProviderError: http.StatusBadGateway,
+		CodeSearchVisionNotConfigured: http.StatusServiceUnavailable,
+		CodeSearchIdempotencyConflict: http.StatusConflict,
+
+		CodeEventNotFound:             http.StatusNotFound,
+		CodeEventForbidden:            http.StatusForbidden,
+		CodeEventSubscriptionNotFound: http.StatusNotFound,
+		CodeEventSubscriptionConflict: http.StatusConflict,
+
+		CodeControlReasonRequired: http.StatusBadRequest,
+		CodeControlNotFound:       http.StatusNotFound,
+
+		CodeTaskMonitorConcurrencyLimited: http.StatusTooManyRequests,
+		CodeTaskStatisticsRequestInvalid:  http.StatusBadRequest,
+	}
+	for code, want := range cases {
+		if got := StatusOf(code); got != want {
+			t.Errorf("StatusOf(%q) = %d, want %d", code, got, want)
+		}
+	}
+}
+
+func TestErrorCodeRegistryConsistency(t *testing.T) {
+	// Registry-consistency guard: every Code const declared in
+	// errorcodes.go must appear in a StatusOf case clause (status
+	// mapping) and vice versa, and every wire string must be unique.
+	// A newly added Code without a StatusOf entry would otherwise
+	// fail closed to 500 silently. Go consts are invisible to
+	// reflect, so the test parses its own package source instead.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed")
+	}
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filepath.Join(filepath.Dir(thisFile), "errorcodes.go"), nil, 0)
+	if err != nil {
+		t.Fatalf("parse errorcodes.go: %v", err)
+	}
+	declared := map[string]string{}
+	for _, decl := range node.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			typeName, ok := vs.Type.(*ast.Ident)
+			if !ok || typeName.Name != "Code" {
+				continue
+			}
+			for i, name := range vs.Names {
+				if !strings.HasPrefix(name.Name, "Code") {
+					continue
+				}
+				wire := ""
+				if i < len(vs.Values) {
+					if lit, ok := vs.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						wire = strings.Trim(lit.Value, `"`)
+					}
+				}
+				declared[name.Name] = wire
+			}
+		}
+	}
+	if len(declared) == 0 {
+		t.Fatal("no Code consts found in errorcodes.go")
+	}
+	var statusOf *ast.FuncDecl
+	for _, decl := range node.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "StatusOf" {
+			continue
+		}
+		statusOf = fn
+	}
+	if statusOf == nil {
+		t.Fatal("StatusOf not found in errorcodes.go")
+	}
+	cased := map[string]bool{}
+	ast.Inspect(statusOf.Body, func(n ast.Node) bool {
+		cc, ok := n.(*ast.CaseClause)
+		if !ok {
+			return true
+		}
+		for _, expr := range cc.List {
+			if id, ok := expr.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Code") {
+				cased[id.Name] = true
+			}
+		}
+		return true
+	})
+	for name := range declared {
+		if !cased[name] {
+			t.Errorf("contract.%s is declared but has no StatusOf mapping", name)
+		}
+	}
+	for name := range cased {
+		if _, ok := declared[name]; !ok {
+			t.Errorf("StatusOf maps %s which is not a declared Code const", name)
+		}
+	}
+	// Wire-string uniqueness. Non-literal values are the two promoted
+	// idempotency aliases; resolve them through the live consts and
+	// fail loud if a third non-literal form ever appears.
+	aliasValues := map[string]Code{
+		"CodeIdempotencyKeyRequired": CodeIdempotencyKeyRequired,
+		"CodeIdempotencyConflict":    CodeIdempotencyConflict,
+	}
+	seen := map[string]string{}
+	for name, wire := range declared {
+		if wire == "" {
+			alias, ok := aliasValues[name]
+			if !ok {
+				t.Errorf("contract.%s has a non-literal value outside the known idempotency aliases", name)
+				continue
+			}
+			wire = string(alias)
+		}
+		if prev, dup := seen[wire]; dup {
+			t.Errorf("wire string %q shared by contract.%s and contract.%s", wire, prev, name)
+			continue
+		}
+		seen[wire] = name
 	}
 }

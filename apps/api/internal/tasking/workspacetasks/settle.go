@@ -77,7 +77,7 @@ func (s *Service) StagedEvents() []TaskEvent {
 	return staged
 }
 
-func (s *Service) stage(taskID, workspaceID, status string) {
+func (s *Service) stage(taskID, workspaceID string, status Status) {
 	s.events = append(s.events, TaskEvent{
 		TaskID: taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: s.clock(),
 	})

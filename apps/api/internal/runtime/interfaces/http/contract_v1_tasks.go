@@ -234,7 +234,7 @@ func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 	dto := v1TaskDTO{
 		ID: task.ID, WorkspaceID: task.WorkspaceID, WorkflowKind: task.WorkflowKind,
 		MediaAssetIDs: append([]string(nil), task.MediaAssetIDs...),
-		Status:        task.Status, RetryCount: task.RetryCount, ExecutionToken: task.ExecutionToken,
+		Status:        string(task.Status), RetryCount: task.RetryCount, ExecutionToken: task.ExecutionToken,
 		ErrorMsg: task.ErrorMsg, CancelReason: task.CancelReason,
 		CreatedAt: v1FormatTime(task.CreatedAt), UpdatedAt: v1FormatTime(task.UpdatedAt),
 		BillingSnapshot: v1TaskBillingSnapshotDTO{
@@ -339,7 +339,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 			// idempotent replays never re-emit. Staged pending maps to
 			// task.created; the hold/free ref maps to billing.settled.
 			for _, staged := range service.StagedEvents() {
-				typ, ok := events.TaskStatusV1Type(staged.Status)
+				typ, ok := events.TaskStatusV1Type(events.TaskStatus(staged.Status))
 				if !ok {
 					continue
 				}
@@ -480,7 +480,7 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 			// never re-emit.
 			if !already {
 				for _, staged := range service.StagedEvents() {
-					typ, ok := events.TaskStatusV1Type(staged.Status)
+					typ, ok := events.TaskStatusV1Type(events.TaskStatus(staged.Status))
 					if !ok {
 						continue
 					}

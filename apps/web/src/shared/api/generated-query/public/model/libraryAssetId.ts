@@ -16,6 +16,6 @@
 
 /**
  * Opaque public library asset identifier.
- * @pattern ^lasset_[A-Za-z0-9]+$
+ * @pattern ^lasset_[A-Za-z0-9_-]+$
  */
 export type LibraryAssetId = string

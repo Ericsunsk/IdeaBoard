@@ -38,7 +38,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	if err := cfg.PublicOrigins.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid public origins: %w", err)
 	}
-	if err := secrets.LoadEncryptionKey(); err != nil {
+	if err := secrets.LoadEncryptionKeyFromValue(cfg.Secrets.EncryptionKey); err != nil {
 		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
 	}
 	if err := configinfra.EnsureRuntimeUploadDir(); err != nil {

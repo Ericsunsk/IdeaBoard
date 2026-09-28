@@ -73,7 +73,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
-import type { LibraryAssetView } from '../transfer'
+import type { LibraryAssetView } from '../domain/transfer'
 
 const props = defineProps<{
   asset: LibraryAssetView | null

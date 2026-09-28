@@ -206,6 +206,8 @@ paths:
       tags: [Workspaces]
       operationId: updateWorkspace
       summary: Rename a workspace (owner/admin only)
+      description: >-
+        Renames the workspace. No Idempotency-Key is required.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -239,6 +241,8 @@ paths:
       tags: [Workspaces]
       operationId: archiveWorkspace
       summary: Archive a workspace (owner/admin only)
+      description: >-
+        Archives the workspace. No Idempotency-Key is required.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       responses:
@@ -282,8 +286,13 @@ paths:
       tags: [WorkspaceMembers]
       operationId: addWorkspaceMember
       summary: Add a workspace member (owner/admin only; owner-only promotion)
+      description: >-
+        Requires the Idempotency-Key header. Re-adding an existing member
+        keeps the current role. Reusing a key with a different request
+        renders 409 workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -308,6 +317,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
   /workspaces/{workspace_id}/members/{member_id}:
@@ -315,6 +326,8 @@ paths:
       tags: [WorkspaceMembers]
       operationId: updateWorkspaceMember
       summary: Change a member role (last owner cannot be demoted)
+      description: >-
+        Changes a member role. No Idempotency-Key is required.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/MemberId'
@@ -348,9 +361,14 @@ paths:
       tags: [WorkspaceMembers]
       operationId: removeWorkspaceMember
       summary: Remove a workspace member (last owner cannot be removed)
+      description: >-
+        Removes a workspace member. Requires the Idempotency-Key header.
+        Reusing a key with a different request renders 409
+        workspace_idempotency_conflict.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/MemberId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: Member removed.
@@ -361,12 +379,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeletedEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /organizations:
     get:
       tags: [Organizations]
@@ -444,6 +466,8 @@ paths:
       tags: [Organizations]
       operationId: updateOrganization
       summary: Rename an organization (owner/admin only)
+      description: >-
+        Renames the organization. No Idempotency-Key is required.
       parameters:
         - $ref: '#/components/parameters/OrganizationId'
       requestBody:
@@ -3365,11 +3389,11 @@ components:
               description: Correlation ID matching the Request-Id response header.
     UserId:
       type: string
-      pattern: '^usr_[A-Za-z0-9]+$'
+      pattern: '^usr_[A-Za-z0-9_-]+$'
       description: Opaque public user identifier.
     OrganizationId:
       type: string
-      pattern: '^org_[A-Za-z0-9]+$'
+      pattern: '^org_[A-Za-z0-9_-]+$'
       description: Opaque public organization identifier.
     WorkspaceId:
       type: string
@@ -3377,7 +3401,7 @@ components:
       description: Opaque public workspace identifier.
     BoardId:
       type: string
-      pattern: '^board_[A-Za-z0-9]+$'
+      pattern: '^board_[A-Za-z0-9_-]+$'
       description: Opaque public board identifier.
     TaskId:
       type: string
@@ -3385,15 +3409,15 @@ components:
       description: Opaque public task identifier.
     MediaAssetId:
       type: string
-      pattern: '^asset_[A-Za-z0-9]+$'
+      pattern: '^asset_[A-Za-z0-9_-]+$'
       description: Opaque public media asset identifier.
     UploadId:
       type: string
-      pattern: '^upload_[A-Za-z0-9]+$'
+      pattern: '^upload_[A-Za-z0-9_-]+$'
       description: Opaque public upload session identifier.
     EventId:
       type: string
-      pattern: '^evt_[A-Za-z0-9]+$'
+      pattern: '^evt_[A-Za-z0-9_-]+$'
       description: Opaque public event identifier.
     MembershipRole:
       type: string
@@ -4740,15 +4764,15 @@ components:
           $ref: '#/components/schemas/PaginationMeta'
     LibraryFolderId:
       type: string
-      pattern: '^lfolder_[A-Za-z0-9]+$'
+      pattern: '^lfolder_[A-Za-z0-9_-]+$'
       description: Opaque public library folder identifier.
     LibraryAssetId:
       type: string
-      pattern: '^lasset_[A-Za-z0-9]+$'
+      pattern: '^lasset_[A-Za-z0-9_-]+$'
       description: Opaque public library asset identifier.
     VisionQueryId:
       type: string
-      pattern: '^visq_[A-Za-z0-9]+$'
+      pattern: '^visq_[A-Za-z0-9_-]+$'
       description: Opaque public vision query operation identifier.
     WorkflowKind:
       type: string

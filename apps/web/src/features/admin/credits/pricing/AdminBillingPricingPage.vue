@@ -8,14 +8,14 @@
           <AdminToolbarSearch
             v-model="searchKeyword"
             fluid
-            input-label="搜索定价功能"
-            placeholder="搜索功能名称、SKU 或映射模型..."
+            :input-label="BILLING_PRICING_MESSAGES.searchLabel"
+            :placeholder="BILLING_PRICING_MESSAGES.searchPlaceholder"
           />
 
           <AdminOptionFilter
             v-model="statusFilter"
             :options="statusFilterOptions"
-            label="筛选功能状态"
+            :label="BILLING_PRICING_MESSAGES.filterLabel"
           />
         </div>
 
@@ -24,7 +24,7 @@
           <AdminRefreshButton
             :loading="isLoading"
             :disabled="modelsLoading"
-            aria-label="刷新功能定价"
+            :aria-label="BILLING_PRICING_MESSAGES.refresh"
             @click="loadCatalog"
           />
         </div>
@@ -34,10 +34,10 @@
       <div v-if="!isLoading" class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
           <span class="font-medium text-admin-text-1"
-            >共 {{ filteredItems.length }} 个计费功能</span
+            >{{ BILLING_PRICING_MESSAGES.billingCount(filteredItems.length) }}</span
           >
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
-            (共 {{ sortedItems.length }} 个)
+            {{ BILLING_PRICING_MESSAGES.totalCount(sortedItems.length) }}
           </span>
         </div>
       </div>
@@ -47,18 +47,18 @@
     <div
       v-if="isLoading && items.length === 0"
       class="flex min-h-[260px] items-center justify-center rounded-xl border border-admin-border-soft bg-white text-admin-text-3"
-      aria-label="加载功能定价中"
+      :aria-label="BILLING_PRICING_MESSAGES.loadingAria"
     >
       <AdminSpinner class="size-9 text-admin-accent" />
     </div>
 
     <!-- 3. 错误告警状态 -->
     <div v-else-if="errorMessage" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">功能定价加载失败</div>
+      <div class="text-admin-title font-semibold text-admin-title-color">{{ BILLING_PRICING_MESSAGES.loadFailedTitle }}</div>
       <div class="mt-2 text-admin-meta text-admin-subtitle-color">{{ errorMessage }}</div>
       <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadCatalog">
         <Refresh class="size-4" />
-        重新加载
+        {{ BILLING_PRICING_MESSAGES.reload }}
       </AdminButton>
     </div>
 
@@ -74,13 +74,13 @@
         <Search v-else class="size-6" />
       </div>
       <h3 class="text-base font-semibold text-admin-title-color">
-        {{ !hasActiveFilter ? '暂无可定价功能' : '未找到匹配的计费功能' }}
+        {{ !hasActiveFilter ? BILLING_PRICING_MESSAGES.emptyNone : BILLING_PRICING_MESSAGES.emptyNoMatch }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{
           !hasActiveFilter
-            ? '当前没有已注册的可计费功能 SKU。'
-            : '未找到符合当前搜索或筛选条件的功能。请尝试调整关键词或清空筛选。'
+            ? BILLING_PRICING_MESSAGES.emptyNoneHint
+            : BILLING_PRICING_MESSAGES.emptyNoMatchHint
         }}
       </p>
       <button
@@ -90,7 +90,7 @@
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />
-        <span>清空筛选条件</span>
+        <span>{{ BILLING_PRICING_MESSAGES.clearFilters }}</span>
       </button>
     </div>
 
@@ -160,6 +160,7 @@ import {
   pricingTableKeyOfSku,
 } from './groups'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
+import { BILLING_PRICING_MESSAGES } from './messages'
 
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
@@ -181,7 +182,7 @@ const {
 // 可映射未配置才显示未配置，与 Dialog 无映射行（只设价格）对齐。
 function modelDisplayFor(sku: string): string {
   if (pricingMappingFeature(sku) === null) return '—'
-  return modelValueFor(sku) ?? '未配置'
+  return modelValueFor(sku) ?? BILLING_PRICING_MESSAGES.modelUnset
 }
 
 const isLoading = ref(true)
@@ -200,11 +201,11 @@ const searchKeyword = ref('')
 const statusFilter = ref('')
 
 const statusFilterOptions = [
-  { label: '全部状态', value: '' },
-  { label: '生效中', value: 'active' },
-  { label: '未定价', value: 'unpriced' },
-  { label: '已停用', value: 'disabled' },
-  { label: '已归档', value: 'archived' },
+  { label: BILLING_PRICING_MESSAGES.statusAll, value: '' },
+  { label: BILLING_PRICING_MESSAGES.statusActive, value: 'active' },
+  { label: BILLING_PRICING_MESSAGES.statusUnpriced, value: 'unpriced' },
+  { label: BILLING_PRICING_MESSAGES.statusDisabled, value: 'disabled' },
+  { label: BILLING_PRICING_MESSAGES.statusArchived, value: 'archived' },
 ]
 
 const hasActiveFilter = computed(() => Boolean(searchKeyword.value.trim() || statusFilter.value))
@@ -278,13 +279,13 @@ async function loadCatalog() {
     if (collisions.length > 0) {
       console.warn('[pricing] mapping feature collision across namespaces', collisions)
       toast.warning(
-        `模型映射存在同名冲突：${collisions.map((c) => c.feature).join('、')}，保存会影响多行，请确认后端 key 空间`,
+        BILLING_PRICING_MESSAGES.mappingCollision(collisions.map((c) => c.feature).join('、')),
       )
     }
     // 目录成功才拉模型：失败页不再叠加模型错误 toast；刷新按钮看两者。
     await loadModels()
   } catch (error) {
-    errorMessage.value = error instanceof Error && error.message ? error.message : '请稍后重试。'
+    errorMessage.value = error instanceof Error && error.message ? error.message : BILLING_PRICING_MESSAGES.retryLater
   } finally {
     isLoading.value = false
   }
@@ -305,9 +306,9 @@ function onDialogSaveModel(model: string) {
 async function confirmArchivedDelete(item: AdminBillableItemCard) {
   if (item.status !== 'archived' || deletePending[item.sku]) return
   const confirmed = await confirm.confirm({
-    title: '删除已归档功能',
-    message: `确定彻底删除“${item.displayName}”及其价格配置吗？此操作不可撤销，且将记录操作人与原因。`,
-    confirmLabel: '确认删除',
+    title: BILLING_PRICING_MESSAGES.deleteTitle,
+    message: BILLING_PRICING_MESSAGES.deleteMessage(item.displayName),
+    confirmLabel: BILLING_PRICING_MESSAGES.deleteConfirm,
     intent: 'danger',
     reason: { required: true },
   })
@@ -323,9 +324,9 @@ async function deleteArchived(item: AdminBillableItemCard, operatorReason: strin
   try {
     await resource.deleteArchived(item.sku, { operatorReason })
     items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
-    toast.success('已归档功能已删除')
+    toast.success(BILLING_PRICING_MESSAGES.deleted)
   } catch (error) {
-    toast.error(formatAdminDisplayError(error, '删除已归档功能失败，请重试'))
+    toast.error(formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.deleteFailed))
   } finally {
     deletePending[item.sku] = false
   }
@@ -337,9 +338,9 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
   // Control writes require an operator reason (audit); a cancelled dialog
   // aborts silently.
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: '发布价格',
-    message: `确定发布“${item.displayName}”的价格配置吗？该操作将记录操作人与原因。`,
-    confirmLabel: '发布价格',
+    title: BILLING_PRICING_MESSAGES.publishTitle,
+    message: BILLING_PRICING_MESSAGES.publishMessage(item.displayName),
+    confirmLabel: BILLING_PRICING_MESSAGES.publishConfirm,
   })
   if (!operatorReason) return
   publishPending.value = true
@@ -353,9 +354,9 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
     if (latest) item.updatedAt = latest.createdAt
     if (item.status === 'unpriced') item.status = 'active'
     priceDialogVisible.value = false
-    toast.success('价格已发布')
+    toast.success(BILLING_PRICING_MESSAGES.published)
   } catch (error) {
-    publishError.value = formatAdminDisplayError(error, '发布价格失败，请重试')
+    publishError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
   } finally {
     publishPending.value = false
   }
@@ -366,9 +367,9 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
     return
   }
   const operatorReason = await confirmSettingsSave(confirm, {
-    title: enabled ? '启用功能' : '停用功能',
-    message: `确定${enabled ? '启用' : '停用'}“${item.displayName}”吗？该操作将记录操作人与原因。`,
-    confirmLabel: enabled ? '启用' : '停用',
+    title: enabled ? BILLING_PRICING_MESSAGES.enableTitle : BILLING_PRICING_MESSAGES.disableTitle,
+    message: BILLING_PRICING_MESSAGES.availabilityMessage(enabled, item.displayName),
+    confirmLabel: enabled ? BILLING_PRICING_MESSAGES.enable : BILLING_PRICING_MESSAGES.disable,
   })
   if (!operatorReason) return
   availabilityPending[item.sku] = true
@@ -376,10 +377,13 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
     const availability = await resource.setAvailability(item.sku, enabled, { operatorReason })
     item.status = availability.status
     item.updatedAt = availability.updatedAt
-    toast.success(enabled ? '功能已启用' : '功能已停用')
+    toast.success(enabled ? BILLING_PRICING_MESSAGES.enabledToast : BILLING_PRICING_MESSAGES.disabledToast)
   } catch (error) {
     toast.error(
-      formatAdminDisplayError(error, enabled ? '启用功能失败，请重试' : '停用功能失败，请重试'),
+      formatAdminDisplayError(
+        error,
+        enabled ? BILLING_PRICING_MESSAGES.enableFailed : BILLING_PRICING_MESSAGES.disableFailed,
+      ),
     )
   } finally {
     availabilityPending[item.sku] = false

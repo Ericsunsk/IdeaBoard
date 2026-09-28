@@ -1,6 +1,6 @@
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
-import { i18n } from '../../shared/i18n'
-import type { WorkspaceLibraryFolder } from './workspace'
+import { i18n } from '../../../shared/i18n'
+import type { WorkspaceLibraryFolder } from '../domain/validators'
 
 export type LibraryFolderView = WorkspaceLibraryFolder
 

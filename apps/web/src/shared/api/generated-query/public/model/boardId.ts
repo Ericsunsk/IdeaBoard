@@ -16,6 +16,6 @@
 
 /**
  * Opaque public board identifier.
- * @pattern ^board_[A-Za-z0-9]+$
+ * @pattern ^board_[A-Za-z0-9_-]+$
  */
 export type BoardId = string

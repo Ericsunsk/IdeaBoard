@@ -16,6 +16,6 @@
 
 /**
  * Opaque public organization identifier.
- * @pattern ^org_[A-Za-z0-9]+$
+ * @pattern ^org_[A-Za-z0-9_-]+$
  */
 export type OrganizationId = string

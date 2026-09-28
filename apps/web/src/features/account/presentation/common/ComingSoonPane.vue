@@ -1,10 +1,10 @@
 <template>
   <AccountPane :title="t(titleKey)">
     <section
-      class="flex min-h-[420px] items-center py-8 max-[640px]:min-h-[320px]"
+      class="flex min-h-[320px] items-center py-8 sm:min-h-[420px]"
       :aria-label="t('account.comingSoonAria', { title: t(titleKey) })"
     >
-      <div class="max-w-[520px] border-l-2 border-ib-creative-accent pl-6 max-[520px]:pl-5">
+      <div class="max-w-[520px] border-l-2 border-ib-creative-accent pl-5 sm:pl-6">
         <span
           class="inline-flex size-11 items-center justify-center rounded-ib-control border border-ib-border-soft bg-ib-surface text-ib-creative-accent-pressed shadow-ib-control"
           aria-hidden="true"

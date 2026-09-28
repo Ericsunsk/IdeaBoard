@@ -1,0 +1,87 @@
+// Colocated admin messages for the monitor page (zh-only, no `t()` wrapping).
+//
+// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
+// to the page that owns them instead of locale bundles. Toast literals stay in
+// `application/useAdminMonitorFeedback.ts` next to the feedback factory;
+// toolbar/table/dialog/cell copy for `components/TaskActivityTable.vue` /
+// `components/TaskControlToolbar.vue` / `components/TaskEventsCard.vue` /
+// `AdminTaskResultDialog.vue` / `TaskResultCell.vue` lives here. Metric labels
+// stay in `shared/domain/taskMetricTokens`; status/attempt labels stay in
+// `domain/status.ts` / `taskResultLabels.ts`; time-range presets stay in
+// `domain/timeRange.ts`; `t('admin.*')` keys in `TaskControlToolbar.vue` belong
+// to the cross-surface locale bundle and stay as-is.
+
+export const MONITOR_MESSAGES = {
+  staleNotice: '任务监控连接不稳定，当前显示上次成功数据。',
+  retryConnection: '重试连接',
+  detailLoadFailed: '加载任务详情失败',
+  listLoadFailed: '加载任务列表失败',
+  snapshotLoadFailed: '加载任务运行监控失败',
+  retry: '重试',
+  // Task result dialog.
+  detailAria: '任务详情控制台',
+  detailDescription: '查看任务执行的完整快照与结果。',
+  copyTaskIdAria: '复制任务 ID',
+  detailLoading: '正在加载任务详情…',
+  detailUnavailable: '任务详情不可用',
+  detailFailedTitle: '执行失败',
+  detailUnknownError: '处理过程中发生未知错误',
+  detailStoppedTitle: '任务已停止',
+  detailStoppedFallback: '任务已停止，未继续执行。',
+  detailDurationLabel: '总耗时:',
+  detailCreatedLabel: '创建于:',
+  identityTitle: '身份与归属',
+  userLabel: '用户',
+  copyUserIdAria: '复制用户 Public ID',
+  priorityLabel: '优先级',
+  providerLabel: '供应商',
+  modelLabel: '模型',
+  createdAtLabel: '创建时间',
+  completedAtLabel: '完成时间',
+  promptTitle: '任务指令 (Prompt)',
+  copyPrompt: '复制全文',
+  promptEmpty: '无提示词',
+  resultTitle: '生成结果',
+  resultImageAlt: '任务生成结果图片',
+  openResultImage: '在新窗口打开',
+  resultDeleted: '图片已由用户删除。',
+  resultUnsafe: '结果图片链接不安全，已拒绝预览。',
+  resultEmpty: '没有可预览的图片结果。',
+  attemptsTitle: '执行轨迹',
+  attemptsCount: (count: number) => `${count} 次尝试`,
+  attemptStageLabel: '阶段:',
+  attemptFailureLabel: '失败分类:',
+  attemptProviderLatencyLabel: 'Provider 耗时:',
+  attemptTotalLatencyLabel: '总耗时:',
+  attemptsEmpty: '暂无执行记录',
+  billingTitle: '计费快照',
+  billingFeatureGone: '功能已删除',
+  billingFeatureLabel: '功能',
+  billingUnitLabel: '单价',
+  billingQuantityLabel: '调用数量',
+  billingTotalLabel: '总消耗',
+  billingSettlementLabel: '结算状态',
+  billingQuotedLabel: '报价时间',
+  billingSettledLabel: '结算时间',
+  apiResultTitle: 'API 响应摘要',
+  copyJson: '复制 JSON',
+  apiResultEmpty: '暂无 API 响应结果',
+  debugToggle: (expanded: boolean) => `原始调试详情 (脱敏) · ${expanded ? '隐藏' : '展开'}`,
+  // Activity table.
+  tableEmpty: '暂无事件日志',
+  timestampColumn: '时间戳',
+  cancelAction: '取消',
+  cancelTaskAria: '取消任务',
+  moreDetailAria: '更多任务详情',
+  totalRecords: (total: number) => `共 ${total} 条记录`,
+  // Control toolbar.
+  sidebarToggleTitle: '切换侧边导航',
+  timeRangeAria: '选择时间范围',
+  moreActionsAria: '更多操作',
+  // Events card.
+  eventsInfoTitle: '查看事件时序概览',
+  chartsToggle: (collapsed: boolean) => (collapsed ? '展开图表' : '折叠图表'),
+  // Result cell.
+  resultInspectAria: (taskId: string, index: number) => `查看任务 ${taskId} 结果 ${index} 详情`,
+  resultImageAltIndex: (taskId: string, index: number) => `任务 ${taskId} 结果 ${index}`,
+} as const

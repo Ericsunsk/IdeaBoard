@@ -12,7 +12,7 @@ import {
   writeLibraryFolderMoveTransfer,
   writeSearchReferenceTransfer,
 } from './transfer'
-import type { LibrarySearchReference } from './workspace'
+import type { LibrarySearchReference } from './validators'
 import type { LibraryAssetView } from './transfer'
 
 function transfer(): DataTransfer {

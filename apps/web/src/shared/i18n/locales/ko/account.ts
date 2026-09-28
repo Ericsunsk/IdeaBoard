@@ -58,6 +58,7 @@ export default {
       enterNewPassword: '새 비밀번호를 입력하세요',
       confirmNewPassword: '새 비밀번호를 확인하세요',
       mismatch: '비밀번호가 일치하지 않습니다',
+      passwordLength: '비밀번호는 {min}-{max}자여야 합니다',
       logoutAfterChangeFailed:
         '비밀번호가 업데이트되었지만 로그아웃에 실패했습니다. 수동으로 로그아웃한 뒤 다시 로그인해 주세요.',
       invalidEmail: '올바른 이메일 주소를 입력하세요',

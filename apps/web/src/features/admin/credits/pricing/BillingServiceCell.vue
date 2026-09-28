@@ -3,7 +3,7 @@
     <component :is="icon" v-if="icon" class="size-4 shrink-0 text-admin-text-2" />
     <div class="flex min-w-0 flex-col">
       <span class="truncate text-slate-700">{{ serviceSlug }}</span>
-      <span class="truncate text-[11px] text-admin-text-3">{{ nodeTitle }}</span>
+      <span class="truncate text-admin-caption text-admin-text-3">{{ nodeTitle }}</span>
     </div>
   </div>
 </template>

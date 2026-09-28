@@ -4,7 +4,7 @@
       class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-white"
     >
       <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
-        <AdminSpinner class="size-9 text-admin-accent" aria-label="加载账本健康状态" />
+        <AdminSpinner class="size-9 text-admin-accent" :aria-label="CREDIT_HEALTH_MESSAGES.loadingAria" />
       </div>
 
       <div
@@ -12,8 +12,8 @@
         class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"
       >
         <XmarkCircle class="size-8 text-admin-danger" aria-hidden="true" />
-        <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">账本健康状态不可用</h2>
-        <p class="mt-2 text-admin-body text-admin-subtitle-color">数据加载失败，请重试。</p>
+        <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}</h2>
+        <p class="mt-2 text-admin-body text-admin-subtitle-color">{{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}</p>
         <AdminButton
           class="mt-5"
           variant="outline"
@@ -21,7 +21,7 @@
           :loading="resource.query.isFetching.value"
           @click="resource.query.refetch()"
         >
-          重新加载
+          {{ CREDIT_HEALTH_MESSAGES.reload }}
         </AdminButton>
       </div>
 
@@ -43,7 +43,7 @@
                   v-if="health.active_run"
                   class="rounded-full border border-admin-border-soft bg-admin-bg px-2.5 py-0.5 text-xs font-semibold text-admin-text-2"
                 >
-                  检查进行中 · Run #{{ health.active_run.id }}
+                  {{ CREDIT_HEALTH_MESSAGES.activeRunBadge(health.active_run.id) }}
                 </span>
               </div>
               <p class="mt-1.5 text-admin-body leading-6 text-admin-subtitle-color">
@@ -58,7 +58,7 @@
               :class="adminActionButtonClass"
               @click="historyDialogVisible = true"
             >
-              检查记录
+              {{ CREDIT_HEALTH_MESSAGES.history }}
             </AdminButton>
             <AdminButton
               :class="adminActionButtonClass"
@@ -66,14 +66,14 @@
               :loading="resource.startPending.value"
               @click="startReconciliation"
             >
-              {{ health.active_run ? '检查中' : '重新检查' }}
+              {{ health.active_run ? CREDIT_HEALTH_MESSAGES.checking : CREDIT_HEALTH_MESSAGES.recheck }}
             </AdminButton>
           </div>
         </div>
 
         <AdminAlert v-if="resource.query.isError.value" class="mx-6 mb-5" severity="secondary">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <span>状态刷新失败，当前显示上次加载的数据。</span>
+            <span>{{ CREDIT_HEALTH_MESSAGES.staleNotice }}</span>
             <AdminButton
               variant="ghost"
               size="small"
@@ -81,7 +81,7 @@
               :loading="resource.query.isFetching.value"
               @click="resource.query.refetch()"
             >
-              重试刷新
+              {{ CREDIT_HEALTH_MESSAGES.retryRefresh }}
             </AdminButton>
           </div>
         </AdminAlert>
@@ -109,8 +109,8 @@
           </div>
         </div>
 
-        <section aria-label="最近检查" class="border-t border-admin-border-soft px-6 py-4">
-          <h3 class="text-sm font-bold text-admin-title-color">最近检查</h3>
+        <section :aria-label="CREDIT_HEALTH_MESSAGES.recentSectionAria" class="border-t border-admin-border-soft px-6 py-4">
+          <h3 class="text-sm font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.recentSectionTitle }}</h3>
           <ul v-if="recentRuns.length > 0" class="mt-2 divide-y divide-admin-border-soft">
             <li
               v-for="{ kind, run } in recentRuns"
@@ -141,7 +141,7 @@
               </span>
             </li>
           </ul>
-          <p v-else class="mt-2 text-xs text-admin-text-3">暂无检查记录</p>
+          <p v-else class="mt-2 text-xs text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.emptyRuns }}</p>
         </section>
       </div>
     </div>
@@ -181,11 +181,12 @@ import {
   formatReconciliationRunResult,
   getReconciliationTriggerLabel,
 } from './reconciliationRunPresentation'
+import { CREDIT_HEALTH_MESSAGES } from './messages'
 
 const toast = useAdminToast()
 const resource = useAdminCreditHealthResource()
 const historyDialogVisible = ref(false)
-const manualReconciliationReason = '管理员手动触发账本检查'
+const manualReconciliationReason = CREDIT_HEALTH_MESSAGES.manualCheckReason
 const health = resource.health
 const showLoading = computed(() => resource.query.isLoading.value && !health.value)
 const loadError = computed(() => resource.query.isError.value && !health.value)
@@ -197,19 +198,22 @@ const facts = computed(() => {
   if (!value) return []
   return [
     {
-      label: '待处理异常',
+      label: CREDIT_HEALTH_MESSAGES.openFindingsLabel,
       value: String(value.open_findings.total),
-      detail: `${value.open_findings.warning} warning · ${value.open_findings.error} error`,
+      detail: CREDIT_HEALTH_MESSAGES.openFindingsDetail(
+        value.open_findings.warning,
+        value.open_findings.error,
+      ),
     },
     {
-      label: '高风险异常',
+      label: CREDIT_HEALTH_MESSAGES.highRiskLabel,
       value: String(value.open_findings.high_risk),
-      detail: `${value.open_findings.critical} critical`,
+      detail: CREDIT_HEALTH_MESSAGES.highRiskDetail(value.open_findings.critical),
     },
     {
-      label: '受限 Wallet',
+      label: CREDIT_HEALTH_MESSAGES.restrictedWalletLabel,
       value: String(value.restricted_wallet_count),
-      detail: 'Ledger Integrity',
+      detail: CREDIT_HEALTH_MESSAGES.restrictedWalletDetail,
     },
   ]
 })
@@ -234,9 +238,9 @@ function formatRecentRunTime(run: AdminCreditRun): string {
 async function startReconciliation() {
   try {
     await resource.start({ reason: manualReconciliationReason })
-    toast.success('账本检查已启动')
+    toast.success(CREDIT_HEALTH_MESSAGES.checkStarted)
   } catch (error) {
-    toast.error(formatAdminDisplayError(error, '启动账本检查失败，请重试'))
+    toast.error(formatAdminDisplayError(error, CREDIT_HEALTH_MESSAGES.checkStartFailed))
   }
 }
 </script>

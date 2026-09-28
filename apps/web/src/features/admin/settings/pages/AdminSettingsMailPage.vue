@@ -1,9 +1,9 @@
 <template>
   <AdminSettingsTable
-    title="邮件服务"
-    subtitle="SMTP 事务邮件发送服务与连通性测试"
-    table-aria-label="邮件服务设置列表"
-    scroll-aria-label="邮件服务设置列表横向滚动区域"
+    :title="SETTINGS_MESSAGES.mailTitle"
+    :subtitle="SETTINGS_MESSAGES.mailSubtitle"
+    :table-aria-label="SETTINGS_MESSAGES.mailTableAria"
+    :scroll-aria-label="SETTINGS_MESSAGES.mailTableScrollAria"
     :rows="settingRows"
   >
     <template #expansion="{ data }">
@@ -21,16 +21,17 @@ import AdminSettingsTable, {
   type AdminSettingsTableRow,
 } from '../components/AdminSettingsTable.vue'
 import AdminMailConfigCard from '../AdminMailConfigCard.vue'
+import { SETTINGS_MESSAGES } from './messages'
 
 const settingRows = computed<AdminSettingsTableRow[]>(() => [
   {
     id: 'mail',
-    title: '邮件发送',
-    description: 'SMTP 事务邮件发送服务与测试',
+    title: SETTINGS_MESSAGES.mailRowTitle,
+    description: SETTINGS_MESSAGES.mailRowDescription,
     icon: Mail,
-    status: '邮件配置',
+    status: SETTINGS_MESSAGES.mailRowStatus,
     statusSeverity: 'secondary',
-    summary: '配置发件人、发件邮箱、密码、端口与邮件连通性测试',
+    summary: SETTINGS_MESSAGES.mailRowSummary,
   },
 ])
 </script>

@@ -127,7 +127,7 @@
         <Minus class="size-4" />
       </button>
       <span
-        class="min-w-[33px] text-center text-[13px] leading-[1.2] font-normal text-[var(--canvas-text-strong)]"
+        class="min-w-[33px] text-center text-ib-body leading-[1.2] font-normal text-[var(--canvas-text-strong)]"
       >
         {{ status.zoomLevel }}%
       </span>

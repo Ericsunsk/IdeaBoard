@@ -5,12 +5,12 @@
       :key="url"
       type="button"
       class="block size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-admin-border-soft bg-admin-surface-muted"
-      :aria-label="`查看任务 ${row.task_id} 结果 ${index + 1} 详情`"
+      :aria-label="MONITOR_MESSAGES.resultInspectAria(row.task_id, index + 1)"
       @click="emit('inspect', row)"
     >
       <img
         :src="url"
-        :alt="`任务 ${row.task_id} 结果 ${index + 1}`"
+        :alt="MONITOR_MESSAGES.resultImageAltIndex(row.task_id, index + 1)"
         class="block h-full w-full object-cover"
         loading="lazy"
       />
@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { MONITOR_MESSAGES } from './pages/messages'
 import { getTaskRowView } from './columns'
 import type { AdminTaskRow } from '../application/useAdminTaskList'
 

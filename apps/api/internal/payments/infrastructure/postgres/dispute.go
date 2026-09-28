@@ -110,12 +110,11 @@ func availablePaymentDisputeIdeas(ctx context.Context, tx pgx.Tx, order paymentR
 		target = order.IdeaQuantity
 	}
 	var occupied int64
-	if err := tx.QueryRow(ctx, `
-SELECT
-  COALESCE((SELECT SUM(idea_quantity) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')), 0)
-  + COALESCE((SELECT SUM(target_idea_quantity) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')), 0)`, order.ID).Scan(&occupied); err != nil {
-		return 0, fmt.Errorf("sum occupied payment Ideas: %w", err)
+	exposure, err := queryPaymentOrderExposure(ctx, tx, order.ID)
+	if err != nil {
+		return 0, err
 	}
+	occupied = exposure.refundedIdeas + exposure.disputedIdeas
 	remaining := order.IdeaQuantity - occupied
 	if remaining < 0 {
 		remaining = 0
