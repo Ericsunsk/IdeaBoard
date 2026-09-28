@@ -378,7 +378,11 @@ describe('FabricMaskPainter', () => {
     const previousRatio = window.devicePixelRatio
     Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 })
     try {
-      const painter = createFabricMaskPainter(canvas, { width: 200, height: 100 }, deps.dependencies)
+      const painter = createFabricMaskPainter(
+        canvas,
+        { width: 200, height: 100 },
+        deps.dependencies,
+      )
       // Vue owns the width/height attrs (CSS plane); a backing store that
       // collapsed to the CSS size is re-applied as Fabric retina dimensions.
       expect(canvas.width).toBe(200)
@@ -388,7 +392,10 @@ describe('FabricMaskPainter', () => {
         height: 100,
       })
     } finally {
-      Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: previousRatio })
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: previousRatio,
+      })
     }
   })
 
@@ -410,7 +417,10 @@ describe('FabricMaskPainter', () => {
     const { canvas } = createHost(2, 1)
     const deps = createDependencies()
     const painter = createFabricMaskPainter(canvas, { width: 2, height: 1 }, deps.dependencies)
-    const getContext = canvas.getContext as unknown as { mockClear: () => void; mock: { calls: unknown[] } }
+    const getContext = canvas.getContext as unknown as {
+      mockClear: () => void
+      mock: { calls: unknown[] }
+    }
 
     painter.paintStroke(
       [
@@ -430,7 +440,10 @@ describe('FabricMaskPainter', () => {
     const { canvas } = createHost(2, 1)
     const deps = createDependencies()
     const painter = createFabricMaskPainter(canvas, { width: 2, height: 1 }, deps.dependencies)
-    const getContext = canvas.getContext as unknown as { mockClear: () => void; mock: { calls: unknown[] } }
+    const getContext = canvas.getContext as unknown as {
+      mockClear: () => void
+      mock: { calls: unknown[] }
+    }
 
     painter.paintStroke(
       [
@@ -462,7 +475,11 @@ describe('FabricMaskPainter', () => {
     const first = createHost(3, 1, painted)
     const second = createHost(3, 1, painted)
     const deps = createDependencies()
-    const painter = createFabricMaskPainter(first.canvas, { width: 3, height: 1 }, deps.dependencies)
+    const painter = createFabricMaskPainter(
+      first.canvas,
+      { width: 3, height: 1 },
+      deps.dependencies,
+    )
 
     const committed = withDeterministicTempCanvases(() => painter.commit())
     const legacy = withDeterministicTempCanvases(() => buildMaskCommitResult(second.canvas))

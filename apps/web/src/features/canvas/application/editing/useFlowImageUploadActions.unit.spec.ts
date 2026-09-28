@@ -128,7 +128,9 @@ describe('useFlowImageUploadActions', () => {
       assetId: 'asset_22',
       derivativeTier: 'preview',
     })
-    expect(updates).toEqual(['/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview'])
+    expect(updates).toEqual([
+      '/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview',
+    ])
     expect(warnings).toEqual([])
   })
 
@@ -185,7 +187,9 @@ describe('useFlowImageUploadActions', () => {
       assetId: 'asset_22',
       derivativeTier: 'preview',
     })
-    expect(updates).toEqual(['/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview'])
+    expect(updates).toEqual([
+      '/api/v1/workspaces/ws_test123/media-assets/asset_22/derivatives/preview',
+    ])
     expect(warnings).toEqual([])
   })
 

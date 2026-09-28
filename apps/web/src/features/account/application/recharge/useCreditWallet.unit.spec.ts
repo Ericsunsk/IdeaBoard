@@ -17,7 +17,9 @@ vi.mock('./useCreditsSync', () => ({
 
 vi.mock('../../infrastructure', () => ({
   fetchCreditWallet: vi.fn(),
-  creditsQueryKeys: { wallet: (workspaceId: string) => ['workspace', 'credits', 'wallet', workspaceId] },
+  creditsQueryKeys: {
+    wallet: (workspaceId: string) => ['workspace', 'credits', 'wallet', workspaceId],
+  },
 }))
 
 vi.mock('../accountWorkspace', () => ({

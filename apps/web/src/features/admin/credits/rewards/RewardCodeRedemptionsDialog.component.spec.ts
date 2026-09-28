@@ -13,9 +13,7 @@ const redemptionFakes = vi.hoisted(() => ({
 }))
 
 vi.mock('./rewardCodeRedemptionResource', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('./rewardCodeRedemptionResource')
-  >()
+  const actual = await importOriginal<typeof import('./rewardCodeRedemptionResource')>()
   return {
     ...actual,
     createRewardCodeRedemptionResource: () => ({

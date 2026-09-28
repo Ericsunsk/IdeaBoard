@@ -17,7 +17,9 @@
       <AdminColumn :style="{ width: adminMonitorColumnWidths.timestamp }">
         <template #header>
           <div class="flex items-center gap-1.5 font-sans">
-            <span class="font-semibold text-admin-text-2 text-xs">{{ MONITOR_MESSAGES.timestampColumn }}</span>
+            <span class="font-semibold text-admin-text-2 text-xs">{{
+              MONITOR_MESSAGES.timestampColumn
+            }}</span>
             <span class="font-mono text-admin-caption text-admin-text-3 font-normal">GMT+8</span>
           </div>
         </template>
@@ -54,18 +56,18 @@
         </template>
       </AdminColumn>
 
-      <!-- 第 3 列：Service (feature 图标 + slug) -->
+      <!-- 第 3 列：Service (service 图标 + slug) -->
       <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
         <template #body="{ data }">
           <div class="flex items-center gap-1.5 font-mono text-xs text-admin-text-1">
             <component
-              :is="getTaskRowView(data).featureIcon"
-              v-if="getTaskRowView(data).featureIcon"
+              :is="getTaskRowView(data).serviceIcon"
+              v-if="getTaskRowView(data).serviceIcon"
               class="size-4 shrink-0 text-admin-text-2"
             />
             <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
             <span class="truncate text-slate-700">{{
-              getTaskRowView(data).featureSlug || '-'
+              getTaskRowView(data).serviceSlug || '-'
             }}</span>
           </div>
         </template>
@@ -151,7 +153,9 @@
     <div
       class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg px-4 py-2.5"
     >
-      <span class="text-xs font-normal text-admin-text-3"> {{ MONITOR_MESSAGES.totalRecords(totalCount) }} </span>
+      <span class="text-xs font-normal text-admin-text-3">
+        {{ MONITOR_MESSAGES.totalRecords(totalCount) }}
+      </span>
 
       <div class="flex items-center gap-2">
         <AdminPagerControls

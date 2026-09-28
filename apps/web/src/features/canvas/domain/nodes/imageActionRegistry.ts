@@ -1,6 +1,6 @@
 import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import { workflowFeatureLabelKey } from '../../../../shared/domain/workflowFeatureRegistry'
-import type { WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
+import { serviceLabelKey } from '../../../../shared/domain/serviceRegistry'
+import type { Service } from '../../../../shared/domain/imageServices'
 import {
   IMAGE_EXECUTION_MODE,
   isImageStrengthAction,
@@ -31,7 +31,7 @@ export type ImageActionMode = (typeof IMAGE_ACTION_MODE)[keyof typeof IMAGE_ACTI
 export type ImageActionMenuIcon =
   'cutout' | 'variations' | 'render' | 'upscale' | 'outpaint' | 'inpaint' | 'retouch'
 
-type WorkflowImageNodeAction = Extract<ImageNodeAction, WorkflowFeature>
+type WorkflowImageNodeAction = Extract<ImageNodeAction, Service>
 
 /**
  * Registry facts only: mode + icon + label key. Copy resolves read-time so it
@@ -52,7 +52,7 @@ function workflowImageAction(
     action,
     ...config,
     // The shared registry derives the locale key from the slug.
-    labelKey: workflowFeatureLabelKey(action),
+    labelKey: serviceLabelKey(action),
   }
 }
 

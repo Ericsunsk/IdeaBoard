@@ -12,8 +12,8 @@ import {
 import type { AdminModelItem, ModelObservedSnapshot } from '../domain/catalogData'
 import { matchesModelKeyword, MODEL_HOSTING_OPTIONS } from '../domain/catalogData'
 
-// Query key 归 workspace 所有（Page 不得自建 key）：定价 adapter 同 key 共享目录缓存。
-export function getAdminModelCatalogQueryKey() {
+// Query key is owned by this workspace.
+function getAdminModelCatalogQueryKey() {
   return ['admin', 'models', 'catalog'] as const
 }
 
@@ -227,7 +227,10 @@ export function useAdminModelCatalogWorkspace(
         confirmLabel: '导入',
       })
       if (!operatorReason) return
-      await saveCatalogMutation.mutateAsync({ items: [...toAdd, ...allModels.value], operatorReason })
+      await saveCatalogMutation.mutateAsync({
+        items: [...toAdd, ...allModels.value],
+        operatorReason,
+      })
       addDialogVisible.value = false
       feedback.imported(toAdd.length)
     } catch (err) {

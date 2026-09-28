@@ -44,7 +44,8 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
     typeof record.revision === 'number' && Number.isFinite(record.revision) && record.revision >= 0
       ? record.revision
       : undefined
-  const archivedAt = typeof record.archivedAt === 'string' && record.archivedAt ? record.archivedAt : undefined
+  const archivedAt =
+    typeof record.archivedAt === 'string' && record.archivedAt ? record.archivedAt : undefined
   return {
     id: record.id,
     name: normalizeBoardName(record.name) || 'Untitled',

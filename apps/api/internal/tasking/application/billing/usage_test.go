@@ -103,7 +103,7 @@ func seedTaskBillingUsageBoundarySnapshots(
 	afterBoundary := time.Date(2026, time.July, 12, 16, 0, 0, 0, time.UTC)
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  task_id, user_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
@@ -130,7 +130,7 @@ FROM (
 CROSS JOIN (
   VALUES ($4::varchar, $5::timestamptz), ($6::varchar, $7::timestamptz)
 ) AS fixture(task_id, created_at)`,
-		userID, request.Feature, string(sku),
+		userID, request.Service, string(sku),
 		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary,
 	); err != nil {
 		t.Fatalf("seed task snapshots around Shanghai day boundary: %v", err)
@@ -178,7 +178,7 @@ func seedTaskBillingUsageSnapshots(
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  task_id, user_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
@@ -203,7 +203,7 @@ FROM (
   LIMIT 1
 ) AS price
 CROSS JOIN generate_series(1, $2::integer) AS series`,
-		userID, count, prefix, request.Feature, string(sku)); err != nil {
+		userID, count, prefix, request.Service, string(sku)); err != nil {
 		t.Fatalf("seed task billing snapshots: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `

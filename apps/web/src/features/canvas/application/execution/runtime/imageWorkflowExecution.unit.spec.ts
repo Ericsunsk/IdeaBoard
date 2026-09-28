@@ -31,8 +31,7 @@ vi.mock('../workspace/canvasWorkspaceTaskAdapter', async (importOriginal) => {
 })
 vi.mock('../../../../../shared/api/mediaAssetDelivery', () => ({
   resolveMediaAssetProcessingURL: vi.fn(
-    async (assetId: number) =>
-      `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
+    async (assetId: number) => `/api/v1/workspaces/ws_test123/media-assets/${assetId}/content`,
   ),
 }))
 
@@ -253,7 +252,7 @@ describe('useImageWorkflowExecution', () => {
 
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
-      feature: 'outpaint',
+      service: 'outpaint',
       image_urls: ['https://example.com/a.png'],
       params: {
         output_count: 1,
@@ -296,7 +295,7 @@ describe('useImageWorkflowExecution', () => {
 
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
-      feature: 'inpaint',
+      service: 'inpaint',
       prompt: 'remove the object',
       params: {
         output_count: 1,

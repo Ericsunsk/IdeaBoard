@@ -4,11 +4,9 @@ import {
   getControlAIGatewayModelReference,
   listControlAIGatewayModelsObserved,
   listControlAIGatewayCatalog,
-  listControlAIGatewayModels,
   listControlAIGatewayProviders,
   previewControlAIGatewayRoute,
   saveControlAIGatewayCatalog,
-  saveControlAIGatewayModel,
   testControlAIGatewayConnection,
   updateControlAIGateway,
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
@@ -30,14 +28,14 @@ import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../domain/c
 // equivalent ride the Control Plane (`GET
 // /api/control/v1/platform/ai-gateway*`, unified contract envelope
 // `{ data }` / `{ error: { code, message, request_id } }`) through the
-// generated hooks: catalog list, providers list, connection get, model
-// mappings list. The read-only extras moved to the Control Plane the same
-// way: route preview, model detection, pricing-reference lookup, and the
-// 7-day observation window. Writes moved to the Control Plane with the
-// same envelope (operator reason required; nil-ack mutations resolve
-// `{ data: {} }`): catalog save, connection update, model mapping save,
-// and the server-side connection probe. Callers keep importing these
-// names, never generated code directly.
+// generated hooks: catalog list, providers list, connection get. The
+// read-only extras moved to the Control Plane the same way: route preview,
+// model detection, pricing-reference lookup, and the 7-day observation
+// window. Writes moved to the Control Plane with the same envelope
+// (operator reason required; nil-ack mutations resolve `{ data: {} }`):
+// catalog save, connection update, and the server-side connection probe
+// (provider/path required since #847 removed the mapping fallback).
+// Callers keep importing these names, never generated code directly.
 export type GatewayMutationOptions = {
   operatorReason: string
   idempotencyKey?: string | undefined
@@ -101,11 +99,6 @@ export type GatewayRoutePreview = {
   path_source_label: string
 }
 
-export type GatewayModelMapping = {
-  feature: string
-  model: string
-}
-
 export type UpdateGatewayConfigRequest = {
   base_url?: string
   token?: string
@@ -114,11 +107,6 @@ export type UpdateGatewayConfigRequest = {
 }
 
 export type GatewayConnectionSummary = GatewayConfigSummary
-
-export interface AdminGatewayModelMapping {
-  feature: string
-  model: string
-}
 
 export interface AdminGatewayCatalog {
   list: () => Promise<AdminModelItem[]>
@@ -153,24 +141,22 @@ export interface AdminGatewayConnection {
     input: {
       base_url: string
       token?: string | undefined
+      provider: string
+      model?: string | undefined
+      path: string
     },
     options: GatewayMutationOptions,
   ) => Promise<{ success: boolean; latencyMs?: number; message?: string }>
 }
 
-export interface AdminGatewayMappings {
-  list: () => Promise<AdminGatewayModelMapping[]>
-  save: (feature: string, model: string, options: GatewayMutationOptions) => Promise<void>
-}
-
 export interface AdminGatewayResource {
   catalog: AdminGatewayCatalog
   connection: AdminGatewayConnection
-  mappings: AdminGatewayMappings
 }
 
-// AI 网关设置面唯一出口：目录、连接、模型映射三组共享 adapter 与归一，
-// 调用方按组取用（catalog / connection / mappings），不得直调 generated client。
+// AI 网关设置面唯一出口：目录、连接两组共享 adapter 与归一，
+// 调用方按组取用（catalog / connection），不得直调 generated client。
+// per-service 模型管理由 #849 的 pool editor 接管，不在此处另起映射面。
 export function createAdminGatewayResource(): AdminGatewayResource {
   return {
     catalog: {
@@ -186,10 +172,6 @@ export function createAdminGatewayResource(): AdminGatewayResource {
       get: getGatewayConnection,
       update: updateGatewayConnection,
       testConnection: testGatewayConnection,
-    },
-    mappings: {
-      list: listGatewayModelMappings,
-      save: saveGatewayModelMapping,
     },
   }
 }
@@ -237,7 +219,9 @@ function pickStringArray(raw: Record<string, unknown>, key: string): string[] | 
   return value.filter((item): item is string => typeof item === 'string')
 }
 
-function pickModalities(raw: Record<string, unknown>): { input?: string[]; output?: string[] } | undefined {
+function pickModalities(
+  raw: Record<string, unknown>,
+): { input?: string[]; output?: string[] } | undefined {
   const value = raw.modalities
   if (!isRecord(value)) return undefined
   const modalities: { input?: string[]; output?: string[] } = {}
@@ -279,30 +263,22 @@ function toModelReferenceSnapshot(raw: Record<string, unknown>): ModelReferenceS
   const note = typeof raw.note === 'string' ? raw.note : ''
   if (!modelId || !source) throw controlError('control_failed', '参照价查询失败')
   const snapshot: ModelReferenceSnapshot = { modelId, source, note, found: raw.found === true }
-  assignOptionalText(
-    snapshot,
-    raw,
-    [
-      ['provider', 'provider'],
-      ['name', 'name'],
-      ['knowledge', 'knowledge'],
-      ['family', 'family'],
-      ['status', 'status'],
-      ['last_updated', 'lastUpdated'],
-      ['release_date', 'releaseDate'],
-      ['error_code', 'errorCode'],
-      ['message', 'message'],
-    ] as const,
-  )
-  assignOptionalNumbers(
-    snapshot,
-    raw,
-    [
-      ['input_usd_per_mtok', 'inputUsdPerMtok'],
-      ['output_usd_per_mtok', 'outputUsdPerMtok'],
-      ['context_limit', 'contextLimit'],
-    ] as const,
-  )
+  assignOptionalText(snapshot, raw, [
+    ['provider', 'provider'],
+    ['name', 'name'],
+    ['knowledge', 'knowledge'],
+    ['family', 'family'],
+    ['status', 'status'],
+    ['last_updated', 'lastUpdated'],
+    ['release_date', 'releaseDate'],
+    ['error_code', 'errorCode'],
+    ['message', 'message'],
+  ] as const)
+  assignOptionalNumbers(snapshot, raw, [
+    ['input_usd_per_mtok', 'inputUsdPerMtok'],
+    ['output_usd_per_mtok', 'outputUsdPerMtok'],
+    ['context_limit', 'contextLimit'],
+  ] as const)
   for (const [snake, camel] of [
     ['reasoning', 'reasoning'],
     ['tool_call', 'toolCall'],
@@ -359,27 +335,17 @@ function toModelObservedSnapshot(raw: unknown): ModelObservedSnapshot {
     cacheHits: pickNumber(raw, 'cache_hits') ?? 0,
     hasObservations: raw.has_observations === true,
     hasSkuMargin: raw.has_sku_margin === true,
-    skuMargins: Array.isArray(raw.sku_margins)
-      ? raw.sku_margins.map(toObservedSkuMargin)
-      : [],
+    skuMargins: Array.isArray(raw.sku_margins) ? raw.sku_margins.map(toObservedSkuMargin) : [],
   }
-  assignOptionalText(
-    snapshot,
-    raw,
-    [
-      ['top_failure_stage', 'topFailureStage'],
-      ['top_failure_category', 'topFailureCategory'],
-    ] as const,
-  )
+  assignOptionalText(snapshot, raw, [
+    ['top_failure_stage', 'topFailureStage'],
+    ['top_failure_category', 'topFailureCategory'],
+  ] as const)
   assignOptionalNumbers(snapshot, raw, [['top_failure_count', 'topFailureCount']] as const)
-  assignNullableNumbers(
-    snapshot,
-    raw,
-    [
-      ['success_rate', 'successRate'],
-      ['cache_hit_rate', 'cacheHitRate'],
-    ] as const,
-  )
+  assignNullableNumbers(snapshot, raw, [
+    ['success_rate', 'successRate'],
+    ['cache_hit_rate', 'cacheHitRate'],
+  ] as const)
   return snapshot
 }
 
@@ -399,12 +365,12 @@ function assignNullableNumbers<T extends object>(
 function toObservedSkuMargin(raw: unknown): ModelObservedSkuMargin {
   if (!isRecord(raw)) throw controlError('control_failed', '观测数据加载失败')
   const sku = pickString(raw, 'sku')
-  const feature = pickString(raw, 'feature')
-  if (!sku || !feature) throw controlError('control_failed', '观测数据加载失败')
+  const service = pickString(raw, 'service')
+  if (!sku || !service) throw controlError('control_failed', '观测数据加载失败')
   const margin: ModelObservedSkuMargin = {
     sku,
     displayName: pickString(raw, 'display_name') ?? '',
-    feature,
+    service,
     onSale: raw.on_sale === true,
     unitCreditsByVariant: pickNumberRecord(raw, 'unit_credits_by_variant'),
     hasActualCost: raw.has_actual_cost === true,
@@ -412,14 +378,10 @@ function toObservedSkuMargin(raw: unknown): ModelObservedSkuMargin {
     costNote: pickString(raw, 'cost_note') ?? '',
     marginStatus: pickString(raw, 'margin_status') ?? '',
   }
-  assignNullableNumbers(
-    margin,
-    raw,
-    [
-      ['actual_cost_credits', 'actualCostCredits'],
-      ['margin_credits', 'marginCredits'],
-    ] as const,
-  )
+  assignNullableNumbers(margin, raw, [
+    ['actual_cost_credits', 'actualCostCredits'],
+    ['margin_credits', 'marginCredits'],
+  ] as const)
   return margin
 }
 
@@ -580,6 +542,9 @@ async function testGatewayConnection(
   input: {
     base_url: string
     token?: string | undefined
+    provider: string
+    model?: string | undefined
+    path: string
   },
   options: GatewayMutationOptions,
 ): Promise<{ success: boolean; latencyMs?: number; message?: string }> {
@@ -587,11 +552,21 @@ async function testGatewayConnection(
   // is used for this probe only and never persisted. Mutation-guarded, so
   // it needs an operator reason like any other control write.
   const operatorReason = requireOperatorReason(options.operatorReason)
-  const payload: { base_url: string; token?: string; reason: string } = {
+  const payload: {
+    base_url: string
+    token?: string
+    provider: string
+    model?: string
+    path: string
+    reason: string
+  } = {
     base_url: input.base_url,
+    provider: input.provider,
+    path: input.path,
     reason: operatorReason,
   }
   if (input.token != null) payload.token = input.token
+  if (input.model != null) payload.model = input.model
   let body: unknown
   try {
     body = await testControlAIGatewayConnection(payload, {
@@ -612,38 +587,6 @@ async function testGatewayConnection(
   if (typeof probe.latency_ms === 'number') result.latencyMs = probe.latency_ms
   if (typeof probe.message === 'string' && probe.message) result.message = probe.message
   return result
-}
-
-async function listGatewayModelMappings(): Promise<AdminGatewayModelMapping[]> {
-  try {
-    const body = await listControlAIGatewayModels()
-    const data = requireContractData<GatewayModelMapping[]>(body, '加载模型映射失败')
-    return (data ?? []).map((item) => ({
-      feature: item.feature,
-      model: item.model,
-    }))
-  } catch (error) {
-    throw withControlCopy(error, '加载模型映射失败')
-  }
-}
-
-async function saveGatewayModelMapping(
-  feature: string,
-  model: string,
-  options: GatewayMutationOptions,
-): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
-  try {
-    const body = await saveControlAIGatewayModel(
-      feature,
-      { model },
-      { headers: mutationHeaders(options, operatorReason) },
-    )
-    // Nil-ack mutation: success is `{ data: {} }`.
-    requireContractData<Record<string, unknown>>(body, '保存模型映射失败')
-  } catch (error) {
-    throw withControlCopy(error, '保存模型映射失败')
-  }
 }
 
 function mutationHeaders(options: GatewayMutationOptions, operatorReason: string) {

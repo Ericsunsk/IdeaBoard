@@ -169,10 +169,8 @@ func (r *SystemConfigRepository) SetManyWithAdminAudit(ctx context.Context, valu
 // SetAndDeleteManyWithAdminAudit upserts values and deletes keys in one
 // transaction with a single audit record. Used when one admin write must
 // retire dependent rows (e.g. catalog save cascading to stale mappings).
-// It always holds the model-mapping write lock: mapping writers
-// (SaveModelMapping routes through here too) serialize against cascades,
-// so a concurrent mapping save can neither slip between the cascade's read
-// and write nor interleave two catalog saves.
+// It always holds the model-mapping write lock so concurrent mapping and
+// catalog writes cannot interleave with the cascade's read and write.
 func (r *SystemConfigRepository) SetAndDeleteManyWithAdminAudit(ctx context.Context, values []SystemConfigValue, deleteKeys []string, audit SystemConfigAdminAudit) error {
 	if r == nil || r.db == nil || r.q == nil {
 		return ErrRuntimeSettingsRepositoryUnavailable

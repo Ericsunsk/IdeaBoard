@@ -46,12 +46,8 @@ export function useRecharge(
     activeWorkspaceId,
     navigateToCheckout,
   )
-  const {
-    pendingActionTarget,
-    pendingActionError,
-    pendingActionMutation,
-    runPendingOrderAction,
-  } = pendingOrders
+  const { pendingActionTarget, pendingActionError, pendingActionMutation, runPendingOrderAction } =
+    pendingOrders
 
   usePaymentEventSubscription({
     queryClient,
@@ -310,8 +306,7 @@ function usePaymentEventSubscription(options: {
 }) {
   const { queryClient, resource, active, selectionSettled, activeWorkspaceId } = options
   watch(
-    () =>
-      [toValue(active), selectionSettled.value, toValue(activeWorkspaceId) ?? ''] as const,
+    () => [toValue(active), selectionSettled.value, toValue(activeWorkspaceId) ?? ''] as const,
     ([enabled, settled, settledWorkspaceId], _previous, onCleanup) => {
       if (!enabled || !settled || !settledWorkspaceId) return
       const unsubscribe = resource.subscribe(settledWorkspaceId, (event) =>

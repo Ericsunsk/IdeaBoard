@@ -39,8 +39,12 @@
   <!-- 存储配置表格 (1:1 对齐功能定价页 BillingPricingTable 规范，预设厂商平铺展示) -->
   <section v-else :aria-label="STORAGE_MESSAGES.tableSectionAria">
     <div class="mb-2 flex items-center gap-2">
-      <h3 class="text-sm font-bold text-admin-title-color">{{ STORAGE_MESSAGES.tableSectionAria }}</h3>
-      <span class="text-xs text-admin-text-3">{{ STORAGE_MESSAGES.tableSectionCount(rows.length) }}</span>
+      <h3 class="text-sm font-bold text-admin-title-color">
+        {{ STORAGE_MESSAGES.tableSectionAria }}
+      </h3>
+      <span class="text-xs text-admin-text-3">{{
+        STORAGE_MESSAGES.tableSectionCount(rows.length)
+      }}</span>
     </div>
 
     <div :class="adminTableCardClass">
@@ -133,7 +137,11 @@
         </AdminColumn>
 
         <!-- 状态列 (对齐 BillingStatusCell 胶囊 + 圆点规范) -->
-        <AdminColumn field="status" :header="STORAGE_MESSAGES.statusColumn" :style="{ width: '110px' }">
+        <AdminColumn
+          field="status"
+          :header="STORAGE_MESSAGES.statusColumn"
+          :style="{ width: '110px' }"
+        >
           <template #body="{ data }">
             <span
               v-if="data.isCurrent"
@@ -160,7 +168,11 @@
         </AdminColumn>
 
         <!-- 存储桶 / 路径 -->
-        <AdminColumn field="bucket" :header="STORAGE_MESSAGES.bucketColumn" :style="{ width: '180px' }">
+        <AdminColumn
+          field="bucket"
+          :header="STORAGE_MESSAGES.bucketColumn"
+          :style="{ width: '180px' }"
+        >
           <template #body="{ data }">
             <span
               class="truncate font-mono text-xs"
@@ -172,7 +184,11 @@
         </AdminColumn>
 
         <!-- 访问端点 / 域名 -->
-        <AdminColumn field="endpoint" :header="STORAGE_MESSAGES.endpointColumn" :style="{ width: '220px' }">
+        <AdminColumn
+          field="endpoint"
+          :header="STORAGE_MESSAGES.endpointColumn"
+          :style="{ width: '220px' }"
+        >
           <template #body="{ data }">
             <span
               class="truncate font-mono text-xs"
@@ -185,7 +201,11 @@
         </AdminColumn>
 
         <!-- 当前生效状态控制 -->
-        <AdminColumn field="current" :header="STORAGE_MESSAGES.currentColumn" :style="{ width: '110px' }">
+        <AdminColumn
+          field="current"
+          :header="STORAGE_MESSAGES.currentColumn"
+          :style="{ width: '110px' }"
+        >
           <template #body="{ data }">
             <span
               v-if="data.isCurrent"
@@ -210,7 +230,11 @@
         </AdminColumn>
 
         <!-- 操作列 (未配置显示“配置”，已配置显示“编辑/测试/删除”) -->
-        <AdminColumn field="actions" :header="STORAGE_MESSAGES.actionsColumn" :style="{ width: '160px' }">
+        <AdminColumn
+          field="actions"
+          :header="STORAGE_MESSAGES.actionsColumn"
+          :style="{ width: '160px' }"
+        >
           <template #body="{ data }">
             <div v-if="data.isPresetOnly" class="flex items-center gap-1.5">
               <AdminButton

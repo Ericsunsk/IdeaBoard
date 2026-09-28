@@ -66,10 +66,7 @@ function configHeaders(config?: MockRequestConfig): Record<string, unknown> {
     : {}
 }
 
-function mockListBoards(
-  state: MockWorkspaceBoardApiState,
-  workspaceId: string,
-): Promise<unknown> {
+function mockListBoards(state: MockWorkspaceBoardApiState, workspaceId: string): Promise<unknown> {
   if (state.listError) return Promise.reject(state.listError)
   void workspaceId
   return Promise.resolve(state.boardsResponse)
@@ -111,10 +108,7 @@ function mockJoinBoard(
   return Promise.reject(new Error(`Unexpected board join without fixture: POST ${url}`))
 }
 
-function mockReadDocument(
-  state: MockWorkspaceBoardApiState,
-  boardId: string,
-): Promise<unknown> {
+function mockReadDocument(state: MockWorkspaceBoardApiState, boardId: string): Promise<unknown> {
   const document = state.documentById[boardId]
   if (!document) {
     return Promise.reject({ status: 404, code: 'board_not_found', msg: '看板不存在' })
@@ -181,10 +175,7 @@ function mockReadOrRenameBoard(
   return Promise.resolve({ data: board })
 }
 
-function mockArchiveBoard(
-  state: MockWorkspaceBoardApiState,
-  boardId: string,
-): Promise<unknown> {
+function mockArchiveBoard(state: MockWorkspaceBoardApiState, boardId: string): Promise<unknown> {
   state.archivedBoardIds.push(boardId)
   const board = state.boardsResponse.data.find((item) => item.id === boardId)
   return Promise.resolve({
@@ -195,10 +186,7 @@ function mockArchiveBoard(
   })
 }
 
-function mockRestoreBoard(
-  state: MockWorkspaceBoardApiState,
-  boardId: string,
-): Promise<unknown> {
+function mockRestoreBoard(state: MockWorkspaceBoardApiState, boardId: string): Promise<unknown> {
   state.archivedBoardIds = state.archivedBoardIds.filter((id) => id !== boardId)
   const board = state.boardsResponse.data.find((item) => item.id === boardId)
   return Promise.resolve({

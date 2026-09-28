@@ -550,7 +550,7 @@ CREATE TABLE task_billing_settlements (
 CREATE TABLE task_billing_snapshots (
     task_id character varying(64) NOT NULL,
     user_id bigint NOT NULL,
-    feature_slug character varying(64) NOT NULL,
+    service character varying(64) NOT NULL,
     sku character varying(128) NOT NULL,
     price_version_id bigint NOT NULL,
     price_version bigint NOT NULL,

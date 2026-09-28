@@ -5,13 +5,7 @@ import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 // `CreditLedgerTransaction` model is gone; the control ledger types the
 // command as a plain string, so this module owns the known command set.
 export type CreditLedgerCommandType =
-  | 'grant'
-  | 'deduction'
-  | 'hold'
-  | 'capture'
-  | 'release'
-  | 'refund'
-  | 'correction'
+  'grant' | 'deduction' | 'hold' | 'capture' | 'release' | 'refund' | 'correction'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',

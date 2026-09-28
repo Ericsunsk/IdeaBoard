@@ -211,9 +211,7 @@ describe('useAdminModelCatalogWorkspace copy feedback contract', () => {
 
     workspace.copyModelId('openai/gpt-4o')
 
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith('复制失败，请手动复制模型标识'),
-    )
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('复制失败，请手动复制模型标识'))
     expect(workspace.copiedModelId.value).toBeNull()
   })
 })

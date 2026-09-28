@@ -138,7 +138,10 @@ export type RewardCodeMutationOptions = {
 
 export type AdminRewardCodeResource = {
   search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>
-  create: (input: CreateRewardCodeInput, options: RewardCodeMutationOptions) => Promise<CreatedRewardCode>
+  create: (
+    input: CreateRewardCodeInput,
+    options: RewardCodeMutationOptions,
+  ) => Promise<CreatedRewardCode>
   update: (
     id: number,
     input: UpdateRewardCodeInput,
@@ -163,7 +166,12 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
 }
 
 async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardCodePage> {
-  const criteria: { query?: string; status?: RewardCodeStatus; before_id?: number; limit?: number } = {}
+  const criteria: {
+    query?: string
+    status?: RewardCodeStatus
+    before_id?: number
+    limit?: number
+  } = {}
   if (input.query.trim()) criteria.query = input.query.trim()
   if (input.status != null) criteria.status = input.status
   if (input.beforeId != null) criteria.before_id = input.beforeId

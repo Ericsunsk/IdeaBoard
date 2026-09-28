@@ -7,7 +7,7 @@
 
 export const BILLING_PRICING_MESSAGES = {
   searchLabel: '搜索定价功能',
-  searchPlaceholder: '搜索功能名称、SKU 或映射模型...',
+  searchPlaceholder: '搜索功能名称或 SKU...',
   filterLabel: '筛选功能状态',
   refresh: '刷新功能定价',
   billingCount: (count: number) => `共 ${count} 个计费功能`,
@@ -25,9 +25,6 @@ export const BILLING_PRICING_MESSAGES = {
   statusUnpriced: '未定价',
   statusDisabled: '已停用',
   statusArchived: '已归档',
-  modelUnset: '未配置',
-  mappingCollision: (features: string) =>
-    `模型映射存在同名冲突：${features}，保存会影响多行，请确认后端 key 空间`,
   retryLater: '请稍后重试。',
   deleteTitle: '删除已归档功能',
   deleteMessage: (displayName: string) =>
@@ -55,9 +52,7 @@ export const BILLING_PRICING_MESSAGES = {
   save: '保存',
   priceHeader: (displayName: string | undefined) => `编辑 · ${displayName ?? ''}`,
   priceDescription: '调整该计费项的价格配置后保存。',
-  priceModelLabel: '模型',
-  pricePlaceholder: (required: boolean) =>
-    required ? '必填' : BILLING_PRICING_MESSAGES.modelUnset,
+  pricePlaceholder: (required: boolean) => (required ? '必填' : '选填'),
   priceRequired: '请输入价格',
   priceRange: (max: string) => `价格必须是 0 到 ${max} 之间的整数`,
   priceVariantLabel: (variant: string) => (variant === 'default' ? '固定' : variant.toUpperCase()),

@@ -113,10 +113,7 @@ describe('createAdminStorageResource', () => {
     const resource = createAdminStorageResource()
 
     await expect(
-      resource.saveProfile(
-        { payload: makeStoragePayload() },
-        { operatorReason: 'storage review' },
-      ),
+      resource.saveProfile({ payload: makeStoragePayload() }, { operatorReason: 'storage review' }),
     ).rejects.toThrow('存储名称已存在')
   })
 

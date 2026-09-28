@@ -74,7 +74,10 @@
           class="text-admin-caption font-semibold text-admin-text-1"
           for="gateway-account-id-input"
         >
-          Account ID <span class="font-normal text-admin-text-3">{{ MODELS_MESSAGES.gatewayCustomDomainHint }}</span>
+          Account ID
+          <span class="font-normal text-admin-text-3">{{
+            MODELS_MESSAGES.gatewayCustomDomainHint
+          }}</span>
         </label>
         <AdminInput
           id="gateway-account-id-input"
@@ -87,7 +90,10 @@
       </div>
       <div class="flex flex-col gap-1.5">
         <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-id-input">
-          Gateway ID <span class="font-normal text-admin-text-3">{{ MODELS_MESSAGES.gatewayCustomDomainHint }}</span>
+          Gateway ID
+          <span class="font-normal text-admin-text-3">{{
+            MODELS_MESSAGES.gatewayCustomDomainHint
+          }}</span>
         </label>
         <AdminInput
           id="gateway-id-input"
@@ -97,6 +103,42 @@
           :disabled="loading || saving"
           class="w-full font-mono"
         />
+      </div>
+
+      <!-- 连接测试目标：provider + path（#847 起必填，后端不再回退模型映射） -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="flex flex-col gap-1.5">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="gateway-probe-provider-input"
+          >
+            {{ MODELS_MESSAGES.gatewayProbeProviderLabel }}
+          </label>
+          <AdminInput
+            id="gateway-probe-provider-input"
+            v-model="probeProvider"
+            :placeholder="MODELS_MESSAGES.gatewayProbeProviderPlaceholder"
+            autocomplete="off"
+            :disabled="loading || saving || testing"
+            class="w-full font-mono"
+          />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label
+            class="text-admin-caption font-semibold text-admin-text-1"
+            for="gateway-probe-path-input"
+          >
+            {{ MODELS_MESSAGES.gatewayProbePathLabel }}
+          </label>
+          <AdminInput
+            id="gateway-probe-path-input"
+            v-model="probePath"
+            :placeholder="MODELS_MESSAGES.gatewayProbePathPlaceholder"
+            autocomplete="off"
+            :disabled="loading || saving || testing"
+            class="w-full font-mono"
+          />
+        </div>
       </div>
     </div>
 
@@ -172,6 +214,8 @@ const feedback = useAdminGatewayConfigFeedback()
 const adminConfirm = useAdminConfirm()
 
 const summary = ref<GatewayConnectionSummary | null>(null)
+const probeProvider = ref('')
+const probePath = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
@@ -183,10 +227,7 @@ const form = useForm({
       v.string(),
       v.trim(),
       v.minLength(1, MODELS_MESSAGES.gatewayBaseUrlRequired),
-      v.check(
-        (value) => /^https?:\/\//i.test(value),
-        MODELS_MESSAGES.gatewayBaseUrlScheme,
-      ),
+      v.check((value) => /^https?:\/\//i.test(value), MODELS_MESSAGES.gatewayBaseUrlScheme),
     ),
   }),
 })
@@ -232,10 +273,18 @@ const handleTestConnection = form.handleSubmit(async (values) => {
     const finalBaseUrl = values.base_url.trim().replace(/\/+$/, '')
 
     // testConnection 是 connection interface 必需成员：直调服务端探活，无假成功回退。
+    const provider = probeProvider.value.trim()
+    const path = probePath.value.trim().replace(/^\/+/, '')
+    if (!provider || !path) {
+      error.value = MODELS_MESSAGES.gatewayProbeRequired
+      return
+    }
     const res = await resource.value.testConnection(
       {
         base_url: finalBaseUrl,
         token: values.token.trim() || undefined,
+        provider,
+        path,
       },
       { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )

@@ -15,14 +15,18 @@
         <SettingEditorCard
           v-if="data.id === 'branding'"
           :title="SETTINGS_MESSAGES.brandingTitle"
-          :status="brandingForm.logo_url ? SETTINGS_MESSAGES.customLogo : SETTINGS_MESSAGES.defaultBrand"
+          :status="
+            brandingForm.logo_url ? SETTINGS_MESSAGES.customLogo : SETTINGS_MESSAGES.defaultBrand
+          "
           :status-severity="brandingForm.logo_url ? 'info' : 'secondary'"
           class="mb-0"
         >
           <div :class="settingCardBodyClass">
             <div class="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)]">
               <div class="flex min-w-0 flex-col gap-2">
-                <span class="text-admin-meta font-[680] text-admin-text-2">{{ SETTINGS_MESSAGES.logoLabel }}</span>
+                <span class="text-admin-meta font-[680] text-admin-text-2">{{
+                  SETTINGS_MESSAGES.logoLabel
+                }}</span>
                 <div class="group/logo relative size-28">
                   <button
                     :class="brandingLogoButtonClass"
@@ -73,7 +77,10 @@
               </div>
 
               <div class="grid content-start gap-4">
-                <AdminFormField :label="SETTINGS_MESSAGES.projectNameLabel" for="admin-branding-project-name">
+                <AdminFormField
+                  :label="SETTINGS_MESSAGES.projectNameLabel"
+                  for="admin-branding-project-name"
+                >
                   <AdminInput
                     id="admin-branding-project-name"
                     v-model="brandingForm.project_name"
@@ -85,7 +92,10 @@
                   />
                 </AdminFormField>
 
-                <AdminFormField :label="SETTINGS_MESSAGES.logoUrlLabel" for="admin-branding-logo-url">
+                <AdminFormField
+                  :label="SETTINGS_MESSAGES.logoUrlLabel"
+                  for="admin-branding-logo-url"
+                >
                   <AdminInput
                     id="admin-branding-logo-url"
                     v-model="brandingForm.logo_url"
@@ -272,7 +282,9 @@ function buildSearchProviderRows(): AdminSettingsTableRow[] {
         title: SETTINGS_MESSAGES.imageSourceTitle(SEARCH_PROVIDER_LABELS[provider]),
         description: SETTINGS_MESSAGES.imageSourceDescription(SEARCH_PROVIDER_LABELS[provider]),
         icon: Search,
-        status: searchLoadError.value ? SETTINGS_MESSAGES.providerLoadFailed : SETTINGS_MESSAGES.providerLoading,
+        status: searchLoadError.value
+          ? SETTINGS_MESSAGES.providerLoadFailed
+          : SETTINGS_MESSAGES.providerLoading,
         statusSeverity: searchLoadError.value ? 'danger' : 'secondary',
         summary: searchLoadError.value
           ? SETTINGS_MESSAGES.providerConfigLoadFailed
@@ -315,7 +327,10 @@ async function loadSearchProviders() {
         SEARCH_PROVIDERS.indexOf(left.provider) - SEARCH_PROVIDERS.indexOf(right.provider),
     )
   } catch (err) {
-    searchLoadError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchProvidersLoadFailed)
+    searchLoadError.value = formatAdminDisplayError(
+      err,
+      SETTINGS_MESSAGES.searchProvidersLoadFailed,
+    )
   }
 }
 

@@ -138,10 +138,7 @@ const fixtureCases: BoundaryFixtureCase[] = [
   {
     name: 'prohibits cross-feature deep imports into workspace infrastructure',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(
-      webRoot,
-      'src/features/admin/.boundary-workspace-deep.fixture.ts',
-    ),
+    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-workspace-deep.fixture.ts'),
     content: `import { getWorkspaceSelectionStore } from '../workspace/infrastructure/workspaceContext'; console.log(getWorkspaceSelectionStore);`,
   },
   {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../../../../shared/domain/imageActions'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import type { WorkflowFeature } from '../../../../../shared/domain/workflowFeatures'
+import type { Service } from '../../../../../shared/domain/imageServices'
 import type { SubmitTaskReadinessData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type { ImageStrengthAction } from '../../../application/execution'
 import HomeCanvasImageActionMenu from './ImageActionMenu.vue'
@@ -21,17 +21,17 @@ function createDeferred<T>() {
 }
 
 function makeReadiness(
-  feature: WorkflowFeature,
+  service: Service,
   outputResolution: OutputResolution,
   unitCredits: number,
 ): SubmitTaskReadinessData {
   return {
     ready: true,
-    feature,
+    service,
     billing: {
-      sku: `ai-image:${feature}`,
+      sku: `ai-image:${service}`,
       output_resolution: outputResolution,
-      display_name: feature,
+      display_name: service,
       price_version_id: 1,
       price_version: 1,
       unit_credits: unitCredits,
@@ -149,13 +149,13 @@ describe('HomeCanvasImageActionMenu', () => {
 
   it('shows AI prices without disabling cached unavailable billing states, and keeps local editor price-free', () => {
     const billingStore: CanvasBillingReadinessStore = {
-      ensureFeature: vi.fn(async () => undefined),
+      ensureService: vi.fn(async () => undefined),
       ensureMatrix: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
-      getFeatureState: (feature) =>
-        feature === IMAGE_NODE_ACTION.cutout
-          ? { feature, status: 'blocked', reason: '价格未配置' }
-          : { feature, status: 'ready', unitCredits: 3, totalCredits: 7, availableCredits: 20 },
+      getServiceState: (service) =>
+        service === IMAGE_NODE_ACTION.cutout
+          ? { service, status: 'blocked', reason: '价格未配置' }
+          : { service, status: 'ready', unitCredits: 3, totalCredits: 7, availableCredits: 20 },
     }
 
     renderImageActionMenu({ billingStore, outputCount: 4 })
@@ -169,11 +169,11 @@ describe('HomeCanvasImageActionMenu', () => {
 
   it('presents explicit zero pricing as free in tooltip and touch quote', () => {
     const billingStore: CanvasBillingReadinessStore = {
-      ensureFeature: vi.fn(async () => undefined),
+      ensureService: vi.fn(async () => undefined),
       ensureMatrix: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
-      getFeatureState: (feature) => ({
-        feature,
+      getServiceState: (service) => ({
+        service,
         status: 'ready',
         unitCredits: 0,
         availableCredits: 0,
@@ -189,19 +189,17 @@ describe('HomeCanvasImageActionMenu', () => {
 
   it('requests and displays the 4K quote when resolution changes during a 2K request', async () => {
     const pending2K = createDeferred<SubmitTaskReadinessData>()
-    const fetchReadiness = vi.fn(
-      async (feature: WorkflowFeature, request?: { params?: unknown }) => {
-        const params = request?.params as { output_resolution?: OutputResolution } | undefined
-        if (feature === IMAGE_NODE_ACTION.variations && params?.output_resolution === '2k') {
-          return pending2K.promise
-        }
-        return makeReadiness(
-          feature,
-          params?.output_resolution ?? '1k',
-          params?.output_resolution === '4k' ? 12 : 4,
-        )
-      },
-    )
+    const fetchReadiness = vi.fn(async (service: Service, request?: { params?: unknown }) => {
+      const params = request?.params as { output_resolution?: OutputResolution } | undefined
+      if (service === IMAGE_NODE_ACTION.variations && params?.output_resolution === '2k') {
+        return pending2K.promise
+      }
+      return makeReadiness(
+        service,
+        params?.output_resolution ?? '1k',
+        params?.output_resolution === '4k' ? 12 : 4,
+      )
+    })
     const billingStore = createCanvasBillingReadinessStore({ fetchReadiness })
     const view = renderImageActionMenu({ billingStore, outputResolution: '2k' })
 

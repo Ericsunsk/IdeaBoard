@@ -5,7 +5,9 @@
       class="flex flex-col gap-2 rounded-xl border border-admin-border-soft bg-admin-surface-muted/30 p-4"
     >
       <div class="flex items-center justify-between">
-        <span class="text-xs font-semibold text-admin-text-2">{{ MODELS_MESSAGES.previewTitle }}</span>
+        <span class="text-xs font-semibold text-admin-text-2">{{
+          MODELS_MESSAGES.previewTitle
+        }}</span>
         <span
           class="inline-flex items-center rounded bg-admin-accent/10 px-1.5 py-0.5 text-admin-micro font-semibold text-admin-accent"
         >
@@ -22,8 +24,12 @@
         <div
           class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg/50 px-4 py-2 text-xs"
         >
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.previewModelId(modelId) }}</span>
-          <span class="text-admin-caption font-medium text-admin-accent">{{ MODELS_MESSAGES.previewBadge }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.previewModelId(modelId)
+          }}</span>
+          <span class="text-admin-caption font-medium text-admin-accent">{{
+            MODELS_MESSAGES.previewBadge
+          }}</span>
         </div>
       </div>
     </div>
@@ -34,7 +40,9 @@
     >
       <div class="flex items-center gap-2">
         <Globe class="size-4 text-admin-accent" />
-        <span class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.routeTitle }}</span>
+        <span class="text-xs font-semibold text-admin-text-1">{{
+          MODELS_MESSAGES.routeTitle
+        }}</span>
       </div>
 
       <div class="flex flex-col gap-2 text-xs">

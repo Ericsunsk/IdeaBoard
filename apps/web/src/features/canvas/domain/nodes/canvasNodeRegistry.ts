@@ -70,9 +70,7 @@ export function formatCanvasNodePortLabel(
 }
 
 /** Menu copy resolved read-time; callers render through their own t(). */
-export function getCanvasNodeKindMenuItems(
-  translate: CanvasNodeCopyResolver,
-): readonly {
+export function getCanvasNodeKindMenuItems(translate: CanvasNodeCopyResolver): readonly {
   key: CanvasCreatableNodeKind
   label: string
 }[] {

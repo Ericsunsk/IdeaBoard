@@ -2018,75 +2018,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
-  /platform/ai-gateway/models:
-    get:
-      tags: [ControlPlatform]
-      operationId: listControlAIGatewayModels
-      summary: List AI gateway feature model mappings
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: null
-        reason: false
-        outcome: read
-      responses:
-        '200':
-          description: Model mappings (contract envelope).
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlObjectEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-  /platform/ai-gateway/models/{feature}:
-    put:
-      tags: [ControlPlatform]
-      operationId: saveControlAIGatewayModel
-      summary: Save an AI gateway feature model mapping (operator reason required)
-      x-capability: control:platform
-      x-audit:
-        operator: true
-        target: ai_gateway_model
-        reason: true
-        outcome: success
-      parameters:
-        - name: feature
-          in: path
-          required: true
-          schema:
-            type: string
-        - $ref: '#/components/parameters/IdempotencyKey'
-        - $ref: '#/components/parameters/OperatorReason'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Model mapping payload (admin DTO shape, unchanged).
-      responses:
-        '200':
-          description: Model mapping saved.
-          headers:
-            Request-Id:
-              $ref: '#/components/headers/RequestId'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ControlAckEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
   /platform/ai-gateway/catalog:
     get:
       tags: [ControlPlatform]
@@ -2406,7 +2337,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [base_url]
+              required: [base_url, provider, path]
               additionalProperties: false
               properties:
                 base_url:
@@ -2416,10 +2347,15 @@ paths:
                   type: string
                 provider:
                   type: string
+                  minLength: 1
                 model:
                   type: string
                 path:
                   type: string
+                  minLength: 1
+                  description: >-
+                    provider-native path is required (#847: the model-mapping
+                    fallback is removed).
                 reason:
                   type: string
       responses:
@@ -3982,8 +3918,9 @@ components:
           pattern: '^task_[A-Za-z0-9_-]+$'
         status:
           type: string
-        feature:
+        service:
           type: string
+          description: Registered AI image service slug (#847 rename).
     ControlSetRoleRequest:
       type: object
       required: [role]

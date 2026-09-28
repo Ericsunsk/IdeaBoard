@@ -45,12 +45,6 @@ type fakeEventSender struct {
 	destinations []string
 }
 
-type eventTaskModelResolver struct{}
-
-func (*eventTaskModelResolver) ResolveModel(context.Context, string) (string, error) {
-	return "openrouter/test-image-model", nil
-}
-
 func (f *fakeEventSender) Send(_ context.Context, destination string, headers map[string]string, body []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -161,11 +155,12 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	v1 := router.Group(ContractV1GroupPath)
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets, TaskModelResolver: &eventTaskModelResolver{},
-		Boards:   boardsStore,
-		Library:  ContractV1LibraryDeps{Store: libStore},
-		Events:   eventLog,
-		Webhooks: webhooks,
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets,
+		TaskRoutingGate: allowTestRouting,
+		Boards:          boardsStore,
+		Library:         ContractV1LibraryDeps{Store: libStore},
+		Events:          eventLog,
+		Webhooks:        webhooks,
 	})
 	const owner, admin, member, outsider = 1, 2, 3, 9
 	for _, id := range []int64{owner, admin, member, outsider, 4} {
@@ -255,7 +250,7 @@ func TestV1TaskCreateEmitsTaskCreatedAndBillingSettled(t *testing.T) {
 			if err := json.Unmarshal(envelope.Data, &data); err != nil {
 				t.Fatal(err)
 			}
-			if data["task_id"] != taskID || data["workflow_kind"] != "render" {
+			if data["task_id"] != taskID || data["service"] != "render" {
 				t.Fatalf("task.created data=%v", data)
 			}
 		case events.EventV1BillingSettled:

@@ -827,7 +827,7 @@ type Task struct {
 	WorkspaceID       int64              `json:"workspace_id"`
 	SubmitterUserID   int64              `json:"submitter_user_id"`
 	BillingAccountID  int64              `json:"billing_account_id"`
-	WorkflowType      string             `json:"workflow_type"`
+	Service           string             `json:"service"`
 	WorkflowInput     []byte             `json:"workflow_input"`
 	Status            string             `json:"status"`
 	Priority          int32              `json:"priority"`
@@ -857,7 +857,7 @@ type TaskBillingSettlement struct {
 type TaskBillingSnapshot struct {
 	TaskID            string             `json:"task_id"`
 	UserID            int64              `json:"user_id"`
-	FeatureSlug       string             `json:"feature_slug"`
+	Service           string             `json:"service"`
 	Sku               string             `json:"sku"`
 	PriceVersionID    int64              `json:"price_version_id"`
 	PriceVersion      int64              `json:"price_version"`
@@ -913,7 +913,7 @@ type TaskExecutionAttempt struct {
 	RiverJobID         int64              `json:"river_job_id"`
 	AttemptNo          int32              `json:"attempt_no"`
 	ExecutionToken     string             `json:"execution_token"`
-	FeatureSlug        string             `json:"feature_slug"`
+	Service            string             `json:"service"`
 	RequestedModel     string             `json:"requested_model"`
 	ResolvedModel      string             `json:"resolved_model"`
 	Provider           string             `json:"provider"`

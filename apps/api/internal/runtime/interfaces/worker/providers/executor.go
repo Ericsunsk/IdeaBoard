@@ -194,7 +194,7 @@ func (c *Executor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.
 	if err != nil {
 		return providerTaskParams{}, fmt.Errorf("parse task params: %w", err)
 	}
-	feature := strings.TrimSpace(typedParams.Feature)
+	feature := strings.TrimSpace(typedParams.Service)
 	var executionPlan *workflow.FeatureExecutionPlan
 	if workflow.IsAIImageFeature(feature) {
 		plan, decodeErr := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
@@ -202,7 +202,7 @@ func (c *Executor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.
 			return providerTaskParams{}, fmt.Errorf("decode task execution plan: %w", decodeErr)
 		}
 		if plan.Feature() != feature {
-			return providerTaskParams{}, fmt.Errorf("task execution plan feature does not match params feature")
+			return providerTaskParams{}, fmt.Errorf("task execution plan service does not match params service")
 		}
 		if validateErr := validateProviderTaskContract(typedParams, plan); validateErr != nil {
 			return providerTaskParams{}, validateErr

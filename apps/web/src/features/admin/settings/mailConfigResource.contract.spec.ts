@@ -98,7 +98,10 @@ describe('mailConfigResource', () => {
     let seen: { method: string; operatorReason: string } | undefined
     useMswHandlers(
       http.delete('/api/control/v1/platform/settings/mail', ({ request }) => {
-        seen = { method: request.method, operatorReason: request.headers.get('X-Operator-Reason') ?? '' }
+        seen = {
+          method: request.method,
+          operatorReason: request.headers.get('X-Operator-Reason') ?? '',
+        }
         return HttpResponse.json({ data: { deleted: true } })
       }),
     )

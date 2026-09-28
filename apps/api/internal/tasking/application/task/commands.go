@@ -48,7 +48,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	}
 	result, err := s.submissionStore.SubmitTask(ctx, canonical)
 	if err != nil {
-		slog.Warn("submit task transaction failed", "user_id", userID, "feature", canonical.Feature(), "err", err)
+		slog.Warn("submit task transaction failed", "user_id", userID, "service", canonical.Service(), "err", err)
 		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
 			return "", taskbilling.ErrInsufficientCredits
 		}
@@ -68,7 +68,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 }
 
 type SubmitTaskReadiness struct {
-	Feature string
+	Service string
 	Billing *taskbilling.Readiness
 }
 
@@ -82,7 +82,7 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
-	result := SubmitTaskReadiness{Feature: compilation.Feature}
+	result := SubmitTaskReadiness{Service: compilation.Service}
 	billingRequest := compilation.BillingRequest
 	if billingRequest == nil {
 		return result, nil

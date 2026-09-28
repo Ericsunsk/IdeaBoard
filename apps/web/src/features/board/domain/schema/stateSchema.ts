@@ -59,10 +59,7 @@ const imageNodeOutputItemSchema = v.strictObject({
   mediaAssetId: v.optional(positiveIntegerSchema),
 })
 
-const libraryAssetOpaqueIdSchema = v.pipe(
-  v.string(),
-  v.regex(opaqueIdPattern('lasset')),
-)
+const libraryAssetOpaqueIdSchema = v.pipe(v.string(), v.regex(opaqueIdPattern('lasset')))
 
 const libraryAssetIdSchema = libraryAssetOpaqueIdSchema
 

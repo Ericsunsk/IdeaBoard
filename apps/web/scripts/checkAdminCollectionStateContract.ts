@@ -21,9 +21,7 @@ function stripComments(source: string): string {
   // Linters must match code, not prose: a comment mentioning "cursor" (e.g.
   // documenting a blocked native-dialect migration) is not a hand-rolled
   // pagination lifecycle.
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|\s)\/\/.*$/gm, '$1')
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1')
 }
 
 async function main() {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
@@ -19,8 +18,6 @@ import (
 type configStore interface {
 	GetSummary(ctx context.Context) (GatewaySummary, error)
 	Update(ctx context.Context, input UpdateInput, actorID int64) error
-	ListModelMappings(ctx context.Context) (map[string]string, error)
-	SaveModelMapping(ctx context.Context, feature, model string, actorID int64) error
 	ListCatalog(ctx context.Context) ([]CatalogItem, error)
 	SaveCatalog(ctx context.Context, items []CatalogItem, actorID int64) error
 	DetectModels(ctx context.Context, provider string) (ModelDetection, error)
@@ -94,60 +91,6 @@ func (h *Handler) Update(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-type modelMappingResponse struct {
-	Feature string `json:"feature"`
-	Model   string `json:"model"`
-}
-
-// ListMappings returns every configured per-feature model mapping.
-func (h *Handler) ListMappings(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
-		return
-	}
-	mappings, err := h.store.ListModelMappings(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, msgListMappings, err)
-		return
-	}
-	items := make([]modelMappingResponse, 0, len(mappings))
-	for feature, model := range mappings {
-		items = append(items, modelMappingResponse{Feature: feature, Model: model})
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].Feature < items[j].Feature })
-	response.SuccessDTO(c, items)
-}
-
-type saveModelMappingRequest struct {
-	Model string `json:"model"`
-}
-
-// SaveMapping validates and persists one feature's model mapping.
-// Pricing lives in Billing and never reads this mapping: changing models
-// cannot move prices by construction. Authorization rides the outer
-// Control Plane guard; the actor is resolved from the request principal.
-func (h *Handler) SaveMapping(c *gin.Context) {
-	if h == nil || h.store == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, msgGet, nil)
-		return
-	}
-	feature := strings.TrimSpace(c.Param("feature"))
-	var req saveModelMappingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, msgUpdate)
-		return
-	}
-	identity, ok := principal.Require(c)
-	if !ok {
-		return
-	}
-	if err := h.store.SaveModelMapping(c.Request.Context(), feature, req.Model, identity.UserID()); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	response.Success(c, nil)
-}
-
 type previewGatewayRouteRequest struct {
 	ModelID      string `json:"model_id"`
 	CustomPath   string `json:"custom_path"`
@@ -195,29 +138,8 @@ func (h *Handler) TestConnection(c *gin.Context) {
 	}
 	provider, model, path := strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model), strings.TrimSpace(req.Path)
 	if provider == "" || path == "" {
-		mappings, err := h.store.ListModelMappings(c.Request.Context())
-		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, msgTestConnection, err)
-			return
-		}
-		features := make([]string, 0, len(mappings))
-		for feature := range mappings {
-			features = append(features, feature)
-		}
-		sort.Strings(features)
-		for _, feature := range features {
-			candidate := strings.TrimSpace(mappings[feature])
-			if candidate == "" {
-				continue
-			}
-			candidateProvider, candidateModel, override, splitErr := splitGatewayModel(candidate)
-			if splitErr != nil {
-				continue
-			}
-			route := workflow.ResolveRoute(candidateProvider, candidateModel, override, "")
-			provider, model, path = candidateProvider, candidateModel, route.Path
-			break
-		}
+		response.Error(c, http.StatusBadRequest, msgTestConnection)
+		return
 	}
 	result := ProbeGatewayConnection(c.Request.Context(), req.BaseURL, req.Token, provider, model, path)
 	response.SuccessDTO(c, result)

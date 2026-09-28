@@ -48,11 +48,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type atomicModelResolver struct{}
-
-func (atomicModelResolver) ResolveModel(context.Context, string) (string, error) {
-	return "openrouter/test-image-model", nil
-}
+func allowTestRouting(context.Context, string, string) error { return nil }
 
 const atomicTestChecksum = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 
@@ -339,8 +335,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	holder := &atomicHolder{credits: creditService}
 	queue := &atomicQueue{pool: pool}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue,
-		Models: atomicModelResolver{},
+		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
 }
@@ -376,7 +371,7 @@ func (e *atomicEnv) createPaidTask(t *testing.T, quantity int64) *workspacetasks
 	t.Helper()
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: e.ws, OwnerUserID: e.userID,
-		WorkflowKind: "render", Quantity: quantity, Resolution: "default",
+		Service: "render", Quantity: quantity, Resolution: "default",
 	}, "atomic-key-"+randomAtomicHex(t, 4))
 	if err != nil {
 		t.Fatalf("atomic Create: %v", err)
@@ -435,7 +430,7 @@ func TestAtomicCreateRollsBackOnEnqueueFailure(t *testing.T) {
 
 	_, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: env.ws, OwnerUserID: env.userID,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, "atomic-key-"+randomAtomicHex(t, 4))
 	if err == nil {
 		t.Fatal("Create with failing enqueue must fail")
@@ -658,7 +653,7 @@ func TestAtomicFreeTaskSettlesWithoutLedger(t *testing.T) {
 	env := openAtomicEnv(t, 0)
 	created, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: env.ws, OwnerUserID: env.userID,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, "atomic-free-"+randomAtomicHex(t, 4))
 	if err != nil {
 		t.Fatalf("free Create: %v", err)

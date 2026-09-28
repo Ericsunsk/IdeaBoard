@@ -95,15 +95,15 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		// MediaObjects stays nil in this fixture: binary reads fail closed
 		// with 503 while metadata keeps working. The production task worker
 		// has its own renderer; this HTTP fixture does not exercise it.
-		Tasks:             tasks,
-		TaskQuoter:        quoter,
-		TaskHolder:        holder,
-		TaskQueue:         queue,
-		TaskModelResolver: &eventTaskModelResolver{},
+		Tasks:      tasks,
+		TaskQuoter: quoter,
+		TaskHolder: holder,
+		TaskQueue:  queue,
 		// Production-shaped asset gate: the real adapter over the
 		// media store, so task input/output verification runs the
 		// same ready/archived/invisible mapping as production.
-		TaskAssets: &workspacemedia.TaskAssetAdapter{Store: media},
+		TaskAssets:      &workspacemedia.TaskAssetAdapter{Store: media},
+		TaskRoutingGate: allowTestRouting,
 	})
 	return &phase4Fixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, media: media, lib: lib, queue: queue}
 }
@@ -176,7 +176,7 @@ func TestPhase4SurfacesLive(t *testing.T) {
 	// TaskAssetAdapter (invisible asset ids 404 as media_not_found).
 	status, taskBody := phase4Call(t, fx, http.MethodPost,
 		ContractV1GroupPath+"/workspaces/"+ws+"/tasks",
-		`{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":["`+assetID+`"]},"params":{},"quantity":1,"resolution":"default"}}`, 1)
+		`{"data":{"service":"render","inputs":{"media_asset_ids":["`+assetID+`"]},"params":{},"quantity":1,"resolution":"default"}}`, 1)
 	if status != http.StatusAccepted {
 		t.Fatalf("create task = %d (%v), want 202", status, taskBody)
 	}
@@ -187,7 +187,7 @@ func TestPhase4SurfacesLive(t *testing.T) {
 
 	status, badTask := phase4Call(t, fx, http.MethodPost,
 		ContractV1GroupPath+"/workspaces/"+ws+"/tasks",
-		`{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":["asset_missing00000001"]},"params":{}}}`, 1)
+		`{"data":{"service":"render","inputs":{"media_asset_ids":["asset_missing00000001"]},"params":{}}}`, 1)
 	if status != http.StatusNotFound {
 		t.Fatalf("create task with invisible asset = %d (%v), want 404 media_not_found", status, badTask)
 	}
@@ -201,7 +201,7 @@ func TestPhase4SurfacesLive(t *testing.T) {
 		if get.name == "quote" {
 			status, body := phase4Call(t, fx, http.MethodPost,
 				ContractV1GroupPath+"/workspaces/"+ws+"/task-quotes",
-				`{"data":{"workflow_kind":"render","quantity":1,"resolution":"default"}}`, 1)
+				`{"data":{"service":"render","quantity":1,"resolution":"default"}}`, 1)
 			if status != http.StatusOK {
 				t.Fatalf("quote task = %d (%v), want 200", status, body)
 			}
@@ -342,7 +342,7 @@ func TestPhase4ConcurrencySanity(t *testing.T) {
 			start := time.Now()
 			_, err := fx.tasks.CreateTask(ctx, &workspacetasks.WorkspaceTask{
 				ID: fmt.Sprintf("task_load%04d", i), WorkspaceID: ws, OwnerUserID: 1,
-				WorkflowKind: "render", Status: workspacetasks.StatusPending,
+				Service: "render", Status: workspacetasks.StatusPending,
 			})
 			record(time.Since(start))
 			if err != nil {

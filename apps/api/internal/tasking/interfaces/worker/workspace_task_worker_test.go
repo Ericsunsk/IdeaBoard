@@ -24,11 +24,7 @@ import (
 // workerTestQuoter mints a fixed-price snapshot (10 credits).
 type workerTestQuoter struct{}
 
-type workspaceTestModelResolver struct{}
-
-func (workspaceTestModelResolver) ResolveModel(context.Context, string) (string, error) {
-	return "openrouter/test-image-model", nil
-}
+func allowTestRouting(context.Context, string, string) error { return nil }
 
 func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if quantity <= 0 {
@@ -126,7 +122,8 @@ func newWorkerTestEnv() *workerTestEnv {
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}}, Models: workspaceTestModelResolver{},
+		Assets:  &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
+		Routing: allowTestRouting,
 	})
 	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service}
 }
@@ -148,7 +145,7 @@ func (e *workerTestEnv) submit(t *testing.T, inputs []string) *workspacetasks.Wo
 	t.Helper()
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind: "render", MediaAssetIDs: inputs, Quantity: 1, Resolution: "default",
+		Service: "render", MediaAssetIDs: inputs, Quantity: 1, Resolution: "default",
 	}, "worker-key-"+t.Name())
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -159,7 +156,7 @@ func (e *workerTestEnv) submit(t *testing.T, inputs []string) *workspacetasks.Wo
 func workerJobFor(task *workspacetasks.WorkspaceTask) *river.Job[taskruntime.WorkspaceTaskArgs] {
 	return &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: task.ID, WorkspaceID: task.WorkspaceID,
-		WorkflowKind: task.WorkflowKind, ExecutionToken: task.ExecutionToken,
+		Service: task.Service, ExecutionToken: task.ExecutionToken,
 	}}
 }
 
@@ -419,7 +416,7 @@ func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 	}), nil)
 	if err := worker.Work(context.Background(), &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: "task_missing", WorkspaceID: "ws_test",
-		WorkflowKind: "render", ExecutionToken: "exec_missing",
+		Service: "render", ExecutionToken: "exec_missing",
 	}}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}
@@ -444,7 +441,7 @@ func TestWorkspaceTaskWorkerInvalidInputFails(t *testing.T) {
 	}
 	seeded, err := env.store.CreateTask(ctx, &workspacetasks.WorkspaceTask{
 		ID: "task_badkind", WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind: "not-a-kind", Status: workspacetasks.StatusPending, ExecutionToken: token,
+		Service: "not-a-kind", Status: workspacetasks.StatusPending, ExecutionToken: token,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -477,7 +474,7 @@ func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created, err := env.service.Create(ctx, workspacetasks.CreateInput{
-		WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "render", Quantity: 1, Resolution: "default",
 	}, "worker-media-key")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -615,7 +612,7 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 		t.Fatalf("compile canonical params: %v", err)
 	}
 	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
-		ID: "task_x", WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "generation",
+		ID: "task_x", WorkspaceID: "ws_test", OwnerUserID: 7, Service: "generation",
 		CanonicalParams: canonical,
 	})
 	if err != nil {
@@ -624,8 +621,8 @@ func TestWorkspaceBridgeTaskPayloadRequiresIdentity(t *testing.T) {
 	if legacy.TaskID != "task_x" || legacy.UserID != 7 || legacy.Prompt != "a sunset" {
 		t.Fatalf("bridged payload = %+v, want workspace facts carried over", legacy)
 	}
-	if !strings.Contains(legacy.Params, `"feature":"generation"`) {
-		t.Fatalf("bridged params = %s, want the workflow feature", legacy.Params)
+	if !strings.Contains(legacy.Params, `"service":"generation"`) {
+		t.Fatalf("bridged params = %s, want the service identity", legacy.Params)
 	}
 	typed, err := tasks.UnmarshalParams(legacy.Params)
 	if err != nil {

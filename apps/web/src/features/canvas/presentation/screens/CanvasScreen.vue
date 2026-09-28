@@ -198,11 +198,11 @@ const { openNodeImagePreview, openImageUrlPreview } = useCanvasImageLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
 const graphInteractionBrowser = createCanvasGraphInteractionBrowserAdapter()
 
-  const workspace = useCanvasWorkspaceRuntime({
+const workspace = useCanvasWorkspaceRuntime({
   route,
   router,
-    getUserIdentity,
-    getWorkspaceId: requireCanvasWorkspaceId,
+  getUserIdentity,
+  getWorkspaceId: requireCanvasWorkspaceId,
   flowPaneAdapter,
   uploadApi,
   graphEditingBrowser,

@@ -64,7 +64,7 @@ func TestCallGatewayAPIAcceptsAssetKindOutputs(t *testing.T) {
 		Prompt: "fake asset finalize",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
+			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
 

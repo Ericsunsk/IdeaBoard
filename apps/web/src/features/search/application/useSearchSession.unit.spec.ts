@@ -62,7 +62,9 @@ describe('useSearchSession', () => {
 
   it('loads the route query into the feed', async () => {
     mocks.route.query = { q: '  warm cafe  ' }
-    const session = useSearchSession({ libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }) })
+    const session = useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
     await nextTick()
 
     expect(session.query.draftQuery.value).toBe('warm cafe')
@@ -71,7 +73,9 @@ describe('useSearchSession', () => {
   })
 
   it('routes a text submission and delegates reference submissions to Vision Search', async () => {
-    const session = useSearchSession({ libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }) })
+    const session = useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
     await nextTick()
     session.query.draftQuery.value = 'product display'
 
@@ -89,7 +93,9 @@ describe('useSearchSession', () => {
   })
 
   it('clears references and reloads the empty query when the route is already clean', async () => {
-    const session = useSearchSession({ libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }) })
+    const session = useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
     await nextTick()
     session.query.draftQuery.value = 'cafe'
     session.query.submittedQuery.value = 'cafe'
@@ -104,7 +110,9 @@ describe('useSearchSession', () => {
   })
 
   it('owns batch selection and Library island commands', async () => {
-    const session = useSearchSession({ libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }) })
+    const session = useSearchSession({
+      libraryCoordinator: createSearchLibraryCoordinator({ workspaceId: 'ws_test123' }),
+    })
     await nextTick()
     const result = {
       provider: 'unsplash',

@@ -44,7 +44,10 @@ import {
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
 import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
-import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { defaultAccountTab, type AccountTab, type PaymentReturnContext } from '../../domain'
 import AccountDialogContent from './AccountDialogContent.vue'
 import { accountDialogContentClass } from '../common/ui'

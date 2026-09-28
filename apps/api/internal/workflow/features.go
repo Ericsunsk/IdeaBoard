@@ -205,7 +205,7 @@ func readFiniteNumber(value interface{}) (float64, bool) {
 }
 
 func ResolveWorkflowFeatureSlug(params map[string]interface{}) (string, error) {
-	rawFeature, ok := ReadWorkflowStringParam(params, paramkeys.Feature)
+	rawFeature, ok := ReadWorkflowStringParam(params, paramkeys.Service)
 	if !ok {
 		return "", nil
 	}

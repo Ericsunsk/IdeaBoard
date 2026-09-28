@@ -45,7 +45,9 @@ describe('Library Folder facts', () => {
   it('does not allow a pre-mutation response to overwrite refreshed facts', async () => {
     const staleRequest = deferred<WorkspaceLibraryFolder[]>()
     const currentRequest = deferred<WorkspaceLibraryFolder[]>()
-    fetchFolders.mockReturnValueOnce(staleRequest.promise).mockReturnValueOnce(currentRequest.promise)
+    fetchFolders
+      .mockReturnValueOnce(staleRequest.promise)
+      .mockReturnValueOnce(currentRequest.promise)
     const facts = createLibraryFolderFacts(fetchFolders)
 
     const stale = facts.load()

@@ -33,6 +33,7 @@ import (
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
 	statisticshttp "ideaboard/api/internal/tasking/interfaces/http/statistics"
+	workspacetasks "ideaboard/api/internal/tasking/workspacetasks"
 	tenancypg "ideaboard/api/internal/tenancy/postgres"
 
 	"github.com/gin-gonic/gin"
@@ -69,7 +70,6 @@ func newAppRouter(
 	aiGatewayHandler := aigateway.NewHandler(aiGatewayRepo)
 	aiGatewayHandler.SetObservedService(aigateway.NewObservedService(
 		aigateway.NewObservedRepository(repos.db),
-		aiGatewayRepo,
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
 
@@ -119,18 +119,15 @@ func newAppRouter(
 			// terminal Capture/Release each commit in ONE shared PG
 			// transaction via the Tx seams, compensating only for
 			// backends without them; see workspace_task_adapters.go).
-			Tasks:                 taskServices.workspaceTaskStore,
-			TaskQuoter:            taskServices.workspaceTaskQuoter,
-			TaskHolder:            taskServices.workspaceTaskHolder,
-			TaskQueue:             taskServices.workspaceTaskQueue,
-			TaskAssets:            taskServices.workspaceTaskAssets,
+			Tasks:      taskServices.workspaceTaskStore,
+			TaskQuoter: taskServices.workspaceTaskQuoter,
+			TaskHolder: taskServices.workspaceTaskHolder,
+			TaskQueue:  taskServices.workspaceTaskQueue,
+			TaskAssets: taskServices.workspaceTaskAssets,
+			// #847 fails closed before Quote/Hold until #848 supplies the
+			// authoritative Service Model Pool routing snapshot.
+			TaskRoutingGate:       workspacetasks.RejectRoutingUntilPool,
 			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
-			// The AI gateway repo doubles as the submit-time model
-			// resolver: it mints the durable plan model at submit.
-			// Unmapped features fail submission closed; gateway
-			// credentials stay request-scoped via Resolve (never
-			// persisted, never logged).
-			TaskModelResolver: aiGatewayRepo,
 			// #833: the webhook store is shared with the River delivery
 			// worker (built in task_wiring.go where the client exists),
 			// so HTTP views and the worker observe one registry.

@@ -10,7 +10,7 @@ import (
 func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 	upsampling := true
 	params := &tasks.WorkflowTaskParams{
-		Feature:  "inpaint",
+		Service:  "inpaint",
 		Controls: &tasks.GenerationControls{OutputCount: 1, PromptUpsampling: &upsampling},
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{Source: " upload-a ", Role: "original"},

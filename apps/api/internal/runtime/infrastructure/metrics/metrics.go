@@ -5,7 +5,7 @@
 // registry; tests build an isolated Set with NewSet(prometheus.NewRegistry()).
 //
 // Label values stay closed: route is the Gin route template (or "unmatched"),
-// status is the numeric HTTP status, feature is the workflow feature slug
+// status is the numeric HTTP status, service is the service slug
 // (or "probe"/"vision-search"/"unknown"), queue is the River queue name.
 // No user IDs, task IDs, URLs, or error text ever enter a label.
 package metrics
@@ -30,8 +30,8 @@ import (
 // paths.
 const UnmatchedRoute = "unmatched"
 
-// UnknownFeature labels gateway observations whose feature slug is missing.
-const UnknownFeature = "unknown"
+// UnknownService labels gateway observations whose service slug is missing.
+const UnknownService = "unknown"
 
 // DefaultRefreshInterval paces the River queue refresher: fresh enough for
 // lag alerting, cheap enough for one short SQL statement per tick.
@@ -68,12 +68,12 @@ func NewSet(reg prometheus.Registerer) *Set {
 		}, []string{"method", "route", "status"}),
 		gatewayRequests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_gateway_requests_total",
-			Help: "Cloudflare AI gateway calls by feature and final outcome (success/error).",
-		}, []string{"feature", "outcome"}),
+			Help: "Cloudflare AI gateway calls by service and final outcome (success/error).",
+		}, []string{"service", "outcome"}),
 		gatewayRetries: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ideaboard_gateway_retries_total",
-			Help: "Worker-level task requeues after retryable gateway failures, by feature.",
-		}, []string{"feature"}),
+			Help: "Worker-level task requeues after retryable gateway failures, by service.",
+		}, []string{"service"}),
 		riverQueueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "ideaboard_river_queue_depth",
 			Help: "River jobs waiting for execution (available/scheduled/retryable), by queue.",
@@ -155,12 +155,12 @@ func normalizeRoute(route string) string {
 	return route
 }
 
-// normalizeFeature keeps the feature label closed to known slugs.
-func normalizeFeature(feature string) string {
-	if trimmed := strings.TrimSpace(feature); trimmed != "" {
+// normalizeService keeps the service label closed to known slugs.
+func normalizeService(service string) string {
+	if trimmed := strings.TrimSpace(service); trimmed != "" {
 		return trimmed
 	}
-	return UnknownFeature
+	return UnknownService
 }
 
 // ObserveHTTP records one finished HTTP request. A nil Set is a no-op so
@@ -179,7 +179,7 @@ func (s *Set) ObserveHTTP(method, route string, status int, latency time.Duratio
 
 // ObserveGatewayRequest records one finished gateway call. err == nil means
 // success; any error means outcome "error".
-func (s *Set) ObserveGatewayRequest(feature string, err error) {
+func (s *Set) ObserveGatewayRequest(service string, err error) {
 	if s == nil {
 		return
 	}
@@ -187,17 +187,17 @@ func (s *Set) ObserveGatewayRequest(feature string, err error) {
 	if err != nil {
 		outcome = "error"
 	}
-	s.gatewayRequests.WithLabelValues(normalizeFeature(feature), outcome).Inc()
+	s.gatewayRequests.WithLabelValues(normalizeService(service), outcome).Inc()
 }
 
 // IncGatewayRetry records one worker-level requeue after a retryable
 // gateway failure (gateway-internal retries exhausted, whole task requeued
 // under River backoff).
-func (s *Set) IncGatewayRetry(feature string) {
+func (s *Set) IncGatewayRetry(service string) {
 	if s == nil {
 		return
 	}
-	s.gatewayRetries.WithLabelValues(normalizeFeature(feature)).Inc()
+	s.gatewayRetries.WithLabelValues(normalizeService(service)).Inc()
 }
 
 // SetRiverQueue publishes the latest River queue snapshot for one queue.

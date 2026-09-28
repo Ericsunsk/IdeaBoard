@@ -15,11 +15,11 @@
  */
 
 /**
- * Registered AI image feature slug.
+ * Registered AI image service slug. Breaking rename (#847): replaces `workflow_kind` with no compatibility alias. A request carrying only the old `workflow_kind` field fails strict decoding with 400 bad_request; a missing `service` renders 422 validation_failed on details.fields.service.
  */
-export type WorkflowKind = (typeof WorkflowKind)[keyof typeof WorkflowKind]
+export type Service = (typeof Service)[keyof typeof Service]
 
-export const WorkflowKind = {
+export const Service = {
   generation: 'generation',
   inpaint: 'inpaint',
   render: 'render',

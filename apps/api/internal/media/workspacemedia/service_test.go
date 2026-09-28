@@ -152,7 +152,7 @@ CREATE TABLE tasks (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
-  workflow_type TEXT NOT NULL,
+  service TEXT NOT NULL,
   workflow_input JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   priority INT NOT NULL DEFAULT 2,
@@ -170,7 +170,7 @@ CREATE TABLE tasks (
   CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT chk_tasks_retry_count CHECK (retry_count >= 0),
-  CONSTRAINT chk_tasks_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
   CONSTRAINT chk_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT chk_tasks_terminal_consistency CHECK (
     (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
@@ -349,7 +349,7 @@ func TestMediaServiceLifecycle(t *testing.T) {
 		t.Fatalf("seed billing account: %v", err)
 	}
 	if _, err := env.pool.Exec(ctx,
-		`INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input)
+		`INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input)
 		 VALUES ($1, (SELECT internal_id FROM workspaces WHERE public_id = $2), $3,
 		         (SELECT internal_id FROM billing_accounts WHERE public_id = 'ba_mediatest1'), 'render', '{}')`,
 		taskID, env.wsA, env.owner,

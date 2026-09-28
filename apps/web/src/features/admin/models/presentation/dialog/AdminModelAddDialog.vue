@@ -305,7 +305,10 @@ function markBrandLogoFailed(modelId: string): void {
 // 供应商下拉项
 const providerOptions = computed(() => {
   const providers = Array.from(new Set(detectedModels.value.map((m) => m.provider))).filter(Boolean)
-  return [{ label: MODELS_MESSAGES.addProviderAll, value: 'all' }, ...providers.map((p) => ({ label: p, value: p }))]
+  return [
+    { label: MODELS_MESSAGES.addProviderAll, value: 'all' },
+    ...providers.map((p) => ({ label: p, value: p })),
+  ]
 })
 
 // 过滤后的模型

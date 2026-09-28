@@ -4,13 +4,17 @@
     class="mt-3 rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 px-3 py-2.5"
   >
     <div class="mb-2 flex items-center justify-between">
-      <h4 class="text-admin-caption font-semibold text-admin-text-1">{{ MODELS_MESSAGES.observedTitle }}</h4>
+      <h4 class="text-admin-caption font-semibold text-admin-text-1">
+        {{ MODELS_MESSAGES.observedTitle }}
+      </h4>
       <span v-if="hasData" class="font-mono text-admin-micro text-admin-text-3">
         {{ MODELS_MESSAGES.observedWindow(observed!.windowDays) }}
       </span>
     </div>
 
-    <p v-if="loading" class="text-admin-caption text-admin-text-2">{{ MODELS_MESSAGES.observedLoading }}</p>
+    <p v-if="loading" class="text-admin-caption text-admin-text-2">
+      {{ MODELS_MESSAGES.observedLoading }}
+    </p>
 
     <!-- 无观测优雅缺省：静默模型 / 接口缺席一律暂无数据，不误报 -->
     <p v-else-if="!hasData" class="text-admin-caption leading-relaxed text-admin-text-3">
@@ -20,30 +24,36 @@
     <div v-else class="flex flex-col gap-1.5 text-xs">
       <div class="grid grid-cols-2 gap-1.5">
         <div class="rounded-md bg-white/70 px-2.5 py-1.5">
-          <div class="text-admin-micro text-admin-text-3">{{ MODELS_MESSAGES.observedSuccessLabel }}</div>
+          <div class="text-admin-micro text-admin-text-3">
+            {{ MODELS_MESSAGES.observedSuccessLabel }}
+          </div>
           <div class="font-semibold text-admin-text-1">
             {{ successText || MODELS_MESSAGES.referenceNoData }}
           </div>
         </div>
         <div class="rounded-md bg-white/70 px-2.5 py-1.5">
-          <div class="text-admin-micro text-admin-text-3">{{ MODELS_MESSAGES.observedCacheLabel }}</div>
+          <div class="text-admin-micro text-admin-text-3">
+            {{ MODELS_MESSAGES.observedCacheLabel }}
+          </div>
           <div class="font-semibold text-admin-text-1">
             {{ cacheHitText || MODELS_MESSAGES.referenceNoData }}
           </div>
         </div>
       </div>
 
-      <div
-        class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5"
-      >
-        <span class="shrink-0 text-admin-micro text-admin-text-3">{{ MODELS_MESSAGES.observedTopFailureLabel }}</span>
+      <div class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5">
+        <span class="shrink-0 text-admin-micro text-admin-text-3">{{
+          MODELS_MESSAGES.observedTopFailureLabel
+        }}</span>
         <span class="truncate text-right font-medium text-admin-text-1">
           {{ failureText || MODELS_MESSAGES.referenceNoData }}
         </span>
       </div>
 
       <div class="rounded-md bg-white/70 px-2.5 py-1.5">
-        <div class="mb-1 text-admin-micro text-admin-text-3">{{ MODELS_MESSAGES.observedSkuLabel }}</div>
+        <div class="mb-1 text-admin-micro text-admin-text-3">
+          {{ MODELS_MESSAGES.observedSkuLabel }}
+        </div>
         <div v-if="observed!.skuMargins.length === 0" class="font-medium text-admin-text-3">
           {{ MODELS_MESSAGES.referenceNoData }}
         </div>
@@ -57,7 +67,7 @@
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-admin-surface-muted text-admin-text-3'
             "
-            :title="margin.feature"
+            :title="margin.service"
           >
             {{ margin.displayName || margin.sku }}
             {{ MODELS_MESSAGES.observedSaleState(margin.onSale) }}
@@ -71,7 +81,9 @@
         class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5"
         :title="MODELS_MESSAGES.observedCostTitle"
       >
-        <span class="shrink-0 text-admin-micro text-admin-text-3">{{ MODELS_MESSAGES.observedCostLabel }}</span>
+        <span class="shrink-0 text-admin-micro text-admin-text-3">{{
+          MODELS_MESSAGES.observedCostLabel
+        }}</span>
         <span class="font-medium text-admin-text-3">{{ MODELS_MESSAGES.referenceNoData }}</span>
       </div>
     </div>

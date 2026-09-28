@@ -45,7 +45,11 @@ export function hydrateAdminBrandLogoOverrides(
 
 export function createAdminBrandLogoResource(queryClient: BrandLogoOverrideQueryClient) {
   return {
-    async save(_scope: AdminBrandLogoScope, _targetKey: string | number, _logoKey: AdminBrandLogoKey) {
+    async save(
+      _scope: AdminBrandLogoScope,
+      _targetKey: string | number,
+      _logoKey: AdminBrandLogoKey,
+    ) {
       await cancelBrandLogoOverrideQuery(queryClient)
       throw adminControlUnavailable('logo-upload')
     },

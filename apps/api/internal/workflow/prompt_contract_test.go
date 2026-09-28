@@ -53,7 +53,7 @@ func TestNormalizeStructuredPromptContractParamsNormalizesOutpaintContract(t *te
 func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{
-		Feature: FeatureSlugFusion,
+		Service: FeatureSlugFusion,
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
 				{AssetID: 1, Role: "input", Weight: 0.7},
@@ -87,8 +87,8 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 
 	providerParams := BuildProviderTaskParams(params, runtimeMedia)
 
-	if got := providerParams["feature"]; got != FeatureSlugFusion {
-		t.Fatalf("feature = %#v, want fusion", got)
+	if got := providerParams["service"]; got != FeatureSlugFusion {
+		t.Fatalf("service = %#v, want fusion", got)
 	}
 	if !reflect.DeepEqual(providerParams["image_urls"], []string{"https://img.example/a.png", "https://img.example/b.png"}) {
 		t.Fatalf("image_urls = %#v", providerParams["image_urls"])
@@ -114,7 +114,7 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 }
 
 func TestBuildProviderTaskParamsIncludesRuntimeOriginalInImageURLs(t *testing.T) {
-	params := &tasks.WorkflowTaskParams{Feature: FeatureSlugInpaint}
+	params := &tasks.WorkflowTaskParams{Service: FeatureSlugInpaint}
 	runtimeMedia := &tasks.RuntimeMediaInputs{
 		Original: &tasks.RuntimeMediaRef{URL: " https://img.example/original.png "},
 	}
@@ -138,7 +138,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "style variation",
 			params: &tasks.WorkflowTaskParams{
-				Feature:   FeatureSlugVariations,
+				Service:   FeatureSlugVariations,
 				Variation: &tasks.VariationsParams{Strength: 42},
 				Extra: map[string]interface{}{
 					"provider_hint":      "keep",
@@ -148,7 +148,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"feature":            FeatureSlugVariations,
+				"service":            FeatureSlugVariations,
 				"variation":          map[string]interface{}{"strength": float64(42)},
 				"variation_strength": float64(42),
 				"provider_hint":      "keep",
@@ -158,7 +158,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "image outpaint",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugOutpaint,
+				Service: FeatureSlugOutpaint,
 				Outpaint: &tasks.OutpaintParams{
 					TargetWidth:  1280,
 					TargetHeight: 768,
@@ -167,18 +167,18 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 				},
 			},
 			want: map[string]interface{}{
-				"feature":  FeatureSlugOutpaint,
+				"service":  FeatureSlugOutpaint,
 				"outpaint": map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 32, "image_offset_y": 16},
 			},
 		},
 		{
 			name: "upscale",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugUpscale,
+				Service: FeatureSlugUpscale,
 				Upscale: &tasks.UpscaleParams{Scale: 2},
 			},
 			want: map[string]interface{}{
-				"feature": FeatureSlugUpscale,
+				"service": FeatureSlugUpscale,
 				"upscale": map[string]interface{}{"scale": float64(2)},
 			},
 			wantAbsent: []string{"scale", "output_quality"},
@@ -186,14 +186,14 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "style fusion",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugFusion,
+				Service: FeatureSlugFusion,
 				Fusion: &tasks.FusionParams{
 					Mode:         "weighted_reference",
 					InputWeights: []float64{0.8, 0.2},
 				},
 			},
 			want: map[string]interface{}{
-				"feature":              FeatureSlugFusion,
+				"service":              FeatureSlugFusion,
 				"fusion":               map[string]interface{}{"mode": "weighted_reference", "input_weights": []float64{0.8, 0.2}},
 				"fusion_input_weights": []float64{0.8, 0.2},
 			},
@@ -201,11 +201,11 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "prompt generation workflow",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugGeneration,
+				Service: FeatureSlugGeneration,
 				Extra:   map[string]interface{}{"provider_hint": "keep"},
 			},
 			want: map[string]interface{}{
-				"feature":       FeatureSlugGeneration,
+				"service":       FeatureSlugGeneration,
 				"provider_hint": "keep",
 			},
 		},

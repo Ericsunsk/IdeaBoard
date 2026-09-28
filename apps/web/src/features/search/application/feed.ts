@@ -2,10 +2,7 @@ import { nextTick, ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useTimeoutFn } from '@vueuse/core'
 import { libraryAssetKey, lookupWorkspaceSavedAssetKeys } from '../../library'
 import { type SearchResult } from '../domain/models'
-import {
-  generateRandomInspirationCursor,
-  searchInspiration,
-} from '../infrastructure/resource'
+import { generateRandomInspirationCursor, searchInspiration } from '../infrastructure/resource'
 import { createBrowserSearchFeedPersistence } from '../infrastructure/feedPersistence'
 import type { SearchFeedPersistence, SearchFeedSnapshot } from '../ports/persistencePort'
 

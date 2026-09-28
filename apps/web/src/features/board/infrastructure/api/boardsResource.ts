@@ -45,9 +45,7 @@ import type { BoardState } from '../../domain'
 
 export class BoardWorkspaceUnavailableError extends Error {
   constructor() {
-    super(
-      'Board workspace is unavailable. Select a workspace before syncing boards.',
-    )
+    super('Board workspace is unavailable. Select a workspace before syncing boards.')
     this.name = 'BoardWorkspaceUnavailableError'
   }
 }

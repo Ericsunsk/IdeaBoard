@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -24,10 +23,7 @@ const (
 	maxSubmitTaskClientActionIDBytes = 128
 	maxSubmitTaskParamsBytes         = 2 * 1024 * 1024
 	maxSubmitTaskParamsDepth         = 24
-	providerUnavailableMessage       = msgPackage3
 )
-
-var errNoAvailableAPIAccount = errors.New("no available API account")
 
 // TaskIntake is the single public seam that turns an HTTP submission request
 // into the canonical Tasking request shared by Readiness and Submit.
@@ -40,7 +36,7 @@ type TaskIntake interface {
 type CanonicalTaskRequest = tasksubmission.CanonicalRequest
 
 type TaskReadinessCompilation struct {
-	Feature        string
+	Service        string
 	BillingRequest *taskbilling.Request
 }
 
@@ -48,14 +44,7 @@ type FeaturePromptStore interface {
 	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
 }
 
-// ModelStore resolves the admin-configured model for one feature.
-// Composition wires the AI gateway settings repository; tests inject fakes.
-type ModelStore interface {
-	ResolveModel(ctx context.Context, feature string) (string, error)
-}
-
 type TaskIntakeDeps struct {
-	Models         ModelStore
 	Prompts        FeaturePromptStore
 	Media          taskmedia.Validator
 	MediaReadiness taskmedia.ProcessingInputReadiness
@@ -64,7 +53,6 @@ type TaskIntakeDeps struct {
 }
 
 type taskIntake struct {
-	models         ModelStore
 	prompts        FeaturePromptStore
 	media          taskmedia.Validator
 	mediaReadiness taskmedia.ProcessingInputReadiness
@@ -74,7 +62,6 @@ type taskIntake struct {
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 	return &taskIntake{
-		models:         deps.Models,
 		prompts:        deps.Prompts,
 		media:          deps.Media,
 		mediaReadiness: deps.MediaReadiness,
@@ -91,8 +78,8 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 	for key, value := range req.Params {
 		params[key] = value
 	}
-	if req.Feature != "" {
-		params["feature"] = req.Feature
+	if req.Service != "" {
+		params["service"] = req.Service
 	}
 	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
 	if err != nil {
@@ -120,15 +107,12 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, userID int64, req *ta
 			return TaskReadinessCompilation{}, err
 		}
 	}
-	if err := i.ensureProviderAvailable(ctx, featureSlug); err != nil {
-		return TaskReadinessCompilation{}, err
-	}
 	billingRequest, err := resolveTaskBillingRequest(executionPlan)
 	if err != nil {
 		return TaskReadinessCompilation{}, err
 	}
 	return TaskReadinessCompilation{
-		Feature:        executionPlan.Feature(),
+		Service:        executionPlan.Feature(),
 		BillingRequest: billingRequest,
 	}, nil
 }
@@ -181,8 +165,8 @@ func (i *taskIntake) normalizeCompileRequest(ctx context.Context, userID int64, 
 	for key, value := range req.Params {
 		params[key] = value
 	}
-	if req.Feature != "" {
-		params["feature"] = req.Feature
+	if req.Service != "" {
+		params["service"] = req.Service
 	}
 	if len(req.ImageURLs) > 0 {
 		params["image_urls"] = req.ImageURLs
@@ -223,9 +207,6 @@ func (i *taskIntake) compileTaskExecution(ctx context.Context, userID int64, req
 		return compiledTaskExecution{}, err
 	}
 	if err := i.validateProcessingInputReadiness(ctx, userID, submitRequestAssetIDs(req)); err != nil {
-		return compiledTaskExecution{}, err
-	}
-	if err := i.ensureProviderAvailable(ctx, featureSlug); err != nil {
 		return compiledTaskExecution{}, err
 	}
 	return compiledTaskExecution{featureSlug: featureSlug, plan: executionPlan, typedParams: typedParams}, nil
@@ -388,17 +369,6 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 		return fmt.Errorf(msgValidateMediaRef)
 	}
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
-}
-
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug string) error {
-	if i == nil || i.models == nil {
-		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-	}
-	model, err := i.models.ResolveModel(ctx, featureSlug)
-	if err != nil || model == "" {
-		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
-	}
-	return nil
 }
 
 func normalizeSubmitTaskClientActionID(raw string) (string, error) {

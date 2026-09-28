@@ -92,7 +92,7 @@ func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.Gatewa
 	// validated above); empty stays empty rather than failing the call.
 	gatewayFeature := ""
 	if params.Canonical != nil {
-		gatewayFeature = strings.TrimSpace(params.Canonical.Feature)
+		gatewayFeature = strings.TrimSpace(params.Canonical.Service)
 	}
 	callResult, err := c.callGatewayAdapter(ctx, task.TaskID, gatewayFeature, route, provider, modelName, customParams, providerReq, operation)
 	providerFinishedAt := time.Now()

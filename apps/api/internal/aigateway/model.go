@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -19,80 +18,23 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-// ErrModelMappingMissing reports a feature without a configured model.
+// ErrVisionModelMissing reports a vision search model without configuration.
 // Workers fail closed on it: no silent default model exists.
-var ErrModelMappingMissing = errors.New("AI gateway model mapping is not configured for this feature")
-
-// modelMappingKeyPrefix scopes per-feature workflow model selections in settings.
-const modelMappingKeyPrefix = "ai_gateway_model_"
-
-// modelMappingKey renders the settings key for one workflow feature slug.
-func modelMappingKey(feature string) string { return modelMappingKeyPrefix + feature }
+var ErrVisionModelMissing = errors.New("AI gateway vision model mapping is not configured")
 
 // visionMappingFeature is the admin API bare key for vision search. It
-// deliberately stays out of the workflow feature contract: vision is not a
+// deliberately stays out of the service contract: vision is not a
 // submittable task, it only needs a model id from the same admin surface.
 // The bare string stays "vision" for API compatibility; storage is isolated
-// via visionMappingKey below so a future workflow slug can never collide.
+// via visionMappingKey below so a future service slug can never collide.
 const visionMappingFeature = "vision"
 
-// visionMappingKey isolates the vision-search model from workflow mappings.
-// It lives outside modelMappingKeyPrefix on purpose: workflow mappings use
-// ai_gateway_model_<slug>, vision uses ai_gateway_vision_model, so the two key
-// spaces never intersect. Fresh DB: no legacy rows exist.
+// visionMappingKey isolates the vision-search model. Fresh DB: no legacy
+// rows exist.
 const visionMappingKey = "ai_gateway_vision_model"
 
-// validateModelMapping checks an admin mapping without touching storage.
-// Model IDs stay provider-qualified (provider/model) so dialect dispatch
-// keeps working, but providers are never allowlisted here: hardcoding them
-// would break zero-code supplier onboarding. Errors are safe to display.
-func validateModelMapping(feature, model string) (string, string, error) {
-	slug := strings.ToLower(strings.TrimSpace(feature))
-	if slug != visionMappingFeature {
-		var err error
-		slug, err = workflow.ValidateWorkflowFeatureSlug(feature)
-		if err != nil {
-			return "", "", err
-		}
-	}
-	model = strings.TrimSpace(model)
-	separator := strings.IndexByte(model, '/')
-	if separator <= 0 || separator == len(model)-1 || strings.HasPrefix(model[separator+1:], "/") || strings.ContainsAny(model, " \t\n") {
-		return "", "", errors.New(msgSplitGatewayModel2)
-	}
-	if len(model) > 128 {
-		return "", "", errors.New(msgValidateModelMapping)
-	}
-	provider := strings.TrimSpace(model[:separator])
-	if provider == "" {
-		return "", "", errors.New(msgValidateModelMapping2)
-	}
-	return slug, model, nil
-}
-
-// ResolveModel returns the admin-configured model for one feature at
-// request time. Unset features fail closed.
-func (r *ConfigRepository) ResolveModel(ctx context.Context, feature string) (string, error) {
-	if r == nil || r.settings == nil {
-		return "", errors.New("AI gateway config repository is unavailable")
-	}
-	slug, err := workflow.ValidateWorkflowFeatureSlug(feature)
-	if err != nil {
-		return "", err
-	}
-	raw, err := r.settings.Get(ctx, modelMappingKey(slug))
-	if err != nil {
-		return "", fmt.Errorf("load AI gateway model mapping: %w", err)
-	}
-	if strings.TrimSpace(raw) == "" {
-		return "", ErrModelMappingMissing
-	}
-	return strings.TrimSpace(raw), nil
-}
-
 // ResolveVisionModel returns the admin-configured vision search model.
-// Storage is isolated at visionMappingKey. Unset means fail closed,
-// exactly like task mappings.
+// Storage is isolated at visionMappingKey. Unset means fail closed.
 func (r *ConfigRepository) ResolveVisionModel(ctx context.Context) (string, error) {
 	if r == nil || r.settings == nil {
 		return "", errors.New("AI gateway config repository is unavailable")
@@ -102,76 +44,9 @@ func (r *ConfigRepository) ResolveVisionModel(ctx context.Context) (string, erro
 		return "", fmt.Errorf("load AI gateway vision model mapping: %w", err)
 	}
 	if strings.TrimSpace(raw) == "" {
-		return "", ErrModelMappingMissing
+		return "", ErrVisionModelMissing
 	}
 	return strings.TrimSpace(raw), nil
-}
-
-// ListModelMappings returns every configured feature mapping for admin display.
-// API contract is unchanged (bare "vision" + workflow slugs). Storage: workflow
-// mappings come from the prefix scan, vision comes from visionMappingKey.
-func (r *ConfigRepository) ListModelMappings(ctx context.Context) (map[string]string, error) {
-	if r == nil || r.settings == nil {
-		return nil, errors.New("AI gateway config repository is unavailable")
-	}
-	values, err := r.settings.GetByPrefix(ctx, modelMappingKeyPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("load AI gateway model mappings: %w", err)
-	}
-	result := make(map[string]string, len(values)+1)
-	for key, value := range values {
-		if strings.TrimSpace(value) == "" {
-			continue
-		}
-		// 目录行与映射共享 key 前缀：后缀 "catalog" 只可能是目录本身，
-		// workflow slug 由 ValidateWorkflowFeatureSlug 把关，不可能叫这个。
-		if key == "catalog" {
-			continue
-		}
-		result[strings.TrimPrefix(key, modelMappingKeyPrefix)] = strings.TrimSpace(value)
-	}
-	visionRaw, visionErr := r.settings.Get(ctx, visionMappingKey)
-	if visionErr != nil && !database.IsNotFound(visionErr) {
-		return nil, fmt.Errorf("load AI gateway vision model mapping: %w", visionErr)
-	}
-	if strings.TrimSpace(visionRaw) != "" {
-		result[visionMappingFeature] = strings.TrimSpace(visionRaw)
-	}
-	return result, nil
-}
-
-// SaveModelMapping validates and persists one feature mapping atomically
-// with its admin audit record. Vision ("vision") writes to the isolated
-// visionMappingKey; workflow slugs write under the shared prefix. The two key
-// spaces never intersect, so cross-namespace overwrites are impossible.
-// It routes through the locked setter so concurrent mapping saves serialize
-// against catalog cascades (same advisory lock, no lost updates).
-func (r *ConfigRepository) SaveModelMapping(ctx context.Context, feature, model string, actorID int64) error {
-	if r == nil || r.settings == nil {
-		return errors.New("AI gateway config repository is unavailable")
-	}
-	if actorID <= 0 {
-		return errors.New("admin actor is required")
-	}
-	slug, normalized, err := validateModelMapping(feature, model)
-	if err != nil {
-		return err
-	}
-	metadata, err := json.Marshal(map[string]any{"operation": "save_model", "feature": slug, "model": normalized})
-	if err != nil {
-		return fmt.Errorf("encode AI gateway model audit: %w", err)
-	}
-	storageKey := modelMappingKey(slug)
-	if slug == visionMappingFeature {
-		storageKey = visionMappingKey
-	}
-	return r.settings.SetAndDeleteManyWithAdminAudit(ctx, []settings.SystemConfigValue{
-		{Key: storageKey, Value: normalized},
-	}, nil, settings.SystemConfigAdminAudit{
-		ActionType: "update_ai_gateway_model",
-		ActorID:    actorID,
-		Metadata:   metadata,
-	})
 }
 
 // RoutePreview is a read-only diagnosis of where a model identifier would
@@ -478,7 +353,7 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 			return settings.SystemConfigAdminAudit{}, fmt.Errorf("save AI gateway model catalog: %w", err)
 		}
 		if err := tx.DeleteMany(ctx, removedMappingKeys); err != nil {
-			return settings.SystemConfigAdminAudit{}, fmt.Errorf("delete stale AI gateway model mappings: %w", err)
+			return settings.SystemConfigAdminAudit{}, fmt.Errorf("delete stale AI gateway vision mapping: %w", err)
 		}
 		return settings.SystemConfigAdminAudit{
 			ActionType: "update_ai_gateway_model",
@@ -491,6 +366,8 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 // staleMappingKeysForRemovedModels returns storage keys that point at models
 // absent from the incoming catalog. Corrupt catalog JSON skips pruning so an
 // admin can replace it; database errors abort the transaction.
+// (#847: the single-value service mappings are removed, so only the isolated
+// vision key can go stale here.)
 func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemConfigWriteTx, items []CatalogItem) ([]string, error) {
 	keep := make(map[string]struct{}, len(items))
 	for _, item := range items {
@@ -517,26 +394,14 @@ func staleMappingKeysForRemovedModels(ctx context.Context, tx settings.SystemCon
 	if len(removed) == 0 {
 		return nil, nil
 	}
-	mappingValues, err := tx.GetByPrefix(ctx, modelMappingKeyPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("load current model mappings: %w", err)
-	}
-	keys := make([]string, 0, len(mappingValues)+1)
-	for _, mapping := range mappingValues {
-		if mapping.Key == catalogConfigKey || !isRemovedModel(removed, mapping.Value) {
-			continue
-		}
-		keys = append(keys, mapping.Key)
-	}
 	visionModel, err := tx.Get(ctx, visionMappingKey)
 	if err != nil && !database.IsNotFound(err) {
 		return nil, fmt.Errorf("load current vision mapping: %w", err)
 	}
 	if err == nil && isRemovedModel(removed, visionModel) {
-		keys = append(keys, visionMappingKey)
+		return []string{visionMappingKey}, nil
 	}
-	sort.Strings(keys)
-	return keys, nil
+	return nil, nil
 }
 
 func isRemovedModel(removed map[string]struct{}, model string) bool {

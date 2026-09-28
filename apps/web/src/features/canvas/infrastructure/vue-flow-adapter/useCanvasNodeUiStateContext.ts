@@ -7,9 +7,8 @@ export type CanvasNodeUiStateContext = {
   getFlowNodeUiState: CanvasNodeUiStateGetter
 }
 
-const CANVAS_NODE_UI_STATE_CONTEXT_KEY: InjectionKey<CanvasNodeUiStateContext> = Symbol(
-  'canvas:node-ui-state',
-)
+const CANVAS_NODE_UI_STATE_CONTEXT_KEY: InjectionKey<CanvasNodeUiStateContext> =
+  Symbol('canvas:node-ui-state')
 
 const defaultCanvasNodeUiStateContext: CanvasNodeUiStateContext = {
   getFlowNodeUiState: () => ({

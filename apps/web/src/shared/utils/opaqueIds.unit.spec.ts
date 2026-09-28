@@ -69,9 +69,7 @@ describe('opaqueIds', () => {
       }
     }
     expect(assertWorkspaceTaskId('task_x-y')).toBe('task_x-y')
-    expect(() => assertWorkspaceTaskId('upload_x')).toThrow(
-      'Invalid task id: expected task_...',
-    )
+    expect(() => assertWorkspaceTaskId('upload_x')).toThrow('Invalid task id: expected task_...')
     expect(assertWorkspaceTaskAssetId('asset_a-1')).toBe('asset_a-1')
     expect(assertWorkspaceAssetId('asset_a-1')).toBe('asset_a-1')
     expect(assertUploadId('upload_up-01')).toBe('upload_up-01')

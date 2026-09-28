@@ -6,7 +6,6 @@ export const billingPricingColumnWidths = {
   service: '200px',
   status: '105px',
   variant: '96px',
-  model: '200px',
   actions: '120px',
   enabled: '72px',
 } as const

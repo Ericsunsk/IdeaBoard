@@ -17,7 +17,11 @@ function sessionFixture(overrides: Record<string, unknown> = {}) {
     size_bytes: 5,
     checksum_sha256: CHECKSUM,
     media_kind: 'image',
-    upload_target: { kind: 'same-origin-slot', slot: UPLOAD_ID, expires_at: '2026-09-23T01:00:00Z' },
+    upload_target: {
+      kind: 'same-origin-slot',
+      slot: UPLOAD_ID,
+      expires_at: '2026-09-23T01:00:00Z',
+    },
     created_at: '2026-09-23T00:00:00Z',
     updated_at: '2026-09-23T00:00:00Z',
     expires_at: '2026-09-23T00:30:00Z',
@@ -52,7 +56,12 @@ function registerSuccessfulUploadHandlers() {
       HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) }),
     ),
     http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () =>
-      HttpResponse.json({ data: { upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }), asset: assetFixture() } }),
+      HttpResponse.json({
+        data: {
+          upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
+          asset: assetFixture(),
+        },
+      }),
     ),
   )
 }
@@ -149,7 +158,9 @@ describe('uploadApi', () => {
     useMswHandlers(
       http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
         return HttpResponse.json(
-          { error: { code: 'upload_too_large', message: 'Upload too large', request_id: 'req-413' } },
+          {
+            error: { code: 'upload_too_large', message: 'Upload too large', request_id: 'req-413' },
+          },
           { status: 413 },
         )
       }),
@@ -194,7 +205,13 @@ describe('uploadApi', () => {
     useMswHandlers(
       http.post('/api/v1/workspaces/:workspaceId/uploads', () => {
         return HttpResponse.json(
-          { error: { code: 'upstream_failure', message: 'Upload service unavailable', request_id: 'req-1' } },
+          {
+            error: {
+              code: 'upstream_failure',
+              message: 'Upload service unavailable',
+              request_id: 'req-1',
+            },
+          },
           { status: 503 },
         )
       }),

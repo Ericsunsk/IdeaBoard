@@ -100,7 +100,11 @@ describe('boardStateSchema', () => {
       imageNodes: [
         {
           ...makePendingImageNodeSnapshot(),
-          libraryImport: { state: 'failed', libraryAssetId: 'lasset_asset0007', failureMessage: '素材导入失败' },
+          libraryImport: {
+            state: 'failed',
+            libraryAssetId: 'lasset_asset0007',
+            failureMessage: '素材导入失败',
+          },
         },
       ],
     })

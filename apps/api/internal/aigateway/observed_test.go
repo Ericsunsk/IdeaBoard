@@ -36,12 +36,12 @@ func TestAggregateModelObservationsComputesRates(t *testing.T) {
 	since := time.Now().UTC().Add(-ObservedWindowDays * 24 * time.Hour)
 	rows := AggregateModelObservations(AttemptObservation{
 		Aggregates: []ModelAttemptAggregate{
-			{Model: "fal/flux-pro", Provider: "fal", Total: 10, Completed: 8, Failed: 2, CacheHits: 4},
+			{Model: "fal/flux-pro", Provider: "fal", Service: "generation", Total: 10, Completed: 8, Failed: 2, CacheHits: 4},
 		},
 		Failures: []ModelFailureCount{
 			{Model: "fal/flux-pro", Provider: "fal", FailureStage: "provider", FailureCategory: "timeout", Count: 2},
 		},
-	}, map[string]string{"generation": "fal/flux-pro"},
+	},
 		[]SKUCatalogCard{{SKU: "ai-image:generation", DisplayName: "Prompt to Image", OnSale: true, UnitCreditsByVariant: map[string]int64{"1k": 25}}},
 		since)
 
@@ -65,7 +65,7 @@ func TestAggregateModelObservationsComputesRates(t *testing.T) {
 		t.Fatalf("sku margins = %+v", row.SKUMargins)
 	}
 	margin := row.SKUMargins[0]
-	if margin.SKU != "ai-image:generation" || margin.Feature != "generation" || !margin.OnSale || margin.UnitCreditsByVariant["1k"] != 25 {
+	if margin.SKU != "ai-image:generation" || margin.Service != "generation" || !margin.OnSale || margin.UnitCreditsByVariant["1k"] != 25 {
 		t.Fatalf("margin charged side = %+v", margin)
 	}
 }
@@ -78,38 +78,30 @@ func TestAggregateModelObservationsTopFailureTiebreakIsDeterministic(t *testing.
 			{Model: "fal/x", Provider: "fal", FailureStage: "worker", FailureCategory: "oom", Count: 2},
 			{Model: "fal/x", Provider: "fal", FailureStage: "provider", FailureCategory: "timeout", Count: 2},
 		},
-	}, nil, nil, since)
+	}, nil, since)
 	row := findObservedRow(rows, "fal/x")
 	if row.TopFailureStage != "provider" || row.TopFailureCat != "timeout" || row.TopFailureCount != 2 {
 		t.Fatalf("top failure = %q/%q x%d, want provider/timeout x2", row.TopFailureStage, row.TopFailureCat, row.TopFailureCount)
 	}
 }
 
-func TestAggregateModelObservationsMappedButIdleModelDefaults(t *testing.T) {
+func TestAggregateModelObservationsEmptyYieldsNoRows(t *testing.T) {
+	// #847: the mapped-but-idle union is gone with the single-value mapping.
+	// Rows cover observed models only; callers render an empty window as 暂无数据.
 	since := time.Now().UTC()
-	rows := AggregateModelObservations(AttemptObservation{}, map[string]string{"generation": "fal/idle-model"},
+	rows := AggregateModelObservations(AttemptObservation{},
 		[]SKUCatalogCard{{SKU: "ai-image:generation", DisplayName: "Prompt to Image", OnSale: false, UnitCreditsByVariant: map[string]int64{}}},
 		since)
-	if len(rows) != 1 {
-		t.Fatalf("rows = %d, want 1", len(rows))
-	}
-	row := rows[0]
-	if row.HasObservations || row.SuccessRate != nil || row.CacheHitRate != nil {
-		t.Fatalf("idle row must have null rates: %+v", row)
-	}
-	if row.Provider != "fal" {
-		t.Fatalf("provider = %q, want fal from model id prefix", row.Provider)
-	}
-	if !row.HasSKUMargin || row.SKUMargins[0].OnSale {
-		t.Fatalf("idle margin = %+v, want one not-on-sale row", row.SKUMargins)
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want none without attempts", rows)
 	}
 }
 
-func TestAggregateModelObservationsObservedButUnmappedModelHasNoMargin(t *testing.T) {
+func TestAggregateModelObservationsAggregateWithoutServiceHasNoMargin(t *testing.T) {
 	since := time.Now().UTC()
 	rows := AggregateModelObservations(AttemptObservation{
 		Aggregates: []ModelAttemptAggregate{{Model: "fal/retired", Provider: "fal", Total: 3, Completed: 3}},
-	}, nil, nil, since)
+	}, nil, since)
 	row := findObservedRow(rows, "fal/retired")
 	if !row.HasObservations || row.HasSKUMargin || len(row.SKUMargins) != 0 {
 		t.Fatalf("unmapped row = %+v", row)
@@ -125,22 +117,25 @@ func TestAggregateModelObservationsObservedButUnmappedModelHasNoMargin(t *testin
 func TestAggregateModelObservationsMarginCostIsNeverFabricated(t *testing.T) {
 	since := time.Now().UTC()
 	rows := AggregateModelObservations(AttemptObservation{
-		Aggregates: []ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Total: 1, Completed: 1}},
-	}, map[string]string{"generation": "fal/flux-pro", "vision": "fal/flux-pro"},
+		Aggregates: []ModelAttemptAggregate{
+			{Model: "fal/flux-pro", Provider: "fal", Service: "generation", Total: 1, Completed: 1},
+			{Model: "fal/flux-pro", Provider: "fal", Service: "vision", Total: 1, Completed: 1},
+		},
+	},
 		[]SKUCatalogCard{
 			{SKU: "ai-image:generation", DisplayName: "Prompt to Image", OnSale: true, UnitCreditsByVariant: map[string]int64{"1k": 25}},
 			{SKU: "ai-search:vision", DisplayName: "视觉搜索", OnSale: true, UnitCreditsByVariant: map[string]int64{"default": 3}},
 		}, since)
 	row := findObservedRow(rows, "fal/flux-pro")
 	if len(row.SKUMargins) != 2 {
-		t.Fatalf("margins = %+v, want one row per mapped feature", row.SKUMargins)
+		t.Fatalf("margins = %+v, want one row per observed service", row.SKUMargins)
 	}
 	bySKU := map[string]ModelSKUMargin{}
 	for _, margin := range row.SKUMargins {
 		bySKU[margin.SKU] = margin
 	}
-	if bySKU["ai-search:vision"].Feature != "vision" {
-		t.Fatalf("vision feature must map to ai-search:vision: %+v", bySKU)
+	if bySKU["ai-search:vision"].Service != "vision" {
+		t.Fatalf("vision service must map to ai-search:vision: %+v", bySKU)
 	}
 	for sku, margin := range bySKU {
 		if margin.ActualCostCredits != nil || margin.HasActualCost || margin.MarginCredits != nil {
@@ -158,7 +153,7 @@ func TestAggregateModelObservationsRequestedModelFallback(t *testing.T) {
 	// its inputs, so this covers rows keyed by requested model only.
 	rows := AggregateModelObservations(AttemptObservation{
 		Aggregates: []ModelAttemptAggregate{{Model: "fal/requested-only", Provider: "", Total: 2, Completed: 1, Failed: 1}},
-	}, nil, nil, since)
+	}, nil, since)
 	row := findObservedRow(rows, "fal/requested-only")
 	if !row.HasObservations || row.Provider != "" {
 		t.Fatalf("row = %+v", row)
@@ -172,7 +167,7 @@ func TestAggregateModelObservationsSortsByAttemptsDesc(t *testing.T) {
 			{Model: "b-model", Provider: "fal", Total: 1, Completed: 1},
 			{Model: "a-model", Provider: "fal", Total: 5, Completed: 5},
 		},
-	}, nil, nil, since)
+	}, nil, since)
 	if len(rows) != 2 || rows[0].Model != "a-model" || rows[1].Model != "b-model" {
 		t.Fatalf("rows order = %+v", rows)
 	}
@@ -199,9 +194,8 @@ func (f *fakeSKUCatalog) ListSKUCatalog(context.Context) ([]SKUCatalogCard, erro
 func TestObservedServiceListsRows(t *testing.T) {
 	svc := NewObservedService(
 		&fakeAttemptStore{obs: AttemptObservation{
-			Aggregates: []ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Total: 2, Completed: 2}},
+			Aggregates: []ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Service: "generation", Total: 2, Completed: 2}},
 		}},
-		&fakeGatewayStore{mappings: map[string]string{"generation": "fal/flux-pro"}},
 		&fakeSKUCatalog{cards: []SKUCatalogCard{{SKU: "ai-image:generation", DisplayName: "Prompt to Image", OnSale: true, UnitCreditsByVariant: map[string]int64{"1k": 25}}}},
 	)
 	rows, err := svc.ListModelsObserved(context.Background())
@@ -216,10 +210,9 @@ func TestObservedServiceListsRows(t *testing.T) {
 func TestObservedServicePropagatesDependencyErrors(t *testing.T) {
 	want := errors.New("boom")
 	for name, svc := range map[string]*ObservedService{
-		"attempts": NewObservedService(&fakeAttemptStore{err: want}, &fakeGatewayStore{}, &fakeSKUCatalog{}),
-		"mappings": NewObservedService(&fakeAttemptStore{}, &fakeGatewayStore{saveErr: want}, &fakeSKUCatalog{}),
-		"billing":  NewObservedService(&fakeAttemptStore{}, &fakeGatewayStore{}, &fakeSKUCatalog{err: want}),
-		"nil":      NewObservedService(nil, nil, nil),
+		"attempts": NewObservedService(&fakeAttemptStore{err: want}, &fakeSKUCatalog{}),
+		"billing":  NewObservedService(&fakeAttemptStore{}, &fakeSKUCatalog{err: want}),
+		"nil":      NewObservedService(nil, nil),
 	} {
 		if _, err := svc.ListModelsObserved(context.Background()); err == nil {
 			t.Fatalf("%s: want error, got nil", name)
@@ -252,13 +245,12 @@ func TestObservedHandlerGatingAndEnvelope(t *testing.T) {
 	})
 
 	t.Run("returns envelope with rows", func(t *testing.T) {
-		handler := NewHandler(&fakeGatewayStore{mappings: map[string]string{"generation": "fal/flux-pro"}})
+		handler := NewHandler(&fakeGatewayStore{})
 		handler.SetObservedService(NewObservedService(
 			&fakeAttemptStore{obs: AttemptObservation{
-				Aggregates: []ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Total: 4, Completed: 3, Failed: 1, CacheHits: 1}},
+				Aggregates: []ModelAttemptAggregate{{Model: "fal/flux-pro", Provider: "fal", Service: "generation", Total: 4, Completed: 3, Failed: 1, CacheHits: 1}},
 				Failures:   []ModelFailureCount{{Model: "fal/flux-pro", Provider: "fal", FailureStage: "provider", FailureCategory: "timeout", Count: 1}},
 			}},
-			&fakeGatewayStore{mappings: map[string]string{"generation": "fal/flux-pro"}},
 			&fakeSKUCatalog{cards: []SKUCatalogCard{{SKU: "ai-image:generation", DisplayName: "Prompt to Image", OnSale: true, UnitCreditsByVariant: map[string]int64{"1k": 25}}}},
 		))
 		rec := serveModelsObserved(t, principal.RoleAdmin, handler)

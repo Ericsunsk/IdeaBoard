@@ -93,7 +93,7 @@ func (s *failCreateLibraryStore) ClaimMaterialization(context.Context, string, s
 func completedTriggerTask() *workspacetasks.WorkspaceTask {
 	return &workspacetasks.WorkspaceTask{
 		ID: "task_trigger_1", WorkspaceID: "ws_trigger", OwnerUserID: 9,
-		WorkflowKind: "render", Status: workspacetasks.StatusCompleted,
+		Service: "render", Status: workspacetasks.StatusCompleted,
 		OutputRefs: []workspacetasks.OutputRef{
 			{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_media_aaa", ResultIndex: 0},
 			{Kind: workspacetasks.OutputKindAsset, AssetID: "asset_media_bbb", ResultIndex: 1},
@@ -202,7 +202,7 @@ func TestTaskAutoMaterializeSkipsRemoteOutputs(t *testing.T) {
 	env := newTriggerEnv()
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_trigger_remote", WorkspaceID: "ws_trigger", OwnerUserID: 9,
-		WorkflowKind: "render", Status: workspacetasks.StatusCompleted,
+		Service: "render", Status: workspacetasks.StatusCompleted,
 		OutputRefs: []workspacetasks.OutputRef{{
 			Kind: workspacetasks.OutputKindRemote, URL: "https://cdn.example.com/r.png",
 			ChecksumSHA256: strings.Repeat("b", 64), ResultIndex: 0,

@@ -2,11 +2,11 @@ import { computed, onMounted, onScopeDispose, reactive, ref, toRef } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
-import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
+import type { Service } from '../../../shared/domain/imageServices'
 import {
-  getWorkflowFeaturePromptVariables,
-  type WorkflowFeaturePromptVariable,
-} from '../../../shared/domain/workflowFeatureRegistry'
+  getServicePromptVariables,
+  type ServicePromptVariable,
+} from '../../../shared/domain/serviceRegistry'
 import type { AdminPromptConfigFeedback } from './usePromptConfigFeedback'
 import {
   createAdminPromptConfigResource,
@@ -16,9 +16,9 @@ import {
 
 export type { FeaturePrompt } from './resource'
 export type {
-  WorkflowFeaturePromptVariable as FeaturePromptVariable,
-  WorkflowFeaturePromptVariableTone as FeaturePromptVariableTone,
-} from '../../../shared/domain/workflowFeatureRegistry'
+  ServicePromptVariable as FeaturePromptVariable,
+  ServicePromptVariableTone as FeaturePromptVariableTone,
+} from '../../../shared/domain/serviceRegistry'
 
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 
@@ -63,7 +63,9 @@ export function useAdminPromptConfigWorkspace(options: UseAdminPromptConfigWorks
 
 function isAbortError(error: unknown): boolean {
   return (
-    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') ||
+    (typeof DOMException !== 'undefined' &&
+      error instanceof DOMException &&
+      error.name === 'AbortError') ||
     (typeof error === 'object' &&
       error !== null &&
       'name' in error &&
@@ -174,8 +176,8 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return savedPromptMap[slug] || ''
   }
 
-  function getPromptVariables(slug: string): readonly WorkflowFeaturePromptVariable[] {
-    return getWorkflowFeaturePromptVariables(slug as WorkflowFeature)
+  function getPromptVariables(slug: string): readonly ServicePromptVariable[] {
+    return getServicePromptVariables(slug as Service)
   }
 
   function getDraftValidation(slug: string): PromptDraftValidation {

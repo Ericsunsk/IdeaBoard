@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../shared/domain/imageServices'
 import { featureMap, groupedFeatureGroups } from './featurePromptMeta'
 
 describe('featurePromptMeta', () => {
@@ -16,28 +16,23 @@ describe('featurePromptMeta', () => {
         key: 'image',
         title: 'Image',
         order: 10,
-        slugs: [
-          WORKFLOW_FEATURE.render,
-          WORKFLOW_FEATURE.variations,
-          WORKFLOW_FEATURE.inpaint,
-          WORKFLOW_FEATURE.outpaint,
-        ],
+        slugs: [SERVICE.render, SERVICE.variations, SERVICE.inpaint, SERVICE.outpaint],
       },
       {
         key: 'prompt',
         title: 'Prompt',
         order: 20,
-        slugs: [WORKFLOW_FEATURE.generation],
+        slugs: [SERVICE.generation],
       },
       {
         key: 'fusion',
         title: 'Fusion',
         order: 30,
-        slugs: [WORKFLOW_FEATURE.fusion],
+        slugs: [SERVICE.fusion],
       },
     ])
-    expect(featureMap[WORKFLOW_FEATURE.render]).toEqual({
-      slug: WORKFLOW_FEATURE.render,
+    expect(featureMap[SERVICE.render]).toEqual({
+      slug: SERVICE.render,
       title: 'Image · 草图成图',
       label: '草图成图',
     })

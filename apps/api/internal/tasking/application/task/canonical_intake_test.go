@@ -71,7 +71,7 @@ func TestCompileWorkspaceParamsCarriesCanonicalWorkspaceMedia(t *testing.T) {
 
 func TestCanonicalSubmitOrderingStampsPlanFactsBeforeTypedConversion(t *testing.T) {
 	t.Run("plan defaults fill omitted caller values", func(t *testing.T) {
-		params := map[string]interface{}{"feature": workflow.FeatureSlugGeneration}
+		params := map[string]interface{}{"service": workflow.FeatureSlugGeneration}
 		if err := normalizeSubmitExecutionMap(params, workflow.FeatureSlugGeneration); err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +111,7 @@ func TestCanonicalSubmitOrderingStampsPlanFactsBeforeTypedConversion(t *testing.
 
 	t.Run("caller output values flow through plan into typed params", func(t *testing.T) {
 		params := map[string]interface{}{
-			"feature":           workflow.FeatureSlugGeneration,
+			"service":           workflow.FeatureSlugGeneration,
 			"output_count":      3,
 			"output_resolution": "2k",
 		}
@@ -135,7 +135,7 @@ func TestCanonicalSubmitOrderingStampsPlanFactsBeforeTypedConversion(t *testing.
 	})
 }
 
-func TestCanonicalSubmitOrderingStripsModelAndStampsFeature(t *testing.T) {
+func TestCanonicalSubmitOrderingStripsModelAndStampsService(t *testing.T) {
 	params := map[string]interface{}{
 		"model":             "gpt-image-1",
 		"provider_specific": "keep-me",
@@ -143,8 +143,8 @@ func TestCanonicalSubmitOrderingStripsModelAndStampsFeature(t *testing.T) {
 	if err := normalizeSubmitExecutionMap(params, workflow.FeatureSlugRender); err != nil {
 		t.Fatal(err)
 	}
-	if params["feature"] != workflow.FeatureSlugRender {
-		t.Fatalf("feature=%v, want stamped render", params["feature"])
+	if params["service"] != workflow.FeatureSlugRender {
+		t.Fatalf("service=%v, want stamped render", params["service"])
 	}
 	if _, exists := params["model"]; exists {
 		t.Fatalf("model survived stage 1: %#v", params)
@@ -156,8 +156,8 @@ func TestCanonicalSubmitOrderingStripsModelAndStampsFeature(t *testing.T) {
 	if _, exists := typed.Extra["model"]; exists {
 		t.Fatalf("model leaked into typed extra: %#v", typed.Extra)
 	}
-	if _, exists := typed.Extra["feature"]; exists {
-		t.Fatalf("feature leaked into typed extra: %#v", typed.Extra)
+	if _, exists := typed.Extra["service"]; exists {
+		t.Fatalf("service leaked into typed extra: %#v", typed.Extra)
 	}
 	if got := typed.Extra["provider_specific"]; got != "keep-me" {
 		t.Fatalf("provider_specific=%v, want keep-me", got)
@@ -166,7 +166,7 @@ func TestCanonicalSubmitOrderingStripsModelAndStampsFeature(t *testing.T) {
 
 func TestCanonicalSubmitOrderingNormalizesFusionBeforeMediaWeights(t *testing.T) {
 	params := map[string]interface{}{
-		"feature":    workflow.FeatureSlugFusion,
+		"service":    workflow.FeatureSlugFusion,
 		"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
 		"fusion": map[string]interface{}{
 			"input_weights": []interface{}{3.0, 1.0},
@@ -281,12 +281,11 @@ func TestCanonicalReadinessOrderingDoesNotStampPlanFacts(t *testing.T) {
 
 func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugRender,
+		Service:        workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "ordering-e2e",
 		Params: map[string]interface{}{

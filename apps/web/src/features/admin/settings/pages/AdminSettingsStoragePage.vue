@@ -7,14 +7,16 @@
     <section :aria-label="SETTINGS_MESSAGES.uploadSectionAria" class="flex flex-col gap-2">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
-          <h3 class="text-admin-title font-bold text-admin-title-color">{{ SETTINGS_MESSAGES.uploadTitle }}</h3>
-          <span class="text-admin-meta text-admin-subtitle-color"
-            >{{ SETTINGS_MESSAGES.uploadSubtitle }}</span
-          >
+          <h3 class="text-admin-title font-bold text-admin-title-color">
+            {{ SETTINGS_MESSAGES.uploadTitle }}
+          </h3>
+          <span class="text-admin-meta text-admin-subtitle-color">{{
+            SETTINGS_MESSAGES.uploadSubtitle
+          }}</span>
         </div>
-        <span class="text-admin-meta text-admin-text-3"
-          >{{ SETTINGS_MESSAGES.paramCount(settingRows.length) }}</span
-        >
+        <span class="text-admin-meta text-admin-text-3">{{
+          SETTINGS_MESSAGES.paramCount(settingRows.length)
+        }}</span>
       </div>
 
       <div :class="adminTableCardClass">
@@ -34,7 +36,11 @@
           </template>
 
           <!-- 配置项列 -->
-          <AdminColumn field="title" :header="SETTINGS_MESSAGES.itemColumn" :style="{ width: '280px', minWidth: '220px' }">
+          <AdminColumn
+            field="title"
+            :header="SETTINGS_MESSAGES.itemColumn"
+            :style="{ width: '280px', minWidth: '220px' }"
+          >
             <template #body="{ data }">
               <AdminItemCell
                 :icon="data.icon"
@@ -45,7 +51,11 @@
           </AdminColumn>
 
           <!-- 参数键名列 -->
-          <AdminColumn field="key" :header="SETTINGS_MESSAGES.keyColumn" :style="{ width: '220px', minWidth: '180px' }">
+          <AdminColumn
+            field="key"
+            :header="SETTINGS_MESSAGES.keyColumn"
+            :style="{ width: '220px', minWidth: '180px' }"
+          >
             <template #body="{ data }">
               <span
                 class="inline-block rounded border border-admin-border-soft bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2"
@@ -101,16 +111,26 @@
                   class="w-24 font-mono text-admin-body text-center"
                   :aria-label="SETTINGS_MESSAGES.concurrentLimitAria"
                 />
-                <span class="text-admin-body text-admin-text-3 select-none">{{ SETTINGS_MESSAGES.tasksUnit }}</span>
+                <span class="text-admin-body text-admin-text-3 select-none">{{
+                  SETTINGS_MESSAGES.tasksUnit
+                }}</span>
               </div>
             </template>
           </AdminColumn>
 
           <!-- 状态列 -->
-          <AdminColumn field="status" :header="SETTINGS_MESSAGES.statusColumn" :style="{ width: '120px' }">
+          <AdminColumn
+            field="status"
+            :header="SETTINGS_MESSAGES.statusColumn"
+            :style="{ width: '120px' }"
+          >
             <template #body>
               <AdminBadge
-                :value="mediaUploadIsDirty ? SETTINGS_MESSAGES.modifiedStatus : SETTINGS_MESSAGES.activeStatus"
+                :value="
+                  mediaUploadIsDirty
+                    ? SETTINGS_MESSAGES.modifiedStatus
+                    : SETTINGS_MESSAGES.activeStatus
+                "
                 :severity="mediaUploadIsDirty ? 'warn' : 'success'"
                 rounded
               />
@@ -118,7 +138,10 @@
           </AdminColumn>
 
           <!-- 操作列 -->
-          <AdminColumn :header="SETTINGS_MESSAGES.actionsColumn" :style="{ width: '160px', minWidth: '150px' }">
+          <AdminColumn
+            :header="SETTINGS_MESSAGES.actionsColumn"
+            :style="{ width: '160px', minWidth: '150px' }"
+          >
             <template #body>
               <div class="flex items-center gap-2">
                 <AdminButton

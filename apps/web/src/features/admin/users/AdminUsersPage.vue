@@ -31,7 +31,11 @@
         <Settings class="size-4 text-admin-text-2" />
       </AdminButton>
 
-      <AdminFilterPopover :active="hasUserFilter" :filter-label="USERS_MESSAGES.filterUsers" @reset="resetUserFilters">
+      <AdminFilterPopover
+        :active="hasUserFilter"
+        :filter-label="USERS_MESSAGES.filterUsers"
+        @reset="resetUserFilters"
+      >
         <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
           <span>{{ USERS_MESSAGES.role }}</span>
           <AdminSelect
@@ -80,7 +84,11 @@
       </template>
 
       <!-- 用户列：头像 + 姓名 -->
-      <AdminColumn field="displayName" :header="USERS_MESSAGES.userColumn" :style="{ minWidth: '240px' }">
+      <AdminColumn
+        field="displayName"
+        :header="USERS_MESSAGES.userColumn"
+        :style="{ minWidth: '240px' }"
+      >
         <template #body="{ data: user }">
           <div class="flex items-center gap-2.5 font-sans">
             <div class="relative shrink-0">
@@ -170,7 +178,11 @@
       </AdminColumn>
 
       <!-- 加入时间列：等宽字体日期 -->
-      <AdminColumn field="createdDateLabel" :header="USERS_MESSAGES.joinedAtColumn" :style="{ width: '130px' }">
+      <AdminColumn
+        field="createdDateLabel"
+        :header="USERS_MESSAGES.joinedAtColumn"
+        :style="{ width: '130px' }"
+      >
         <template #body="{ data: user }">
           <span class="whitespace-nowrap font-mono text-xs text-admin-text-1">
             {{ user.createdDateLabel }}
@@ -186,7 +198,11 @@
       </AdminColumn>
 
       <!-- 账户余额列：可交互打开钱包详情 -->
-      <AdminColumn field="availableCredits" :header="USERS_MESSAGES.balanceColumn" :style="{ width: '140px' }">
+      <AdminColumn
+        field="availableCredits"
+        :header="USERS_MESSAGES.balanceColumn"
+        :style="{ width: '140px' }"
+      >
         <template #body="{ data: user }">
           <button
             type="button"

@@ -93,10 +93,7 @@ export type AdminStorageResource = {
     id: string,
     options: StorageProfileMutationOptions,
   ) => Promise<StorageProfileCommandResult>
-  testProfile: (
-    id: string,
-    options: StorageProfileMutationOptions,
-  ) => Promise<{ message: string }>
+  testProfile: (id: string, options: StorageProfileMutationOptions) => Promise<{ message: string }>
   deleteProfile: (
     id: string,
     options: StorageProfileMutationOptions,
@@ -163,19 +160,19 @@ async function saveAdminStorageProfile(
     body,
     '保存存储配置失败',
   )
-    // The legacy `?apply=true` save-and-apply rides the query string, which
-    // the generated Control functions do not expose; apply explicitly with
-    // the same reason instead of inventing a second command API.
-    if (input.apply) {
-      return applyAdminStorageProfileRecord(saved.profile.id, {
-        operatorReason,
-        idempotencyKey: newRequestId(),
-      })
-    }
-    return {
-      message: saved.message,
-      profile: normalizeGeneratedProfile(saved.profile),
-    }
+  // The legacy `?apply=true` save-and-apply rides the query string, which
+  // the generated Control functions do not expose; apply explicitly with
+  // the same reason instead of inventing a second command API.
+  if (input.apply) {
+    return applyAdminStorageProfileRecord(saved.profile.id, {
+      operatorReason,
+      idempotencyKey: newRequestId(),
+    })
+  }
+  return {
+    message: saved.message,
+    profile: normalizeGeneratedProfile(saved.profile),
+  }
 }
 
 async function applyAdminStorageProfileRecord(
@@ -195,10 +192,10 @@ async function applyAdminStorageProfileRecord(
     body,
     '设为当前失败',
   )
-    return {
-      message: applied.message,
-      profile: normalizeGeneratedProfile(applied.profile),
-    }
+  return {
+    message: applied.message,
+    profile: normalizeGeneratedProfile(applied.profile),
+  }
 }
 
 async function testAdminStorageProfileRecord(

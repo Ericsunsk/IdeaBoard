@@ -43,7 +43,7 @@
 import { computed, ref } from 'vue'
 import { NodePromptComposer } from '../../../presentation/nodes/primitives'
 import { OUTPAINT_DRAG_ANCHORS, type OutpaintDragAnchor } from '../useImageOutpaintOverlay'
-import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../../../shared/domain/imageServices'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildOutpaintReadinessRequest } from '../../execution/commands/imageTaskRequests'
 import { i18n } from '../../../../../shared/i18n'
@@ -65,7 +65,7 @@ const promptDraft = ref('')
 const anchors = OUTPAINT_DRAG_ANCHORS
 const outpaintPromptPlaceholder = i18n.global.t('canvas.tools.outpaintPromptPlaceholder')
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.outpaint,
+  () => SERVICE.outpaint,
   () => true,
   () => buildOutpaintReadinessRequest(),
 )

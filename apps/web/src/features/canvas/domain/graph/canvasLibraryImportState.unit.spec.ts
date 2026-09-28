@@ -32,7 +32,12 @@ describe('CanvasLibraryImportState', () => {
     const materialized = materializeLibraryImport(
       retried,
       LIBRARY_ASSET_ID,
-      { mediaAssetId: 'asset_media0042', url: 'https://app.example/media/42', width: 400, height: 200 },
+      {
+        mediaAssetId: 'asset_media0042',
+        url: 'https://app.example/media/42',
+        width: 400,
+        height: 200,
+      },
       1,
     )!
 

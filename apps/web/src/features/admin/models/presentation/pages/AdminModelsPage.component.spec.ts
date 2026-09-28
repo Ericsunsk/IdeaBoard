@@ -23,9 +23,7 @@ vi.mock('../../../shared/composables/useAdminConfirm', () => ({
 // spec pins the fail-closed contract. Everything else rides the real
 // resource over MSW control handlers.
 vi.mock('../../infrastructure/adminGatewayResource', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('../../infrastructure/adminGatewayResource')
-  >()
+  const actual = await importOriginal<typeof import('../../infrastructure/adminGatewayResource')>()
   return {
     ...actual,
     createAdminGatewayResource: () => {

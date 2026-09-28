@@ -181,7 +181,7 @@ func seedUsageLoadTaskSnapshots(
 	}
 	if _, err := db.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  task_id, user_id, service, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT

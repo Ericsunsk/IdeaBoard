@@ -15,17 +15,17 @@
  */
 import type { CreateWorkspaceTaskRequestDataInputs } from './createWorkspaceTaskRequestDataInputs'
 import type { CreateWorkspaceTaskRequestDataParams } from './createWorkspaceTaskRequestDataParams'
-import type { WorkflowKind } from './workflowKind'
+import type { Service } from './service'
 
 export type CreateWorkspaceTaskRequestData = {
-  workflow_kind: WorkflowKind
+  service: Service
   inputs?: CreateWorkspaceTaskRequestDataInputs
   /**
    * Free-text prompt (max 8KB bytes). Required for generation and inpaint, optional for render/variations/fusion/outpaint, ignored for cutout/upscale. Covered by the idempotency hash: same key with a different prompt renders 409 task_idempotency_conflict, never a silent replay.
    * @maxLength 8192
    */
   prompt?: string
-  /** Feature params object (unknown fields rejected; no storage URLs; params.prompt still renders 422 unknown_field). */
+  /** Service params object (unknown fields rejected; no storage URLs; params.prompt still renders 422 unknown_field). */
   params?: CreateWorkspaceTaskRequestDataParams
   /** @minimum 1 */
   quantity?: number

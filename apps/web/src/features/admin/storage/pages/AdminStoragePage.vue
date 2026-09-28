@@ -22,7 +22,11 @@
 
         <!-- 右侧：刷新同步与新增操作 -->
         <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton :loading="loading" :aria-label="STORAGE_MESSAGES.refresh" @click="refreshData" />
+          <AdminRefreshButton
+            :loading="loading"
+            :aria-label="STORAGE_MESSAGES.refresh"
+            @click="refreshData"
+          />
 
           <AdminButton
             :class="adminActionButtonClass"
@@ -226,7 +230,9 @@ function buildConfiguredRow(
     vendorIcon: card.vendorIcon,
     avatarLabel: card.avatarLabel,
     isCurrent: isCur,
-    statusText: isCur ? STORAGE_MESSAGES.current : (card.statusText as '使用中' | '已配置' | '未配置'),
+    statusText: isCur
+      ? STORAGE_MESSAGES.current
+      : (card.statusText as '使用中' | '已配置' | '未配置'),
     statusType: isCur ? 'current' : isConf ? 'configured' : 'unconfigured',
     bucket: getBucketDisplay(card),
     endpoint: getEndpointDisplay(card),

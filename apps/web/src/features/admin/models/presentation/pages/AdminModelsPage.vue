@@ -86,9 +86,9 @@
       <!-- 次级统计提示条：我们找到了 X 个模型 (Cloudflare 1:1 原生文案与布局) -->
       <div class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1"
-            >{{ MODELS_MESSAGES.foundCount(filteredModels.length) }}</span
-          >
+          <span class="font-medium text-admin-text-1">{{
+            MODELS_MESSAGES.foundCount(filteredModels.length)
+          }}</span>
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
             {{ MODELS_MESSAGES.totalCount(allModels.length) }}
           </span>
@@ -181,7 +181,11 @@
         <Search v-else class="size-6" />
       </div>
       <h3 class="text-base font-semibold text-admin-title-color">
-        {{ !hasActiveFilter && allModels.length === 0 ? MODELS_MESSAGES.emptyLibrary : MODELS_MESSAGES.emptyNoMatch }}
+        {{
+          !hasActiveFilter && allModels.length === 0
+            ? MODELS_MESSAGES.emptyLibrary
+            : MODELS_MESSAGES.emptyNoMatch
+        }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{

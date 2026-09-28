@@ -112,8 +112,7 @@ export function useFusionBlendControl({
   function bindBlendDragListeners() {
     cleanupBlendDragListeners()
     const ownerWindow =
-      stageRef.value?.ownerDocument.defaultView ??
-      (typeof window === 'undefined' ? null : window)
+      stageRef.value?.ownerDocument.defaultView ?? (typeof window === 'undefined' ? null : window)
     if (!ownerWindow) return
     dragWindow = ownerWindow
     ownerWindow.addEventListener('pointermove', onBlendPointerMove, true)

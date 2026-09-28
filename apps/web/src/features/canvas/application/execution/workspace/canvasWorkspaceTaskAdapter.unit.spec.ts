@@ -53,7 +53,7 @@ function taskItem(overrides: Record<string, unknown> = {}) {
   return {
     id: 'task_aaa111',
     workspace_id: WORKSPACE_ID,
-    workflow_kind: 'upscale',
+    service: 'upscale',
     status: 'completed',
     retry_count: 0,
     billing_snapshot: {
@@ -86,11 +86,11 @@ function expectUnmappable(run: () => unknown, reason: string): CanvasWorkspaceTa
 }
 
 describe('toWorkspaceCreateInput', () => {
-  it('maps workflow kind, opaque media refs, params, quantity, and resolution', () => {
+  it('maps service, opaque media refs, params, quantity, and resolution', () => {
     expect(
       toWorkspaceCreateInput({
         prompt: '   ',
-        feature: 'upscale',
+        service: 'upscale',
         client_action_id: 'canvas:act-1',
         priority: 1,
         media_asset_ids: ['asset_aaa1', 'asset_aaa1', ' asset_bbb2 '],
@@ -101,7 +101,7 @@ describe('toWorkspaceCreateInput', () => {
         },
       }),
     ).toEqual({
-      workflow_kind: 'upscale',
+      service: 'upscale',
       media_asset_ids: ['asset_aaa1', 'asset_bbb2'],
       params: {
         output_count: 2,
@@ -113,54 +113,56 @@ describe('toWorkspaceCreateInput', () => {
     })
   })
 
-  it('maps non-empty prompts onto data.prompt for prompt-carrying features', () => {
-    expect(
-      toWorkspaceCreateInput({ prompt: '  a cat  ', feature: 'generation' }).prompt,
-    ).toBe('a cat')
+  it('maps non-empty prompts onto data.prompt for prompt-carrying services', () => {
+    expect(toWorkspaceCreateInput({ prompt: '  a cat  ', service: 'generation' }).prompt).toBe(
+      'a cat',
+    )
     expect(
       toWorkspaceCreateInput({
         prompt: 'redraw the area',
-        feature: 'inpaint',
+        service: 'inpaint',
         media_asset_ids: ['asset_aaa1'],
         params: { mask_asset_id: 'asset_mask1', use_mask: true },
       }),
     ).toMatchObject({
-      workflow_kind: 'inpaint',
+      service: 'inpaint',
       prompt: 'redraw the area',
       media_asset_ids: ['asset_aaa1'],
       params: { mask_asset_id: 'asset_mask1', use_mask: true },
     })
   })
 
-  it('mirrors the backend prompt policy per workflow (required/optional/ignored)', () => {
+  it('mirrors the backend prompt policy per service (required/optional/ignored)', () => {
     // Required (generation, inpaint) and optional (render, variations,
     // fusion, outpaint) carry user text; blank prompts ride as absent so
     // the server 422 stays authoritative for required-policy empties.
-    for (const feature of ['generation', 'inpaint', 'render', 'variations', 'fusion', 'outpaint']) {
-      expect(toWorkspaceCreateInput({ prompt: 'keep me', feature }).prompt).toBe('keep me')
-      expect(toWorkspaceCreateInput({ prompt: '   ', feature })).not.toHaveProperty('prompt')
+    for (const service of ['generation', 'inpaint', 'render', 'variations', 'fusion', 'outpaint']) {
+      expect(toWorkspaceCreateInput({ prompt: 'keep me', service }).prompt).toBe('keep me')
+      expect(toWorkspaceCreateInput({ prompt: '   ', service })).not.toHaveProperty('prompt')
     }
     // Ignored (cutout, upscale) never send user text, even when non-blank.
-    for (const feature of ['cutout', 'upscale']) {
-      expect(toWorkspaceCreateInput({ prompt: 'drop me', feature })).not.toHaveProperty('prompt')
+    for (const service of ['cutout', 'upscale']) {
+      expect(toWorkspaceCreateInput({ prompt: 'drop me', service })).not.toHaveProperty('prompt')
     }
   })
 
   it('fails closed on over-8KB-byte prompts with byte (not char) length', () => {
-    expect(toWorkspaceCreateInput({ prompt: 'a'.repeat(8192), feature: 'generation' }).prompt).toHaveLength(8192)
+    expect(
+      toWorkspaceCreateInput({ prompt: 'a'.repeat(8192), service: 'generation' }).prompt,
+    ).toHaveLength(8192)
     // Multibyte text counts bytes: 5000 e-acutes are 10000 bytes.
     expectUnmappable(
-      () => toWorkspaceCreateInput({ prompt: 'é'.repeat(5000), feature: 'generation' }),
+      () => toWorkspaceCreateInput({ prompt: 'é'.repeat(5000), service: 'generation' }),
       'prompt',
     )
     expectUnmappable(
-      () => toWorkspaceCreateInput({ prompt: `x${'y'.repeat(8192)}`, feature: 'render' }),
+      () => toWorkspaceCreateInput({ prompt: `x${'y'.repeat(8192)}`, service: 'render' }),
       'prompt',
     )
   })
 
-  it('fails closed on unknown features', () => {
-    expectUnmappable(() => toWorkspaceCreateInput({ prompt: '', feature: 'teleport' }), 'feature')
+  it('fails closed on unknown services', () => {
+    expectUnmappable(() => toWorkspaceCreateInput({ prompt: '', service: 'teleport' }), 'service')
   })
 
   it('fails closed on image URLs and numeric asset ids', () => {
@@ -168,20 +170,20 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: '',
-          feature: 'generation',
+          service: 'generation',
           image_urls: ['https://cdn.example/a.png'],
         }),
       'media-urls',
     )
     expectUnmappable(
-      () => toWorkspaceCreateInput({ prompt: '', feature: 'generation', image_asset_ids: [12] }),
+      () => toWorkspaceCreateInput({ prompt: '', service: 'generation', image_asset_ids: [12] }),
       'media-ids',
     )
     expectUnmappable(
       () =>
         toWorkspaceCreateInput({
           prompt: '',
-          feature: 'generation',
+          service: 'generation',
           reference_image_asset_ids: [7],
         }),
       'media-ids',
@@ -193,7 +195,7 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: '',
-          feature: 'inpaint',
+          service: 'inpaint',
           params: { mask_image_url: 'data:image/png;base64,AAA', use_mask: true },
         }),
       'media-urls',
@@ -201,7 +203,7 @@ describe('toWorkspaceCreateInput', () => {
     try {
       toWorkspaceCreateInput({
         prompt: '',
-        feature: 'inpaint',
+        service: 'inpaint',
         params: { mask_image_url: 'data:image/png;base64,AAA', use_mask: true },
       })
       expect.unreachable()
@@ -215,7 +217,7 @@ describe('toWorkspaceCreateInput', () => {
     expect(
       toWorkspaceCreateInput({
         prompt: 'redraw',
-        feature: 'inpaint',
+        service: 'inpaint',
         params: { mask_asset_id: ' asset_mask1 ', use_mask: true },
       }).params,
     ).toMatchObject({ mask_asset_id: 'asset_mask1', use_mask: true })
@@ -224,7 +226,7 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: 'redraw',
-          feature: 'inpaint',
+          service: 'inpaint',
           params: { mask_asset_id: 'data:image/png;base64,AAA' },
         }),
       'media-urls',
@@ -234,7 +236,7 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: 'redraw',
-          feature: 'inpaint',
+          service: 'inpaint',
           params: { mask_asset_id: 'not-an-id' },
         }),
       'media-ids',
@@ -243,17 +245,17 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: 'redraw',
-          feature: 'inpaint',
+          service: 'inpaint',
           params: { mask_asset_id: '42' },
         }),
       'media-ids',
     )
     // Mask policy (inpaint-only) stays server-side: a well-shaped mask id
-    // on another feature threads through instead of failing closed here.
+    // on another service threads through instead of failing closed here.
     expect(
       toWorkspaceCreateInput({
         prompt: '',
-        feature: 'render',
+        service: 'render',
         params: { mask_asset_id: 'asset_mask1' },
       }).params,
     ).toMatchObject({ mask_asset_id: 'asset_mask1' })
@@ -261,14 +263,14 @@ describe('toWorkspaceCreateInput', () => {
 
   it('fails closed on unknown params and storage URLs instead of a backend 422', () => {
     expectUnmappable(
-      () => toWorkspaceCreateInput({ prompt: '', feature: 'render', params: { prompt: 'hi' } }),
+      () => toWorkspaceCreateInput({ prompt: '', service: 'render', params: { prompt: 'hi' } }),
       'params',
     )
     expectUnmappable(
       () =>
         toWorkspaceCreateInput({
           prompt: '',
-          feature: 'render',
+          service: 'render',
           params: { fusion: { mode: 'weighted_reference', note: 's3://bucket/x' } },
         }),
       'params',
@@ -280,7 +282,7 @@ describe('toWorkspaceCreateInput', () => {
       () =>
         toWorkspaceCreateInput({
           prompt: '',
-          feature: 'render',
+          service: 'render',
           media_asset_ids: ['not-an-id'],
         }),
       'media-ids',
@@ -293,12 +295,12 @@ describe('quote mapping', () => {
     expect(
       toWorkspaceQuoteInput({
         prompt: 'a cat (never sent)',
-        feature: 'generation',
+        service: 'generation',
         image_urls: ['https://cdn.example/a.png'],
         media_asset_ids: ['asset_aaa1'],
         params: { output_count: 3, output_resolution: '1k' },
       }),
-    ).toEqual({ workflow_kind: 'generation', quantity: 3, resolution: '1k' })
+    ).toEqual({ service: 'generation', quantity: 3, resolution: '1k' })
   })
 
   it('maps a snapshot to readiness with inferred sufficiency', () => {
@@ -315,7 +317,7 @@ describe('quote mapping', () => {
       ),
     ).toEqual({
       ready: true,
-      feature: 'generation',
+      service: 'generation',
       billing: {
         sufficient: true,
         unit_credits: 6,
@@ -343,7 +345,7 @@ describe('canvas workspace task transport', () => {
     await expect(
       submitCanvasWorkspaceTask({
         prompt: 'a cat',
-        feature: 'generation',
+        service: 'generation',
         client_action_id: 'canvas:act-2',
         params: { output_count: 1, output_resolution: '1k' },
       }),
@@ -352,7 +354,7 @@ describe('canvas workspace task transport', () => {
     expect(mocks.createWorkspaceTask).toHaveBeenCalledWith(
       WORKSPACE_ID,
       {
-        workflow_kind: 'generation',
+        service: 'generation',
         prompt: 'a cat',
         params: { output_count: 1, output_resolution: '1k' },
         quantity: 1,
@@ -371,12 +373,12 @@ describe('canvas workspace task transport', () => {
 
     await submitCanvasWorkspaceTask({
       prompt: 'a cat',
-      feature: 'generation',
+      service: 'generation',
       client_action_id: 'canvas:act-3',
     })
     await submitCanvasWorkspaceTask({
       prompt: 'a dog',
-      feature: 'generation',
+      service: 'generation',
       client_action_id: 'canvas:act-3',
     })
 
@@ -394,7 +396,7 @@ describe('canvas workspace task transport', () => {
     await expect(
       submitCanvasWorkspaceTask({
         prompt: '',
-        feature: 'upscale',
+        service: 'upscale',
         client_action_id: 'canvas:act-1',
         media_asset_ids: ['asset_aaa1'],
         params: { upscale: { scale: 2 } },
@@ -404,7 +406,7 @@ describe('canvas workspace task transport', () => {
     expect(mocks.createWorkspaceTask).toHaveBeenCalledWith(
       WORKSPACE_ID,
       {
-        workflow_kind: 'upscale',
+        service: 'upscale',
         media_asset_ids: ['asset_aaa1'],
         params: { upscale: { scale: 2 } },
       },
@@ -416,7 +418,7 @@ describe('canvas workspace task transport', () => {
     mocks.selectedId.value = null
 
     await expect(
-      submitCanvasWorkspaceTask({ prompt: '', feature: 'upscale' }),
+      submitCanvasWorkspaceTask({ prompt: '', service: 'upscale' }),
     ).rejects.toMatchObject({
       name: 'CanvasWorkspaceUnavailableError',
       message: CANVAS_WORKSPACE_REQUIRED_MESSAGE,
@@ -429,15 +431,32 @@ describe('canvas workspace task transport', () => {
       Object.assign(new Error('Idea不足'), { status: 402, code: 'task_insufficient_credits' }),
     )
     await expect(
-      fetchCanvasWorkspaceTaskReadiness({ prompt: '', feature: 'generation' }),
+      fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
     ).rejects.toMatchObject({ name: 'CanvasBillingPreflightError', kind: 'insufficient-credits' })
 
     mocks.quoteWorkspaceTask.mockRejectedValueOnce(
       Object.assign(new Error('bad kind'), { status: 422, code: 'validation_failed' }),
     )
     await expect(
-      fetchCanvasWorkspaceTaskReadiness({ prompt: '', feature: 'generation' }),
-    ).resolves.toMatchObject({ ready: false, feature: 'generation' })
+      fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
+    ).resolves.toMatchObject({ ready: false, service: 'generation' })
+  })
+
+  it('preserves the unavailable resolution code from quote readiness', async () => {
+    mocks.quoteWorkspaceTask.mockRejectedValueOnce(
+      Object.assign(new Error('unavailable'), {
+        status: 422,
+        code: 'service_resolution_unavailable',
+      }),
+    )
+    await expect(
+      fetchCanvasWorkspaceTaskReadiness({ prompt: '', service: 'generation' }),
+    ).resolves.toMatchObject({
+      ready: false,
+      service: 'generation',
+      error_code: 'service_resolution_unavailable',
+      message: 'This resolution is unavailable right now.',
+    })
   })
 
   it('threads an optional caller signal to the quote transport', async () => {
@@ -451,13 +470,13 @@ describe('canvas workspace task transport', () => {
     const controller = new AbortController()
 
     await fetchCanvasWorkspaceTaskReadiness(
-      { prompt: '', feature: 'generation' },
+      { prompt: '', service: 'generation' },
       { signal: controller.signal },
     )
 
     expect(mocks.quoteWorkspaceTask).toHaveBeenCalledWith(
       WORKSPACE_ID,
-      expect.objectContaining({ workflow_kind: 'generation' }),
+      expect.objectContaining({ service: 'generation' }),
       { signal: controller.signal },
     )
   })
@@ -480,13 +499,13 @@ describe('canvas workspace task transport', () => {
       })
 
     const items = await fetchCanvasWorkspaceTaskReadinessMatrix([
-      { prompt: '', feature: 'generation', params: { output_count: 1 } },
-      { prompt: '', feature: 'cutout', params: { output_count: 1 } },
+      { prompt: '', service: 'generation', params: { output_count: 1 } },
+      { prompt: '', service: 'cutout', params: { output_count: 1 } },
     ])
 
     expect(items).toHaveLength(2)
-    expect(items[0]).toMatchObject({ ready: true, feature: 'generation' })
-    expect(items[1]).toMatchObject({ ready: true, feature: 'cutout' })
+    expect(items[0]).toMatchObject({ ready: true, service: 'generation' })
+    expect(items[1]).toMatchObject({ ready: true, service: 'cutout' })
     expect(mocks.quoteWorkspaceTask).toHaveBeenCalledTimes(2)
     await expect(fetchCanvasWorkspaceTaskReadinessMatrix([])).resolves.toEqual([])
   })
@@ -565,7 +584,9 @@ describe('waitCanvasWorkspaceTaskImageResults', () => {
   })
 
   it('throws terminal failures and propagates 404', async () => {
-    mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'failed', error_msg: '上游超时' }))
+    mocks.getWorkspaceTask.mockResolvedValueOnce(
+      taskItem({ status: 'failed', error_msg: '上游超时' }),
+    )
     await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toThrow('上游超时')
 
     mocks.getWorkspaceTask.mockRejectedValueOnce(
@@ -621,9 +642,7 @@ describe('waitCanvasWorkspaceTaskImageResults', () => {
 
   it('maps waiter aborts to the timeout pending kind', async () => {
     mocks.getWorkspaceTask.mockResolvedValueOnce(taskItem({ status: 'running' }))
-    mocks.waitWorkspaceTaskTerminal.mockRejectedValueOnce(
-      new Error('Workspace task wait aborted'),
-    )
+    mocks.waitWorkspaceTaskTerminal.mockRejectedValueOnce(new Error('Workspace task wait aborted'))
     await expect(waitCanvasWorkspaceTaskImageResults('task_aaa111')).rejects.toMatchObject({
       name: 'TaskResultPendingError',
       kind: 'timeout',

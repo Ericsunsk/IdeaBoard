@@ -129,10 +129,8 @@ export default {
     restore: 'Restaurar',
     restoringArchivedBoard: 'Restaurando…',
     boardRestoredSuccess: 'Lienzo restaurado.',
-    boardRestoreFailedError:
-      'No se pudo restaurar el lienzo. Inténtelo de nuevo más tarde.',
-    boardArchivedRenameBlocked:
-      'Este lienzo está archivado. Restáurelo antes de renombrarlo.',
+    boardRestoreFailedError: 'No se pudo restaurar el lienzo. Inténtelo de nuevo más tarde.',
+    boardArchivedRenameBlocked: 'Este lienzo está archivado. Restáurelo antes de renombrarlo.',
   },
   viewport: {
     zoomIn: 'Acercar',

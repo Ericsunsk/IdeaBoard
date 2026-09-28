@@ -75,7 +75,11 @@ describe('rewardsResource', () => {
 
     const controller = new AbortController()
     await expect(
-      fetchRewardRedemptions(WORKSPACE_ID, { cursor: 'cursor-prev', page_size: 20 }, controller.signal),
+      fetchRewardRedemptions(
+        WORKSPACE_ID,
+        { cursor: 'cursor-prev', page_size: 20 },
+        controller.signal,
+      ),
     ).resolves.toMatchObject({
       redemptions: [{ id: 7, reward_code_display_name: '夏日灵感奖励' }],
       next_cursor: 'cursor-next',

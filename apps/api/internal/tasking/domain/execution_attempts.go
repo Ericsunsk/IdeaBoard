@@ -11,7 +11,7 @@ type ExecutionAttemptStart struct {
 	TaskID         string
 	RiverJobID     int64
 	ExecutionToken string
-	FeatureSlug    string
+	Service        string
 	RequestedModel string
 	Provider       string
 	StartedAt      time.Time

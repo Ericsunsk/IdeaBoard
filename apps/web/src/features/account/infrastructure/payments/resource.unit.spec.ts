@@ -40,10 +40,7 @@ describe('paymentsResource checkout', () => {
       },
     })
 
-    const session = await paymentsResource.createCheckout(
-      WORKSPACE_ID,
-      checkoutRequest(),
-    )
+    const session = await paymentsResource.createCheckout(WORKSPACE_ID, checkoutRequest())
 
     expect(session).toMatchObject({
       checkout_url: 'https://pay.example/checkout',
@@ -158,7 +155,9 @@ describe('paymentsResource checkout', () => {
       `/v1/workspaces/${WORKSPACE_ID}/pending-orders/tok-1/continue`,
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'Idempotency-Key': expect.stringMatching(/^billing:pending-continue:/) }),
+        headers: expect.objectContaining({
+          'Idempotency-Key': expect.stringMatching(/^billing:pending-continue:/),
+        }),
       }),
     )
 
@@ -169,7 +168,9 @@ describe('paymentsResource checkout', () => {
       `/v1/workspaces/${WORKSPACE_ID}/pending-orders/tok-1/abandon`,
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'Idempotency-Key': expect.stringMatching(/^billing:pending-abandon:/) }),
+        headers: expect.objectContaining({
+          'Idempotency-Key': expect.stringMatching(/^billing:pending-abandon:/),
+        }),
       }),
     )
   })

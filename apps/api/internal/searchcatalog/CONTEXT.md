@@ -12,7 +12,7 @@ SearchCatalog is the image-search context with two subdomains: web image search 
 | FailureCategory | Test failure class `credentials` / `quota_or_permission` / `network_timeout` / `response_format` / `unknown` |
 | VisionExtraction | Normalized vision understanding result (query text) |
 | VisionInput | Validated vision request: up to 4 images (10MB each and total, format triple-checked) plus free text |
-| Vision Model | Vision-only model mapping, isolated from workflow mappings under the bare key `vision` |
+| Vision Model | Vision-only model mapping, isolated from Service Model Pool routing under the bare key `vision` |
 | Vision Billing | Per-call vision billing (SKU `ai-search:vision`; callers reuse one idempotency key across retries; hold/capture via credits) |
 
 ## Public Seams
@@ -29,7 +29,7 @@ SearchCatalog is the image-search context with two subdomains: web image search 
 - Vision input/output text is whitespace-normalized; empty or over-`MaxSearchQueryRunes` queries are rejected.
 - Oversize vision images (count, single, total, format) fail closed; extra user selections are never silently dropped.
 - Vision billing requires an idempotency key; same key with a different body conflicts instead of double-charging.
-- Web-search and vision model-mapping key spaces are isolated: workflow mappings live under `ai_gateway_model_<slug>`, vision under `ai_gateway_vision_model`; `vision` is never registered as a workflow feature (see `workflow.ReservedVisionSlug`, locked by test).
+- Vision mapping is isolated under `ai_gateway_vision_model`; Service Model Pool routing owns image-task model selection, and `vision` is never registered as an image service (see `workflow.ReservedVisionSlug`, locked by test).
 
 ## Non-goals
 

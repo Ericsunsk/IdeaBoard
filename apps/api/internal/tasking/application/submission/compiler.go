@@ -68,7 +68,7 @@ func validateGenerationPrompts(input *GenerationCompilerInput) error {
 func newGenerationSnapshot(input GenerationCompilerInput) tasks.GenerationRequestSnapshot {
 	return tasks.GenerationRequestSnapshot{
 		SchemaVersion:        tasks.CurrentParamsSchemaVersion,
-		Feature:              input.Plan.Feature(),
+		Service:              input.Plan.Feature(),
 		Primitive:            string(input.Plan.RuntimeInputs().GenerationPrimitive()),
 		UserPrompt:           input.UserPrompt,
 		SystemPrompt:         input.SystemPrompt,

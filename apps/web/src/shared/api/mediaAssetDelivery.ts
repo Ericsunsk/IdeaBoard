@@ -250,23 +250,19 @@ function mapDeliveryVariantStatus(value: unknown, field: string): MediaAssetDeli
   throw new Error(`Invalid media asset payload: ${field}`)
 }
 
-function toDeliveryVariant(
-  tier: string,
-  variant: unknown,
-): MediaAssetDeliveryVariant | null {
+function toDeliveryVariant(tier: string, variant: unknown): MediaAssetDeliveryVariant | null {
   if (!variant || typeof variant !== 'object') return null
   const record = variant as { status?: unknown; url?: unknown }
-  const url =
-    typeof record.url === 'string' && record.url.trim() ? record.url.trim() : undefined
+  const url = typeof record.url === 'string' && record.url.trim() ? record.url.trim() : undefined
   return {
     status: mapDeliveryVariantStatus(record.status, `derivatives.${tier}`),
     ...(url == null ? {} : { url }),
   }
 }
 
-function toDeliveryDerivatives(
-  derivatives: MediaAsset['derivatives'],
-): { [key: string]: MediaAssetDeliveryVariant } {
+function toDeliveryDerivatives(derivatives: MediaAsset['derivatives']): {
+  [key: string]: MediaAssetDeliveryVariant
+} {
   const mapped: { [key: string]: MediaAssetDeliveryVariant } = {}
   for (const [tier, variant] of Object.entries(derivatives ?? {})) {
     const delivery = toDeliveryVariant(tier, variant)
@@ -601,9 +597,7 @@ export function useMediaAssetDelivery(
       if (currentAssetId === null || !enabled) return
 
       try {
-        releaseWorkspaceSubscription = ensureWorkspaceMediaInvalidation(
-          requireMediaWorkspaceId(),
-        )
+        releaseWorkspaceSubscription = ensureWorkspaceMediaInvalidation(requireMediaWorkspaceId())
       } catch {
         status.value = 'error'
         error.value = new MediaWorkspaceUnavailableError()

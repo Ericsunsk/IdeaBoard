@@ -33,9 +33,9 @@ export function usePagePagination(options: AdminPagePaginationOptions) {
       if (totalRecords === undefined) return
 
       const nextTotalPages = Math.max(
-  1,
-  Math.ceil(totalRecords / normalizePageSize(rawPageSize, 1, Number.POSITIVE_INFINITY)),
-)
+        1,
+        Math.ceil(totalRecords / normalizePageSize(rawPageSize, 1, Number.POSITIVE_INFINITY)),
+      )
       totalPages.value = nextTotalPages
       if (options.currentPage.value > nextTotalPages) {
         options.currentPage.value = nextTotalPages

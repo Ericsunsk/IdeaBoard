@@ -151,7 +151,10 @@ import { useI18n } from 'vue-i18n'
 import { Check, Plus, Search, Xmark } from '@iconoir/vue'
 import { libraryAssetKey, resolveLibraryAssetCardURL } from '../domain/validators'
 import type { LibraryAssetView } from '../domain/transfer'
-import { toCanvasLibraryImportDescriptor, type CanvasLibraryImportDescriptor } from '../domain/transfer'
+import {
+  toCanvasLibraryImportDescriptor,
+  type CanvasLibraryImportDescriptor,
+} from '../domain/transfer'
 
 const props = defineProps<{
   assets: LibraryAssetView[]

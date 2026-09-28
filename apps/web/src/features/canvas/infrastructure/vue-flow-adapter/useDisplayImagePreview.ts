@@ -102,10 +102,7 @@ function runNextPreviewTask() {
   }
 }
 
-function enqueuePreviewTask<T>(
-  taskFactory: () => Promise<T>,
-  signal?: AbortSignal,
-): Promise<T> {
+function enqueuePreviewTask<T>(taskFactory: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'))
   return new Promise<T>((resolve, reject) => {
     const cleanup = () => signal?.removeEventListener('abort', handleAbort)
@@ -255,10 +252,7 @@ async function getOrCreatePreviewUrl(
   const inFlight = inFlightPreviewTasks.get(cacheKey)
   if (inFlight) return inFlight
 
-  const task = enqueuePreviewTask(
-    () => createPreviewObjectUrl(sourceUrl, maxSide, signal),
-    signal,
-  )
+  const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide, signal), signal)
     .then((previewUrl) => {
       if (previewUrl) touchCache(cacheKey, previewUrl)
       return previewUrl

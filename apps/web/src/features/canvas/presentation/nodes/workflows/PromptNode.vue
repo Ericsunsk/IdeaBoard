@@ -91,7 +91,7 @@ import NodeStageFrame from '../primitives/NodeStageFrame.vue'
 import PromptTextComposer from '../primitives/PromptTextComposer.vue'
 import { useImageInputSlots } from '../primitives/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../board'
-import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../../../shared/domain/imageServices'
 import { useCanvasBillingQuote } from '../../../application/execution'
 import { buildGenerationTaskRequest } from '../../../application/execution/commands/imageTaskRequests.ts'
 
@@ -132,7 +132,7 @@ const maxInputImages = 4
 const outputCount = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.generation,
+  () => SERVICE.generation,
   () => props.active,
   () =>
     buildGenerationTaskRequest({

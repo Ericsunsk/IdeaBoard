@@ -6,14 +6,26 @@
 
     <template v-else>
       <div :class="adminSummaryGridClass">
-        <AdminSummaryCard :label="STATISTICS_MESSAGES.todayCalls" :value="todayCalls" :footer="todayCallsFoot" />
-        <AdminSummaryCard :label="STATISTICS_MESSAGES.todayFailed" :value="todayFailed" :footer="todayFailedFoot" />
+        <AdminSummaryCard
+          :label="STATISTICS_MESSAGES.todayCalls"
+          :value="todayCalls"
+          :footer="todayCallsFoot"
+        />
+        <AdminSummaryCard
+          :label="STATISTICS_MESSAGES.todayFailed"
+          :value="todayFailed"
+          :footer="todayFailedFoot"
+        />
         <AdminSummaryCard
           :label="STATISTICS_MESSAGES.todaySuccessRate"
           :value="todaySuccessRate"
           :footer="todaySuccessRateFoot"
         />
-        <AdminSummaryCard :label="STATISTICS_MESSAGES.monthCalls" :value="monthCalls" :footer="monthCallsFoot" />
+        <AdminSummaryCard
+          :label="STATISTICS_MESSAGES.monthCalls"
+          :value="monthCalls"
+          :footer="monthCallsFoot"
+        />
       </div>
 
       <div :class="adminChartGridClass">
@@ -53,7 +65,11 @@
           :show-chart="isChartReady"
         />
 
-        <AdminChartCard :title="STATISTICS_MESSAGES.bottleneckTitle" chart-size="compact" span-class="xl:col-span-4">
+        <AdminChartCard
+          :title="STATISTICS_MESSAGES.bottleneckTitle"
+          chart-size="compact"
+          span-class="xl:col-span-4"
+        >
           <ChartRenderer
             v-if="isChartReady"
             type="polarArea"

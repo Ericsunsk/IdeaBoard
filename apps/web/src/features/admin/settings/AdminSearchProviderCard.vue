@@ -137,10 +137,7 @@ import AdminButton from '../shared/components/AdminButton.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-} from '../shared/lib/confirmSettingsSave'
+import { ADMIN_PROBE_OPERATOR_REASON, confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import SettingEditorCard from './SettingEditorCard.vue'
@@ -292,7 +289,10 @@ async function setEnabled(enabled: boolean) {
     emit('change')
     feedback.toggled(providerLabel.value, enabled)
   } catch (err) {
-    operationError.value = formatAdminDisplayError(err, SETTINGS_MESSAGES.searchToggleFailed(enabled))
+    operationError.value = formatAdminDisplayError(
+      err,
+      SETTINGS_MESSAGES.searchToggleFailed(enabled),
+    )
   } finally {
     saving.value = false
   }

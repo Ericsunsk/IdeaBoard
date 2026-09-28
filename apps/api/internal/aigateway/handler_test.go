@@ -22,17 +22,9 @@ type fakeGatewayStore struct {
 	actors   []int64
 	getErr   error
 	setErr   error
-	mappings map[string]string
-	saved    []savedMapping
 	saveErr  error
 	catalog  []CatalogItem
 	detected []DetectedModel
-}
-
-type savedMapping struct {
-	feature string
-	model   string
-	actor   int64
 }
 
 func (f *fakeGatewayStore) GetSummary(context.Context) (GatewaySummary, error) {
@@ -43,29 +35,6 @@ func (f *fakeGatewayStore) Update(_ context.Context, input UpdateInput, actorID 
 	f.updated = append(f.updated, input)
 	f.actors = append(f.actors, actorID)
 	return f.setErr
-}
-
-func (f *fakeGatewayStore) ListModelMappings(context.Context) (map[string]string, error) {
-	if f.saveErr != nil {
-		return nil, f.saveErr
-	}
-	out := make(map[string]string, len(f.mappings))
-	for feature, model := range f.mappings {
-		out[feature] = model
-	}
-	return out, nil
-}
-
-func (f *fakeGatewayStore) SaveModelMapping(_ context.Context, feature, model string, actorID int64) error {
-	if f.saveErr != nil {
-		return f.saveErr
-	}
-	if f.mappings == nil {
-		f.mappings = map[string]string{}
-	}
-	f.mappings[feature] = model
-	f.saved = append(f.saved, savedMapping{feature: feature, model: model, actor: actorID})
-	return nil
 }
 
 func (f *fakeGatewayStore) ListCatalog(context.Context) ([]CatalogItem, error) {
@@ -178,44 +147,6 @@ func TestGatewayHandlerUpdate(t *testing.T) {
 		router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-		}
-	})
-}
-
-func TestGatewayHandlerMappings(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("lists mappings", func(t *testing.T) {
-		store := &fakeGatewayStore{mappings: map[string]string{"generation": "openai/gpt-image-1"}}
-		router := gin.New()
-		router.GET("/settings/ai-gateway/models", NewHandler(store).ListMappings)
-
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/settings/ai-gateway/models", nil))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-		}
-		if !strings.Contains(rec.Body.String(), "openai/gpt-image-1") {
-			t.Fatalf("body = %s, want mapping", rec.Body.String())
-		}
-	})
-
-	t.Run("save forwards actor and mapping", func(t *testing.T) {
-		store := &fakeGatewayStore{}
-		router := gin.New()
-		router.PUT("/settings/ai-gateway/models/:feature", func(c *gin.Context) {
-			testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-			NewHandler(store).SaveMapping(c)
-		})
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPut, "/settings/ai-gateway/models/generation", strings.NewReader(`{"model":"openai/gpt-image-1"}`))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
-		}
-		if len(store.saved) != 1 || store.saved[0].actor != 9 || store.saved[0].model != "openai/gpt-image-1" {
-			t.Fatalf("store calls = %+v", store.saved)
 		}
 	})
 }
@@ -447,7 +378,10 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 	})
 
 	t.Run("unreachable host reports failure", func(t *testing.T) {
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9"}`)
+		// #847: provider/path are required (the mapping fallback is
+		// removed); the probe itself still reports transport failure as
+		// reachable:false with HTTP 200.
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9","provider":"openai","model":"gpt-4o","path":"v1/models"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}
@@ -456,8 +390,15 @@ func TestGatewayHandlerTestConnection(t *testing.T) {
 		}
 	})
 
+	t.Run("missing provider or path is rejected", func(t *testing.T) {
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"http://127.0.0.1:9"}`)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+	})
+
 	t.Run("non-http URL is rejected", func(t *testing.T) {
-		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"ftp://example.com/x"}`)
+		rec := serveTest(t, principal.RoleAdmin, `{"base_url":"ftp://example.com/x","provider":"openai","model":"gpt-4o","path":"v1/models"}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 		}

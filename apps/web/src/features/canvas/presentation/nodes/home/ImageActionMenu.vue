@@ -59,11 +59,7 @@
 <script setup lang="ts">
 import { computed, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  WORKFLOW_FEATURE_SLUGS,
-  WORKFLOW_FEATURE,
-  type WorkflowFeature,
-} from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE_SLUGS, SERVICE, type Service } from '../../../../../shared/domain/imageServices'
 import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 import {
   getImageActionMenuItems,
@@ -106,11 +102,9 @@ const billingStore = useCanvasBillingReadinessStore()
 const actionMenuMotion = createPopoverMotionTransition()
 const outputResolution = computed(() => props.outputResolution ?? '1k')
 
-function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
-  if (item.action === IMAGE_NODE_ACTION.inpaint) return WORKFLOW_FEATURE.inpaint
-  return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
-    ? (item.action as WorkflowFeature)
-    : null
+function resolveItemBillingService(item: ImageActionMenuItem): Service | null {
+  if (item.action === IMAGE_NODE_ACTION.inpaint) return SERVICE.inpaint
+  return SERVICE_SLUGS.includes(item.action as Service) ? (item.action as Service) : null
 }
 
 function buildItemReadinessRequest(item: ImageActionMenuItem) {
@@ -130,12 +124,12 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
 function refreshBillingQuotes() {
   if (!billingStore) return
   const entries: Array<{
-    feature: WorkflowFeature
+    service: Service
     request: NonNullable<ReturnType<typeof buildItemReadinessRequest>>
   }> = actionMenuItems.value.flatMap((item) => {
-    const feature = resolveItemBillingFeature(item)
+    const service = resolveItemBillingService(item)
     const request = buildItemReadinessRequest(item)
-    return feature && request ? [{ feature, request }] : []
+    return service && request ? [{ service, request }] : []
   })
   if (entries.length === 0) return
   void billingStore.ensureMatrix(entries)
@@ -144,9 +138,9 @@ function refreshBillingQuotes() {
 watch([() => props.outputCount, outputResolution], refreshBillingQuotes, { immediate: true })
 
 function getItemBillingState(item: ImageActionMenuItem) {
-  const feature = resolveItemBillingFeature(item)
-  return feature && billingStore
-    ? billingStore.getFeatureState(feature, buildItemReadinessRequest(item))
+  const service = resolveItemBillingService(item)
+  return service && billingStore
+    ? billingStore.getServiceState(service, buildItemReadinessRequest(item))
     : null
 }
 

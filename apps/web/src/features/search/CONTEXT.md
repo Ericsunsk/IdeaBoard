@@ -1,18 +1,21 @@
 # Search Context
+
 Search owns the public image-text Feed, paid image-based search, Library bridging, anonymous conversion gate, and post-login continuation.
 It does NOT own the Library gallery, Canvas, or auth overlay UI.
 
 ## Domain Language
-| Term | Meaning |
-| ---- | ------- |
-| Search Feed | Feed fact owner in `application/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
-| Submitted Query | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher. |
-| Vision Reference | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted. |
-| Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed. |
-| Auth Continuation | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`. |
-| Scope | Storage isolation key `userPublicID ?? anonymous`; post-login scope switch migrates only vision references and disposes the old scope. |
+
+| Term                         | Meaning                                                                                                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search Feed                  | Feed fact owner in `application/createSearchFeed`: `results`, `nextCursor`, `hasMore`, `loading`, `loadingMore`, `hasError`, `savedKeys`, `failedImages`; stale requests cancelled in order via `AbortController` + `generation`. |
+| Submitted Query              | `route.query.q`, the single source of truth for search; `useSearchSession` drives `feed.load(true)` through an `immediate` watcher.                                                                                               |
+| Vision Reference             | Image-search input reference: library asset ID or external reference plus optional `File`/`blob` preview; only the serializable part is persisted.                                                                                |
+| Library Bridge / Coordinator | Pure mapping between Feed and Library (`SearchResult`/`LibraryAssetView` <-> `VisionReference`) plus pub/sub that writes saved state back to the feed.                                                                            |
+| Auth Continuation            | Pending intent resumed after login for anonymous actions (search, save, open Library); `vision-search` intent stays memory-only, others may use `sessionStorage`.                                                                 |
+| Scope                        | Storage isolation key `userPublicID ?? anonymous`; post-login scope switch migrates only vision references and disposes the old scope.                                                                                            |
 
 ## Public Seams
+
 - `features/search/index.ts` unified public export: exports domain models (`SearchResult`, `SearchPage`) and intent-continuation API (`clearPendingSearchAuthAction`).
 - `ports/` (feature-root hexagonal seam): `libraryCoordinatorPort` + `persistencePort` are the only application↔infrastructure contracts; application and infrastructure never import each other directly.
 - `SearchPage` the only route page (`meta.public`); pure assembly, lazy-loaded by `workspaceRoutes` via `useSearchScreenRuntime`.
@@ -25,6 +28,7 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 - `infrastructure/browserPersistence` scope-isolated `sessionStorage` primitives via `searchScopedStorageKey(:scope)`; `anonymous-query-gate` dedups by query with a cap of 5.
 
 ## Invariants
+
 - `?q` is the single source of truth: draft is input-box only, submit writes the URL via `router.replace`, feed reacts only to the URL.
 - Never use `useQuery` for feed or server-derived state; `savedKeys` manual backfill must carry `savedMutationRevision` against stale overwrites.
 - Never cache the feed with `useQuery`; never leave pagination uncancelled.
@@ -45,6 +49,7 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 - `hold`/`capture` is never shown on the search side; it only enters the admin ledger.
 
 ## Non-goals
+
 - No gallery ownership; no Canvas editing.
 - No second fetcher or hand-edited generated wrappers.
 - No persisted `blob:` URLs or oversized reference sets.

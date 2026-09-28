@@ -3,7 +3,9 @@
     <!-- 顶栏：左侧标题与状态切换，右侧刷新（与用户管理页/订单页同源） -->
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div class="text-base font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.queueTitle }}</div>
+        <div class="text-base font-bold text-admin-title-color">
+          {{ CREDIT_HEALTH_MESSAGES.queueTitle }}
+        </div>
         <div
           class="inline-flex items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-0.5"
           role="group"
@@ -88,12 +90,19 @@
           <AdminEmptyState :title="emptyTitle" />
         </template>
 
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueSummaryColumn" :style="{ minWidth: '260px' }">
+        <AdminColumn
+          :header="CREDIT_HEALTH_MESSAGES.queueSummaryColumn"
+          :style="{ minWidth: '260px' }"
+        >
           <template #body="{ data }">
             <button
               type="button"
               class="group block max-w-[34rem] rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent cursor-pointer"
-              :aria-label="CREDIT_HEALTH_MESSAGES.queueViewDiagnosis(getFindingTypePresentation(data.finding_type).title)"
+              :aria-label="
+                CREDIT_HEALTH_MESSAGES.queueViewDiagnosis(
+                  getFindingTypePresentation(data.finding_type).title,
+                )
+              "
               @click="openFinding(data)"
             >
               <span
@@ -108,7 +117,10 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueSubjectColumn" :style="{ width: '28%', minWidth: '190px' }">
+        <AdminColumn
+          :header="CREDIT_HEALTH_MESSAGES.queueSubjectColumn"
+          :style="{ width: '28%', minWidth: '190px' }"
+        >
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col gap-1">
               <span v-if="data.wallet_public_id" class="text-xs font-semibold text-admin-text-1">
@@ -124,7 +136,10 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueRiskColumn" :style="{ width: '18%', minWidth: '140px' }">
+        <AdminColumn
+          :header="CREDIT_HEALTH_MESSAGES.queueRiskColumn"
+          :style="{ width: '18%', minWidth: '140px' }"
+        >
           <template #body="{ data }">
             <AdminBadge
               :value="getFindingRiskPresentation(data).label"
@@ -135,7 +150,10 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.queueLastSeenColumn" :style="{ width: '18%', minWidth: '170px' }">
+        <AdminColumn
+          :header="CREDIT_HEALTH_MESSAGES.queueLastSeenColumn"
+          :style="{ width: '18%', minWidth: '170px' }"
+        >
           <template #body="{ data }">
             <span class="whitespace-nowrap font-mono text-xs text-admin-text-3">
               {{ formatAdminDateTimeWithSeconds(data.last_seen_at) }}
@@ -149,7 +167,11 @@
               <button
                 type="button"
                 :class="adminTableRowActionButtonClass"
-                :aria-label="CREDIT_HEALTH_MESSAGES.queueViewDiagnosisDetail(getFindingTypePresentation(data.finding_type).title)"
+                :aria-label="
+                  CREDIT_HEALTH_MESSAGES.queueViewDiagnosisDetail(
+                    getFindingTypePresentation(data.finding_type).title,
+                  )
+                "
                 @click="openFinding(data)"
               >
                 <Eye class="size-4" />
@@ -221,31 +243,41 @@
               class="grid gap-x-5 gap-y-4 border-y border-admin-border-soft py-5 sm:grid-cols-2"
             >
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}
+                </div>
                 <div class="mt-1 break-all text-admin-body font-[680] text-admin-text-1">
                   {{ selectedFinding.subject_type }} · {{ selectedFinding.subject_id }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerOccurrences }}</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.queueDrawerOccurrences }}
+                </div>
                 <div class="mt-1 font-mono text-admin-body font-[680] text-admin-text-1">
                   {{ selectedFinding.occurrence_count }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerFirstSeen }}</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.queueDrawerFirstSeen }}
+                </div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.first_seen_at) }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueLastSeenColumn }}</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.queueLastSeenColumn }}
+                </div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.last_seen_at) }}
                 </div>
               </div>
               <div v-if="selectedFinding.resolved_at">
-                <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerResolvedAt }}</div>
+                <div class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.queueDrawerResolvedAt }}
+                </div>
                 <div class="mt-1 font-mono text-admin-body text-admin-text-1">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.resolved_at) }}
                 </div>
@@ -253,7 +285,9 @@
             </section>
 
             <section v-if="selectedFinding.wallet_public_id">
-              <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}</div>
+              <div class="text-admin-caption font-[700] text-admin-text-3">
+                {{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}
+              </div>
               <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
                 Wallet ·
                 {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
@@ -261,7 +295,9 @@
             </section>
 
             <section class="min-w-0">
-              <div class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerDetails }}</div>
+              <div class="text-admin-caption font-[700] text-admin-text-3">
+                {{ CREDIT_HEALTH_MESSAGES.queueDrawerDetails }}
+              </div>
               <dl v-if="detailEntries.length > 0" class="mt-2 grid min-w-0 gap-2">
                 <div
                   v-for="entry in detailEntries"
@@ -276,7 +312,9 @@
                   </dd>
                 </div>
               </dl>
-              <div v-else class="mt-2 text-admin-body text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.queueDrawerNoDetails }}</div>
+              <div v-else class="mt-2 text-admin-body text-admin-text-3">
+                {{ CREDIT_HEALTH_MESSAGES.queueDrawerNoDetails }}
+              </div>
             </section>
 
             <section class="min-w-0">
@@ -379,11 +417,7 @@ const {
   pagination,
   // Status cadence (5s open / 30s resolved); fail-fast stays in the shared
   // collection wrapper.
-  refetchInterval: adminPolling(
-    5_000,
-    30_000,
-    () => status.value === 'open',
-  ).refetchInterval,
+  refetchInterval: adminPolling(5_000, 30_000, () => status.value === 'open').refetchInterval,
 })
 const findings = computed(() => findingPage.value?.findings ?? [])
 const currentPage = pagination.currentPage

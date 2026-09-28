@@ -258,8 +258,7 @@ describe('workspace mediaAssetDelivery', () => {
         width: 0,
         height: 0,
         size_bytes: 0,
-        checksum_sha256:
-          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
         content_url: `/api/v1/workspaces/${WORKSPACE_ID}/media-assets/${ASSET_ID}/content`,
         derivatives: {},
         created_at: '2026-09-25T00:00:00.000Z',

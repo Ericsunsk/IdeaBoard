@@ -53,51 +53,45 @@ describe('ObservedStatsPanel', () => {
   })
 
   it('shows 暂无数据 for null rates and empty failures without fabricating', () => {
-    render(
-      ObservedStatsPanel,
-      {
-        props: {
-          observed: observed({
-            successRate: null,
-            cacheHitRate: null,
-            topFailureStage: '',
-            topFailureCategory: '',
-            topFailureCount: 0,
-            skuMargins: [],
-          }),
-        },
+    render(ObservedStatsPanel, {
+      props: {
+        observed: observed({
+          successRate: null,
+          cacheHitRate: null,
+          topFailureStage: '',
+          topFailureCategory: '',
+          topFailureCount: 0,
+          skuMargins: [],
+        }),
       },
-    )
+    })
 
     expect(screen.getAllByText('暂无数据').length).toBeGreaterThanOrEqual(4)
     expect(screen.queryByText(/%/)).not.toBeInTheDocument()
   })
 
   it('marks off-sale SKUs distinctly from on-sale ones', () => {
-    render(
-      ObservedStatsPanel,
-      {
-        props: {
-          observed: observed({
-            skuMargins: [
-              {
-                sku: 'ai-image:off',
-                displayName: 'Off Sale',
-                feature: 'generation',
-                onSale: false,
-                unitCreditsByVariant: {},
-                actualCostCredits: null,
-                hasActualCost: false,
-                costSource: 'unavailable',
-                costNote: '',
-                marginCredits: null,
-                marginStatus: 'unknown_no_cost',
-              },
-            ],
-          }),
-        },
+    render(ObservedStatsPanel, {
+      props: {
+        observed: observed({
+          skuMargins: [
+            {
+              sku: 'ai-image:off',
+              displayName: 'Off Sale',
+              feature: 'generation',
+              onSale: false,
+              unitCreditsByVariant: {},
+              actualCostCredits: null,
+              hasActualCost: false,
+              costSource: 'unavailable',
+              costNote: '',
+              marginCredits: null,
+              marginStatus: 'unknown_no_cost',
+            },
+          ],
+        }),
       },
-    )
+    })
 
     expect(screen.getByText('SKU 状态')).toBeInTheDocument()
     expect(screen.getByText('Off Sale · 非在售')).toBeInTheDocument()

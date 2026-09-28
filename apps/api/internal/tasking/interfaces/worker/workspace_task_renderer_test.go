@@ -117,7 +117,7 @@ func (e *rendererTestEnv) renderer(t *testing.T, mutate func(*taskruntime.Worksp
 func rendererTestTask() *workspacetasks.WorkspaceTask {
 	return &workspacetasks.WorkspaceTask{
 		ID: "task_render1", WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind: "render", Status: workspacetasks.StatusRunning,
+		Service: "render", Status: workspacetasks.StatusRunning,
 	}
 }
 
@@ -301,11 +301,11 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Models: workspaceTestModelResolver{},
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Routing: allowTestRouting,
 	})
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, "worker-render-key")
 	if err != nil {
 		t.Fatalf("submit: %v", err)

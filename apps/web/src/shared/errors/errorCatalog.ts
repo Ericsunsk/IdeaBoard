@@ -15,6 +15,7 @@ const USER_ERROR_CODE_COPY_KEY_MAP: Readonly<Record<string, string>> = {
   submission_failed: 'errorCodes.submission_failed',
   pricing_unavailable: 'errorCodes.pricing_unavailable',
   provider_unavailable: 'errorCodes.provider_unavailable',
+  service_resolution_unavailable: 'errorCodes.service_resolution_unavailable',
   prompt_unavailable: 'errorCodes.prompt_unavailable',
   wallet_restricted: 'errorCodes.wallet_restricted',
   insufficient_credits: 'errorCodes.insufficient_credits',

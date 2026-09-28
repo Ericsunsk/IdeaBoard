@@ -50,7 +50,7 @@ func seedStatisticsFixture(t *testing.T) (*StatisticsStore, statSeed) {
 	insertTask := func(publicID, status string, created, updated, completed, cancelled *time.Time) {
 		t.Helper()
 		if _, err := db.Exec(ctx, `
-INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, completed_at, cancelled_at)
+INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, completed_at, cancelled_at)
 VALUES ($1,$2,$3,$4,'render','{}',$5,2,0,'','', $6,$7,$8,$9)`,
 			publicID, workspaceInternalID, userID, billingAccountID, status, created, updated, completed, cancelled); err != nil {
 			t.Fatalf("seed task %s failed: %v", publicID, err)
@@ -138,7 +138,7 @@ VALUES ('test:render', '1k', 2, 0, $1) RETURNING price_version_id`, userID).Scan
 			hold = holdID
 		}
 		if _, err := db.Exec(ctx, `
-INSERT INTO task_billing_snapshots (task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
+INSERT INTO task_billing_snapshots (task_id, user_id, service, sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id)
 VALUES ($1,$2,'render','test:render','Render',$3,$4,$5,$6,$7,$8,$9)`,
 			taskID, userID, priceVersionID, priceVersion, unitCredits, quantity, total, quotedAt, hold); err != nil {
 			t.Fatalf("seed snapshot %s failed: %v", taskID, err)

@@ -7,7 +7,6 @@ import {
   createBillingCatalogHandlers,
   createBillingCatalogMswState,
   makeCatalogItems,
-  makeCatalogModel,
 } from './testing'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
@@ -36,7 +35,6 @@ describe('AdminBillingPricingPage', () => {
     toast.warning.mockReset()
     toast.error.mockReset()
     useMswHandlers(
-      http.get('/api/control/v1/platform/ai-gateway/models', () => HttpResponse.json({ data: [] })),
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({ data: [] }),
       ),
@@ -321,135 +319,11 @@ describe('AdminBillingPricingPage', () => {
     })
     expect(toast.error).toHaveBeenCalledWith('功能已有历史计费记录，无法删除')
   })
-
-  it('prefills per-feature models and saves without touching prices', async () => {
-    let savedBody: unknown
-    useMswHandlers(
-      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
-      http.get('/api/control/v1/platform/ai-gateway/models', () =>
-        HttpResponse.json({
-          data: [{ feature: 'inpaint', model: 'openai/gpt-image-1' }],
-        }),
-      ),
-      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
-        HttpResponse.json({
-          data: [makeCatalogModel()],
-        }),
-      ),
-      http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ request }) => {
-        savedBody = await request.json()
-        return HttpResponse.json({ data: {} })
-      }),
-    )
-
-    const { user } = renderPricingPage()
-    // 模型映射收进设置弹窗：先打开 inpaint 行的设置弹窗
-    await user.click(await screen.findByRole('button', { name: '设置' }))
-    const trigger = await screen.findByRole('button', { name: '模型（局部重绘）' })
-    expect(trigger).toBeVisible()
-    await waitFor(() => expect(trigger).toHaveTextContent('openai/gpt-image-1'))
-
-    await user.click(trigger)
-    const catalogOption = await screen.findByRole('option', {
-      name: /google\/gemini-2\.5-flash-image/,
-    })
-    await user.click(catalogOption)
-
-    expect(toast.success).toHaveBeenCalledWith('模型映射已保存，价格不受影响')
-    expect(savedBody).toEqual({ model: 'google/gemini-2.5-flash-image' })
-    // Prices stay exactly as cataloged: model switches never move prices.
-    expect(screen.getByText('inpaint')).toBeVisible()
-  })
-
-  it('keeps model save failures inline on the card', async () => {
-    useMswHandlers(
-      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
-      http.get('/api/control/v1/platform/ai-gateway/models', () => HttpResponse.json({ data: [] })),
-      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
-        HttpResponse.json({
-          data: [makeCatalogModel({ id: 'bad/model', name: 'Bad Model' })],
-        }),
-      ),
-      http.put('/api/control/v1/platform/ai-gateway/models/:feature', () =>
-        HttpResponse.json(
-          {
-            error: { code: 'bad_request', message: '网关写入失败', request_id: 'req-gateway-400' },
-          },
-          { status: 400 },
-        ),
-      ),
-    )
-
-    const { user } = renderPricingPage()
-    await user.click(await screen.findByRole('button', { name: '设置' }))
-    const trigger = await screen.findByRole('button', { name: '模型（局部重绘）' })
-    await user.click(trigger)
-    const catalogOption = await screen.findByRole('option', { name: /bad\/model/ })
-    await user.click(catalogOption)
-
-    expect(await screen.findByText('网关写入失败')).toBeVisible()
-  })
-  it('renders the AI search table and saves its model mapping from the dialog', async () => {
-    let putFeature = ''
-    let putBody: unknown = null
-    useMswHandlers(
-      http.get('/api/control/v1/billing/catalog', () =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            items: [
-              {
-                sku: 'ai-search:vision',
-                namespace: 'ai-search',
-                product_kind: 'search-feature',
-                display_name: '视觉搜索',
-                sort_order: 10,
-                status: 'active',
-                pricing_variants: ['default'],
-              },
-            ],
-          },
-        }),
-      ),
-      http.get('/api/control/v1/platform/ai-gateway/models', () => HttpResponse.json({ data: [] })),
-      http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
-        HttpResponse.json({
-          data: [makeCatalogModel({ id: 'test-provider/test-model', name: 'Vision Model' })],
-        }),
-      ),
-      http.put(
-        '/api/control/v1/platform/ai-gateway/models/:feature',
-        async ({ request, params }) => {
-          putFeature = String(params.feature)
-          putBody = await request.json()
-          return HttpResponse.json({ data: {} })
-        },
-      ),
-    )
-
-    const { user } = renderPricingPage()
-    expect(await screen.findByRole('heading', { name: 'Other' })).toBeVisible()
-    expect(screen.queryByRole('heading', { name: 'Image' })).not.toBeInTheDocument()
-    // Service 次标题回退映射特性（vision）
-    expect(screen.getByText('vision')).toBeVisible()
-    expect(screen.getByText('未配置')).toBeVisible()
-
-    await user.click(await screen.findByRole('button', { name: '调整' }))
-    const trigger = await screen.findByRole('button', { name: '模型（视觉搜索）' })
-    await user.click(trigger)
-    await user.click(await screen.findByRole('option', { name: /test-provider\/test-model/ }))
-
-    await waitFor(() => expect(putBody).toEqual({ model: 'test-provider/test-model' }))
-    expect(putFeature).toBe('vision')
-    expect(toast.success).toHaveBeenCalledWith('模型映射已保存，价格不受影响')
-  })
 })
 
 function renderPricingPage() {
-  // Fresh client per render: the pricing model adapter shares the catalog
-  // queryKey with the models page, so sharing one client across tests would
-  // serve stale lists and hide refetch behavior.
+  // Fresh client per render: sharing one client across tests would serve
+  // stale lists and hide refetch behavior.
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })

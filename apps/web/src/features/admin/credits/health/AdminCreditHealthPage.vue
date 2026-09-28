@@ -4,7 +4,10 @@
       class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-white"
     >
       <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
-        <AdminSpinner class="size-9 text-admin-accent" :aria-label="CREDIT_HEALTH_MESSAGES.loadingAria" />
+        <AdminSpinner
+          class="size-9 text-admin-accent"
+          :aria-label="CREDIT_HEALTH_MESSAGES.loadingAria"
+        />
       </div>
 
       <div
@@ -12,8 +15,12 @@
         class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"
       >
         <XmarkCircle class="size-8 text-admin-danger" aria-hidden="true" />
-        <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}</h2>
-        <p class="mt-2 text-admin-body text-admin-subtitle-color">{{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}</p>
+        <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">
+          {{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}
+        </h2>
+        <p class="mt-2 text-admin-body text-admin-subtitle-color">
+          {{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}
+        </p>
         <AdminButton
           class="mt-5"
           variant="outline"
@@ -66,7 +73,9 @@
               :loading="resource.startPending.value"
               @click="startReconciliation"
             >
-              {{ health.active_run ? CREDIT_HEALTH_MESSAGES.checking : CREDIT_HEALTH_MESSAGES.recheck }}
+              {{
+                health.active_run ? CREDIT_HEALTH_MESSAGES.checking : CREDIT_HEALTH_MESSAGES.recheck
+              }}
             </AdminButton>
           </div>
         </div>
@@ -109,8 +118,13 @@
           </div>
         </div>
 
-        <section :aria-label="CREDIT_HEALTH_MESSAGES.recentSectionAria" class="border-t border-admin-border-soft px-6 py-4">
-          <h3 class="text-sm font-bold text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.recentSectionTitle }}</h3>
+        <section
+          :aria-label="CREDIT_HEALTH_MESSAGES.recentSectionAria"
+          class="border-t border-admin-border-soft px-6 py-4"
+        >
+          <h3 class="text-sm font-bold text-admin-title-color">
+            {{ CREDIT_HEALTH_MESSAGES.recentSectionTitle }}
+          </h3>
           <ul v-if="recentRuns.length > 0" class="mt-2 divide-y divide-admin-border-soft">
             <li
               v-for="{ kind, run } in recentRuns"
@@ -141,7 +155,9 @@
               </span>
             </li>
           </ul>
-          <p v-else class="mt-2 text-xs text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.emptyRuns }}</p>
+          <p v-else class="mt-2 text-xs text-admin-text-3">
+            {{ CREDIT_HEALTH_MESSAGES.emptyRuns }}
+          </p>
         </section>
       </div>
     </div>

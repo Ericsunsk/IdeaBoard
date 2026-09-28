@@ -32,7 +32,7 @@ export type CanvasTaskParams = {
 
 export type CanvasTaskRequestData = {
   prompt: string
-  feature?: string
+  service?: string
   client_action_id?: string
   priority?: number
   image_urls?: string[]
@@ -66,7 +66,7 @@ export type SubmitTaskReadinessData = {
   ready: boolean
   message?: string
   error_code?: string
-  feature?: string
+  service?: string
   billing?: SubmitTaskReadinessBilling | null
 }
 

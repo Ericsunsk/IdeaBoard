@@ -21,13 +21,13 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('uses the request output count for presentation quote refreshes', async () => {
-    const readiness = { ready: true, feature: 'generation' } as const
+    const readiness = { ready: true, service: 'generation' } as const
     mocks.fetchReadiness.mockResolvedValue(readiness)
 
     await expect(
       fetchCanvasBillingReadiness('generation', {
         prompt: 'presentation quote',
-        feature: 'generation',
+        service: 'generation',
         params: { output_count: 1 },
       }),
     ).resolves.toEqual(readiness)
@@ -45,7 +45,7 @@ describe('canvas billing readiness request contracts', () => {
       }),
     ).toMatchObject({
       prompt: '[fusion] submit readiness',
-      feature: 'fusion',
+      service: 'fusion',
       image_urls: ['/uploads/a.png', '/uploads/b.png'],
       params: {
         ratio: '1:1',
@@ -58,7 +58,7 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('quotes Fusion at the selected output count', async () => {
-    const readiness = { ready: true, feature: 'fusion' } as const
+    const readiness = { ready: true, service: 'fusion' } as const
     mocks.fetchReadiness.mockResolvedValue(readiness)
     const request = buildFusionBillingReadinessRequest({
       imageUrls: ['/uploads/a.png', '/uploads/b.png'],
@@ -88,13 +88,13 @@ describe('canvas billing readiness request contracts', () => {
 
   it('delegates matrix readiness to one quote per request', async () => {
     const items = [
-      { ready: true, feature: 'generation' },
-      { ready: true, feature: 'cutout' },
+      { ready: true, service: 'generation' },
+      { ready: true, service: 'cutout' },
     ] as const
     mocks.fetchMatrix.mockResolvedValue(items)
     const requests = [
-      { prompt: '', feature: 'generation', params: { output_count: 1 } },
-      { prompt: '', feature: 'cutout', params: { output_count: 1 } },
+      { prompt: '', service: 'generation', params: { output_count: 1 } },
+      { prompt: '', service: 'cutout', params: { output_count: 1 } },
     ] as const
 
     await expect(fetchCanvasBillingReadinessMatrix([...requests])).resolves.toEqual(items)

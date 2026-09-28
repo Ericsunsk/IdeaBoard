@@ -315,13 +315,17 @@
                 <span>{{ getAttemptFailureLabel(attempt.failure_category) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptProviderLatencyLabel }}</span>
+                <span class="text-admin-text-3">{{
+                  MONITOR_MESSAGES.attemptProviderLatencyLabel
+                }}</span>
                 <span class="font-mono">{{
                   formatAttemptLatency(attempt.provider_latency_ms)
                 }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptTotalLatencyLabel }}</span>
+                <span class="text-admin-text-3">{{
+                  MONITOR_MESSAGES.attemptTotalLatencyLabel
+                }}</span>
                 <span class="font-mono">{{ formatAttemptLatency(attempt.total_latency_ms) }}</span>
               </div>
             </div>

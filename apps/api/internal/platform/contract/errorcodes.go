@@ -120,10 +120,11 @@ const (
 	// task_state_conflict; Idempotency-Key reuse with a different
 	// request renders 409 task_idempotency_conflict (kernel code).
 	// Insufficient Ideas render 402 task_insufficient_credits.
-	CodeTaskNotFound            Code = "task_not_found"
-	CodeTaskForbidden           Code = "task_forbidden"
-	CodeTaskStateConflict       Code = "task_state_conflict"
-	CodeTaskInsufficientCredits Code = "task_insufficient_credits"
+	CodeTaskNotFound                 Code = "task_not_found"
+	CodeTaskForbidden                Code = "task_forbidden"
+	CodeTaskStateConflict            Code = "task_state_conflict"
+	CodeTaskInsufficientCredits      Code = "task_insufficient_credits"
+	CodeServiceResolutionUnavailable Code = "service_resolution_unavailable"
 
 	// Workspace library codes (issue #806). Wire-stable: do not rename
 	// without coordinating the OpenAPI contract and callers. Library
@@ -400,6 +401,7 @@ func StatusOf(code Code) int {
 		CodeSearchProviderTestRequired, CodeSearchProviderAPIKeyRequired:
 		return http.StatusConflict
 	case CodeValidationFailed, CodeUploadValidationFailed, CodeMediaValidationFailed,
+		CodeServiceResolutionUnavailable,
 		CodeBillingPricingUnavailable,
 		CodeBillingQuoteTotalExceeded, CodeRewardCodeUnavailable,
 		CodeStripeConfigurationUnprocessable,

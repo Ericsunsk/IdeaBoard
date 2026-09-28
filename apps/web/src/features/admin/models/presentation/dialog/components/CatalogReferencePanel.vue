@@ -23,7 +23,9 @@
       {{ MODELS_MESSAGES.referenceFalNotice }}
     </p>
 
-    <p v-else-if="loading" class="text-admin-caption text-admin-text-2">{{ MODELS_MESSAGES.referenceLoading }}</p>
+    <p v-else-if="loading" class="text-admin-caption text-admin-text-2">
+      {{ MODELS_MESSAGES.referenceLoading }}
+    </p>
 
     <div v-else-if="loadError" class="flex items-center justify-between gap-2">
       <span class="text-admin-caption text-admin-danger">{{ loadError }}</span>
@@ -113,8 +115,12 @@
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceCapabilitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceCapabilitiesLabel }}</span>
-          <span v-if="!hasCapabilityData" class="font-medium text-admin-text-3">{{ MODELS_MESSAGES.referenceNoData }}</span>
+          <span class="shrink-0 text-admin-text-3">{{
+            MODELS_MESSAGES.referenceCapabilitiesLabel
+          }}</span>
+          <span v-if="!hasCapabilityData" class="font-medium text-admin-text-3">{{
+            MODELS_MESSAGES.referenceNoData
+          }}</span>
           <span v-else class="flex flex-wrap justify-end gap-1">
             <span
               v-for="capability in capabilities"
@@ -129,7 +135,9 @@
               "
             >
               {{ capability.label
-              }}{{ capability.supported === true ? '✓' : capability.supported === false ? '✗' : '?' }}
+              }}{{
+                capability.supported === true ? '✓' : capability.supported === false ? '✗' : '?'
+              }}
             </span>
           </span>
         </div>
@@ -138,7 +146,9 @@
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceModalitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceModalitiesLabel }}</span>
+          <span class="shrink-0 text-admin-text-3">{{
+            MODELS_MESSAGES.referenceModalitiesLabel
+          }}</span>
           <span class="text-right font-medium text-admin-text-1">
             {{ modalitiesText || MODELS_MESSAGES.referenceNoData }}
           </span>
@@ -148,7 +158,9 @@
           class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceReleaseTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceReleaseLabel }}</span>
+          <span class="shrink-0 text-admin-text-3">{{
+            MODELS_MESSAGES.referenceReleaseLabel
+          }}</span>
           <span class="font-mono text-admin-caption text-admin-text-1">
             {{ releaseKnowledgeText || MODELS_MESSAGES.referenceNoData }}
           </span>
@@ -170,7 +182,9 @@
           :title="MODELS_MESSAGES.referenceStatusTitle"
         >
           <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceStatusLabel }}</span>
-          <span v-if="statusKind === 'unknown'" class="font-medium text-admin-text-3">{{ MODELS_MESSAGES.referenceNoData }}</span>
+          <span v-if="statusKind === 'unknown'" class="font-medium text-admin-text-3">{{
+            MODELS_MESSAGES.referenceNoData
+          }}</span>
           <span
             v-else-if="statusKind === 'deprecated'"
             class="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-admin-caption font-semibold text-red-700"
@@ -343,9 +357,7 @@ const freshnessText = computed(() =>
 
 // enrichment 接线：能力/modality/发布知识截止/家族/上游状态 5 行；
 // 缺失一律暂无数据，deprecated 红 badge，beta 普通徽标，无 status 绝不误报。
-const capabilities = computed(() =>
-  snapshot.value ? referenceCapabilities(snapshot.value) : [],
-)
+const capabilities = computed(() => (snapshot.value ? referenceCapabilities(snapshot.value) : []))
 
 const hasCapabilityData = computed(() =>
   snapshot.value ? hasReferenceCapabilityData(snapshot.value) : false,

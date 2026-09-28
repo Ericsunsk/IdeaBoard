@@ -50,7 +50,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, fmt.Sprintf("renderer-loop-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
@@ -93,7 +93,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 	}
 	if err := renderingWorker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
-		WorkflowKind: "render", ExecutionToken: created.ExecutionToken,
+		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}

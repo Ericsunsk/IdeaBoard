@@ -69,7 +69,7 @@ func newPendingTask(taskID, workspaceID string, ownerUserID int64) *workspacetas
 		ID:             taskID,
 		WorkspaceID:    workspaceID,
 		OwnerUserID:    ownerUserID,
-		WorkflowKind:   "render",
+		Service:        "render",
 		Params:         map[string]any{"quality": "high"},
 		Status:         workspacetasks.StatusPending,
 		ExecutionToken: token,
@@ -98,8 +98,8 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 	if created.ID != taskID || created.Status != workspacetasks.StatusPending {
 		t.Fatalf("created = %+v, want pending %s", created, taskID)
 	}
-	if created.WorkflowKind != "render" {
-		t.Fatalf("workflow_kind = %q, want canonical render", created.WorkflowKind)
+	if created.Service != "render" {
+		t.Fatalf("service = %q, want canonical render", created.Service)
 	}
 	if created.BillingSnapshot.TotalCredits != 10 || created.BillingSnapshot.HoldTransactionID != "hold_test" {
 		t.Fatalf("billing snapshot did not round-trip: %+v", created.BillingSnapshot)
@@ -331,7 +331,7 @@ func TestWorkspaceTaskValidation(t *testing.T) {
 	workspaceID, ownerID := seedTaskWorkspace(t, db)
 
 	bad := newPendingTask("task_test"+randomHex(t, 6), workspaceID, ownerID)
-	bad.WorkflowKind = "nope"
+	bad.Service = "nope"
 	if _, err := store.CreateTask(ctx, bad); !workspacetasks.IsValidationError(err) {
 		t.Fatalf("unknown kind err = %v, want validation", err)
 	}
@@ -355,7 +355,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	task := &workspacetasks.WorkspaceTask{
 		MediaAssetIDs:   []string{"asset_abc"},
 		Params:          map[string]any{"prompt": "x"},
-		CanonicalParams: `{"schema_version":5,"feature":"render"}`,
+		CanonicalParams: `{"schema_version":6,"service":"render"}`,
 		ResolvedModel:   "openrouter/fake-image-model",
 		ExecutionToken:  "exec_abc",
 		CancelReason:    "done",
@@ -377,7 +377,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	if envelope.BillingSnapshot == nil || envelope.BillingSnapshot.HoldTransactionID != "hold_1" {
 		t.Fatalf("snapshot = %+v", envelope.BillingSnapshot)
 	}
-	if envelope.CanonicalParams != `{"schema_version":5,"feature":"render"}` {
+	if envelope.CanonicalParams != `{"schema_version":6,"service":"render"}` {
 		t.Fatalf("canonical_params = %q, want round-trip", envelope.CanonicalParams)
 	}
 	if envelope.ResolvedModel != "openrouter/fake-image-model" {

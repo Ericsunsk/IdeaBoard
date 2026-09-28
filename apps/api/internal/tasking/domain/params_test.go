@@ -4,8 +4,8 @@ import "testing"
 
 func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	params, err := UnmarshalParams(`{
-		"schema_version": 5,
-		"feature": "upscale",
+		"schema_version": 6,
+		"service": "upscale",
 		"upscale": {"scale": 2.0},
 		"provider_only": {"mode": "test"},
 		"controls": {"sample_count": 2}
@@ -13,8 +13,8 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UnmarshalParams returned error: %v", err)
 	}
-	if params.Feature != "upscale" {
-		t.Fatalf("feature = %q, want upscale", params.Feature)
+	if params.Service != "upscale" {
+		t.Fatalf("feature = %q, want upscale", params.Service)
 	}
 	if params.Upscale == nil || params.Upscale.Scale != 2 {
 		t.Fatalf("upscale = %#v, want scale 2", params.Upscale)
@@ -33,7 +33,7 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 func TestUnmarshalParamsRejectsMissingAndUnsupportedSchemaVersions(t *testing.T) {
 	tests := map[string]string{
 		"empty":   "",
-		"missing": `{"feature":"generation"}`,
+		"missing": `{"service":"generation"}`,
 		"zero":    `{"schema_version":0}`,
 		"legacy":  `{"schema_version":1}`,
 		"future":  `{"schema_version":99}`,
@@ -49,10 +49,10 @@ func TestUnmarshalParamsRejectsMissingAndUnsupportedSchemaVersions(t *testing.T)
 
 func TestUnmarshalParamsRejectsLegacyPersistedMediaURLs(t *testing.T) {
 	tests := []string{
-		`{"schema_version":5,"image_urls":["https://legacy.example/input.png"]}`,
-		`{"schema_version":5,"media":{"inputs":[{"asset_id":1,"url":"https://legacy.example/input.png"}]}}`,
-		`{"schema_version":5,"generation":{"media":[{"input_index":0,"role":"input","asset_id":1,"ref":"https://legacy.example/input.png"}]}}`,
-		`{"schema_version":5,"extra":{"original_image_url":"https://legacy.example/input.png"}}`,
+		`{"schema_version":6,"image_urls":["https://legacy.example/input.png"]}`,
+		`{"schema_version":6,"media":{"inputs":[{"asset_id":1,"url":"https://legacy.example/input.png"}]}}`,
+		`{"schema_version":6,"generation":{"media":[{"input_index":0,"role":"input","asset_id":1,"ref":"https://legacy.example/input.png"}]}}`,
+		`{"schema_version":6,"extra":{"original_image_url":"https://legacy.example/input.png"}}`,
 	}
 	for _, raw := range tests {
 		if _, err := UnmarshalParams(raw); err == nil {

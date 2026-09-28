@@ -236,10 +236,7 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
       if (message.type() === 'error') consoleErrors.push(message.text())
     })
     page.on('response', (response) => {
-      if (
-        probePathOf(response.url()) === SESSION_PROBE_PATH &&
-        response.status() === 401
-      ) {
+      if (probePathOf(response.url()) === SESSION_PROBE_PATH && response.status() === 401) {
         observedProbeFailures += 1
       }
     })
@@ -281,10 +278,7 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
   for (const message of pageErrors) failures.push(`uncaught page error: ${message}`)
   let allowedProbeNoise = 0
   for (const message of consoleErrors) {
-    if (
-      SESSION_PROBE_NOISE.test(message) &&
-      allowedProbeNoise < observedProbeFailures
-    ) {
+    if (SESSION_PROBE_NOISE.test(message) && allowedProbeNoise < observedProbeFailures) {
       allowedProbeNoise += 1
       continue
     }

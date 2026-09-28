@@ -5,44 +5,6 @@ import { createAdminGatewayResource } from './adminGatewayResource'
 const reason = { operatorReason: 'gateway review' }
 
 describe('Admin gateway resource', () => {
-  it('lists per-feature model mappings', async () => {
-    useMswHandlers(
-      http.get('/api/control/v1/platform/ai-gateway/models', () =>
-        HttpResponse.json({
-          data: [{ feature: 'generation', model: 'openai/gpt-image-1' }],
-        }),
-      ),
-    )
-
-    await expect(createAdminGatewayResource().mappings.list()).resolves.toEqual([
-      { feature: 'generation', model: 'openai/gpt-image-1' },
-    ])
-  })
-
-  it('saves one feature mapping through control with an operator reason', async () => {
-    let requestBody: unknown
-    let requestPath = ''
-    let seenHeaders: Record<string, string | null> = {}
-    useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway/models/:feature', async ({ params, request }) => {
-        requestPath = `/api/control/v1/platform/ai-gateway/models/${params.feature}`
-        requestBody = await request.json()
-        seenHeaders = {
-          idempotencyKey: request.headers.get('Idempotency-Key'),
-          operatorReason: request.headers.get('X-Operator-Reason'),
-        }
-        return HttpResponse.json({ data: {} })
-      }),
-    )
-
-    await createAdminGatewayResource().mappings.save('generation', 'openai/gpt-image-1', reason)
-
-    expect(requestPath).toBe('/api/control/v1/platform/ai-gateway/models/generation')
-    expect(requestBody).toEqual({ model: 'openai/gpt-image-1' })
-    expect(seenHeaders.idempotencyKey).toMatch(/.+/)
-    expect(seenHeaders.operatorReason).toBe('gateway review')
-  })
-
   it('saves catalogs through control without legacy price fields', async () => {
     let requestBody: unknown
     useMswHandlers(
@@ -209,32 +171,30 @@ describe('Admin gateway resource', () => {
     })
 
     await expect(
-      resource.connection.testConnection({ base_url: 'https://gateway.example.com' }, reason),
-    ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
-    expect(seen[1]?.body).toMatchObject({ base_url: 'https://gateway.example.com' })
-    expect(seen[1]?.reason).toBe('gateway review')
-  })
-
-  it('surfaces mapping save validation errors', async () => {
-    useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway/models/:feature', () =>
-        HttpResponse.json(
-          { error: { code: 'bad_request', message: '模型必须是 provider/model 格式且不含空白', request_id: 'req-gateway-400' } },
-          { status: 400 },
-        ),
+      resource.connection.testConnection(
+        { base_url: 'https://gateway.example.com', provider: 'openai', path: 'v1/models' },
+        reason,
       ),
-    )
-
-    await expect(
-      createAdminGatewayResource().mappings.save('generation', 'bad', reason),
-    ).rejects.toThrow()
+    ).resolves.toMatchObject({ success: true, latencyMs: 38, message: 'ok' })
+    expect(seen[1]?.body).toMatchObject({
+      base_url: 'https://gateway.example.com',
+      provider: 'openai',
+      path: 'v1/models',
+    })
+    expect(seen[1]?.reason).toBe('gateway review')
   })
 
   it('rejects gateway config updates when the envelope reports an error', async () => {
     useMswHandlers(
       http.put('/api/control/v1/platform/ai-gateway', () =>
         HttpResponse.json(
-          { error: { code: 'bad_request', message: '网关配置校验失败', request_id: 'req-gateway-400' } },
+          {
+            error: {
+              code: 'bad_request',
+              message: '网关配置校验失败',
+              request_id: 'req-gateway-400',
+            },
+          },
           { status: 400 },
         ),
       ),
@@ -250,9 +210,7 @@ describe('Admin gateway resource', () => {
 
   it('resolves gateway config updates when the envelope reports success', async () => {
     useMswHandlers(
-      http.put('/api/control/v1/platform/ai-gateway', () =>
-        HttpResponse.json({ data: {} }),
-      ),
+      http.put('/api/control/v1/platform/ai-gateway', () => HttpResponse.json({ data: {} })),
     )
 
     await expect(
@@ -265,9 +223,10 @@ describe('Admin gateway resource', () => {
 
   it('requires an operator reason before gateway writes', async () => {
     await expect(
-      createAdminGatewayResource().mappings.save('generation', 'openai/gpt-image-1', {
-        operatorReason: '  ',
-      }),
+      createAdminGatewayResource().connection.testConnection(
+        { base_url: 'https://gateway.example.com', provider: 'openai', path: 'v1/models' },
+        { operatorReason: '  ' },
+      ),
     ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

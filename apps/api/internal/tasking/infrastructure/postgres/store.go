@@ -170,7 +170,7 @@ func mapTaskRow(workspacePublicID string, row dbsqlc.Task, outputs []workspaceta
 		ID:              row.PublicID,
 		WorkspaceID:     strings.TrimSpace(workspacePublicID),
 		OwnerUserID:     row.SubmitterUserID,
-		WorkflowKind:    row.WorkflowType,
+		Service:         row.Service,
 		MediaAssetIDs:   append([]string(nil), envelope.MediaAssetIDs...),
 		Params:          envelope.Params,
 		CanonicalParams: envelope.CanonicalParams,
@@ -298,10 +298,10 @@ func (s *Store) CreateBillingFactsInTx(ctx context.Context, tx pgx.Tx, task *wor
 	snapshot := task.BillingSnapshot
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  task_id, user_id, service, sku, display_name, price_version_id, price_version,
   output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		task.ID, task.OwnerUserID, task.WorkflowKind, snapshot.SKU, snapshot.DisplayName,
+		task.ID, task.OwnerUserID, task.Service, snapshot.SKU, snapshot.DisplayName,
 		snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution,
 		snapshot.UnitCredits, snapshot.Quantity, snapshot.TotalCredits, snapshot.QuotedAt,
 		nilIfEmpty(snapshot.HoldTransactionID)); err != nil {
@@ -370,7 +370,7 @@ func createTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, task *workspa
 	if !contract.IsTaskID(taskID) || !contract.IsValidPublicID(contract.PrefixWorkspace, workspaceID) {
 		return nil, fmt.Errorf("tasking postgres: task identity required: %w", workspacetasks.ErrValidation)
 	}
-	canonical, err := workspacetasks.ValidateCreate(task.WorkflowKind, task.MediaAssetIDs, task.Params)
+	canonical, err := workspacetasks.ValidateCreate(task.Service, task.MediaAssetIDs, task.Params)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func createTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, task *workspa
 	stored := *task
 	stored.ID = taskID
 	stored.WorkspaceID = workspaceID
-	stored.WorkflowKind = canonical
+	stored.Service = canonical
 	stored.ExecutionToken = token
 	envelope, err := marshalEnvelope(&stored)
 	if err != nil {
@@ -403,7 +403,7 @@ func createTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, task *workspa
 		WorkspaceID:      workspaceInternalID,
 		SubmitterUserID:  stored.OwnerUserID,
 		BillingAccountID: billingAccountID,
-		WorkflowType:     canonical,
+		Service:          canonical,
 		WorkflowInput:    envelope,
 		Priority:         defaultTaskPriority,
 	})

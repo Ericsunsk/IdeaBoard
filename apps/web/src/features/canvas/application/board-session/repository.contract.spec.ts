@@ -10,15 +10,9 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../../board'
-import {
-  makeBoardSnapshot,
-  makeBoardState,
-} from '../testing/boardFixtures'
+import { makeBoardSnapshot, makeBoardState } from '../testing/boardFixtures'
 import { createBoardSessionRepository, isBoardSessionRemoteSyncError } from './repository'
-import {
-  getWorkspaceSelectionStore,
-  resetWorkspaceSelectionStore,
-} from '../../../workspace'
+import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {
@@ -143,10 +137,7 @@ function routeV1DocumentRequest(
   return null
 }
 
-function routeV1BoardRequest(
-  url: string,
-  config: V1RequestConfig | undefined,
-): Promise<unknown> {
+function routeV1BoardRequest(url: string, config: V1RequestConfig | undefined): Promise<unknown> {
   const method = config?.method ?? 'GET'
   const path = url.split('?')[0] ?? url
   if (path === `/v1/workspaces/${WORKSPACE_ID}/boards` && method === 'GET') {

@@ -34,13 +34,10 @@ const (
 	msgGet                           = "网关配置服务暂不可用"                                                // Get @ handler.go
 	msgGet2                          = "读取网关配置失败"                                                  // Get @ handler.go
 	msgUpdate                        = "参数错误"                                                      // Update @ handler.go
-	msgListMappings                  = "读取网关模型映射失败"                                                // ListMappings @ handler.go
 	msgPreviewGatewayRoute           = "模型标识不能为空"                                                  // PreviewGatewayRoute @ handler.go
-	msgTestConnection                = "读取网关模型映射失败"                                                // TestConnection @ handler.go
+	msgTestConnection                = "必须提供 provider 和 path"                                      // TestConnection @ handler.go
 	msgListCatalog                   = "读取模型库失败"                                                   // ListCatalog @ handler.go
 	msgSaveCatalog                   = "参数错误：含未知字段，目录单价字段已下线，请改用 models.dev 参照接口"                  // SaveCatalog @ handler.go
-	msgValidateModelMapping          = "模型标识过长"                                                    // ValidateModelMapping @ model.go
-	msgValidateModelMapping2         = "模型缺少 provider 前缀"                                          // ValidateModelMapping @ model.go
 	msgProbeGatewayConnection        = "网关地址为空"                                                    // ProbeGatewayConnection @ model.go
 	msgProbeGatewayConnection2       = "网关地址必须是 http(s) URL"                                       // ProbeGatewayConnection @ model.go
 	msgProbeGatewayConnection3       = "必须提供 provider 和 provider-native path"                      // ProbeGatewayConnection @ model.go

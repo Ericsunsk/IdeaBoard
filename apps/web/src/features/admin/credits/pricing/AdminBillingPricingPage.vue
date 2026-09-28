@@ -23,7 +23,6 @@
         <div class="flex shrink-0 items-center gap-2">
           <AdminRefreshButton
             :loading="isLoading"
-            :disabled="modelsLoading"
             :aria-label="BILLING_PRICING_MESSAGES.refresh"
             @click="loadCatalog"
           />
@@ -33,9 +32,9 @@
       <!-- 次级统计提示条：共 X 个计费功能 -->
       <div v-if="!isLoading" class="flex items-center justify-between pt-1">
         <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1"
-            >{{ BILLING_PRICING_MESSAGES.billingCount(filteredItems.length) }}</span
-          >
+          <span class="font-medium text-admin-text-1">{{
+            BILLING_PRICING_MESSAGES.billingCount(filteredItems.length)
+          }}</span>
           <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
             {{ BILLING_PRICING_MESSAGES.totalCount(sortedItems.length) }}
           </span>
@@ -54,7 +53,9 @@
 
     <!-- 3. 错误告警状态 -->
     <div v-else-if="errorMessage" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">{{ BILLING_PRICING_MESSAGES.loadFailedTitle }}</div>
+      <div class="text-admin-title font-semibold text-admin-title-color">
+        {{ BILLING_PRICING_MESSAGES.loadFailedTitle }}
+      </div>
       <div class="mt-2 text-admin-meta text-admin-subtitle-color">{{ errorMessage }}</div>
       <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadCatalog">
         <Refresh class="size-4" />
@@ -74,7 +75,11 @@
         <Search v-else class="size-6" />
       </div>
       <h3 class="text-base font-semibold text-admin-title-color">
-        {{ !hasActiveFilter ? BILLING_PRICING_MESSAGES.emptyNone : BILLING_PRICING_MESSAGES.emptyNoMatch }}
+        {{
+          !hasActiveFilter
+            ? BILLING_PRICING_MESSAGES.emptyNone
+            : BILLING_PRICING_MESSAGES.emptyNoMatch
+        }}
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{
@@ -108,14 +113,6 @@
         @publish="openPriceDialog"
         @delete="confirmArchivedDelete"
       >
-        <template #model="{ item }">
-          <span
-            class="truncate font-mono text-xs"
-            :class="modelValueFor(item.sku) ? 'text-admin-text-1' : 'text-admin-text-3'"
-          >
-            {{ modelDisplayFor(item.sku) }}
-          </span>
-        </template>
       </BillingPricingTable>
     </div>
 
@@ -125,12 +122,7 @@
       :item="selectedItem"
       :pending="publishPending"
       :error-message="publishError"
-      :model-value="selectedItem ? modelValueFor(selectedItem.sku) : undefined"
-      :model-pending="selectedItem ? modelPendingFor(selectedItem.sku) : undefined"
-      :model-error="selectedItem ? modelErrorFor(selectedItem.sku) : undefined"
-      :available-models="availableModels"
       @submit="publishPrice"
-      @save-model="onDialogSaveModel"
     />
   </div>
 </template>
@@ -150,12 +142,9 @@ import BillingPriceDialog from './BillingPriceDialog.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
-import { usePricingModelAdapter } from './usePricingModelAdapter'
 import {
   PRICING_NAMESPACE_TABLES,
   PRICING_OTHER_TABLE,
-  findPricingMappingCollisions,
-  pricingMappingFeature,
   pricingNamespaceRank,
   pricingTableKeyOfSku,
 } from './groups'
@@ -165,25 +154,6 @@ import { BILLING_PRICING_MESSAGES } from './messages'
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
 const sortedItems = computed(() => [...items.value].sort(compareCatalogCards))
-
-// 模型映射域出口
-const modelAdapter = usePricingModelAdapter()
-const {
-  availableModels,
-  modelsLoading,
-  loadModels,
-  saveModelForItem,
-  modelValueFor,
-  modelPendingFor,
-  modelErrorFor,
-} = modelAdapter
-
-// Model 列文案：不可映射（如已归档 SKU）显示 —，与价格列不适用态一致；
-// 可映射未配置才显示未配置，与 Dialog 无映射行（只设价格）对齐。
-function modelDisplayFor(sku: string): string {
-  if (pricingMappingFeature(sku) === null) return '—'
-  return modelValueFor(sku) ?? BILLING_PRICING_MESSAGES.modelUnset
-}
 
 const isLoading = ref(true)
 const errorMessage = ref('')
@@ -226,9 +196,6 @@ const filteredItems = computed(() => {
 
     if (item.displayName.toLowerCase().includes(query)) return true
     if (item.sku.toLowerCase().includes(query)) return true
-
-    const mappedModel = modelValueFor(item.sku)
-    if (mappedModel?.toLowerCase().includes(query)) return true
 
     return false
   })
@@ -273,19 +240,9 @@ async function loadCatalog() {
   errorMessage.value = ''
   try {
     items.value = await resource.list()
-    // 裸 key 碰撞兜底：同 bare feature 被多 namespace 认领时保存 A 即改 B 的显示，
-    // 当前目录无碰撞，仅防新增同名 feature，需人工确认后端 key 空间。
-    const collisions = findPricingMappingCollisions(items.value.map((item) => item.sku))
-    if (collisions.length > 0) {
-      console.warn('[pricing] mapping feature collision across namespaces', collisions)
-      toast.warning(
-        BILLING_PRICING_MESSAGES.mappingCollision(collisions.map((c) => c.feature).join('、')),
-      )
-    }
-    // 目录成功才拉模型：失败页不再叠加模型错误 toast；刷新按钮看两者。
-    await loadModels()
   } catch (error) {
-    errorMessage.value = error instanceof Error && error.message ? error.message : BILLING_PRICING_MESSAGES.retryLater
+    errorMessage.value =
+      error instanceof Error && error.message ? error.message : BILLING_PRICING_MESSAGES.retryLater
   } finally {
     isLoading.value = false
   }
@@ -297,10 +254,6 @@ function openPriceDialog(item: AdminBillableItemCard) {
   selectedItem.value = item
   publishError.value = ''
   priceDialogVisible.value = true
-}
-
-function onDialogSaveModel(model: string) {
-  if (selectedItem.value) saveModelForItem(selectedItem.value, model)
 }
 
 async function confirmArchivedDelete(item: AdminBillableItemCard) {
@@ -377,7 +330,9 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
     const availability = await resource.setAvailability(item.sku, enabled, { operatorReason })
     item.status = availability.status
     item.updatedAt = availability.updatedAt
-    toast.success(enabled ? BILLING_PRICING_MESSAGES.enabledToast : BILLING_PRICING_MESSAGES.disabledToast)
+    toast.success(
+      enabled ? BILLING_PRICING_MESSAGES.enabledToast : BILLING_PRICING_MESSAGES.disabledToast,
+    )
   } catch (error) {
     toast.error(
       formatAdminDisplayError(

@@ -1,6 +1,4 @@
-import type {
-  CanvasGraphStoreTelemetry,
-} from '../../domain/graph/canvasGraphStoreTelemetry'
+import type { CanvasGraphStoreTelemetry } from '../../domain/graph/canvasGraphStoreTelemetry'
 import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics'
 import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe'
 

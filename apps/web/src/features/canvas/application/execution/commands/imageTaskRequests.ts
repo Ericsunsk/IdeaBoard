@@ -13,7 +13,7 @@ import {
 } from '../../../domain/graph/outpaintGeometry.ts'
 import {
   buildExecutionTaskRequest,
-  EXECUTION_FEATURE,
+  EXECUTION_SERVICE,
   EXECUTION_FUSION_META,
   EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_META,
@@ -52,11 +52,7 @@ function imageAssetIds(sources: ImageExecutionInput[]): number[] {
 
 /** Opaque `asset_...` refs: the only media inputs the v1 transport sends. */
 function opaqueAssetIds(sources: Array<{ assetId?: string | undefined }>): string[] {
-  return [
-    ...new Set(
-      sources.map((source) => `${source.assetId ?? ''}`.trim()).filter(Boolean),
-    ),
-  ]
+  return [...new Set(sources.map((source) => `${source.assetId ?? ''}`.trim()).filter(Boolean))]
 }
 
 function opaqueAssetId(source: { assetId?: string | undefined }): string | null {
@@ -100,8 +96,8 @@ type ImageActionReadinessOptions = {
   outputResolution?: OutputResolution | undefined
 }
 
-function buildOutputBillingParams(options: ImageActionReadinessOptions = {}, feature?: string) {
-  const isRemoveBg = feature === EXECUTION_FEATURE.cutout
+function buildOutputBillingParams(options: ImageActionReadinessOptions = {}, service?: string) {
+  const isRemoveBg = service === EXECUTION_SERVICE.cutout
   return {
     output_count: assertRequestedOutputCount(isRemoveBg ? 1 : (options.outputCount ?? 1)),
     output_resolution: isRemoveBg ? ('default' as const) : (options.outputResolution ?? '1k'),
@@ -115,14 +111,14 @@ function buildDirectActionReadinessRequest(
   const execution = requireImageActionExecution(action)
   const strengthConfig = execution.strength
   const params = {
-    ...buildOutputBillingParams(options, execution.feature),
+    ...buildOutputBillingParams(options, execution.service),
     ...(strengthConfig?.paramPath === 'variation.strength'
       ? { variation: { strength: strengthConfig.defaultValue } }
       : {}),
   }
   return buildExecutionTaskRequest({
     prompt: '',
-    feature: execution.feature,
+    service: execution.service,
     params,
   })
 }
@@ -130,7 +126,7 @@ function buildDirectActionReadinessRequest(
 export function buildInpaintReadinessRequest(): SubmitTaskData {
   return buildExecutionTaskRequest({
     prompt: '[inpaint] submit readiness',
-    feature: EXECUTION_PARTIAL_EDIT_META.feature,
+    service: EXECUTION_PARTIAL_EDIT_META.service,
     params: {
       output_count: 1,
       output_resolution: 'default',
@@ -143,7 +139,7 @@ export function buildOutpaintReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
-    feature: execution.feature,
+    service: execution.service,
     params: {
       output_count: 1,
       output_resolution: 'default',
@@ -158,7 +154,7 @@ function buildUpscaleReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
-    feature: execution.feature,
+    service: execution.service,
     params: {
       upscale: {
         scale: resolveUpscaleScale(),
@@ -192,7 +188,7 @@ export function buildGenerationTaskRequest(input: {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
     prompt: `${input.prompt ?? ''}`.trim(),
-    feature: EXECUTION_META[EXECUTION_FEATURE.generation].feature,
+    service: EXECUTION_META[EXECUTION_SERVICE.generation].service,
     imageUrls: input.imageUrls,
     imageAssetIds: input.imageAssetIds,
     referenceImageAssetIds: input.referenceImageAssetIds,
@@ -220,7 +216,7 @@ export function buildDirectActionTaskRequest(input: {
   const strengthConfig = execution.strength
   const outputParams = buildOutputBillingParams(
     { outputCount: input.outputCount, outputResolution: input.outputResolution },
-    execution.feature,
+    execution.service,
   )
   // Prefer the opaque asset ref: covered sources omit URL/numeric inputs so
   // the v1 adapter sends media_asset_ids only. Uncovered sources keep the
@@ -235,7 +231,7 @@ export function buildDirectActionTaskRequest(input: {
   if (strengthConfig?.paramPath === 'variation.strength') {
     return buildExecutionTaskRequest({
       prompt: input.prompt.trim(),
-      feature: execution.feature,
+      service: execution.service,
       imageUrls,
       imageAssetIds,
       mediaAssetIds: opaqueId ? [opaqueId] : undefined,
@@ -253,7 +249,7 @@ export function buildDirectActionTaskRequest(input: {
 
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
-    feature: execution.feature,
+    service: execution.service,
     imageUrls,
     imageAssetIds,
     mediaAssetIds: opaqueId ? [opaqueId] : undefined,
@@ -269,7 +265,7 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
   const maskAssetId = `${input.maskAssetId ?? ''}`.trim()
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
-    feature: EXECUTION_PARTIAL_EDIT_META.feature,
+    service: EXECUTION_PARTIAL_EDIT_META.service,
     mediaAssetIds: originalOpaqueId ? [originalOpaqueId] : undefined,
     params: {
       output_count: 1,
@@ -307,9 +303,13 @@ export function buildOutpaintTaskRequest(input: {
   const opaqueId = opaqueAssetId(input.source)
   return buildExecutionTaskRequest({
     prompt,
-    feature: execution.feature,
+    service: execution.service,
     imageUrls: opaqueId ? undefined : input.source.mediaAssetId ? undefined : [sourceUrl],
-    imageAssetIds: opaqueId ? undefined : input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
+    imageAssetIds: opaqueId
+      ? undefined
+      : input.source.mediaAssetId
+        ? [input.source.mediaAssetId]
+        : undefined,
     mediaAssetIds: opaqueId ? [opaqueId] : undefined,
     params: {
       output_count: 1,
@@ -339,9 +339,13 @@ export function buildUpscaleTaskRequest(input: {
   const opaqueId = opaqueAssetId(input.source)
   return buildExecutionTaskRequest({
     prompt: '',
-    feature: execution.feature,
+    service: execution.service,
     imageUrls: opaqueId ? undefined : input.source.mediaAssetId ? undefined : [sourceUrl],
-    imageAssetIds: opaqueId ? undefined : input.source.mediaAssetId ? [input.source.mediaAssetId] : undefined,
+    imageAssetIds: opaqueId
+      ? undefined
+      : input.source.mediaAssetId
+        ? [input.source.mediaAssetId]
+        : undefined,
     mediaAssetIds: opaqueId ? [opaqueId] : undefined,
     params: {
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
@@ -357,7 +361,7 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
     input.outputCount === undefined ? undefined : assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
     prompt: input.prompt,
-    feature: EXECUTION_FUSION_META.feature,
+    service: EXECUTION_FUSION_META.service,
     imageUrls: input.imageUrls,
     imageAssetIds: input.imageAssetIds,
     mediaAssetIds: input.mediaAssetIds,
@@ -421,10 +425,7 @@ export function buildImageExecutionTaskRequest(
       return buildGenerationTaskRequest({
         prompt: plan.prompt,
         aspectRatio: plan.aspectRatio,
-        imageUrls:
-          uncoveredRefs.length > 0
-            ? uncoveredRefs.map((image) => image.url)
-            : undefined,
+        imageUrls: uncoveredRefs.length > 0 ? uncoveredRefs.map((image) => image.url) : undefined,
         referenceImageAssetIds: imageAssetIds(uncoveredRefs),
         mediaAssetIds: opaqueAssetIds(plan.referenceImages),
         outputCount: plan.outputCount,
@@ -433,7 +434,8 @@ export function buildImageExecutionTaskRequest(
     }
     case 'fusion': {
       const opaqueIds = opaqueAssetIds(plan.inputImages)
-      const fullyCovered = plan.inputImages.length > 0 && opaqueIds.length === plan.inputImages.length
+      const fullyCovered =
+        plan.inputImages.length > 0 && opaqueIds.length === plan.inputImages.length
       return buildFusionTaskRequest({
         prompt: plan.taskPrompt,
         imageUrls: fullyCovered ? [] : plan.imageUrls,

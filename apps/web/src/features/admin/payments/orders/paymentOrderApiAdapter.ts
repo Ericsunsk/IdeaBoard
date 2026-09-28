@@ -132,7 +132,15 @@ export type AdminPaymentOrderApiAdapter = {
 // transport.
 export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
   return {
-    search: async ({ orderNumber, user, status, anomalyOnly, cursor, limit = PAGE_SIZES.standard, signal }) => {
+    search: async ({
+      orderNumber,
+      user,
+      status,
+      anomalyOnly,
+      cursor,
+      limit = PAGE_SIZES.standard,
+      signal,
+    }) => {
       // The generated filter param is typed as order_number only, but the
       // control contract accepts the same six legacy filters (see the
       // openapi description on ListControlPaymentOrdersParams).
@@ -145,10 +153,7 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
         limit,
       }) as ListControlPaymentOrdersParams
       try {
-        const body = await listControlPaymentOrders(
-          params,
-          ...(signal == null ? [] : [{ signal }]),
-        )
+        const body = await listControlPaymentOrders(params, ...(signal == null ? [] : [{ signal }]))
         return requireContractData<PaymentOrderApiPage>(body, '加载支付订单失败')
       } catch (error) {
         throw withControlCopy(error, '加载支付订单失败')

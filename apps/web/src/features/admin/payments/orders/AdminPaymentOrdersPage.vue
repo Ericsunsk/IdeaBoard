@@ -42,7 +42,11 @@
             class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
           >
             <span>{{ PAYMENT_ORDERS_MESSAGES.anomalyOnly }}</span>
-            <AdminSwitch v-model="anomalyOnly" class="shrink-0" :aria-label="PAYMENT_ORDERS_MESSAGES.anomalyOnly" />
+            <AdminSwitch
+              v-model="anomalyOnly"
+              class="shrink-0"
+              :aria-label="PAYMENT_ORDERS_MESSAGES.anomalyOnly"
+            />
           </label>
         </div>
       </AdminFilterPopover>
@@ -108,7 +112,11 @@
       </template>
 
       <!-- 订单时间列：等宽日期 -->
-      <AdminColumn field="createdAt" :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn" :style="{ width: '160px' }">
+      <AdminColumn
+        field="createdAt"
+        :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn"
+        :style="{ width: '160px' }"
+      >
         <template #body="{ data }">
           <time
             :datetime="data.createdAt"
@@ -120,7 +128,11 @@
       </AdminColumn>
 
       <!-- 公开订单号列：等宽可点击链接 -->
-      <AdminColumn field="publicOrderNumber" :header="PAYMENT_ORDERS_MESSAGES.orderNumberColumn" :style="{ minWidth: '220px' }">
+      <AdminColumn
+        field="publicOrderNumber"
+        :header="PAYMENT_ORDERS_MESSAGES.orderNumberColumn"
+        :style="{ minWidth: '220px' }"
+      >
         <template #body="{ data }">
           <button
             type="button"
@@ -143,7 +155,11 @@
       </AdminColumn>
 
       <!-- Idea 数量列：等宽数字 -->
-      <AdminColumn field="ideaQuantity" :header="PAYMENT_ORDERS_MESSAGES.ideaColumn" :style="{ width: '120px' }">
+      <AdminColumn
+        field="ideaQuantity"
+        :header="PAYMENT_ORDERS_MESSAGES.ideaColumn"
+        :style="{ width: '120px' }"
+      >
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
             {{ formatLocaleNumber(data.ideaQuantity) }}
@@ -161,7 +177,11 @@
       </AdminColumn>
 
       <!-- Stripe 状态列：圆角徽标 -->
-      <AdminColumn field="stripeStatus" :header="PAYMENT_ORDERS_MESSAGES.stripeColumn" :style="{ width: '120px' }">
+      <AdminColumn
+        field="stripeStatus"
+        :header="PAYMENT_ORDERS_MESSAGES.stripeColumn"
+        :style="{ width: '120px' }"
+      >
         <template #body="{ data }">
           <AdminBadge
             :value="getStripeStatusLabel(data.stripeStatus)"
@@ -172,7 +192,11 @@
       </AdminColumn>
 
       <!-- 本地到账列：圆角徽标 -->
-      <AdminColumn field="creditStatus" :header="PAYMENT_ORDERS_MESSAGES.creditColumn" :style="{ width: '120px' }">
+      <AdminColumn
+        field="creditStatus"
+        :header="PAYMENT_ORDERS_MESSAGES.creditColumn"
+        :style="{ width: '120px' }"
+      >
         <template #body="{ data }">
           <AdminBadge
             :value="getCreditStatusLabel(data.creditStatus)"
@@ -185,7 +209,12 @@
       <!-- 异常列：Badge 或横线 -->
       <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.anomalyColumn" :style="{ width: '110px' }">
         <template #body="{ data }">
-          <AdminBadge v-if="data.anomalousAt" :value="PAYMENT_ORDERS_MESSAGES.anomalyBadge" severity="danger" rounded />
+          <AdminBadge
+            v-if="data.anomalousAt"
+            :value="PAYMENT_ORDERS_MESSAGES.anomalyBadge"
+            severity="danger"
+            rounded
+          />
           <span v-else class="text-xs text-admin-text-3">—</span>
         </template>
       </AdminColumn>
@@ -324,7 +353,9 @@ const {
 const orders = computed(() => orderPage.value?.orders ?? [])
 const total = computed(() => orderPage.value?.total ?? 0)
 
-const totalLabel = computed(() => PAYMENT_ORDERS_MESSAGES.totalUnit(formatLocaleNumber(total.value)))
+const totalLabel = computed(() =>
+  PAYMENT_ORDERS_MESSAGES.totalUnit(formatLocaleNumber(total.value)),
+)
 const hasFilters = computed(
   () => statusFilter.value !== ORDER_STATUS_FILTER_ALL || anomalyOnly.value,
 )

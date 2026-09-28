@@ -14,7 +14,6 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/platform/contract"
-	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
@@ -53,11 +52,7 @@ type ContractV1Deps struct {
 	TaskHolder            WorkspaceTaskHolder
 	TaskQueue             WorkspaceTaskEnqueuer
 	TaskAssets            WorkspaceTaskAssetReader
-	TaskCanonicalCompiler func(feature, userPrompt string, params map[string]interface{}) (string, error)
-	// TaskModelResolver mints the submit-time resolved model into the
-	// durable plan (ai-gateway model mapping in production). Nil makes
-	// task creation fail closed.
-	TaskModelResolver workspacetasks.ModelResolver
+	TaskCanonicalCompiler func(service, userPrompt string, params map[string]interface{}) (string, error)
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
@@ -96,6 +91,7 @@ type ContractV1Deps struct {
 	// tests inject an inline runner for determinism. Unexported:
 	// production never overrides it.
 	libraryMaterializeSpawn func(func())
+	TaskRoutingGate         WorkspaceTaskRoutingGate
 }
 
 // V1UserDirectory translates between internal numeric user ids and the

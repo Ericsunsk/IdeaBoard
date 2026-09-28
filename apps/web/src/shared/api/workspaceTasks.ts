@@ -29,11 +29,7 @@ import type {
   PaginatedWorkspaceTasks,
   QuoteWorkspaceTaskRequest,
 } from './generated-query/public/model'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from './contractKernel'
+import { buildContractRequestHeaders, newRequestId, requireContractData } from './contractKernel'
 import { assertOpaqueId } from '../utils/opaqueIds'
 import { createPollDelay, sleep } from '../utils/polling'
 import { PAGE_SIZES } from '../config/pagination'
@@ -117,7 +113,7 @@ export type WorkspaceTaskBillingSnapshot = {
 export type WorkspaceTaskItem = {
   id: string
   workspace_id: string
-  workflow_kind: string
+  service: string
   media_asset_ids?: string[] | undefined
   status: WorkspaceTaskStatus
   retry_count: number
@@ -132,7 +128,7 @@ export type WorkspaceTaskItem = {
 }
 
 export type CreateWorkspaceTaskInput = {
-  workflow_kind: string
+  service: string
   media_asset_ids?: string[] | undefined
   /**
    * Free-text prompt (v1 `data.prompt`, max 8KB bytes). Required for
@@ -174,8 +170,14 @@ export function toWorkspaceTask(raw: unknown): WorkspaceTaskItem {
   return item
 }
 
-export function toWorkspaceTaskOutputs(raw: unknown): { task_id: string; outputs: WorkspaceTaskOutputRef[] } {
-  const data = requireContractData<{ task_id: string; outputs: WorkspaceTaskOutputRef[] }>(raw, 'Task outputs load failed')
+export function toWorkspaceTaskOutputs(raw: unknown): {
+  task_id: string
+  outputs: WorkspaceTaskOutputRef[]
+} {
+  const data = requireContractData<{ task_id: string; outputs: WorkspaceTaskOutputRef[] }>(
+    raw,
+    'Task outputs load failed',
+  )
   assertWorkspaceTaskId(data.task_id)
   const outputs = Array.isArray(data.outputs) ? data.outputs : []
   for (const ref of outputs) {
@@ -200,7 +202,9 @@ export async function listWorkspaceTasks(
   params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<PaginatedWorkspaceTasks> {
-  const query: { cursor?: string; page_size?: number } = { page_size: params?.pageSize ?? PAGE_SIZES.standard }
+  const query: { cursor?: string; page_size?: number } = {
+    page_size: params?.pageSize ?? PAGE_SIZES.standard,
+  }
   if (params?.cursor?.trim()) query.cursor = params.cursor.trim()
   return listWorkspaceTasksTransport(
     assertWorkspaceTaskWorkspaceId(workspaceId),
@@ -215,7 +219,7 @@ export async function createWorkspaceTask(
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskItem> {
   const data: CreateWorkspaceTaskRequest['data'] = {
-    workflow_kind: input.workflow_kind as CreateWorkspaceTaskRequest['data']['workflow_kind'],
+    service: input.service as CreateWorkspaceTaskRequest['data']['service'],
     inputs: { media_asset_ids: input.media_asset_ids ?? [] },
   }
   if (input.prompt != null) data.prompt = input.prompt
@@ -277,11 +281,11 @@ export async function listWorkspaceTaskOutputs(
 
 export async function quoteWorkspaceTask(
   workspaceId: string,
-  input: { workflow_kind: string; quantity?: number | undefined; resolution?: string | undefined },
+  input: { service: string; quantity?: number | undefined; resolution?: string | undefined },
   options?: WorkspaceTasksRequestOptions,
 ): Promise<WorkspaceTaskBillingSnapshot> {
   const data: QuoteWorkspaceTaskRequest['data'] = {
-    workflow_kind: input.workflow_kind as QuoteWorkspaceTaskRequest['data']['workflow_kind'],
+    service: input.service as QuoteWorkspaceTaskRequest['data']['service'],
   }
   if (input.quantity != null) data.quantity = input.quantity
   if (input.resolution != null) data.resolution = input.resolution

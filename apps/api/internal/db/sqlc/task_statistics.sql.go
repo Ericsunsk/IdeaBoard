@@ -18,7 +18,7 @@ WITH candidate_tasks AS (
          t.submitter_user_id AS user_id,
          t.billing_account_id AS account_id,
          t.status,
-         t.workflow_type AS feature_slug,
+         t.service AS feature_slug,
          COALESCE(latest_snapshot.quantity, 1) AS quantity,
          COALESCE(latest_attempt.resolved_model, '') AS resolved_model,
          t.created_at, t.completed_at, t.cancelled_at,
@@ -193,7 +193,7 @@ WHERE status = $1
 //	provider_endpoint_id <- 0 (the workspace schema records no provider
 //	                        endpoint assignment on tasks)
 //	credential_id        <- 0 (same: no credential assignment on tasks)
-//	feature_slug         <- tasks.workflow_type
+//	feature_slug         <- tasks.service
 //	api_type             <- '' (no provider api_type on workspace tasks)
 //	model_name           <- latest execution attempt resolved_model, else
 //	                        '未识别模型' (attempts are empty until the

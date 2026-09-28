@@ -41,7 +41,8 @@ export default {
     folderNameLabel: '폴더 이름',
     folderNamePlaceholder: '예: 미니멀 공간',
     deleteFolderTitle: '폴더 삭제',
-    deleteFolderMessage: '"{name}"을(를) 삭제하시겠습니까? 저장된 참조는 미분류 상태가 됩니다(전체 에셋에서 볼 수 있습니다).',
+    deleteFolderMessage:
+      '"{name}"을(를) 삭제하시겠습니까? 저장된 참조는 미분류 상태가 됩니다(전체 에셋에서 볼 수 있습니다).',
     removeAssetTitle: '저장된 참조 제거',
     removeAssetMessage: '라이브러리에서 이 저장된 참조를 제거하시겠습니까?',
     cancel: '취소',

@@ -8,11 +8,11 @@ import {
   type MockWorkspaceBoardApiState,
 } from '../../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
+import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import {
-  getWorkspaceSelectionStore,
-  resetWorkspaceSelectionStore,
-} from '../../../workspace'
-import { BoardPayloadError, BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
+  BoardPayloadError,
+  BoardWorkspaceUnavailableError,
+} from '../../infrastructure/api/boardsResource'
 import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persistence'
 import { listBoards, replaceBoards, subscribeBoardChanges } from '../catalog/boards'
 import {

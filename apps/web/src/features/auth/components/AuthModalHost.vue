@@ -37,7 +37,10 @@ import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
 import { useI18n } from 'vue-i18n'
 import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
-import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../shared/composables/useOverlayInteractionLifecycle'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../../../shared/composables/useOverlayInteractionLifecycle'
 import { authDialogContentClass } from './modalUi'
 
 const props = withDefaults(

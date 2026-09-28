@@ -21,7 +21,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = $3
 AND w.public_id = $4
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 `
 
 type CancelWorkspaceTaskParams struct {
@@ -49,7 +49,7 @@ func (q *Queries) CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTa
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -75,7 +75,7 @@ AND t.public_id = $2
 AND w.public_id = $3
 AND t.status = 'pending'
 AND t.lease_token = ''
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 `
 
 type ClaimWorkspaceTaskParams struct {
@@ -96,7 +96,7 @@ func (q *Queries) ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTask
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -121,7 +121,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = $1
 AND w.public_id = $2
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 `
 
 type CompleteWorkspaceTaskParams struct {
@@ -141,7 +141,7 @@ func (q *Queries) CompleteWorkspaceTask(ctx context.Context, arg CompleteWorkspa
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -164,7 +164,7 @@ FROM tasks AS t
 WHERE ($1 = 0 OR t.submitter_user_id = $1)
   AND ($2 = ''
     OR t.public_id ILIKE '%' || $2 || '%'
-    OR t.workflow_type ILIKE '%' || $2 || '%'
+    OR t.service ILIKE '%' || $2 || '%'
     OR t.error_message ILIKE '%' || $2 || '%')
 GROUP BY t.status
 `
@@ -217,9 +217,9 @@ func (q *Queries) CountWorkspaceTasks(ctx context.Context, workspacePublicID str
 
 const createWorkspaceTask = `-- name: CreateWorkspaceTask :one
 
-INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message)
+INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message)
 VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, 0, '', '')
-RETURNING internal_id, public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, started_at, completed_at, cancelled_at, cancelled_by_user_id
+RETURNING internal_id, public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, started_at, completed_at, cancelled_at, cancelled_by_user_id
 `
 
 type CreateWorkspaceTaskParams struct {
@@ -227,7 +227,7 @@ type CreateWorkspaceTaskParams struct {
 	WorkspaceID      int64  `json:"workspace_id"`
 	SubmitterUserID  int64  `json:"submitter_user_id"`
 	BillingAccountID int64  `json:"billing_account_id"`
-	WorkflowType     string `json:"workflow_type"`
+	Service          string `json:"service"`
 	WorkflowInput    []byte `json:"workflow_input"`
 	Priority         int32  `json:"priority"`
 }
@@ -247,7 +247,7 @@ func (q *Queries) CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTa
 		arg.WorkspaceID,
 		arg.SubmitterUserID,
 		arg.BillingAccountID,
-		arg.WorkflowType,
+		arg.Service,
 		arg.WorkflowInput,
 		arg.Priority,
 	)
@@ -258,7 +258,7 @@ func (q *Queries) CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTa
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -306,7 +306,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = $2
 AND w.public_id = $3
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 `
 
 type FailWorkspaceTaskParams struct {
@@ -327,7 +327,7 @@ func (q *Queries) FailWorkspaceTask(ctx context.Context, arg FailWorkspaceTaskPa
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -393,7 +393,7 @@ func (q *Queries) GetControlTaskBilling(ctx context.Context, taskID string) (Get
 
 const getControlTaskByPublicID = `-- name: GetControlTaskByPublicID :one
 
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
   w.public_id AS workspace_public_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
@@ -407,7 +407,7 @@ type GetControlTaskByPublicIDRow struct {
 	WorkspaceID       int64              `json:"workspace_id"`
 	SubmitterUserID   int64              `json:"submitter_user_id"`
 	BillingAccountID  int64              `json:"billing_account_id"`
-	WorkflowType      string             `json:"workflow_type"`
+	Service           string             `json:"service"`
 	WorkflowInput     []byte             `json:"workflow_input"`
 	Status            string             `json:"status"`
 	Priority          int32              `json:"priority"`
@@ -438,7 +438,7 @@ func (q *Queries) GetControlTaskByPublicID(ctx context.Context, publicID string)
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -480,7 +480,7 @@ func (q *Queries) GetWorkspaceMediaAssetID(ctx context.Context, arg GetWorkspace
 }
 
 const getWorkspaceTaskByPublicID = `-- name: GetWorkspaceTaskByPublicID :one
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE t.public_id = $1 AND w.public_id = $2
@@ -501,7 +501,7 @@ func (q *Queries) GetWorkspaceTaskByPublicID(ctx context.Context, arg GetWorkspa
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,
@@ -565,7 +565,7 @@ func (q *Queries) InsertWorkspaceTaskOutput(ctx context.Context, arg InsertWorks
 }
 
 const listControlTasks = `-- name: ListControlTasks :many
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
   w.public_id AS workspace_public_id,
   s.total_credits AS billing_total_credits,
   st.state AS settlement_state,
@@ -578,7 +578,7 @@ WHERE ($1 = '' OR t.status = $1)
   AND ($2 = 0 OR t.submitter_user_id = $2)
   AND ($3 = ''
     OR t.public_id ILIKE '%' || $3 || '%'
-    OR t.workflow_type ILIKE '%' || $3 || '%'
+    OR t.service ILIKE '%' || $3 || '%'
     OR t.error_message ILIKE '%' || $3 || '%')
 ORDER BY t.created_at DESC, t.internal_id DESC
 LIMIT $5 OFFSET $4
@@ -598,7 +598,7 @@ type ListControlTasksRow struct {
 	WorkspaceID               int64              `json:"workspace_id"`
 	SubmitterUserID           int64              `json:"submitter_user_id"`
 	BillingAccountID          int64              `json:"billing_account_id"`
-	WorkflowType              string             `json:"workflow_type"`
+	Service                   string             `json:"service"`
 	WorkflowInput             []byte             `json:"workflow_input"`
 	Status                    string             `json:"status"`
 	Priority                  int32              `json:"priority"`
@@ -638,7 +638,7 @@ func (q *Queries) ListControlTasks(ctx context.Context, arg ListControlTasksPara
 			&i.WorkspaceID,
 			&i.SubmitterUserID,
 			&i.BillingAccountID,
-			&i.WorkflowType,
+			&i.Service,
 			&i.WorkflowInput,
 			&i.Status,
 			&i.Priority,
@@ -748,7 +748,7 @@ func (q *Queries) ListWorkspaceTaskOutputsByTaskIDs(ctx context.Context, taskIds
 }
 
 const listWorkspaceTasks = `-- name: ListWorkspaceTasks :many
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE w.public_id = $1
@@ -777,7 +777,7 @@ func (q *Queries) ListWorkspaceTasks(ctx context.Context, arg ListWorkspaceTasks
 			&i.WorkspaceID,
 			&i.SubmitterUserID,
 			&i.BillingAccountID,
-			&i.WorkflowType,
+			&i.Service,
 			&i.WorkflowInput,
 			&i.Status,
 			&i.Priority,
@@ -811,7 +811,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = $2
 AND w.public_id = $3
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 `
 
 type RetryWorkspaceTaskParams struct {
@@ -833,7 +833,7 @@ func (q *Queries) RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTask
 		&i.WorkspaceID,
 		&i.SubmitterUserID,
 		&i.BillingAccountID,
-		&i.WorkflowType,
+		&i.Service,
 		&i.WorkflowInput,
 		&i.Status,
 		&i.Priority,

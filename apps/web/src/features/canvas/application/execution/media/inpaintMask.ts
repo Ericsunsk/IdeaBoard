@@ -27,9 +27,7 @@ type MaskAssetUploadTransport = Pick<
 
 export type PrepareInpaintMaskAssetDeps = {
   uploadTransport?: MaskAssetUploadTransport | undefined
-  mintIdempotencyKey?:
-    | ((operation: 'create' | 'bytes' | 'complete') => string)
-    | undefined
+  mintIdempotencyKey?: ((operation: 'create' | 'bytes' | 'complete') => string) | undefined
   digestSha256Hex?: ((bytes: ArrayBuffer) => Promise<string>) | undefined
   clockNow?: (() => number) | undefined
 }

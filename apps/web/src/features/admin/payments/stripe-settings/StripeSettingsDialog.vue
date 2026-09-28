@@ -108,7 +108,10 @@
         />
       </AdminFormField>
 
-      <AdminFormField :label="PAYMENTS_MESSAGES.purchasesLabel" for="admin-stripe-purchases-enabled">
+      <AdminFormField
+        :label="PAYMENTS_MESSAGES.purchasesLabel"
+        for="admin-stripe-purchases-enabled"
+      >
         <div
           class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
         >
@@ -206,7 +209,11 @@ const form = useForm({
           PAYMENTS_MESSAGES.pmcInvalid,
         ),
       ),
-      productTaxCode: v.pipe(v.string(), v.trim(), v.minLength(1, PAYMENTS_MESSAGES.productTaxCodeRequired)),
+      productTaxCode: v.pipe(
+        v.string(),
+        v.trim(),
+        v.minLength(1, PAYMENTS_MESSAGES.productTaxCodeRequired),
+      ),
     }),
 })
 const isBusy = computed(() => isLoading.value || isSaving.value)

@@ -37,13 +37,7 @@ export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'
 export type WorkspaceSelectionSource = 'url' | 'stored' | 'auto-personal' | 'auto-first' | 'none'
 
 export type WorkspaceSelectionStatus =
-  | 'loading'
-  | 'empty'
-  | 'ready'
-  | 'error'
-  | 'hidden'
-  | 'forbidden'
-  | 'disabled'
+  'loading' | 'empty' | 'ready' | 'error' | 'hidden' | 'forbidden' | 'disabled'
 
 export function asWorkspaceId(value: unknown): string | null {
   if (typeof value !== 'string') return null

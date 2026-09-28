@@ -112,6 +112,9 @@ var (
 	// underlying billing cause via multi-%w, and the 422-vs-503 split in
 	// renderTaskError depends on that pairing.
 	ErrQuoteUnavailable = errors.New("workspacetasks: quote unavailable")
+	// ErrRoutingUnavailable prevents accepting a task before a durable
+	// Service Model Pool decision exists.
+	ErrRoutingUnavailable = errors.New("workspacetasks: service routing unavailable")
 	// ErrWalletRestricted is the canonical credits restriction failure
 	// (403 billing_wallet_restricted). Alias, not a copy: see
 	// ErrInsufficientCredits for the multi-%w pairing.
@@ -123,6 +126,16 @@ var (
 	// ErrMediaArchived wraps an archived asset (410 media_archived).
 	ErrMediaArchived = errors.New("workspacetasks: media archived")
 )
+
+// RoutingGate is the pre-settlement availability seam. Routing must be
+// accepted before credits are held.
+type RoutingGate func(ctx context.Context, service, resolution string) error
+
+// RejectRoutingUntilPool is the production fail-closed gate used until #848
+// wires the authoritative Service Model Pool resolver.
+func RejectRoutingUntilPool(context.Context, string, string) error {
+	return ErrRoutingUnavailable
+}
 
 // FieldError carries one field-level validation failure for
 // details.fields (Baseline 5.3).
@@ -193,16 +206,14 @@ const (
 // ExecutionToken, OutputRefs, and BillingSnapshot persist as durable
 // facts; the store never exposes internal numeric keys.
 //
-// ResolvedModel is the durable execution-plan fact minted at submit: the
-// admin model mapping (provider/model) frozen for this task. The worker
-// prefers it over a live mapping lookup so retries and redeliveries reuse
-// the submit-time model even if the admin remaps the feature mid-flight.
-// Every newly created task must carry a non-empty provider/model target.
+// ResolvedModel is retained as the execution target field for the upcoming
+// Service Model Pool snapshot. Until that snapshot is wired, production
+// routing rejects submissions and an empty target fails the worker closed.
 type WorkspaceTask struct {
 	ID              string          `json:"id"`
 	WorkspaceID     string          `json:"workspace_id"`
 	OwnerUserID     int64           `json:"owner_user_id"`
-	WorkflowKind    string          `json:"workflow_kind"`
+	Service         string          `json:"service"`
 	MediaAssetIDs   []string        `json:"media_asset_ids,omitempty"`
 	Params          map[string]any  `json:"params,omitempty"`
 	CanonicalParams string          `json:"canonical_params,omitempty"`
@@ -243,22 +254,22 @@ type TaskEvent struct {
 type CreateParams struct {
 	WorkspaceID   string
 	OwnerUserID   int64
-	WorkflowKind  string
+	Service       string
 	MediaAssetIDs []string
 	Params        map[string]any
 }
 
 // QuoteParams carries preflight quote input (no persistence).
 type QuoteParams struct {
-	WorkflowKind string
-	Quantity     int64
-	Resolution   string
+	Service    string
+	Quantity   int64
+	Resolution string
 }
 
 // Quoter mints immutable server-side price snapshots. Production adapts
 // the Billing catalog; tests stub this interface.
 type Quoter interface {
-	Quote(ctx context.Context, workflowKind, resolution string, quantity int64) (BillingSnapshot, error)
+	Quote(ctx context.Context, service, resolution string, quantity int64) (BillingSnapshot, error)
 }
 
 // Holder reserves Ideas via Credits Commands (never direct ledger
@@ -290,24 +301,17 @@ type AssetReader interface {
 	GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error)
 }
 
-// ModelResolver returns the admin-configured model for one workflow feature
-// at submit time. Production adapts the AI gateway model mapping; tests stub
-// it. A nil resolver makes task creation fail closed.
-type ModelResolver interface {
-	ResolveModel(ctx context.Context, feature string) (string, error)
-}
-
 // ValidateCreate enforces the discriminated input union:
-// workflow_kind against the workflow features registry, media_asset_ids
+// service against the workflow features registry, media_asset_ids
 // as asset_... only (no raw storage URLs), and params as a bounded map
 // with no storage internals or unknown fields.
 func ValidateCreate(kind string, mediaAssetIDs []string, params map[string]any) (string, error) {
 	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(kind))
 	if !ok {
 		if _, perr := workflow.ValidateWorkflowFeatureSlug(strings.TrimSpace(kind)); perr != nil {
-			return "", newValidationError(FieldError{Field: "workflow_kind", Message: "unsupported"})
+			return "", newValidationError(FieldError{Field: "service", Message: "unsupported"})
 		}
-		return "", newValidationError(FieldError{Field: "workflow_kind", Message: "unsupported"})
+		return "", newValidationError(FieldError{Field: "service", Message: "unsupported"})
 	}
 	if len(mediaAssetIDs) > MaxMediaInputs {
 		return "", newValidationError(FieldError{Field: "media_asset_ids", Message: "too_many"})

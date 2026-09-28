@@ -94,13 +94,13 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 		}}
 		service := NewService(ServiceDeps{
 			Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Models: testModelResolver{},
+			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Routing: allowTestRouting,
 		})
 		return store, service
 	}
 	_, service := newMaskedService()
 	created, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "inpaint",
+		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "inpaint",
 		MediaAssetIDs: []string{"asset_ready"},
 		Params:        map[string]any{"mask_asset_id": "asset_mask"},
 	}, "mask-ok")
@@ -121,7 +121,7 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 	} {
 		_, service := newMaskedService()
 		_, err := service.Create(ctx, CreateInput{
-			WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "inpaint",
+			WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "inpaint",
 			MediaAssetIDs: []string{"asset_ready"}, Params: tc.params,
 		}, "mask-"+tc.name)
 		if !errors.Is(err, tc.want) {

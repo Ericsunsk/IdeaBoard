@@ -72,7 +72,7 @@ export const MODEL_HOSTING_OPTIONS = [MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_TH
 export interface ModelObservedSkuMargin {
   sku: string
   displayName: string
-  feature: string
+  service: string
   onSale: boolean
   unitCreditsByVariant: Record<string, number>
   actualCostCredits?: number | null | undefined

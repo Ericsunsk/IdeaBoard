@@ -32,7 +32,7 @@ func TestResolveAdapterDispatch(t *testing.T) {
 	assert.Contains(t, err.Error(), "网关不支持操作")
 }
 
-func TestResolveModelImageSharesResolveRoute(t *testing.T) {
+func TestServiceImageSharesResolveRoute(t *testing.T) {
 	route, err := Resolve(workflow.RuntimeOperationGeneration, "openai", "dall-e-3", "", "")
 	require.NoError(t, err)
 	want := workflow.ResolveRoute("openai", "dall-e-3", "", "")

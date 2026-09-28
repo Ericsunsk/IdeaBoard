@@ -1,6 +1,6 @@
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import type { WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
-import { EXECUTION_META, type ExecutionFeature } from './executionContract'
+import type { Service } from '../../../../shared/domain/imageServices'
+import { EXECUTION_META, type ExecutionService } from './executionContract'
 
 export const IMAGE_EXECUTION_MODE = {
   directTask: 'direct-task',
@@ -47,26 +47,26 @@ export const IMAGE_STRENGTH_ACTIONS = [
 export type ImageActionExecutionConfig = {
   action: ImageExecutionAction
   mode: ImageExecutionMode
-  feature: ExecutionFeature
+  service: ExecutionService
   prompt?: string | undefined
   promptPrefix?: string | undefined
   strength?: ImageActionStrengthConfig | undefined
 }
 
-type WorkflowImageExecutionAction = Extract<ImageExecutionAction, WorkflowFeature>
+type WorkflowImageExecutionAction = Extract<ImageExecutionAction, Service>
 
 function createWorkflowExecutionConfig<TAction extends WorkflowImageExecutionAction>(
   action: TAction,
-  config: Omit<ImageActionExecutionConfig, 'action' | 'feature'>,
+  config: Omit<ImageActionExecutionConfig, 'action' | 'service'>,
 ): ImageActionExecutionConfig & { action: TAction } {
   const meta = EXECUTION_META[action] as {
-    feature: ExecutionFeature
+    service: ExecutionService
     prompt?: string
     promptPrefix?: string
   }
   return {
     action,
-    feature: meta.feature,
+    service: meta.service,
     prompt: meta.prompt,
     promptPrefix: meta.promptPrefix,
     ...config,

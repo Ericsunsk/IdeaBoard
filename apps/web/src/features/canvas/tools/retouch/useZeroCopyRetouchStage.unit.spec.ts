@@ -314,8 +314,7 @@ describe('useZeroCopyRetouchStage', () => {
 
       expect(renderer.render).not.toHaveBeenCalled()
       expect(renderer.updateUniforms).not.toHaveBeenCalled()
-      const cancelled =
-        clearTimeoutSpy.mock.calls.length + (cancelRafSpy?.mock.calls.length ?? 0)
+      const cancelled = clearTimeoutSpy.mock.calls.length + (cancelRafSpy?.mock.calls.length ?? 0)
       expect(cancelled).toBeGreaterThan(0)
     } finally {
       clearTimeoutSpy.mockRestore()

@@ -50,7 +50,12 @@ function pointerDownOnHandle(
   handle: HTMLElement,
   init: Record<string, unknown> = {},
 ) {
-  const event = createPointerEvent('pointerdown', { pointerId: 7, clientX: 50, clientY: 25, ...init })
+  const event = createPointerEvent('pointerdown', {
+    pointerId: 7,
+    clientX: 50,
+    clientY: 25,
+    ...init,
+  })
   Object.defineProperty(event, 'currentTarget', { value: handle })
   control.onBlendHandlePointerDown(event)
 }
@@ -68,10 +73,14 @@ describe('useFusionBlendControl', () => {
     scopes.push(scope)
     pointerDownOnHandle(control, handle)
 
-    window.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }))
+    window.dispatchEvent(
+      createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
     expect(control.blendDragging.value).toBe(true)
 
-    window.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }))
+    window.dispatchEvent(
+      createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
     expect(onCommit).toHaveBeenCalledTimes(1)
     expect(control.blendDragging.value).toBe(false)
   })
@@ -81,10 +90,14 @@ describe('useFusionBlendControl', () => {
     scopes.push(scope)
     pointerDownOnHandle(control, handle)
 
-    window.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }))
+    window.dispatchEvent(
+      createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
     expect(control.blendDragging.value).toBe(true)
 
-    window.dispatchEvent(createPointerEvent('pointercancel', { pointerId: 7, clientX: 150, clientY: 75 }))
+    window.dispatchEvent(
+      createPointerEvent('pointercancel', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
     expect(onCommit).not.toHaveBeenCalled()
     expect(control.blendDragging.value).toBe(false)
     expect(control.activeBlendPoint.value).toEqual({ x: 0.5, y: 0.5 })
@@ -93,8 +106,12 @@ describe('useFusionBlendControl', () => {
   it('ignores window pointer moves when no drag is active', () => {
     const { onCommit, control, scope } = mountBlendControl()
     scopes.push(scope)
-    window.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }))
-    window.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }))
+    window.dispatchEvent(
+      createPointerEvent('pointermove', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
+    window.dispatchEvent(
+      createPointerEvent('pointerup', { pointerId: 7, clientX: 150, clientY: 75 }),
+    )
     expect(onCommit).not.toHaveBeenCalled()
     expect(control.blendDragging.value).toBe(false)
   })

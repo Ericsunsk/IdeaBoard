@@ -121,9 +121,10 @@ function parseEventData(raw: unknown): Record<string, unknown> {
 
 /** Parse + validate one SSE `data:` payload into a typed envelope. Throws on invalid. */
 export function parseWorkspaceEventEnvelope(raw: unknown): WorkspaceEventEnvelope {
-  const envelope = (
-    typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
-  ) as Record<string, unknown>
+  const envelope = (typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw) as Record<
+    string,
+    unknown
+  >
   if (typeof envelope !== 'object' || envelope === null) {
     throw new Error('Invalid workspace event envelope: expected an object')
   }
@@ -416,9 +417,12 @@ export function waitForWorkspaceEnvelope(
       return
     }
     options?.signal?.addEventListener('abort', onAbort, { once: true })
-    timer = window.setTimeout(() => {
-      settleReject(new Error('Workspace event wait timed out'))
-    }, Math.max(0, timeoutMs))
+    timer = window.setTimeout(
+      () => {
+        settleReject(new Error('Workspace event wait timed out'))
+      },
+      Math.max(0, timeoutMs),
+    )
 
     try {
       unsubscribe = subscribeWorkspaceEvent(
@@ -462,6 +466,9 @@ export function subscribeWorkspaceMediaInvalidation(
       const assetId = typeof raw === 'string' ? raw.trim() : ''
       if (assetId.length > 0) onInvalidated(assetId)
     },
-    { types: ['media.asset_ready', 'media.asset_archived'], ...(onError == null ? {} : { onError }) },
+    {
+      types: ['media.asset_ready', 'media.asset_archived'],
+      ...(onError == null ? {} : { onError }),
+    },
   )
 }

@@ -50,7 +50,9 @@ function resolveWebRelative(sourceFile: string, specifier: string): string | nul
   const resolved = resolve(dirname(sourceFile), specifier)
   const candidates = [resolved, `${resolved}.ts`, join(resolved, 'index.ts')]
   const existing = candidates.find((candidate) => existsSync(candidate))
-  return relative(webRoot, existing ?? resolved).split('\\').join('/')
+  return relative(webRoot, existing ?? resolved)
+    .split('\\')
+    .join('/')
 }
 
 describe('canvas domain purity', () => {
@@ -69,10 +71,7 @@ describe('canvas domain purity', () => {
           continue
         }
         const resolved = resolveWebRelative(file, specifier)
-        if (
-          resolved &&
-          RESOLVED_FORBIDDEN_PREFIXES.some((prefix) => resolved.startsWith(prefix))
-        ) {
+        if (resolved && RESOLVED_FORBIDDEN_PREFIXES.some((prefix) => resolved.startsWith(prefix))) {
           violations.push(`${display} imports forbidden module '${specifier}' (${resolved})`)
         }
       }

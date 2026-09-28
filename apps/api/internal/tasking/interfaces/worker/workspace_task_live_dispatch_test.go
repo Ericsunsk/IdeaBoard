@@ -1,11 +1,10 @@
 package worker
 
-// Live dispatch proof: submit mints the durable plan (canonical params +
-// submit-time resolved model), the worker Generate consumes the plan
+// Live dispatch proof: the worker Generate consumes the canonical plan
 // through the REAL gateway executor against a fake gateway, the workspace
 // materializer ingests provider bytes, the renderer verifies, and
 // settlement completes atomically. The fail-closed twins prove missing
-// gateway credentials and missing model mappings converge deterministically
+// gateway credentials and missing pool routes converge deterministically
 // (failed, no requeue, hold released).
 //
 // No secrets anywhere: the fake gateway runs on httptest with an
@@ -33,19 +32,6 @@ import (
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
-
-// liveDispatchModelResolver is a stub workspacetasks.ModelResolver.
-type liveDispatchModelResolver struct {
-	models map[string]string
-	err    error
-}
-
-func (s *liveDispatchModelResolver) ResolveModel(_ context.Context, feature string) (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-	return s.models[feature], nil
-}
 
 // liveDispatchGatewayServer serves one canned chat-completions image
 // result (inline data: PNG, the common generation path).
@@ -94,14 +80,14 @@ type liveDispatchEnv struct {
 	service *workspacetasks.Service
 }
 
-func newLiveDispatchEnv(models workspacetasks.ModelResolver) *liveDispatchEnv {
+func newLiveDispatchEnv() *liveDispatchEnv {
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	store := workspacetasks.NewInMemoryStoreForTests()
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Models: models,
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Routing: allowTestRouting,
 	})
 	return &liveDispatchEnv{
 		media: media, objects: &fakeRendererObjects{},
@@ -118,7 +104,7 @@ func (e *liveDispatchEnv) submit(t *testing.T, key string) *workspacetasks.Works
 		t.Fatalf("CompileWorkspaceParams: %v", err)
 	}
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
-		WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "generation",
+		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "generation",
 		Params:          map[string]any{"output_count": 1},
 		Quantity:        1,
 		Resolution:      "default",
@@ -176,21 +162,33 @@ func allowLiveDispatchLoopback(t *testing.T) {
 	t.Cleanup(restore)
 }
 
-// Submit mints the plan, the fake gateway serves bytes, the materializer
+// pinLiveDispatchModel simulates the #848 RoutingSnapshot pin: submit no
+// longer mints a model, so tests that need a runnable task persist the
+// pinned target explicitly before dispatch.
+func pinLiveDispatchModel(t *testing.T, env *liveDispatchEnv, created *workspacetasks.WorkspaceTask, model string) *workspacetasks.WorkspaceTask {
+	t.Helper()
+	if err := env.store.DeleteTask(context.Background(), created.WorkspaceID, created.ID); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	pinned := *created
+	pinned.ResolvedModel = model
+	stored, err := env.store.CreateTask(context.Background(), &pinned)
+	if err != nil {
+		t.Fatalf("CreateTask with pinned model: %v", err)
+	}
+	return stored
+}
+
+// Submit persists the plan, the fake gateway serves bytes, the materializer
 // ingests them, the renderer verifies, and settlement captures atomically.
+// The execution model is pinned explicitly (#848 snapshot stand-in): the
+// bridge consumes only the pinned task model, never a live lookup.
 func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	allowLiveDispatchLoopback(t)
-	env := newLiveDispatchEnv(&liveDispatchModelResolver{
-		models: map[string]string{"generation": "openrouter/fake-test-image"},
-	})
-	created := env.submit(t, "live-dispatch-key")
+	env := newLiveDispatchEnv()
+	created := pinLiveDispatchModel(t, env, env.submit(t, "live-dispatch-key"), "openrouter/fake-test-image")
 
-	// The durable plan is frozen at submit: canonical params carry the
-	// execution plan, and the model mapping is resolved into the task.
-	if created.ResolvedModel != "openrouter/fake-test-image" {
-		t.Fatalf("resolved_model = %q, want the submit-time mapping", created.ResolvedModel)
-	}
 	if !strings.Contains(created.CanonicalParams, "execution_plan") {
 		t.Fatalf("canonical params lack the execution plan: %.120s", created.CanonicalParams)
 	}
@@ -239,13 +237,8 @@ func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 // credential seam is absent.
 func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testing.T) {
 	ctx := context.Background()
-	env := newLiveDispatchEnv(&liveDispatchModelResolver{
-		models: map[string]string{"generation": "openrouter/fake-test-image"},
-	})
-	created := env.submit(t, "live-dispatch-no-creds")
-	if created.ResolvedModel == "" {
-		t.Fatal("plan must carry the model even when credentials are absent")
-	}
+	env := newLiveDispatchEnv()
+	created := pinLiveDispatchModel(t, env, env.submit(t, "live-dispatch-no-creds"), "openrouter/fake-test-image")
 
 	// The real missing-credential sentinel (no secret material, just the
 	// error the config seam returns when unconfigured).
@@ -278,19 +271,34 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testin
 	}
 }
 
-// Missing model mapping fails closed at submit: no task or hold is created
-// without a durable execution target.
-func TestWorkspaceTaskLiveDispatchFailsClosedWithoutModelMapping(t *testing.T) {
+// A task without a pinned model fails closed in the worker: the failure is
+// deterministic (no retry budget consumed) and the full hold is released.
+// Submit itself succeeds; #848 restores model pinning via RoutingSnapshot.
+func TestWorkspaceTaskLiveDispatchFailsClosedWithoutPinnedModel(t *testing.T) {
 	ctx := context.Background()
-	env := newLiveDispatchEnv(&liveDispatchModelResolver{err: aigateway.ErrModelMappingMissing})
-	_, err := env.service.Create(ctx, workspacetasks.CreateInput{
-		WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "generation",
-		Params: map[string]any{"output_count": 1}, Quantity: 1, Resolution: "default",
-	}, "live-dispatch-no-model")
-	if err == nil || !strings.Contains(err.Error(), aigateway.ErrModelMappingMissing.Error()) {
-		t.Fatalf("Create err = %v, want missing mapping failure", err)
+	env := newLiveDispatchEnv()
+	created := env.submit(t, "live-dispatch-no-model")
+	if created.ResolvedModel != "" {
+		t.Fatalf("resolved_model = %q, want empty until the #848 snapshot lands", created.ResolvedModel)
 	}
-	if count, _ := env.store.CountTasks(ctx, "ws_test"); count != 0 {
-		t.Fatalf("tasks = %d, want no persisted task", count)
+	worker := env.liveWorker(t, liveDispatchGatewayFactory("http://127.0.0.1:1"))
+	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
+		t.Fatalf("Work must converge (nil), got: %v", err)
+	}
+	got, err := env.store.GetTask(ctx, "ws_test", created.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != workspacetasks.StatusFailed {
+		t.Fatalf("status = %q, want failed", got.Status)
+	}
+	if got.RetryCount != 0 {
+		t.Fatalf("retry_count = %d, want 0 (deterministic, no requeue)", got.RetryCount)
+	}
+	env.holder.mu.Lock()
+	released := env.holder.releases["hold_"+created.ID]
+	env.holder.mu.Unlock()
+	if released != 10 {
+		t.Fatalf("released = %d, want 10 (full hold back on fail)", released)
 	}
 }

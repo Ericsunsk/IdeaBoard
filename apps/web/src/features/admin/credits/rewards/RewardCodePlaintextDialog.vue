@@ -6,7 +6,9 @@
     size="compact"
     @update:visible="emit('update:visible', $event)"
   >
-    <p class="m-0 text-admin-body text-admin-text-2">{{ REWARD_CODES_MESSAGES.plaintextWarning }}</p>
+    <p class="m-0 text-admin-body text-admin-text-2">
+      {{ REWARD_CODES_MESSAGES.plaintextWarning }}
+    </p>
     <div
       class="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-surface-muted p-3"
     >
@@ -19,7 +21,9 @@
         {{ REWARD_CODES_MESSAGES.plaintextCopyLabel(copied) }}
       </AdminButton>
     </div>
-    <AdminAlert v-if="copyError" severity="error">{{ REWARD_CODES_MESSAGES.plaintextCopyFailed }}</AdminAlert>
+    <AdminAlert v-if="copyError" severity="error">{{
+      REWARD_CODES_MESSAGES.plaintextCopyFailed
+    }}</AdminAlert>
     <template #footer>
       <AdminButton :class="adminActionButtonClass" @click="emit('update:visible', false)">
         {{ REWARD_CODES_MESSAGES.plaintextAcknowledged }}

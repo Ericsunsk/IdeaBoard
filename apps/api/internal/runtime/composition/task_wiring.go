@@ -173,7 +173,7 @@ func newAppTaskRuntime(
 	workspaceEnqueuer := taskruntime.NewWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: workspaceStore, Quoter: workspaceQuoter, Holder: workspaceHolder,
-		Queue: workspaceEnqueuer, Assets: workspaceAssets, Models: aiGatewayRepo,
+		Queue: workspaceEnqueuer, Assets: workspaceAssets,
 	})
 	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
 	// Live dispatch finalize seam: provider image bytes land directly in

@@ -84,7 +84,10 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui'
-import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import {
   adminDialogChromeClass,
   adminDialogChromeCloseClass,

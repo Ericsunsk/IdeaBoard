@@ -1,5 +1,5 @@
 import { adminTaskStatuses } from '../domain/status'
-import { getAdminWorkflowFeatureMeta } from '../../shared/lib/workflowFeatureAdminMeta'
+import { getAdminServiceMeta } from '../../shared/lib/serviceAdminMeta'
 import type { AdminMonitorDetailModel, AdminTaskBillingSnapshot } from '../infrastructure/resource'
 import type { AdminTaskRow } from './useAdminTaskList'
 
@@ -7,7 +7,7 @@ export const DEMO_MODE_QUERY_VALUE = '1'
 
 type DemoTemplate = {
   user: string
-  feature: string
+  service: string
   model: string
   prompt: string
   failedPrompt?: string
@@ -17,53 +17,53 @@ type DemoTemplate = {
 const demoTemplates: readonly DemoTemplate[] = [
   {
     user: 'Eric Sun',
-    feature: 'render',
+    service: 'render',
     model: 'seedream-v2',
     prompt: 'render: 产品主图草图成图，白底 + 柔光阴影，输出 1 张',
     failedPrompt: 'render: 超时未返回网关回执，已释放预留额度',
   },
   {
     user: 'Alice W',
-    feature: 'variations',
+    service: 'variations',
     model: 'gpt-image-1',
     prompt: 'variations: 主图风格延展 3 张，暖色电商风',
   },
   {
     user: 'Dev Bot',
-    feature: 'upscale',
+    service: 'upscale',
     model: 'topaz-upscale',
     prompt: 'upscale: 详情页长图 2x 放大',
     failedPrompt: 'upscale: 上游模型返回 500，已自动释放额度',
   },
   {
     user: 'System Cron',
-    feature: 'inpaint',
+    service: 'inpaint',
     model: 'seedream-v2',
     prompt: 'inpaint: 局部重绘商品 logo 区域',
   },
   {
     user: 'Eric Sun',
-    feature: 'outpaint',
+    service: 'outpaint',
     model: 'gpt-image-1',
     prompt: 'outpaint: 横版海报左右扩图',
     failedPrompt: 'outpaint: 参考图缺失，已释放预留额度',
   },
   {
     user: 'Alice W',
-    feature: 'cutout',
+    service: 'cutout',
     model: 'bria-cutout',
     prompt: 'cutout: 主图一键抠图去背景',
   },
   {
     user: 'Dev Bot',
-    feature: 'fusion',
+    service: 'fusion',
     model: 'seedream-v2',
     prompt: 'fusion: 模特图与产品图多图融合',
   },
   {
     // 超长 Message 演示截断：实际渲染 120 字 + 省略号，hover 看全文
     user: 'Eric Sun',
-    feature: 'variations',
+    service: 'variations',
     model: 'gpt-image-1',
     prompt:
       'variations: 双十一大促主会场英雄区横版海报延展适配，要求保留主标题排版与价格标签位置，背景从深蓝渐变过渡到品红光斑，模特姿态不变，输出三张不同构图分别适配首屏轮播、信息流卡片与开屏广告位，同步输出各尺寸安全边距标注与字体描边参数，失败自动重试两次并回退默认模板',
@@ -128,7 +128,7 @@ export function createDemoMonitorList(durationMs: number, count = 42): AdminTask
       user_public_id: '00000000-0000-0000-0000-000000000000',
       user_display_name: template.user,
       prompt: failed ? template.failedPrompt! : template.prompt,
-      feature_slug: template.feature,
+      service: template.service,
       credits: completed ? 2 + Math.floor(random() * 3) : 0,
       result: resultImages.length > 0 ? JSON.stringify({ image_urls: resultImages }) : '',
       latest_execution: {
@@ -165,12 +165,12 @@ export function createDemoMonitorStats(list: readonly AdminTaskRow[]): DemoMonit
 
 // 演示详情弹窗：用行内数据本地拼装，不触达真实详情接口。
 export function createDemoTaskDetail(row: AdminTaskRow): AdminMonitorDetailModel {
-  const meta = getAdminWorkflowFeatureMeta(row.feature_slug)
+  const meta = getAdminServiceMeta(row.service)
   const settled = row.status === adminTaskStatuses.completed
   const billing: AdminTaskBillingSnapshot = {
-    sku: `${row.feature_slug || 'render'}:demo`,
+    sku: `${row.service || 'render'}:demo`,
     output_resolution: 'default',
-    display_name: meta?.label ?? row.feature_slug,
+    display_name: meta?.label ?? row.service,
     price_version_id: 1,
     price_version: 1,
     unit_credits: row.credits,
@@ -190,7 +190,7 @@ export function createDemoTaskDetail(row: AdminTaskRow): AdminMonitorDetailModel
     prompt: row.prompt,
     user_prompt: row.prompt,
     params: '{}',
-    feature_slug: row.feature_slug,
+    service: row.service,
     priority: row.priority,
     status: row.status,
     retry_count: 0,

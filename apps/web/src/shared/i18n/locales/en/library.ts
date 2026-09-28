@@ -41,7 +41,8 @@ export default {
     folderNameLabel: 'Folder name',
     folderNamePlaceholder: 'e.g. Minimalist Spatial',
     deleteFolderTitle: 'Delete folder',
-    deleteFolderMessage: 'Delete "{name}"? Saved references will become unfiled (visible under All Assets).',
+    deleteFolderMessage:
+      'Delete "{name}"? Saved references will become unfiled (visible under All Assets).',
     removeAssetTitle: 'Remove saved reference',
     removeAssetMessage: 'Remove this saved reference from your Library?',
     cancel: 'Cancel',

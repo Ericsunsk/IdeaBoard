@@ -41,12 +41,11 @@ var _ taskmedia.Validator = assetAwareMediaValidator{}
 func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T) {
 	readiness := &processingReadinessStub{err: errors.New("derivative pending")}
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models:         &fakeIntakeModelStore{},
 		Media:          assetAwareMediaValidator{},
 		MediaReadiness: readiness,
 	})
 	_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugVariations,
+		Service: workflow.FeatureSlugVariations,
 		Params: map[string]interface{}{
 			"image_asset_ids": []int64{9},
 		},
@@ -61,7 +60,6 @@ func TestTaskIntakeReadinessRejectsMissingProcessingInputDerivative(t *testing.T
 
 func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t *testing.T) {
 	var intake = NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugInpaint:  {Prompt: "system"},
 			workflow.FeatureSlugOutpaint: {Prompt: "system"},
@@ -130,7 +128,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 			canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "保留主体",
-				Feature:        tt.feature,
+				Service:        tt.feature,
 				ImageURLs:      tt.images,
 				Params:         requestParams,
 				ClientActionID: "intake-" + tt.feature,
@@ -138,8 +136,8 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			if err != nil {
 				t.Fatalf("Prepare() error = %v", err)
 			}
-			if canonical.Feature() != tt.feature {
-				t.Fatalf("Feature() = %q, want %q", canonical.Feature(), tt.feature)
+			if canonical.Service() != tt.feature {
+				t.Fatalf("Service() = %q, want %q", canonical.Service(), tt.feature)
 			}
 			if canonical.UserID() != 42 {
 				t.Fatalf("UserID() = %d, want authorized user 42", canonical.UserID())
@@ -150,7 +148,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
-			if billingRequest == nil || billingRequest.Feature != tt.feature || billingRequest.Quantity != wantQuantity {
+			if billingRequest == nil || billingRequest.Service != tt.feature || billingRequest.Quantity != wantQuantity {
 				t.Fatalf("BillingRequest() = %#v", billingRequest)
 			}
 
@@ -178,15 +176,14 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 
 func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 
 	for _, outputCount := range []interface{}{0, 5, 8, 1.5, "2"} {
 		t.Run(fmt.Sprint(outputCount), func(t *testing.T) {
 			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "generate",
-				Feature:        workflow.FeatureSlugGeneration,
+				Service:        workflow.FeatureSlugGeneration,
 				ClientActionID: "invalid-output-count",
 				Params:         map[string]interface{}{"output_count": outputCount},
 			})
@@ -199,8 +196,7 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 
 func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 
 	for _, feature := range []string{workflow.FeatureSlugCutout, workflow.FeatureSlugUpscale} {
@@ -213,7 +209,7 @@ func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T
 				params["upscale"] = map[string]interface{}{"scale": 2.5}
 			}
 			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-				Prompt: "ignored", Feature: feature, ClientActionID: "ignored-controls-" + feature, Params: params,
+				Prompt: "ignored", Service: feature, ClientActionID: "ignored-controls-" + feature, Params: params,
 			})
 			if err == nil || !strings.Contains(err.Error(), "output_count") {
 				t.Fatalf("expected fixed output contract error, got %v", err)
@@ -224,12 +220,11 @@ func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T
 
 func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 
 	if _, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Feature:        workflow.FeatureSlugCutout,
+		Service:        workflow.FeatureSlugCutout,
 		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "modeless-cutout",
 	}); err != nil {
@@ -239,7 +234,6 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 
 func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugInpaint: {Prompt: "system"},
 		}},
@@ -255,14 +249,14 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 				params["custom_height"] = 768
 			}
 			compiled, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
-				Feature: feature,
+				Service: feature,
 				Params:  params,
 			})
 			if err != nil {
 				t.Fatalf("CompileReadiness() error = %v", err)
 			}
-			if compiled.Feature != feature {
-				t.Fatalf("feature = %q, want %q", compiled.Feature, feature)
+			if compiled.Service != feature {
+				t.Fatalf("service = %q, want %q", compiled.Service, feature)
 			}
 		})
 	}
@@ -270,11 +264,10 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 
 func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw a chair", Feature: workflow.FeatureSlugRender,
+		Prompt: "draw a chair", Service: workflow.FeatureSlugRender,
 		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "snapshot-intake", Params: map[string]interface{}{"output_count": 2},
 	})
@@ -289,7 +282,7 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 		t.Fatal("expected generation snapshot in canonical params")
 	}
 	snapshot := params.Generation
-	if snapshot.Feature != workflow.FeatureSlugRender || snapshot.UserPrompt != "draw a chair" || snapshot.CompiledPrompt != canonical.Prompt() {
+	if snapshot.Service != workflow.FeatureSlugRender || snapshot.UserPrompt != "draw a chair" || snapshot.CompiledPrompt != canonical.Prompt() {
 		t.Fatalf("generation snapshot=%+v canonical prompt=%q", snapshot, canonical.Prompt())
 	}
 	if snapshot.RequestedOutputCount != 2 || snapshot.TemplateFingerprint == "" || snapshot.TemplateVersion != "" {
@@ -303,13 +296,12 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 	preparer := &recordingGenerationMediaPreparer{}
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models:        &fakeIntakeModelStore{},
 		Media:         testSubmitMediaValidator{},
 		MediaPreparer: preparer,
 		MediaManifest: recordingTaskInputManifestBuilder{},
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
+		Prompt: "draw from reference", Service: workflow.FeatureSlugRender,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "plan-media-prepare",
 	})
 	if err != nil {
@@ -345,11 +337,10 @@ func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 
 func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw from reference", Feature: workflow.FeatureSlugRender,
+		Prompt: "draw from reference", Service: workflow.FeatureSlugRender,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "missing-media-preparer",
 	})
 	if err != nil {
@@ -362,7 +353,6 @@ func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
 
 func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugGeneration: {
 				Prompt:                "Create an image. {{user_prompt}}",
@@ -373,7 +363,7 @@ func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T)
 	})
 
 	textRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugGeneration, ClientActionID: "prompt-text",
+		Service: workflow.FeatureSlugGeneration, ClientActionID: "prompt-text",
 		Params: map[string]interface{}{"output_count": 2},
 	})
 	if err != nil {
@@ -385,7 +375,7 @@ func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T)
 
 	refs := []string{"https://example.com/one.png", "https://example.com/two.png", "https://example.com/three.png"}
 	imageRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Prompt: "keep this order", Feature: workflow.FeatureSlugGeneration,
+		Prompt: "keep this order", Service: workflow.FeatureSlugGeneration,
 		ImageURLs: refs, ClientActionID: "prompt-image",
 		Params: map[string]interface{}{"output_count": 4},
 	})
@@ -402,20 +392,19 @@ func TestTaskIntakeCompilesGenerationPrimitiveAndOrderedReferences(t *testing.T)
 		}
 	}
 	billing := imageRequest.BillingRequest()
-	if billing == nil || billing.Feature != workflow.FeatureSlugGeneration || billing.Quantity != 4 {
+	if billing == nil || billing.Service != workflow.FeatureSlugGeneration || billing.Quantity != 4 {
 		t.Fatalf("billing=%+v", billing)
 	}
 }
 
 func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugGeneration,
+		Service:        workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-system-prompt",
 	})
 	if err != nil {
@@ -427,9 +416,7 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 }
 
 func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
-	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: &fakeIntakeModelStore{},
-	})
+	intake := NewTaskIntake(TaskIntakeDeps{})
 	tests := []struct {
 		feature string
 		params  map[string]interface{}
@@ -455,7 +442,7 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.feature, func(t *testing.T) {
 			_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
-				Feature: test.feature,
+				Service: test.feature,
 				Params:  test.params,
 			})
 			if err == nil || !strings.Contains(err.Error(), "未配置 System Prompt") {
@@ -468,14 +455,13 @@ func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
 func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 	cause := errors.New("database connection refused")
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models:  &fakeIntakeModelStore{},
 		Prompts: fakeFeaturePromptStore{err: cause},
 		Media:   testSubmitMediaValidator{},
 	})
 
 	_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugGeneration,
+		Service:        workflow.FeatureSlugGeneration,
 		ClientActionID: "prompt-cause",
 	})
 	if !errors.Is(err, cause) {
@@ -490,28 +476,27 @@ func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 	}
 }
 
-func TestTaskIntakeReadinessFailsFastWithoutModelMapping(t *testing.T) {
-	// T09 pin: an unmapped feature fails closed at readiness with
-	// provider_unavailable, before any billing or submission work.
+func TestTaskIntakeReadinessDoesNotConsultModelMapping(t *testing.T) {
+	// #847: the single-value model mapping is removed from the readiness
+	// path. Readiness compiles the service + billing request without any
+	// mapping lookup; pool availability gating arrives with #848/#851.
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models:  &fakeIntakeModelStore{err: errors.New("AI gateway model mapping is not configured for this feature")},
 		Prompts: fakeFeaturePromptStore{},
 		Media:   testSubmitMediaValidator{},
 	})
 
-	_, err := intake.CompileReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
+	compilation, err := intake.CompileReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugGeneration,
+		Service:        workflow.FeatureSlugGeneration,
 		ClientActionID: "unmapped-feature",
 	})
-	if err == nil {
-		t.Fatal("CompileReadiness succeeded without a model mapping, want provider_unavailable")
+	if err != nil {
+		t.Fatalf("CompileReadiness() error = %v, want no mapping gate", err)
 	}
-	var submissionErr *SubmissionError
-	if !errors.As(err, &submissionErr) {
-		t.Fatalf("readiness error = %T, want SubmissionError", err)
+	if compilation.Service != workflow.FeatureSlugGeneration {
+		t.Fatalf("readiness service = %q, want generation", compilation.Service)
 	}
-	if submissionErr.Code != "provider_unavailable" {
-		t.Fatalf("readiness code = %q, want provider_unavailable", submissionErr.Code)
+	if compilation.BillingRequest == nil {
+		t.Fatal("readiness billing request is nil, want a compiled request")
 	}
 }

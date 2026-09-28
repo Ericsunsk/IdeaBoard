@@ -8,10 +8,7 @@ import {
   type ComputedRef,
   type InjectionKey,
 } from 'vue'
-import {
-  WORKFLOW_FEATURE_SLUGS,
-  type WorkflowFeature,
-} from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE_SLUGS, type Service } from '../../../../../shared/domain/imageServices'
 import type { SubmitTaskReadinessData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 import { i18n } from '../../../../../shared/i18n'
@@ -23,7 +20,7 @@ import {
 import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 
 export type CanvasBillingQuoteState = {
-  feature: WorkflowFeature
+  service: Service
   status: 'idle' | 'loading' | 'ready' | 'blocked' | 'error'
   unitCredits?: number
   totalCredits?: number
@@ -34,7 +31,7 @@ export type CanvasBillingQuoteState = {
 }
 
 type CanvasBillingReadinessFetcher = (
-  feature: WorkflowFeature,
+  service: Service,
   request?: Parameters<typeof fetchCanvasBillingReadiness>[1],
 ) => Promise<SubmitTaskReadinessData>
 type CanvasBillingReadinessMatrixFetcher = (
@@ -44,18 +41,18 @@ type CanvasBillingReadinessMatrixFetcher = (
 type CanvasBillingReadinessRequest = Parameters<typeof fetchCanvasBillingReadiness>[1]
 
 export type CanvasBillingReadinessStore = {
-  ensureFeature: (
-    feature: WorkflowFeature,
+  ensureService: (
+    service: Service,
     options?: { force?: boolean; request?: CanvasBillingReadinessRequest },
   ) => Promise<void>
   ensureMatrix: (
     entries: Array<{
-      feature: WorkflowFeature
+      service: Service
       request: NonNullable<CanvasBillingReadinessRequest>
     }>,
   ) => Promise<void>
-  getFeatureState: (
-    feature: WorkflowFeature,
+  getServiceState: (
+    service: Service,
     request?: CanvasBillingReadinessRequest,
   ) => CanvasBillingQuoteState
   applyReadiness: (
@@ -65,22 +62,19 @@ export type CanvasBillingReadinessStore = {
 }
 
 const EMPTY_STATES = Object.fromEntries(
-  WORKFLOW_FEATURE_SLUGS.map((feature) => [feature, { feature, status: 'idle' as const }]),
-) as Record<WorkflowFeature, CanvasBillingQuoteState>
+  SERVICE_SLUGS.map((service) => [service, { service, status: 'idle' as const }]),
+) as Record<Service, CanvasBillingQuoteState>
 
 export const canvasBillingReadinessKey: InjectionKey<CanvasBillingReadinessStore> = Symbol(
   'canvas-billing-readiness',
 )
 
-function isWorkflowFeature(value: string | undefined): value is WorkflowFeature {
-  return WORKFLOW_FEATURE_SLUGS.includes(value as WorkflowFeature)
+function isService(value: string | undefined): value is Service {
+  return SERVICE_SLUGS.includes(value as Service)
 }
 
-function buildReadinessStateKey(
-  feature: WorkflowFeature,
-  request?: CanvasBillingReadinessRequest,
-): string {
-  return request === undefined ? feature : `${feature}:${JSON.stringify(request)}`
+function buildReadinessStateKey(service: Service, request?: CanvasBillingReadinessRequest): string {
+  return request === undefined ? service : `${service}:${JSON.stringify(request)}`
 }
 
 export function createCanvasBillingReadinessStore(
@@ -105,12 +99,12 @@ export function createCanvasBillingReadinessStore(
   function resolveReadinessState(
     readiness: SubmitTaskReadinessData,
   ): CanvasBillingQuoteState | null {
-    if (!isWorkflowFeature(readiness.feature)) return null
-    const feature = readiness.feature
+    if (!isService(readiness.service)) return null
+    const service = readiness.service
     const billing = readiness.billing
     if (billing && !billing.sufficient) {
       return {
-        feature,
+        service,
         status: 'ready',
         unitCredits: billing.unit_credits,
         totalCredits: billing.total_credits,
@@ -125,20 +119,20 @@ export function createCanvasBillingReadinessStore(
     }
     if (!readiness.ready) {
       return {
-        feature,
+        service,
         status: 'blocked',
         reason: readinessErrorCopy(readiness.error_code),
       }
     }
     if (!billing) {
       return {
-        feature,
+        service,
         status: 'error',
         reason: i18n.global.t('common.errors.billingInfoUnavailable'),
       }
     }
     return {
-      feature,
+      service,
       status: 'ready',
       unitCredits: billing.unit_credits,
       totalCredits: billing.total_credits,
@@ -160,18 +154,18 @@ export function createCanvasBillingReadinessStore(
     readiness: SubmitTaskReadinessData,
     request?: CanvasBillingReadinessRequest,
   ): void {
-    if (!isWorkflowFeature(readiness.feature)) return
-    applyReadinessForKey(buildReadinessStateKey(readiness.feature, request), readiness)
+    if (!isService(readiness.service)) return
+    applyReadinessForKey(buildReadinessStateKey(readiness.service, request), readiness)
   }
 
-  async function ensureFeature(
-    feature: WorkflowFeature,
+  async function ensureService(
+    service: Service,
     requestOptions: {
       force?: boolean
       request?: CanvasBillingReadinessRequest
     } = {},
   ): Promise<void> {
-    const stateKey = buildReadinessStateKey(feature, requestOptions.request)
+    const stateKey = buildReadinessStateKey(service, requestOptions.request)
     const lastFailureAt = failedAt.get(stateKey)
     if (lastFailureAt !== undefined && now() - lastFailureAt < cacheMs) return
     const lastLoadedAt = loadedAt.get(stateKey) ?? 0
@@ -179,16 +173,16 @@ export function createCanvasBillingReadinessStore(
     const existing = pending.get(stateKey)
     if (existing) return existing
 
-    const previous = states.get(stateKey) ?? EMPTY_STATES[feature]
+    const previous = states.get(stateKey) ?? EMPTY_STATES[service]
     states.set(stateKey, { ...previous, status: 'loading', reason: undefined })
-    const request = fetchReadiness(feature, requestOptions.request)
+    const request = fetchReadiness(service, requestOptions.request)
       .then((readiness) => applyReadinessForKey(stateKey, readiness))
       .catch(() => {
         // Optional Billing/provider integrations can be intentionally unavailable.
         // Cache the failure briefly so reactive quote consumers do not create a request storm.
         failedAt.set(stateKey, now())
         states.set(stateKey, {
-          feature,
+          service,
           status: 'error',
           // Transport failures carry no user-safe detail; show the generic copy.
           reason: i18n.global.t('common.errors.billingInfoUnavailable'),
@@ -203,25 +197,25 @@ export function createCanvasBillingReadinessStore(
 
   async function ensureMatrix(
     entries: Array<{
-      feature: WorkflowFeature
+      service: Service
       request: NonNullable<CanvasBillingReadinessRequest>
     }>,
   ): Promise<void> {
     // Custom fetchers are used by isolated consumers/tests that only implement the
-    // single-feature contract; preserve that adapter seam without issuing a real request.
+    // single-service contract; preserve that adapter seam without issuing a real request.
     if (customFetcher && options.fetchReadinessMatrix === undefined) {
-      await Promise.all(entries.map(({ feature, request }) => ensureFeature(feature, { request })))
+      await Promise.all(entries.map(({ service, request }) => ensureService(service, { request })))
       return
     }
-    const stale = entries.filter(({ feature, request }) => {
-      const key = buildReadinessStateKey(feature, request)
+    const stale = entries.filter(({ service, request }) => {
+      const key = buildReadinessStateKey(service, request)
       const loaded = loadedAt.get(key) ?? 0
       const failed = failedAt.get(key) ?? 0
       return now() - loaded >= cacheMs && now() - failed >= cacheMs
     })
     if (stale.length === 0) return
     const batchKey = stale
-      .map(({ feature, request }) => buildReadinessStateKey(feature, request))
+      .map(({ service, request }) => buildReadinessStateKey(service, request))
       .sort()
       .join('|')
     const pendingBatch = pendingMatrices.get(batchKey)
@@ -232,16 +226,16 @@ export function createCanvasBillingReadinessStore(
         values.forEach((readiness, index) => {
           const entry = stale[index]
           if (entry)
-            applyReadinessForKey(buildReadinessStateKey(entry.feature, entry.request), readiness)
+            applyReadinessForKey(buildReadinessStateKey(entry.service, entry.request), readiness)
         })
       })
       .catch(() => {
         const timestamp = now()
-        stale.forEach(({ feature, request }) => {
-          const key = buildReadinessStateKey(feature, request)
+        stale.forEach(({ service, request }) => {
+          const key = buildReadinessStateKey(service, request)
           failedAt.set(key, timestamp)
           states.set(key, {
-            feature,
+            service,
             status: 'error',
             reason: i18n.global.t('common.errors.billingInfoUnavailable'),
           })
@@ -253,10 +247,10 @@ export function createCanvasBillingReadinessStore(
   }
 
   return {
-    ensureFeature,
+    ensureService,
     ensureMatrix,
-    getFeatureState: (feature, request) =>
-      states.get(buildReadinessStateKey(feature, request)) ?? EMPTY_STATES[feature],
+    getServiceState: (service, request) =>
+      states.get(buildReadinessStateKey(service, request)) ?? EMPTY_STATES[service],
     applyReadiness,
   }
 }
@@ -275,7 +269,7 @@ export function useCanvasBillingReadinessStore(): CanvasBillingReadinessStore | 
 }
 
 export function useCanvasBillingQuote(
-  feature: () => WorkflowFeature,
+  service: () => Service,
   enabled: () => boolean = () => true,
   request: () => Parameters<typeof fetchCanvasBillingReadiness>[1] = () => undefined,
 ): ComputedRef<CanvasBillingQuoteState | null> {
@@ -283,15 +277,15 @@ export function useCanvasBillingQuote(
   watchEffect(() => {
     if (!store || !enabled()) return
     const readinessRequest = request()
-    void store.ensureFeature(feature(), {
+    void store.ensureService(service(), {
       request: readinessRequest,
       // Readiness quotes include quantity and resolution. Dynamic node controls
-      // must bypass the feature-level cache when they provide a concrete request.
+      // must bypass the service-level cache when they provide a concrete request.
       force: readinessRequest !== undefined,
     })
   })
   return computed(() => {
     if (!store) return null
-    return store.getFeatureState(feature(), request())
+    return store.getServiceState(service(), request())
   })
 }

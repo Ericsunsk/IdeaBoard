@@ -238,7 +238,10 @@ async function runBrowserChecks(config: SmokeConfig, baseUrl: string): Promise<s
   for (const message of pageErrors) failures.push(`uncaught page error: ${message}`)
   let allowedSessionProbeNoise = 0
   for (const message of consoleErrors) {
-    if (sessionProbeNoise.test(message) && allowedSessionProbeNoise < observedSessionProbeFailures) {
+    if (
+      sessionProbeNoise.test(message) &&
+      allowedSessionProbeNoise < observedSessionProbeFailures
+    ) {
       allowedSessionProbeNoise += 1
       continue
     }

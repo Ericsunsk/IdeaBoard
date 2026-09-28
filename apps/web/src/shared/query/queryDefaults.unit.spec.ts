@@ -20,7 +20,11 @@ describe('query presets', () => {
   })
 
   it('adminPolling() selects the active/idle cadence from cached data', () => {
-    const polling = adminPolling(5_000, 30_000, (data) => data != null && (data as { on: boolean }).on)
+    const polling = adminPolling(
+      5_000,
+      30_000,
+      (data) => data != null && (data as { on: boolean }).on,
+    )
 
     expect(polling.retry).toBe(false)
     expect(polling.refetchIntervalInBackground).toBe(false)

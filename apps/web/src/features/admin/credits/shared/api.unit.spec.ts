@@ -175,4 +175,3 @@ describe('credits billing API adapter', () => {
     ).rejects.toMatchObject({ code: 'billing_wallet_restricted' })
   })
 })
-

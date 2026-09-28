@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { getWorkflowFeatureIcon } from '../../../../shared/domain/workflowFeatureIcons'
+import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import type { TaskMetricDefinition } from '../../../../shared/domain/taskMetricTokens'
 import { getTaskMetricByStatus } from '../../../../shared/domain/taskMetricTokens'
 import type { AdminMonitorListItemModel } from '../infrastructure/resource'
@@ -42,24 +42,24 @@ export function getTaskModelLabel(row: AdminMonitorListItemModel) {
   return row.latest_execution?.resolved_model || ''
 }
 
-// Service 列展示 workflow feature：图标 + slug。
-export function getTaskFeatureSlug(row: AdminMonitorListItemModel) {
-  return row.feature_slug || ''
+// Service 列展示 service：图标 + slug。
+export function getTaskServiceSlug(row: AdminMonitorListItemModel) {
+  return row.service || ''
 }
 
 // Service 列图标单源已上移 shared/domain：此处保留别名，调用方不动。
-export const getTaskFeatureIcon = getWorkflowFeatureIcon
+export const getTaskServiceIcon = getServiceIcon
 
 // Message 列展示上限：超出截断加省略号，完整原文由调用方放 title。
 export const TASK_MESSAGE_MAX_LENGTH = 120
 
-// Service 列已独立展示 feature：Message 仅剥离与本行 feature 一致的前缀
+// Service 列已独立展示 service：Message 仅剥离与本行 service 一致的前缀
 //（如 "render: ..."），用户原文其它内容原样保留。
 export function getTaskMessageText(row: AdminMonitorListItemModel) {
   const prompt = row.prompt || ''
-  const feature = getTaskFeatureSlug(row).trim().toLowerCase()
-  if (!feature) return truncateTaskMessage(prompt)
-  const match = new RegExp(`^${escapeRegExp(feature)}\\s*[:：\\-\\/]?\\s*`, 'i').exec(prompt)
+  const service = getTaskServiceSlug(row).trim().toLowerCase()
+  if (!service) return truncateTaskMessage(prompt)
+  const match = new RegExp(`^${escapeRegExp(service)}\\s*[:：\\-\\/]?\\s*`, 'i').exec(prompt)
   if (!match) return truncateTaskMessage(prompt)
   const stripped = prompt.slice(match[0].length)
   return truncateTaskMessage(stripped || prompt)
@@ -88,8 +88,8 @@ export function getTaskResultPreview(row: AdminMonitorListItemModel): {
 
 export type AdminTaskRowView = {
   metric: TaskMetricDefinition | undefined
-  featureSlug: string
-  featureIcon: Component | undefined
+  serviceSlug: string
+  serviceIcon: Component | undefined
   message: string
   preview: { urls: string[]; overflow: number }
 }
@@ -100,11 +100,11 @@ const rowViewCache = new WeakMap<AdminMonitorListItemModel, AdminTaskRowView>()
 export function getTaskRowView(row: AdminMonitorListItemModel): AdminTaskRowView {
   const cached = rowViewCache.get(row)
   if (cached) return cached
-  const featureSlug = getTaskFeatureSlug(row)
+  const serviceSlug = getTaskServiceSlug(row)
   const view: AdminTaskRowView = {
     metric: getTaskMetricByStatus(row.status),
-    featureSlug,
-    featureIcon: getTaskFeatureIcon(featureSlug),
+    serviceSlug,
+    serviceIcon: getTaskServiceIcon(serviceSlug),
     message: getTaskMessageText(row),
     preview: getTaskResultPreview(row),
   }

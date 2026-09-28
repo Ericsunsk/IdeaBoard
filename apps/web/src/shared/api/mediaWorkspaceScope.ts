@@ -10,9 +10,7 @@
 // the workspace feature) fails closed exactly like a missing selection.
 let mediaWorkspaceIdResolver: (() => string | null) | null = null
 
-export function setMediaWorkspaceIdResolver(
-  resolver: (() => string | null) | null,
-): void {
+export function setMediaWorkspaceIdResolver(resolver: (() => string | null) | null): void {
   mediaWorkspaceIdResolver = resolver
 }
 

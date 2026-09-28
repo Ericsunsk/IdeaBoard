@@ -10,8 +10,7 @@ export const ListAdminTasksStatus = {
   cancelled: 'cancelled',
 } as const
 
-export type ListAdminTasksStatus =
-  (typeof ListAdminTasksStatus)[keyof typeof ListAdminTasksStatus]
+export type ListAdminTasksStatus = (typeof ListAdminTasksStatus)[keyof typeof ListAdminTasksStatus]
 
 export type ListAdminTasksStatusValue = ListAdminTasksStatus
 

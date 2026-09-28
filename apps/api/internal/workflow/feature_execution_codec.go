@@ -6,11 +6,11 @@ import (
 	"fmt"
 )
 
-const CurrentFeatureExecutionPlanSchemaVersion = 5
+const CurrentFeatureExecutionPlanSchemaVersion = 6
 
 type durableFeatureExecutionPlan struct {
 	SchemaVersion int                       `json:"schema_version"`
-	Feature       string                    `json:"feature"`
+	Service       string                    `json:"service"`
 	PromptPolicy  PromptPolicy              `json:"prompt_policy"`
 	Output        durableOutputPlan         `json:"output"`
 	Routing       durableRoutingRequirement `json:"routing"`
@@ -212,7 +212,7 @@ func DecodeFeatureExecutionPlan(payload []byte) (FeatureExecutionPlan, error) {
 	}
 	if err := requireJSONEOF(decoder); err != nil {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractInvalidDurablePlan, envelope.Feature, "payload", err.Error(),
+			FeatureContractInvalidDurablePlan, envelope.Service, "payload", err.Error(),
 		)
 	}
 	return featureExecutionPlanFromDurable(envelope)
@@ -224,7 +224,7 @@ func validateDurableRequiredFields(payload []byte) error {
 		return err
 	}
 	if err := requireJSONKeys(top, "plan", []string{
-		"schema_version", "feature", "prompt_policy", "output", "routing", "runtime",
+		"schema_version", "service", "prompt_policy", "output", "routing", "runtime",
 	}); err != nil {
 		return err
 	}
@@ -265,13 +265,13 @@ func requireJSONKeys(object map[string]json.RawMessage, path string, required []
 func featureExecutionPlanFromDurable(envelope durableFeatureExecutionPlan) (FeatureExecutionPlan, error) {
 	if envelope.SchemaVersion != CurrentFeatureExecutionPlanSchemaVersion {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractUnsupportedSchema, envelope.Feature, "schema_version", fmt.Sprintf("%d", envelope.SchemaVersion),
+			FeatureContractUnsupportedSchema, envelope.Service, "schema_version", fmt.Sprintf("%d", envelope.SchemaVersion),
 		)
 	}
-	definition, ok := durableFeatureDefinitionForCurrentSchema(envelope.Feature)
+	definition, ok := durableFeatureDefinitionForCurrentSchema(envelope.Service)
 	if !ok {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractInvalidDurablePlan, envelope.Feature, "feature", envelope.Feature,
+			FeatureContractInvalidDurablePlan, envelope.Service, "service", envelope.Service,
 		)
 	}
 	if envelope.PromptPolicy != definition.promptPolicy ||
@@ -285,17 +285,17 @@ func featureExecutionPlanFromDurable(envelope durableFeatureExecutionPlan) (Feat
 		envelope.Runtime.OriginalImagePolicy != definition.originalImagePolicy ||
 		envelope.Runtime.ControlContract != definition.controlContract {
 		return FeatureExecutionPlan{}, newFeatureContractValidationError(
-			FeatureContractInvalidDurablePlan, envelope.Feature, "facts", "inconsistent or unknown execution facts",
+			FeatureContractInvalidDurablePlan, envelope.Service, "facts", "inconsistent or unknown execution facts",
 		)
 	}
-	if err := validateDurableOutputV1(envelope.Feature, envelope.Output, envelope.Routing); err != nil {
+	if err := validateDurableOutputV1(envelope.Service, envelope.Output, envelope.Routing); err != nil {
 		return FeatureExecutionPlan{}, err
 	}
-	if err := validateDurableRuntimeV1(envelope.Feature, definition, envelope.Runtime); err != nil {
+	if err := validateDurableRuntimeV1(envelope.Service, definition, envelope.Runtime); err != nil {
 		return FeatureExecutionPlan{}, err
 	}
 	return FeatureExecutionPlan{
-		feature: envelope.Feature, promptPolicy: envelope.PromptPolicy,
+		feature: envelope.Service, promptPolicy: envelope.PromptPolicy,
 		outputCountPolicy:      envelope.Output.CountPolicy,
 		requestedOutputCount:   RequestedOutputCount(envelope.Output.RequestedCount),
 		outputResolutionPolicy: envelope.Output.ResolutionPolicy,
@@ -384,7 +384,7 @@ func durableFeatureExecutionPlanFromPlan(plan FeatureExecutionPlan) durableFeatu
 	runtimeInputs := plan.RuntimeInputs()
 	return durableFeatureExecutionPlan{
 		SchemaVersion: CurrentFeatureExecutionPlanSchemaVersion,
-		Feature:       plan.Feature(),
+		Service:       plan.Feature(),
 		PromptPolicy:  plan.PromptPolicy(),
 		Output: durableOutputPlan{
 			CountPolicy:      plan.OutputCountPolicy(),

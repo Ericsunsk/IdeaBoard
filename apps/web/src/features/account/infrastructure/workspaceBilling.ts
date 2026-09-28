@@ -23,9 +23,7 @@ function guidanceError(code: string, message: string): WorkspaceBillingGuidanceE
   return error
 }
 
-export function requireAccountWorkspaceId(
-  workspaceId: string | null | undefined,
-): string {
+export function requireAccountWorkspaceId(workspaceId: string | null | undefined): string {
   return requireSharedWorkspaceId(workspaceId, () =>
     guidanceError(
       WORKSPACE_SELECTION_REQUIRED_CODE,

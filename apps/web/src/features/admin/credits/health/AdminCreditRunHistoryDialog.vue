@@ -12,7 +12,9 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">{{ CREDIT_HEALTH_MESSAGES.runHistoryTitle }}</div>
+              <div class="text-admin-title-sm font-[740] text-admin-title-color">
+                {{ CREDIT_HEALTH_MESSAGES.runHistoryTitle }}
+              </div>
             </div>
           </template>
           <template #actions="{ iconButtonClass }">
@@ -84,7 +86,10 @@
         @row-collapse="collapseRun"
       >
         <template #empty>
-          <AdminEmptyState :title="CREDIT_HEALTH_MESSAGES.emptyRuns" :description="CREDIT_HEALTH_MESSAGES.runHistoryEmptyHint" />
+          <AdminEmptyState
+            :title="CREDIT_HEALTH_MESSAGES.emptyRuns"
+            :description="CREDIT_HEALTH_MESSAGES.runHistoryEmptyHint"
+          />
         </template>
 
         <AdminColumn expander style="width: 52px" />
@@ -109,7 +114,10 @@
             {{ getReconciliationTriggerLabel(data) }}
           </template>
         </AdminColumn>
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryResultColumn" style="min-width: 240px">
+        <AdminColumn
+          :header="CREDIT_HEALTH_MESSAGES.runHistoryResultColumn"
+          style="min-width: 240px"
+        >
           <template #body="{ data }">{{ formatReconciliationRunResult(data) }}</template>
         </AdminColumn>
         <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryDurationColumn" style="width: 120px">
@@ -123,7 +131,10 @@
               class="flex min-h-24 items-center justify-center"
               :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria"
             >
-              <AdminSpinner class="h-7 w-7" :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria" />
+              <AdminSpinner
+                class="h-7 w-7"
+                :aria-label="CREDIT_HEALTH_MESSAGES.runHistoryDetailLoadingAria"
+              />
             </div>
             <AdminAlert v-else-if="runDetailError && selectedRunId === data.id" severity="error">
               <div class="flex flex-wrap items-center justify-between gap-3">
@@ -142,25 +153,33 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryTechId }}</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.runHistoryTechId }}
+                </dt>
                 <dd class="mt-1 mb-0 font-mono text-admin-body text-admin-text-1">
                   Run #{{ selectedRun.id }}
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryAttempts }}</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.runHistoryAttempts }}
+                </dt>
                 <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
                   {{ selectedRun.attempt_count }}
                 </dd>
               </div>
               <div class="sm:col-span-2">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}
+                </dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-admin-text-1">
                   {{ selectedRun.reason || CREDIT_HEALTH_MESSAGES.runHistoryDefaultReason }}
                 </dd>
               </div>
               <div v-if="selectedRun.error_message" class="sm:col-span-2 xl:col-span-4">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">{{ CREDIT_HEALTH_MESSAGES.runHistoryError }}</dt>
+                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                  {{ CREDIT_HEALTH_MESSAGES.runHistoryError }}
+                </dt>
                 <dd class="mt-1 mb-0 break-words text-admin-body text-admin-danger">
                   {{ formatReconciliationRunError(selectedRun.error_message) }}
                 </dd>

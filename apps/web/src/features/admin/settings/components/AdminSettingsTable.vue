@@ -33,19 +33,31 @@
 
         <AdminColumn expander :style="{ width: '48px' }" />
 
-        <AdminColumn field="title" :header="SETTINGS_MESSAGES.tableModuleColumn" :style="{ width: '280px', minWidth: '220px' }">
+        <AdminColumn
+          field="title"
+          :header="SETTINGS_MESSAGES.tableModuleColumn"
+          :style="{ width: '280px', minWidth: '220px' }"
+        >
           <template #body="{ data }">
             <AdminItemCell :icon="data.icon" :title="data.title" :description="data.description" />
           </template>
         </AdminColumn>
 
-        <AdminColumn field="status" :header="SETTINGS_MESSAGES.statusColumn" :style="{ width: '140px' }">
+        <AdminColumn
+          field="status"
+          :header="SETTINGS_MESSAGES.statusColumn"
+          :style="{ width: '140px' }"
+        >
           <template #body="{ data }">
             <AdminBadge :value="data.status" :severity="data.statusSeverity" rounded />
           </template>
         </AdminColumn>
 
-        <AdminColumn field="summary" :header="SETTINGS_MESSAGES.tableSummaryColumn" :style="{ minWidth: '280px' }">
+        <AdminColumn
+          field="summary"
+          :header="SETTINGS_MESSAGES.tableSummaryColumn"
+          :style="{ minWidth: '280px' }"
+        >
           <template #body="{ data }">
             <slot name="summary" :data="data">
               <span class="text-admin-body text-admin-text-2">{{ data.summary }}</span>
@@ -53,7 +65,11 @@
           </template>
         </AdminColumn>
 
-        <AdminColumn v-if="hasQuickSwitchSlot" :header="SETTINGS_MESSAGES.tableQuickSwitchColumn" :style="{ width: '100px' }">
+        <AdminColumn
+          v-if="hasQuickSwitchSlot"
+          :header="SETTINGS_MESSAGES.tableQuickSwitchColumn"
+          :style="{ width: '100px' }"
+        >
           <template #body="{ data }">
             <slot name="quick-switch" :data="data" />
           </template>

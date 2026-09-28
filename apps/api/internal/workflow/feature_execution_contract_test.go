@@ -524,7 +524,7 @@ func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":5`) {
+	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":6`) {
 		t.Fatalf("plan did not use versioned durable encoding: %s", payload)
 	}
 	var decoded FeatureExecutionPlan
@@ -552,7 +552,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 	}{
 		{
 			name:    "unknown schema",
-			payload: strings.Replace(string(payload), `"schema_version":5`, `"schema_version":99`, 1),
+			payload: strings.Replace(string(payload), `"schema_version":6`, `"schema_version":99`, 1),
 			code:    FeatureContractUnsupportedSchema,
 		},
 		{
@@ -567,7 +567,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 		},
 		{
 			name:    "unknown field",
-			payload: strings.Replace(string(payload), `"feature":"variations"`, `"feature":"variations","legacy":true`, 1),
+			payload: strings.Replace(string(payload), `"service":"variations"`, `"feature":"variations","legacy":true`, 1),
 			code:    FeatureContractInvalidDurablePlan,
 		},
 		{
@@ -597,7 +597,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 		},
 		{
 			name:    "duplicate top-level key",
-			payload: strings.Replace(string(payload), `"feature":"variations"`, `"feature":"variations","feature":"variations"`, 1),
+			payload: strings.Replace(string(payload), `"service":"variations"`, `"feature":"variations","feature":"variations"`, 1),
 			code:    FeatureContractInvalidDurablePlan,
 		},
 		{

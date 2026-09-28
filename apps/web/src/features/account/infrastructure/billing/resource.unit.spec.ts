@@ -31,7 +31,11 @@ describe('billingResource', () => {
 
     const controller = new AbortController()
     await expect(
-      fetchBillingRecords(WORKSPACE_ID, { cursor: 'cursor-prev', page_size: 20 }, controller.signal),
+      fetchBillingRecords(
+        WORKSPACE_ID,
+        { cursor: 'cursor-prev', page_size: 20 },
+        controller.signal,
+      ),
     ).resolves.toMatchObject({
       records: [{ record_id: 'record-1', title: '局部重绘' }],
       next_cursor: 'cursor-next',
@@ -54,9 +58,9 @@ describe('billingResource', () => {
       meta: { next_cursor: null, has_more: false },
     })
 
-    await expect(
-      fetchBillingRecords(WORKSPACE_ID, { page_size: 20 }),
-    ).resolves.toMatchObject({ records: [] })
+    await expect(fetchBillingRecords(WORKSPACE_ID, { page_size: 20 })).resolves.toMatchObject({
+      records: [],
+    })
     const page = await fetchBillingRecords(WORKSPACE_ID, { page_size: 20 })
     expect(page.next_cursor).toBeUndefined()
   })

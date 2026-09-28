@@ -309,10 +309,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions): {
         provider: asset.provider,
         sourceID: asset.sourceId,
         assetKey: libraryAssetKey(asset.provider, asset.sourceId),
-        affectedFolderKeys: [
-          LIBRARY_ALL_FOLDER_KEY,
-          ...(asset.folderId ? [asset.folderId] : []),
-        ],
+        affectedFolderKeys: [LIBRARY_ALL_FOLDER_KEY, ...(asset.folderId ? [asset.folderId] : [])],
         galleryEffect: 'none',
       })
       toast.success(i18n.global.t('library.toasts.removedFromLibrary'))

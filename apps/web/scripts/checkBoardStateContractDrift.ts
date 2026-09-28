@@ -19,18 +19,25 @@ async function main() {
   const violations: string[] = []
   const fields = ['id', 'nodeIds', 'x', 'y', 'width', 'height']
 
-  if (!domain.includes('export interface CanvasGroup')) violations.push('CanvasGroup interface missing')
+  if (!domain.includes('export interface CanvasGroup'))
+    violations.push('CanvasGroup interface missing')
   for (const field of fields) {
-    if (!new RegExp(`\\b${field}\\??:`).test(domain)) violations.push(`CanvasGroup field missing: ${field}`)
+    if (!new RegExp(`\\b${field}\\??:`).test(domain))
+      violations.push(`CanvasGroup field missing: ${field}`)
   }
-  if (!schema.includes('v.regex(/^group-\\d+$/)')) violations.push('frontend group id pattern drift')
+  if (!schema.includes('v.regex(/^group-\\d+$/)'))
+    violations.push('frontend group id pattern drift')
   if (!schema.includes('v.regex(/^(?:image|prompt|fusion)-\\d+(?:\\.\\d+)?$/)')) {
     violations.push('frontend group node id pattern drift')
   }
-  if (!schema.includes('positiveFiniteNumberSchema')) violations.push('frontend positive geometry guard missing')
-  if (!backend.includes('CurrentBoardStateSchemaVersion = 4')) violations.push('backend schema version drift')
-  if (!backend.includes('boardStateGroupIDPattern')) violations.push('backend group id validator missing')
-  if (!backend.includes('boardStateGroupNodeIDPattern')) violations.push('backend group node id validator missing')
+  if (!schema.includes('positiveFiniteNumberSchema'))
+    violations.push('frontend positive geometry guard missing')
+  if (!backend.includes('CurrentBoardStateSchemaVersion = 4'))
+    violations.push('backend schema version drift')
+  if (!backend.includes('boardStateGroupIDPattern'))
+    violations.push('backend group id validator missing')
+  if (!backend.includes('boardStateGroupNodeIDPattern'))
+    violations.push('backend group node id validator missing')
   if (!backend.includes('width <= 0') || !backend.includes('height <= 0')) {
     violations.push('backend group geometry positivity guard missing')
   }

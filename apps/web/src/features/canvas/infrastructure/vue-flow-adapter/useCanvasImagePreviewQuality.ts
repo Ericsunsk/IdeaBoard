@@ -94,8 +94,7 @@ export function useCanvasImagePreviewQuality(options: UseCanvasImagePreviewQuali
       stageWidth: toValue(options.stageWidth),
       stageHeight: toValue(options.stageHeight),
       zoomLevel: toValue(options.zoomLevel),
-      devicePixelRatio:
-        toValue(options.devicePixelRatio) ?? systemDevicePixelRatio.value,
+      devicePixelRatio: toValue(options.devicePixelRatio) ?? systemDevicePixelRatio.value,
       forceFullQuality: toValue(options.forceFullQuality),
     }),
   )

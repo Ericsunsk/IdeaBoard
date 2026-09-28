@@ -11,33 +11,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Search } from '@iconoir/vue'
-import { getWorkflowFeatureIcon } from '../../../../shared/domain/workflowFeatureIcons'
-import {
-  getAdminWorkflowFeatureGroupMeta,
-  getAdminWorkflowFeatureMeta,
-} from '../../shared/lib/workflowFeatureAdminMeta'
-import { featureOfSku } from './skuFeature'
-import { pricingMappingFeature } from './groups'
+import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
+import { getAdminServiceGroupMeta, getAdminServiceMeta } from '../../shared/lib/serviceAdminMeta'
+import { serviceOfSku } from './skuFeature'
 
 // 对齐任务监控页 Service 列：图标 + slug；次标题为对应节点名（不带“节点”后缀）。
-// 无 workflow 元信息的行：主文案去 namespace 前缀（如 vision），图标按
+// 无服务元信息的行：主文案去 namespace 前缀（如 vision），图标按
 // namespace 补（ai-search 用搜索图标），次标题回退 namespace。
 const props = defineProps<{
   sku: string
   namespace: string
 }>()
 
-const mappingFeature = computed(() => pricingMappingFeature(props.sku))
-const serviceSlug = computed(() => featureOfSku(props.sku) ?? mappingFeature.value ?? props.sku)
+const serviceSlug = computed(() => serviceOfSku(props.sku) ?? props.sku)
 const icon = computed(
-  () =>
-    getWorkflowFeatureIcon(serviceSlug.value) ??
-    (props.namespace === 'ai-search' ? Search : undefined),
+  () => getServiceIcon(serviceSlug.value) ?? (props.namespace === 'ai-search' ? Search : undefined),
 )
 const nodeTitle = computed(() => {
-  const featureSlug = featureOfSku(props.sku)
-  const feature = featureSlug ? getAdminWorkflowFeatureMeta(featureSlug) : null
-  if (feature) return getAdminWorkflowFeatureGroupMeta(feature.groupKey).title
+  const slug = serviceOfSku(props.sku)
+  const meta = slug ? getAdminServiceMeta(slug) : null
+  if (meta) return getAdminServiceGroupMeta(meta.groupKey).title
   return props.namespace || props.sku
 })
 </script>

@@ -48,7 +48,7 @@ func TestWorkspaceTaskEnqueuerForwardsAmbientTx(t *testing.T) {
 	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txforward1", WorkspaceID: "ws_txforward1",
-		WorkflowKind: "render", ExecutionToken: "exec_txforward1",
+		Service: "render", ExecutionToken: "exec_txforward1",
 	}
 
 	if err := enqueuer.Enqueue(ctx, task); err != nil {
@@ -71,7 +71,7 @@ func TestWorkspaceTaskEnqueueInTxJoinsRiverTx(t *testing.T) {
 	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txjoin1", WorkspaceID: "ws_txjoin1",
-		WorkflowKind: "render", ExecutionToken: "exec_txjoin1",
+		Service: "render", ExecutionToken: "exec_txjoin1",
 	}
 
 	var tx pgx.Tx
@@ -98,7 +98,7 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txfwd1", WorkspaceID: env.wsA,
-		WorkflowKind: "render", ExecutionToken: "exec_txfwd1",
+		Service: "render", ExecutionToken: "exec_txfwd1",
 	}
 
 	tx, err := env.pool.Begin(ctx)

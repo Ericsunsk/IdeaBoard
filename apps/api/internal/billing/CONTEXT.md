@@ -33,7 +33,7 @@ Billing is the platform-level product identity and Credit pricing context. Users
 - Admin feature pricing only publishes new immutable Price Versions; no Price Version enable/disable command and no Admin-typed reason required. Database commands record actor, target, old/new and outcome automatically.
 - `create_sku`, `update_sku`, `set_price_enabled` survive only as historical append-only Admin Audit vocabulary, not as runtime or Admin command contracts.
 - Registry SKU identity has no rename/delete contract; deactivation uses `enabled=false`. Only Archived aggregates whose Registry entry is gone and which hold no durable reference may be hard-deleted.
-- Admin Catalog, Quote and Task Billing uniformly use the feature-level identity `ai-image:<feature>`. Provider Model belongs only to the execution/idempotency contract and never to user price identity; switching models never changes feature prices. Billing eligibility comes from the Workflow registry AI image product list, not from Provider Accounts.
+- Admin Catalog, Quote and Task Billing uniformly use the Service-level identity `ai-image:<service>`. Provider Model belongs only to the execution/idempotency contract and never to user price identity; switching models never changes Service prices. Billing eligibility comes from the Workflow registry AI image product list, not from Provider Accounts.
 - The application catalog orchestrates the immutable Registry against the `CatalogStore` persistence seam; the `infrastructure/postgres` Store owns all SQL, and Admin HTTP stays behind narrow handler interfaces.
 
 ## Invariants

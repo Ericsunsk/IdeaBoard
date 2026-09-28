@@ -89,7 +89,10 @@ describe('searchProviderResource', () => {
     let seen: { method: string; operatorReason: string } | undefined
     useMswHandlers(
       http.post('/api/control/v1/platform/search/providers/pexels/test', ({ request }) => {
-        seen = { method: request.method, operatorReason: request.headers.get('X-Operator-Reason') ?? '' }
+        seen = {
+          method: request.method,
+          operatorReason: request.headers.get('X-Operator-Reason') ?? '',
+        }
         return HttpResponse.json({
           data: { provider: 'pexels', test_state: 'passed', message: 'ok' },
         })

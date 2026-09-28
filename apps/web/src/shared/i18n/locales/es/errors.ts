@@ -8,6 +8,7 @@ export default {
   pricing_unavailable: 'El precio no está disponible temporalmente. Inténtelo de nuevo en breve.',
   provider_unavailable:
     'Este servicio no está disponible en este momento. Inténtelo de nuevo más tarde.',
+  service_resolution_unavailable: 'Esta resolución no está disponible en este momento.',
   prompt_unavailable:
     'Esta indicación no está disponible en este momento. Inténtelo de nuevo más tarde.',
   wallet_restricted: 'Las Ideas no están disponibles temporalmente para esta cuenta.',

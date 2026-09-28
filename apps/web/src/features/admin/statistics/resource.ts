@@ -142,7 +142,9 @@ function selectAdminStatistics(response: ApiResponseAdminStatistics): AdminStati
   return requireContractData<AdminStatistics>(response, '加载统计数据失败')
 }
 
-function statisticsParams(params?: GetAdminStatisticsParams): GetControlStatisticsParams | undefined {
+function statisticsParams(
+  params?: GetAdminStatisticsParams,
+): GetControlStatisticsParams | undefined {
   const range = params?.range
   return range ? { range } : undefined
 }

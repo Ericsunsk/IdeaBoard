@@ -6,15 +6,8 @@ import {
   stageWorkspaceUploadBytes as stageWorkspaceUploadBytesTransport,
 } from './generated-query/public/workspace-media/workspace-media'
 import { uploadAvatar as uploadAvatarTransport } from './generated-query/public/user/user'
-import type {
-  CompleteUploadRequest,
-  CreateUploadRequest,
-} from './generated-query/public/model'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from './contractKernel'
+import type { CompleteUploadRequest, CreateUploadRequest } from './generated-query/public/model'
+import { buildContractRequestHeaders, newRequestId, requireContractData } from './contractKernel'
 import { assertOpaqueId } from '../utils/opaqueIds'
 import { workspaceUploadIdempotencyKey } from './idempotencyKey'
 import { i18n } from '../i18n'
@@ -134,11 +127,7 @@ export const uploadApi = {
 // `asset_...` only) is #805/#806.
 
 export type WorkspaceUploadSessionStatus =
-  | 'pending'
-  | 'transferring'
-  | 'completed'
-  | 'failed'
-  | 'expired'
+  'pending' | 'transferring' | 'completed' | 'failed' | 'expired'
 
 const WORKSPACE_UPLOAD_SESSION_STATUSES: readonly WorkspaceUploadSessionStatus[] = [
   'pending',
@@ -194,10 +183,7 @@ export function workspaceMediaAssetContentSuffix(workspaceId: string, assetId: s
 }
 
 export type WorkspaceMediaDerivativeVariant =
-  | 'thumb'
-  | 'preview'
-  | 'large-preview'
-  | 'processing-input'
+  'thumb' | 'preview' | 'large-preview' | 'processing-input'
 
 export function workspaceMediaAssetDerivativeSuffix(
   workspaceId: string,
@@ -438,7 +424,10 @@ export const workspaceUploadApi = {
     if (!isRecord(result.upload) || !isRecord(result.asset)) {
       throw new Error(i18n.global.t('common.errors.uploadFailed'))
     }
-    return { upload: toWorkspaceUploadSession(result.upload), asset: toWorkspaceMediaAsset(result.asset) }
+    return {
+      upload: toWorkspaceUploadSession(result.upload),
+      asset: toWorkspaceMediaAsset(result.asset),
+    }
   },
 
   /**

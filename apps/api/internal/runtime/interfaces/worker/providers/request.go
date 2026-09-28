@@ -116,7 +116,7 @@ func validateProviderTaskContract(params *tasks.WorkflowTaskParams, plan workflo
 
 func validateGenerationSnapshot(generation *tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan, runtimeInputs workflow.RuntimeInputSemantics) error {
 	if generation.SchemaVersion != tasks.CurrentParamsSchemaVersion ||
-		generation.Feature != plan.Feature() ||
+		generation.Service != plan.Feature() ||
 		generation.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
 		generation.RequestedOutputCount != plan.RequestedOutputCount().Int() {
 		return fmt.Errorf("task generation snapshot does not match execution plan")

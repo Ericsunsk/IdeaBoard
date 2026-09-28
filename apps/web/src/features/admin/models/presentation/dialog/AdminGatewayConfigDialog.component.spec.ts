@@ -217,6 +217,12 @@ describe('AdminGatewayConfigDialog', () => {
 
     const { user } = renderDialog()
 
+    await user.click(await screen.findByRole('button', { name: '测试连接' }))
+    expect(screen.getByText('测试连接需要填写 provider 与 path')).toBeVisible()
+    expect(mockResource.testConnection).not.toHaveBeenCalled()
+
+    await user.type(screen.getByPlaceholderText('例如: openai'), 'openai')
+    await user.type(screen.getByPlaceholderText('例如: v1/models'), 'v1/models')
     const testBtn = await screen.findByRole('button', { name: '测试连接' })
     await user.click(testBtn)
 
@@ -224,6 +230,8 @@ describe('AdminGatewayConfigDialog', () => {
       expect.objectContaining({
         base_url:
           'https://gateway.ai.cloudflare.com/v1/3bf89a1c2d3e4f5a6b7c8d9e0f1a2b3c/my-gateway',
+        provider: 'openai',
+        path: 'v1/models',
       }),
       { operatorReason: ADMIN_PROBE_OPERATOR_REASON },
     )

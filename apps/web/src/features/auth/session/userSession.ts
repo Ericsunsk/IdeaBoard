@@ -22,10 +22,7 @@ export type UserSessionStore = {
   requestEmailChangeOTP: (newEmail: string) => Promise<boolean>
   changeEmailWithOTP: (newEmail: string, otp: string) => Promise<boolean>
   logout: () => Promise<boolean>
-  fetchUserInfo: (
-    force?: boolean,
-    options?: { retryTransient?: boolean },
-  ) => Promise<User | null>
+  fetchUserInfo: (force?: boolean, options?: { retryTransient?: boolean }) => Promise<User | null>
   ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
   completeOAuthCallback: (input: {
     providerError?: unknown

@@ -2,7 +2,9 @@
   <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
       <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.identityTitle }}</h4>
-      <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.identitySubtitle }}</span>
+      <span class="text-admin-caption text-admin-text-3">{{
+        MODELS_MESSAGES.identitySubtitle
+      }}</span>
     </div>
 
     <div class="flex flex-col gap-3.5">
@@ -12,7 +14,9 @@
           <label class="text-admin-caption font-semibold text-admin-text-1" for="model-id-input">
             {{ MODELS_MESSAGES.identityIdLabel }} <span class="text-admin-danger">*</span>
           </label>
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.identityIdHint }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.identityIdHint
+          }}</span>
         </div>
         <AdminInput
           id="model-id-input"
@@ -26,7 +30,9 @@
           v-if="!isEditing && idPrefixOptions.length > 0"
           class="flex flex-wrap items-center gap-1 pt-0.5"
         >
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.identityPrefixLabel }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.identityPrefixLabel
+          }}</span>
           <button
             v-for="prefix in idPrefixOptions"
             :key="prefix"

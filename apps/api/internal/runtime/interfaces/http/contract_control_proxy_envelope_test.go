@@ -145,14 +145,6 @@ func (proxyEnvelopeFakeGatewayStore) Update(context.Context, aigateway.UpdateInp
 	return nil
 }
 
-func (proxyEnvelopeFakeGatewayStore) ListModelMappings(context.Context) (map[string]string, error) {
-	return map[string]string{}, nil
-}
-
-func (proxyEnvelopeFakeGatewayStore) SaveModelMapping(context.Context, string, string, int64) error {
-	return nil
-}
-
 func (proxyEnvelopeFakeGatewayStore) ListCatalog(context.Context) ([]aigateway.CatalogItem, error) {
 	return nil, nil
 }
@@ -237,7 +229,6 @@ func TestControlProxyFamiliesRenderContractEnvelope(t *testing.T) {
 	admin := controlCall{userID: controlOperatorID, role: "admin"}
 	reads := []string{
 		"/api/control/v1/platform/ai-gateway",
-		"/api/control/v1/platform/ai-gateway/models",
 		"/api/control/v1/platform/ai-gateway/catalog",
 		"/api/control/v1/platform/ai-gateway/providers",
 		"/api/control/v1/platform/storage/providers",

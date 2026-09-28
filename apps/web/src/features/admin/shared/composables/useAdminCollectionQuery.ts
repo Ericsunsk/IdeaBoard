@@ -21,8 +21,7 @@ export function useAdminCollectionQuery<TPage, TCursor>(options: {
   // getter rides the callback branch structurally (fewer params), matching
   // how `useQuery` itself accepts it.
   refetchInterval?:
-    | MaybeRefOrGetter<number | false>
-    | ((query: Query<TPage>) => number | false | undefined)
+    MaybeRefOrGetter<number | false> | ((query: Query<TPage>) => number | false | undefined)
   getNextCursor?: (page: TPage) => TCursor | undefined
   pagination?: { setNextCursor: (cursor: TCursor | undefined) => boolean }
 }) {

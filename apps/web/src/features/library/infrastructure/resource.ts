@@ -64,9 +64,7 @@ export type WorkspaceLibraryRequestOptions = {
   authFailure?: AuthFailureMode | undefined
 }
 
-function workspaceLibraryHeaders(
-  options: WorkspaceLibraryRequestOptions,
-): Record<string, string> {
+function workspaceLibraryHeaders(options: WorkspaceLibraryRequestOptions): Record<string, string> {
   return buildContractRequestHeaders({
     requestId: options.requestId,
     idempotencyKey: options.idempotencyKey,
@@ -111,7 +109,11 @@ export const workspaceLibraryApi = {
       query,
       toGeneratedOptions(options),
     )
-    return toWorkspaceLibraryPage(page, toWorkspaceLibraryFolder, i18n.global.t('library.errors.loadFoldersFailed'))
+    return toWorkspaceLibraryPage(
+      page,
+      toWorkspaceLibraryFolder,
+      i18n.global.t('library.errors.loadFoldersFailed'),
+    )
   },
 
   createFolder: async (
@@ -183,7 +185,11 @@ export const workspaceLibraryApi = {
       query,
       toGeneratedOptions(options),
     )
-    return toWorkspaceLibraryPage(page, toWorkspaceLibraryAsset, i18n.global.t('library.errors.loadAssetsFailed'))
+    return toWorkspaceLibraryPage(
+      page,
+      toWorkspaceLibraryAsset,
+      i18n.global.t('library.errors.loadAssetsFailed'),
+    )
   },
 
   saveAsset: async (
@@ -269,7 +275,11 @@ export const workspaceLibraryApi = {
             }
             if (item.sourceId != null) entry.source_id = item.sourceId
             if (item.sourceUrl != null) entry.source_url = item.sourceUrl
-            return entry as { provider: 'unsplash' | 'pexels'; source_id?: string; source_url?: string }
+            return entry as {
+              provider: 'unsplash' | 'pexels'
+              source_id?: string
+              source_url?: string
+            }
           }),
         },
       },
@@ -279,7 +289,8 @@ export const workspaceLibraryApi = {
       envelope,
       i18n.global.t('library.errors.lookupStatusFailed'),
     )
-    if (!Array.isArray(result.items)) throw new Error(i18n.global.t('library.errors.lookupStatusFailed'))
+    if (!Array.isArray(result.items))
+      throw new Error(i18n.global.t('library.errors.lookupStatusFailed'))
     return result.items.map(toWorkspaceLibraryResolveResult)
   },
 }

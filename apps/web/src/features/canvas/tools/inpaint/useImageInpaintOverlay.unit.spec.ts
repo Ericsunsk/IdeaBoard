@@ -8,11 +8,7 @@ import {
   INPAINT_MAX_PENDING_STROKES_PER_NODE,
   INPAINT_MAX_POINTS_PER_STROKE,
 } from './config/constants'
-import type {
-  MaskPainter,
-  MaskPainterClientPoint,
-  MaskPainterViewport,
-} from './fabric/index.ts'
+import type { MaskPainter, MaskPainterClientPoint, MaskPainterViewport } from './fabric/index.ts'
 import type { ImageInpaintCommittedData } from './model.ts'
 import { useImageInpaintOverlay } from './useImageInpaintOverlay'
 
@@ -148,14 +144,12 @@ function createStageElement() {
 function createHarness() {
   const stage = createStageElement()
   const painters: FakeMaskPainter[] = []
-  const createMaskPainter = vi.fn(
-    (host: HTMLCanvasElement): MaskPainter | Promise<MaskPainter> => {
-      void host
-      const painter = new FakeMaskPainter()
-      painters.push(painter)
-      return painter
-    },
-  )
+  const createMaskPainter = vi.fn((host: HTMLCanvasElement): MaskPainter | Promise<MaskPainter> => {
+    void host
+    const painter = new FakeMaskPainter()
+    painters.push(painter)
+    return painter
+  })
   const nodes: Ref<Node[]> = shallowRef([{ id: 'node-1', data: { kind: 'image' } }] as Node[])
   const editorMode = useRetouchMode({
     nodes,
@@ -246,25 +240,21 @@ function createPixelCanvas(width: number, height: number) {
 function stubCanvasElementCreation() {
   const realCreateElement = document.createElement.bind(document)
   const spy = vi.spyOn(document, 'createElement')
-  spy.mockImplementation(
-    ((tagName: string) => {
-      if (tagName.toLowerCase() !== 'canvas') return realCreateElement(tagName)
-      const temp = realCreateElement('canvas') as HTMLCanvasElement
-      const tempContext = {
-        clearRect: vi.fn(),
-        drawImage: vi.fn(),
-        getImageData: vi.fn(() => {
-          const data = new Uint8ClampedArray(temp.width * temp.height * 4)
-          for (let index = 3; index < data.length; index += 4) data[index] = 255
-          return { width: temp.width, height: temp.height, data }
-        }),
-      }
-      vi.spyOn(temp, 'getContext').mockReturnValue(
-        tempContext as unknown as CanvasRenderingContext2D,
-      )
-      return temp
-    }) as unknown as typeof document.createElement,
-  )
+  spy.mockImplementation(((tagName: string) => {
+    if (tagName.toLowerCase() !== 'canvas') return realCreateElement(tagName)
+    const temp = realCreateElement('canvas') as HTMLCanvasElement
+    const tempContext = {
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => {
+        const data = new Uint8ClampedArray(temp.width * temp.height * 4)
+        for (let index = 3; index < data.length; index += 4) data[index] = 255
+        return { width: temp.width, height: temp.height, data }
+      }),
+    }
+    vi.spyOn(temp, 'getContext').mockReturnValue(tempContext as unknown as CanvasRenderingContext2D)
+    return temp
+  }) as unknown as typeof document.createElement)
   return spy
 }
 
@@ -272,8 +262,7 @@ describe('useImageInpaintOverlay', () => {
   it('keeps mask editor active when committing without a drawable mask', async () => {
     const { editorMode, overlay } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -320,8 +309,7 @@ describe('useImageInpaintOverlay', () => {
   it('paints a single tap as one live stroke so the seam can render its dot', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -340,8 +328,7 @@ describe('useImageInpaintOverlay', () => {
   it('discards the live preview when the drag is cancelled', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -366,8 +353,7 @@ describe('useImageInpaintOverlay', () => {
   it('falls back to one-shot release when the painter loads mid-drag', async () => {
     const { editorMode, overlay, painters, createMaskPainter } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     let resolvePainter!: (painter: FakeMaskPainter) => void
     createMaskPainter.mockImplementationOnce(
@@ -415,8 +401,7 @@ describe('useImageInpaintOverlay', () => {
   it('drops pointer pressure so strokes render at constant brush width', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -446,8 +431,7 @@ describe('useImageInpaintOverlay', () => {
   it('routes erase strokes to the seam live path', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -463,8 +447,7 @@ describe('useImageInpaintOverlay', () => {
   it('restores the committed preview through the seam baseline on remount', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -483,8 +466,7 @@ describe('useImageInpaintOverlay', () => {
   it('delegates undo, redo, clear, and commit to the seam painter', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -516,8 +498,7 @@ describe('useImageInpaintOverlay', () => {
   it('clamps brush size through the seam range', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -532,8 +513,7 @@ describe('useImageInpaintOverlay', () => {
   it('caps buffered strokes while the painter loads, keeping the newest', async () => {
     const { editorMode, overlay, painters, createMaskPainter } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     let resolvePainter!: (painter: FakeMaskPainter) => void
     createMaskPainter.mockImplementationOnce(
@@ -568,8 +548,7 @@ describe('useImageInpaintOverlay', () => {
   it('decimates sub-threshold jitter from the buffer and the live preview', async () => {
     const { editorMode, overlay, painters } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     expect(editorMode.enterRetouchMode('node-1', 'inpaint')).toBe(true)
     await mountPainter(overlay, canvas)
@@ -594,8 +573,7 @@ describe('useImageInpaintOverlay', () => {
   it('caps buffered points per drag instead of growing without bound', async () => {
     const { editorMode, overlay, painters, createMaskPainter } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
     let resolvePainter!: (painter: FakeMaskPainter) => void
     createMaskPainter.mockImplementationOnce(
@@ -641,11 +619,9 @@ describe('useImageInpaintOverlay', () => {
   it('disposes a stale painter creation when the element is reused', async () => {
     const { editorMode, overlay, painters, createMaskPainter } = createHarness()
     const canvas = createMaskCanvas()
-    canvas.getBoundingClientRect = () =>
-      ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 10, top: 20, width: 100, height: 50 }) as DOMRect
 
-    const deferred: Array<{ painter: FakeMaskPainter; resolve: (p: FakeMaskPainter) => void }> =
-      []
+    const deferred: Array<{ painter: FakeMaskPainter; resolve: (p: FakeMaskPainter) => void }> = []
     createMaskPainter.mockImplementation(
       () =>
         new Promise<FakeMaskPainter>((resolve) => {

@@ -56,7 +56,9 @@ type ContractErrorFields = {
 // request_id } }` envelope (issue #803). It returns undefined when the
 // payload carries no contract error. Contract messages are user-facing by
 // kernel design, hence safe to display.
-function getContractErrorFields(data: Record<string, unknown> | null): ContractErrorFields | undefined {
+function getContractErrorFields(
+  data: Record<string, unknown> | null,
+): ContractErrorFields | undefined {
   const nested = toObject(data?.error)
   if (typeof nested?.code !== 'string' || !nested.code) return undefined
   const fields: ContractErrorFields = { code: nested.code }
@@ -116,9 +118,7 @@ type AuthFailureReport = {
 }
 
 function resolveAuthFailureMode(option: unknown): AuthFailureMode {
-  return (option as ApiRequestConfig | undefined)?.authFailure === 'silent'
-    ? 'silent'
-    : 'redirect'
+  return (option as ApiRequestConfig | undefined)?.authFailure === 'silent' ? 'silent' : 'redirect'
 }
 
 function reportAuthFailure(report: AuthFailureReport, mode: AuthFailureMode): boolean {
@@ -136,7 +136,10 @@ const apiFetch = ofetch.create({
   onResponseError({ request, response, options }) {
     const payload = response._data
     const requestUrl = response.url || requestURL(request)
-    reportAuthFailure({ status: response.status, payload, requestUrl }, resolveAuthFailureMode(options))
+    reportAuthFailure(
+      { status: response.status, payload, requestUrl },
+      resolveAuthFailureMode(options),
+    )
     throw createApiError(payload, response.status)
   },
 })

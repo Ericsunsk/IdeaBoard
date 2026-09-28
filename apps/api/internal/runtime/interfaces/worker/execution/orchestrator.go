@@ -20,17 +20,9 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-// ModelResolver returns the admin-configured model for one feature at
-// execution time. Empty model with nil error means unmapped (fail fast);
-// any error is transient (requeue).
-type ModelResolver interface {
-	ResolveModel(ctx context.Context, feature string) (string, error)
-}
-
 type Orchestrator struct {
 	enqueuer      taskqueueports.TaskEnqueuer
 	taskExecution *taskexecution.Service
-	modelResolver ModelResolver
 	gatewayCall   runtimeports.GatewayCallerFunc
 	// redMetrics receives worker-level gateway retry observations for the
 	// RED set; nil disables observation (unit tests, unmigrated callers).
@@ -49,13 +41,11 @@ type TaskExecutionOrchestrator = Orchestrator
 func NewOrchestrator(
 	enqueuer taskqueueports.TaskEnqueuer,
 	taskExecution *taskexecution.Service,
-	modelResolver ModelResolver,
 	gatewayCall runtimeports.GatewayCallerFunc,
 ) *Orchestrator {
 	return &Orchestrator{
 		enqueuer:      enqueuer,
 		taskExecution: taskExecution,
-		modelResolver: modelResolver,
 		gatewayCall:   gatewayCall,
 	}
 }
@@ -125,7 +115,7 @@ func operationForFeature(feature string, task *tasks.TaskPayload) workflow.Runti
 	if err != nil || typedParams == nil {
 		return ""
 	}
-	if !workflow.IsAIImageFeature(strings.TrimSpace(typedParams.Feature)) {
+	if !workflow.IsAIImageFeature(strings.TrimSpace(typedParams.Service)) {
 		return ""
 	}
 	plan, err := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
@@ -143,7 +133,7 @@ func taskFeatureSlug(task *tasks.TaskPayload) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	feature := strings.TrimSpace(typedParams.Feature)
+	feature := strings.TrimSpace(typedParams.Service)
 	if feature == "" {
 		return "", fmt.Errorf("drawing task has no feature")
 	}
@@ -186,27 +176,14 @@ func (o *Orchestrator) prepareTaskExecution(
 		// the task now instead of enqueueing a hot retry loop.
 		return "", "", true, o.completeFailedTask(ctx, task, "", msgPrepareTaskExecution, 0)
 	}
-	model, err = o.modelResolver.ResolveModel(ctx, feature)
-	if err != nil {
-		slog.Warn("resolve task model failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
-		if phaseErr := phaseMachine.advance(phaseRequeued); phaseErr != nil {
-			return "", "", true, phaseErr
-		}
-		// Missing mappings and transient store errors both ride River
-		// backoff with attempt accounting; a mapping added mid-flight
-		// self-heals, a persistently missing one converges via final failure.
-		return "", "", true, err
+	// #847: the single-value live model lookup is removed with no
+	// replacement yet. #848 provides the execution target via the
+	// RoutingSnapshot. Until then every legacy execution fails closed
+	// deterministically (never a live lookup, never a hot requeue loop).
+	if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
+		return "", "", true, phaseErr
 	}
-	if strings.TrimSpace(model) == "" {
-		if phaseErr := phaseMachine.advance(phaseFailed); phaseErr != nil {
-			return "", "", true, phaseErr
-		}
-		return "", "", true, o.completeFailedTask(ctx, task, "", msgPrepareTaskExecution2, 0)
-	}
-	if err := phaseMachine.advance(phaseAssigned); err != nil {
-		return "", "", true, err
-	}
-	return feature, strings.TrimSpace(model), false, nil
+	return "", "", true, o.completeFailedTask(ctx, task, "", msgPrepareTaskExecution2, 0)
 }
 
 func (o *Orchestrator) startTaskAttempt(
@@ -222,7 +199,7 @@ func (o *Orchestrator) startTaskAttempt(
 		TaskID:         task.TaskID,
 		RiverJobID:     task.RiverJobID,
 		ExecutionToken: token,
-		FeatureSlug:    feature,
+		Service:        feature,
 		RequestedModel: model,
 		Provider:       gatewayModelProvider(model),
 		StartedAt:      time.Now(),
@@ -492,7 +469,7 @@ func (o *Orchestrator) requeueFailedAttempt(
 		FailureStage:     tasks.StringPtr(decision.FailureStage),
 		FailureCategory:  tasks.StringPtr(decision.FailureCategory),
 	})
-	feature := redmetrics.UnknownFeature
+	feature := redmetrics.UnknownService
 	if slug, err := taskFeatureSlug(attempt.task); err == nil && strings.TrimSpace(slug) != "" {
 		feature = strings.TrimSpace(slug)
 	}
@@ -765,7 +742,7 @@ func buildExecutionSnapshot(task *tasks.TaskPayload, feature, model, token strin
 		return snapshot
 	}
 	snapshot.TaskID = task.TaskID
-	snapshot.FeatureSlug = feature
+	snapshot.Service = feature
 	snapshot.ResolvedModel = model
 	return snapshot
 }

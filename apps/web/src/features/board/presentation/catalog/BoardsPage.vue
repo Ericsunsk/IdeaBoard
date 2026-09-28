@@ -199,7 +199,10 @@ import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
-import { defineDialogSurfaceIntent, useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import {
+  defineDialogSurfaceIntent,
+  useOverlayInteractionLifecycle,
+} from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
 import { useUserStore } from '../../../auth'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'

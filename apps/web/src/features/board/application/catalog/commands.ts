@@ -101,11 +101,7 @@ export interface BoardCommandDependencies {
   // register the minted identity locally, then sync the document.
   resolveWorkspace?(): string
   createServerBoard?(workspaceId: string, name: string): Promise<WorkspaceBoardMeta>
-  registerServerBoard?(input: {
-    id: string
-    name: string
-    revision?: number
-  }): BoardMeta | null
+  registerServerBoard?(input: { id: string; name: string; revision?: number }): BoardMeta | null
 }
 
 export interface BoardCommands {

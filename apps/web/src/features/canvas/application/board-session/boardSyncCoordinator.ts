@@ -13,7 +13,8 @@ import {
 } from '../../infrastructure/browser/canvasPerfProbe.ts'
 import { rebaseStabilizedMedia } from './boardSyncMediaReconciliation'
 
-export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover' | 'archived'
+export type SaveStatus =
+  'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover' | 'archived'
 
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'archived' | 'save-failed'
 export type ValueRef<T> = { value: T }
@@ -68,7 +69,9 @@ function cloneBoardSnapshot(snapshot: BoardSnapshot): BoardSnapshot {
 }
 
 function isRecoverableSaveStatus(status: SaveStatus): boolean {
-  return status === 'retry' || status === 'conflict' || status === 'recover' || status === 'archived'
+  return (
+    status === 'retry' || status === 'conflict' || status === 'recover' || status === 'archived'
+  )
 }
 
 export function createBoardSyncCoordinator(

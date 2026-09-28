@@ -21,7 +21,9 @@
           </label>
           <!-- 变量快捷填充标签 -->
           <div v-if="variables.length > 0" class="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span class="text-admin-caption font-medium text-admin-text-3">{{ PROMPTS_MESSAGES.editorInsertVariables }}</span>
+            <span class="text-admin-caption font-medium text-admin-text-3">{{
+              PROMPTS_MESSAGES.editorInsertVariables
+            }}</span>
             <button
               v-for="variable in variables"
               :key="variable.key"

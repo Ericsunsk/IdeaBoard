@@ -9,8 +9,8 @@
 // stays feature-free.
 //
 // Semantic mappings (#809 audit):
-// - submit: `SubmitTaskData` prompt/feature/image inputs/params ->
-//   `CreateWorkspaceTaskInput` workflow_kind/media_asset_ids/prompt
+// - submit: `SubmitTaskData` prompt/service/image inputs/params ->
+//   `CreateWorkspaceTaskInput` service/media_asset_ids/prompt
 //   (+params incl. `mask_asset_id`, quantity, resolution).
 //   `client_action_id` becomes the header-only `Idempotency-Key` (never
 //   sent in the v1 body); the prompt rides `data.prompt` and is covered
@@ -30,7 +30,7 @@
 // Fail-closed rules: anything without a faithful v1 mapping throws
 // `CanvasWorkspaceTaskUnmappableError` BEFORE any network call (never a
 // silent drop, never a cryptic 422). Remaining guards and their reasons:
-// `prompt` (over-8KB-byte prompts), `feature` (unknown slugs), `media-urls`
+// `prompt` (over-8KB-byte prompts), `service` (unknown slugs), `media-urls`
 // (request/param image URLs incl. mask data-URLs: bytes cannot ride params,
 // upload via the session flow first), `media-ids` (numeric asset ids and
 // malformed opaque refs incl. `mask_asset_id`), `params` (unknown keys incl.
@@ -39,7 +39,10 @@
 
 import type { ApiClientError } from '../../../../../shared/api/client'
 import { isOpaqueId, opaqueIdPrefix } from '../../../../../shared/api/contractKernel'
-import { taskCancellationIdempotencyKey, workspaceTaskIdempotencyKey } from '../../../../../shared/api/idempotencyKey'
+import {
+  taskCancellationIdempotencyKey,
+  workspaceTaskIdempotencyKey,
+} from '../../../../../shared/api/idempotencyKey'
 import {
   cancelWorkspaceTask,
   createWorkspaceTask,
@@ -50,11 +53,9 @@ import {
   type WorkspaceTaskItem,
   type WorkspaceTaskOutputRef,
 } from '../../../../../shared/api/workspaceTasks'
-import {
-  WORKFLOW_FEATURE_SLUGS,
-  type WorkflowFeature,
-} from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE_SLUGS, type Service } from '../../../../../shared/domain/imageServices'
 import { i18n } from '../../../../../shared/i18n'
+import { readinessErrorCopy } from '../../../../../shared/errors/errorCatalog'
 import { resolveWorkspaceMediaAssetDerivativeURL } from '../../../../../shared/api/mediaAssetDelivery'
 import { notifyUserCreditsInvalidation } from '../../../../../shared/query/userCreditsInvalidation'
 import type { TaskImageResult } from '../../../../../shared/query/taskResult'
@@ -72,8 +73,7 @@ import {
 } from '../task-runner/taskResultErrors'
 import { insufficientCreditsPreflightError } from '../task-runner/canvasBillingPreflight'
 
-export const CANVAS_WORKSPACE_REQUIRED_MESSAGE =
-  'Select a workspace before running image tasks.'
+export const CANVAS_WORKSPACE_REQUIRED_MESSAGE = 'Select a workspace before running image tasks.'
 
 export class CanvasWorkspaceUnavailableError extends Error {
   readonly kind = 'workspace-unavailable' as const
@@ -91,11 +91,7 @@ export function isCanvasWorkspaceUnavailableError(
 }
 
 export type CanvasWorkspaceTaskUnmappableReason =
-  | 'prompt'
-  | 'feature'
-  | 'media-urls'
-  | 'media-ids'
-  | 'params'
+  'prompt' | 'service' | 'media-urls' | 'media-ids' | 'params'
 
 export class CanvasWorkspaceTaskUnmappableError extends Error {
   readonly kind = 'task-unmappable' as const
@@ -182,29 +178,29 @@ function isTaskStateConflict(error: unknown): boolean {
 //   policy (inpaint-only, inpaint-requires-mask) stays server-side 422.
 // ---------------------------------------------------------------------------
 
-function assertWorkflowKind(feature: unknown): WorkflowFeature {
-  if (typeof feature === 'string' && (WORKFLOW_FEATURE_SLUGS as readonly string[]).includes(feature)) {
-    return feature as WorkflowFeature
+function assertService(service: unknown): Service {
+  if (typeof service === 'string' && (SERVICE_SLUGS as readonly string[]).includes(service)) {
+    return service as Service
   }
   throw new CanvasWorkspaceTaskUnmappableError(
-    'feature',
-    `Unsupported canvas task feature ${JSON.stringify(feature)}: v1 workflow_kind accepts only ${WORKFLOW_FEATURE_SLUGS.join(', ')}.`,
+    'service',
+    `Unsupported canvas task service ${JSON.stringify(service)}: v1 service accepts only ${SERVICE_SLUGS.join(', ')}.`,
   )
 }
 
 /** v1 prompt bound in bytes (mirrors `workspacetasks.MaxWorkspaceTaskPromptBytes`). */
 const MAX_WORKSPACE_TASK_PROMPT_BYTES = 8 * 1024
 
-const PROMPT_IGNORED_FEATURES: ReadonlySet<WorkflowFeature> = new Set(['cutout', 'upscale'])
+const PROMPT_IGNORED_SERVICES: ReadonlySet<Service> = new Set(['cutout', 'upscale'])
 
 function promptByteLength(prompt: string): number {
   return new TextEncoder().encode(prompt).length
 }
 
-function toWorkspacePrompt(feature: WorkflowFeature, prompt: unknown): string | undefined {
-  // Prompt-ignored features never send user text (binary media operations,
+function toWorkspacePrompt(service: Service, prompt: unknown): string | undefined {
+  // Prompt-ignored services never send user text (binary media operations,
   // legacy parity with the canonical compile drop).
-  if (PROMPT_IGNORED_FEATURES.has(feature)) return undefined
+  if (PROMPT_IGNORED_SERVICES.has(service)) return undefined
   const text = `${prompt ?? ''}`.trim()
   // Blank prompts ride as absent: required-policy empties (generation,
   // inpaint) are rejected server-side with 422 `validation_failed`, which
@@ -383,8 +379,8 @@ function toWorkspaceResolution(params: SubmitTaskData['params']): string | undef
 }
 
 export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspaceTaskInput {
-  const workflowKind = assertWorkflowKind(request.feature)
-  const prompt = toWorkspacePrompt(workflowKind, request.prompt)
+  const service = assertService(request.service)
+  const prompt = toWorkspacePrompt(service, request.prompt)
   if (nonEmptyStrings(request.image_urls).length > 0) {
     throw new CanvasWorkspaceTaskUnmappableError(
       'media-urls',
@@ -393,7 +389,8 @@ export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspace
   }
   if (
     (Array.isArray(request.image_asset_ids) && request.image_asset_ids.length > 0) ||
-    (Array.isArray(request.reference_image_asset_ids) && request.reference_image_asset_ids.length > 0)
+    (Array.isArray(request.reference_image_asset_ids) &&
+      request.reference_image_asset_ids.length > 0)
   ) {
     throw new CanvasWorkspaceTaskUnmappableError(
       'media-ids',
@@ -405,7 +402,7 @@ export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspace
   // NOTE: legacy `priority` (interactive hint) has no v1 field and is
   // dropped; `client_action_id` becomes the header-only Idempotency-Key.
   return {
-    workflow_kind: workflowKind,
+    service,
     ...(mediaAssetIds.length > 0 ? { media_asset_ids: mediaAssetIds } : {}),
     ...(prompt == null ? {} : { prompt }),
     ...(params == null ? {} : { params }),
@@ -438,15 +435,15 @@ export async function submitCanvasWorkspaceTask(
 // ---------------------------------------------------------------------------
 
 export function toWorkspaceQuoteInput(request: SubmitTaskData): {
-  workflow_kind: WorkflowFeature
+  service: Service
   quantity?: number | undefined
   resolution?: string | undefined
 } {
   // Quotes are price-only: prompt/media never ride a quote, so readiness
   // preflight never throws unmappable for them (submit does, fail-closed).
-  const workflowKind = assertWorkflowKind(request.feature)
+  const service = assertService(request.service)
   return {
-    workflow_kind: workflowKind,
+    service,
     ...(toWorkspaceQuantity(request.params) == null
       ? {}
       : { quantity: toWorkspaceQuantity(request.params) as number }),
@@ -464,7 +461,7 @@ export function toSubmitTaskReadiness(
     price_version: number
     quantity: number
   },
-  feature: WorkflowFeature,
+  service: Service,
 ): SubmitTaskReadinessData {
   // Quote snapshots carry no wallet balances: sufficiency is inferred from
   // the absence of 402 (a 402 quote throws insufficient-credits instead of
@@ -472,7 +469,7 @@ export function toSubmitTaskReadiness(
   // unit/total only.
   return {
     ready: true,
-    feature,
+    service,
     billing: {
       sufficient: true,
       unit_credits: snapshot.unit_credits,
@@ -486,12 +483,8 @@ export function toSubmitTaskReadiness(
   }
 }
 
-function toNotReady(
-  feature: WorkflowFeature,
-  message: string,
-  errorCode: string,
-): SubmitTaskReadinessData {
-  return { ready: false, message, error_code: errorCode, feature }
+function toNotReady(service: Service, message: string, errorCode: string): SubmitTaskReadinessData {
+  return { ready: false, message, error_code: errorCode, service }
 }
 
 export async function fetchCanvasWorkspaceTaskReadiness(
@@ -506,17 +499,20 @@ export async function fetchCanvasWorkspaceTaskReadiness(
       input,
       options?.signal == null ? undefined : { signal: options.signal },
     )
-    return toSubmitTaskReadiness(snapshot, input.workflow_kind)
+    return toSubmitTaskReadiness(snapshot, input.service)
   } catch (error) {
     const apiError = error as ApiClientError
     const code = apiError?.code
     if (code === 'task_insufficient_credits') throw insufficientCreditsPreflightError()
+    if (code === 'service_resolution_unavailable') {
+      return toNotReady(input.service, readinessErrorCopy(code), code)
+    }
     if (errorStatus(error) === 422 || code === 'validation_failed') {
       const message =
         error instanceof Error && error.message
           ? error.message
           : i18n.global.t('common.errors.billingInfoUnavailable')
-      return toNotReady(input.workflow_kind, message, 'validation_failed')
+      return toNotReady(input.service, message, 'validation_failed')
     }
     throw error
   }
@@ -583,13 +579,14 @@ export function extractWorkspaceTaskImageResults(
   // Role parity with the legacy extractor (`role === 'image'`), relaxed to
   // accept blank roles: v1 output_refs are image outputs by construction of
   // the canvas flows, and several carry no role fact.
-  const imageRefs = (outputs ?? []).filter(
-    (ref) => !ref.role?.trim() || ref.role === 'image',
-  )
+  const imageRefs = (outputs ?? []).filter((ref) => !ref.role?.trim() || ref.role === 'image')
   return toWorkspaceImageResults(workspaceId, imageRefs)
 }
 
-function settleWorkspaceTaskItem(taskId: string, item: WorkspaceTaskItem): TaskImageResult[] | null {
+function settleWorkspaceTaskItem(
+  taskId: string,
+  item: WorkspaceTaskItem,
+): TaskImageResult[] | null {
   const workspaceId = item.workspace_id
   if (item.status === 'completed') {
     const results = extractWorkspaceTaskImageResults(workspaceId, item.output_refs)
@@ -619,9 +616,7 @@ function settleWorkspaceTaskItem(taskId: string, item: WorkspaceTaskItem): TaskI
 }
 
 function resolveWaitWorkspaceId(taskId: string): string {
-  return (
-    resolveCanvasTaskWorkspaceId(taskId) ?? requireCanvasWorkspaceId()
-  )
+  return resolveCanvasTaskWorkspaceId(taskId) ?? requireCanvasWorkspaceId()
 }
 
 export async function waitCanvasWorkspaceTaskImageResults(
@@ -649,10 +644,7 @@ export async function waitCanvasWorkspaceTaskImageResults(
   } catch (error) {
     if (isWorkspaceTaskGone(error)) throw error
     if (error instanceof TaskResultPendingError) throw error
-    throw new TaskResultPendingError(
-      'timeout',
-      error instanceof Error ? error.message : '',
-    )
+    throw new TaskResultPendingError('timeout', error instanceof Error ? error.message : '')
   }
   // Settlement errors (failure/cancelled/no-image) propagate unwrapped: only
   // waiter transport rejections map to the timeout pending kind above.

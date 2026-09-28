@@ -380,13 +380,13 @@ components:
           description: Opaque resource identifier (task_*, board_*, asset_*).
     TaskCreatedData:
       type: object
-      required: [task_id, workflow_kind]
+      required: [task_id, service]
       additionalProperties: false
       properties:
         task_id:
           type: string
           pattern: '^task_[A-Za-z0-9_-]+$'
-        workflow_kind:
+        service:
           type: string
     TaskRunningData:
       type: object

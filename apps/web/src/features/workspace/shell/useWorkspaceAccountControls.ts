@@ -36,9 +36,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
   // Validated session only (not the best-effort restored snapshot): this
   // header mounts on public pages too, and an anonymous/stale 401 reloads
   // the whole page to login via the shared auth-failure handler.
-  const wallet = useCreditWallet(
-    () => Boolean(userStore.user) && userStore.sessionValidatedAt > 0,
-  )
+  const wallet = useCreditWallet(() => Boolean(userStore.user) && userStore.sessionValidatedAt > 0)
   const accountOverlay = useAccountOverlay()
 
   const authOverlay = useAuthOverlay()

@@ -1,9 +1,6 @@
 import { reactive } from 'vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import {
-  confirmSettingsSave,
-  requireDestructiveReason,
-} from '../../shared/lib/confirmSettingsSave'
+import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { useRewardCodesFeedback } from './useRewardCodesFeedback'
 import {
   createAdminRewardCodeResource,

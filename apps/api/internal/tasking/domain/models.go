@@ -18,7 +18,7 @@ type Task struct {
 	Prompt                     string                `json:"prompt"`
 	UserPrompt                 string                `json:"user_prompt"`
 	Params                     string                `json:"params"`
-	FeatureSlug                string                `json:"feature_slug"`
+	Service                    string                `json:"service"`
 	Priority                   int                   `json:"priority"`
 	ResolvedModel              string                `json:"resolved_model"`
 	Status                     string                `json:"status"`
@@ -38,7 +38,7 @@ type Task struct {
 }
 
 type TaskBillingRequest struct {
-	Feature          string
+	Service          string
 	OutputResolution string
 	Quantity         int64
 }
@@ -250,7 +250,7 @@ func SafeTaskResultJSON(raw string) string {
 
 type SubmitTaskRequest struct {
 	Prompt                 string                 `json:"prompt"`
-	Feature                string                 `json:"feature"`
+	Service                string                 `json:"service"`
 	ClientActionID         string                 `json:"client_action_id"`
 	Priority               int                    `json:"priority"`
 	ImageURLs              []string               `json:"image_urls"`

@@ -143,7 +143,7 @@ import {
 } from '../config/constants'
 import ChromeFrame from '../../image-tools/components/ChromeFrame.vue'
 import { NodeToolIconButton, PromptTextComposer } from '../../../presentation/nodes/primitives'
-import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../../../shared/domain/imageServices'
 import { useCanvasBillingQuote } from '../../../application/execution'
 
 defineProps<{
@@ -174,7 +174,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const promptDraft = ref('')
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.inpaint)
+const billingQuote = useCanvasBillingQuote(() => SERVICE.inpaint)
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null

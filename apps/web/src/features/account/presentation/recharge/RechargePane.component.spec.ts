@@ -544,10 +544,12 @@ describe('RechargePane', () => {
           },
         ],
       })
-    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
-      paymentListener = listener
-      return unsubscribe
-    })
+    const subscribe = vi.fn(
+      (_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
+        paymentListener = listener
+        return unsubscribe
+      },
+    )
     const { unmount } = renderPane({
       resource: makeResource({ listPendingOrders, listRecharges, subscribe }),
     })
@@ -593,10 +595,12 @@ describe('RechargePane', () => {
           },
         ],
       })
-    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
-      paymentListener = listener
-      return () => undefined
-    })
+    const subscribe = vi.fn(
+      (_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
+        paymentListener = listener
+        return () => undefined
+      },
+    )
     const { queryClient } = renderPane({
       resource: makeResource({ listPendingOrders, listRecharges, subscribe }),
     })
@@ -626,10 +630,12 @@ describe('RechargePane', () => {
       expires_at: '2026-08-01T01:00:00Z',
       reused: false,
     })
-    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
-      paymentListener = listener
-      return () => undefined
-    })
+    const subscribe = vi.fn(
+      (_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
+        paymentListener = listener
+        return () => undefined
+      },
+    )
     const { user } = renderPane({
       resource: makeResource({
         createCheckout,
@@ -675,10 +681,12 @@ describe('RechargePane', () => {
       ],
     })
     const listRecharges = vi.fn().mockResolvedValue({ items: [] })
-    const subscribe = vi.fn((_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
-      paymentListener = listener
-      return () => undefined
-    })
+    const subscribe = vi.fn(
+      (_workspaceId: string, listener: Parameters<PaymentsResource['subscribe']>[1]) => {
+        paymentListener = listener
+        return () => undefined
+      },
+    )
     renderPane({ resource: makeResource({ listPendingOrders, listRecharges, subscribe }) })
 
     const pendingOrder = await screen.findByTestId('pending-payment-order-failed-order')

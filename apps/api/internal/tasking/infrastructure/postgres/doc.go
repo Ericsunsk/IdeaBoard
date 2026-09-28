@@ -5,7 +5,7 @@
 //   - WorkspaceTask.ID <-> tasks.public_id (task_...)
 //   - WorkspaceTask.WorkspaceID <-> workspaces.public_id (resolved to
 //     internal_id per call; cross-workspace ids stay invisible/ErrNotFound)
-//   - WorkflowKind <-> tasks.workflow_type (canonical AI-image feature slug)
+//   - Service <-> tasks.service (canonical AI-image service slug)
 //   - ExecutionToken <-> workflow_input envelope execution_token (durable
 //     across states); tasks.lease_token mirrors it ONLY while running
 //     (chk_tasks_lease_status) and fences Claim/terminal transitions

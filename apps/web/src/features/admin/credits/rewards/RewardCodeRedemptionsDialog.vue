@@ -12,7 +12,9 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">{{ REWARD_CODES_MESSAGES.redemptionsTitle }}</div>
+              <div class="text-admin-title-sm font-[740] text-admin-title-color">
+                {{ REWARD_CODES_MESSAGES.redemptionsTitle }}
+              </div>
             </div>
           </template>
           <template #pager>
@@ -85,16 +87,28 @@
         @row-collapse="collapseRedemption"
       >
         <AdminColumn expander :style="{ width: '52px' }" />
-        <AdminColumn field="userPublicId" :header="REWARD_CODES_MESSAGES.redemptionsUserColumn" :style="{ minWidth: '240px' }">
+        <AdminColumn
+          field="userPublicId"
+          :header="REWARD_CODES_MESSAGES.redemptionsUserColumn"
+          :style="{ minWidth: '240px' }"
+        >
           <template #body="{ data }">
             <span class="font-semibold text-admin-text-1">{{ data.displayName }}</span>
             <span class="block text-admin-caption text-admin-text-3">{{ data.userPublicId }}</span>
           </template>
         </AdminColumn>
-        <AdminColumn field="creditedAmount" :header="REWARD_CODES_MESSAGES.redemptionsAmountColumn" :style="{ width: '180px' }">
+        <AdminColumn
+          field="creditedAmount"
+          :header="REWARD_CODES_MESSAGES.redemptionsAmountColumn"
+          :style="{ width: '180px' }"
+        >
           <template #body="{ data }">{{ formatIdeaAmount(data.creditedAmount) }}</template>
         </AdminColumn>
-        <AdminColumn field="redeemedAt" :header="REWARD_CODES_MESSAGES.redemptionsTimeColumn" :style="{ width: '220px' }">
+        <AdminColumn
+          field="redeemedAt"
+          :header="REWARD_CODES_MESSAGES.redemptionsTimeColumn"
+          :style="{ width: '220px' }"
+        >
           <template #body="{ data }">{{
             formatAdminDateTimeWithSeconds(data.redeemedAt)
           }}</template>
@@ -106,7 +120,10 @@
               v-if="detailLoading && selectedRedemptionId === data.id"
               class="flex min-h-24 items-center justify-center"
             >
-              <AdminSpinner class="size-7" :aria-label="REWARD_CODES_MESSAGES.redemptionsDetailLoadingAria" />
+              <AdminSpinner
+                class="size-7"
+                :aria-label="REWARD_CODES_MESSAGES.redemptionsDetailLoadingAria"
+              />
             </div>
             <AdminAlert
               v-else-if="detailError && selectedRedemptionId === data.id"

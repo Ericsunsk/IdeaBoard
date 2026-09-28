@@ -23,7 +23,8 @@ const PassthroughStub = defineComponent({
 const DialogOverlayStub = defineComponent({
   inheritAttrs: false,
   emits: ['click'],
-  template: '<div data-testid="account-dialog-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
+  template:
+    '<div data-testid="account-dialog-mask" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></div>',
 })
 
 const DialogContentStub = defineComponent({

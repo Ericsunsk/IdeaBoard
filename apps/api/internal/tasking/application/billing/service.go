@@ -49,7 +49,7 @@ type Service struct {
 }
 
 type Request struct {
-	Feature          string
+	Service          string
 	OutputResolution billing.OutputResolution
 	Quantity         int64
 }
@@ -73,7 +73,7 @@ type Readiness struct {
 type Snapshot struct {
 	TaskID            string
 	UserID            int64
-	Feature           string
+	Service           string
 	SKU               billing.SKU
 	DisplayName       string
 	PriceVersionID    int64
@@ -90,8 +90,8 @@ func NewService(quoter Quoter, creditService CreditService) *Service {
 	return &Service{quoter: quoter, credits: creditService}
 }
 
-func AIImageRequest(feature, rawResolution string, quantity int64) (Request, error) {
-	canonicalFeature, ok := workflow.ParseAIImageFeatureSlug(feature)
+func AIImageRequest(service, rawResolution string, quantity int64) (Request, error) {
+	canonicalService, ok := workflow.ParseAIImageFeatureSlug(service)
 	if !ok {
 		return Request{}, ErrUnsupportedProduct
 	}
@@ -102,15 +102,15 @@ func AIImageRequest(feature, rawResolution string, quantity int64) (Request, err
 	if err != nil {
 		return Request{}, err
 	}
-	return Request{Feature: canonicalFeature, OutputResolution: resolution, Quantity: quantity}, nil
+	return Request{Service: canonicalService, OutputResolution: resolution, Quantity: quantity}, nil
 }
 
 func ResolveSKU(request Request) (billing.SKU, error) {
-	feature, ok := workflow.ParseAIImageFeatureSlug(request.Feature)
+	service, ok := workflow.ParseAIImageFeatureSlug(request.Service)
 	if !ok {
 		return "", ErrUnsupportedProduct
 	}
-	return billing.SKU("ai-image:" + feature), nil
+	return billing.SKU("ai-image:" + service), nil
 }
 
 func RequestFingerprint(request Request) (string, error) {
@@ -176,7 +176,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 	}
 
 	snapshot := Snapshot{
-		TaskID: taskID, UserID: userID, Feature: request.Feature,
+		TaskID: taskID, UserID: userID, Service: request.Service,
 		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
 		OutputResolution: quote.OutputResolution,
 		UnitCredits:      quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
@@ -211,10 +211,10 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, command HoldCom
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
+  task_id, user_id, service, sku, display_name, price_version_id, price_version,
   output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		snapshot.TaskID, snapshot.UserID, snapshot.Feature, snapshot.SKU,
+		snapshot.TaskID, snapshot.UserID, snapshot.Service, snapshot.SKU,
 		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution, snapshot.UnitCredits, snapshot.Quantity,
 		snapshot.TotalCredits, snapshot.QuotedAt, holdTransactionID,
 	); err != nil {

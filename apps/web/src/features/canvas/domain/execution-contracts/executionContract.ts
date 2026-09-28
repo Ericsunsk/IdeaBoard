@@ -1,67 +1,64 @@
-import type {
-  SubmitTaskData,
-  SubmitTaskParams,
-} from './canvasTaskRequest'
+import type { SubmitTaskData, SubmitTaskParams } from './canvasTaskRequest'
 import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeUrls'
-import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../../shared/domain/imageServices'
 
-export const EXECUTION_FEATURE = {
-  generation: WORKFLOW_FEATURE.generation,
-  inpaint: WORKFLOW_FEATURE.inpaint,
-  cutout: WORKFLOW_FEATURE.cutout,
-  fusion: WORKFLOW_FEATURE.fusion,
-  render: WORKFLOW_FEATURE.render,
-  variations: WORKFLOW_FEATURE.variations,
-  upscale: WORKFLOW_FEATURE.upscale,
-  outpaint: WORKFLOW_FEATURE.outpaint,
+export const EXECUTION_SERVICE = {
+  generation: SERVICE.generation,
+  inpaint: SERVICE.inpaint,
+  cutout: SERVICE.cutout,
+  fusion: SERVICE.fusion,
+  render: SERVICE.render,
+  variations: SERVICE.variations,
+  upscale: SERVICE.upscale,
+  outpaint: SERVICE.outpaint,
 } as const
 
-export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
+export type ExecutionService = (typeof EXECUTION_SERVICE)[keyof typeof EXECUTION_SERVICE]
 
 type ExecutionMetaEntry = {
-  feature: ExecutionFeature
+  service: ExecutionService
   promptPrefix?: string
   prompt?: string
 }
 
 export const EXECUTION_META = {
-  [EXECUTION_FEATURE.generation]: {
-    feature: EXECUTION_FEATURE.generation,
+  [EXECUTION_SERVICE.generation]: {
+    service: EXECUTION_SERVICE.generation,
   },
-  [EXECUTION_FEATURE.inpaint]: {
-    feature: EXECUTION_FEATURE.inpaint,
+  [EXECUTION_SERVICE.inpaint]: {
+    service: EXECUTION_SERVICE.inpaint,
   },
-  [EXECUTION_FEATURE.fusion]: {
-    feature: EXECUTION_FEATURE.fusion,
+  [EXECUTION_SERVICE.fusion]: {
+    service: EXECUTION_SERVICE.fusion,
     promptPrefix: '[fusion]',
   },
-  [EXECUTION_FEATURE.render]: {
-    feature: EXECUTION_FEATURE.render,
+  [EXECUTION_SERVICE.render]: {
+    service: EXECUTION_SERVICE.render,
   },
-  [EXECUTION_FEATURE.variations]: {
-    feature: EXECUTION_FEATURE.variations,
+  [EXECUTION_SERVICE.variations]: {
+    service: EXECUTION_SERVICE.variations,
   },
-  [EXECUTION_FEATURE.cutout]: {
-    feature: EXECUTION_FEATURE.cutout,
+  [EXECUTION_SERVICE.cutout]: {
+    service: EXECUTION_SERVICE.cutout,
   },
-  [EXECUTION_FEATURE.upscale]: {
-    feature: EXECUTION_FEATURE.upscale,
+  [EXECUTION_SERVICE.upscale]: {
+    service: EXECUTION_SERVICE.upscale,
   },
-  [EXECUTION_FEATURE.outpaint]: {
-    feature: EXECUTION_FEATURE.outpaint,
+  [EXECUTION_SERVICE.outpaint]: {
+    service: EXECUTION_SERVICE.outpaint,
     promptPrefix: '[outpaint]',
   },
-} as const satisfies Record<ExecutionFeature, ExecutionMetaEntry>
+} as const satisfies Record<ExecutionService, ExecutionMetaEntry>
 
-export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.inpaint]
+export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_SERVICE.inpaint]
 
-export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.fusion]
+export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_SERVICE.fusion]
 
 interface BuildExecutionTaskRequestOptions {
   prompt: string
   // Optional task inputs: explicit undefined is equivalent to absent (every
   // consumer guards with truthiness/length checks before setting DTO keys).
-  feature?: ExecutionFeature | undefined
+  service?: ExecutionService | undefined
   imageUrls?: string[] | undefined
   imageAssetIds?: number[] | undefined
   referenceImageAssetIds?: number[] | undefined
@@ -88,8 +85,8 @@ export function buildExecutionTaskRequest(
     priority: CANVAS_INTERACTIVE_TASK_PRIORITY,
   }
 
-  if (options.feature) {
-    request.feature = options.feature
+  if (options.service) {
+    request.service = options.service
   }
   if (options.imageUrls && options.imageUrls.length > 0) {
     request.image_urls = options.imageUrls.map(canonicalizeRuntimeUploadRef)

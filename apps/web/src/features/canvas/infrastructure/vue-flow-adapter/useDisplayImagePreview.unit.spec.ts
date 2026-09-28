@@ -84,8 +84,7 @@ describe('useDisplayImagePreview', () => {
                 width: 2048,
                 height: 1024,
                 size_bytes: 100,
-                checksum_sha256:
-                  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
                 content_url: '/api/v1/workspaces/ws_test123/media-assets/asset-42/content',
                 derivatives: {
                   thumb: {
@@ -227,7 +226,11 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+      ),
+    )
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/ws_test123/media-assets/asset-42',
       expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
@@ -245,13 +248,23 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb'))
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb',
+      ),
+    )
 
     maxSide.value = 640
     await nextTick()
-    expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb')
+    expect(preview.displayUrl.value).toBe(
+      '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/thumb',
+    )
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+      ),
+    )
     scope.stop()
   })
 
@@ -298,10 +311,16 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview'))
+    await vi.waitFor(() =>
+      expect(preview.displayUrl.value).toBe(
+        '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+      ),
+    )
     isVisible.value = false
     await nextTick()
-    expect(preview.displayUrl.value).toBe('/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview')
+    expect(preview.displayUrl.value).toBe(
+      '/api/v1/workspaces/ws_test123/media-assets/asset-42/derivatives/preview',
+    )
     scope.stop()
   })
 
@@ -415,9 +434,7 @@ describe('useDisplayImagePreview', () => {
     for (let index = 0; index < 85; index += 1) {
       const fillerScope = effectScope()
       const fillerSource = ref(`https://example.com/filler-${index}.jpg`)
-      const filler = fillerScope.run(() =>
-        useDisplayImagePreview(fillerSource, { maxSide: 640 }),
-      )
+      const filler = fillerScope.run(() => useDisplayImagePreview(fillerSource, { maxSide: 640 }))
       if (!filler) throw new Error('preview composable was not created')
       fillerScopes.push(fillerScope)
     }
@@ -425,9 +442,7 @@ describe('useDisplayImagePreview', () => {
     await vi.waitFor(() => {
       expect(vi.mocked(URL.revokeObjectURL).mock.calls.length).toBeGreaterThanOrEqual(6)
     })
-    const revokedWhileDisplayed = vi
-      .mocked(URL.revokeObjectURL)
-      .mock.calls.map(([url]) => url)
+    const revokedWhileDisplayed = vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)
     expect(revokedWhileDisplayed).not.toContain(heroUrl)
 
     // Once the image is no longer displayed, its URL becomes evictable again.
@@ -437,9 +452,7 @@ describe('useDisplayImagePreview', () => {
     const extra = extraScope.run(() => useDisplayImagePreview(extraSource, { maxSide: 640 }))
     if (!extra) throw new Error('preview composable was not created')
     await vi.waitFor(() => {
-      expect(
-        vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url),
-      ).toContain(heroUrl)
+      expect(vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)).toContain(heroUrl)
     })
     for (const fillerScope of fillerScopes) fillerScope.stop()
     extraScope.stop()

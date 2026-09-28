@@ -6,7 +6,7 @@ import {
   IMAGE_UPSCALE_ACTION,
   resolveUpscaleScale,
 } from '../../../domain/execution-contracts/imageActionExecution.ts'
-import { EXECUTION_FEATURE } from '../../../domain/execution-contracts/executionContract.ts'
+import { EXECUTION_SERVICE } from '../../../domain/execution-contracts/executionContract.ts'
 import type {
   OutpaintExecutionPlan,
   ImageActionExecutionPlan,
@@ -57,7 +57,7 @@ describe('imageTaskRequests', () => {
   it('builds task readiness requests from the execution contract', () => {
     expect(buildImageActionReadinessRequest(IMAGE_NODE_ACTION.variations)).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.variations,
+      service: EXECUTION_SERVICE.variations,
       params: {
         variation: {
           strength: 50,
@@ -66,7 +66,7 @@ describe('imageTaskRequests', () => {
     })
     expect(buildImageActionReadinessRequest(IMAGE_UPSCALE_ACTION)).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.upscale,
+      service: EXECUTION_SERVICE.upscale,
       params: {
         upscale: {
           scale: 2,
@@ -97,7 +97,7 @@ describe('imageTaskRequests', () => {
   it('builds valid quote-only fill readiness placeholders', () => {
     expect(buildInpaintReadinessRequest()).toMatchObject({
       prompt: '[inpaint] submit readiness',
-      feature: EXECUTION_FEATURE.inpaint,
+      service: EXECUTION_SERVICE.inpaint,
       params: {
         output_count: 1,
         output_resolution: 'default',
@@ -109,7 +109,7 @@ describe('imageTaskRequests', () => {
     })
     expect(buildOutpaintReadinessRequest()).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.outpaint,
+      service: EXECUTION_SERVICE.outpaint,
       params: {
         output_count: 1,
         output_resolution: 'default',
@@ -131,7 +131,7 @@ describe('imageTaskRequests', () => {
     expect(request).toEqual({
       prompt: 'repeatable textile pattern',
       priority: 1,
-      feature: EXECUTION_FEATURE.generation,
+      service: EXECUTION_SERVICE.generation,
       image_urls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
       params: { output_count: 3, output_resolution: '1k', ratio: '1:1' },
     })
@@ -266,15 +266,15 @@ describe('imageTaskRequests', () => {
       }),
     ]
 
-    expect(requests.map((request) => request.feature)).toEqual([
-      EXECUTION_FEATURE.variations,
-      EXECUTION_FEATURE.render,
-      EXECUTION_FEATURE.cutout,
-      EXECUTION_FEATURE.upscale,
+    expect(requests.map((request) => request.service)).toEqual([
+      EXECUTION_SERVICE.variations,
+      EXECUTION_SERVICE.render,
+      EXECUTION_SERVICE.cutout,
+      EXECUTION_SERVICE.upscale,
     ])
     for (const request of requests) {
       expect(request.image_urls).toEqual([source.url])
-      if (request.feature === EXECUTION_FEATURE.upscale) {
+      if (request.service === EXECUTION_SERVICE.upscale) {
         expect(request.prompt).toBe('')
         expect(request.params).not.toHaveProperty('output_count')
         expect(request.params).not.toHaveProperty('output_resolution')
@@ -282,9 +282,9 @@ describe('imageTaskRequests', () => {
       }
       expect(request.prompt).toBe('preserve the subject')
       expect(request.params?.output_count).toBe(
-        request.feature === EXECUTION_FEATURE.cutout ? 1 : 4,
+        request.service === EXECUTION_SERVICE.cutout ? 1 : 4,
       )
-      if (request.feature === EXECUTION_FEATURE.cutout) {
+      if (request.service === EXECUTION_SERVICE.cutout) {
         expect(request.params?.output_resolution).toBe('default')
       }
     }
@@ -319,7 +319,7 @@ describe('imageTaskRequests', () => {
       originalImageMediaAssetId: 'asset_aaa1',
     })
 
-    expect(request.feature).toBe(EXECUTION_FEATURE.inpaint)
+    expect(request.service).toBe(EXECUTION_SERVICE.inpaint)
     expect(request.media_asset_ids).toEqual(['asset_aaa1'])
     expect(request.params).toMatchObject({
       output_count: 1,
@@ -338,7 +338,7 @@ describe('imageTaskRequests', () => {
       prompt: 'extend horizon',
     })
 
-    expect(request.feature).toBe(EXECUTION_FEATURE.outpaint)
+    expect(request.service).toBe(EXECUTION_SERVICE.outpaint)
     expect(request.params).toMatchObject({
       output_count: 1,
       output_resolution: 'default',
@@ -357,7 +357,7 @@ describe('imageTaskRequests', () => {
 
   it('builds outpaint readiness from the same action contract', () => {
     expect(buildImageActionReadinessRequest(IMAGE_OUTPAINT_ACTION)).toMatchObject({
-      feature: EXECUTION_FEATURE.outpaint,
+      service: EXECUTION_SERVICE.outpaint,
       params: {
         outpaint: {
           target_width: 1032,
@@ -380,7 +380,7 @@ describe('imageTaskRequests', () => {
 
     expect(request).toMatchObject({
       prompt: '[fusion] blend references',
-      feature: EXECUTION_FEATURE.fusion,
+      service: EXECUTION_SERVICE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         output_count: 3,
@@ -405,7 +405,7 @@ describe('imageTaskRequests', () => {
 
     expect(request).toMatchObject({
       prompt: '[fusion] blend references',
-      feature: EXECUTION_FEATURE.fusion,
+      service: EXECUTION_SERVICE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         custom_width: 1280,
@@ -453,7 +453,7 @@ describe('imageTaskRequests', () => {
 
     expect(buildImageExecutionTaskRequest(plan)).toMatchObject({
       prompt: '[fusion] blend references',
-      feature: EXECUTION_FEATURE.fusion,
+      service: EXECUTION_SERVICE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         custom_width: 1200,
@@ -519,16 +519,16 @@ describe('imageTaskRequests', () => {
       resultOptions: {},
     }
 
-    expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.cutout)
+    expect(buildImageExecutionTaskRequest(actionPlan).service).toBe(EXECUTION_SERVICE.cutout)
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.generation,
+      service: EXECUTION_SERVICE.generation,
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
     expect(
       buildImageExecutionTaskRequest(outpaintPlan, { width: 1000, height: 1000 }),
     ).toMatchObject({
-      feature: EXECUTION_FEATURE.outpaint,
+      service: EXECUTION_SERVICE.outpaint,
       image_urls: [source.url],
       params: {
         outpaint: {
@@ -538,7 +538,7 @@ describe('imageTaskRequests', () => {
       },
     })
     expect(buildImageExecutionTaskRequest(fusionPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.fusion,
+      service: EXECUTION_SERVICE.fusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         fusion: {
@@ -566,7 +566,7 @@ describe('imageTaskRequests', () => {
         imageSize: { width: 900, height: 600 },
       }),
     ).toMatchObject({
-      feature: EXECUTION_FEATURE.inpaint,
+      service: EXECUTION_SERVICE.inpaint,
       params: {
         output_count: 1,
         original_image_asset_id: 42,

@@ -14,17 +14,17 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MediaAssetId } from './mediaAssetId'
+import type { Service } from './service'
 import type { TaskBillingSnapshot } from './taskBillingSnapshot'
 import type { TaskId } from './taskId'
 import type { TaskOutputRef } from './taskOutputRef'
 import type { TaskStatus } from './taskStatus'
-import type { WorkflowKind } from './workflowKind'
 import type { WorkspaceId } from './workspaceId'
 
 export interface WorkspaceTask {
   id: TaskId
   workspace_id: WorkspaceId
-  workflow_kind: WorkflowKind
+  service: Service
   /** asset_... input references (no raw storage URLs). */
   media_asset_ids?: MediaAssetId[]
   status: TaskStatus

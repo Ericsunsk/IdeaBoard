@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computed, ref } from 'vue'
-import { getWorkflowFeaturePromptVariables } from '../../../shared/domain/workflowFeatureRegistry'
+import { getServicePromptVariables } from '../../../shared/domain/serviceRegistry'
 import { groupedFeatureGroups, type FeatureSlug } from './featurePromptMeta'
 import { usePromptConfigFilters } from './filtering'
 
@@ -11,7 +11,7 @@ function createHarness() {
     groups: computed(() => groups.value),
     isConfigured: (slug) => configured.has(slug),
     getSavedPrompt: (slug) => (configured.has(slug) ? `saved template ${slug}` : ''),
-    getPromptVariables: (slug) => getWorkflowFeaturePromptVariables(slug),
+    getPromptVariables: (slug) => getServicePromptVariables(slug),
   })
   return { filters }
 }

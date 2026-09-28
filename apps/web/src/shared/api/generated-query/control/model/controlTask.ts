@@ -36,5 +36,6 @@ export interface ControlTask {
   /** @pattern ^task_[A-Za-z0-9_-]+$ */
   task_id: string
   status?: string
-  feature?: string
+  /** Registered AI image service slug (#847 rename). */
+  service?: string
 }

@@ -268,8 +268,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
         }
         const results = await uploadDedupedWithConcurrency(
           taskKeysInOrder,
-          (taskKey) =>
-            fetchAndUploadStable(normalizedByTaskKey.get(taskKey) as string),
+          (taskKey) => fetchAndUploadStable(normalizedByTaskKey.get(taskKey) as string),
           STABILIZE_UPLOAD_CONCURRENCY,
         )
         for (const { ref, taskKey } of unstableEntries) {

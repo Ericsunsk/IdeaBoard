@@ -45,7 +45,7 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 	}
 	params, err := json.Marshal(tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       feature,
+		Service:       feature,
 		ExecutionPlan: encoded,
 	})
 	if err != nil {
@@ -57,10 +57,10 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
-		Feature:        "variations",
+		Service:        "variations",
 		ClientActionID: "action-1",
 		BillingRequest: &taskbilling.Request{
-			Feature:          "generation",
+			Service:          "generation",
 			OutputResolution: "1k",
 			Quantity:         1,
 		},
@@ -73,7 +73,7 @@ func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 func TestNewCanonicalRequestRejectsInvalidPriority(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:   42,
-		Feature:  "variations",
+		Service:  "variations",
 		Priority: tasks.TaskPriorityLowest + 1,
 	})
 	if err == nil {
@@ -85,7 +85,7 @@ func TestNewCanonicalRequestRejectsInvalidUserID(t *testing.T) {
 	for _, userID := range []int64{0, -1} {
 		_, err := NewCanonicalRequest(CanonicalRequestInput{
 			UserID:  userID,
-			Feature: "variations",
+			Service: "variations",
 		})
 		if err == nil {
 			t.Fatalf("expected userID %d to be rejected", userID)
@@ -96,7 +96,7 @@ func TestNewCanonicalRequestRejectsInvalidUserID(t *testing.T) {
 func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:  42,
-		Feature: "variations",
+		Service: "variations",
 	})
 	if err == nil {
 		t.Fatal("expected billable workflow without Billing request to be rejected")
@@ -105,10 +105,10 @@ func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.
 
 func TestNewCanonicalRequestRejectsMissingExecutionPlanForAIImageWorkflow(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugGeneration,
+		UserID: 42, Service: workflow.FeatureSlugGeneration,
 		ClientActionID: "missing-plan",
 		BillingRequest: &taskbilling.Request{
-			Feature: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
+			Service: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
 		},
 	})
 	if err == nil {
@@ -120,10 +120,10 @@ func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) 
 	plan, _ := canonicalExecutionPlanForTest(t, workflow.FeatureSlugGeneration, 1)
 	_, styleParams := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, 1)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugGeneration, Params: styleParams,
+		UserID: 42, Service: workflow.FeatureSlugGeneration, Params: styleParams,
 		ClientActionID: "mismatched-plan", ExecutionPlan: &plan,
 		BillingRequest: &taskbilling.Request{
-			Feature: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
+			Service: workflow.FeatureSlugGeneration, OutputResolution: "1k", Quantity: 1,
 		},
 	})
 	if err == nil {
@@ -132,11 +132,11 @@ func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) 
 }
 
 func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
-	inputBilling := &taskbilling.Request{Feature: "variations", OutputResolution: "1k", Quantity: 1}
-	plan, params := canonicalExecutionPlanForTest(t, inputBilling.Feature, 1)
+	inputBilling := &taskbilling.Request{Service: "variations", OutputResolution: "1k", Quantity: 1}
+	plan, params := canonicalExecutionPlanForTest(t, inputBilling.Service, 1)
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
-		Feature:        inputBilling.Feature,
+		Service:        inputBilling.Service,
 		Params:         params,
 		ClientActionID: "action-1",
 		BillingRequest: inputBilling,
@@ -146,10 +146,10 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inputBilling.Feature = "generation"
+	inputBilling.Service = "generation"
 	inputBilling.Quantity = 9
 	billingRequest := request.BillingRequest()
-	if billingRequest == nil || billingRequest.Feature != "variations" || billingRequest.Quantity != 1 {
+	if billingRequest == nil || billingRequest.Service != "variations" || billingRequest.Quantity != 1 {
 		t.Fatalf("Billing request=%+v, want immutable variations quantity 1", billingRequest)
 	}
 }
@@ -157,11 +157,11 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *testing.T) {
 	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, 1)
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: workflow.FeatureSlugVariations, Params: params,
+		UserID: 42, Service: workflow.FeatureSlugVariations, Params: params,
 		ClientActionID: "prepare-media-contract", ExecutionPlan: &plan,
-		BillingRequest: &taskbilling.Request{Feature: workflow.FeatureSlugVariations, OutputResolution: "1k", Quantity: 1},
+		BillingRequest: &taskbilling.Request{Service: workflow.FeatureSlugVariations, OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
-			Feature: workflow.FeatureSlugVariations, Primitive: string(workflow.GenerationPrimitiveImageToImage),
+			Service: workflow.FeatureSlugVariations, Primitive: string(workflow.GenerationPrimitiveImageToImage),
 			TemplateFingerprint: "fp", RequestedOutputCount: 1,
 			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "input", Source: "source"}},
 		},
@@ -208,10 +208,10 @@ func TestNewCanonicalRequestRejectsBillingQuantityMismatchedWithGeneration(t *te
 	count := 2
 	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugVariations, count)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: "variations", Params: params, ClientActionID: "action-1", ExecutionPlan: &plan,
-		BillingRequest: &taskbilling.Request{Feature: "variations", OutputResolution: "1k", Quantity: 1},
+		UserID: 42, Service: "variations", Params: params, ClientActionID: "action-1", ExecutionPlan: &plan,
+		BillingRequest: &taskbilling.Request{Service: "variations", OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
-			Feature: "variations", Primitive: "image-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
+			Service: "variations", Primitive: "image-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
 		},
 	})
 	if err == nil {

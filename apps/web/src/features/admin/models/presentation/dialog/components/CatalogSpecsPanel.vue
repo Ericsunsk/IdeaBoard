@@ -37,7 +37,9 @@
 
         <!-- 托管类型 (Hosting) -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-admin-caption font-semibold text-admin-text-1">{{ MODELS_MESSAGES.specsHostingLabel }}</label>
+          <label class="text-admin-caption font-semibold text-admin-text-1">{{
+            MODELS_MESSAGES.specsHostingLabel
+          }}</label>
           <div
             class="flex h-9 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 p-1"
           >
@@ -75,7 +77,9 @@
           <label class="text-admin-caption font-semibold text-admin-text-1" for="model-caps-input">
             {{ MODELS_MESSAGES.specsCapabilitiesLabel }}
           </label>
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsCapabilitiesHint }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.specsCapabilitiesHint
+          }}</span>
         </div>
         <AdminInput
           id="model-caps-input"
@@ -84,7 +88,9 @@
           @update:model-value="emit('update:capabilitiesDraft', String($event))"
         />
         <div class="flex flex-wrap items-center gap-1 pt-0.5">
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsQuickAdd }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.specsQuickAdd
+          }}</span>
           <button
             v-for="tag in MODELS_MESSAGES.specsPopularCapabilities"
             :key="tag"
@@ -102,10 +108,7 @@
 
 <script setup lang="ts">
 import AdminInput from '../../../../shared/components/AdminInput.vue'
-import {
-  MODEL_HOSTING_CLOUDFLARE,
-  MODEL_HOSTING_THIRD_PARTY,
-} from '../../../domain/catalogData'
+import { MODEL_HOSTING_CLOUDFLARE, MODEL_HOSTING_THIRD_PARTY } from '../../../domain/catalogData'
 import { splitCapabilities } from '../../../domain/modelForm'
 import { MODELS_MESSAGES } from '../../pages/messages'
 

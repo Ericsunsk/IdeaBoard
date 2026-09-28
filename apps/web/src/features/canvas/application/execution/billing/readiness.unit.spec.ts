@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  WORKFLOW_FEATURE,
-  type WorkflowFeature,
-} from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
 import type {
   SubmitTaskReadinessData,
   SubmitTaskReadinessRequestData,
@@ -10,12 +7,12 @@ import type {
 import { createCanvasBillingReadinessStore } from './readiness.ts'
 
 function makeReadiness(
-  feature: WorkflowFeature,
+  service: Service,
   overrides: Partial<SubmitTaskReadinessData> = {},
 ): SubmitTaskReadinessData {
   return {
     ready: true,
-    feature,
+    service,
     billing: {
       sku: 'ai-image:generation',
       output_resolution: '1k',
@@ -37,17 +34,17 @@ function makeReadiness(
 describe('canvas billing readiness store', () => {
   it('loads multiple action quotes through one readiness matrix request', async () => {
     const fetchReadinessMatrix = vi.fn(async (requests: SubmitTaskReadinessRequestData[]) =>
-      requests.map((request) => makeReadiness(request.feature as WorkflowFeature)),
+      requests.map((request) => makeReadiness(request.service as Service)),
     )
     const store = createCanvasBillingReadinessStore({ fetchReadinessMatrix })
     const entries = [
       {
-        feature: WORKFLOW_FEATURE.variations,
-        request: { prompt: '', feature: WORKFLOW_FEATURE.variations },
+        service: SERVICE.variations,
+        request: { prompt: '', service: SERVICE.variations },
       },
       {
-        feature: WORKFLOW_FEATURE.cutout,
-        request: { prompt: '', feature: WORKFLOW_FEATURE.cutout },
+        service: SERVICE.cutout,
+        request: { prompt: '', service: SERVICE.cutout },
       },
     ]
 
@@ -60,18 +57,16 @@ describe('canvas billing readiness store', () => {
 
     expect(fetchReadinessMatrix).toHaveBeenCalledOnce()
     expect(fetchReadinessMatrix).toHaveBeenCalledWith(entries.map((entry) => entry.request))
-    expect(store.getFeatureState(WORKFLOW_FEATURE.variations, firstEntry.request).status).toBe(
-      'ready',
-    )
-    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout, secondEntry.request).status).toBe('ready')
+    expect(store.getServiceState(SERVICE.variations, firstEntry.request).status).toBe('ready')
+    expect(store.getServiceState(SERVICE.cutout, secondEntry.request).status).toBe('ready')
   })
 
   it('exposes the server quote and refreshes when the quote changes', async () => {
-    const fetchReadiness = vi.fn(async (feature: WorkflowFeature) => makeReadiness(feature))
+    const fetchReadiness = vi.fn(async (service: Service) => makeReadiness(service))
     const store = createCanvasBillingReadinessStore({ fetchReadiness })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.generation)
-    expect(store.getFeatureState(WORKFLOW_FEATURE.generation)).toMatchObject({
+    await store.ensureService(SERVICE.generation)
+    expect(store.getServiceState(SERVICE.generation)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       totalCredits: 4,
@@ -80,9 +75,9 @@ describe('canvas billing readiness store', () => {
     })
 
     store.applyReadiness(
-      makeReadiness(WORKFLOW_FEATURE.generation, {
+      makeReadiness(SERVICE.generation, {
         billing: {
-          ...makeReadiness(WORKFLOW_FEATURE.generation).billing!,
+          ...makeReadiness(SERVICE.generation).billing!,
           price_version_id: 2,
           price_version: 2,
           unit_credits: 6,
@@ -92,7 +87,7 @@ describe('canvas billing readiness store', () => {
       }),
     )
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.generation)).toMatchObject({
+    expect(store.getServiceState(SERVICE.generation)).toMatchObject({
       status: 'ready',
       unitCredits: 6,
       totalCredits: 24,
@@ -102,12 +97,12 @@ describe('canvas billing readiness store', () => {
 
   it('retains an insufficient quote for actionable preflight instead of disabling the control', async () => {
     const store = createCanvasBillingReadinessStore({
-      fetchReadiness: async (feature) =>
-        makeReadiness(feature, {
+      fetchReadiness: async (service) =>
+        makeReadiness(service, {
           ready: false,
           message: 'Idea不足',
           billing: {
-            ...makeReadiness(feature).billing!,
+            ...makeReadiness(service).billing!,
             total_credits: 8,
             available_credits: 3,
             sufficient: false,
@@ -115,9 +110,9 @@ describe('canvas billing readiness store', () => {
         }),
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.inpaint)
+    await store.ensureService(SERVICE.inpaint)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.inpaint)).toMatchObject({
+    expect(store.getServiceState(SERVICE.inpaint)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       availableCredits: 3,
@@ -128,15 +123,15 @@ describe('canvas billing readiness store', () => {
   it('classifies a blocked readiness through the shared error catalog', async () => {
     const store = createCanvasBillingReadinessStore({
       fetchReadiness: async () =>
-        makeReadiness(WORKFLOW_FEATURE.cutout, {
+        makeReadiness(SERVICE.cutout, {
           ready: false,
           error_code: 'pricing_unavailable',
         }),
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.cutout)
+    await store.ensureService(SERVICE.cutout)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout)).toMatchObject({
+    expect(store.getServiceState(SERVICE.cutout)).toMatchObject({
       status: 'blocked',
       reason: 'Pricing is temporarily unavailable. Please try again shortly.',
     })
@@ -149,9 +144,9 @@ describe('canvas billing readiness store', () => {
       },
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.cutout)
+    await store.ensureService(SERVICE.cutout)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.cutout)).toMatchObject({
+    expect(store.getServiceState(SERVICE.cutout)).toMatchObject({
       status: 'error',
       reason: 'Billing information is unavailable right now.',
     })
@@ -169,15 +164,15 @@ describe('canvas billing readiness store', () => {
     })
     const request: SubmitTaskReadinessRequestData = {
       prompt: 'quote',
-      feature: WORKFLOW_FEATURE.cutout,
+      service: SERVICE.cutout,
     }
 
-    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
-    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
+    await store.ensureService(SERVICE.cutout, { request, force: true })
+    await store.ensureService(SERVICE.cutout, { request, force: true })
     expect(fetchReadiness).toHaveBeenCalledOnce()
 
     currentTime += 60_001
-    await store.ensureFeature(WORKFLOW_FEATURE.cutout, { request, force: true })
+    await store.ensureService(SERVICE.cutout, { request, force: true })
     expect(fetchReadiness).toHaveBeenCalledTimes(2)
   })
 })

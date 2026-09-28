@@ -65,7 +65,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "trigger-input.png")
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
+		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
 	}, fmt.Sprintf("worker-trigger-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
@@ -92,7 +92,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	}
 	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
-		WorkflowKind: "render", ExecutionToken: created.ExecutionToken,
+		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}

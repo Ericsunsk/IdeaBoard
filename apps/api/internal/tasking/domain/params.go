@@ -9,15 +9,15 @@ import (
 )
 
 // SchemaVersion tracks the WorkflowTaskParams schema carried by task records.
-const CurrentParamsSchemaVersion = 5
+const CurrentParamsSchemaVersion = 6
 
 // WorkflowTaskParams is the typed contract for task parameters flowing
 // from frontend submit through API, River, and into the worker/provider layer.
 type WorkflowTaskParams struct {
 	SchemaVersion int `json:"schema_version"`
 
-	// Feature routing.
-	Feature string `json:"feature,omitempty"`
+	// Service routing.
+	Service string `json:"service,omitempty"`
 
 	// Runtime media refs. Provider adapters flatten this object at the edge.
 	Media *MediaInputs `json:"media,omitempty"`
@@ -58,7 +58,7 @@ type WorkflowTaskParams struct {
 // account, or endpoint selection.
 type GenerationRequestSnapshot struct {
 	SchemaVersion        int                     `json:"schema_version"`
-	Feature              string                  `json:"feature"`
+	Service              string                  `json:"service"`
 	Primitive            string                  `json:"primitive"`
 	UserPrompt           string                  `json:"user_prompt"`
 	SystemPrompt         string                  `json:"system_prompt"`

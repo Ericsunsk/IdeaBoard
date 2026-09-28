@@ -79,10 +79,7 @@ function toLocalMeta(board: WorkspaceBoardMeta): BoardMeta | null {
   }
 }
 
-function toLocalState(
-  boardId: string,
-  document: WorkspaceBoardDocument,
-): BoardState | null {
+function toLocalState(boardId: string, document: WorkspaceBoardDocument): BoardState | null {
   // v1 splits the envelope: `schema_version` rides beside `payload`, while
   // the domain validator expects one `{ schemaVersion, ...nodes }` snapshot.
   // The write path (`saveWorkspaceBoard`) nests nodes under `payload`, so
@@ -94,7 +91,10 @@ function toLocalState(
       ? (document.document as Record<string, unknown>)
       : null
   const nested =
-    snapshot && typeof snapshot.payload === 'object' && snapshot.payload !== null && !Array.isArray(snapshot.payload)
+    snapshot &&
+    typeof snapshot.payload === 'object' &&
+    snapshot.payload !== null &&
+    !Array.isArray(snapshot.payload)
       ? (snapshot.payload as Record<string, unknown>)
       : null
   const payload = { ...(nested ?? snapshot ?? {}), schemaVersion: document.schemaVersion }
@@ -306,17 +306,13 @@ export async function syncBoardToServer(boardId: string, stateOverride?: BoardSt
   const workspaceId = requireBoardWorkspaceId()
   const state = stateOverride ?? getBoardState(boardId) ?? createEmptyBoardState(board.updatedAt)
   try {
-    const response = await saveWorkspaceBoard(
-      workspaceId,
-      boardId,
-      {
-        name: board.name,
-        state: toGeneratedBoardStateProjection(state),
-        // v1 `If-Match` requires revision >= 1; an unknown local base
-        // reconciles through the 409 rollback path below, never a 400.
-        baseRevision: board.revision ?? 1,
-      },
-    )
+    const response = await saveWorkspaceBoard(workspaceId, boardId, {
+      name: board.name,
+      state: toGeneratedBoardStateProjection(state),
+      // v1 `If-Match` requires revision >= 1; an unknown local base
+      // reconciles through the 409 rollback path below, never a 400.
+      baseRevision: board.revision ?? 1,
+    })
     applySyncSuccess(boardId, response, syncScope)
   } catch (error) {
     markSyncFailure(boardId, syncScope, error)
@@ -365,11 +361,7 @@ export function isBoardNameConflictError(error: unknown): boolean {
   // rollback/reconcile policy the legacy name conflict used.
   // `board_archived` (409) is excluded above: archived writes surface the
   // archived banner instead of the conflict recovery path.
-  return (
-    code === 409 ||
-    code === 'board_revision_conflict' ||
-    code === 'board_idempotency_conflict'
-  )
+  return code === 409 || code === 'board_revision_conflict' || code === 'board_idempotency_conflict'
 }
 
 /**

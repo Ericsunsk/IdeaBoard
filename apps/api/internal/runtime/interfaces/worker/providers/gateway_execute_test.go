@@ -79,7 +79,7 @@ func TestCallGatewayAPIAppliesCatalogRouteOverride(t *testing.T) {
 		Prompt: "catalog override",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
+			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
 
@@ -118,7 +118,7 @@ func TestCallGatewayAPIFailsClosedOnRouteOverrideError(t *testing.T) {
 		Prompt: "x",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
+			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
 	_, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
@@ -168,7 +168,7 @@ func TestCallGatewayAPIStoresParsedOutputEnvelope(t *testing.T) {
 		Prompt: "repeatable textile pattern",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
+			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
 
@@ -249,7 +249,7 @@ func TestCallGatewayAPIOpenRouterResolvesRelativeUploads(t *testing.T) {
 
 	rawParams := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "variations",
+		Service:       "variations",
 		Media: &tasks.MediaInputs{
 			Inputs:   []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
@@ -332,7 +332,7 @@ func TestCallGatewayAPIRejectsUnknownModel(t *testing.T) {
 		Prompt: "x",
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugGeneration,
+			Service:       workflow.FeatureSlugGeneration,
 		}),
 	}
 	_, err := executor.CallGatewayAPI(context.Background(), runtimeports.GatewayCallInput{
@@ -374,7 +374,7 @@ func TestCallGatewayAPICutoutSupportsJSONAndBinary(t *testing.T) {
 		UserID: 42,
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugCutout,
+			Service:       workflow.FeatureSlugCutout,
 			Media: &tasks.MediaInputs{
 				Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 			},
@@ -412,7 +412,7 @@ func TestCallGatewayAPICutoutSupportsJSONAndBinary(t *testing.T) {
 		UserID: 42,
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
-			Feature:       workflow.FeatureSlugUpscale,
+			Service:       workflow.FeatureSlugUpscale,
 			Media: &tasks.MediaInputs{
 				Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 			},

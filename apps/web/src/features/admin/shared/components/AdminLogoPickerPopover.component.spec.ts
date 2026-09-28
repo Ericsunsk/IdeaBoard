@@ -105,12 +105,8 @@ describe('AdminLogoPickerPopover', () => {
     await fireEvent.error(fluxThumb)
 
     // 破图缩略图隐藏回落占位，选择按钮仍在可继续点选。
-    expect(
-      screen.queryByRole('img', { name: 'Flux (Black Forest Labs)' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Flux (Black Forest Labs)' }),
-    ).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Flux (Black Forest Labs)' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Flux (Black Forest Labs)' })).toBeInTheDocument()
   })
 
   it('keeps the current logo when the server mutation fails', async () => {

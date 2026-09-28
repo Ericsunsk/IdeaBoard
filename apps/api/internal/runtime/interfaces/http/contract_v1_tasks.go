@@ -26,6 +26,7 @@ type (
 	WorkspaceTaskHolder      = workspacetasks.Holder
 	WorkspaceTaskEnqueuer    = workspacetasks.Enqueuer
 	WorkspaceTaskAssetReader = workspacetasks.AssetReader
+	WorkspaceTaskRoutingGate = workspacetasks.RoutingGate
 )
 
 // Workspace task lifecycle (issue #805). Additive only: legacy
@@ -104,7 +105,7 @@ func (h *contractV1Handler) taskService() *workspacetasks.Service {
 	return workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: h.deps.Tasks, Quoter: h.deps.TaskQuoter,
 		Holder: h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
-		Models: h.deps.TaskModelResolver,
+		Routing: h.deps.TaskRoutingGate,
 	})
 }
 
@@ -148,6 +149,8 @@ func renderTaskError(c *gin.Context, err error) {
 			contract.CodeTaskInsufficientCredits, msgValidationFailed2)
 	case errors.Is(err, workspacetasks.ErrQuoteUnavailable):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
+	case errors.Is(err, workspacetasks.ErrRoutingUnavailable):
+		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeServiceResolutionUnavailable, "该清晰度暂不可用")
 	case errors.Is(err, workspacetasks.ErrWalletRestricted):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted2)
 	case errors.Is(err, workspacetasks.ErrMediaNotFound):
@@ -167,9 +170,15 @@ func taskLocation(workspaceID, taskID string) string {
 }
 
 // v1CreateTaskBody is the discriminated input union:
-// {workflow_kind, inputs:{media_asset_ids}, prompt, params}. DecodeStrict
+// {service, inputs:{media_asset_ids}, prompt, params}. DecodeStrict
 // rejects unknown top-level fields; ValidateParams rejects unknown params
 // keys and raw storage URLs.
+//
+// Breaking rename (#847): `service` replaces `workflow_kind` with no
+// compatibility alias. A body carrying only the old `workflow_kind` field
+// fails DecodeStrict (unknown field) and renders 400 bad_request; a body
+// with neither field binds and then fails validation as 422
+// validation_failed on details.fields.service.
 //
 // Prompt rides the explicit data.prompt field (bound:
 // workspacetasks.MaxWorkspaceTaskPromptBytes = 8KB, legacy parity), never
@@ -179,8 +188,8 @@ func taskLocation(workspaceID, taskID string) string {
 // (workspace public asset_... from the upload-session flow, inpaint only).
 type v1CreateTaskBody struct {
 	Data struct {
-		WorkflowKind string `json:"workflow_kind"`
-		Inputs       struct {
+		Service string `json:"service"`
+		Inputs  struct {
 			MediaAssetIDs []string `json:"media_asset_ids"`
 		} `json:"inputs"`
 		Prompt     string         `json:"prompt,omitempty"`
@@ -193,7 +202,7 @@ type v1CreateTaskBody struct {
 type v1TaskDTO struct {
 	ID              string                   `json:"id"`
 	WorkspaceID     string                   `json:"workspace_id"`
-	WorkflowKind    string                   `json:"workflow_kind"`
+	Service         string                   `json:"service"`
 	MediaAssetIDs   []string                 `json:"media_asset_ids,omitempty"`
 	Status          string                   `json:"status"`
 	RetryCount      int                      `json:"retry_count"`
@@ -232,7 +241,7 @@ type v1TaskOutputRefDTO struct {
 
 func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 	dto := v1TaskDTO{
-		ID: task.ID, WorkspaceID: task.WorkspaceID, WorkflowKind: task.WorkflowKind,
+		ID: task.ID, WorkspaceID: task.WorkspaceID, Service: task.Service,
 		MediaAssetIDs: append([]string(nil), task.MediaAssetIDs...),
 		Status:        string(task.Status), RetryCount: task.RetryCount, ExecutionToken: task.ExecutionToken,
 		ErrorMsg: task.ErrorMsg, CancelReason: task.CancelReason,
@@ -283,7 +292,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 			writeV1InputError(c)
 			return
 		}
-		kind := strings.TrimSpace(body.Data.WorkflowKind)
+		kind := strings.TrimSpace(body.Data.Service)
 		assetIDs := append([]string(nil), body.Data.Inputs.MediaAssetIDs...)
 		for i := range assetIDs {
 			assetIDs[i] = strings.TrimSpace(assetIDs[i])
@@ -329,7 +338,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 			created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
 				WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
-				WorkflowKind: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
+				Service: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
 				Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
 			}, key)
 			if err != nil {
@@ -345,7 +354,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 				}
 				h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
 					events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
-					events.V1TaskCreatedData{TaskID: staged.TaskID, WorkflowKind: kind})
+					events.V1TaskCreatedData{TaskID: staged.TaskID, Service: kind})
 			}
 			h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
 				created.WorkspaceID, created.ID,
@@ -540,9 +549,9 @@ func (h *contractV1Handler) listWorkspaceTaskOutputs(c *gin.Context) {
 
 type v1QuoteTaskBody struct {
 	Data struct {
-		WorkflowKind string  `json:"workflow_kind"`
-		Quantity     *int64  `json:"quantity"`
-		Resolution   *string `json:"resolution"`
+		Service    string  `json:"service"`
+		Quantity   *int64  `json:"quantity"`
+		Resolution *string `json:"resolution"`
 	} `json:"data"`
 }
 
@@ -560,7 +569,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		}
 		service := h.taskService()
 		snapshot, err := service.Quote(c.Request.Context(), workspacetasks.QuoteParams{
-			WorkflowKind: strings.TrimSpace(body.Data.WorkflowKind), Quantity: quantity, Resolution: resolution,
+			Service: strings.TrimSpace(body.Data.Service), Quantity: quantity, Resolution: resolution,
 		})
 		if err != nil {
 			renderTaskError(c, err)
@@ -597,7 +606,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //
 // Schemas:
 //
-//	WorkspaceTask: {id: TaskId (task_...), workspace_id: WorkspaceId, workflow_kind: {enum: [render,
+//	WorkspaceTask: {id: TaskId (task_...), workspace_id: WorkspaceId, service: {enum: [render,
 //	  variations, inpaint, cutout, fusion, upscale, outpaint]}, media_asset_ids?: asset_...[],
 //	  params?: object (no storage URLs, unknown fields rejected), status: {enum: [pending, running,
 //	  completed, failed, cancelled]}, retry_count: int>=0, execution_token?: string,
@@ -610,13 +619,16 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	  price_version_id: int64, price_version: int64, output_resolution: string,
 //	  unit_credits: int64>=0, quantity: int64>=1, total_credits: int64>=0,
 //	  quoted_at: date-time, hold_transaction_id?: string, settlement_state: {enum: [quoted, free, held, captured, released]}}
-//	CreateWorkspaceTaskRequest: {data: {workflow_kind: string, inputs: {media_asset_ids?: asset_...[]},
+//	CreateWorkspaceTaskRequest: {data: {service: string, inputs: {media_asset_ids?: asset_...[]},
 //	  prompt?: string (max 8KB bytes; required for generation/inpaint, optional for
 //	  render/variations/fusion/outpaint, ignored for cutout/upscale),
 //	  params?: object (params.mask_asset_id?: asset_... — inpaint only; data-URL and
 //	  storage-URL masks rejected 422, params.prompt still 422 unknown_field),
 //	  quantity?: int64>=1, resolution?: string}}
-//	QuoteWorkspaceTaskRequest: {data: {workflow_kind: string, quantity?: int64>=1, resolution?: string}}
+//	  Breaking rename (#847): the old `workflow_kind` field is rejected by
+//	  strict decoding as 400 bad_request; a missing `service` renders 422
+//	  validation_failed on details.fields.service.
+//	QuoteWorkspaceTaskRequest: {data: {service: string, quantity?: int64>=1, resolution?: string}}
 //
 // Prompt/mask spec notes for the merger (v1 task creation gap batch):
 //   - data.prompt is new; the idempotency hash covers it (same key +

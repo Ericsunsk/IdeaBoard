@@ -518,7 +518,7 @@ INSERT INTO billing_accounts (public_id, workspace_id) VALUES ('ba_deleteconverg
 		t.Fatalf("seed retained billing account: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `
-INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status)
+INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status)
 VALUES ('task_deleteconvergence', $1, $2, $3, 'render', '{}', 'pending')`, workspaceID, provisioned.User.ID, billingAccountID); err != nil {
 		t.Fatalf("seed retained task: %v", err)
 	}

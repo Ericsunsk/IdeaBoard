@@ -22,7 +22,9 @@
           >
             {{ MODELS_MESSAGES.gatewayPathLabel }}
           </label>
-          <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.gatewayPathHint }}</span>
+          <span class="text-admin-caption text-admin-text-3">{{
+            MODELS_MESSAGES.gatewayPathHint
+          }}</span>
         </div>
         <AdminInput
           id="model-custom-path-input"

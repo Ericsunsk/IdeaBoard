@@ -20,7 +20,7 @@ function renderControls(billingState?: CanvasBillingQuoteState | null) {
 describe('PromptComposerControls billing contract', () => {
   it('shows the quoted total and keeps submit enabled when points are sufficient', () => {
     renderControls({
-      feature: 'generation',
+      service: 'generation',
       status: 'ready',
       unitCredits: 4,
       availableCredits: 20,
@@ -41,7 +41,7 @@ describe('PromptComposerControls billing contract', () => {
         actionsClass: 'prompt-actions',
         sendButtonClass: 'prompt-send',
         billingState: {
-          feature: 'generation',
+          service: 'generation',
           status: 'ready',
           unitCredits: 3,
           availableCredits: 20,
@@ -61,7 +61,7 @@ describe('PromptComposerControls billing contract', () => {
       actionsClass: 'prompt-actions',
       sendButtonClass: 'prompt-send',
       billingState: {
-        feature: 'generation',
+        service: 'generation',
         status: 'ready',
         unitCredits: 0,
         availableCredits: 0,
@@ -75,7 +75,7 @@ describe('PromptComposerControls billing contract', () => {
 
   it('keeps submit actionable when a cached quote reports insufficient Idea余额', () => {
     renderControls({
-      feature: 'generation',
+      service: 'generation',
       status: 'ready',
       unitCredits: 8,
       availableCredits: 3,

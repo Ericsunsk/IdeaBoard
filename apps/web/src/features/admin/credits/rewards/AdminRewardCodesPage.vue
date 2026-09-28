@@ -93,7 +93,11 @@
       </template>
 
       <!-- 兑换码列：名称 + 掩码 Code -->
-      <AdminColumn field="displayName" :header="REWARD_CODES_MESSAGES.codeColumn" :style="{ minWidth: '220px' }">
+      <AdminColumn
+        field="displayName"
+        :header="REWARD_CODES_MESSAGES.codeColumn"
+        :style="{ minWidth: '220px' }"
+      >
         <template #body="{ data }">
           <div class="min-w-0">
             <div class="truncate font-medium text-admin-text-1">
@@ -107,7 +111,11 @@
       </AdminColumn>
 
       <!-- 奖励 Idea 列：等宽字体金额 -->
-      <AdminColumn field="creditAmount" :header="REWARD_CODES_MESSAGES.ideaColumn" :style="{ width: '140px' }">
+      <AdminColumn
+        field="creditAmount"
+        :header="REWARD_CODES_MESSAGES.ideaColumn"
+        :style="{ width: '140px' }"
+      >
         <template #body="{ data }">
           <span class="font-mono text-xs font-semibold text-admin-text-1">
             {{ formatIdeaAmount(data.creditAmount) }}
@@ -116,7 +124,11 @@
       </AdminColumn>
 
       <!-- 状态列：Badge + 开关 -->
-      <AdminColumn field="status" :header="REWARD_CODES_MESSAGES.statusColumn" :style="{ width: '180px' }">
+      <AdminColumn
+        field="status"
+        :header="REWARD_CODES_MESSAGES.statusColumn"
+        :style="{ width: '180px' }"
+      >
         <template #body="{ data }">
           <div class="flex items-center gap-3">
             <AdminBadge
@@ -145,7 +157,11 @@
       </AdminColumn>
 
       <!-- 过期时间列：等宽日期 -->
-      <AdminColumn field="expiresAt" :header="REWARD_CODES_MESSAGES.expiresColumn" :style="{ width: '180px' }">
+      <AdminColumn
+        field="expiresAt"
+        :header="REWARD_CODES_MESSAGES.expiresColumn"
+        :style="{ width: '180px' }"
+      >
         <template #body="{ data }">
           <span class="whitespace-nowrap font-mono text-xs text-admin-text-2">
             {{ formatExpiresAt(data.expiresAt) }}
@@ -301,11 +317,15 @@ async function confirmRewardCodeSave(editing: RewardCode | null, displayName: st
   // and an empty field falls back to a default so one click proceeds.
   // Returns null only when the operator cancels.
   return confirmSettingsSave(confirm, {
-    title: editing ? REWARD_CODES_MESSAGES.confirmUpdateTitle : REWARD_CODES_MESSAGES.confirmCreateTitle,
+    title: editing
+      ? REWARD_CODES_MESSAGES.confirmUpdateTitle
+      : REWARD_CODES_MESSAGES.confirmCreateTitle,
     message: editing
       ? REWARD_CODES_MESSAGES.confirmUpdateMessage(editing.displayName)
       : REWARD_CODES_MESSAGES.confirmCreateMessage(displayName),
-    confirmLabel: editing ? REWARD_CODES_MESSAGES.confirmUpdate : REWARD_CODES_MESSAGES.confirmCreate,
+    confirmLabel: editing
+      ? REWARD_CODES_MESSAGES.confirmUpdate
+      : REWARD_CODES_MESSAGES.confirmCreate,
   })
 }
 
@@ -338,7 +358,9 @@ async function persistRewardCode(
       plaintextHeader.value = REWARD_CODES_MESSAGES.newCodeHeader
       plaintextDialogVisible.value = true
     }
-    toast.success(input.code ? REWARD_CODES_MESSAGES.updatedWithCode : REWARD_CODES_MESSAGES.updated)
+    toast.success(
+      input.code ? REWARD_CODES_MESSAGES.updatedWithCode : REWARD_CODES_MESSAGES.updated,
+    )
   }
 }
 
@@ -360,7 +382,9 @@ async function saveRewardCode(input: RewardCodeFormSubmit) {
   } catch (error) {
     saveError.value = formatAdminDisplayError(
       error,
-      editingRewardCode.value ? REWARD_CODES_MESSAGES.updateFailed : REWARD_CODES_MESSAGES.createFailed,
+      editingRewardCode.value
+        ? REWARD_CODES_MESSAGES.updateFailed
+        : REWARD_CODES_MESSAGES.createFailed,
     )
   } finally {
     saving.value = false

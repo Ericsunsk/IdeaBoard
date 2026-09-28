@@ -1,7 +1,6 @@
 package task
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -102,16 +101,14 @@ func TestValidateImageFillDimensions(t *testing.T) {
 	}
 }
 
-func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) {
-	accountsStore := &countingImageFillAccountStore{}
+func TestTaskIntakeRejectsImageFillDimensions(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
-		Models: accountsStore,
-		Media:  testSubmitMediaValidator{},
+		Media: testSubmitMediaValidator{},
 	})
 
 	_, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "补全右侧背景",
-		Feature:        workflow.FeatureSlugOutpaint,
+		Service:        workflow.FeatureSlugOutpaint,
 		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "invalid-fill-size",
 		Params: map[string]interface{}{
@@ -126,17 +123,13 @@ func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) 
 	if err == nil || !strings.Contains(err.Error(), "4096 边长或约 4MP 限制") {
 		t.Fatalf("Compile() error = %v", err)
 	}
-	if accountsStore.calls != 0 {
-		t.Fatalf("provider lookup calls = %d, want 0", accountsStore.calls)
-	}
 }
 
-func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) {
-	accountsStore := &countingImageFillAccountStore{}
-	intake := NewTaskIntake(TaskIntakeDeps{Models: accountsStore})
+func TestTaskIntakeReadinessRejectsImageFillDimensions(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{})
 
 	_, err := intake.CompileReadiness(t.Context(), 42, &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugInpaint,
+		Service: workflow.FeatureSlugInpaint,
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 768,
@@ -147,23 +140,18 @@ func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *te
 	if err == nil || !strings.Contains(err.Error(), "必须与原图尺寸一致") {
 		t.Fatalf("CompileReadiness() error = %v", err)
 	}
-	if accountsStore.calls != 0 {
-		t.Fatalf("provider lookup calls = %d, want 0", accountsStore.calls)
-	}
 }
 
 func TestSubmitTaskRejectsImageFillDimensionsBeforeSubmissionTransaction(t *testing.T) {
-	accountsStore := &countingImageFillAccountStore{}
 	submissionStore := &recordingSubmissionStore{}
 	service := newSubmitServiceForTest(submitTestServiceDeps{
-		ModelStore:      accountsStore,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 
 	_, err := service.SubmitTask(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "补全右侧背景",
-		Feature:        workflow.FeatureSlugOutpaint,
+		Service:        workflow.FeatureSlugOutpaint,
 		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "invalid-size-before-transaction",
 		Params: map[string]interface{}{
@@ -178,19 +166,7 @@ func TestSubmitTaskRejectsImageFillDimensionsBeforeSubmissionTransaction(t *test
 	if err == nil || !strings.Contains(err.Error(), "4096 边长或约 4MP 限制") {
 		t.Fatalf("SubmitTask() error = %v", err)
 	}
-	if accountsStore.calls != 0 {
-		t.Fatalf("provider lookup calls = %d, want 0", accountsStore.calls)
-	}
 	if len(submissionStore.calls) != 0 {
 		t.Fatalf("submission transaction calls = %d, want 0", len(submissionStore.calls))
 	}
-}
-
-type countingImageFillAccountStore struct {
-	calls int
-}
-
-func (s *countingImageFillAccountStore) ResolveModel(context.Context, string) (string, error) {
-	s.calls++
-	return "openai/gpt-image-1", nil
 }

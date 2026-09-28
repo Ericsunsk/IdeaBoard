@@ -2,7 +2,9 @@
   <section :aria-label="BILLING_PRICING_MESSAGES.tableAria(props.title)">
     <div v-if="props.title" class="mb-2 flex items-center gap-2">
       <h3 class="text-sm font-bold text-admin-title-color">{{ props.title }}</h3>
-      <span class="text-xs text-admin-text-3">{{ BILLING_PRICING_MESSAGES.tableCount(props.items.length) }}</span>
+      <span class="text-xs text-admin-text-3">{{
+        BILLING_PRICING_MESSAGES.tableCount(props.items.length)
+      }}</span>
     </div>
     <div :class="adminTableCardClass">
       <AdminTable
@@ -84,16 +86,6 @@
             <span :class="priceValueClass(formatPricingCellValue(data, '4k'))">{{
               formatPricingCellValue(data, '4k')
             }}</span>
-          </template>
-        </AdminColumn>
-
-        <AdminColumn
-          field="model"
-          header="Model"
-          :style="{ width: billingPricingColumnWidths.model }"
-        >
-          <template #body="{ data }">
-            <slot name="model" :item="data" />
           </template>
         </AdminColumn>
 

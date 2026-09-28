@@ -26,34 +26,38 @@ import (
 // flush ONLY after commit; staging never publishes inside the txn (NATS
 // fanout itself is #807).
 type Service struct {
-	tasks  WorkspaceTaskStore
-	quoter Quoter
-	holder Holder
-	queue  Enqueuer
-	assets AssetReader
-	models ModelResolver
-	events []TaskEvent
-	now    func() time.Time
+	tasks   WorkspaceTaskStore
+	quoter  Quoter
+	holder  Holder
+	queue   Enqueuer
+	assets  AssetReader
+	routing RoutingGate
+	events  []TaskEvent
+	now     func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. Tasks is required; Quoter,
-// Holder, Enqueuer, Assets, and Models are required for production creates.
-// Models mints the submit-time resolved model into the durable plan; tasks
-// are never persisted without that fact.
+// Holder, Enqueuer, Assets, and Routing are required for production creates.
+// (#847: the submit-time single-value model mint is removed; #848 pins the
+// RoutingSnapshot in this transaction instead.)
 type ServiceDeps struct {
-	Tasks  WorkspaceTaskStore
-	Quoter Quoter
-	Holder Holder
-	Queue  Enqueuer
-	Assets AssetReader
-	Models ModelResolver
+	Tasks   WorkspaceTaskStore
+	Quoter  Quoter
+	Holder  Holder
+	Queue   Enqueuer
+	Assets  AssetReader
+	Routing RoutingGate
 }
 
 // NewService builds the settlement orchestrator.
 func NewService(deps ServiceDeps) *Service {
+	routing := deps.Routing
+	if routing == nil {
+		routing = RejectRoutingUntilPool
+	}
 	return &Service{
 		tasks: deps.Tasks, quoter: deps.Quoter, holder: deps.Holder,
-		queue: deps.Queue, assets: deps.Assets, models: deps.Models, now: time.Now,
+		queue: deps.Queue, assets: deps.Assets, routing: routing, now: time.Now,
 	}
 }
 
@@ -89,7 +93,7 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 	if s.quoter == nil {
 		return BillingSnapshot{}, fmt.Errorf("workspacetasks: quoter unavailable: %w", ErrQuoteUnavailable)
 	}
-	kind, err := ValidateCreate(params.WorkflowKind, nil, map[string]any{})
+	kind, err := ValidateCreate(params.Service, nil, map[string]any{})
 	if err != nil {
 		return BillingSnapshot{}, err
 	}
@@ -101,6 +105,9 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 	if resolution == "" {
 		resolution = "default"
 	}
+	if err := s.routing(ctx, kind, resolution); err != nil {
+		return BillingSnapshot{}, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
+	}
 	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
 	if err != nil {
 		return BillingSnapshot{}, err
@@ -110,12 +117,13 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 }
 
 // CreateInput is the validated creation intent for settlement. The provider
-// model is deliberately absent: submit always resolves it from the admin
-// mapping seam so callers cannot inject or replay a different target.
+// model is deliberately absent: submit never accepts a caller-chosen model.
+// (#847: the single-value admin mapping mint is removed; #848 resolves the
+// model via RoutingResolver and pins the snapshot here instead.)
 type CreateInput struct {
 	WorkspaceID     string
 	OwnerUserID     int64
-	WorkflowKind    string
+	Service         string
 	MediaAssetIDs   []string
 	Params          map[string]any
 	Quantity        int64
@@ -130,7 +138,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if s.tasks == nil {
 		return nil, fmt.Errorf("workspacetasks: store unavailable: %w", ErrNotFound)
 	}
-	kind, err := ValidateCreate(input.WorkflowKind, input.MediaAssetIDs, input.Params)
+	kind, err := ValidateCreate(input.Service, input.MediaAssetIDs, input.Params)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +156,12 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if resolution == "" {
 		resolution = "default"
 	}
-	// Mint the durable plan model before settlement. A task without a frozen
-	// provider/model target cannot be retried deterministically.
-	resolvedModel, err := s.mintResolvedModel(ctx, kind)
-	if err != nil {
-		return nil, err
+	if err := s.routing(ctx, kind, resolution); err != nil {
+		return nil, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
 	}
+	// #847: no submit-time model mint. The task persists without a pinned
+	// model; #848 resolves via RoutingResolver and pins the RoutingSnapshot
+	// in this transaction. The worker fails closed on an empty model.
 	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
 	if err != nil {
 		return nil, err
@@ -166,7 +174,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
-	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, resolvedModel, taskID, token); handled {
+	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token); handled {
 		return created, err
 	}
 	var holdTxID string
@@ -182,8 +190,8 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	task := &WorkspaceTask{
 		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
-		WorkflowKind: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
-		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams, ResolvedModel: resolvedModel,
+		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
+		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
 		Status:     StatusPending,
 		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
 	}
@@ -203,41 +211,6 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	s.stage(created.ID, created.WorkspaceID, StatusPending)
 	return created, nil
-}
-
-// mintResolvedModel freezes the admin model mapping into the durable plan.
-// Invalid, missing, or unresolved targets fail submit.
-func (s *Service) mintResolvedModel(ctx context.Context, kind string) (string, error) {
-	if s == nil || s.models == nil {
-		return "", fmt.Errorf("workspacetasks: model resolver unavailable")
-	}
-	model, err := s.models.ResolveModel(ctx, kind)
-	if err != nil {
-		return "", fmt.Errorf("workspacetasks: resolve model: %w", err)
-	}
-	model = strings.TrimSpace(model)
-	if err := validateResolvedModel(model); err != nil {
-		return "", fmt.Errorf("workspacetasks: resolve model: %w", err)
-	}
-	return model, nil
-}
-
-func validateResolvedModel(model string) error {
-	if model == "" || strings.ContainsAny(model, " \t\r\n") {
-		return fmt.Errorf("model must be provider/model without whitespace")
-	}
-	base := model
-	if at := strings.IndexByte(base, '@'); at >= 0 {
-		if at == 0 || at == len(base)-1 || strings.ContainsAny(base[at+1:], " \t\r\n") {
-			return fmt.Errorf("model gateway path is invalid")
-		}
-		base = base[:at]
-	}
-	parts := strings.SplitN(base, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("model must be provider/model")
-	}
-	return nil
 }
 
 func cloneParams(in map[string]any) map[string]any {

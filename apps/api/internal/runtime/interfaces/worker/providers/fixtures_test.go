@@ -26,7 +26,7 @@ func buildTinyPNGBytes(t *testing.T) []byte {
 
 func marshalWorkflowTaskParamsForTest(t testing.TB, params *tasks.WorkflowTaskParams) string {
 	t.Helper()
-	if workflow.IsAIImageFeature(params.Feature) && len(params.ExecutionPlan) == 0 {
+	if workflow.IsAIImageFeature(params.Service) && len(params.ExecutionPlan) == 0 {
 		imageInputCount := 0
 		hasMaskInput := false
 		if params.Media != nil {
@@ -42,7 +42,7 @@ func marshalWorkflowTaskParamsForTest(t testing.TB, params *tasks.WorkflowTaskPa
 			requestedOutputCount = &count
 		}
 		plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
-			Feature: params.Feature,
+			Feature: params.Service,
 			Params: workflow.FeatureExecutionParams{
 				RequestedOutputCount: requestedOutputCount,
 				ImageInputCount:      imageInputCount,
@@ -64,7 +64,7 @@ func marshalWorkflowTaskParamsForTest(t testing.TB, params *tasks.WorkflowTaskPa
 			params.Generation = &tasks.GenerationRequestSnapshot{}
 		}
 		params.Generation.SchemaVersion = tasks.CurrentParamsSchemaVersion
-		params.Generation.Feature = plan.Feature()
+		params.Generation.Service = plan.Feature()
 		params.Generation.Primitive = string(plan.RuntimeInputs().GenerationPrimitive())
 		params.Generation.RequestedOutputCount = plan.RequestedOutputCount().Int()
 		if params.Generation.TemplateFingerprint == "" {

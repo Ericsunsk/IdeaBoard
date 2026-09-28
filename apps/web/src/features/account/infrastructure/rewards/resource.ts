@@ -7,10 +7,7 @@ import type {
   WorkspaceRewardRedemption,
   WorkspaceRewardRedemptionHistoryItem,
 } from '../../../../shared/api/generated-query/public/model'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-} from '../../../../shared/api/contractKernel'
+import { buildContractRequestHeaders, newRequestId } from '../../../../shared/api/contractKernel'
 import { workspaceRewardsRedeemIdempotencyKey } from '../../../../shared/api/idempotencyKey'
 import { i18n } from '../../../../shared/i18n'
 import {

@@ -98,7 +98,10 @@ const healthBadge = computed(() => {
     }
   }
   return healthResource.query.isError.value
-    ? { label: CREDITS_BILLING_LAYOUT_MESSAGES.navUnknownBadge, className: 'border-admin-border text-admin-text-3' }
+    ? {
+        label: CREDITS_BILLING_LAYOUT_MESSAGES.navUnknownBadge,
+        className: 'border-admin-border text-admin-text-3',
+      }
     : null
 })
 const activeNavigationPath = computed<NavigationPath>(

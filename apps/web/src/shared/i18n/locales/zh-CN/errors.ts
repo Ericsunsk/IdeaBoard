@@ -5,6 +5,7 @@ export default {
   insufficient_credits: '需要更多 Ideas 才能执行此操作。',
   pricing_unavailable: '定价服务暂不可用，请稍后重试。',
   provider_unavailable: '该服务当前不可用，请稍后再试。',
+  service_resolution_unavailable: '该清晰度暂不可用。',
   prompt_unavailable: '该提示词服务当前不可用，请稍后再试。',
   wallet_restricted: '该账户当前受限，无法使用 Ideas。',
   vision_search_not_configured: '视觉搜索暂不可用。',

@@ -1,7 +1,4 @@
-import type {
-  CreditReconciliationFinding,
-  CreditReconciliationFindingType,
-} from '../shared/api'
+import type { CreditReconciliationFinding, CreditReconciliationFindingType } from '../shared/api'
 
 interface FindingTypePresentation {
   title: string

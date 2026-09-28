@@ -49,7 +49,7 @@ import (
 )
 
 // WorkspaceTaskQuoter adapts the billing catalog to workspacetasks.Quoter.
-// SKU is server-derived (ai-image:<canonical feature>); no client price
+// SKU is server-derived (ai-image:<canonical service>); no client price
 // input crosses this seam. Quoter failures keep the ErrQuoteUnavailable
 // routing identity while preserving the underlying catalog cause
 // (multi-%w): pricing failures (ErrPricingUnavailable/ErrSKUNotFound)
@@ -62,13 +62,13 @@ type WorkspaceTaskQuoter struct {
 var _ workspacetasks.Quoter = (*WorkspaceTaskQuoter)(nil)
 var _ workspacetasks.TxQuoter = (*WorkspaceTaskQuoter)(nil)
 
-func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, workflowKind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(workflowKind))
+	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(service))
 	if !ok {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported kind %q: %w", workflowKind, workspacetasks.ErrQuoteUnavailable)
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, workspacetasks.ErrQuoteUnavailable)
 	}
 	if quantity <= 0 {
 		quantity = 1
@@ -104,16 +104,16 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, workflowKind, resolutio
 // QuoteInTx mints the same snapshot through the settlement transaction so
 // the price read shares the repeatable-read snapshot with the Hold that
 // follows. It satisfies workspacetasks.TxQuoter.
-func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, workflowKind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
+func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if q == nil || q.Catalog == nil {
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter is not configured: %w", workspacetasks.ErrQuoteUnavailable)
 	}
 	if tx == nil {
 		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: settlement transaction is nil: %w", workspacetasks.ErrQuoteUnavailable)
 	}
-	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(workflowKind))
+	canonical, ok := workflow.ParseAIImageFeatureSlug(strings.TrimSpace(service))
 	if !ok {
-		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported kind %q: %w", workflowKind, workspacetasks.ErrQuoteUnavailable)
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: unsupported service %q: %w", service, workspacetasks.ErrQuoteUnavailable)
 	}
 	if quantity <= 0 {
 		quantity = 1
@@ -395,7 +395,7 @@ func (h *WorkspaceTaskHolder) ReleaseInTx(ctx context.Context, tx pgx.Tx, userID
 type WorkspaceTaskArgs struct {
 	TaskID         string `json:"task_id"`
 	WorkspaceID    string `json:"workspace_id"`
-	WorkflowKind   string `json:"workflow_kind"`
+	Service        string `json:"service"`
 	ExecutionToken string `json:"execution_token"`
 }
 
@@ -464,7 +464,7 @@ func (e *WorkspaceTaskEnqueuer) Enqueue(ctx context.Context, task *workspacetask
 	_, err := client.Insert(ctx, WorkspaceTaskArgs{
 		TaskID:         strings.TrimSpace(task.ID),
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
-		WorkflowKind:   strings.TrimSpace(task.WorkflowKind),
+		Service:        strings.TrimSpace(task.Service),
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
 	}, &river.InsertOpts{
 		Queue:       e.queue,
@@ -500,7 +500,7 @@ func (e *WorkspaceTaskEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task
 	_, err := client.InsertTx(ctx, tx, WorkspaceTaskArgs{
 		TaskID:         strings.TrimSpace(task.ID),
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
-		WorkflowKind:   strings.TrimSpace(task.WorkflowKind),
+		Service:        strings.TrimSpace(task.Service),
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
 	}, &river.InsertOpts{
 		Queue:       e.queue,

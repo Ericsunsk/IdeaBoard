@@ -51,7 +51,14 @@ export function useUsageStatisticsQualityTrendCharts(options: {
         // Sparse backend series: a missing day means no activity, not broken
         // data — render an explicit zero day (failureRate 0, not 100%).
         // Present-but-invalid values below propagate NaN instead (no fake 0).
-        return { label: bucket.label, total: 0, success: 0, fail: 0, successRate: 0, failureRate: 0 }
+        return {
+          label: bucket.label,
+          total: 0,
+          success: 0,
+          fail: 0,
+          successRate: 0,
+          failureRate: 0,
+        }
       }
       const total = toNonNegativeNumber(item?.total)
       const success = toNonNegativeNumber(item?.success)

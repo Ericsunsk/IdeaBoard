@@ -21,7 +21,7 @@ func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 	}
 	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
 		ID: "task_prompt1", WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind:    "generation",
+		Service:         "generation",
 		CanonicalParams: raw,
 	})
 	if err != nil {
@@ -34,9 +34,9 @@ func TestWorkspaceBridgeTaskPayloadUsesGenerationPrompt(t *testing.T) {
 
 // Snapshot precedence: CompiledPrompt wins; UserPrompt is the fallback.
 func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
-	compiled := `{"schema_version":5,"feature":"generation","generation":{"user_prompt":"user text","compiled_prompt":"compiled text"}}`
+	compiled := `{"schema_version":6,"service":"generation","generation":{"user_prompt":"user text","compiled_prompt":"compiled text"}}`
 	legacy, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
-		ID: "task_prec1", WorkflowKind: "generation",
+		ID: "task_prec1", Service: "generation",
 		CanonicalParams: compiled, Params: map[string]any{"prompt": "stale"},
 	})
 	if err != nil {
@@ -46,9 +46,9 @@ func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 		t.Fatalf("prompt = %q, want compiled snapshot text", legacy.Prompt)
 	}
 
-	userOnly := `{"schema_version":5,"feature":"generation","generation":{"user_prompt":"user text"}}`
+	userOnly := `{"schema_version":6,"service":"generation","generation":{"user_prompt":"user text"}}`
 	legacy, err = workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
-		ID: "task_prec2", WorkflowKind: "generation", CanonicalParams: userOnly,
+		ID: "task_prec2", Service: "generation", CanonicalParams: userOnly,
 	})
 	if err != nil {
 		t.Fatalf("bridge: %v", err)
@@ -58,7 +58,7 @@ func TestWorkspaceBridgeTaskPayloadPromptPrecedence(t *testing.T) {
 	}
 
 	if _, err := workspaceBridgeTaskPayload(&workspacetasks.WorkspaceTask{
-		ID: "task_prec3", WorkflowKind: "render", Params: map[string]any{"prompt": "legacy"},
+		ID: "task_prec3", Service: "render", Params: map[string]any{"prompt": "legacy"},
 	}); err == nil {
 		t.Fatal("missing canonical params = nil, want fail-closed error")
 	}
@@ -74,13 +74,13 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 		assets := &workerTestAssets{ready: map[string]bool{"asset_mask1": true}, archived: map[string]bool{}}
 		env.service = workspacetasks.NewService(workspacetasks.ServiceDeps{
 			Tasks: env.store, Quoter: workerTestQuoter{}, Holder: env.holder, Queue: env.queue,
-			Assets: assets, Models: workspaceTestModelResolver{},
+			Assets: assets, Routing: allowTestRouting,
 		})
 		return env, assets
 	}
 	env, assets := newMaskEnv()
 	created, err := env.service.Create(ctx, workspacetasks.CreateInput{
-		WorkspaceID: "ws_test", OwnerUserID: 7, WorkflowKind: "inpaint",
+		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "inpaint",
 		Params: map[string]any{"mask_asset_id": "asset_mask1"},
 	}, "mask-loop")
 	if err != nil {
@@ -114,7 +114,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	}
 	seeded, err := env.store.CreateTask(ctx, &workspacetasks.WorkspaceTask{
 		ID: "task_gone_mask", WorkspaceID: "ws_test", OwnerUserID: 7,
-		WorkflowKind: "inpaint", Status: workspacetasks.StatusPending, ExecutionToken: token,
+		Service: "inpaint", Status: workspacetasks.StatusPending, ExecutionToken: token,
 		Params: map[string]any{"mask_asset_id": "asset_vanished"},
 	})
 	if err != nil {

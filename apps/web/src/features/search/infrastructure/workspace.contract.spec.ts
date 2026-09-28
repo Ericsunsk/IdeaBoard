@@ -47,7 +47,9 @@ describe('workspace search paths', () => {
     expect(() => assertWorkspaceLibraryAssetId('lfolder_x')).toThrow()
     expect(() => assertWorkspaceLibraryAssetId(ASSET_ID)).not.toThrow()
     expect(() => assertWorkspaceLibraryAssetId('lasset_asset0001')).not.toThrow()
-    await expect(workspaceSearchApi.search({ workspaceId: 'nope', query: 'cafe' })).rejects.toThrow()
+    await expect(
+      workspaceSearchApi.search({ workspaceId: 'nope', query: 'cafe' }),
+    ).rejects.toThrow()
   })
 })
 

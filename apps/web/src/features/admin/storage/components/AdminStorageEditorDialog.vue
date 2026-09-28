@@ -50,7 +50,12 @@
           </div>
         </div>
 
-        <AdminBadge v-if="form.isCurrent" :value="STORAGE_MESSAGES.editorCurrentBadge" severity="success" rounded />
+        <AdminBadge
+          v-if="form.isCurrent"
+          :value="STORAGE_MESSAGES.editorCurrentBadge"
+          severity="success"
+          rounded
+        />
       </div>
     </template>
 
@@ -108,7 +113,9 @@
         <div
           class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
         >
-          <span class="text-admin-body font-semibold text-admin-title-color">{{ STORAGE_MESSAGES.editorEnableLabel }}</span>
+          <span class="text-admin-body font-semibold text-admin-title-color">{{
+            STORAGE_MESSAGES.editorEnableLabel
+          }}</span>
           <div class="flex items-center gap-2.5">
             <span
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
@@ -210,7 +217,9 @@
               v-if="field.key === 'access_domain' && bucketDomains.length > 0"
               class="flex items-center gap-1.5 flex-wrap pt-1"
             >
-              <span class="text-admin-caption font-semibold text-admin-text-3">{{ STORAGE_MESSAGES.editorDomainsFound }}</span>
+              <span class="text-admin-caption font-semibold text-admin-text-3">{{
+                STORAGE_MESSAGES.editorDomainsFound
+              }}</span>
               <button
                 v-for="domain in bucketDomains"
                 :key="domain"

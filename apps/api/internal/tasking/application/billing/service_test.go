@@ -139,7 +139,7 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 		request Request
 		wantErr error
 	}{
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugInpaint}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Service: workflow.FeatureSlugInpaint}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {

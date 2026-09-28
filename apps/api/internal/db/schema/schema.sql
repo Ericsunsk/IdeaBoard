@@ -2291,7 +2291,7 @@ CREATE TABLE tasks (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
-  workflow_type TEXT NOT NULL,
+  service TEXT NOT NULL,
   workflow_input JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   priority INT NOT NULL DEFAULT 2,
@@ -2309,7 +2309,7 @@ CREATE TABLE tasks (
   CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT chk_tasks_retry_count CHECK (retry_count >= 0),
-  CONSTRAINT chk_tasks_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
   CONSTRAINT chk_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT chk_tasks_terminal_consistency CHECK (
     (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
@@ -2406,7 +2406,7 @@ CREATE TABLE task_execution_attempts (
   river_job_id BIGINT NOT NULL DEFAULT 0,
   attempt_no INTEGER NOT NULL,
   execution_token VARCHAR(128) NOT NULL,
-  feature_slug VARCHAR(64) NOT NULL DEFAULT '',
+  service VARCHAR(64) NOT NULL DEFAULT '',
   requested_model VARCHAR(128) NOT NULL DEFAULT '',
   resolved_model VARCHAR(128) NOT NULL DEFAULT '',
   provider VARCHAR(64) NOT NULL DEFAULT '',
@@ -3778,7 +3778,7 @@ CREATE TABLE task_billing_settlements (
 CREATE TABLE task_billing_snapshots (
     task_id character varying(64) NOT NULL,
     user_id bigint NOT NULL,
-    feature_slug character varying(64) NOT NULL,
+    service character varying(64) NOT NULL,
     sku character varying(128) NOT NULL,
     price_version_id bigint NOT NULL,
     price_version bigint NOT NULL,

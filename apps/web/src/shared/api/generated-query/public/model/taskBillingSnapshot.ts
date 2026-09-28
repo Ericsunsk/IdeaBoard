@@ -16,7 +16,7 @@
 import type { TaskSettlementState } from './taskSettlementState'
 
 export interface TaskBillingSnapshot {
-  /** Price SKU (ai-image:<feature>). */
+  /** Price SKU (ai-image:<service>). */
   sku: string
   display_name: string
   price_version_id: number

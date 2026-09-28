@@ -1,4 +1,5 @@
 # Auth Context
+
 Auth owns the Better Auth session facts, login/register/OTP/OAuth/logout and impersonation exit, auth overlay chrome, and post-auth redirect intent.
 It caches the server session as a 5-minute client snapshot via a single store.
 It does NOT own workspace layout, account management UI, or per-page login modals.
@@ -6,15 +7,15 @@ Shape: flat feature (`components/` + `session/` + `pages/`, no `domain/`/`applic
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| User Session | Client session facts (`user` / `isAdmin` / `sessionValidatedAt`); single `useUserStore()`; server session belongs to Better Auth. |
-| Auth Transport | Sole Better Auth adapter (`session/transport.ts`): signIn/signUp/signOut/getSession plus `/api/auth/*` fetch. |
-| Session Cache | In-memory session snapshot with 5-minute TTL (`browserSessionTransition.ts`, shared with the router admin threshold); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
-| Post-Auth Path | Post-login redirect intent; stored only in `sessionStorage` (`ideaboard:auth:post-auth-path`), consume-once, must pass internal-path validation. |
-| Auth Overlay | Global login/register modal (`mode: login\|register\|null`); installed in `WorkspaceLayout` via `createAuthOverlay` / `provideAuthOverlay`, opened per surface. |
-| OTP | Two-step form state for forgot-password and register verification (`otpPending`); authenticated only on success, failure toasts without state change. |
-| Impersonation | Admin impersonation banner state: `impersonatedBy` from Better Auth `useSession()` read only in `WorkspaceLayout`; exit via `stopImpersonating`. |
+| Term           | Meaning                                                                                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User Session   | Client session facts (`user` / `isAdmin` / `sessionValidatedAt`); single `useUserStore()`; server session belongs to Better Auth.                                                                  |
+| Auth Transport | Sole Better Auth adapter (`session/transport.ts`): signIn/signUp/signOut/getSession plus `/api/auth/*` fetch.                                                                                      |
+| Session Cache  | In-memory session snapshot with 5-minute TTL (`browserSessionTransition.ts`, shared with the router admin threshold); `ensureSession` returns cache when fresh, else `hasSession ? fetch : clear`. |
+| Post-Auth Path | Post-login redirect intent; stored only in `sessionStorage` (`ideaboard:auth:post-auth-path`), consume-once, must pass internal-path validation.                                                   |
+| Auth Overlay   | Global login/register modal (`mode: login\|register\|null`); installed in `WorkspaceLayout` via `createAuthOverlay` / `provideAuthOverlay`, opened per surface.                                    |
+| OTP            | Two-step form state for forgot-password and register verification (`otpPending`); authenticated only on success, failure toasts without state change.                                              |
+| Impersonation  | Admin impersonation banner state: `impersonatedBy` from Better Auth `useSession()` read only in `WorkspaceLayout`; exit via `stopImpersonating`.                                                   |
 
 ## Public Seams
 

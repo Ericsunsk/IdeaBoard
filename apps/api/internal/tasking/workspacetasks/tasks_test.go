@@ -40,6 +40,8 @@ func newFakeHolder() *fakeHolder {
 	return &fakeHolder{holds: map[string]int64{}, captured: map[string]int64{}, released: map[string]int64{}}
 }
 
+func allowTestRouting(context.Context, string, string) error { return nil }
+
 func (f *fakeHolder) Hold(ctx context.Context, userID int64, amount int64, key, taskID string) (string, error) {
 	if f.holdErr != nil {
 		return "", f.holdErr
@@ -82,12 +84,6 @@ func (f *fakeEnqueuer) Enqueue(ctx context.Context, task *WorkspaceTask) error {
 type fakeAssets struct {
 	assets map[string]*AssetInfo
 	err    error
-}
-
-type testModelResolver struct{}
-
-func (testModelResolver) ResolveModel(context.Context, string) (string, error) {
-	return "openrouter/test-image-model", nil
 }
 
 func (f *fakeAssets) GetAsset(ctx context.Context, workspaceID, assetID string) (*AssetInfo, error) {
@@ -144,9 +140,9 @@ func TestCreateAtomicityRollbackOnEnqueueFailure(t *testing.T) {
 	queue := &fakeEnqueuer{failNext: errors.New("river down")}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue, Models: testModelResolver{},
+		Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
-	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
+	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
 	if err == nil {
 		t.Fatal("create with failing enqueue must fail")
 	}
@@ -170,9 +166,9 @@ func TestCreateAtomicityRollbackOnHoldFailure(t *testing.T) {
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue, Models: testModelResolver{},
+		Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
-	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
+	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
 	if !errors.Is(err, ErrInsufficientCredits) {
 		t.Fatalf("err = %v, want insufficient", err)
 	}
@@ -192,9 +188,9 @@ func TestCancelTerminalSettleReleases(t *testing.T) {
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue, Models: testModelResolver{},
+		Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
-	created, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render"}, "k1")
+	created, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,15 +261,15 @@ func TestInputAssetsRequireReady(t *testing.T) {
 	}}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Models: testModelResolver{},
+		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Routing: allowTestRouting,
 	})
-	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render", MediaAssetIDs: []string{"asset_ready"}}, "k1"); err != nil {
+	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render", MediaAssetIDs: []string{"asset_ready"}}, "k1"); err != nil {
 		t.Fatalf("ready input err = %v", err)
 	}
-	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render", MediaAssetIDs: []string{"asset_pending"}}, "k2"); !errors.Is(err, ErrMediaNotReady) {
+	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render", MediaAssetIDs: []string{"asset_pending"}}, "k2"); !errors.Is(err, ErrMediaNotReady) {
 		t.Fatalf("pending input err = %v, want media_not_ready", err)
 	}
-	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render", MediaAssetIDs: []string{"asset_missing"}}, "k3"); !errors.Is(err, ErrMediaNotFound) {
+	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render", MediaAssetIDs: []string{"asset_missing"}}, "k3"); !errors.Is(err, ErrMediaNotFound) {
 		t.Fatalf("missing input err = %v, want media_not_found", err)
 	}
 }

@@ -6,7 +6,7 @@ package postgres
 // targeted dropped tables. This store re-implements the 12-method
 // application statistics.Store seam over the CURRENT schema only:
 //   - task facts read from the workspace-scoped tasks table
-//     (public_id, submitter_user_id, billing_account_id, workflow_type,
+//     (public_id, submitter_user_id, billing_account_id, service,
 //     created/completed/cancelled timestamps);
 //   - aggregates read from task_daily_stats / task_stat_events /
 //     task_daily_stat_backfills (populated by BackfillDailyStatsByCreatedRange);

@@ -36,8 +36,13 @@ export type TestControlAIGatewayConnectionBody = {
   /** @minLength 1 */
   base_url: string
   token?: string
-  provider?: string
+  /** @minLength 1 */
+  provider: string
   model?: string
-  path?: string
+  /**
+   * provider-native path is required (#847: the model-mapping fallback is removed).
+   * @minLength 1
+   */
+  path: string
   reason?: string
 }

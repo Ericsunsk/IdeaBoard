@@ -128,7 +128,7 @@ func TestVisionSlugIsReservedForSearch(t *testing.T) {
 
 func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
 	repoRoot := findWorkflowRepoRoot(t)
-	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts")
+	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "imageServices.ts")
 	raw, err := os.ReadFile(frontendPath)
 	if err != nil {
 		t.Fatalf("read frontend workflow features: %v", err)
@@ -143,15 +143,16 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 		t.Fatalf("read PublicAPI: %v", err)
 	}
 	// Post-#809 the legacy openapi.yaml (WorkflowFeatureSlug +
-	// CanonicalWorkflowFeatureSlug) is deleted; WorkflowKind in the Public
-	// contract is the canonical slug registry (backend registry includes
-	// the `generation` slug, matched 1:1 here).
-	assertSameFeatureSlugs(t, "PublicAPI WorkflowKind", backendSlugs, extractPublicWorkflowKindSlugs(t, string(publicAPIRaw)))
+	// CanonicalWorkflowFeatureSlug) is deleted; #847 renames WorkflowKind
+	// to Service in the Public contract. The Service enum is the canonical
+	// slug registry (backend registry includes the `generation` slug,
+	// matched 1:1 here).
+	assertSameFeatureSlugs(t, "PublicAPI Service", backendSlugs, extractPublicServiceSlugs(t, string(publicAPIRaw)))
 
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
 		"frontend execution": "apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts",
-		"Admin registry":     "apps/web/src/features/admin/shared/lib/workflowFeatureAdminMeta.ts",
+		"Admin registry":     "apps/web/src/features/admin/shared/lib/serviceAdminMeta.ts",
 	} {
 		contractRaw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relativePath)))
 		if err != nil {
@@ -179,9 +180,9 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "missing feature returns empty", params: map[string]interface{}{}, want: "", wantErr: false},
-		{name: "canonical feature key", params: map[string]interface{}{"feature": FeatureSlugFusion}, want: FeatureSlugFusion, wantErr: false},
-		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "unknown-feature"}, want: "", wantErr: true},
+		{name: "missing service returns empty", params: map[string]interface{}{}, want: "", wantErr: false},
+		{name: "canonical service key", params: map[string]interface{}{"service": FeatureSlugFusion}, want: FeatureSlugFusion, wantErr: false},
+		{name: "unsupported service returns error", params: map[string]interface{}{"service": "unknown-feature"}, want: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -206,7 +207,7 @@ func findWorkflowRepoRoot(t *testing.T) string {
 	dir := filepath.Dir(filename)
 	for {
 		if fileExists(filepath.Join(dir, "apps", "api", "internal", "workflow", "features.go")) &&
-			fileExists(filepath.Join(dir, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts")) {
+			fileExists(filepath.Join(dir, "apps", "web", "src", "shared", "domain", "imageServices.ts")) {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -224,20 +225,20 @@ func fileExists(path string) bool {
 
 func extractFrontendWorkflowFeatureSlugs(t *testing.T, source string) []string {
 	t.Helper()
-	if !regexp.MustCompile(`export\s+const\s+WORKFLOW_FEATURE_SLUGS\s*=\s*Object\.values\(WORKFLOW_FEATURE\)\s+as\s+readonly\s+WorkflowFeature\[\]`).MatchString(source) {
-		t.Fatal("WORKFLOW_FEATURE_SLUGS must be derived from Object.values(WORKFLOW_FEATURE)")
+	if !regexp.MustCompile(`export\s+const\s+SERVICE_SLUGS\s*=\s*Object\.values\(SERVICE\)\s+as\s+readonly\s+Service\[\]`).MatchString(source) {
+		t.Fatal("SERVICE_SLUGS must be derived from Object.values(SERVICE)")
 	}
 
-	objectRe := regexp.MustCompile(`(?s)export\s+const\s+WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
+	objectRe := regexp.MustCompile(`(?s)export\s+const\s+SERVICE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
 	match := objectRe.FindStringSubmatch(source)
 	if match == nil {
-		t.Fatal("WORKFLOW_FEATURE object not found")
+		t.Fatal("SERVICE object not found")
 	}
 	body := match[objectRe.SubexpIndex("body")]
 	entryRe := regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*'([^']+)'\s*,?`)
 	matches := entryRe.FindAllStringSubmatch(body, -1)
 	if len(matches) == 0 {
-		t.Fatal("WORKFLOW_FEATURE has no string literal values")
+		t.Fatal("SERVICE has no string literal values")
 	}
 	slugs := make([]string, 0, len(matches))
 	seenKeys := make(map[string]struct{}, len(matches))
@@ -246,10 +247,10 @@ func extractFrontendWorkflowFeatureSlugs(t *testing.T, source string) []string {
 		key := match[1]
 		slug := match[2]
 		if _, exists := seenKeys[key]; exists {
-			t.Fatalf("duplicate WORKFLOW_FEATURE key %q", key)
+			t.Fatalf("duplicate SERVICE key %q", key)
 		}
 		if _, exists := seenSlugs[slug]; exists {
-			t.Fatalf("duplicate WORKFLOW_FEATURE slug %q", slug)
+			t.Fatalf("duplicate SERVICE slug %q", slug)
 		}
 		seenKeys[key] = struct{}{}
 		seenSlugs[slug] = struct{}{}
@@ -260,10 +261,10 @@ func extractFrontendWorkflowFeatureSlugs(t *testing.T, source string) []string {
 
 func extractFrontendWorkflowFeatureKeys(t *testing.T, source string) map[string]string {
 	t.Helper()
-	objectRe := regexp.MustCompile(`(?s)export\s+const\s+WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
+	objectRe := regexp.MustCompile(`(?s)export\s+const\s+SERVICE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
 	match := objectRe.FindStringSubmatch(source)
 	if match == nil {
-		t.Fatal("WORKFLOW_FEATURE object not found")
+		t.Fatal("SERVICE object not found")
 	}
 	body := match[objectRe.SubexpIndex("body")]
 	entryRe := regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*'([^']+)'\s*,?`)
@@ -274,20 +275,20 @@ func extractFrontendWorkflowFeatureKeys(t *testing.T, source string) map[string]
 	return keys
 }
 
-// extractPublicWorkflowKindSlugs parses the flow-style WorkflowKind enum
+// extractPublicServiceSlugs parses the flow-style Service enum
 // from openapi.public.yaml (e.g. `enum: [generation, inpaint, ...]`).
-func extractPublicWorkflowKindSlugs(t *testing.T, source string) []string {
+func extractPublicServiceSlugs(t *testing.T, source string) []string {
 	t.Helper()
-	blockRe := regexp.MustCompile(`(?m)^    WorkflowKind:\n      type: string\n      enum: \[([^\]]+)\]`)
+	blockRe := regexp.MustCompile(`(?m)^    Service:\n      type: string\n      enum: \[([^\]]+)\]`)
 	match := blockRe.FindStringSubmatch(source)
 	if match == nil {
-		t.Fatal("PublicAPI WorkflowKind enum not found")
+		t.Fatal("PublicAPI Service enum not found")
 	}
 	slugs := make([]string, 0, 8)
 	for _, raw := range strings.Split(match[1], ",") {
 		slug := strings.TrimSpace(raw)
 		if slug == "" {
-			t.Fatal("PublicAPI WorkflowKind enum contains an empty entry")
+			t.Fatal("PublicAPI Service enum contains an empty entry")
 		}
 		slugs = append(slugs, slug)
 	}
@@ -299,9 +300,9 @@ func extractWorkflowFeatureReferences(t *testing.T, label, source string, featur
 	var blockPattern string
 	switch label {
 	case "frontend execution":
-		blockPattern = `(?s)export\s+const\s+EXECUTION_FEATURE\s*=\s*\{(.*?)\}\s+as\s+const`
+		blockPattern = `(?s)export\s+const\s+EXECUTION_SERVICE\s*=\s*\{(.*?)\}\s+as\s+const`
 	case "Admin registry":
-		blockPattern = `(?s)const\s+ADMIN_WORKFLOW_FEATURE_META.*?=\s*\{(.*?)\}\n\nexport\s+function`
+		blockPattern = `(?s)const\s+ADMIN_SERVICE_META.*?=\s*\{(.*?)\}\n\nexport\s+function`
 	default:
 		t.Fatalf("unsupported feature contract label %q", label)
 	}
@@ -309,14 +310,14 @@ func extractWorkflowFeatureReferences(t *testing.T, label, source string, featur
 	if match == nil {
 		t.Fatalf("%s feature contract block not found", label)
 	}
-	references := regexp.MustCompile(`WORKFLOW_FEATURE\.([A-Za-z_][A-Za-z0-9_]*)`).FindAllStringSubmatch(match[1], -1)
+	references := regexp.MustCompile(`SERVICE\.([A-Za-z_][A-Za-z0-9_]*)`).FindAllStringSubmatch(match[1], -1)
 	slugs := make([]string, 0, len(references))
 	seen := make(map[string]struct{}, len(references))
 	for _, reference := range references {
 		key := reference[1]
 		slug, ok := featureKeys[key]
 		if !ok {
-			t.Fatalf("%s references unknown WORKFLOW_FEATURE key %q", label, key)
+			t.Fatalf("%s references unknown SERVICE key %q", label, key)
 		}
 		if _, duplicate := seen[slug]; duplicate {
 			t.Fatalf("%s duplicates workflow feature %q", label, slug)

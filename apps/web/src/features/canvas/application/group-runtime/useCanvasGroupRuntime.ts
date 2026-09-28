@@ -237,9 +237,7 @@ export function useCanvasGroupRuntime(
       selectedGroupId: selectedGroupId.value,
     }).map((frame) => {
       const preview = activeGroupPreview.value
-      return preview && preview.groupId === frame.id
-        ? { ...frame, bounds: preview.bounds }
-        : frame
+      return preview && preview.groupId === frame.id ? { ...frame, bounds: preview.bounds } : frame
     }),
   )
 

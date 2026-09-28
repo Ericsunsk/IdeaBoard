@@ -246,10 +246,6 @@ func (d *ContractControlDeps) registerControlProxiedRoutes(control *gin.RouterGr
 			controlRoute{Operation: "platform.get_ai_gateway", Route: "GET /platform/ai-gateway"}, ControlCapabilityPlatform, gatewayAvailable, h.Get))
 		control.PUT("/platform/ai-gateway", d.controlProxy(
 			controlRoute{Operation: "platform.update_ai_gateway", Route: "PUT /platform/ai-gateway", Mutation: true}, ControlCapabilityPlatform, gatewayAvailable, h.Update))
-		control.GET("/platform/ai-gateway/models", d.controlProxy(
-			controlRoute{Operation: "platform.list_ai_gateway_models", Route: "GET /platform/ai-gateway/models"}, ControlCapabilityPlatform, gatewayAvailable, h.ListMappings))
-		control.PUT("/platform/ai-gateway/models/:feature", d.controlProxy(
-			controlRoute{Operation: "platform.save_ai_gateway_model", Route: "PUT /platform/ai-gateway/models/{feature}", Mutation: true, Target: controlTargetParam("feature", "ai_gateway_model")}, ControlCapabilityPlatform, gatewayAvailable, h.SaveMapping))
 		control.GET("/platform/ai-gateway/catalog", d.controlProxy(
 			controlRoute{Operation: "platform.list_ai_gateway_catalog", Route: "GET /platform/ai-gateway/catalog"}, ControlCapabilityPlatform, gatewayAvailable, h.ListCatalog))
 		control.PUT("/platform/ai-gateway/catalog", d.controlProxy(

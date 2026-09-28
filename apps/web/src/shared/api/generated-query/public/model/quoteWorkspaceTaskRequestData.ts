@@ -13,10 +13,10 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { WorkflowKind } from './workflowKind'
+import type { Service } from './service'
 
 export type QuoteWorkspaceTaskRequestData = {
-  workflow_kind: WorkflowKind
+  service: Service
   /** @minimum 1 */
   quantity?: number
   /** Output resolution; defaults to default when omitted. */

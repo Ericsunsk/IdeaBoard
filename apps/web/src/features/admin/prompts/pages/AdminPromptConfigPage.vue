@@ -22,7 +22,11 @@
 
         <!-- 右侧：刷新操作 -->
         <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton :loading="loading" :aria-label="PROMPTS_MESSAGES.refresh" @click="loadPrompts()" />
+          <AdminRefreshButton
+            :loading="loading"
+            :aria-label="PROMPTS_MESSAGES.refresh"
+            @click="loadPrompts()"
+          />
         </div>
       </div>
 
@@ -41,7 +45,9 @@
 
     <!-- 2. 错误告警状态 -->
     <div v-if="loadFailed && prompts.length === 0" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">{{ PROMPTS_MESSAGES.loadFailedTitle }}</div>
+      <div class="text-admin-title font-semibold text-admin-title-color">
+        {{ PROMPTS_MESSAGES.loadFailedTitle }}
+      </div>
       <div class="mt-2 text-admin-meta text-admin-subtitle-color">
         {{ PROMPTS_MESSAGES.loadFailedHint }}
       </div>
@@ -67,9 +73,7 @@
       </h3>
       <p class="mt-1 max-w-sm text-xs text-admin-text-3">
         {{
-          !hasActiveFilter
-            ? PROMPTS_MESSAGES.emptyNoConfigHint
-            : PROMPTS_MESSAGES.emptyNoMatchHint
+          !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfigHint : PROMPTS_MESSAGES.emptyNoMatchHint
         }}
       </p>
       <button
@@ -93,7 +97,9 @@
         <!-- 分组标题栏 (1:1 对齐 BillingPricingTable section header) -->
         <div class="mb-2 flex items-center gap-2">
           <h3 class="text-sm font-bold text-admin-title-color">{{ group.title }}</h3>
-          <span class="text-xs text-admin-text-3">{{ PROMPTS_MESSAGES.featureCount(group.items.length) }}</span>
+          <span class="text-xs text-admin-text-3">{{
+            PROMPTS_MESSAGES.featureCount(group.items.length)
+          }}</span>
         </div>
 
         <!-- 数据表格壳体 -->
@@ -108,7 +114,9 @@
             :class="adminTableClass"
           >
             <template #empty>
-              <div class="p-6 text-center text-xs text-admin-text-3">{{ PROMPTS_MESSAGES.groupEmpty }}</div>
+              <div class="p-6 text-center text-xs text-admin-text-3">
+                {{ PROMPTS_MESSAGES.groupEmpty }}
+              </div>
             </template>
 
             <!-- 1. Service (1:1 对齐功能定价页 Service 规范) -->
@@ -139,7 +147,11 @@
                   ]"
                 >
                   <span :class="['size-1.5 rounded-full', rowView(data.slug).metric.dotClass]" />
-                  <span>{{ rowView(data.slug).configured ? PROMPTS_MESSAGES.configured : PROMPTS_MESSAGES.unconfigured }}</span>
+                  <span>{{
+                    rowView(data.slug).configured
+                      ? PROMPTS_MESSAGES.configured
+                      : PROMPTS_MESSAGES.unconfigured
+                  }}</span>
                 </span>
               </template>
             </AdminColumn>
@@ -179,12 +191,18 @@
                 >
                   {{ rowView(data.slug).saved }}
                 </div>
-                <span v-else class="text-xs text-admin-text-3 font-mono">{{ PROMPTS_MESSAGES.unset }}</span>
+                <span v-else class="text-xs text-admin-text-3 font-mono">{{
+                  PROMPTS_MESSAGES.unset
+                }}</span>
               </template>
             </AdminColumn>
 
             <!-- 5. 操作 (Actions, 1:1 对齐功能定价表规范) -->
-            <AdminColumn field="actions" :header="PROMPTS_MESSAGES.actionsColumn" :style="{ width: '120px' }">
+            <AdminColumn
+              field="actions"
+              :header="PROMPTS_MESSAGES.actionsColumn"
+              :style="{ width: '120px' }"
+            >
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
                   <AdminButton
@@ -194,7 +212,11 @@
                     :disabled="isInitialLoading"
                     @click="openEditor(data)"
                   >
-                    {{ rowView(data.slug).configured ? PROMPTS_MESSAGES.adjust : PROMPTS_MESSAGES.setup }}
+                    {{
+                      rowView(data.slug).configured
+                        ? PROMPTS_MESSAGES.adjust
+                        : PROMPTS_MESSAGES.setup
+                    }}
                   </AdminButton>
                 </div>
               </template>
@@ -242,7 +264,7 @@ import {
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
 import { taskMetricDefinitions } from '../../../../shared/domain/taskMetricTokens'
-import { getWorkflowFeatureIcon } from '../../../../shared/domain/workflowFeatureIcons'
+import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import { useAdminPromptConfigWorkspace } from '../workspace'
 import type { FeaturePromptVariable } from '../workspace'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
@@ -298,7 +320,7 @@ const pendingMetric =
   taskMetricDefinitions.find((m) => m.key === 'pending') ?? taskMetricDefinitions[0]!
 
 function getFeatureIcon(slug: string): Component {
-  return getWorkflowFeatureIcon(slug) ?? Spark
+  return getServiceIcon(slug) ?? Spark
 }
 
 const featureGroups = computed<FeatureGroup[]>(() =>

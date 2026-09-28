@@ -5,10 +5,7 @@ import { IMAGE_NODE_ACTION } from '../../domain/nodes/imageActionRegistry.ts'
 import type { MediaInputImage } from '../editing/useFlowMediaInputImages.ts'
 import { createPendingImageExecutionCore } from '../execution/pending-execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
-import {
-  getWorkspaceSelectionStore,
-  resetWorkspaceSelectionStore,
-} from '../../../workspace'
+import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { resetMediaWorkspaceIdResolver } from '../../../../shared/api/mediaAssetDelivery'
 
 const mocks = vi.hoisted(() => {

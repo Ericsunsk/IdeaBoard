@@ -64,13 +64,13 @@ func TestGatewayCountersSplitByFeatureAndOutcome(t *testing.T) {
 	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues("render", "error")); got != 1 {
 		t.Fatalf("gateway error = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues(UnknownFeature, "error")); got != 1 {
+	if got := testutil.ToFloat64(set.gatewayRequests.WithLabelValues(UnknownService, "error")); got != 1 {
 		t.Fatalf("gateway unknown error = %v, want 1", got)
 	}
 	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues("render")); got != 1 {
 		t.Fatalf("gateway retries = %v, want 1", got)
 	}
-	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues(UnknownFeature)); got != 1 {
+	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues(UnknownService)); got != 1 {
 		t.Fatalf("gateway unknown retries = %v, want 1", got)
 	}
 }

@@ -12,10 +12,7 @@ import {
   toWorkspaceLibraryFolder,
   toWorkspaceLibraryResolveResult,
 } from './domain/validators'
-import {
-  WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS,
-  workspaceLibraryApi,
-} from './infrastructure/resource'
+import { WORKSPACE_LIBRARY_RESOLVE_MAX_ITEMS, workspaceLibraryApi } from './infrastructure/resource'
 import {
   lookupWorkspaceSavedAssetKeys,
   materializeLibraryAssetForCanvas,
@@ -160,8 +157,11 @@ describe('workspace library mapping', () => {
     })
     expect(resolved.asset?.id).toBe(ASSET_ID)
     expect(
-      toWorkspaceLibraryResolveResult({ provider: 'unsplash', source_id: 'x', status: 'unresolved' })
-        .asset,
+      toWorkspaceLibraryResolveResult({
+        provider: 'unsplash',
+        source_id: 'x',
+        status: 'unresolved',
+      }).asset,
     ).toBeUndefined()
     expect(() =>
       toWorkspaceLibraryResolveResult({ provider: 'unsplash', status: 'bogus' }),
@@ -207,7 +207,8 @@ describe('workspace library pagination and replay headers', () => {
   })
 })
 
-describe('workspace library error branches', () => {  it('propagates machine-readable codes for 404 and 409', async () => {
+describe('workspace library error branches', () => {
+  it('propagates machine-readable codes for 404 and 409', async () => {
     useMswHandlers(
       http.get('/api/v1/workspaces/:workspaceId/library/assets', () => {
         return HttpResponse.json(

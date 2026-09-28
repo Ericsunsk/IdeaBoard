@@ -112,15 +112,6 @@ func (f *prepareFakeCancelStore) ClearCancelled(context.Context, string) error {
 	return nil
 }
 
-type prepareFakeModelResolver struct {
-	model string
-	err   error
-}
-
-func (f *prepareFakeModelResolver) ResolveModel(context.Context, string) (string, error) {
-	return f.model, f.err
-}
-
 type prepareFakeEnqueuer struct {
 	calls int
 }
@@ -130,14 +121,14 @@ func (f *prepareFakeEnqueuer) Enqueue(context.Context, *tasks.TaskPayload) error
 	return nil
 }
 
-func newPrepareTestOrchestrator(store *prepareFakeTaskStore, cancel *prepareFakeCancelStore, resolver *prepareFakeModelResolver, enqueuer *prepareFakeEnqueuer) *Orchestrator {
-	return NewOrchestrator(enqueuer, taskexecution.NewService(store, cancel), resolver, nil)
+func newPrepareTestOrchestrator(store *prepareFakeTaskStore, cancel *prepareFakeCancelStore, enqueuer *prepareFakeEnqueuer) *Orchestrator {
+	return NewOrchestrator(enqueuer, taskexecution.NewService(store, cancel), nil)
 }
 
 func TestPrepareUnparseableParamsFailsTaskWithoutEnqueue(t *testing.T) {
 	store := &prepareFakeTaskStore{}
 	enqueuer := &prepareFakeEnqueuer{}
-	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeModelResolver{}, enqueuer)
+	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, enqueuer)
 
 	err := orchestrator.Execute(context.Background(), &tasks.TaskPayload{TaskID: "bad-params-task"})
 	if err != nil {
@@ -151,24 +142,27 @@ func TestPrepareUnparseableParamsFailsTaskWithoutEnqueue(t *testing.T) {
 	}
 }
 
-func TestPrepareModelResolverErrorReturnsErrorWithoutEnqueue(t *testing.T) {
+func TestPrepareFailsClosedWithoutRoutingSnapshot(t *testing.T) {
+	// #847: the single-value live lookup is removed. Prepare resolves the
+	// service slug and then fails the task deterministically: no live
+	// lookup, no error for River backoff, no enqueue. #848 restores model
+	// selection via the submit-time RoutingSnapshot.
 	store := &prepareFakeTaskStore{}
 	enqueuer := &prepareFakeEnqueuer{}
-	resolverErr := errors.New("settings DB unavailable")
-	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeModelResolver{err: resolverErr}, enqueuer)
+	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, enqueuer)
 
 	err := orchestrator.Execute(context.Background(), &tasks.TaskPayload{
 		TaskID: "model-error-task",
-		Params: `{"schema_version":5,"feature":"generation"}`,
+		Params: `{"schema_version":6,"service":"generation"}`,
 	})
-	if !errors.Is(err, resolverErr) {
-		t.Fatalf("Execute error = %v, want resolver error for River backoff", err)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
 	}
 	if enqueuer.calls != 0 {
-		t.Fatalf("enqueue calls = %d, want 0 when returning error", enqueuer.calls)
+		t.Fatalf("enqueue calls = %d, want 0 on deterministic prepare failure", enqueuer.calls)
 	}
-	if len(store.converged) != 0 {
-		t.Fatalf("converged intents = %+v, want none on transient prepare failure", store.converged)
+	if len(store.converged) != 1 || store.converged[0].Kind != runtimecontracts.TaskConvergenceFailed {
+		t.Fatalf("converged intents = %+v, want one failed convergence", store.converged)
 	}
 }
 
@@ -176,7 +170,7 @@ func TestPrepareCancelCheckErrorReturnsErrorWithoutEnqueue(t *testing.T) {
 	store := &prepareFakeTaskStore{}
 	enqueuer := &prepareFakeEnqueuer{}
 	cancelErr := errors.New("cancel store unavailable")
-	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{err: cancelErr}, &prepareFakeModelResolver{}, enqueuer)
+	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{err: cancelErr}, enqueuer)
 
 	err := orchestrator.Execute(context.Background(), &tasks.TaskPayload{TaskID: "cancel-check-task"})
 	if !errors.Is(err, cancelErr) {
@@ -193,7 +187,7 @@ func retryableProviderError() error {
 
 func TestRetryableProviderFailureRequeuesForRiverBackoff(t *testing.T) {
 	store := &prepareFakeTaskStore{task: &tasks.Task{TaskID: "retry-task", RetryCount: 0}}
-	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeModelResolver{}, &prepareFakeEnqueuer{})
+	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeEnqueuer{})
 	attempt := newAttemptContext(&tasks.TaskPayload{TaskID: "retry-task"}, "openai/gpt-image-1", "tok-retry", 1, time.Now())
 	machine := newPhaseMachine("retry-task")
 	for _, next := range []phase{phaseAssigned, phaseProvider} {
@@ -217,7 +211,7 @@ func TestRetryableProviderFailureRequeuesForRiverBackoff(t *testing.T) {
 
 func TestExhaustedRetryableFailureFinalFails(t *testing.T) {
 	store := &prepareFakeTaskStore{task: &tasks.Task{TaskID: "exhausted-task", RetryCount: maxProviderFailureRequeues}}
-	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeModelResolver{}, &prepareFakeEnqueuer{})
+	orchestrator := newPrepareTestOrchestrator(store, &prepareFakeCancelStore{}, &prepareFakeEnqueuer{})
 	attempt := newAttemptContext(&tasks.TaskPayload{TaskID: "exhausted-task"}, "openai/gpt-image-1", "tok-done", 3, time.Now())
 	machine := newPhaseMachine("exhausted-task")
 	for _, next := range []phase{phaseAssigned, phaseProvider} {

@@ -978,7 +978,7 @@ func insertReconciliationWorkspaceTask(t testing.TB, db *pgxpool.Pool, taskID st
 	if status == "completed" || status == "failed" {
 		completedAt = "clock_timestamp()"
 	}
-	query := `INSERT INTO tasks (public_id,workspace_id,submitter_user_id,billing_account_id,workflow_type,workflow_input,status,error_message,completed_at) VALUES ($1,$2,$3,$4,'test-feature','{}',$5,$6,` + completedAt + `)`
+	query := `INSERT INTO tasks (public_id,workspace_id,submitter_user_id,billing_account_id,service,workflow_input,status,error_message,completed_at) VALUES ($1,$2,$3,$4,'test-feature','{}',$5,$6,` + completedAt + `)`
 	if _, err := db.Exec(t.Context(), query, taskID, workspaceID, userID, billingAccountID, status, errorMessage); err != nil {
 		t.Fatal(err)
 	}
@@ -1019,7 +1019,7 @@ WHERE NOT EXISTS (SELECT 1 FROM billing_accounts WHERE workspace_id = $2)`, "ba_
 func insertReconciliationTaskBillingSnapshot(t testing.TB, db *pgxpool.Pool, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {
 	t.Helper()
 	result, err := db.Exec(t.Context(), `
-INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+INSERT INTO task_billing_snapshots(task_id,user_id,service,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
 SELECT $1, $2, 'test', prices.sku, skus.display_name, prices.price_version_id, prices.version,
        prices.unit_credits, 1, prices.unit_credits, clock_timestamp(), $5
 FROM billing_price_versions prices

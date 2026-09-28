@@ -1,10 +1,7 @@
 import { getWorkspaceUsage } from '../../../../shared/api/generated-query/public/workspace-billing/workspace-billing'
 import type { WorkspaceUsage } from '../../../../shared/api/generated-query/public/model'
 import { i18n } from '../../../../shared/i18n'
-import {
-  requireAccountWorkspaceId,
-  resolveWorkspaceBillingData,
-} from '../workspaceBilling'
+import { requireAccountWorkspaceId, resolveWorkspaceBillingData } from '../workspaceBilling'
 
 // User usage boundary (W2 transports). Reads go through the Public Data
 // Plane (`GET /api/v1/workspaces/{id}/usage?range=`) with local view types;

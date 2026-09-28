@@ -155,7 +155,8 @@ export const SETTINGS_MESSAGES = {
   searchDisable: '停用',
   searchEnableState: (enabled: boolean) => (enabled ? '启用' : '停用'),
   searchSaveKeyTitle: (providerLabel: string) => `保存 ${providerLabel} API Key`,
-  searchSaveKeyMessage: '保存新 Key 会重置测试状态并停用该供应商，保存后需重新测试。该操作将记录操作人与原因。',
+  searchSaveKeyMessage:
+    '保存新 Key 会重置测试状态并停用该供应商，保存后需重新测试。该操作将记录操作人与原因。',
   searchSaveKeyFailed: '保存 API Key 失败',
   searchTestFailed: '连接测试失败',
   searchToggleTitle: (enabled: boolean, providerLabel: string) =>

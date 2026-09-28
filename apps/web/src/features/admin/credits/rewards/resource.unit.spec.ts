@@ -110,7 +110,13 @@ describe('AdminRewardCodeResource', () => {
 
     const updated = await resource.update(
       7,
-      { displayName: '新名', creditAmount: 80, maxRedemptions: 100, expiresAt: '', code: 'NEWCODE1' },
+      {
+        displayName: '新名',
+        creditAmount: 80,
+        maxRedemptions: 100,
+        expiresAt: '',
+        code: 'NEWCODE1',
+      },
       { operatorReason: '补发 code' },
     )
 
@@ -122,7 +128,9 @@ describe('AdminRewardCodeResource', () => {
   })
 
   it('toggles enabled through the control plane with an operator reason', async () => {
-    transport.request.mockResolvedValue(contractOk(codeFixture({ enabled: false, status: 'disabled' })))
+    transport.request.mockResolvedValue(
+      contractOk(codeFixture({ enabled: false, status: 'disabled' })),
+    )
     const resource = createAdminRewardCodeResource()
 
     const code = await resource.setEnabled(7, false, { operatorReason: '活动结束停用' })
@@ -154,9 +162,9 @@ describe('AdminRewardCodeResource', () => {
   it('requires an operator reason for mutations before any network call', async () => {
     const resource = createAdminRewardCodeResource()
 
-    await expect(
-      resource.setEnabled(7, false, { operatorReason: '  ' }),
-    ).rejects.toMatchObject({ code: 'control_reason_required' })
+    await expect(resource.setEnabled(7, false, { operatorReason: '  ' })).rejects.toMatchObject({
+      code: 'control_reason_required',
+    })
     await expect(resource.delete(7, { operatorReason: '' })).rejects.toMatchObject({
       code: 'control_reason_required',
     })

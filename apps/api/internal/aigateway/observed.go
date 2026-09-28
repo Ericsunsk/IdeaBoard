@@ -30,12 +30,15 @@ const (
 	ObservedMarginUnknownNoCost = "unknown_no_cost"
 )
 
-// ModelAttemptAggregate is one (model, provider) terminal-attempt total over
-// the observation window. Only completed/failed attempts count: running,
-// requeued and cancelled attempts carry no outcome signal.
+// ModelAttemptAggregate is one (model, provider, service) terminal-attempt
+// total over the observation window. Only completed/failed attempts count:
+// running, requeued and cancelled attempts carry no outcome signal. Service
+// is the task service slug recorded on the attempt fact; it replaces the
+// removed single-value model mapping as the model→service linkage (#847).
 type ModelAttemptAggregate struct {
 	Model     string
 	Provider  string
+	Service   string
 	Total     int64
 	Completed int64
 	Failed    int64
@@ -81,12 +84,6 @@ type SKUCatalogReader interface {
 	ListSKUCatalog(ctx context.Context) ([]SKUCatalogCard, error)
 }
 
-// observedMappingReader is the gateway mapping surface the observed service
-// needs. ConfigRepository (via configStore) satisfies it.
-type observedMappingReader interface {
-	ListModelMappings(ctx context.Context) (map[string]string, error)
-}
-
 // ModelSKUMargin is one on-sale (or formerly on-sale) SKU charge row for an
 // observed model. ActualCostCredits stays nil until a receipt/log cost source
 // exists; MarginCredits stays nil with it. Both nils serialize as JSON null
@@ -94,7 +91,7 @@ type observedMappingReader interface {
 type ModelSKUMargin struct {
 	SKU                  string           `json:"sku"`
 	DisplayName          string           `json:"display_name"`
-	Feature              string           `json:"feature"`
+	Service              string           `json:"service"`
 	OnSale               bool             `json:"on_sale"`
 	UnitCreditsByVariant map[string]int64 `json:"unit_credits_by_variant"`
 	ActualCostCredits    *int64           `json:"actual_cost_credits"`
@@ -127,33 +124,24 @@ type ModelObservedRow struct {
 	SKUMargins      []ModelSKUMargin `json:"sku_margins"`
 }
 
-// skuForFeature maps one gateway mapping feature to its billing SKU. Vision
-// rides ai-search:vision; every workflow feature rides ai-image:<slug> (see
-// billingregistry). Unknown future features still get a deterministic SKU so
+// skuForService maps one service slug to its billing SKU. Vision rides
+// ai-search:vision; every image service rides ai-image:<slug> (see
+// billingregistry). Unknown future services still get a deterministic SKU so
 // margin rows degrade to not-on-sale instead of vanishing.
-func skuForFeature(feature string) string {
-	if strings.TrimSpace(feature) == visionMappingFeature {
+func skuForService(service string) string {
+	if strings.TrimSpace(service) == visionMappingFeature {
 		return "ai-search:vision"
 	}
-	return "ai-image:" + strings.TrimSpace(feature)
+	return "ai-image:" + strings.TrimSpace(service)
 }
 
-// providerFromModelID splits the provider prefix off a provider/model
-// identifier. Mapping validation guarantees the slash for mapped models;
-// bare IDs yield an empty provider instead of a guess.
-func providerFromModelID(model string) string {
-	if provider, _, found := strings.Cut(strings.TrimSpace(model), "/"); found && strings.TrimSpace(provider) != "" {
-		return strings.TrimSpace(provider)
-	}
-	return ""
-}
-
-// AggregateModelObservations folds raw attempt facts, feature mappings and
-// SKU catalog cards into per-model observed rows. Rows are the union of
-// observed models and currently mapped models so mapped-but-idle models
-// report HasObservations=false instead of disappearing. Pure function of its
-// inputs for unit tests; the service supplies the window start.
-func AggregateModelObservations(obs AttemptObservation, mappings map[string]string, skuCards []SKUCatalogCard, since time.Time) []ModelObservedRow {
+// AggregateModelObservations folds raw attempt facts and SKU catalog cards
+// into per-model observed rows. Rows cover observed models only: the removed
+// single-value mapping no longer supplies mapped-but-idle models (#847);
+// the model→service linkage comes from the service recorded on each attempt
+// fact. Pure function of its inputs for unit tests; the service supplies the
+// window start.
+func AggregateModelObservations(obs AttemptObservation, skuCards []SKUCatalogCard, since time.Time) []ModelObservedRow {
 	aggregateByKey := make(map[string]ModelAttemptAggregate, len(obs.Aggregates))
 	for _, aggregate := range obs.Aggregates {
 		model := strings.TrimSpace(aggregate.Model)
@@ -172,17 +160,27 @@ func AggregateModelObservations(obs AttemptObservation, mappings map[string]stri
 		key := model + "\x00" + strings.TrimSpace(failure.Provider)
 		failuresByKey[key] = append(failuresByKey[key], failure)
 	}
-	featuresByModel := make(map[string][]string)
-	for feature, model := range mappings {
-		feature = strings.TrimSpace(feature)
-		model = strings.TrimSpace(model)
-		if feature == "" || model == "" {
+	servicesByModel := make(map[string][]string)
+	seenServiceByModel := make(map[string]map[string]struct{})
+	for _, aggregate := range obs.Aggregates {
+		model := strings.TrimSpace(aggregate.Model)
+		service := strings.TrimSpace(aggregate.Service)
+		if model == "" || service == "" {
 			continue
 		}
-		featuresByModel[model] = append(featuresByModel[model], feature)
+		seen := seenServiceByModel[model]
+		if seen == nil {
+			seen = make(map[string]struct{})
+			seenServiceByModel[model] = seen
+		}
+		if _, dup := seen[service]; dup {
+			continue
+		}
+		seen[service] = struct{}{}
+		servicesByModel[model] = append(servicesByModel[model], service)
 	}
-	for model := range featuresByModel {
-		sort.Strings(featuresByModel[model])
+	for model := range servicesByModel {
+		sort.Strings(servicesByModel[model])
 	}
 	skuBySKU := make(map[string]SKUCatalogCard, len(skuCards))
 	for _, card := range skuCards {
@@ -192,22 +190,13 @@ func AggregateModelObservations(obs AttemptObservation, mappings map[string]stri
 		skuBySKU[strings.TrimSpace(card.SKU)] = card
 	}
 
-	keys := make(map[string]struct{}, len(aggregateByKey)+len(featuresByModel))
-	modelByKey := make(map[string]string, len(aggregateByKey)+len(featuresByModel))
-	providerByKey := make(map[string]string, len(aggregateByKey)+len(featuresByModel))
+	keys := make(map[string]struct{}, len(aggregateByKey))
+	modelByKey := make(map[string]string, len(aggregateByKey))
+	providerByKey := make(map[string]string, len(aggregateByKey))
 	for key, aggregate := range aggregateByKey {
 		keys[key] = struct{}{}
 		modelByKey[key] = strings.TrimSpace(aggregate.Model)
 		providerByKey[key] = strings.TrimSpace(aggregate.Provider)
-	}
-	for model := range featuresByModel {
-		provider := providerFromModelID(model)
-		key := model + "\x00" + provider
-		if _, exists := keys[key]; !exists {
-			keys[key] = struct{}{}
-			modelByKey[key] = model
-			providerByKey[key] = provider
-		}
 	}
 
 	rows := make([]ModelObservedRow, 0, len(keys))
@@ -236,8 +225,8 @@ func AggregateModelObservations(obs AttemptObservation, mappings map[string]stri
 			}
 			row.TopFailureStage, row.TopFailureCat, row.TopFailureCount = topFailure(failuresByKey[key])
 		}
-		for _, feature := range featuresByModel[model] {
-			row.SKUMargins = append(row.SKUMargins, buildSKUMargin(feature, skuBySKU))
+		for _, service := range servicesByModel[model] {
+			row.SKUMargins = append(row.SKUMargins, buildSKUMargin(service, skuBySKU))
 		}
 		row.HasSKUMargin = len(row.SKUMargins) > 0
 		rows = append(rows, row)
@@ -269,14 +258,15 @@ func topFailure(failures []ModelFailureCount) (stage, category string, count int
 	return stage, category, count
 }
 
-// buildSKUMargin renders one margin row for a mapped feature. The charged
-// side comes from the on-sale catalog card; the gateway actual cost has no
-// receipt/log source, so the cost side stays an explicit unavailable marker.
-func buildSKUMargin(feature string, skuBySKU map[string]SKUCatalogCard) ModelSKUMargin {
-	sku := skuForFeature(feature)
+// buildSKUMargin renders one margin row for a service observed on the model.
+// The charged side comes from the on-sale catalog card; the gateway actual
+// cost has no receipt/log source, so the cost side stays an explicit
+// unavailable marker.
+func buildSKUMargin(service string, skuBySKU map[string]SKUCatalogCard) ModelSKUMargin {
+	sku := skuForService(service)
 	margin := ModelSKUMargin{
 		SKU:                  sku,
-		Feature:              feature,
+		Service:              service,
 		UnitCreditsByVariant: map[string]int64{},
 		CostSource:           ObservedCostSourceUnavailable,
 		CostNote:             msgBuildSKUMargin,
@@ -292,24 +282,23 @@ func buildSKUMargin(feature string, skuBySKU map[string]SKUCatalogCard) ModelSKU
 	return margin
 }
 
-// ObservedService composes attempt facts, gateway mappings and the billing
-// SKU catalog into the admin models-observed read model.
+// ObservedService composes attempt facts and the billing SKU catalog into
+// the admin models-observed read model.
 type ObservedService struct {
 	attempts ObservedAttemptStore
-	mappings observedMappingReader
 	billing  SKUCatalogReader
 }
 
-// NewObservedService builds the service over its three narrow seams.
-func NewObservedService(attempts ObservedAttemptStore, mappings observedMappingReader, billing SKUCatalogReader) *ObservedService {
-	return &ObservedService{attempts: attempts, mappings: mappings, billing: billing}
+// NewObservedService builds the service over its two narrow seams.
+func NewObservedService(attempts ObservedAttemptStore, billing SKUCatalogReader) *ObservedService {
+	return &ObservedService{attempts: attempts, billing: billing}
 }
 
 // ListModelsObserved returns per-model 7-day first-party observations with
-// SKU margin rows. Models absent from the result have neither attempts nor
-// mappings in the window; callers render them as 暂无数据.
+// SKU margin rows. Models absent from the result have no attempts in the
+// window; callers render them as 暂无数据.
 func (s *ObservedService) ListModelsObserved(ctx context.Context) ([]ModelObservedRow, error) {
-	if s == nil || s.attempts == nil || s.mappings == nil || s.billing == nil {
+	if s == nil || s.attempts == nil || s.billing == nil {
 		return nil, errors.New("model observation service is unavailable")
 	}
 	since := time.Now().UTC().Add(-ObservedWindowDays * 24 * time.Hour)
@@ -317,15 +306,11 @@ func (s *ObservedService) ListModelsObserved(ctx context.Context) ([]ModelObserv
 	if err != nil {
 		return nil, fmt.Errorf("list model attempt observations: %w", err)
 	}
-	mappings, err := s.mappings.ListModelMappings(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list gateway model mappings: %w", err)
-	}
 	skuCards, err := s.billing.ListSKUCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list billing SKU catalog: %w", err)
 	}
-	return AggregateModelObservations(obs, mappings, skuCards, since), nil
+	return AggregateModelObservations(obs, skuCards, since), nil
 }
 
 // ObservedRepository reads attempt facts with raw SQL: the aggregation needs
@@ -375,6 +360,7 @@ const listObservedAggregatesSQL = `
 SELECT
   COALESCE(NULLIF(resolved_model, ''), requested_model) AS model,
   provider AS provider,
+  service AS service,
   COUNT(*) AS total,
   COUNT(*) FILTER (WHERE status = 'completed') AS completed,
   COUNT(*) FILTER (WHERE status = 'failed') AS failed,
@@ -383,7 +369,7 @@ FROM task_execution_attempts
 WHERE created_at >= $1
   AND status IN ('completed', 'failed')
   AND (resolved_model <> '' OR requested_model <> '')
-GROUP BY 1, 2
+GROUP BY 1, 2, 3
 ORDER BY 1 ASC, 2 ASC
 `
 
@@ -396,7 +382,7 @@ func (r *ObservedRepository) listAggregates(ctx context.Context, since time.Time
 	aggregates := make([]ModelAttemptAggregate, 0)
 	for rows.Next() {
 		var aggregate ModelAttemptAggregate
-		if err := rows.Scan(&aggregate.Model, &aggregate.Provider, &aggregate.Total, &aggregate.Completed, &aggregate.Failed, &aggregate.CacheHits); err != nil {
+		if err := rows.Scan(&aggregate.Model, &aggregate.Provider, &aggregate.Service, &aggregate.Total, &aggregate.Completed, &aggregate.Failed, &aggregate.CacheHits); err != nil {
 			return nil, fmt.Errorf("scan model attempt aggregate: %w", err)
 		}
 		aggregates = append(aggregates, aggregate)

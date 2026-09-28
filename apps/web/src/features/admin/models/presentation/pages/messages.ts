@@ -49,6 +49,11 @@ export const MODELS_MESSAGES = {
   gatewayIdPlaceholder: '网关标识',
   cancel: '取消',
   gatewayTest: '测试连接',
+  gatewayProbeProviderLabel: 'Provider',
+  gatewayProbeProviderPlaceholder: '例如: openai',
+  gatewayProbePathLabel: 'Path',
+  gatewayProbePathPlaceholder: '例如: v1/models',
+  gatewayProbeRequired: '测试连接需要填写 provider 与 path',
   gatewayBaseUrlRequired: '请输入网关 Base URL',
   gatewayBaseUrlScheme: '网关 Base URL 必须以 http:// 或 https:// 开头',
   gatewayLoadFailed: '读取网关配置失败',
@@ -80,7 +85,8 @@ export const MODELS_MESSAGES = {
   addEmptyUnconfigured: '网关未配置任何 Provider',
   addEmptyNoneAvailable: (count: number) => `已配置 ${count} 家 Provider，社区目录中未发现可用模型`,
   addEmptyNone: '未探测到可用的网关模型',
-  addHintEnableFirst: '请先在 Cloudflare AI Gateway 控制台启用 Provider（BYOK 存密钥），再回来探测入库。',
+  addHintEnableFirst:
+    '请先在 Cloudflare AI Gateway 控制台启用 Provider（BYOK 存密钥），再回来探测入库。',
   addHintCheckProviders:
     '请检查 Cloudflare AI Gateway 是否已配置相应 Provider 的 API Key (BYOK)。仍无结果请用下方「手动新增」入库。',
   editHeader: (editing: boolean) => (editing ? '编辑模型' : '新增模型'),
@@ -99,7 +105,8 @@ export const MODELS_MESSAGES = {
   gatewayParamsLabel: '额外自定义请求参数 (Custom JSON)',
   gatewayFormatJson: '格式化 JSON',
   gatewayParamsPlaceholder: '例如: {"guidance_scale": 7.5, "output_format": "png"}',
-  gatewayParamsHint: '必须为合法 JSON 键值对对象。调用网关时将自动与基础 Payload 进行深度合并注入。',
+  gatewayParamsHint:
+    '必须为合法 JSON 键值对对象。调用网关时将自动与基础 Payload 进行深度合并注入。',
   previewTitle: '卡片效果实时预览',
   previewModelId: (modelId: string) => `ID: ${modelId || '未配置'}`,
   previewBadge: '预览视图',
@@ -109,7 +116,8 @@ export const MODELS_MESSAGES = {
   routeCustomNamespace: '自定义命名空间',
   routePathLabel: '预期端点路径:',
   routeProtocolLabel: '调用调度协议:',
-  routeNote: '💡 系统后端采用统一 Cloudflare AI Gateway 驱动，无需配置第三方独立 SDK 或外部密钥池。',
+  routeNote:
+    '💡 系统后端采用统一 Cloudflare AI Gateway 驱动，无需配置第三方独立 SDK 或外部密钥池。',
   identityTitle: '模型身份与接入定义',
   identitySubtitle: 'Cloudflare AI Gateway 路由基础',
   identityIdLabel: '模型标识',

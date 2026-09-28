@@ -65,7 +65,7 @@ import FusionStage from './FusionStage.vue'
 import NodeShell from '../primitives/NodeShell.vue'
 import NodePromptComposer from '../primitives/NodePromptComposer.vue'
 import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
-import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE } from '../../../../../shared/domain/imageServices'
 import {
   buildFusionBillingReadinessRequest,
   useCanvasBillingQuote,
@@ -106,7 +106,7 @@ const showPromptComposer = computed(() => !!props.promptComposerVisible)
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.fusion,
+  () => SERVICE.fusion,
   () => showPromptComposer.value && canGenerate.value,
   () =>
     buildFusionBillingReadinessRequest({

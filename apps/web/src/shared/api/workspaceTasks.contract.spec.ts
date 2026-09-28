@@ -44,7 +44,7 @@ function taskFixture(overrides: Record<string, unknown> = {}): Record<string, un
     data: {
       id: TASK_ID,
       workspace_id: WORKSPACE_ID,
-      workflow_kind: 'render',
+      service: 'render',
       media_asset_ids: [],
       status: 'pending',
       retry_count: 0,
@@ -117,7 +117,11 @@ describe('workspace task union validation mapping', () => {
     const task = toWorkspaceTask(taskFixture())
     expect(task.id).toBe(TASK_ID)
     expect(task.status).toBe('pending')
-    expect(() => toWorkspaceTask({ data: { ...(taskFixture().data as Record<string, unknown>), status: 'ready' } })).toThrow()
+    expect(() =>
+      toWorkspaceTask({
+        data: { ...(taskFixture().data as Record<string, unknown>), status: 'ready' },
+      }),
+    ).toThrow()
   })
 
   it('rejects output refs that leak storage internals', () => {
@@ -126,14 +130,29 @@ describe('workspace task union validation mapping', () => {
         task_id: TASK_ID,
         outputs: [
           { kind: 'asset', asset_id: ASSET_ID, result_index: 0 },
-          { kind: 'remote', url: 'https://cdn.example.com/o.png', checksum_sha256: CHECKSUM, result_index: 1 },
+          {
+            kind: 'remote',
+            url: 'https://cdn.example.com/o.png',
+            checksum_sha256: CHECKSUM,
+            result_index: 1,
+          },
         ],
       },
     })
     expect(good.outputs).toHaveLength(2)
     expect(() =>
       toWorkspaceTaskOutputs({
-        data: { task_id: TASK_ID, outputs: [{ kind: 'remote', url: 'https://x/ws-uploads/y', checksum_sha256: CHECKSUM, result_index: 0 }] },
+        data: {
+          task_id: TASK_ID,
+          outputs: [
+            {
+              kind: 'remote',
+              url: 'https://x/ws-uploads/y',
+              checksum_sha256: CHECKSUM,
+              result_index: 0,
+            },
+          ],
+        },
       }),
     ).toThrow()
     expect(() =>
@@ -158,10 +177,15 @@ describe('workspace task cancel headers', () => {
       }),
     )
     const createKey = workspaceTaskIdempotencyKey('create')
-    await createWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'render' }, { idempotencyKey: createKey })
+    await createWorkspaceTask(WORKSPACE_ID, { service: 'render' }, { idempotencyKey: createKey })
     expect(seen.create).toBe(createKey)
     const cancelKey = workspaceTaskIdempotencyKey('cancel')
-    await cancelWorkspaceTask(WORKSPACE_ID, TASK_ID, { reason: 'stop' }, { idempotencyKey: cancelKey })
+    await cancelWorkspaceTask(
+      WORKSPACE_ID,
+      TASK_ID,
+      { reason: 'stop' },
+      { idempotencyKey: cancelKey },
+    )
     expect(seen.cancel).toBe(cancelKey)
   })
 
@@ -169,13 +193,15 @@ describe('workspace task cancel headers', () => {
     useMswHandlers(
       http.post('/api/v1/workspaces/:workspaceId/tasks', () => {
         return HttpResponse.json(
-          { error: { code: 'task_idempotency_conflict', message: 'conflict', request_id: 'req_1' } },
+          {
+            error: { code: 'task_idempotency_conflict', message: 'conflict', request_id: 'req_1' },
+          },
           { status: 409 },
         )
       }),
     )
     await expect(
-      createWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'render' }, { idempotencyKey: 'k' }),
+      createWorkspaceTask(WORKSPACE_ID, { service: 'render' }, { idempotencyKey: 'k' }),
     ).rejects.toMatchObject({ code: 'task_idempotency_conflict' })
   })
 
@@ -190,7 +216,7 @@ describe('workspace task cancel headers', () => {
     await createWorkspaceTask(
       WORKSPACE_ID,
       {
-        workflow_kind: 'inpaint',
+        service: 'inpaint',
         media_asset_ids: [ASSET_ID],
         prompt: 'redraw the area',
         params: { mask_asset_id: ASSET_ID, use_mask: true },
@@ -200,7 +226,7 @@ describe('workspace task cancel headers', () => {
     expect(seen).toHaveLength(1)
     expect(seen[0]).toMatchObject({
       data: {
-        workflow_kind: 'inpaint',
+        service: 'inpaint',
         inputs: { media_asset_ids: [ASSET_ID] },
         prompt: 'redraw the area',
         params: { mask_asset_id: ASSET_ID, use_mask: true },
@@ -216,7 +242,7 @@ describe('workspace task cancel headers', () => {
         return HttpResponse.json(taskFixture(), { status: 202 })
       }),
     )
-    await createWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'upscale' })
+    await createWorkspaceTask(WORKSPACE_ID, { service: 'upscale' })
     expect((seen[0] as { data: Record<string, unknown> }).data).not.toHaveProperty('prompt')
   })
 })
@@ -240,8 +266,12 @@ describe('workspace task 404/403 matrix', () => {
       }),
     )
     await expect(getWorkspaceTask(WORKSPACE_ID, TASK_ID)).resolves.toMatchObject({ id: TASK_ID })
-    await expect(getWorkspaceTask(WORKSPACE_ID, 'task_missing000')).rejects.toMatchObject({ code: 'task_not_found' })
-    await expect(listWorkspaceTaskOutputs(WORKSPACE_ID, TASK_ID)).rejects.toMatchObject({ code: 'task_not_found' })
+    await expect(getWorkspaceTask(WORKSPACE_ID, 'task_missing000')).rejects.toMatchObject({
+      code: 'task_not_found',
+    })
+    await expect(listWorkspaceTaskOutputs(WORKSPACE_ID, TASK_ID)).rejects.toMatchObject({
+      code: 'task_not_found',
+    })
   })
 
   it('lists with cursor pagination and quotes without persistence', async () => {
@@ -269,7 +299,7 @@ describe('workspace task 404/403 matrix', () => {
       }),
     )
     await listWorkspaceTasks(WORKSPACE_ID, { pageSize: 2 })
-    const quote = await quoteWorkspaceTask(WORKSPACE_ID, { workflow_kind: 'render' })
+    const quote = await quoteWorkspaceTask(WORKSPACE_ID, { service: 'render' })
     expect(quote.settlement_state).toBe('quoted')
     expect(getCreateWorkspaceTaskUrl(WORKSPACE_ID)).toBe('/workspaces/ws_abc123/tasks')
   })

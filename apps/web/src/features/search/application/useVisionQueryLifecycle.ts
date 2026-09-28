@@ -110,7 +110,8 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
       )
       await workspaceUploadApi.stageBytes(workspaceId, session.id, file, {
         contentType: mimeType,
-        idempotencyKey: `${key}:upload:bytes:${index}`, signal,
+        idempotencyKey: `${key}:upload:bytes:${index}`,
+        signal,
       })
       await workspaceUploadApi.completeSession(
         workspaceId,
@@ -194,7 +195,12 @@ export function useVisionQueryLifecycle(options: VisionQueryLifecycleOptions) {
       try {
         const workspaceId = (toValue(options.workspaceId) ?? '').trim()
         if (!workspaceId) throw new Error(i18n.global.t('search.visionSearchFailed'))
-        const extraction = await createVisionQuery(workspaceId, query, idempotencyKey, controller.signal)
+        const extraction = await createVisionQuery(
+          workspaceId,
+          query,
+          idempotencyKey,
+          controller.signal,
+        )
         if (generation !== extractionGeneration) return
         if (extraction.status !== 'succeeded') {
           state.value = 'idle'

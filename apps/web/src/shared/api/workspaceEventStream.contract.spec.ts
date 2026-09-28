@@ -81,7 +81,7 @@ function envelopeFixture(overrides: Record<string, unknown> = {}): Record<string
     actor: { type: 'user', id: 'usr_abc123' },
     resource: { type: 'task', id: 'task_def456' },
     workspace_id: WORKSPACE_ID,
-    data: { task_id: 'task_def456', workflow_kind: 'render' },
+    data: { task_id: 'task_def456', service: 'render' },
     ...overrides,
   }
 }
@@ -379,7 +379,7 @@ describe('waitWorkspaceTaskTerminal', () => {
       data: {
         id: TASK_ID,
         workspace_id: WORKSPACE_ID,
-        workflow_kind: 'render',
+        service: 'render',
         status,
         retry_count: 0,
         billing_snapshot: {
@@ -422,7 +422,10 @@ describe('waitWorkspaceTaskTerminal', () => {
       envelopeFixture({
         id: 'evt_done222',
         type: 'task.completed',
-        data: { task_id: TASK_ID, outputs_uri: `/api/v1/workspaces/${WORKSPACE_ID}/tasks/${TASK_ID}/outputs` },
+        data: {
+          task_id: TASK_ID,
+          outputs_uri: `/api/v1/workspaces/${WORKSPACE_ID}/tasks/${TASK_ID}/outputs`,
+        },
       }),
     )
     await expect(pending).resolves.toMatchObject({ id: TASK_ID, status: 'completed' })

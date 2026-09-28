@@ -55,7 +55,11 @@
                 <button
                   type="button"
                   class="absolute right-3 flex items-center text-admin-text-3 hover:text-admin-text-1 cursor-pointer transition-colors"
-                  :aria-label="showPassword ? ADMIN_LOGIN_MESSAGES.hidePassword : ADMIN_LOGIN_MESSAGES.showPassword"
+                  :aria-label="
+                    showPassword
+                      ? ADMIN_LOGIN_MESSAGES.hidePassword
+                      : ADMIN_LOGIN_MESSAGES.showPassword
+                  "
                   @click="showPassword = !showPassword"
                 >
                   <Eye v-if="!showPassword" class="size-4" />
@@ -170,7 +174,9 @@ async function handleLogin() {
   const email = formValue.value.email.trim()
   const password = formValue.value.password
   if (!email || !password) {
-    formError.value = !email ? ADMIN_LOGIN_MESSAGES.emailRequired : ADMIN_LOGIN_MESSAGES.passwordRequired
+    formError.value = !email
+      ? ADMIN_LOGIN_MESSAGES.emailRequired
+      : ADMIN_LOGIN_MESSAGES.passwordRequired
     return
   }
 

@@ -49,7 +49,6 @@ const (
 	msgValidateSubmitTaskMediaParamsWithRefValidator  = "%s 数量不能超过 %d 张"                                          // ValidateSubmitTaskMediaParamsWithRefValidator @ submit_validation.go
 	msgValidateSubmitTaskMediaParamsWithRefValidator2 = "%s 无效: %w"                                               // ValidateSubmitTaskMediaParamsWithRefValidator @ submit_validation.go
 	msgValidateSubmitTaskContractKeys                 = "任务参数必须使用结构化字段"                                           // ValidateSubmitTaskContractKeys @ submit_validation.go
-	msgPackage3                                       = "生图服务暂不可用，请稍后重试"                                          // Package @ task_intake.go
 	msgCompileReadiness                               = "参数错误"                                                    // CompileReadiness @ task_intake.go
 	msgNormalizeCompileRequest                        = "priority 仅支持 1-4"                                        // NormalizeCompileRequest @ task_intake.go
 	msgNormalizeCompileRequest2                       = "提示词"                                                     // NormalizeCompileRequest @ task_intake.go

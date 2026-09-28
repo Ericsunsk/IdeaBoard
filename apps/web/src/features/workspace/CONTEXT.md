@@ -1,4 +1,5 @@
 # Workspace Context
+
 Workspace owns user-side route assembly, shell layout, global navigation, shell account controls, and the share-join entry flow.
 Public `/user/*` URLs are an external product contract and stay unchanged (not a compat shim).
 It does NOT own business content (owned by submodules like `board`) or identity concept components like `UserAccountMenu` in `shared/components`.
@@ -6,13 +7,13 @@ Shape: flat assembly layer (`layout/` + `routes/` + `shell/` + `pages/` + `infra
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Workspace Layout | Main wrapper for user-side routes (`WorkspaceLayout.vue`): top navigation, global feedback containers (Toast / Confirm Dialog), main content slot. |
-| Workspace Routes | User-side route definitions (`routes/workspaceRoutes.ts`, exports `workspaceRoutes`): `/user/boards`, `/user/join/:share_token`, with `requiresAuth: true` and lazy loading. |
-| Workspace Navigation | Post-login top/main nav (`WorkspaceNavigation.vue`): board entry, inspiration search, Idea balance, avatar, global settings menu. |
-| Workspace Account Controls | Top-level account interaction orchestration (`useWorkspaceAccountControls.ts`): routes clicks to `accountOverlay.open(tab)`, sign-out cleanup (`signOut`), session refresh. |
-| Share Join Page | Collaboration share-join flow (`WorkspaceShareJoinPage.vue`): parses `share_token` from URL, runs the board join workflow, navigates to canvas. |
+| Term                       | Meaning                                                                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace Layout           | Main wrapper for user-side routes (`WorkspaceLayout.vue`): top navigation, global feedback containers (Toast / Confirm Dialog), main content slot.                           |
+| Workspace Routes           | User-side route definitions (`routes/workspaceRoutes.ts`, exports `workspaceRoutes`): `/user/boards`, `/user/join/:share_token`, with `requiresAuth: true` and lazy loading. |
+| Workspace Navigation       | Post-login top/main nav (`WorkspaceNavigation.vue`): board entry, inspiration search, Idea balance, avatar, global settings menu.                                            |
+| Workspace Account Controls | Top-level account interaction orchestration (`useWorkspaceAccountControls.ts`): routes clicks to `accountOverlay.open(tab)`, sign-out cleanup (`signOut`), session refresh.  |
+| Share Join Page            | Collaboration share-join flow (`WorkspaceShareJoinPage.vue`): parses `share_token` from URL, runs the board join workflow, navigates to canvas.                              |
 
 ## Public Seams
 

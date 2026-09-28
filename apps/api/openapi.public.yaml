@@ -1943,8 +1943,8 @@ paths:
       summary: Submit a workspace task (members only, 202 + Location)
       description: >-
         Submits an async task under the discriminated input union
-        {workflow_kind, inputs:{media_asset_ids}, params}: workflow_kind
-        names a registered AI image feature (generation, inpaint, render,
+        {service, inputs:{media_asset_ids}, params}: service
+        names a registered AI image service (generation, inpaint, render,
         variations, cutout, fusion, upscale, outpaint); media_asset_ids
         carry asset_... references only (no raw storage URLs); unknown
         params keys and storage URLs render 422 validation_failed with
@@ -1954,10 +1954,11 @@ paths:
         reuse with a different request renders 409
         task_idempotency_conflict. Insufficient Ideas render 402
         task_insufficient_credits. Billing settles against a server-side
-        quote for the ai-image:<feature> SKU (unpriced or unregistered SKU
+        quote for the ai-image:<service> SKU (unpriced or unregistered SKU
         renders billing_pricing_unavailable 422 deterministic, transient
         quote failures billing_quote_unavailable 503,
-        billing_wallet_restricted 403).
+        billing_wallet_restricted 403). Missing Service Model Pool routing
+        returns service_resolution_unavailable 422 before Quote/Hold.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2008,7 +2009,7 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
-          description: Validation failure (validation_failed) or SKU unpriced/unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          description: Validation failure (validation_failed), unavailable Service resolution (service_resolution_unavailable), or SKU unpriced/unregistered (billing_pricing_unavailable, deterministic, do not retry).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -2130,7 +2131,8 @@ paths:
         from the authoritative create). No Idempotency-Key is required.
         Unpriced or unregistered SKU renders billing_pricing_unavailable
         422 deterministic; transient quote failures render
-        billing_quote_unavailable 503.
+        billing_quote_unavailable 503. Missing Service Model Pool routing
+        renders service_resolution_unavailable 422.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -4781,10 +4783,15 @@ components:
       type: string
       pattern: '^visq_[A-Za-z0-9_-]+$'
       description: Opaque public vision query operation identifier.
-    WorkflowKind:
+    Service:
       type: string
       enum: [generation, inpaint, render, variations, cutout, fusion, upscale, outpaint]
-      description: Registered AI image feature slug.
+      description: >-
+        Registered AI image service slug. Breaking rename (#847): replaces
+        `workflow_kind` with no compatibility alias. A request carrying only
+        the old `workflow_kind` field fails strict decoding with 400
+        bad_request; a missing `service` renders 422 validation_failed on
+        details.fields.service.
     TaskStatus:
       type: string
       enum: [pending, running, completed, failed, cancelled]
@@ -4804,7 +4811,7 @@ components:
       properties:
         sku:
           type: string
-          description: Price SKU (ai-image:<feature>).
+          description: Price SKU (ai-image:<service>).
         display_name:
           type: string
         price_version_id:
@@ -4869,15 +4876,15 @@ components:
           minimum: 0
     WorkspaceTask:
       type: object
-      required: [id, workspace_id, workflow_kind, status, retry_count, billing_snapshot, created_at, updated_at]
+      required: [id, workspace_id, service, status, retry_count, billing_snapshot, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
           $ref: '#/components/schemas/TaskId'
         workspace_id:
           $ref: '#/components/schemas/WorkspaceId'
-        workflow_kind:
-          $ref: '#/components/schemas/WorkflowKind'
+        service:
+          $ref: '#/components/schemas/Service'
         media_asset_ids:
           type: array
           items:
@@ -4950,11 +4957,11 @@ components:
       properties:
         data:
           type: object
-          required: [workflow_kind]
+          required: [service]
           additionalProperties: false
           properties:
-            workflow_kind:
-              $ref: '#/components/schemas/WorkflowKind'
+            service:
+              $ref: '#/components/schemas/Service'
             inputs:
               type: object
               additionalProperties: false
@@ -4976,7 +4983,7 @@ components:
             params:
               type: object
               description: >-
-                Feature params object (unknown fields rejected; no storage
+                Service params object (unknown fields rejected; no storage
                 URLs; params.prompt still renders 422 unknown_field).
               properties:
                 mask_asset_id:
@@ -5005,11 +5012,11 @@ components:
       properties:
         data:
           type: object
-          required: [workflow_kind]
+          required: [service]
           additionalProperties: false
           properties:
-            workflow_kind:
-              $ref: '#/components/schemas/WorkflowKind'
+            service:
+              $ref: '#/components/schemas/Service'
             quantity:
               type: integer
               format: int64

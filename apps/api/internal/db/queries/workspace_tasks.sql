@@ -9,19 +9,19 @@
 -- Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 
 -- name: CreateWorkspaceTask :one
-INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message)
-VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(submitter_user_id), sqlc.arg(billing_account_id), sqlc.arg(workflow_type), sqlc.arg(workflow_input), 'pending', sqlc.arg(priority), 0, '', '')
-RETURNING internal_id, public_id, workspace_id, submitter_user_id, billing_account_id, workflow_type, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, started_at, completed_at, cancelled_at, cancelled_by_user_id;
+INSERT INTO tasks (public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message)
+VALUES (sqlc.arg(public_id), sqlc.arg(workspace_id), sqlc.arg(submitter_user_id), sqlc.arg(billing_account_id), sqlc.arg(service), sqlc.arg(workflow_input), 'pending', sqlc.arg(priority), 0, '', '')
+RETURNING internal_id, public_id, workspace_id, submitter_user_id, billing_account_id, service, workflow_input, status, priority, retry_count, lease_token, error_message, created_at, updated_at, started_at, completed_at, cancelled_at, cancelled_by_user_id;
 
 -- name: GetWorkspaceTaskByPublicID :one
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE t.public_id = sqlc.arg(public_id) AND w.public_id = sqlc.arg(workspace_public_id)
 LIMIT 1;
 
 -- name: ListWorkspaceTasks :many
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
 WHERE w.public_id = sqlc.arg(workspace_public_id)
@@ -46,7 +46,7 @@ AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND t.status = 'pending'
 AND t.lease_token = ''
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
 
 -- CompleteWorkspaceTask flips a live task to completed and releases the
 -- lease. Outputs are inserted separately in the same caller-owned
@@ -59,7 +59,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
 
 -- FailWorkspaceTask flips a live task to failed with the terminal error
 -- (chk_tasks_terminal_consistency requires a non-blank error_message) and
@@ -72,7 +72,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
 
 -- RetryWorkspaceTask consumes one retry budget entry: a live task returns
 -- to pending with retry_count incremented, the lease released (pending rows
@@ -88,7 +88,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
 
 -- CancelWorkspaceTask flips a live task to cancelled (chk constraint
 -- requires cancelled_at) and releases the lease. The tasks table carries
@@ -104,7 +104,7 @@ WHERE t.workspace_id = w.internal_id
 AND t.public_id = sqlc.arg(public_id)
 AND w.public_id = sqlc.arg(workspace_public_id)
 AND t.status IN ('pending', 'running')
-RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
+RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id;
 
 -- DeleteWorkspaceTask removes a task row (settlement compensation rollback
 -- on enqueue failure). Outputs cascade.
@@ -160,7 +160,7 @@ LIMIT 1;
 -- pre-settlement rows) still list.
 
 -- name: GetControlTaskByPublicID :one
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
   w.public_id AS workspace_public_id
 FROM tasks AS t
 INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
@@ -168,7 +168,7 @@ WHERE t.public_id = sqlc.arg(public_id)
 LIMIT 1;
 
 -- name: ListControlTasks :many
-SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.workflow_type, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
+SELECT t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id,
   w.public_id AS workspace_public_id,
   s.total_credits AS billing_total_credits,
   st.state AS settlement_state,
@@ -181,7 +181,7 @@ WHERE (sqlc.arg(status) = '' OR t.status = sqlc.arg(status))
   AND (sqlc.arg(submitter_user_id) = 0 OR t.submitter_user_id = sqlc.arg(submitter_user_id))
   AND (sqlc.arg(keyword) = ''
     OR t.public_id ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.workflow_type ILIKE '%' || sqlc.arg(keyword) || '%'
+    OR t.service ILIKE '%' || sqlc.arg(keyword) || '%'
     OR t.error_message ILIKE '%' || sqlc.arg(keyword) || '%')
 ORDER BY t.created_at DESC, t.internal_id DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
@@ -194,7 +194,7 @@ FROM tasks AS t
 WHERE (sqlc.arg(submitter_user_id) = 0 OR t.submitter_user_id = sqlc.arg(submitter_user_id))
   AND (sqlc.arg(keyword) = ''
     OR t.public_id ILIKE '%' || sqlc.arg(keyword) || '%'
-    OR t.workflow_type ILIKE '%' || sqlc.arg(keyword) || '%'
+    OR t.service ILIKE '%' || sqlc.arg(keyword) || '%'
     OR t.error_message ILIKE '%' || sqlc.arg(keyword) || '%')
 GROUP BY t.status;
 

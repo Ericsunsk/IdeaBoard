@@ -74,7 +74,7 @@ type Querier interface {
 	//   provider_endpoint_id <- 0 (the workspace schema records no provider
 	//                           endpoint assignment on tasks)
 	//   credential_id        <- 0 (same: no credential assignment on tasks)
-	//   feature_slug         <- tasks.workflow_type
+	//   feature_slug         <- tasks.service
 	//   api_type             <- '' (no provider api_type on workspace tasks)
 	//   model_name           <- latest execution attempt resolved_model, else
 	//                           '未识别模型' (attempts are empty until the

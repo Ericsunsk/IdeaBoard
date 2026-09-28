@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { AdminMonitorListItemModel } from '../infrastructure/resource'
 import {
   TASK_MESSAGE_MAX_LENGTH,
-  getTaskFeatureIcon,
-  getTaskFeatureSlug,
+  getTaskServiceIcon,
+  getTaskServiceSlug,
   getTaskMessageText,
   getTaskModelLabel,
   getTaskResultPreview,
@@ -31,43 +31,43 @@ describe('task monitor model column', () => {
     const task = makeTask()
 
     expect(getTaskModelLabel(task)).toBe('')
-    expect(getTaskFeatureSlug(task)).toBe('')
-    expect(getTaskFeatureIcon('')).toBeUndefined()
-    expect(getTaskFeatureIcon('unknown-slug')).toBeUndefined()
+    expect(getTaskServiceSlug(task)).toBe('')
+    expect(getTaskServiceIcon('')).toBeUndefined()
+    expect(getTaskServiceIcon('unknown-slug')).toBeUndefined()
   })
 
-  it('resolves the service icon from the feature slug', () => {
-    expect(getTaskFeatureIcon('render')).toBeDefined()
-    expect(getTaskFeatureIcon('variations')).toBeDefined()
-    expect(getTaskFeatureIcon('inpaint')).toBeDefined()
-    expect(getTaskFeatureIcon('cutout')).toBeDefined()
-    expect(getTaskFeatureIcon('fusion')).toBeDefined()
-    expect(getTaskFeatureIcon('upscale')).toBeDefined()
-    expect(getTaskFeatureIcon('outpaint')).toBeDefined()
+  it('resolves the service icon from the service slug', () => {
+    expect(getTaskServiceIcon('render')).toBeDefined()
+    expect(getTaskServiceIcon('variations')).toBeDefined()
+    expect(getTaskServiceIcon('inpaint')).toBeDefined()
+    expect(getTaskServiceIcon('cutout')).toBeDefined()
+    expect(getTaskServiceIcon('fusion')).toBeDefined()
+    expect(getTaskServiceIcon('upscale')).toBeDefined()
+    expect(getTaskServiceIcon('outpaint')).toBeDefined()
   })
 
-  it('strips only the matching feature prefix from the message', () => {
-    const withPrefix = makeTask({ prompt: 'render: draw a chair', feature_slug: 'render' })
-    expect(getTaskFeatureSlug(withPrefix)).toBe('render')
+  it('strips only the matching service prefix from the message', () => {
+    const withPrefix = makeTask({ prompt: 'render: draw a chair', service: 'render' })
+    expect(getTaskServiceSlug(withPrefix)).toBe('render')
     expect(getTaskMessageText(withPrefix)).toBe('draw a chair')
 
-    const otherPrefix = makeTask({ prompt: 'render: draw a chair', feature_slug: 'openai' })
+    const otherPrefix = makeTask({ prompt: 'render: draw a chair', service: 'openai' })
     expect(getTaskMessageText(otherPrefix)).toBe('render: draw a chair')
 
     const noFeature = makeTask({ prompt: 'render: draw a chair' })
     expect(getTaskMessageText(noFeature)).toBe('render: draw a chair')
 
-    const onlyPrefix = makeTask({ prompt: 'render:', feature_slug: 'render' })
+    const onlyPrefix = makeTask({ prompt: 'render:', service: 'render' })
     expect(getTaskMessageText(onlyPrefix)).toBe('render:')
   })
 
   it('truncates overlong messages with an ellipsis', () => {
-    const long = makeTask({ prompt: `render: ${'x'.repeat(200)}`, feature_slug: 'render' })
+    const long = makeTask({ prompt: `render: ${'x'.repeat(200)}`, service: 'render' })
     const text = getTaskMessageText(long)
     expect(text.endsWith(' ...')).toBe(true)
     expect(text.length).toBe(TASK_MESSAGE_MAX_LENGTH + 4)
 
-    const short = makeTask({ prompt: 'short prompt', feature_slug: 'render' })
+    const short = makeTask({ prompt: 'short prompt', service: 'render' })
     expect(getTaskMessageText(short)).toBe('short prompt')
   })
 
@@ -92,17 +92,17 @@ describe('task monitor model column', () => {
   })
 
   it('memoizes the row view per row object', () => {
-    const row = makeTask({ prompt: 'render: draw a chair', feature_slug: 'render' })
+    const row = makeTask({ prompt: 'render: draw a chair', service: 'render' })
     const first = getTaskRowView(row)
     expect(getTaskRowView(row)).toBe(first)
-    expect(first.featureSlug).toBe('render')
+    expect(first.serviceSlug).toBe('render')
     expect(first.message).toBe('draw a chair')
     expect(first.metric?.key).toBe('pending')
 
     const completed = makeTask({
       status: 'completed',
       prompt: 'render: draw a chair',
-      feature_slug: 'render',
+      service: 'render',
     })
     expect(getTaskRowView(completed).metric?.key).toBe('completed')
   })
@@ -114,7 +114,7 @@ function makeTask(overrides: Partial<AdminMonitorListItemModel> = {}): AdminMoni
     user_public_id: '00000000-0000-0000-0000-000000000001',
     user_display_name: 'User 1',
     prompt: 'prompt',
-    feature_slug: '',
+    service: '',
     credits: 0,
     priority: 2,
     status: 'pending',

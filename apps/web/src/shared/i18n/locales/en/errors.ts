@@ -10,6 +10,7 @@ export default {
   insufficient_credits: 'You need more Ideas to run this action.',
   pricing_unavailable: 'Pricing is temporarily unavailable. Please try again shortly.',
   provider_unavailable: 'This service is unavailable right now. Please try again later.',
+  service_resolution_unavailable: 'This resolution is unavailable right now.',
   prompt_unavailable: 'This prompt is unavailable right now. Please try again later.',
   wallet_restricted: 'Ideas are temporarily unavailable for this account.',
   vision_search_not_configured: 'Visual Search is unavailable right now.',

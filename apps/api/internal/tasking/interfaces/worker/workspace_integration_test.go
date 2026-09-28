@@ -192,7 +192,7 @@ CREATE TABLE tasks (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
-  workflow_type TEXT NOT NULL,
+  service TEXT NOT NULL,
   workflow_input JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   priority INT NOT NULL DEFAULT 2,
@@ -210,7 +210,7 @@ CREATE TABLE tasks (
   CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT chk_tasks_retry_count CHECK (retry_count >= 0),
-  CONSTRAINT chk_tasks_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
   CONSTRAINT chk_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT chk_tasks_terminal_consistency CHECK (
     (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
@@ -397,7 +397,7 @@ func newIntegrationTask(taskID, ws string, owner int64, assetIDs []string) *work
 	}
 	return &workspacetasks.WorkspaceTask{
 		ID: taskID, WorkspaceID: ws, OwnerUserID: owner,
-		WorkflowKind: "render", MediaAssetIDs: assetIDs,
+		Service: "render", MediaAssetIDs: assetIDs,
 		Status: workspacetasks.StatusPending, ExecutionToken: token,
 		BillingSnapshot: workspacetasks.BillingSnapshot{
 			SKU: "ai-image:render", DisplayName: "Render",
@@ -650,12 +650,12 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		Tasks: env.tasks, Quoter: quoter, Holder: holder, Queue: queue, Models: workspaceTestModelResolver{},
+		Tasks: env.tasks, Quoter: quoter, Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, "settle-key-1")
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
@@ -683,7 +683,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	queue.mu.Unlock()
 	failed, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, "settle-key-2")
 	if err == nil {
 		t.Fatalf("settlement Create with dead queue = (%v, nil), want error", failed)

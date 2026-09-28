@@ -1,121 +1,102 @@
 package workspacetasks
 
-// Submit-time durable plan tests: Create mints the resolved model into
-// the persisted task (ResolvedModel) via the Models seam. The
-// canonical params (prompt, mask refs, params snapshot, execution plan)
-// ride CanonicalParams untouched; the model is the only plan fact minted
-// here, with submit failing closed when the target cannot be resolved.
+// Submit-time durable plan tests (#847): Create persists the task without a
+// submit-time model mint. The single-value admin mapping is removed; #848
+// pins the RoutingSnapshot in this transaction instead. Canonical params
+// ride CanonicalParams untouched, and an empty ResolvedModel fails the
+// worker closed until the snapshot lands.
 
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 )
 
-type stubModelResolver struct {
-	models map[string]string
-	err    error
-	calls  []string
-}
-
-func (s *stubModelResolver) ResolveModel(_ context.Context, feature string) (string, error) {
-	s.calls = append(s.calls, feature)
-	if s.err != nil {
-		return "", s.err
-	}
-	return s.models[feature], nil
-}
-
-func planTestService(models ModelResolver) (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
+func planTestService() (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
 	store := NewInMemoryStoreForTests()
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
 	service := NewService(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue, Models: models,
+		Holder: holder, Queue: queue, Routing: allowTestRouting,
 	})
 	return store, holder, queue, service
 }
 
-func TestCreateMintsResolvedModel(t *testing.T) {
+func TestCreatePersistsWithoutResolvedModel(t *testing.T) {
 	ctx := context.Background()
-	store, _, _, service := planTestService(&stubModelResolver{
-		models: map[string]string{"render": "openrouter/fake-image-model"},
-	})
+	store, _, _, service := planTestService()
 	created, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render",
-		CanonicalParams: `{"schema_version":5,"feature":"render"}`,
+		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render",
+		CanonicalParams: `{"schema_version":6,"service":"render"}`,
 	}, "plan-key-1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if created.ResolvedModel != "openrouter/fake-image-model" {
-		t.Fatalf("resolved_model = %q, want the submit-time mapping", created.ResolvedModel)
+	if created.Service != "render" {
+		t.Fatalf("service = %q, want render", created.Service)
 	}
-	if created.CanonicalParams != `{"schema_version":5,"feature":"render"}` {
+	if created.ResolvedModel != "" {
+		t.Fatalf("resolved_model = %q, want empty until the #848 snapshot lands", created.ResolvedModel)
+	}
+	if created.CanonicalParams != `{"schema_version":6,"service":"render"}` {
 		t.Fatalf("canonical_params = %q, want passthrough untouched", created.CanonicalParams)
 	}
-	// The minted fact survives the store round-trip (durable plan).
+	// The persisted fact survives the store round-trip (durable plan).
 	loaded, err := store.GetTask(ctx, "ws_abc", created.ID)
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if loaded.ResolvedModel != "openrouter/fake-image-model" {
-		t.Fatalf("loaded resolved_model = %q, want the minted model", loaded.ResolvedModel)
+	if loaded.Service != "render" || loaded.ResolvedModel != "" {
+		t.Fatalf("loaded service = %q resolved_model = %q, want render and empty", loaded.Service, loaded.ResolvedModel)
 	}
 }
 
-func TestCreateWithoutModelsSeamFailsClosed(t *testing.T) {
+func TestCreateRejectsUnknownService(t *testing.T) {
 	ctx := context.Background()
-	_, _, _, service := planTestService(nil)
+	_, _, _, service := planTestService()
 	_, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render",
+		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "nope",
 	}, "plan-key-2")
-	if err == nil || !strings.Contains(err.Error(), "model resolver unavailable") {
-		t.Fatalf("Create err = %v, want missing resolver failure", err)
+	validationErr, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("Create err = %T %v, want *ValidationError", err, err)
+	}
+	if validationErr.Fields["service"] == "" {
+		t.Fatalf("Create fields = %v, want a service entry", validationErr.Fields)
 	}
 }
 
-func TestCreateAlwaysUsesSubmitTimeModelMapping(t *testing.T) {
+func TestCreateRejectsBeforeHoldWhenRoutingIsUnavailable(t *testing.T) {
 	ctx := context.Background()
-	stub := &stubModelResolver{models: map[string]string{"render": "openrouter/seam-model"}}
-	_, _, _, service := planTestService(stub)
-	created, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render",
-	}, "plan-key-3")
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if created.ResolvedModel != "openrouter/seam-model" {
-		t.Fatalf("resolved_model = %q, want the submit-time mapping", created.ResolvedModel)
-	}
-	if len(stub.calls) != 1 || stub.calls[0] != "render" {
-		t.Fatalf("resolver calls = %v, want one canonical-kind lookup", stub.calls)
-	}
-}
+	store, holder, queue, service := planTestService()
+	quoter := service.quoter.(*fakeQuoter)
+	service = NewService(ServiceDeps{
+		Tasks: store, Quoter: quoter, Holder: holder, Queue: queue,
+	})
 
-func TestCreateResolverFailureBlocksSettlement(t *testing.T) {
-	ctx := context.Background()
-	_, _, _, service := planTestService(&stubModelResolver{err: errors.New("fake: mapping store down")})
+	_, quoteErr := service.Quote(ctx, QuoteParams{Service: "render"})
+	if !errors.Is(quoteErr, ErrRoutingUnavailable) {
+		t.Fatalf("Quote err = %v, want ErrRoutingUnavailable", quoteErr)
+	}
+
 	_, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render",
-	}, "plan-key-4")
-	if err == nil || !strings.Contains(err.Error(), "mapping store down") {
-		t.Fatalf("Create err = %v, want resolver failure", err)
+		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render",
+	}, "routing-key-1")
+	if !errors.Is(err, ErrRoutingUnavailable) {
+		t.Fatalf("Create err = %v, want ErrRoutingUnavailable", err)
 	}
-}
-
-func TestCreateMintsCanonicalKindForModelLookup(t *testing.T) {
-	ctx := context.Background()
-	stub := &stubModelResolver{models: map[string]string{"render": "openrouter/fake-image-model"}}
-	_, _, _, service := planTestService(stub)
-	if _, err := service.Create(ctx, CreateInput{
-		WorkspaceID: "ws_abc", OwnerUserID: 7, WorkflowKind: "render",
-	}, "plan-key-5"); err != nil {
-		t.Fatalf("Create: %v", err)
+	count, _ := store.CountTasks(ctx, "ws_abc")
+	if count != 0 {
+		t.Fatalf("tasks = %d, want 0", count)
 	}
-	if len(stub.calls) != 1 || strings.TrimSpace(stub.calls[0]) != "render" {
-		t.Fatalf("resolver calls = %v, want one canonical-kind lookup", stub.calls)
+	if len(holder.holds) != 0 || len(holder.released) != 0 {
+		t.Fatalf("routing rejection must not touch credits: holds=%v released=%v", holder.holds, holder.released)
+	}
+	if queue.calls != 0 {
+		t.Fatalf("enqueue calls = %d, want 0", queue.calls)
+	}
+	if quoter.calls != 0 {
+		t.Fatalf("quote calls = %d, want 0", quoter.calls)
 	}
 }

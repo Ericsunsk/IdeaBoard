@@ -129,9 +129,7 @@ describe('Admin System Settings adapters', () => {
       }),
     )
     const feedback = createBrandingFeedback()
-    const harness = mountComposable(() =>
-      useBrandingSettings({ feedback, confirm: testConfirm() }),
-    )
+    const harness = mountComposable(() => useBrandingSettings({ feedback, confirm: testConfirm() }))
 
     try {
       await vi.waitFor(() => expect(harness.value.form.value.project_name).toBe('IdeaBoard'))

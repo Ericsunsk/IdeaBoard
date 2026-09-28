@@ -6,23 +6,6 @@ import { http, HttpResponse } from '../../../../test/msw'
 // collection (code/msg/data envelope) with hang + fail-first injection for the
 // loading/retry tests; per-test price/availability/delete mutations keep their
 // bespoke assertions in the specs.
-export function makeCatalogModel(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'google/gemini-2.5-flash-image',
-    name: 'Gemini Flash Image',
-    provider: 'Google',
-    mode: 'image_generation',
-    description: 'catalog model',
-    context_or_resolution: '2048×2048',
-    capabilities: [],
-    hosting: '第三方',
-    terms_url: '',
-    docs_url: '',
-    gradient: 'from-blue-600 to-cyan-500',
-    ...overrides,
-  }
-}
-
 export type BillingCatalogMswState = {
   items: unknown[]
   getItems: () => unknown[]

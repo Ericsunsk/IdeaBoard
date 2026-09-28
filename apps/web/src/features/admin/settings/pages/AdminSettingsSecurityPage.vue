@@ -25,7 +25,11 @@
         <SettingEditorCard
           v-if="data.id === 'registration_ratelimit'"
           :title="SETTINGS_MESSAGES.registrationTitle"
-          :status="registrationEnabled ? SETTINGS_MESSAGES.registrationOpen : SETTINGS_MESSAGES.registrationClosed"
+          :status="
+            registrationEnabled
+              ? SETTINGS_MESSAGES.registrationOpen
+              : SETTINGS_MESSAGES.registrationClosed
+          "
           :status-severity="registrationEnabled ? 'success' : 'warn'"
           class="mb-0"
         >
@@ -34,10 +38,12 @@
               class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
             >
               <div class="flex flex-col">
-                <span class="text-admin-body font-bold text-admin-text-1">{{ SETTINGS_MESSAGES.registrationOpen }}</span>
-                <span class="text-admin-caption text-admin-text-3"
-                  >{{ SETTINGS_MESSAGES.registrationHint }}</span
-                >
+                <span class="text-admin-body font-bold text-admin-text-1">{{
+                  SETTINGS_MESSAGES.registrationOpen
+                }}</span>
+                <span class="text-admin-caption text-admin-text-3">{{
+                  SETTINGS_MESSAGES.registrationHint
+                }}</span>
               </div>
               <AdminSwitch
                 id="admin-registration-enabled"
@@ -49,7 +55,10 @@
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <AdminFormField :label="SETTINGS_MESSAGES.maxRequestsLabel" for="admin-rate-limit-max-requests">
+              <AdminFormField
+                :label="SETTINGS_MESSAGES.maxRequestsLabel"
+                for="admin-rate-limit-max-requests"
+              >
                 <AdminInput
                   id="admin-rate-limit-max-requests"
                   v-model="rateLimitForm.max_requests"
@@ -60,7 +69,10 @@
                 />
               </AdminFormField>
 
-              <AdminFormField :label="SETTINGS_MESSAGES.windowSecondsLabel" for="admin-rate-limit-window-seconds">
+              <AdminFormField
+                :label="SETTINGS_MESSAGES.windowSecondsLabel"
+                for="admin-rate-limit-window-seconds"
+              >
                 <AdminInput
                   id="admin-rate-limit-window-seconds"
                   v-model="rateLimitForm.window_seconds"

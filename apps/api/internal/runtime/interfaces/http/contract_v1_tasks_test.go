@@ -32,6 +32,8 @@ type fakeTaskQuoter struct {
 	err         error
 }
 
+func allowTestRouting(context.Context, string, string) error { return nil }
+
 func (f *fakeTaskQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	f.calls++
 	if f.err != nil {
@@ -120,7 +122,7 @@ type v1TaskFixture struct {
 	assets *fakeTaskAssets
 }
 
-func newV1TaskFixture(t *testing.T) *v1TaskFixture {
+func newV1TaskFixture(t *testing.T, routingGate ...WorkspaceTaskRoutingGate) *v1TaskFixture {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
@@ -158,9 +160,14 @@ func newV1TaskFixture(t *testing.T) *v1TaskFixture {
 		c.Next()
 	})
 	v1 := router.Group(ContractV1GroupPath)
+	gate := WorkspaceTaskRoutingGate(allowTestRouting)
+	if len(routingGate) > 0 {
+		gate = routingGate[0]
+	}
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets, TaskModelResolver: &eventTaskModelResolver{},
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
+		TaskRoutingGate: gate,
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "tasks", OwnerUserID: 1})
 	if err != nil {
@@ -174,8 +181,29 @@ func newV1TaskFixture(t *testing.T) *v1TaskFixture {
 	return &v1TaskFixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, quoter: quoter, holder: holder, queue: queue, assets: assets}
 }
 
+func TestV1TaskRoutingUnavailableBeforeQuoteOrHold(t *testing.T) {
+	fx := newV1TaskFixture(t, workspacetasks.RejectRoutingUntilPool)
+	base := "/api/v1/workspaces/" + fx.ws.PublicID
+	for _, tc := range []struct{ path, body string }{
+		{base + "/task-quotes", `{"data":{"service":"render","quantity":1}}`},
+		{base + "/tasks", v1CreateTaskBodyJSON("render")},
+	} {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: tc.path, userID: 3, body: tc.body,
+			headers: map[string]string{contract.IdempotencyKeyHeader: "routing-unavailable"},
+		})
+		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeServiceResolutionUnavailable) {
+			t.Fatalf("%s = %d %v, want 422 service_resolution_unavailable", tc.path, status, payload)
+		}
+	}
+	count, _ := fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
+	if count != 0 || len(fx.holder.holds) != 0 || len(fx.queue.enqueued) != 0 || fx.quoter.calls != 0 {
+		t.Fatalf("routing rejection created work: tasks=%d holds=%v queued=%d quotes=%d", count, fx.holder.holds, len(fx.queue.enqueued), fx.quoter.calls)
+	}
+}
+
 func v1CreateTaskBodyJSON(kind string) string {
-	return fmt.Sprintf(`{"data":{"workflow_kind":%q,"inputs":{"media_asset_ids":[]},"params":{}}}`, kind)
+	return fmt.Sprintf(`{"data":{"service":%q,"inputs":{"media_asset_ids":[]},"params":{}}}`, kind)
 }
 
 func TestV1TaskCreateAcceptedWithLocation(t *testing.T) {
@@ -225,12 +253,49 @@ func TestV1TaskCreateAcceptedWithLocation(t *testing.T) {
 	}
 }
 
+func TestV1TaskRejectsLegacyWorkflowKindField(t *testing.T) {
+	// #847 breaking rename: `service` replaces `workflow_kind` with no
+	// compatibility alias. Strict decoding rejects the old field with 400
+	// bad_request (existing CodeBadRequest, no new error code); a missing
+	// `service` renders 422 validation_failed on details.fields.service.
+	fx := newV1TaskFixture(t)
+	tasksPath := "/api/v1/workspaces/" + fx.ws.PublicID + "/tasks"
+	quotePath := "/api/v1/workspaces/" + fx.ws.PublicID + "/task-quotes"
+	for _, tc := range []struct{ name, path, body string }{
+		{"create old-field-only", tasksPath, `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":[]},"params":{}}}`},
+		{"create dual-field", tasksPath, `{"data":{"service":"render","workflow_kind":"render","inputs":{"media_asset_ids":[]},"params":{}}}`},
+		{"quote old-field-only", quotePath, `{"data":{"workflow_kind":"render","quantity":1}}`},
+		{"quote dual-field", quotePath, `{"data":{"service":"render","workflow_kind":"render","quantity":1}}`},
+	} {
+		status, _, payload := doV1(t, fx.engine, v1Call{
+			method: http.MethodPost, path: tc.path, userID: 3,
+			body: tc.body, headers: map[string]string{contract.IdempotencyKeyHeader: "legacy-kind-" + tc.name},
+		})
+		if status != http.StatusBadRequest || v1ErrorCode(t, payload) != string(contract.CodeBadRequest) {
+			t.Fatalf("%s = %d %v, want 400 bad_request", tc.name, status, payload)
+		}
+	}
+	// Neither field binds, then fails validation on details.fields.service.
+	status, _, payload := doV1(t, fx.engine, v1Call{
+		method: http.MethodPost, path: tasksPath, userID: 3,
+		body: `{"data":{"inputs":{"media_asset_ids":[]},"params":{}}}`, headers: map[string]string{contract.IdempotencyKeyHeader: "legacy-kind-neither"},
+	})
+	if status != 422 || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+		t.Fatalf("missing service = %d %v, want 422 validation_failed", status, payload)
+	}
+	// No task was created by any rejected submit.
+	count, _ := fx.tasks.CountTasks(context.Background(), fx.ws.PublicID)
+	if count != 0 {
+		t.Fatalf("rejected submits persisted %d tasks, want 0", count)
+	}
+}
+
 func TestV1TaskQuoteCreateSeparation(t *testing.T) {
 	fx := newV1TaskFixture(t)
 	quotePath := "/api/v1/workspaces/" + fx.ws.PublicID + "/task-quotes"
 	status, _, quoted := doV1(t, fx.engine, v1Call{
 		method: http.MethodPost, path: quotePath, userID: 3,
-		body: `{"data":{"workflow_kind":"render","quantity":2}}`,
+		body: `{"data":{"service":"render","quantity":2}}`,
 	})
 	if status != 200 {
 		t.Fatalf("quote = %d %v, want 200", status, quoted)
@@ -452,9 +517,9 @@ func TestV1TaskAuthMatrix(t *testing.T) {
 	}
 	// Unknown kind + raw URL + unknown field all 422 with details.fields.
 	for _, tc := range []struct{ name, body, field string }{
-		{"unknown kind", `{"data":{"workflow_kind":"nope","inputs":{"media_asset_ids":[]},"params":{}}}`, "workflow_kind"},
-		{"raw url", `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":["https://x/y.png"]},"params":{}}}`, "media_asset_ids[0]"},
-		{"unknown params", `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":[]},"params":{"mystery":1}}}`, "params.mystery"},
+		{"unknown kind", `{"data":{"service":"nope","inputs":{"media_asset_ids":[]},"params":{}}}`, "service"},
+		{"raw url", `{"data":{"service":"render","inputs":{"media_asset_ids":["https://x/y.png"]},"params":{}}}`, "media_asset_ids[0]"},
+		{"unknown params", `{"data":{"service":"render","inputs":{"media_asset_ids":[]},"params":{"mystery":1}}}`, "params.mystery"},
 	} {
 		status, _, payload := doV1(t, fx.engine, v1Call{
 			method: http.MethodPost, path: tasksPath, userID: 3,
@@ -480,7 +545,7 @@ func TestV1TaskCreateBillingBranches(t *testing.T) {
 	quote := func(fx *v1TaskFixture) (int, map[string]any) {
 		status, _, payload := doV1(t, fx.engine, v1Call{
 			method: http.MethodPost, path: quotePath(fx), userID: 3,
-			body: `{"data":{"workflow_kind":"render","quantity":1}}`,
+			body: `{"data":{"service":"render","quantity":1}}`,
 		})
 		return status, payload
 	}

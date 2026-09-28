@@ -263,7 +263,7 @@ function makeTask(status: string, id: number): AdminMonitorListItem {
     user_public_id: '00000000-0000-0000-0000-000000000001',
     user_display_name: 'User 1',
     prompt: `prompt-${id}`,
-    feature_slug: 'render',
+    service: 'render',
     credits: 0,
     priority: 2,
     status,

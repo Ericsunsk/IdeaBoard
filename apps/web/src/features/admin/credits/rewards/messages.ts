@@ -31,8 +31,7 @@ export const REWARD_CODES_MESSAGES = {
   newCodeHeader: '保存新 Code',
   confirmUpdateTitle: '确认更新兑换码',
   confirmCreateTitle: '确认创建兑换码',
-  confirmUpdateMessage: (displayName: string) =>
-    `确定更新“${displayName}”吗？该操作将记录审计。`,
+  confirmUpdateMessage: (displayName: string) => `确定更新“${displayName}”吗？该操作将记录审计。`,
   confirmCreateMessage: (displayName: string) =>
     `确定创建兑换码“${displayName}”吗？该操作将记录审计。`,
   confirmUpdate: '确认更新',

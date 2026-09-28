@@ -113,7 +113,7 @@ export type AdminMonitorDetail = {
   prompt: string
   user_prompt: string
   params: string
-  feature_slug: string
+  service: string
   priority: number
   status: string
   retry_count: number
@@ -136,7 +136,7 @@ export type AdminMonitorListItem = {
   user_public_id: string
   user_display_name: string
   prompt: string
-  feature_slug: string
+  service: string
   credits: number
   priority: number
   status: string
@@ -235,14 +235,14 @@ type NestedQueryOptions<TQueryFnData> = {
   }
 }
 
-function selectAdminTaskList(
-  response: { data: ApiResponseAdminTaskListData },
-): ApiResponseAdminTaskListData {
+function selectAdminTaskList(response: {
+  data: ApiResponseAdminTaskListData
+}): ApiResponseAdminTaskListData {
   return requireContractData<ApiResponseAdminTaskListData>(response, '加载任务列表失败')
 }
-function selectAdminTaskDetail(
-  response: { data: ApiResponseAdminTaskData },
-): ApiResponseAdminTaskData {
+function selectAdminTaskDetail(response: {
+  data: ApiResponseAdminTaskData
+}): ApiResponseAdminTaskData {
   return requireContractData<ApiResponseAdminTaskData>(response, '加载任务详情失败')
 }
 function selectAdminMonitor(response: ApiResponseMonitor): MonitorResponse {
@@ -253,11 +253,7 @@ export function useAdminTaskListResource(
   params: MaybeRef<AdminTaskListQueryParams>,
   options?: NestedQueryOptions<{ data: ApiResponseAdminTaskListData }>,
 ) {
-  return useQuery<
-    { data: ApiResponseAdminTaskListData },
-    Error,
-    ApiResponseAdminTaskListData
-  >({
+  return useQuery<{ data: ApiResponseAdminTaskListData }, Error, ApiResponseAdminTaskListData>({
     ...(options?.query ?? {}),
     queryKey: computed(() => [...ADMIN_TASK_LIST_QUERY_KEY, toValue(params)]),
     queryFn: () => Promise.reject(taskListUnavailable()),
@@ -287,9 +283,7 @@ export function getAdminMonitorQueryKey() {
   return ADMIN_MONITOR_QUERY_KEY
 }
 
-export function useAdminMonitorResource(
-  options?: NestedQueryOptions<ApiResponseMonitor>,
-) {
+export function useAdminMonitorResource(options?: NestedQueryOptions<ApiResponseMonitor>) {
   return useQuery<ApiResponseMonitor, Error, MonitorResponse>({
     ...(options?.query ?? {}),
     queryKey: ADMIN_MONITOR_QUERY_KEY,
@@ -309,11 +303,7 @@ export function useAdminTaskDetailResource(
   taskID: MaybeRef<string>,
   options?: NestedQueryOptions<{ data: ApiResponseAdminTaskData }>,
 ) {
-  return useQuery<
-    { data: ApiResponseAdminTaskData },
-    Error,
-    ApiResponseAdminTaskData
-  >({
+  return useQuery<{ data: ApiResponseAdminTaskData }, Error, ApiResponseAdminTaskData>({
     ...(options?.query ?? {}),
     queryKey: computed(() => getAdminTaskDetailQueryKey(toValue(taskID))),
     queryFn: () => Promise.reject(adminControlUnavailable('task-detail')),

@@ -63,8 +63,9 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 	v1 := router.Group(ContractV1GroupPath)
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
-		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets, TaskModelResolver: &eventTaskModelResolver{},
+		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
 		TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
+		TaskRoutingGate:       allowTestRouting,
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prompt-mask", OwnerUserID: 1})
 	if err != nil {
@@ -110,7 +111,7 @@ func (fx *v1PromptMaskFixture) canonicalParams(t *testing.T, taskID string) *tas
 // changes conflict.
 func TestV1TaskCreateWithPromptEndToEnd(t *testing.T) {
 	fx := newV1PromptMaskFixture(t)
-	body := `{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"prompt":"a red bicycle","params":{"output_count":1}}}`
+	body := `{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"prompt":"a red bicycle","params":{"output_count":1}}}`
 	status, created := fx.postTask(t, "prompt-1", body)
 	if status != http.StatusAccepted {
 		t.Fatalf("create = %d %v, want 202", status, created)
@@ -129,7 +130,7 @@ func TestV1TaskCreateWithPromptEndToEnd(t *testing.T) {
 		t.Fatalf("replay = %d %v, want same task %s", status, replay, taskID)
 	}
 	// Same key + different prompt conflicts (prompt is in the hash).
-	other := `{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"prompt":"a blue bicycle","params":{"output_count":1}}}`
+	other := `{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"prompt":"a blue bicycle","params":{"output_count":1}}}`
 	status, conflict := fx.postTask(t, "prompt-1", other)
 	if status != http.StatusConflict || v1ErrorCode(t, conflict) != string(contract.CodeTaskIdempotencyConflict) {
 		t.Fatalf("prompt change = %d %v, want 409 task_idempotency_conflict", status, conflict)
@@ -141,10 +142,10 @@ func TestV1TaskCreateWithPromptEndToEnd(t *testing.T) {
 func TestV1TaskCreatePromptBoundaries(t *testing.T) {
 	fx := newV1PromptMaskFixture(t)
 	for _, tc := range []struct{ name, body string }{
-		{"over-long prompt", fmt.Sprintf(`{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"prompt":%q,"params":{}}}`,
+		{"over-long prompt", fmt.Sprintf(`{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"prompt":%q,"params":{}}}`,
 			strings.Repeat("x", workspacetasks.MaxWorkspaceTaskPromptBytes+1))},
-		{"missing prompt on generation", `{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"params":{}}}`},
-		{"params prompt still rejected", `{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"prompt":"ok","params":{"prompt":"stowaway"}}}`},
+		{"missing prompt on generation", `{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"params":{}}}`},
+		{"params prompt still rejected", `{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"prompt":"ok","params":{"prompt":"stowaway"}}}`},
 	} {
 		status, payload := fx.postTask(t, "bound-"+tc.name, tc.body)
 		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
@@ -158,7 +159,7 @@ func TestV1TaskCreatePromptBoundaries(t *testing.T) {
 // intent + plan mask input).
 func TestV1TaskCreateInpaintWithMaskEndToEnd(t *testing.T) {
 	fx := newV1PromptMaskFixture(t)
-	body := `{"data":{"workflow_kind":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill the hole","params":{"mask_asset_id":"asset_mask1"}}}`
+	body := `{"data":{"service":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill the hole","params":{"mask_asset_id":"asset_mask1"}}}`
 	status, created := fx.postTask(t, "inpaint-mask-1", body)
 	if status != http.StatusAccepted {
 		t.Fatalf("create = %d %v, want 202", status, created)
@@ -181,10 +182,10 @@ func TestV1TaskCreateInpaintWithMaskEndToEnd(t *testing.T) {
 func TestV1TaskCreateMaskPolicy(t *testing.T) {
 	fx := newV1PromptMaskFixture(t)
 	for _, tc := range []struct{ name, body string }{
-		{"inpaint without mask", `{"data":{"workflow_kind":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill it","params":{}}}`},
-		{"mask on render", `{"data":{"workflow_kind":"render","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"edit it","params":{"mask_asset_id":"asset_mask1"}}}`},
-		{"data-url mask", `{"data":{"workflow_kind":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill it","params":{"mask_asset_id":"data:image/png;base64,AAAA"}}}`},
-		{"unknown params still rejected", `{"data":{"workflow_kind":"generation","inputs":{"media_asset_ids":[]},"prompt":"ok","params":{"mystery":1}}}`},
+		{"inpaint without mask", `{"data":{"service":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill it","params":{}}}`},
+		{"mask on render", `{"data":{"service":"render","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"edit it","params":{"mask_asset_id":"asset_mask1"}}}`},
+		{"data-url mask", `{"data":{"service":"inpaint","inputs":{"media_asset_ids":["asset_input1"]},"prompt":"fill it","params":{"mask_asset_id":"data:image/png;base64,AAAA"}}}`},
+		{"unknown params still rejected", `{"data":{"service":"generation","inputs":{"media_asset_ids":[]},"prompt":"ok","params":{"mystery":1}}}`},
 	} {
 		status, payload := fx.postTask(t, "maskpol-"+tc.name, tc.body)
 		if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {

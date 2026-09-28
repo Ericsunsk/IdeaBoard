@@ -29,7 +29,7 @@ type AdminMonitorListItem struct {
 	UserPublicID    uuid.UUID                      `json:"user_public_id"`
 	UserDisplayName string                         `json:"user_display_name"`
 	Prompt          string                         `json:"prompt"`
-	FeatureSlug     string                         `json:"feature_slug"`
+	Service         string                         `json:"service"`
 	Credits         int64                          `json:"credits"`
 	Priority        int                            `json:"priority"`
 	Status          string                         `json:"status"`
@@ -49,7 +49,7 @@ type AdminMonitorDetail struct {
 	Prompt            string                         `json:"prompt"`
 	UserPrompt        string                         `json:"user_prompt"`
 	Params            string                         `json:"params"`
-	FeatureSlug       string                         `json:"feature_slug"`
+	Service           string                         `json:"service"`
 	Priority          int                            `json:"priority"`
 	Status            string                         `json:"status"`
 	RetryCount        int                            `json:"retry_count"`
@@ -195,7 +195,7 @@ func adminMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.AdminT
 		TaskID:         task.TaskID,
 		internalUserID: task.UserID,
 		Prompt:         task.Prompt,
-		FeatureSlug:    task.FeatureSlug,
+		Service:        task.Service,
 		Priority:       task.Priority,
 		Status:         task.Status,
 		ErrorMsg:       task.ErrorMsg,
@@ -226,7 +226,7 @@ func adminMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBillingSnap
 		Prompt:            task.Prompt,
 		UserPrompt:        task.UserPrompt,
 		Params:            task.Params,
-		FeatureSlug:       task.FeatureSlug,
+		Service:           task.Service,
 		Priority:          task.Priority,
 		Status:            task.Status,
 		RetryCount:        task.RetryCount,

@@ -34,7 +34,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.
 	queue := &integrationQueue{}
 	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: env.tasks, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Models: workspaceTestModelResolver{},
+		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Routing: allowTestRouting,
 	})
 	return service, holder, queue
 }
@@ -67,7 +67,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
+		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
 	}, fmt.Sprintf("worker-loop-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create with media input: %v", err)
@@ -88,7 +88,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 		}))
 	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
-		WorkflowKind: "render", ExecutionToken: created.ExecutionToken,
+		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		WorkflowKind: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "default",
 	}, fmt.Sprintf("worker-fail-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
@@ -133,7 +133,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 		}))
 	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
-		WorkflowKind: "render", ExecutionToken: created.ExecutionToken,
+		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}

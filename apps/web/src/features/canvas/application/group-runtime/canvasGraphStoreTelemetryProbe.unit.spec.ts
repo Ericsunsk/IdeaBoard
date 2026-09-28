@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEmptyBoardSnapshot } from '../../../board'
-import {
-  CanvasGraphStore,
-} from '../../domain/graph/canvasGraphStore'
+import { CanvasGraphStore } from '../../domain/graph/canvasGraphStore'
 import {
   noopCanvasGraphStoreTelemetry,
   type CanvasGraphStoreTelemetry,

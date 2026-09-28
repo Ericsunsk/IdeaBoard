@@ -7,6 +7,7 @@ export default {
   insufficient_credits: '이 작업을 실행하려면 더 많은 Ideas가 필요합니다.',
   pricing_unavailable: '가격 정보를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
   provider_unavailable: '현재 서비스를 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
+  service_resolution_unavailable: '현재 이 해상도를 사용할 수 없습니다.',
   prompt_unavailable: '현재 프롬프트를 사용할 수 없습니다. 나중에 다시 시도해 주세요.',
   wallet_restricted: '이 계정에서는 Ideas를 일시적으로 사용할 수 없습니다.',
   vision_search_not_configured: '비전 검색을 현재 사용할 수 없습니다.',

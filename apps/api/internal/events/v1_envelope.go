@@ -134,8 +134,8 @@ type V1Envelope struct {
 // Typed data payloads (public ids only, no amounts, no storage URLs).
 
 type V1TaskCreatedData struct {
-	TaskID       string `json:"task_id"`
-	WorkflowKind string `json:"workflow_kind"`
+	TaskID  string `json:"task_id"`
+	Service string `json:"service"`
 }
 
 type V1TaskRunningData struct {
@@ -319,7 +319,7 @@ func validateV1Data(typ string, raw json.RawMessage) error {
 	}
 	switch typ {
 	case EventV1TaskCreated:
-		if err := require(fields, "task_id", "workflow_kind"); err != nil {
+		if err := require(fields, "task_id", "service"); err != nil {
 			return err
 		}
 		if !contract.IsValidPublicID(contract.PrefixTask, stringField("task_id")) {

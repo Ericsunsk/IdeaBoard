@@ -105,7 +105,7 @@ func CompileWorkspaceParams(feature, userPrompt string, params map[string]interf
 // Contract normalization must precede media-fact derivation so fusion weights
 // and structured prompt fields are canonical before anything reads them.
 func normalizeSubmitExecutionMap(params map[string]interface{}, featureSlug string) error {
-	params["feature"] = featureSlug
+	params["service"] = featureSlug
 	delete(params, "model")
 	if err := validateWorkspaceMaskParam(params); err != nil {
 		return err
@@ -226,7 +226,7 @@ func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, no
 		return CanonicalTaskRequest{}, err
 	}
 	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
-		UserID: userID, Feature: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
+		UserID: userID, Service: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
 		Params: paramsJSON, ClientActionID: normalized.clientActionID, Priority: normalized.priority,
 		Generation:     &generationSnapshot,
 		BillingRequest: billingRequest,
@@ -321,8 +321,8 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		return p, nil
 	}
 	p.Extra = workflowExtraParamsFromMap(params)
-	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
-		p.Feature = v
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Service); ok {
+		p.Service = v
 	}
 	p.Media = workflowMediaInputsFromMap(params, featureSlug)
 	p.Controls = generationControlsFromMap(params)

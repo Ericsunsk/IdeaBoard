@@ -132,7 +132,10 @@ export type PaymentEvent = {
 
 export interface PaymentsResource {
   getPurchaseOptions(workspaceId: string, signal?: AbortSignal): Promise<PaymentPurchaseOptions>
-  createCheckout(workspaceId: string, request: PaymentCheckoutRequest): Promise<PaymentCheckoutSession>
+  createCheckout(
+    workspaceId: string,
+    request: PaymentCheckoutRequest,
+  ): Promise<PaymentCheckoutSession>
   getReturnStatus(
     workspaceId: string,
     publicToken: string,
@@ -203,22 +206,19 @@ export const paymentsResource: PaymentsResource = {
       listWorkspacePendingOrders(id, { ...(signal == null ? {} : { signal }) }),
       i18n.global.t('account.errors.pendingOrdersLoadFailed'),
     )
-    if (!Array.isArray(list?.items)) throw new Error(i18n.global.t('account.errors.pendingOrdersLoadFailed'))
+    if (!Array.isArray(list?.items))
+      throw new Error(i18n.global.t('account.errors.pendingOrdersLoadFailed'))
     return { items: list.items.map(toPendingOrder) }
   },
   continuePendingOrder: async (workspaceId, publicToken) => {
     const id = requireAccountWorkspaceId(workspaceId)
     const order = await resolveWorkspaceBillingData<WorkspacePendingOrder>(
-      continueWorkspacePendingOrderTransport(
-        id,
-        publicToken.trim(),
-        {
-          headers: buildContractRequestHeaders({
-            requestId: newRequestId(),
-            idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('continue'),
-          }),
-        },
-      ),
+      continueWorkspacePendingOrderTransport(id, publicToken.trim(), {
+        headers: buildContractRequestHeaders({
+          requestId: newRequestId(),
+          idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('continue'),
+        }),
+      }),
       i18n.global.t('account.errors.continuePaymentFailed'),
     )
     return toPendingOrder(order)
@@ -226,16 +226,12 @@ export const paymentsResource: PaymentsResource = {
   abandonPendingOrder: async (workspaceId, publicToken) => {
     const id = requireAccountWorkspaceId(workspaceId)
     const order = await resolveWorkspaceBillingData<WorkspacePendingOrder>(
-      abandonWorkspacePendingOrderTransport(
-        id,
-        publicToken.trim(),
-        {
-          headers: buildContractRequestHeaders({
-            requestId: newRequestId(),
-            idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('abandon'),
-          }),
-        },
-      ),
+      abandonWorkspacePendingOrderTransport(id, publicToken.trim(), {
+        headers: buildContractRequestHeaders({
+          requestId: newRequestId(),
+          idempotencyKey: workspaceBillingPendingOrderIdempotencyKey('abandon'),
+        }),
+      }),
       i18n.global.t('account.errors.abandonOrderFailed'),
     )
     return toPendingOrder(order)
@@ -252,11 +248,16 @@ export const paymentsResource: PaymentsResource = {
     } catch (error) {
       throw asWorkspaceBillingError(error, fallback)
     }
-    const page = readContractListBody<{ data: WorkspaceRechargeHistoryItem[]; meta: { has_more: boolean; next_cursor?: string | null } }>(body, fallback)
+    const page = readContractListBody<{
+      data: WorkspaceRechargeHistoryItem[]
+      meta: { has_more: boolean; next_cursor?: string | null }
+    }>(body, fallback)
     if (!Array.isArray(page?.data) || page?.meta == null) throw new Error(fallback)
     return {
       items: page.data.map(toRechargeItem),
-      ...(page.meta.has_more && page.meta.next_cursor ? { next_cursor: page.meta.next_cursor } : {}),
+      ...(page.meta.has_more && page.meta.next_cursor
+        ? { next_cursor: page.meta.next_cursor }
+        : {}),
     }
   },
   subscribe: (workspaceId, listener) => subscribeToPaymentEvents(workspaceId, listener),
@@ -318,7 +319,8 @@ function toRechargeItem(item: WorkspaceRechargeHistoryItem): RechargeHistoryItem
   }
   if (item.paid_amount_minor != null) result.paid_amount_minor = item.paid_amount_minor
   if (item.paid_currency != null) result.paid_currency = item.paid_currency
-  if (item.refunded_idea_quantity != null) result.refunded_idea_quantity = item.refunded_idea_quantity
+  if (item.refunded_idea_quantity != null)
+    result.refunded_idea_quantity = item.refunded_idea_quantity
   if (item.refunded_amount_minor != null) result.refunded_amount_minor = item.refunded_amount_minor
   if (item.receipt_url != null) result.receipt_url = item.receipt_url
   return result
@@ -400,8 +402,10 @@ export function usePaymentsContext(): PaymentsContext {
 
 export const paymentsQueryKeys = {
   all: ['workspace', 'payments'] as const,
-  options: (workspaceId: string) => ['workspace', 'payments', 'purchase-options', workspaceId] as const,
-  pending: (workspaceId: string) => ['workspace', 'payments', 'pending-orders', workspaceId] as const,
+  options: (workspaceId: string) =>
+    ['workspace', 'payments', 'purchase-options', workspaceId] as const,
+  pending: (workspaceId: string) =>
+    ['workspace', 'payments', 'pending-orders', workspaceId] as const,
   history: (workspaceId: string) => ['workspace', 'payments', 'recharges', workspaceId] as const,
   returnStatus: (workspaceId: string, publicToken: string) =>
     ['workspace', 'payments', 'orders', 'return', workspaceId, publicToken] as const,

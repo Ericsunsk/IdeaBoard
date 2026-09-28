@@ -20,10 +20,16 @@
             </AdminButton>
           </div>
         </AdminAlert>
-        <AdminAlert v-else-if="loading" severity="secondary">{{ SETTINGS_MESSAGES.mailLoading }}</AdminAlert>
+        <AdminAlert v-else-if="loading" severity="secondary">{{
+          SETTINGS_MESSAGES.mailLoading
+        }}</AdminAlert>
 
         <div class="grid gap-4 md:grid-cols-2">
-          <AdminFormField :label="SETTINGS_MESSAGES.mailFromNameLabel" for="admin-mail-from-name" required>
+          <AdminFormField
+            :label="SETTINGS_MESSAGES.mailFromNameLabel"
+            for="admin-mail-from-name"
+            required
+          >
             <AdminInput
               id="admin-mail-from-name"
               v-model="form.values.from_name"
@@ -32,7 +38,11 @@
               class="w-full"
             />
           </AdminFormField>
-          <AdminFormField :label="SETTINGS_MESSAGES.mailFromEmailLabel" for="admin-mail-from-email" required>
+          <AdminFormField
+            :label="SETTINGS_MESSAGES.mailFromEmailLabel"
+            for="admin-mail-from-email"
+            required
+          >
             <AdminInput
               id="admin-mail-from-email"
               v-model="form.values.from_email"
@@ -147,10 +157,7 @@ import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { secretField } from '../shared/lib/secretSchema'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-} from '../shared/lib/confirmSettingsSave'
+import { ADMIN_PROBE_OPERATOR_REASON, confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import { useAdminMailSettingsFeedback } from './useSettingsFeedback'
@@ -180,17 +187,27 @@ const form = useForm({
   initialValues: { from_name: '', from_email: '', api_key: '', reply_to: '' },
   schema: () =>
     v.object({
-      from_name: v.pipe(v.string(), v.trim(), v.minLength(1, SETTINGS_MESSAGES.mailFromNameRequired)),
+      from_name: v.pipe(
+        v.string(),
+        v.trim(),
+        v.minLength(1, SETTINGS_MESSAGES.mailFromNameRequired),
+      ),
       from_email: v.pipe(
         v.string(),
         v.trim(),
         v.check((value) => value.includes('@'), SETTINGS_MESSAGES.mailFromEmailInvalid),
       ),
-      api_key: secretField(!summary.value?.api_key_configured, SETTINGS_MESSAGES.mailApiKeyRequired),
+      api_key: secretField(
+        !summary.value?.api_key_configured,
+        SETTINGS_MESSAGES.mailApiKeyRequired,
+      ),
       reply_to: v.pipe(
         v.string(),
         v.trim(),
-        v.check((value) => value === '' || value.includes('@'), SETTINGS_MESSAGES.mailReplyToInvalid),
+        v.check(
+          (value) => value === '' || value.includes('@'),
+          SETTINGS_MESSAGES.mailReplyToInvalid,
+        ),
       ),
     }),
 })

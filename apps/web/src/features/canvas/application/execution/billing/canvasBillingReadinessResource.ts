@@ -1,7 +1,4 @@
-import {
-  WORKFLOW_FEATURE,
-  type WorkflowFeature,
-} from '../../../../../shared/domain/workflowFeatures'
+import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
 import type {
   SubmitTaskData,
   SubmitTaskReadinessData,
@@ -23,34 +20,34 @@ import {
   fetchCanvasWorkspaceTaskReadinessMatrix,
 } from '../workspace/canvasWorkspaceTaskAdapter'
 
-function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
-  switch (feature) {
-    case WORKFLOW_FEATURE.inpaint:
+function buildCanvasBillingReadinessRequest(service: Service): SubmitTaskData {
+  switch (service) {
+    case SERVICE.inpaint:
       return buildInpaintReadinessRequest()
-    case WORKFLOW_FEATURE.generation:
+    case SERVICE.generation:
       return buildGenerationTaskRequest({
         prompt: '',
         aspectRatio: 'auto',
         outputCount: 1,
       })
-    case WORKFLOW_FEATURE.fusion:
+    case SERVICE.fusion:
       throw new Error('Fusion readiness requires current image inputs')
-    case WORKFLOW_FEATURE.cutout:
-    case WORKFLOW_FEATURE.variations:
-    case WORKFLOW_FEATURE.render:
-    case WORKFLOW_FEATURE.upscale:
-    case WORKFLOW_FEATURE.outpaint:
-      return buildImageActionReadinessRequest(feature)
+    case SERVICE.cutout:
+    case SERVICE.variations:
+    case SERVICE.render:
+    case SERVICE.upscale:
+    case SERVICE.outpaint:
+      return buildImageActionReadinessRequest(service)
   }
 }
 
 export async function fetchCanvasBillingReadiness(
-  feature: WorkflowFeature,
+  service: Service,
   request?: SubmitTaskData,
 ): Promise<SubmitTaskReadinessData> {
   return fetchCanvasWorkspaceTaskReadiness(
     withTaskClientActionId(
-      request ?? buildCanvasBillingReadinessRequest(feature),
+      request ?? buildCanvasBillingReadinessRequest(service),
       createCanvasTaskClientActionId(),
     ),
   )

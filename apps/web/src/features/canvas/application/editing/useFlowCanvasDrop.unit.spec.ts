@@ -92,7 +92,10 @@ describe('useFlowCanvasDrop', () => {
     const dataTransfer = transfer()
     dataTransfer.setData(
       CANVAS_LIBRARY_IMPORT_MIME,
-      JSON.stringify({ type: 'canvas-library-import', asset: { ...asset, assetId: 'not-a-library-id' } }),
+      JSON.stringify({
+        type: 'canvas-library-import',
+        asset: { ...asset, assetId: 'not-a-library-id' },
+      }),
     )
 
     await harness.drop.onCanvasDrop({

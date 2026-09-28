@@ -1,9 +1,9 @@
-import { WORKFLOW_FEATURE } from './workflowFeatures'
+import { SERVICE } from './imageServices'
 
 export const IMAGE_NODE_ACTION = {
-  cutout: WORKFLOW_FEATURE.cutout,
-  variations: WORKFLOW_FEATURE.variations,
-  render: WORKFLOW_FEATURE.render,
-  upscale: WORKFLOW_FEATURE.upscale,
-  outpaint: WORKFLOW_FEATURE.outpaint,
+  cutout: SERVICE.cutout,
+  variations: SERVICE.variations,
+  render: SERVICE.render,
+  upscale: SERVICE.upscale,
+  outpaint: SERVICE.outpaint,
 } as const

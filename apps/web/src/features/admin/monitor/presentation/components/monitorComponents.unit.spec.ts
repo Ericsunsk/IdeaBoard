@@ -75,7 +75,7 @@ describe('Monitor Components', () => {
       status: 'completed',
       error_msg: '',
       result: 'res',
-      feature_slug: 'image_generate',
+      service: 'image_generate',
       created_at: '2026-09-20T10:00:00Z',
       completed_at: '2026-09-20T10:00:05Z',
       credits: 10,

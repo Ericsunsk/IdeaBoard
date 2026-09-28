@@ -111,9 +111,10 @@ describe('resolveWorkspaceSelection', () => {
   })
 
   it('ignores stale or malformed hints instead of selecting them', () => {
-    expect(
-      resolveWorkspaceSelection([PERSONAL], { urlId: 'ws_gone9', storedId: '123' }),
-    ).toEqual({ selectedId: 'ws_personal1', source: 'auto-personal' })
+    expect(resolveWorkspaceSelection([PERSONAL], { urlId: 'ws_gone9', storedId: '123' })).toEqual({
+      selectedId: 'ws_personal1',
+      source: 'auto-personal',
+    })
   })
 })
 

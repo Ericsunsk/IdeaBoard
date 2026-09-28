@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BoardWorkspaceUnavailableError } from '../../infrastructure/api/boardsResource'
-import {
-  getWorkspaceSelectionStore,
-  resetWorkspaceSelectionStore,
-} from '../../../workspace'
+import { getWorkspaceSelectionStore, resetWorkspaceSelectionStore } from '../../../workspace'
 import { joinSharedBoardByToken } from './joinSharedBoardWorkflow'
 
 const WORKSPACE_ID = 'ws_test123'

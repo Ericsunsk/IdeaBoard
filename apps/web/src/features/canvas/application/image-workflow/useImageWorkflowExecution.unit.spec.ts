@@ -148,8 +148,6 @@ describe('useImageWorkflowExecution', () => {
     await gated.runGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
     expect(mocks.workflow.executeImageWorkflow).not.toHaveBeenCalled()
-    expect(feedback.warning).toHaveBeenCalledWith(
-      'Select a workspace before running image tasks.',
-    )
+    expect(feedback.warning).toHaveBeenCalledWith('Select a workspace before running image tasks.')
   })
 })

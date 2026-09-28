@@ -144,9 +144,7 @@ export type WorkspaceSearchRequestOptions = {
   signal?: AbortSignal | null | undefined
 }
 
-function workspaceSearchHeaders(
-  options: WorkspaceSearchRequestOptions,
-): Record<string, string> {
+function workspaceSearchHeaders(options: WorkspaceSearchRequestOptions): Record<string, string> {
   return buildContractRequestHeaders({
     requestId: options.requestId,
     idempotencyKey: options.idempotencyKey,
@@ -185,7 +183,12 @@ export const workspaceSearchApi = {
         `${i18n.global.t('search.loadFailed')}: multi-provider search needs repeated provider params`,
       )
     }
-    const query: { q: string; provider?: ('unsplash' | 'pexels')[]; cursor?: string; page_size?: number } = {
+    const query: {
+      q: string
+      provider?: ('unsplash' | 'pexels')[]
+      cursor?: string
+      page_size?: number
+    } = {
       q: normalizeSearchQuery(input.query),
     }
     if (providers.length === 1) query.provider = [providers[0] as 'unsplash' | 'pexels']

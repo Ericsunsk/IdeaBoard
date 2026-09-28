@@ -2,7 +2,9 @@
   <AdminDialogShell
     :visible="visible"
     :header="
-      detail ? PAYMENT_ORDERS_MESSAGES.detailHeader(detail.publicOrderNumber) : PAYMENT_ORDERS_MESSAGES.detailHeaderFallback
+      detail
+        ? PAYMENT_ORDERS_MESSAGES.detailHeader(detail.publicOrderNumber)
+        : PAYMENT_ORDERS_MESSAGES.detailHeaderFallback
     "
     :description="PAYMENT_ORDERS_MESSAGES.detailDescription"
     size="wide"
@@ -11,7 +13,9 @@
     @update:visible="$emit('update:visible', $event)"
   >
     <div v-if="loading" class="grid min-h-56 place-items-center" role="status">
-      <span class="text-admin-body text-admin-text-3">{{ PAYMENT_ORDERS_MESSAGES.detailLoading }}</span>
+      <span class="text-admin-body text-admin-text-3">{{
+        PAYMENT_ORDERS_MESSAGES.detailLoading
+      }}</span>
     </div>
 
     <AdminAlert v-else-if="error" severity="error">
@@ -279,23 +283,59 @@ const overviewRows = computed(() => {
   const detail = props.detail
   if (!detail) return []
   return [
-    { label: PAYMENT_ORDERS_MESSAGES.overviewIdeaLabel, value: formatLocaleNumber(detail.ideaQuantity) },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewIdeaLabel,
+      value: formatLocaleNumber(detail.ideaQuantity),
+    },
     {
       label: PAYMENT_ORDERS_MESSAGES.overviewPaidTotalLabel,
       value: formatPaymentMoney(detail.paidTotalMinor, detail.paidCurrency),
     },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewSubtotalLabel, value: formatPaymentMoney(detail.paidSubtotalMinor, detail.paidCurrency) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewTaxLabel, value: formatPaymentMoney(detail.paidTaxMinor, detail.paidCurrency) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewBaseAmountLabel, value: formatPaymentMoney(detail.baseAmountMinor, detail.baseCurrency) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewStripeStatusLabel, value: getStripeStatusLabel(detail.stripeStatus) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewCreditStatusLabel, value: getCreditStatusLabel(detail.creditStatus) },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewSubtotalLabel,
+      value: formatPaymentMoney(detail.paidSubtotalMinor, detail.paidCurrency),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewTaxLabel,
+      value: formatPaymentMoney(detail.paidTaxMinor, detail.paidCurrency),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewBaseAmountLabel,
+      value: formatPaymentMoney(detail.baseAmountMinor, detail.baseCurrency),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewStripeStatusLabel,
+      value: getStripeStatusLabel(detail.stripeStatus),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewCreditStatusLabel,
+      value: getCreditStatusLabel(detail.creditStatus),
+    },
     { label: PAYMENT_ORDERS_MESSAGES.overviewTermsLabel, value: detail.termsVersion || '—' },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewRefundPolicyLabel, value: detail.refundPolicyVersion || '—' },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewCreatedLabel, value: formatPaymentDateTime(detail.createdAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewPaidLabel, value: formatPaymentDateTime(detail.paidAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewCreditedLabel, value: formatPaymentDateTime(detail.creditedAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewExpiresLabel, value: formatPaymentDateTime(detail.expiresAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.overviewUpdatedLabel, value: formatPaymentDateTime(detail.updatedAt) },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewRefundPolicyLabel,
+      value: detail.refundPolicyVersion || '—',
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewCreatedLabel,
+      value: formatPaymentDateTime(detail.createdAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewPaidLabel,
+      value: formatPaymentDateTime(detail.paidAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewCreditedLabel,
+      value: formatPaymentDateTime(detail.creditedAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewExpiresLabel,
+      value: formatPaymentDateTime(detail.expiresAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.overviewUpdatedLabel,
+      value: formatPaymentDateTime(detail.updatedAt),
+    },
   ]
 })
 
@@ -315,11 +355,26 @@ const reconciliationRows = computed(() => {
   const reconciliation = props.detail?.reconciliation
   if (!reconciliation) return []
   return [
-    { label: PAYMENT_ORDERS_MESSAGES.reconciliationAnomalousLabel, value: formatPaymentDateTime(reconciliation.anomalousAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.reconciliationCheckedLabel, value: formatPaymentDateTime(reconciliation.lastCheckedAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.reconciliationNextLabel, value: formatPaymentDateTime(reconciliation.nextAttemptAt) },
-    { label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorCodeLabel, value: reconciliation.lastErrorCode || '—' },
-    { label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorSummaryLabel, value: reconciliation.lastErrorSummary || '—' },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.reconciliationAnomalousLabel,
+      value: formatPaymentDateTime(reconciliation.anomalousAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.reconciliationCheckedLabel,
+      value: formatPaymentDateTime(reconciliation.lastCheckedAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.reconciliationNextLabel,
+      value: formatPaymentDateTime(reconciliation.nextAttemptAt),
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorCodeLabel,
+      value: reconciliation.lastErrorCode || '—',
+    },
+    {
+      label: PAYMENT_ORDERS_MESSAGES.reconciliationErrorSummaryLabel,
+      value: reconciliation.lastErrorSummary || '—',
+    },
   ]
 })
 

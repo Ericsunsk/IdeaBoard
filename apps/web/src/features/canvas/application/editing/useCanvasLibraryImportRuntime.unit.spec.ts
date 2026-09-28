@@ -202,7 +202,12 @@ describe('useCanvasLibraryImportRuntime', () => {
     expect(harness.imports.resumePending()).toBe(1)
     expect(harness.imports.resumePending()).toBe(0)
 
-    first.resolve({ mediaAssetId: 'asset_media0042', url: 'https://app.example/old', width: 100, height: 100 })
+    first.resolve({
+      mediaAssetId: 'asset_media0042',
+      url: 'https://app.example/old',
+      width: 100,
+      height: 100,
+    })
     await flushPromises()
     expect(
       ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport,
@@ -211,7 +216,12 @@ describe('useCanvasLibraryImportRuntime', () => {
       libraryAssetId: 'lasset_asset0007',
     })
 
-    second.resolve({ mediaAssetId: 'asset_media0043', url: 'https://app.example/new', width: 100, height: 100 })
+    second.resolve({
+      mediaAssetId: 'asset_media0043',
+      url: 'https://app.example/new',
+      width: 100,
+      height: 100,
+    })
     await flushPromises()
     expect(
       ((harness.nodes.value[0]!.data as FlowNodeData).snapshotNode as ImageNodeItem)

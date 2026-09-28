@@ -18,7 +18,7 @@ func mustMintV1(t *testing.T, typ, workspace, resourceType, resourceID string, d
 func TestWorkspaceLogReplayResumesGap(t *testing.T) {
 	log := NewWorkspaceEventLog()
 	first := mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"})
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"})
 	second := mustMintV1(t, EventV1TaskCompleted, "ws_1", V1ResourceTask, "task_1",
 		V1TaskCompletedData{TaskID: "task_1", OutputsURI: "/api/v1/workspaces/ws_1/tasks/task_1/outputs"})
 	log.Append(first)
@@ -51,7 +51,7 @@ func TestWorkspaceLogUnknownCursorResumesFromOldestWithGap(t *testing.T) {
 func TestWorkspaceLogEmptyCursorIsLiveOnly(t *testing.T) {
 	log := NewWorkspaceEventLog()
 	log.Append(mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"}))
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"}))
 	missed, gap, found := log.ReplayAfter("ws_1", "", WorkspaceEventFilter{})
 	if len(missed) != 0 || gap || !found {
 		t.Fatalf("empty cursor must be live-only: missed=%d gap=%v found=%v", len(missed), gap, found)
@@ -61,7 +61,7 @@ func TestWorkspaceLogEmptyCursorIsLiveOnly(t *testing.T) {
 func TestWorkspaceLogRetentionBoundaryEvictsOldest(t *testing.T) {
 	log := NewWorkspaceEventLogWithLimits(2, 8)
 	first := mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"})
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"})
 	second := mustMintV1(t, EventV1TaskRunning, "ws_1", V1ResourceTask, "task_1",
 		V1TaskRunningData{TaskID: "task_1"})
 	third := mustMintV1(t, EventV1TaskCompleted, "ws_1", V1ResourceTask, "task_1",
@@ -84,7 +84,7 @@ func TestWorkspaceLogRetentionBoundaryEvictsOldest(t *testing.T) {
 func TestWorkspaceLogAppendDedupsOnID(t *testing.T) {
 	log := NewWorkspaceEventLog()
 	first := mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"})
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"})
 	log.Append(first)
 	log.Append(first)
 	if log.Len("ws_1") != 1 {
@@ -95,7 +95,7 @@ func TestWorkspaceLogAppendDedupsOnID(t *testing.T) {
 func TestWorkspaceLogFilterNarrowsReplayAndLive(t *testing.T) {
 	log := NewWorkspaceEventLog()
 	created := mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"})
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"})
 	ready := mustMintV1(t, EventV1MediaAssetReady, "ws_1", V1ResourceMediaAsset, "asset_1",
 		V1MediaAssetReadyData{AssetID: "asset_1"})
 	log.Append(created)
@@ -142,7 +142,7 @@ func TestWorkspaceLogFilterNarrowsReplayAndLive(t *testing.T) {
 func TestWorkspaceLogIsolatesWorkspaces(t *testing.T) {
 	log := NewWorkspaceEventLog()
 	log.Append(mustMintV1(t, EventV1TaskCreated, "ws_1", V1ResourceTask, "task_1",
-		V1TaskCreatedData{TaskID: "task_1", WorkflowKind: "render"}))
+		V1TaskCreatedData{TaskID: "task_1", Service: "render"}))
 	missed, _, _ := log.ReplayAfter("ws_2", "evt_unknown", WorkspaceEventFilter{})
 	if len(missed) != 0 {
 		t.Fatalf("cross-workspace replay must be empty, got %d", len(missed))

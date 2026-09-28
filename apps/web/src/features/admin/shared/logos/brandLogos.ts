@@ -339,7 +339,12 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
 
   // 4. 对象存储（站内现成资产，不走 models.dev）
   { key: 'amazons3', label: 'Amazon S3', logoSrc: logoAmazonS3, category: 'storage' },
-  { key: 'cloudflare-r2', label: 'Cloudflare R2', logoSrc: logoCloudflareVendor, category: 'storage' },
+  {
+    key: 'cloudflare-r2',
+    label: 'Cloudflare R2',
+    logoSrc: logoCloudflareVendor,
+    category: 'storage',
+  },
   { key: 'alibabacloud', label: '阿里云 OSS', logoSrc: logoAlibabaCloud, category: 'storage' },
   { key: 'tencent-cos', label: '腾讯云 COS', logoSrc: logoTencentCloud, category: 'storage' },
   { key: 'minio', label: 'MinIO', logoSrc: logoMinio, category: 'storage' },

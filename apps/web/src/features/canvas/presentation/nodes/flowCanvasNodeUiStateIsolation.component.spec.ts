@@ -25,9 +25,7 @@ const FusionProbe = defineComponent({
     uiState: { type: Object, default: undefined },
   },
   setup(props) {
-    const title = computed(
-      () => (props.node as { title?: string } | undefined)?.title ?? 'unknown',
-    )
+    const title = computed(() => (props.node as { title?: string } | undefined)?.title ?? 'unknown')
     fusionRenderCounts.set(title.value, (fusionRenderCounts.get(title.value) ?? 0) + 1)
     onUpdated(() => {
       fusionRenderCounts.set(title.value, (fusionRenderCounts.get(title.value) ?? 1) + 1)

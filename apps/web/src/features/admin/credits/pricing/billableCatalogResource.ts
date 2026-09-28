@@ -137,10 +137,7 @@ export async function publishBillableItemPrices(
       prices: Partial<Record<PricingVariant, BillingPrice>>
     }>(body, '发布价格失败')
     return Object.fromEntries(
-      Object.entries(data.prices).map(([resolution, price]) => [
-        resolution,
-        normalizePrice(price),
-      ]),
+      Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
     ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
   } catch (error) {
     throw withControlCopy(error, '发布价格失败')
@@ -150,10 +147,7 @@ export async function publishBillableItemPrices(
 async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
   try {
     const body = await listControlBillingCatalog()
-    const data = requireContractData<{ items: BillableItemCatalogCard[] }>(
-      body,
-      '加载功能定价失败',
-    )
+    const data = requireContractData<{ items: BillableItemCatalogCard[] }>(body, '加载功能定价失败')
     return data.items.map(normalizeBillableItem)
   } catch (error) {
     throw withControlCopy(error, '加载功能定价失败')

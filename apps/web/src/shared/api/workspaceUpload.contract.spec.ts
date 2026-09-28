@@ -48,7 +48,11 @@ function sessionFixture(overrides: Record<string, unknown> = {}): Record<string,
     size_bytes: 1024,
     checksum_sha256: CHECKSUM,
     media_kind: 'image',
-    upload_target: { kind: 'same-origin-slot', slot: UPLOAD_ID, expires_at: '2026-09-23T01:00:00Z' },
+    upload_target: {
+      kind: 'same-origin-slot',
+      slot: UPLOAD_ID,
+      expires_at: '2026-09-23T01:00:00Z',
+    },
     created_at: '2026-09-23T00:00:00Z',
     updated_at: '2026-09-23T00:00:00Z',
     expires_at: '2026-09-23T00:30:00Z',
@@ -102,12 +106,14 @@ describe('workspace upload paths', () => {
     expect(() => assertWorkspaceId('upload_def456')).toThrow()
     expect(() => assertUploadId(UPLOAD_ID)).not.toThrow()
     expect(() => assertWorkspaceAssetId('42')).toThrow()
-    await expect(workspaceUploadApi.createSession('  ', {
-      filename: 'x.png',
-      mimeType: 'image/png',
-      sizeBytes: 1,
-      checksumSha256: CHECKSUM,
-    })).rejects.toThrow()
+    await expect(
+      workspaceUploadApi.createSession('  ', {
+        filename: 'x.png',
+        mimeType: 'image/png',
+        sizeBytes: 1,
+        checksumSha256: CHECKSUM,
+      }),
+    ).rejects.toThrow()
     expect(() => workspaceMediaAssetContentSuffix(WORKSPACE_ID, 'asset with space')).toThrow()
   })
 })
@@ -132,7 +138,9 @@ describe('workspace upload session state machine', () => {
     expect(session.assetId).toBeUndefined()
     expect(toWorkspaceUploadSession(sessionFixture({ asset_id: ASSET_ID })).assetId).toBe(ASSET_ID)
     expect(() =>
-      toWorkspaceUploadSession(sessionFixture({ upload_target: { kind: 'presigned', slot: 'https://bucket/secret' } })),
+      toWorkspaceUploadSession(
+        sessionFixture({ upload_target: { kind: 'presigned', slot: 'https://bucket/secret' } }),
+      ),
     ).toThrow()
   })
 
@@ -171,13 +179,16 @@ describe('workspace upload idempotency keys', () => {
     expect(workspaceUploadIdempotencyKey('bytes')).toMatch(/^upload:bytes:.+/)
     expect(workspaceUploadIdempotencyKey('complete')).toMatch(/^upload:complete:.+/)
     expect(workspaceMediaIdempotencyKey('archive')).toMatch(/^media:archive:.+/)
-    expect(workspaceUploadIdempotencyKey('create')).not.toBe(workspaceUploadIdempotencyKey('create'))
+    expect(workspaceUploadIdempotencyKey('create')).not.toBe(
+      workspaceUploadIdempotencyKey('create'),
+    )
   })
 })
 
 describe('workspace upload client', () => {
   it('creates sessions with header-only idempotency keys', async () => {
-    const seen: Array<{ idempotencyKey: string | null; requestId: string | null; path: string }> = []
+    const seen: Array<{ idempotencyKey: string | null; requestId: string | null; path: string }> =
+      []
     useMswHandlers(
       http.post('/api/v1/workspaces/:workspaceId/uploads', ({ request, params }) => {
         seen.push({
@@ -208,17 +219,20 @@ describe('workspace upload client', () => {
   it('stages raw bytes with the declared MIME and header-only idempotency keys', async () => {
     const seen: Array<{ idempotencyKey: string | null; contentType: string | null }> = []
     useMswHandlers(
-      http.put('/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes', async ({ request, params }) => {
-        expect(params.workspaceId).toBe('ws_abc123')
-        expect(params.uploadId).toBe(UPLOAD_ID)
-        seen.push({
-          idempotencyKey: request.headers.get('Idempotency-Key'),
-          contentType: request.headers.get('Content-Type'),
-        })
-        const bytes = new Uint8Array(await request.arrayBuffer())
-        expect(bytes.length).toBe(4)
-        return HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) })
-      }),
+      http.put(
+        '/api/v1/workspaces/:workspaceId/uploads/:uploadId/bytes',
+        async ({ request, params }) => {
+          expect(params.workspaceId).toBe('ws_abc123')
+          expect(params.uploadId).toBe(UPLOAD_ID)
+          seen.push({
+            idempotencyKey: request.headers.get('Idempotency-Key'),
+            contentType: request.headers.get('Content-Type'),
+          })
+          const bytes = new Uint8Array(await request.arrayBuffer())
+          expect(bytes.length).toBe(4)
+          return HttpResponse.json({ data: sessionFixture({ status: 'transferring' }) })
+        },
+      ),
     )
     const session = await workspaceUploadApi.stageBytes(
       WORKSPACE_ID,
@@ -235,7 +249,10 @@ describe('workspace upload client', () => {
     useMswHandlers(
       http.post('/api/v1/workspaces/:workspaceId/uploads/:uploadId/complete', () => {
         return HttpResponse.json({
-          data: { upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }), asset: assetFixture() },
+          data: {
+            upload: sessionFixture({ status: 'completed', asset_id: ASSET_ID }),
+            asset: assetFixture(),
+          },
         })
       }),
     )
@@ -289,7 +306,14 @@ describe('workspace upload client', () => {
 describe('contract error mapping', () => {
   it('maps v1 error envelopes to branchable codes without touching legacy codes', () => {
     const contract = createApiError(
-      { error: { code: 'upload_idempotency_conflict', message: 'conflict', details: { fields: {} }, request_id: 'req-7' } },
+      {
+        error: {
+          code: 'upload_idempotency_conflict',
+          message: 'conflict',
+          details: { fields: {} },
+          request_id: 'req-7',
+        },
+      },
       409,
     )
     expect(contract.code).toBe('upload_idempotency_conflict')

@@ -1,7 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import {
-  useAdminMonitorResource,
-} from '../../monitor/infrastructure/resource'
+import { useAdminMonitorResource } from '../../monitor/infrastructure/resource'
 import { GetAdminStatisticsRange, useAdminStatisticsResource } from '../../statistics/resource'
 import {
   buildAdminAnomalyItems,

@@ -1,21 +1,22 @@
 # Board Context
+
 Board owns the Board document model, Schema, catalog repository, sync protocol, gallery use cases, and share-join workflow.
 It is the sole repository and synchronization fact source for boards.
 It does NOT own Canvas session orchestration, Vue Flow runtime instances, or viewport UI state.
 
 ## Domain Language
 
-| Term | Meaning |
-| ---- | ------- |
-| Board Document | Immutable pure-data snapshot (`BoardState` with `schemaVersion`, `imageNodes`, `promptNodes`, `fusionNodes`, `connections`, `groups`, `mediaRefs`); owned by `domain/document`. |
-| Schema Versioning & Migration | Strict snapshot validation via Valibot `stateSchema`; deterministic forward-compatible migration when loading historic versions. |
-| Board State Envelope | Safe transport/persistence envelope `BoardStateEnvelope`; unified by `domain/schema/boardStateEnvelopeContract.ts`. |
-| Media Reference Extraction | Extraction of persisted media-asset refs from canvas nodes on save; feeds backend refcount and GC lock. |
-| Board Repository | Sole catalog fact source (`application/catalog/repository.ts`): local catalog state plus CRUD commands plus server hydrate facade. |
-| Board Sync & Revision | Optimistic-lock sync protocol (`application/sync/boardSync.ts`): each save carries `base_revision`, server returns monotonic `new_revision`; 409 enters rollback/reconcile. |
-| Share Join | Share-collaboration join use case (`application/collaboration/joinSharedBoardWorkflow.ts`): token validation, join, hydrate. |
-| Board Preview | Thumbnail generator (`infrastructure/preview`): lightweight preview snapshot data URL from node layout and key renders for gallery cards. |
-| Catalog Gallery | Gallery UI (`presentation/catalog`): `BoardsPage` / `BoardCard`, gallery controller, command handlers, feedback, skin; pure view orchestration over repository data. |
+| Term                          | Meaning                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Board Document                | Immutable pure-data snapshot (`BoardState` with `schemaVersion`, `imageNodes`, `promptNodes`, `fusionNodes`, `connections`, `groups`, `mediaRefs`); owned by `domain/document`. |
+| Schema Versioning & Migration | Strict snapshot validation via Valibot `stateSchema`; deterministic forward-compatible migration when loading historic versions.                                                |
+| Board State Envelope          | Safe transport/persistence envelope `BoardStateEnvelope`; unified by `domain/schema/boardStateEnvelopeContract.ts`.                                                             |
+| Media Reference Extraction    | Extraction of persisted media-asset refs from canvas nodes on save; feeds backend refcount and GC lock.                                                                         |
+| Board Repository              | Sole catalog fact source (`application/catalog/repository.ts`): local catalog state plus CRUD commands plus server hydrate facade.                                              |
+| Board Sync & Revision         | Optimistic-lock sync protocol (`application/sync/boardSync.ts`): each save carries `base_revision`, server returns monotonic `new_revision`; 409 enters rollback/reconcile.     |
+| Share Join                    | Share-collaboration join use case (`application/collaboration/joinSharedBoardWorkflow.ts`): token validation, join, hydrate.                                                    |
+| Board Preview                 | Thumbnail generator (`infrastructure/preview`): lightweight preview snapshot data URL from node layout and key renders for gallery cards.                                       |
+| Catalog Gallery               | Gallery UI (`presentation/catalog`): `BoardsPage` / `BoardCard`, gallery controller, command handlers, feedback, skin; pure view orchestration over repository data.            |
 
 ## Public Seams
 

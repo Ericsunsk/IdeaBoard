@@ -53,15 +53,15 @@ describe('imageActionExecution', () => {
   it('maps execution modes and features by action', () => {
     expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_NODE_ACTION.cutout]).toMatchObject({
       mode: IMAGE_EXECUTION_MODE.directTask,
-      feature: IMAGE_NODE_ACTION.cutout,
+      service: IMAGE_NODE_ACTION.cutout,
     })
     expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_UPSCALE_ACTION]).toMatchObject({
       mode: IMAGE_EXECUTION_MODE.upscaleTask,
-      feature: IMAGE_UPSCALE_ACTION,
+      service: IMAGE_UPSCALE_ACTION,
     })
     expect(IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_OUTPAINT_ACTION]).toMatchObject({
       mode: IMAGE_EXECUTION_MODE.outpaint,
-      feature: IMAGE_OUTPAINT_ACTION,
+      service: IMAGE_OUTPAINT_ACTION,
     })
   })
 })

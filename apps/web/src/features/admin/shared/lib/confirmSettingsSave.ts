@@ -1,7 +1,4 @@
-import type {
-  AdminConfirmPort,
-  AdminConfirmReasonSpec,
-} from '../composables/useAdminConfirm'
+import type { AdminConfirmPort, AdminConfirmReasonSpec } from '../composables/useAdminConfirm'
 import { readConfirmReason } from '../composables/useAdminConfirm'
 import { useAdminToast } from './toast'
 

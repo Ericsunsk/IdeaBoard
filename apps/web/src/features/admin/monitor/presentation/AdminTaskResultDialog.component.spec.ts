@@ -265,7 +265,7 @@ function makeTask(
     prompt: 'Prompt',
     user_prompt: '',
     params: '{}',
-    feature_slug: 'render',
+    service: 'render',
     priority: 2,
     status: 'completed',
     retry_count: 0,

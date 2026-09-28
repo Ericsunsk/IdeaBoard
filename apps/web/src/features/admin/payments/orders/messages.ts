@@ -49,8 +49,7 @@ export const PAYMENT_ORDERS_MESSAGES = {
   detailLoadFailed: '支付订单详情加载失败，请重试。',
   stripeSummaryTitle: 'Stripe 安全摘要',
   reconciliationTitle: '对账与异常',
-  anomalyState: (anomalous: boolean) =>
-    anomalous ? '超过 24 小时未收敛' : '无异常标记',
+  anomalyState: (anomalous: boolean) => (anomalous ? '超过 24 小时未收敛' : '无异常标记'),
   refundsTitle: '退款',
   refundsEmpty: '暂无退款记录',
   disputesTitle: 'Dispute',

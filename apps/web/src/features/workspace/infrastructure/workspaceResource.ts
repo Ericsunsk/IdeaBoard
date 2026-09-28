@@ -26,10 +26,7 @@ import {
   getListWorkspacesQueryKey,
   listWorkspaces,
 } from '../../../shared/api/generated-query/public/workspaces/workspaces'
-import {
-  getGetUserQueryKey,
-  getUser,
-} from '../../../shared/api/generated-query/public/user/user'
+import { getGetUserQueryKey, getUser } from '../../../shared/api/generated-query/public/user/user'
 import type { ListWorkspacesParams } from '../../../shared/api/generated-query/public/model'
 import {
   buildContractRequestHeaders,
@@ -180,7 +177,8 @@ export function buildWorkspaceCreateHeaders(options?: {
   idempotencyKey?: string | undefined
   requestId?: string | undefined
 }): Record<string, string> {
-  const idempotencyKey = asTrimmedString(options?.idempotencyKey) ?? workspaceCreationIdempotencyKey()
+  const idempotencyKey =
+    asTrimmedString(options?.idempotencyKey) ?? workspaceCreationIdempotencyKey()
   return buildContractRequestHeaders({
     requestId: asTrimmedString(options?.requestId) ?? newRequestId(),
     idempotencyKey,
@@ -242,7 +240,10 @@ export async function fetchWorkspacePage(
   params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
   options?: WorkspaceRequestOptions,
 ): Promise<WorkspaceListPage> {
-  const response = await listWorkspaces(normalizeWorkspaceListParams(params), toRequestConfig(options))
+  const response = await listWorkspaces(
+    normalizeWorkspaceListParams(params),
+    toRequestConfig(options),
+  )
   return parseWorkspacePage(response)
 }
 
@@ -294,7 +295,9 @@ export async function provisionWorkspace(
     {
       ...(options?.signal == null ? {} : { signal: options.signal }),
       headers: buildWorkspaceCreateHeaders({
-        ...(options?.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
+        ...(options?.idempotencyKey === undefined
+          ? {}
+          : { idempotencyKey: options.idempotencyKey }),
         ...(options?.requestId === undefined ? {} : { requestId: options.requestId }),
       }),
     },
@@ -316,7 +319,10 @@ export async function provisionWorkspace(
 // flows through the generated client above (never direct fetch); these URLs
 // are the reference for deep-link building and for the endpoints the backend
 // slice is adding (detail/archive/organizations are not in the stubs yet).
-function withCursorQuery(base: string, params?: { cursor?: string | null | undefined; pageSize?: number | undefined }): string {
+function withCursorQuery(
+  base: string,
+  params?: { cursor?: string | null | undefined; pageSize?: number | undefined },
+): string {
   const normalized = normalizeWorkspaceListParams(params)
   const search = new URLSearchParams()
   if (normalized.cursor) search.set('cursor', normalized.cursor)
@@ -327,8 +333,10 @@ function withCursorQuery(base: string, params?: { cursor?: string | null | undef
 
 export const workspaceApiUrls = {
   user: (): string => resolveApiUrl('/api/v1/user'),
-  workspaces: (params?: { cursor?: string | null | undefined; pageSize?: number | undefined }): string =>
-    withCursorQuery(resolveApiUrl('/api/v1/workspaces'), params),
+  workspaces: (params?: {
+    cursor?: string | null | undefined
+    pageSize?: number | undefined
+  }): string => withCursorQuery(resolveApiUrl('/api/v1/workspaces'), params),
   workspaceDetail: (workspaceId: string): string =>
     resolveApiUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`),
   archiveWorkspace: (workspaceId: string): string =>

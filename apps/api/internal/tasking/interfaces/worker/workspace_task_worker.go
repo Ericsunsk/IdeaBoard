@@ -27,11 +27,10 @@ package worker
 // holder instance would fail every Capture/Release with "unknown hold".
 //
 // Provider-creds boundary (deliberate): the production Generate bridge
-// consumes the durable execution plan minted at submit (canonical params
-// plus the submit-time resolved model) and calls
+// consumes the canonical execution plan and calls
 // providers.Executor.CallGatewayAPI (transport/auth/retries stay inside
-// the gateway). Missing gateway credentials or model mappings fail the
-// task deterministically with a clear message. Result materialization
+// the gateway). Missing gateway credentials or an unresolved pool route
+// fail the task deterministically with a clear message. Result materialization
 // into workspace media assets runs inside the executor finalize seam
 // (workspace result materializer) and through the WorkspaceTaskRenderer
 // below: once a provider (real or fake) yields output refs, the renderer
@@ -247,7 +246,7 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 // validateInput enforces the discriminated input union before claiming, so
 // malformed tasks fail from pending without lease churn.
 func (w *WorkspaceTaskWorker) validateInput(_ context.Context, task *workspacetasks.WorkspaceTask) error {
-	if _, err := workspacetasks.ValidateCreate(task.WorkflowKind, task.MediaAssetIDs, task.Params); err != nil {
+	if _, err := workspacetasks.ValidateCreate(task.Service, task.MediaAssetIDs, task.Params); err != nil {
 		return fmt.Errorf(msgValidateInput, err)
 	}
 	return nil
@@ -430,24 +429,22 @@ func redactToken(token string) string {
 }
 
 // workspaceGatewayProvider bridges the EXISTING provider gateway seam for
-// workspace tasks. It consumes the durable execution plan minted at submit
-// (submit-time resolved model), synthesizes
+// workspace tasks. It consumes the canonical execution plan, synthesizes
 // the legacy TaskPayload the executor requires, and maps provider outputs
 // back to workspace OutputRefs. It never shapes provider bodies and never
 // dials providers: transport/auth/retries stay inside the gateway client.
 //
 // Boundary: gateway credentials resolve per execution through the AI
 // gateway config seam (system settings + env-held encryption key) and are
-// never persisted; a missing gateway configuration or model mapping fails
-// the task deterministically at Resolve/factory time. Provider image bytes
+// never persisted; a missing gateway configuration or pool route fails the
+// task deterministically at Resolve/factory time. Provider image bytes
 // land in workspace media through the workspace result materializer
 // (executor finalize seam), so Generate yields workspace asset refs that
 // the renderer verifies before the atomic Complete.
 // WorkspaceGatewayCallInput carries one gateway execution's resolved
 // inputs. It mirrors the runtime gateway seam with tasking-domain types so
-// this package never imports the runtime layer: the model comes from the
-// durable execution plan, the token fences terminal writes so stale
-// workers lose.
+// this package never imports the runtime layer; the execution token fences
+// terminal writes so stale workers lose.
 type WorkspaceGatewayCallInput struct {
 	Task           *tasks.TaskPayload
 	Model          string

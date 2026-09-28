@@ -20,7 +20,7 @@ type CanonicalRequestInput struct {
 	Prompt         string
 	Params         string
 	ClientActionID string
-	Feature        string
+	Service        string
 	Priority       int
 	BillingRequest *taskbilling.Request
 	Generation     *tasks.GenerationRequestSnapshot
@@ -35,7 +35,7 @@ type CanonicalRequest struct {
 	prompt         string
 	params         string
 	clientActionID string
-	feature        string
+	service        string
 	priority       int
 	billingRequest *taskbilling.Request
 	generation     *tasks.GenerationRequestSnapshot
@@ -43,15 +43,15 @@ type CanonicalRequest struct {
 }
 
 func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) {
-	feature, priority, err := validateCanonicalMetadata(input)
+	service, priority, err := validateCanonicalMetadata(input)
 	if err != nil {
 		return CanonicalRequest{}, err
 	}
-	executionPlan, err := validateCanonicalExecutionPlan(feature, input.Params, input.ExecutionPlan)
+	executionPlan, err := validateCanonicalExecutionPlan(service, input.Params, input.ExecutionPlan)
 	if err != nil {
 		return CanonicalRequest{}, err
 	}
-	billingRequest, err := validateCanonicalBilling(feature, input.ClientActionID, executionPlan, input.BillingRequest)
+	billingRequest, err := validateCanonicalBilling(service, input.ClientActionID, executionPlan, input.BillingRequest)
 	if err != nil {
 		return CanonicalRequest{}, err
 	}
@@ -64,7 +64,7 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 	}
 	return CanonicalRequest{
 		userID: input.UserID, userPrompt: input.UserPrompt, prompt: input.Prompt, params: input.Params,
-		clientActionID: strings.TrimSpace(input.ClientActionID), feature: feature,
+		clientActionID: strings.TrimSpace(input.ClientActionID), service: service,
 		priority: priority, billingRequest: billingRequest,
 		generation: generation, executionPlan: executionPlan,
 	}, nil
@@ -74,19 +74,19 @@ func validateCanonicalMetadata(input CanonicalRequestInput) (string, int, error)
 	if input.UserID <= 0 {
 		return "", 0, fmt.Errorf("canonical submission user id is invalid")
 	}
-	feature := strings.TrimSpace(input.Feature)
-	if feature == "" {
-		return "", 0, fmt.Errorf("canonical submission feature is required")
+	service := strings.TrimSpace(input.Service)
+	if service == "" {
+		return "", 0, fmt.Errorf("canonical submission service is required")
 	}
 	priority := tasks.EffectiveTaskPriority(input.Priority)
 	if !tasks.IsValidTaskPriority(priority) {
 		return "", 0, fmt.Errorf("canonical submission priority is invalid")
 	}
-	return feature, priority, nil
+	return service, priority, nil
 }
 
-func validateCanonicalExecutionPlan(feature, params string, planInput *workflow.FeatureExecutionPlan) (*workflow.FeatureExecutionPlan, error) {
-	if !workflow.IsAIImageFeature(feature) {
+func validateCanonicalExecutionPlan(service, params string, planInput *workflow.FeatureExecutionPlan) (*workflow.FeatureExecutionPlan, error) {
+	if !workflow.IsAIImageFeature(service) {
 		if planInput != nil {
 			return nil, fmt.Errorf("canonical non-image submission must not carry execution plan")
 		}
@@ -99,8 +99,8 @@ func validateCanonicalExecutionPlan(feature, params string, planInput *workflow.
 	if err != nil {
 		return nil, fmt.Errorf("canonical submission execution plan: %w", err)
 	}
-	if planInput.Feature() != feature {
-		return nil, fmt.Errorf("canonical submission execution plan does not match feature")
+	if planInput.Feature() != service {
+		return nil, fmt.Errorf("canonical submission execution plan does not match service")
 	}
 	typedParams, err := tasks.UnmarshalParams(params)
 	if err != nil {
@@ -118,16 +118,16 @@ func validateCanonicalExecutionPlan(feature, params string, planInput *workflow.
 	return &planCopy, nil
 }
 
-func validateCanonicalBilling(feature, clientActionID string, executionPlan *workflow.FeatureExecutionPlan, input *taskbilling.Request) (*taskbilling.Request, error) {
-	if workflow.IsAIImageFeature(feature) && input == nil {
+func validateCanonicalBilling(service, clientActionID string, executionPlan *workflow.FeatureExecutionPlan, input *taskbilling.Request) (*taskbilling.Request, error) {
+	if workflow.IsAIImageFeature(service) && input == nil {
 		return nil, fmt.Errorf("canonical billed submission requires billing request")
 	}
 	if input == nil {
 		return nil, nil
 	}
 	request := *input
-	if strings.TrimSpace(request.Feature) != feature {
-		return nil, fmt.Errorf("canonical submission billing product does not match feature")
+	if strings.TrimSpace(request.Service) != service {
+		return nil, fmt.Errorf("canonical submission billing product does not match service")
 	}
 	if _, err := taskbilling.RequestFingerprint(request); err != nil {
 		return nil, fmt.Errorf("canonical submission billing request: %w", err)
@@ -161,8 +161,8 @@ func (r CanonicalRequest) UserID() int64 {
 	return r.userID
 }
 
-func (r CanonicalRequest) Feature() string {
-	return r.feature
+func (r CanonicalRequest) Service() string {
+	return r.service
 }
 
 func (r CanonicalRequest) Prompt() string {
@@ -272,20 +272,20 @@ func (r CanonicalRequest) BillingRequest() *taskbilling.Request {
 }
 
 func (r CanonicalRequest) valid() bool {
-	if r.userID <= 0 || strings.TrimSpace(r.feature) == "" || !tasks.IsValidTaskPriority(r.priority) {
+	if r.userID <= 0 || strings.TrimSpace(r.service) == "" || !tasks.IsValidTaskPriority(r.priority) {
 		return false
 	}
-	if workflow.IsAIImageFeature(r.feature) && r.billingRequest == nil {
+	if workflow.IsAIImageFeature(r.service) && r.billingRequest == nil {
 		return false
 	}
-	if r.billingRequest != nil && strings.TrimSpace(r.billingRequest.Feature) != strings.TrimSpace(r.feature) {
+	if r.billingRequest != nil && strings.TrimSpace(r.billingRequest.Service) != strings.TrimSpace(r.service) {
 		return false
 	}
 	if r.generation != nil && validateGenerationSnapshot(*r.generation) != nil {
 		return false
 	}
-	if workflow.IsAIImageFeature(r.feature) {
-		if r.executionPlan == nil || r.executionPlan.Feature() != r.feature {
+	if workflow.IsAIImageFeature(r.service) {
+		if r.executionPlan == nil || r.executionPlan.Feature() != r.service {
 			return false
 		}
 		if _, err := workflow.EncodeFeatureExecutionPlan(*r.executionPlan); err != nil {
@@ -309,7 +309,7 @@ func cloneGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) tasks.Gen
 }
 
 func validateGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) error {
-	if strings.TrimSpace(snapshot.Feature) == "" || snapshot.TemplateFingerprint == "" {
+	if strings.TrimSpace(snapshot.Service) == "" || snapshot.TemplateFingerprint == "" {
 		return fmt.Errorf("canonical generation snapshot is invalid")
 	}
 	if _, err := workflow.ParseGenerationPrimitive(snapshot.Primitive); err != nil {
@@ -343,7 +343,7 @@ func ValidatePreparedGenerationMedia(snapshot *tasks.GenerationRequestSnapshot) 
 
 func validateGenerationSnapshotAgainstPlan(snapshot tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan) error {
 	runtimeInputs := plan.RuntimeInputs()
-	if snapshot.Feature != plan.Feature() ||
+	if snapshot.Service != plan.Feature() ||
 		snapshot.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
 		snapshot.RequestedOutputCount != plan.RequestedOutputCount().Int() {
 		return fmt.Errorf("canonical generation snapshot does not match execution plan")
@@ -368,11 +368,11 @@ func (r CanonicalRequest) materialize(taskID string, createdAt time.Time) (*task
 	task := &tasks.Task{
 		TaskID: taskID, CorrelationID: correlationID, UserID: r.userID,
 		ClientActionID: r.clientActionID, Prompt: r.prompt, UserPrompt: r.userPrompt,
-		Params: r.params, FeatureSlug: r.feature, Priority: r.priority, Status: tasks.StatusPending,
+		Params: r.params, Service: r.service, Priority: r.priority, Status: tasks.StatusPending,
 	}
 	if r.billingRequest != nil {
 		task.BillingRequest = &tasks.TaskBillingRequest{
-			Feature: r.billingRequest.Feature, OutputResolution: string(r.billingRequest.OutputResolution), Quantity: r.billingRequest.Quantity,
+			Service: r.billingRequest.Service, OutputResolution: string(r.billingRequest.OutputResolution), Quantity: r.billingRequest.Quantity,
 		}
 	}
 	payload := &tasks.TaskPayload{
