@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
 import type {
   SubmitTaskReadinessData,
-  SubmitTaskReadinessRequestData,
+  CanvasTaskRequestData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createCanvasBillingReadinessStore } from './readiness.ts'
 
@@ -33,7 +33,7 @@ function makeReadiness(
 
 describe('canvas billing readiness store', () => {
   it('loads multiple action quotes through one readiness matrix request', async () => {
-    const fetchReadinessMatrix = vi.fn(async (requests: SubmitTaskReadinessRequestData[]) =>
+    const fetchReadinessMatrix = vi.fn(async (requests: CanvasTaskRequestData[]) =>
       requests.map((request) => makeReadiness(request.service as Service)),
     )
     const store = createCanvasBillingReadinessStore({ fetchReadinessMatrix })
@@ -162,7 +162,7 @@ describe('canvas billing readiness store', () => {
       now: () => currentTime,
       cacheMs: 60_000,
     })
-    const request: SubmitTaskReadinessRequestData = {
+    const request: CanvasTaskRequestData = {
       prompt: 'quote',
       service: SERVICE.cutout,
     }

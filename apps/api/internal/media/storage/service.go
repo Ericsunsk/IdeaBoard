@@ -26,33 +26,21 @@ const (
 	msgNewServiceWithLocalRoot = "不支持的存储类型" // NewServiceWithLocalRoot
 )
 
-type dynamicAssetLocator struct {
-	svc *Service
-}
-
-func (d dynamicAssetLocator) LocateStoredUpload(ctx context.Context, lookup ports.StoredUploadLookup) (ports.StoredUploadLocation, bool, error) {
-	if d.svc == nil || d.svc.assetLocator == nil {
-		return ports.StoredUploadLocation{}, false, nil
-	}
-	return d.svc.assetLocator.LocateStoredUpload(ctx, lookup)
-}
-
 type Service struct {
-	assetLocator        ports.StoredUploadLocator
 	s3CompatibleService *s3.S3CompatibleService
 
 	profilesService *profiles.Service
 	runtimeService  *runtime.Service
 }
 
-func NewService(profileRepo ports.ProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin string) *Service {
-	return NewServiceWithLocalRoot(profileRepo, assetLocator, publicAPIOrigin, "")
+func NewService(profileRepo ports.ProfileRepository, publicAPIOrigin string) *Service {
+	return NewServiceWithLocalRoot(profileRepo, publicAPIOrigin, "")
 }
 
 // NewServiceWithLocalRoot binds the builtin-local driver to a canonical
 // filesystem root. An empty root resolves the process working directory once
 // at construction; prefer passing the configured STORAGE_LOCAL_ROOT.
-func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, assetLocator ports.StoredUploadLocator, publicAPIOrigin, localRoot string) *Service {
+func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, publicAPIOrigin, localRoot string) *Service {
 	origin := strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/")
 	s3Svc := s3.NewS3CompatibleService()
 	localDriver := local.NewLocalStorageDriverWithRoot(origin, localRoot)
@@ -72,22 +60,14 @@ func NewServiceWithLocalRoot(profileRepo ports.ProfileRepository, assetLocator p
 	profilesSvc := profiles.NewService(profileRepo, drivers)
 
 	service := &Service{
-		assetLocator:        assetLocator,
 		s3CompatibleService: s3Svc,
 		profilesService:     profilesSvc,
 	}
 
-	runtimeSvc := runtime.NewService(profilesSvc, drivers, dynamicAssetLocator{svc: service}, origin)
+	runtimeSvc := runtime.NewService(profilesSvc, drivers, origin)
 	service.runtimeService = runtimeSvc
 
 	return service
-}
-
-func (s *Service) SetAssetLocator(locator ports.StoredUploadLocator) {
-	s.assetLocator = locator
-	if s.runtimeService != nil {
-		s.runtimeService.SetAssetLocator(locator)
-	}
 }
 
 func (s *Service) SetCapabilityProbe(fn func(context.Context, *s3.S3CompatibleConfig) error) {
@@ -236,16 +216,8 @@ func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey 
 	return s.runtimeService.ReadObjectAtProfile(ctx, profileID, objectKey, maxBytes)
 }
 
-func (s *Service) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
-	return s.runtimeService.ResolveProviderDerivativeURL(ctx, assetID, tier)
-}
-
 func (s *Service) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	return s.runtimeService.DeleteProfileAvatarByURL(ctx, storageUID, rawURL)
-}
-
-func (s *Service) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
-	return s.runtimeService.DeleteCanvasByStorageUID(ctx, storageUID)
 }
 
 func (s *Service) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
@@ -270,10 +242,6 @@ func (s *Service) DeleteUploadObjectPrefix(ctx context.Context, prefix string) e
 
 func (s *Service) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []string) error {
 	return s.runtimeService.DeleteUploadObjectPrefixes(ctx, prefixes)
-}
-
-func (s *Service) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
-	return s.runtimeService.DeleteCanvasBoardByStorageUID(ctx, storageUID, boardID)
 }
 
 func (s *Service) UsesObjectStorage(ctx context.Context) bool {

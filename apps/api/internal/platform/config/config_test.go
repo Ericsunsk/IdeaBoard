@@ -95,7 +95,7 @@ func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
 		if got := origins.WebURL("/user/boards"); got != "https://app.example.com/user/boards" {
 			t.Fatalf("WebURL() = %q", got)
 		}
-		if got := origins.APIURL("/uploads/canvas/example.png"); got != "https://api.example.com/uploads/canvas/example.png" {
+		if got := origins.APIURL("/uploads/site/assets/example.png"); got != "https://api.example.com/uploads/site/assets/example.png" {
 			t.Fatalf("APIURL() = %q", got)
 		}
 	})

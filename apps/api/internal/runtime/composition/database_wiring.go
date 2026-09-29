@@ -7,9 +7,7 @@ import (
 	"strings"
 
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
-	"ideaboard/api/internal/boards"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
-	"ideaboard/api/internal/media/assets"
 	storagepostgres "ideaboard/api/internal/media/storage/infrastructure/postgres"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -44,8 +42,6 @@ type appRepositories struct {
 	systemConfigRepo   *settings.SystemConfigRepository
 	featurePromptRepo  *prompts.FeaturePromptRepository
 	storageProfileRepo *storagepostgres.Repository
-	mediaAssetRegistry *assets.MediaAssetRegistry
-	boardRepo          *boards.Repository
 	paymentRepo        *paymentpostgres.Repository
 	adminBrandLogoRepo *adminbranding.Repository
 }
@@ -171,8 +167,6 @@ func newAppRepositories(ctx context.Context, db *pgxpool.Pool) (appRepositories,
 		systemConfigRepo:   settings.NewSystemConfigRepository(db),
 		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo: storagepostgres.NewRepository(db),
-		mediaAssetRegistry: assets.NewMediaAssetRegistry(db),
-		boardRepo:          boards.NewRepository(db),
 		paymentRepo:        paymentpostgres.NewRepository(db),
 		adminBrandLogoRepo: adminbranding.NewRepository(db),
 	}

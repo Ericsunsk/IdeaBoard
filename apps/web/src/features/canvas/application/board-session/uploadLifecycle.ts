@@ -58,10 +58,10 @@ function pathSegmentMatches(segment: string, expected: string): boolean {
   }
 }
 
-function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string): boolean {
+function isBoardTaskUploadPath(path: string, userUid: string, boardId: string): boolean {
   const segments = path.split('/').filter(Boolean)
   for (let i = 0; i + 4 < segments.length; i += 1) {
-    if (segments[i] !== 'uploads' || segments[i + 1] !== 'canvas') continue
+    if (segments[i] !== 'uploads' || segments[i + 1] !== 'tasks') continue
     if (!pathSegmentMatches(segments[i + 2] ?? '', userUid)) continue
     if (!pathSegmentMatches(segments[i + 3] ?? '', boardId)) continue
     if (segments[i + 4] !== 'content') continue
@@ -161,7 +161,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     if (!trimmed) return true
     const path = parsePathname(trimmed)
     if (!path) return false
-    return isBoardCanvasUploadPath(path, normalizedUserUid, normalizedBoardId)
+    return isBoardTaskUploadPath(path, normalizedUserUid, normalizedBoardId)
   }
 
   async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaRef: MediaRef }> {

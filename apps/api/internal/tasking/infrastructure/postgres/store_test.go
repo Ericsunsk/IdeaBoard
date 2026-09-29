@@ -83,7 +83,8 @@ func newPendingTask(taskID, workspaceID string, ownerUserID int64) *workspacetas
 }
 
 // TestWorkspaceTaskLifecycle proves create -> claim -> complete at the
-// repository level, including lease fencing and output persistence.
+// repository level, including same-token redelivery recovery, lease fencing,
+// and output persistence.
 func TestWorkspaceTaskLifecycle(t *testing.T) {
 	db := newTaskTestDB(t)
 	ctx := context.Background()
@@ -119,9 +120,13 @@ func TestWorkspaceTaskLifecycle(t *testing.T) {
 		t.Fatal("claim must preserve the execution token")
 	}
 
-	// Second claim loses the race: the task is no longer pending.
-	if _, err := store.ClaimTask(ctx, workspaceID, taskID, created.ExecutionToken); !errors.Is(err, workspacetasks.ErrStateConflict) {
-		t.Fatalf("re-claim err = %v, want state conflict", err)
+	// The same River job may be redelivered after an interruption and must
+	// reacquire its own lease. A different token remains fenced out.
+	if _, err := store.ClaimTask(ctx, workspaceID, taskID, created.ExecutionToken); err != nil {
+		t.Fatalf("same-token redelivery claim failed: %v", err)
+	}
+	if _, err := store.ClaimTask(ctx, workspaceID, taskID, "another-execution-token"); !errors.Is(err, workspacetasks.ErrStateConflict) {
+		t.Fatalf("different-token claim err = %v, want state conflict", err)
 	}
 
 	checksum := strings.Repeat("c", 64)
@@ -356,9 +361,11 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		MediaAssetIDs:   []string{"asset_abc"},
 		Params:          map[string]any{"prompt": "x"},
 		CanonicalParams: `{"schema_version":6,"service":"render"}`,
-		ResolvedModel:   "openrouter/fake-image-model",
-		ExecutionToken:  "exec_abc",
-		CancelReason:    "done",
+		// The transient worker handoff must not leak into the durable
+		// envelope (#854: no resolved_model key survives marshal).
+		ResolvedModel:  "openrouter/fake-image-model",
+		ExecutionToken: "exec_abc",
+		CancelReason:   "done",
 		BillingSnapshot: workspacetasks.BillingSnapshot{
 			SKU: "ai-image:render", TotalCredits: 10, HoldTransactionID: "hold_1",
 		},
@@ -380,7 +387,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	if envelope.CanonicalParams != `{"schema_version":6,"service":"render"}` {
 		t.Fatalf("canonical_params = %q, want round-trip", envelope.CanonicalParams)
 	}
-	if envelope.ResolvedModel != "openrouter/fake-image-model" {
-		t.Fatalf("resolved_model = %q, want round-trip", envelope.ResolvedModel)
+	if strings.Contains(string(raw), "resolved_model") {
+		t.Fatalf("envelope = %s, must not persist a resolved_model key", string(raw))
 	}
 }

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createCanvasActivationId, withTaskClientActionId } from './taskClientActionIds'
 
 describe('taskClientActionIds', () => {
   it('adds a normalized client action id to a submit request', () => {
-    const request: SubmitTaskData = {
+    const request: CanvasTaskRequestData = {
       prompt: 'generate',
-      feature: 'generation',
+      service: 'generation',
     }
 
     expect(withTaskClientActionId(request, ' canvas:action-1 ')).toEqual({

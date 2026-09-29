@@ -14,20 +14,17 @@ awareness and no pool: `ConfigRepository.ResolveModel`
 (`apps/api/internal/aigateway/model.go:75`) reads one settings key per
 workflow feature (`modelMappingKeyPrefix`, `model.go:27`), submit freezes one
 model string via `mintResolvedModel` (`apps/api/internal/tasking/workspacetasks/settle.go:210`),
-and the worker re-resolves the live mapping per execution
-(`apps/api/internal/runtime/interfaces/worker/execution/orchestrator.go:189`).
+and the workspace worker previously re-resolved the live mapping per
+execution. The worker now consumes the submit-time routing snapshot.
 Resolution travels on two unjoined tracks: `params.output_resolution`
 (`apps/api/internal/workflow/paramkeys/keys.go:43`,
 `apps/api/internal/workflow/feature_execution_codec.go:30`) for the execution
 plan, and a top-level/independent billing `resolution` on submit/quote
 (`apps/api/internal/runtime/interfaces/http/contract_v1_tasks.go:189,300,557`)
-that defaults to `"default"` in the settlement layer
+that previously had an independent settlement fallback
 (`apps/api/internal/tasking/workspacetasks/settle.go:100,147`).
-No `service_resolution_unavailable` code exists today
-(`apps/api/internal/platform/contract/errorcodes.go` has only
-`billing_pricing_unavailable` 422 / `billing_quote_unavailable` 503 plus the
-`provider_unavailable` submission error in
-`apps/api/internal/tasking/application/task/task_intake.go:393`).
+The `service_resolution_unavailable` code is the dedicated 422 outcome for
+an empty eligible pool; pricing and provider errors retain their own codes.
 
 ## Decision
 
@@ -142,9 +139,8 @@ No `service_resolution_unavailable` code exists today
     decision point. Readiness, quote, and submit call it; Worker execution
     consumes only its persisted snapshot. No layer performs an independent
     live Model lookup. Today's
-    independent lookups (`task_intake.go:397` readiness gate,
-    `settle.go:214` submit mint, `orchestrator.go:189` worker re-resolve) all
-    collapse into this seam.
+    independent readiness, submit, and worker live lookups all collapse into
+    this seam.
 11. **One-time resolution canonicalization.** `params.output_resolution` is
     the single client resolution source of truth. Ingress normalizes it once
     (against the Service's resolution policy) into the execution plan; the
@@ -153,7 +149,7 @@ No `service_resolution_unavailable` code exists today
     checked for exact agreement — never silently preferred. Today's dual
     track (`canonical_intake.go:190` plan write-back vs
     `contract_v1_tasks.go:300` top-level `resolution` vs `settle.go:100`
-    defaulting) is the gap this rule closes.
+    fallback) is the gap this rule closes.
 12. **Launched resolutions stay visible.** The frontend keeps showing launched
     `1K/2K/4K` options and MUST NOT depend on a dynamic
     `available_resolutions` list (no such source exists today and none is
@@ -200,14 +196,13 @@ fixtures follow the same rename):
   (`modelMappingKeyPrefix`, `modelMappingKey`, `ResolveModel`,
   `SaveModelMapping`), `ModelResolver`/`ModelStore` seams
   (`workspacetasks/tasks.go:297`, `settle.go:34`,
-  `task/application/task/task_intake.go:54`), submit mint
-  (`settle.go:210`), readiness gate (`task_intake.go:393`), worker live
-  lookup (`orchestrator.go:27,189`), `ResolvedModel` single-string durable
+  task application and settlement seams, submit mint, readiness gate, worker
+  live lookup, and `ResolvedModel` single-string durable
   plan field (`workspacetasks/tasks.go:209`) superseded by `RoutingSnapshot`.
 - Dual resolution tracks: top-level `resolution` on submit/quote
   (`contract_v1_tasks.go:189,300,557`) vs `params.output_resolution`
   (`paramkeys/keys.go:43`, `canonical_intake.go:190,261`); settlement
-  defaulting (`settle.go:100,147`) moves under rule 11.
+  defaulting (`settle.go:100,147`) is removed under rule 11.
 - Error-code delta: `service_resolution_unavailable` (422) is new; today's
   neighbors (`billing_pricing_unavailable` 422 unpriced SKU,
   `billing_quote_unavailable` 503 transient, `provider_unavailable`
@@ -218,6 +213,37 @@ The following decisions are frozen for #847–#854 implementation: the
 selection algorithm and 128-bit seed above, monotonic per-Service uint64 pool
 versions, immutable task-row JSONB routing snapshots, 422 fields named
 `service` and `resolution`, and vision search remaining outside the pool.
+
+## Final state (#854)
+
+#854 closes the migration with no schema change of its own: the single
+schema boundary is the #848 pool migration, and generated sqlc/OpenAPI/
+frontend artifacts are regenerated from source contracts (prose-only
+OpenAPI delta for the 422 resolution-mismatch and policy-normalization
+behaviors; no shape change).
+
+Removed in #854: the unwired legacy drawing execution package, the
+`RoutingGate`/`RejectRoutingUntilPool` fallback and its render site
+(nil resolver fails closed with the canonical sentinel), the durable
+`resolved_model` envelope key (transient worker handoff only; attempt
+facts keep `resolved_model`), and the legacy
+`tasking/application/task.SubmitTask` path with its submission store
+seam. `ResolveModel`, single-value mappings, and `workflow_kind`
+runtime uses were already gone on arrival.
+
+Enforced in #854 (rule 3): only `1k`, `2k`, and `4k` are accepted at
+ingress. Omitted resolutions are normalized to the fixed Service policy's
+canonical value; an explicit value that does not match that policy is
+rejected as 422 `validation_failed`.
+
+Explicitly deferred: the startup reaper / `abandoned` status
+vocabulary (needs a status migration plus backfill, pressure-query,
+Admin, and frontend updates). Stale `running` attempts keep reporting
+`normal_running` pressure until River redelivery converges them.
+Vision search stays outside the pool (rule 14); its admin write seam
+is unchanged.
+
+Rollback is code-only: no #854 data migration exists to undo.
 
 ## Status
 

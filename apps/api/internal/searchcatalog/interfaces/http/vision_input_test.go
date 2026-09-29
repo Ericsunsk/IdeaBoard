@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/searchcatalog/domain"
@@ -64,11 +64,11 @@ func TestMultipartVisionInputReaderIsAllOrNothing(t *testing.T) {
 type visionLibraryAssetReaderStub struct {
 	ownerID int64
 	assetID int64
-	asset   library.Asset
+	asset   librarydomain.Asset
 	err     error
 }
 
-func (s *visionLibraryAssetReaderStub) GetAsset(_ context.Context, ownerID, assetID int64) (library.Asset, error) {
+func (s *visionLibraryAssetReaderStub) GetAsset(_ context.Context, ownerID, assetID int64) (librarydomain.Asset, error) {
 	s.ownerID = ownerID
 	s.assetID = assetID
 	return s.asset, s.err
@@ -85,7 +85,7 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 	}
 	request := httptest.NewRequest(http.MethodPost, "/", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
-	reader := &visionLibraryAssetReaderStub{asset: library.Asset{OriginalURL: "https://evil.example/image.png"}}
+	reader := &visionLibraryAssetReaderStub{asset: librarydomain.Asset{OriginalURL: "https://evil.example/image.png"}}
 
 	_, err := (multipartVisionInputReader{materializer: visionReferenceMaterializer{libraryReader: reader}}).Read(request, 42)
 	if !errors.Is(err, domain.ErrVisionImageUnavailable) {

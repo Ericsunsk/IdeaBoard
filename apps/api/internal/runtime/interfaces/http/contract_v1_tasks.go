@@ -709,7 +709,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	  agree with it exactly (case-insensitive) or submit fails 422
 //	  validation_failed on details.fields.resolution; an absent top level
 //	  carries the params value through, and an absent pair applies the
-//	  service policy default (1k scalable, default fixed-resolution).
+//	  omitted resolutions are normalized to the Service policy's canonical 1k/2k/4k value.
 //	QuoteWorkspaceTaskRequest: {data: {service: string, quantity?: int64>=1, resolution?: string}}
 //
 // Prompt/mask spec notes for the merger (v1 task creation gap batch):

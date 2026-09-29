@@ -1,8 +1,7 @@
 # Media Storage Context
 
 Media Storage owns file/object storage drivers, profile configurations,
-presigned URL generation, upload authorization, media integrity verification,
-and asset location resolution.
+presigned URL generation, upload authorization, and media integrity verification.
 It does not own image derivative generation, prompt orchestration,
 task scheduling, or billing ledger facts.
 
@@ -13,7 +12,7 @@ task scheduling, or billing ledger facts.
   Free of external SDKs, SQL, and HTTP libraries.
 - `ports`: inbound/outbound contracts including `StorageDriver`,
   `StorageProfileRepository`, `ObjectStore`, `UploadAuthorizer`,
-  `StoredUploadLocator`, and transfer models.
+  and transfer models.
 - `infrastructure`: technical adapters: `local` (filesystem driver with safety
   boundary checks); `s3` (MinIO/AWS S3 compatible driver and capability probe,
   SDK and credentials sealed within); `postgres` (profile repository with
@@ -36,7 +35,6 @@ task scheduling, or billing ledger facts.
 - `StorageProfileRepository`: storage profile persistence contract.
 - `ObjectStore`: object-store access contract.
 - `UploadAuthorizer`: upload authorization contract.
-- `StoredUploadLocator`: asset location resolution contract.
 - `runtime`: upload, fetch, presign, and object lifecycle orchestration.
 - `profiles`: profile management, activation, and credential testing.
 - `authorization`: path and resource read/write authorization.
@@ -51,7 +49,7 @@ task scheduling, or billing ledger facts.
 - Storage profile secret rotation must protect past revisions until
   explicitly retired/revoked.
 - Path traversal and object key attacks must be blocked at domain boundaries
-  (`NormalizeUploadObjectKey`, `NormalizeCanvasStorageUserSegment`).
+  (`NormalizeUploadObjectKey`, `NormalizeStorageUserSegment`).
 - Presigned URLs must clamp TTL to safe bounds
   (`DefaultPresignTTL` / `MaxPresignTTL`).
 - The root package is a composition surface only; production code depends

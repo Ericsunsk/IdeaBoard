@@ -43,13 +43,6 @@ export type CanvasTaskRequestData = {
   params?: CanvasTaskParams
 }
 
-// Legacy aliases kept so the adapter seam reads without churn. New code
-// prefers the `CanvasTask*` names.
-export type SubmitTaskParams = CanvasTaskParams
-export type SubmitTaskData = CanvasTaskRequestData
-export type SubmitTaskRequest = CanvasTaskRequestData
-export type SubmitTaskReadinessRequestData = CanvasTaskRequestData
-
 export type SubmitTaskReadinessBilling = {
   sufficient: boolean
   unit_credits: number

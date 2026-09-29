@@ -90,6 +90,18 @@ func RenderPaginated[T any](c *gin.Context, data T, meta PageMeta) {
 	c.JSON(http.StatusOK, SuccessEnvelope[T]{Data: data, Meta: &metaCopy})
 }
 
+// RenderPaginatedWithMeta renders 200 with a caller-supplied meta
+// payload under the unified {data, meta} envelope (Baseline 5.5 shape,
+// extended meta for endpoints whose list meta carries more than the
+// cursor, e.g. control task status counts). Prefer RenderPaginated;
+// use this only when PageMeta cannot carry the endpoint's meta.
+func RenderPaginatedWithMeta[T, M any](c *gin.Context, data T, meta M) {
+	c.JSON(http.StatusOK, struct {
+		Data T `json:"data"`
+		Meta M `json:"meta"`
+	}{Data: data, Meta: meta})
+}
+
 // RenderError renders the error envelope with an explicit status.
 func RenderError(c *gin.Context, status int, code Code, message string) {
 	RenderErrorWithDetails(c, status, code, message, nil)

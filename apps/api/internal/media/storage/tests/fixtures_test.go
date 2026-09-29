@@ -37,26 +37,18 @@ type (
 	StorageStoreOptions           = ports.StorageStoreOptions
 	StoredUploadRef               = ports.StoredUploadRef
 	StoredUploadObject            = ports.StoredUploadObject
-	StoredUploadLookup            = ports.StoredUploadLookup
-	StoredDerivativeLookup        = ports.StoredDerivativeLookup
-	StoredUploadLocation          = ports.StoredUploadLocation
-	StoredUploadLocator           = ports.StoredUploadLocator
-	StoredDerivativeLocator       = ports.StoredDerivativeLocator
 	ObjectStore                   = ports.ObjectStore
 	PresignedURL                  = ports.PresignedURL
 	PresignRequest                = ports.PresignRequest
 	UploadResourceKind            = domain.UploadResourceKind
 	UploadResource                = domain.UploadResource
-	UploadCanvasResource          = domain.UploadCanvasResource
 	UploadProfileAvatarResource   = domain.UploadProfileAvatarResource
 	UploadTaskOutputResource      = domain.UploadTaskOutputResource
 	UploadLibraryResource         = domain.UploadLibraryResource
 	UploadSiteAssetResource       = domain.UploadSiteAssetResource
-	UploadBoardAccessResolver     = ports.UploadBoardAccessResolver
 	UploadOwnerStorageUIDResolver = ports.UploadOwnerStorageUIDResolver
 	ReadableUploadAccess          = ports.ReadableUploadAccess
 	ReadableUploadAccessResult    = ports.ReadableUploadAccessResult
-	TaskMediaAuthorizer           = authorization.TaskMediaAuthorizer
 	IntegrityVerifier             = integrity.IntegrityVerifier
 	IntegrityConfig               = integrity.IntegrityConfig
 	S3CompatibleService           = s3.S3CompatibleService
@@ -81,7 +73,6 @@ const (
 	storageSecretAccessKeyName        = "secret_access_key"
 
 	UploadResourceKindSiteAsset     = domain.UploadResourceKindSiteAsset
-	UploadResourceKindCanvas        = domain.UploadResourceKindCanvas
 	UploadResourceKindProfileAvatar = domain.UploadResourceKindProfileAvatar
 	UploadResourceKindTaskOutput    = domain.UploadResourceKindTaskOutput
 	UploadResourceKindLibrary       = domain.UploadResourceKindLibrary
@@ -102,19 +93,18 @@ var (
 	ErrUploadAccessDependencyMissing  = domain.ErrUploadAccessDependencyMissing
 	ErrProviderHTTPSUnavailable       = domain.ErrProviderHTTPSUnavailable
 
-	NewStorageService                 = storage.NewService
-	NewStorageProfileRepository       = newStorageProfileRepository
-	NewTaskMediaAuthorizer            = authorization.NewTaskMediaAuthorizer
-	NewReadableUploadAccess           = authorization.NewReadableUploadAccess
-	NewIntegrityVerifier              = integrity.NewIntegrityVerifier
-	ParseUploadResource               = domain.ParseUploadResource
-	NormalizeUploadObjectKey          = domain.NormalizeUploadObjectKey
-	NormalizeCanvasStorageUserSegment = domain.NormalizeCanvasStorageUserSegment
-	UserUploadObjectPrefixes          = domain.UserUploadObjectPrefixes
-	ImageDerivativeObjectKey          = domain.ImageDerivativeObjectKey
-	IsImageDerivativeObjectKey        = domain.IsImageDerivativeObjectKey
-	PublicUploadURL                   = publicUploadURL
-	S3CompatibleProfileConfigFromMap  = s3.S3CompatibleProfileConfigFromMap
+	NewStorageService                = storage.NewService
+	NewStorageProfileRepository      = newStorageProfileRepository
+	NewReadableUploadAccess          = authorization.NewReadableUploadAccess
+	NewIntegrityVerifier             = integrity.NewIntegrityVerifier
+	ParseUploadResource              = domain.ParseUploadResource
+	NormalizeUploadObjectKey         = domain.NormalizeUploadObjectKey
+	NormalizeStorageUserSegment      = domain.NormalizeStorageUserSegment
+	UserUploadObjectPrefixes         = domain.UserUploadObjectPrefixes
+	ImageDerivativeObjectKey         = domain.ImageDerivativeObjectKey
+	IsImageDerivativeObjectKey       = domain.IsImageDerivativeObjectKey
+	PublicUploadURL                  = publicUploadURL
+	S3CompatibleProfileConfigFromMap = s3.S3CompatibleProfileConfigFromMap
 )
 
 func publicUploadURL(objectKey string) string {
@@ -131,7 +121,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, nil, "")
+	service := NewStorageService(repo, "")
 	service.SetCapabilityProbe(func(context.Context, *S3CompatibleConfig) error { return nil })
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
@@ -145,7 +135,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, nil, "")
+	service := NewStorageService(repo, "")
 	service.SetCapabilityProbe(func(context.Context, *S3CompatibleConfig) error { return nil })
 	return service, repo
 }

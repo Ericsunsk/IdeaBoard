@@ -29,8 +29,8 @@ func TestMultipartUploadUsesDetectedFormatForKeyAndMetadata(t *testing.T) {
 		t.Fatalf("encode png: %v", err)
 	}
 	file := multipartHeader(t, "client.jpg", payload.Bytes())
-	service := NewStorageService(nil, nil, "")
-	stored, err := service.UploadRefWithProfile(context.Background(), benchmarkLocalProfile(), file, StorageStoreOptions{DirPrefix: "canvas/test"})
+	service := NewStorageService(nil, "")
+	stored, err := service.UploadRefWithProfile(context.Background(), benchmarkLocalProfile(), file, StorageStoreOptions{DirPrefix: "profile/OWNR1A/avatar"})
 	if err != nil {
 		t.Fatalf("upload: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestStoreBytesUsesDetectedFormatForKeyAndMetadata(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(originalWD) })
 
 	payload := tinyPNGBytes(t)
-	service := NewStorageService(nil, nil, "")
+	service := NewStorageService(nil, "")
 	profile := service.DefaultLocalStorageProfile(true)
 	ref, err := service.StoreBytesRefWithProfile(context.Background(), profile, "provider.jpg", payload, StorageStoreOptions{ObjectKey: "uploads/tasks/1/result.jpg"})
 	if err != nil {

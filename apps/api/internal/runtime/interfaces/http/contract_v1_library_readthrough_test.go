@@ -20,7 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/outbound"
@@ -104,7 +105,7 @@ func readThroughPNGBytes(t *testing.T) []byte {
 
 type v1ReadThroughFixture struct {
 	engine  *gin.Engine
-	lib     *library.InMemoryWorkspaceLibraryStore
+	lib     *librarymemory.InMemoryWorkspaceLibraryStore
 	media   *workspacemedia.InMemoryWorkspaceMediaStore
 	objects *fakeV1MediaObjects
 	ws      *tenancy.Workspace
@@ -119,7 +120,7 @@ func newV1ReadThroughFixture(t *testing.T, fetcher interface {
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
-	lib := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	lib := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	objects := &fakeV1MediaObjects{objects: make(map[string][]byte)}
 	const owner, member = 11, 12
@@ -141,14 +142,14 @@ func newV1ReadThroughFixture(t *testing.T, fetcher interface {
 
 func (f *v1ReadThroughFixture) saveRemoteAsset(t *testing.T, sourceID string) string {
 	t.Helper()
-	publicID, err := library.NewV1AssetPublicID()
+	publicID, err := librarydomain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
 	providerURL := "https://images.unsplash.com/" + sourceID
-	saved, created, err := f.lib.SaveAsset(context.Background(), f.ws.PublicID, library.V1SaveAssetInput{
-		Asset: library.AssetInput{
-			Provider: library.ProviderUnsplash, SourceID: sourceID,
+	saved, created, err := f.lib.SaveAsset(context.Background(), f.ws.PublicID, librarydomain.V1SaveAssetInput{
+		Asset: librarydomain.AssetInput{
+			Provider: librarydomain.ProviderUnsplash, SourceID: sourceID,
 			SourceURL: providerURL, PreviewURL: providerURL, OriginalURL: providerURL,
 			Width: 100, Height: 80,
 		},
@@ -163,7 +164,7 @@ func (f *v1ReadThroughFixture) mediaPath(assetID string) string {
 	return "/api/v1/workspaces/" + f.ws.PublicID + "/media-assets/" + assetID
 }
 
-func (f *v1ReadThroughFixture) jobs(t *testing.T) []*library.V1Materialization {
+func (f *v1ReadThroughFixture) jobs(t *testing.T) []*librarydomain.V1Materialization {
 	t.Helper()
 	all, err := f.lib.ListMaterializations(context.Background(), f.ws.PublicID)
 	if err != nil {
@@ -172,7 +173,7 @@ func (f *v1ReadThroughFixture) jobs(t *testing.T) []*library.V1Materialization {
 	return all
 }
 
-func (f *v1ReadThroughFixture) pollJobs(t *testing.T, want func([]*library.V1Materialization) bool) []*library.V1Materialization {
+func (f *v1ReadThroughFixture) pollJobs(t *testing.T, want func([]*librarydomain.V1Materialization) bool) []*librarydomain.V1Materialization {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -205,7 +206,7 @@ func TestV1LibraryReadThroughMissTriggerFound(t *testing.T) {
 		t.Fatalf("fetch calls = %d, want 1 (miss triggers exactly one fetch)", got)
 	}
 	all := f.jobs(t)
-	if len(all) != 1 || all[0].Status != library.V1MaterializationCompleted || !contract.IsAssetID(all[0].MediaAssetID) {
+	if len(all) != 1 || all[0].Status != librarydomain.V1MaterializationCompleted || !contract.IsAssetID(all[0].MediaAssetID) {
 		t.Fatalf("jobs = %+v, want one completed job linked to an asset_ id", all)
 	}
 
@@ -240,7 +241,7 @@ func TestV1LibraryReadThroughUnknownAsset(t *testing.T) {
 	fetcher := &readThroughStubFetcher{data: readThroughPNGBytes(t)}
 	f := newV1ReadThroughFixture(t, fetcher, true)
 
-	missing, err := library.NewV1AssetPublicID()
+	missing, err := librarydomain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +274,7 @@ func TestV1LibraryReadThroughDedupsInFlight(t *testing.T) {
 	if status != http.StatusNotFound {
 		t.Fatalf("first read = %d, want 404 while fetch runs", status)
 	}
-	f.pollJobs(t, func(all []*library.V1Materialization) bool { return len(all) == 1 })
+	f.pollJobs(t, func(all []*librarydomain.V1Materialization) bool { return len(all) == 1 })
 
 	status, _, _ = doV1(t, f.engine, v1Call{method: "GET", path: f.mediaPath(lassetID), userID: f.member})
 	if status != http.StatusNotFound {
@@ -284,8 +285,8 @@ func TestV1LibraryReadThroughDedupsInFlight(t *testing.T) {
 	}
 
 	close(fetcher.release)
-	completed := f.pollJobs(t, func(all []*library.V1Materialization) bool {
-		return len(all) == 1 && all[0].Status == library.V1MaterializationCompleted
+	completed := f.pollJobs(t, func(all []*librarydomain.V1Materialization) bool {
+		return len(all) == 1 && all[0].Status == librarydomain.V1MaterializationCompleted
 	})
 	if !contract.IsAssetID(completed[0].MediaAssetID) {
 		t.Fatalf("completed link = %q, want asset_ shape", completed[0].MediaAssetID)
@@ -314,7 +315,7 @@ func TestV1LibraryReadThroughFetchFailureRecordsFailed(t *testing.T) {
 		t.Fatalf("first read = %d, want 404 (fetch fails async)", status)
 	}
 	all := f.jobs(t)
-	if len(all) != 1 || all[0].Status != library.V1MaterializationFailed {
+	if len(all) != 1 || all[0].Status != librarydomain.V1MaterializationFailed {
 		t.Fatalf("jobs = %+v, want one failed job", all)
 	}
 	if all[0].ErrorMessage != "素材转存失败，请稍后重试" {
@@ -330,7 +331,7 @@ func TestV1LibraryReadThroughFetchFailureRecordsFailed(t *testing.T) {
 		t.Fatalf("jobs = %d, want 2 (retry records a new job, terminal records stay immutable)", len(all))
 	}
 	for _, job := range all {
-		if job.Status != library.V1MaterializationFailed {
+		if job.Status != librarydomain.V1MaterializationFailed {
 			t.Fatalf("job %+v, want failed", job)
 		}
 	}

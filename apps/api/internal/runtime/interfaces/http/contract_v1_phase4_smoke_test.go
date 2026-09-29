@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -40,7 +40,7 @@ type phase4Fixture struct {
 	ws     *tenancy.Workspace
 	tasks  *workspacetasks.InMemoryStore
 	media  *workspacemedia.InMemoryWorkspaceMediaStore
-	lib    *library.InMemoryWorkspaceLibraryStore
+	lib    *librarymemory.InMemoryWorkspaceLibraryStore
 	queue  *fakeTaskQueue
 }
 
@@ -51,7 +51,7 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 	dir := newStaticUserDirectory()
 	tasks := workspacetasks.NewInMemoryStoreForTests()
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
-	lib := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	lib := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	quoter := &fakeTaskQuoter{}
 	holder := newFakeTaskHolder()
 	queue := &fakeTaskQueue{}

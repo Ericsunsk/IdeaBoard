@@ -10,7 +10,7 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 )
 
-var stringKeys = []string{"image_url", "mask_image_url", "canvas_image_ref"}
+var stringKeys = []string{"image_url", "mask_image_url"}
 var listKeys = []string{"image_urls", "mask_image_urls", "reference_image_urls"}
 
 type DataImage struct {
@@ -63,7 +63,7 @@ func isSupportedUploadPath(parts []string) bool {
 		return false
 	}
 	switch parts[0] {
-	case "canvas", "tasks":
+	case "tasks":
 		return parts[2] != ""
 	case "profile":
 		return parts[2] == "avatar" || parts[2] == "vector"

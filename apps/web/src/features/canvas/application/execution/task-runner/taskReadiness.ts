@@ -1,6 +1,6 @@
 import type {
   SubmitTaskReadinessData,
-  SubmitTaskReadinessRequestData,
+  CanvasTaskRequestData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessages'
 import { i18n } from '../../../../../shared/i18n'
@@ -12,7 +12,7 @@ import {
 import { fetchCanvasWorkspaceTaskReadiness } from '../workspace/canvasWorkspaceTaskAdapter'
 
 export async function assertTaskSubmitReady(
-  request: SubmitTaskReadinessRequestData,
+  request: CanvasTaskRequestData,
   fallbackMessage: string = i18n.global.t('common.errors.taskSubmitFailed'),
   options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData> {

@@ -17,7 +17,7 @@ package httpapi
 //
 // Materialization has no HTTP surface: the former
 // POST/GET .../library/materializations routes, the lmat_ job DTO,
-// and the library.materialization_* emitters were deleted (owner hard
+// and the librarydomain.materialization_* emitters were deleted (owner hard
 // cut); materialization runs internal-only.
 //
 // Auth model: ResolvePrincipal + RequireWorkspaceCapability for the
@@ -42,7 +42,7 @@ package httpapi
 // assets only — NOT a general proxy; unknown references report
 // unresolved per item.
 //
-// Store-level lmat_ job records, the library.ErrV1MaterializationNotFound
+// Store-level lmat_ job records, the domain.ErrV1MaterializationNotFound
 // sentinel, and the library_materialization_not_found code stay frozen
 // for internal tooling; this surface renders no materialization 404.
 //
@@ -57,7 +57,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
+	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -91,7 +92,7 @@ type V1BillingQuoter interface {
 // V1CreditSettler interfaces below stay defined here because the search
 // surface still settles through them.
 type ContractV1LibraryDeps struct {
-	Store       library.WorkspaceLibraryStore
+	Store       libraryports.WorkspaceLibraryStore
 	Idempotency *contract.IdempotencyStore
 }
 
@@ -152,24 +153,24 @@ func (h *contractV1Handler) libraryWorkspaceContext(c *gin.Context, identityPrin
 
 func renderLibraryError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, library.ErrV1FolderNotFound):
+	case errors.Is(err, librarydomain.ErrV1FolderNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
-	case errors.Is(err, library.ErrV1AssetNotFound):
+	case errors.Is(err, librarydomain.ErrV1AssetNotFound):
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
-	case errors.Is(err, library.ErrV1ResolveTooMany):
+	case errors.Is(err, librarydomain.ErrV1ResolveTooMany):
 		contract.RenderErrorWithDetails(c, http.StatusBadRequest, contract.CodeBadRequest,
 			msgRenderLibraryError, contract.FieldErrors{Fields: map[string]string{"items": "too_many"}})
-	case errors.Is(err, library.ErrV1FolderNameConflict):
+	case errors.Is(err, librarydomain.ErrV1FolderNameConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict5)
-	case errors.Is(err, library.ErrSystemFolderImmutable):
+	case errors.Is(err, librarydomain.ErrSystemFolderImmutable):
 		contract.RenderError(c, http.StatusConflict, contract.CodeConflict, msgConflict6)
-	case errors.Is(err, library.ErrInvalidFolderName):
+	case errors.Is(err, librarydomain.ErrInvalidFolderName):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			msgRenderLibraryError2, contract.FieldErrors{Fields: map[string]string{"name": "invalid"}})
-	case errors.Is(err, library.ErrInvalidProvider):
+	case errors.Is(err, librarydomain.ErrInvalidProvider):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			msgRenderLibraryError3, contract.FieldErrors{Fields: map[string]string{"provider": "invalid"}})
-	case errors.Is(err, library.ErrInvalidSource):
+	case errors.Is(err, librarydomain.ErrInvalidSource):
 		contract.RenderErrorWithDetails(c, contract.StatusOf(contract.CodeValidationFailed), contract.CodeValidationFailed,
 			msgRenderLibraryError4, contract.FieldErrors{Fields: map[string]string{"asset": "invalid"}})
 	default:
@@ -226,7 +227,7 @@ type v1LibraryFolderDTO struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
-func toLibraryFolderDTO(workspacePublicID string, folder *library.V1Folder) v1LibraryFolderDTO {
+func toLibraryFolderDTO(workspacePublicID string, folder *librarydomain.V1Folder) v1LibraryFolderDTO {
 	return v1LibraryFolderDTO{
 		ID: folder.PublicID, WorkspaceID: workspacePublicID, Name: folder.Name,
 		CreatedAt: v1FormatTime(folder.CreatedAt), UpdatedAt: v1FormatTime(folder.UpdatedAt),
@@ -250,7 +251,7 @@ type v1LibraryAssetDTO struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
-func toLibraryAssetDTO(workspacePublicID string, asset *library.V1Asset) v1LibraryAssetDTO {
+func toLibraryAssetDTO(workspacePublicID string, asset *librarydomain.V1Asset) v1LibraryAssetDTO {
 	return v1LibraryAssetDTO{
 		ID: asset.PublicID, WorkspaceID: workspacePublicID, FolderID: asset.FolderPublicID,
 		Provider: asset.Provider, SourceID: asset.SourceID,
@@ -342,7 +343,7 @@ func (h *contractV1Handler) createLibraryFolder(c *gin.Context) {
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 		hash := contract.HashIdempotencyRequest("library:folder-create", workspace.PublicID, name)
 		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "folder-create", key, hash, func() (any, error) {
-			publicID, mintErr := library.NewV1FolderPublicID()
+			publicID, mintErr := librarydomain.NewV1FolderPublicID()
 			if mintErr != nil {
 				return nil, mintErr
 			}
@@ -355,7 +356,7 @@ func (h *contractV1Handler) createLibraryFolder(c *gin.Context) {
 			renderLibraryError(c, fnErr)
 			return
 		}
-		created, ok := result.(*library.V1Folder)
+		created, ok := result.(*librarydomain.V1Folder)
 		if !ok || created == nil {
 			renderLibraryError(c, errors.New("library: folder-create type mismatch"))
 			return
@@ -370,9 +371,9 @@ type v1RenameLibraryFolderBody struct {
 	} `json:"data"`
 }
 
-func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy.Workspace, folderID string) (*library.V1Folder, bool) {
+func (h *contractV1Handler) libraryFolderByID(c *gin.Context, workspace *tenancy.Workspace, folderID string) (*librarydomain.V1Folder, bool) {
 	folderID = strings.TrimSpace(folderID)
-	if !library.IsV1FolderID(folderID) {
+	if !librarydomain.IsV1FolderID(folderID) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 		c.Abort()
 		return nil, false
@@ -421,7 +422,7 @@ func (h *contractV1Handler) deleteLibraryFolder(c *gin.Context) {
 		// idempotent fn so replays converge instead of 404ing on the
 		// already-deleted folder.
 		folderID := strings.TrimSpace(c.Param("folder_id"))
-		if !library.IsV1FolderID(folderID) {
+		if !librarydomain.IsV1FolderID(folderID) {
 			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryFolderNotFound, msgLibraryFolderNotFound)
 			c.Abort()
 			return
@@ -510,9 +511,9 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 			writeV1InputError(c)
 			return
 		}
-		input := library.V1SaveAssetInput{
+		input := librarydomain.V1SaveAssetInput{
 			FolderPublicID: strings.TrimSpace(body.Data.FolderID),
-			Asset: library.AssetInput{
+			Asset: librarydomain.AssetInput{
 				Provider: body.Data.Provider, SourceID: body.Data.SourceID,
 				SourceURL: body.Data.SourceURL, PreviewURL: body.Data.PreviewURL, OriginalURL: body.Data.OriginalURL,
 				Title: body.Data.Title, Author: body.Data.Author,
@@ -530,7 +531,7 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 		hash := contract.HashIdempotencyRequest("library:asset-save", workspace.PublicID,
 			strings.ToLower(strings.TrimSpace(body.Data.Provider)), strings.TrimSpace(body.Data.SourceID), input.FolderPublicID)
 		result, _, fnErr, ok := h.libraryDo(c, externalUser, identityPrincipal.UserID(), "asset-save", key, hash, func() (any, error) {
-			publicID, mintErr := library.NewV1AssetPublicID()
+			publicID, mintErr := librarydomain.NewV1AssetPublicID()
 			if mintErr != nil {
 				return nil, mintErr
 			}
@@ -561,13 +562,13 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 }
 
 type v1SavedAsset struct {
-	Asset   *library.V1Asset
+	Asset   *librarydomain.V1Asset
 	Created bool
 }
 
-func (h *contractV1Handler) libraryAssetOr404(c *gin.Context, workspace *tenancy.Workspace) (*library.V1Asset, bool) {
+func (h *contractV1Handler) libraryAssetOr404(c *gin.Context, workspace *tenancy.Workspace) (*librarydomain.V1Asset, bool) {
 	raw := strings.TrimSpace(c.Param("asset_id"))
-	if !library.IsV1AssetID(raw) {
+	if !librarydomain.IsV1AssetID(raw) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 		c.Abort()
 		return nil, false
@@ -612,7 +613,7 @@ func (h *contractV1Handler) deleteLibraryAsset(c *gin.Context) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
 		assetID := strings.TrimSpace(c.Param("asset_id"))
-		if !library.IsV1AssetID(assetID) {
+		if !librarydomain.IsV1AssetID(assetID) {
 			contract.RenderError(c, http.StatusNotFound, contract.CodeLibraryAssetNotFound, msgLibraryAssetNotFound)
 			c.Abort()
 			return
@@ -669,9 +670,9 @@ type v1ResolveLibraryResponseDTO struct {
 func (h *contractV1Handler) resolveLibraryAssets(c *gin.Context) {
 	withV1WorkspaceBody(h, c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx, body v1ResolveLibraryAssetsBody) {
 		workspace := wctx.Workspace
-		items := make([]library.V1ResolveItem, 0, len(body.Data.Items))
+		items := make([]librarydomain.V1ResolveItem, 0, len(body.Data.Items))
 		for _, item := range body.Data.Items {
-			items = append(items, library.V1ResolveItem{
+			items = append(items, librarydomain.V1ResolveItem{
 				Provider: item.Provider, SourceID: item.SourceID, SourceURL: item.SourceURL,
 			})
 		}

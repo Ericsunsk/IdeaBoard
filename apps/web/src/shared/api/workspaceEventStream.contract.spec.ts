@@ -387,7 +387,7 @@ describe('waitWorkspaceTaskTerminal', () => {
           display_name: 'Render',
           price_version_id: 1,
           price_version: 1,
-          output_resolution: 'default',
+          output_resolution: '1k',
           unit_credits: 0,
           quantity: 1,
           total_credits: 0,

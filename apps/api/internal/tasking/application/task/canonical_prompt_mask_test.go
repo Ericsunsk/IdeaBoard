@@ -49,7 +49,7 @@ func TestCompileWorkspaceParamsRejectsMissingPrompt(t *testing.T) {
 }
 
 // Prompt-ignored features (cutout, upscale) drop user text: binary media
-// operations never consume it (legacy parity, documented).
+// operations never consume it (documented).
 func TestCompileWorkspaceParamsDropsPromptWhenIgnored(t *testing.T) {
 	raw, err := CompileWorkspaceParams(workflow.FeatureSlugUpscale, "should be dropped", map[string]interface{}{
 		CompilerWorkspaceMediaAssetIDsParam: []string{"asset_input1"},

@@ -20,7 +20,7 @@ describe('rebuildBoardMediaRefs', () => {
               id: 'external:prompt',
               sourceType: 'external',
               sourceId: 'prompt-input',
-              url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
+              url: '/uploads/tasks/user-uid/board-a/content/prompt-input.png',
               ratio: 1,
               mediaAssetId: 301,
             },

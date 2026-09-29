@@ -563,7 +563,7 @@ func TestWorkspaceTaskWorkerClaimConflictRetries(t *testing.T) {
 	ctx := context.Background()
 	created := env.submit(t, nil)
 	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
-	if _, err := env.store.ClaimTask(ctx, "ws_test", created.ID, created.ExecutionToken); err != nil {
+	if _, err := env.store.ClaimTask(ctx, "ws_test", created.ID, "another-execution-token"); err != nil {
 		t.Fatalf("ClaimTask: %v", err)
 	}
 	called := false
@@ -576,6 +576,37 @@ func TestWorkspaceTaskWorkerClaimConflictRetries(t *testing.T) {
 	}
 	if called {
 		t.Fatal("provider called without the lease, want no generate")
+	}
+}
+
+// A River redelivery carries the same execution token as the interrupted
+// attempt. It must reacquire that lease and continue execution instead of
+// retrying forever on a claim conflict.
+func TestWorkspaceTaskWorkerRedeliveryReacquiresInterruptedLease(t *testing.T) {
+	env := newWorkerTestEnv()
+	ctx := context.Background()
+	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
+	if _, err := env.store.ClaimTask(ctx, "ws_test", created.ID, created.ExecutionToken); err != nil {
+		t.Fatalf("initial ClaimTask: %v", err)
+	}
+	called := false
+	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+		called = true
+		return workerTestRemoteOutput(), nil
+	}), nil)
+	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
+		t.Fatalf("redelivered Work: %v", err)
+	}
+	if !called {
+		t.Fatal("provider was not called after same-token lease reacquisition")
+	}
+	got, err := env.store.GetTask(ctx, "ws_test", created.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != workspacetasks.StatusCompleted {
+		t.Fatalf("status = %q, want completed", got.Status)
 	}
 }
 

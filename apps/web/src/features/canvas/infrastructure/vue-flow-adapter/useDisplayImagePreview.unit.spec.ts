@@ -192,7 +192,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   it('resizes managed uploads in the browser when no media asset id is available', async () => {
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
@@ -209,7 +209,7 @@ describe('useDisplayImagePreview', () => {
     })
 
     expect(fetch).toHaveBeenCalledWith(
-      '/uploads/canvas/U123/board/content/image.png',
+      '/uploads/tasks/U123/board/content/image.png',
       expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
     )
     expect(createImageBitmap).toHaveBeenCalled()
@@ -218,7 +218,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   it('uses the canonical media derivative and never falls back to the original asset', async () => {
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
@@ -239,7 +239,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   it('keeps the current media derivative visible while a zoom tier refreshes', async () => {
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const maxSide = ref(256)
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
@@ -279,7 +279,7 @@ describe('useDisplayImagePreview', () => {
     }
     vi.stubGlobal('Image', DeferredImage)
 
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/first.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
@@ -291,7 +291,7 @@ describe('useDisplayImagePreview', () => {
     decodeResolvers.shift()?.()
     await vi.waitFor(() => expect(preview.displayUrl.value).toContain('first.png'))
 
-    sourceUrl.value = '/uploads/canvas/U123/board/content/second.png'
+    sourceUrl.value = '/uploads/tasks/U123/board/content/second.png'
     await nextTick()
     expect(preview.displayUrl.value).toContain('first.png')
 
@@ -302,7 +302,7 @@ describe('useDisplayImagePreview', () => {
   })
 
   it('keeps the decoded frame when the stage leaves the viewport', async () => {
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const isVisible = ref(true)
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
@@ -335,7 +335,7 @@ describe('useDisplayImagePreview', () => {
     }
     vi.stubGlobal('Image', DeferredImage)
 
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/first.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: null }))
@@ -344,16 +344,16 @@ describe('useDisplayImagePreview', () => {
     await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
     decodeResolvers.shift()?.()
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/first.png')
+      expect(preview.displayUrl.value).toContain('/uploads/tasks/U123/board/content/first.png')
     })
 
-    sourceUrl.value = '/uploads/canvas/U123/board/content/second.png'
+    sourceUrl.value = '/uploads/tasks/U123/board/content/second.png'
     await nextTick()
     expect(preview.displayUrl.value).toBe('')
     await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
     const resolveSecond = decodeResolvers.shift()
 
-    sourceUrl.value = '/uploads/canvas/U123/board/content/third.png'
+    sourceUrl.value = '/uploads/tasks/U123/board/content/third.png'
     await nextTick()
     await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
     resolveSecond?.()
@@ -362,14 +362,14 @@ describe('useDisplayImagePreview', () => {
 
     decodeResolvers.shift()?.()
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/third.png')
+      expect(preview.displayUrl.value).toContain('/uploads/tasks/U123/board/content/third.png')
     })
     scope.stop()
   })
 
   it('falls back to the original managed upload when browser preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/fallback.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: 640 }))
@@ -377,13 +377,13 @@ describe('useDisplayImagePreview', () => {
 
     expect(preview.displayUrl.value).toBe('')
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/fallback.png')
+      expect(preview.displayUrl.value).toContain('/uploads/tasks/U123/board/content/fallback.png')
     })
     scope.stop()
   })
 
   it('resolves upload refs before the first image render', async () => {
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/image.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
@@ -394,7 +394,7 @@ describe('useDisplayImagePreview', () => {
     if (!preview) throw new Error('preview composable was not created')
 
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toBe('/uploads/canvas/U123/board/content/image.png')
+      expect(preview.displayUrl.value).toBe('/uploads/tasks/U123/board/content/image.png')
     })
     scope.stop()
   })
@@ -402,7 +402,7 @@ describe('useDisplayImagePreview', () => {
   it('resolves local upload refs through the configured API origin', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
     vi.resetModules()
-    const sourceUrl = ref('/uploads/canvas/U123/board/content/local.png')
+    const sourceUrl = ref('/uploads/tasks/U123/board/content/local.png')
     const { useDisplayImagePreview } = await importPreviewModule()
     const scope = effectScope()
     const preview = scope.run(() =>
@@ -413,7 +413,7 @@ describe('useDisplayImagePreview', () => {
     if (!preview) throw new Error('preview composable was not created')
 
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toBe('/uploads/canvas/U123/board/content/local.png')
+      expect(preview.displayUrl.value).toBe('/uploads/tasks/U123/board/content/local.png')
     })
     scope.stop()
   })

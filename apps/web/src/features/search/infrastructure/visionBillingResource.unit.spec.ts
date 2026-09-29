@@ -11,7 +11,7 @@ function quoteFixture(totalCredits: number): Record<string, unknown> {
       display_name: 'Vision search',
       price_version_id: 1,
       price_version: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       unit_credits: totalCredits,
       quantity: 1,
       total_credits: totalCredits,

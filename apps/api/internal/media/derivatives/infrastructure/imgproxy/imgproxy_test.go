@@ -20,11 +20,11 @@ func TestSignPathMatchesDocumentedVector(t *testing.T) {
 
 func TestTierURLGeometry(t *testing.T) {
 	cfg := Config{BaseURL: "http://127.0.0.1:8080", KeyHex: strings.Repeat("ab", 16), SaltHex: strings.Repeat("cd", 16)}
-	url, err := cfg.TierURL(domain.TierThumb, "local:///uploads/canvas/u/b/content/image.png")
+	url, err := cfg.TierURL(domain.TierThumb, "local:///uploads/tasks/u/b/content/image.png")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(url, "http://127.0.0.1:8080/") || !strings.Contains(url, "/rs:fit:256:256/plain/local:///uploads/canvas/u/b/content/image.png@webp") {
+	if !strings.HasPrefix(url, "http://127.0.0.1:8080/") || !strings.Contains(url, "/rs:fit:256:256/plain/local:///uploads/tasks/u/b/content/image.png@webp") {
 		t.Fatalf("unexpected tier URL %s", url)
 	}
 	if _, err := cfg.TierURL("nope", "local:///x.png"); err == nil {
@@ -55,8 +55,8 @@ func TestValidateRejectsWeakBindings(t *testing.T) {
 func TestLocalSource(t *testing.T) {
 	// Builtin-local keys carry the uploads root, which is mounted below /data
 	// by Compose and therefore remains part of the imgproxy source path.
-	got, err := LocalSource("uploads/canvas/u/b/content/image.png")
-	if err != nil || got != "local:///uploads/canvas/u/b/content/image.png" {
+	got, err := LocalSource("uploads/tasks/u/b/content/image.png")
+	if err != nil || got != "local:///uploads/tasks/u/b/content/image.png" {
 		t.Fatalf("got %q err %v", got, err)
 	}
 	if _, err := LocalSource("  "); err == nil {

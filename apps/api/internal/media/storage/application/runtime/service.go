@@ -25,26 +25,19 @@ const maxRemoteFileSize = 50 * 1024 * 1024
 type Service struct {
 	profiles        *profiles.Service
 	drivers         profiles.DriverResolver
-	assetLocator    ports.StoredUploadLocator
 	publicAPIOrigin string
 }
 
 func NewService(
 	profiles *profiles.Service,
 	drivers profiles.DriverResolver,
-	assetLocator ports.StoredUploadLocator,
 	publicAPIOrigin string,
 ) *Service {
 	return &Service{
 		profiles:        profiles,
 		drivers:         drivers,
-		assetLocator:    assetLocator,
 		publicAPIOrigin: strings.TrimRight(strings.TrimSpace(publicAPIOrigin), "/"),
 	}
-}
-
-func (s *Service) SetAssetLocator(locator ports.StoredUploadLocator) {
-	s.assetLocator = locator
 }
 
 func (s *Service) Profiles() *profiles.Service {
@@ -312,44 +305,6 @@ func (s *Service) ReadObjectAtProfile(ctx context.Context, profileID, objectKey 
 	return driver.Read(ctx, profile, objectKey, maxBytes)
 }
 
-func (s *Service) ResolveProviderDerivativeURL(ctx context.Context, assetID int64, tier string) (string, error) {
-	if s == nil || s.assetLocator == nil || assetID <= 0 || strings.TrimSpace(tier) == "" {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL)
-	}
-	locator, ok := s.assetLocator.(ports.StoredDerivativeLocator)
-	if !ok {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL)
-	}
-	location, found, err := locator.LocateStoredDerivative(ctx, ports.StoredDerivativeLookup{AssetID: assetID, Tier: strings.TrimSpace(tier)})
-	if err != nil {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL2, err)
-	}
-	if !found {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL3)
-	}
-	key, err := domain.NormalizeUploadObjectKey(location.StorageKey)
-	if err != nil {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL4, err)
-	}
-	profile, err := s.profiles.ResolveProfileByID(ctx, location.StorageProfileID)
-	if err != nil {
-		return "", fmt.Errorf(msgResolveProviderDerivativeURL5, err)
-	}
-	driver, err := s.drivers.GetDriver(profile.Provider)
-	if err != nil {
-		return "", err
-	}
-	resolved, err := driver.ProviderURL(profile, key)
-	if err != nil {
-		return "", err
-	}
-	parsed, err := url.Parse(strings.TrimSpace(resolved))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-		return "", domain.ErrProviderHTTPSUnavailable
-	}
-	return parsed.String(), nil
-}
-
 func (s *Service) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	return s.deleteUserUploadByURL(ctx, rawURL, func(resource domain.UploadResource) error {
 		if resource.Kind != domain.UploadResourceKindProfileAvatar || resource.ProfileAvatar == nil {
@@ -381,14 +336,6 @@ func (s *Service) deleteUserUploadByURL(ctx context.Context, rawURL string, vali
 		return err
 	}
 	return driver.Delete(ctx, profile, key)
-}
-
-func (s *Service) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
-	prefix, err := domain.CanvasUserUploadObjectPrefix(storageUID)
-	if err != nil {
-		return err
-	}
-	return s.DeleteUploadObjectPrefix(ctx, prefix)
 }
 
 func (s *Service) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
@@ -465,14 +412,6 @@ func (s *Service) DeleteUploadObjectPrefixes(ctx context.Context, prefixes []str
 	return firstErr
 }
 
-func (s *Service) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
-	prefix, err := domain.CanvasBoardUploadObjectPrefix(storageUID, boardID)
-	if err != nil {
-		return err
-	}
-	return s.DeleteUploadObjectPrefix(ctx, prefix)
-}
-
 func (s *Service) UsesObjectStorage(ctx context.Context) bool {
 	profile, err := s.profiles.ResolveActiveProfile(ctx)
 	if err != nil {
@@ -492,30 +431,6 @@ func (s *Service) ResolveStoredUploadTarget(ctx context.Context, rawURL string) 
 	}
 	if _, err := domain.ParseUploadResource(key); err != nil {
 		return nil, "", err
-	}
-
-	if s.assetLocator != nil {
-		location, found, err := s.assetLocator.LocateStoredUpload(ctx, ports.StoredUploadLookup{
-			URL:       strings.TrimSpace(rawURL),
-			ObjectKey: key,
-		})
-		if err != nil {
-			return nil, "", fmt.Errorf(msgResolveStoredUploadTarget, err)
-		}
-		if found {
-			locatedKey, err := domain.NormalizeUploadObjectKey(location.StorageKey)
-			if err != nil {
-				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget2, err)
-			}
-			if locatedKey != key {
-				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget3)
-			}
-			profile, err := s.profiles.ResolveProfileByID(ctx, location.StorageProfileID)
-			if err != nil {
-				return nil, "", fmt.Errorf(msgResolveStoredUploadTarget4, err)
-			}
-			return profile, locatedKey, nil
-		}
 	}
 
 	profile, err := s.resolveProfileFromUploadURL(ctx, rawURL, key)

@@ -13,7 +13,7 @@ describe('useFlowNodeMediaInputs', () => {
           x: 0,
           y: 0,
           width: 280,
-          sourceImageUrl: '/uploads/canvas/user-uid/board-a/content/source.png',
+          sourceImageUrl: '/uploads/tasks/user-uid/board-a/content/source.png',
           sourceMediaAssetId: 101,
           sourceImageRatio: 1,
           outputStatus: 'ready',

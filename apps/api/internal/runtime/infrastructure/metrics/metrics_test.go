@@ -36,6 +36,8 @@ func TestNilSetObserversNeverCrash(t *testing.T) {
 	set.ObserveGatewayRequest("render", nil)
 	set.ObserveGatewayRequest("render", errors.New("boom"))
 	set.IncGatewayRetry("render")
+	set.IncModelFallback("render", nil)
+	set.IncModelFallback("render", errors.New("boom"))
 	set.SetRiverQueue("drawing_default", 3, 1.5)
 	set.RefreshRiverQueue(context.Background(), "drawing_default", func(context.Context) (int64, float64, error) {
 		return 1, 0.5, nil
@@ -72,6 +74,23 @@ func TestGatewayCountersSplitByFeatureAndOutcome(t *testing.T) {
 	}
 	if got := testutil.ToFloat64(set.gatewayRetries.WithLabelValues(UnknownService)); got != 1 {
 		t.Fatalf("gateway unknown retries = %v, want 1", got)
+	}
+}
+
+func TestModelFallbackCounterSplitsByServiceAndOutcome(t *testing.T) {
+	set := NewSet(prometheus.NewRegistry())
+	set.IncModelFallback("render", nil)
+	set.IncModelFallback("render", errors.New("candidate failed"))
+	set.IncModelFallback("", errors.New("candidate failed"))
+
+	if got := testutil.ToFloat64(set.modelFallbacks.WithLabelValues("render", "success")); got != 1 {
+		t.Fatalf("fallback success = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(set.modelFallbacks.WithLabelValues("render", "error")); got != 1 {
+		t.Fatalf("fallback error = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(set.modelFallbacks.WithLabelValues(UnknownService, "error")); got != 1 {
+		t.Fatalf("fallback unknown error = %v, want 1", got)
 	}
 }
 

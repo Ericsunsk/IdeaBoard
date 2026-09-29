@@ -72,9 +72,9 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	newMaskEnv := func() (*workerTestEnv, *workerTestAssets) {
 		env := newWorkerTestEnv()
 		assets := &workerTestAssets{ready: map[string]bool{"asset_mask1": true}, archived: map[string]bool{}}
-		env.service = workspacetasks.NewService(workspacetasks.ServiceDeps{
+		env.service = workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 			Tasks: env.store, Quoter: workerTestQuoter{}, Holder: env.holder, Queue: env.queue,
-			Assets: assets, Routing: allowTestRouting,
+			Assets: assets, Resolver: allowTestPoolResolver(),
 		})
 		return env, assets
 	}
@@ -86,6 +86,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("submit with mask: %v", err)
 	}
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "inpaint", []string{"openrouter/only-model"}))
 	seenMask := ""
 	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 		id, _ := workspacetasks.MaskAssetIDFromParams(task.Params)

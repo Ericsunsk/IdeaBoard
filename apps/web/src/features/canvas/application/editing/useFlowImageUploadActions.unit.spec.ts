@@ -348,13 +348,13 @@ describe('useFlowImageUploadActions', () => {
       upload: vi
         .fn()
         .mockResolvedValueOnce({
-          url: '/uploads/canvas/user/board-a/content/first.png',
+          url: '/uploads/tasks/user/board-a/content/first.png',
           asset_id: 'asset_41',
           width: 100,
           height: 100,
         })
         .mockResolvedValueOnce({
-          url: '/uploads/canvas/user/board-a/content/second.png',
+          url: '/uploads/tasks/user/board-a/content/second.png',
           asset_id: 'asset_42',
           width: 100,
           height: 100,

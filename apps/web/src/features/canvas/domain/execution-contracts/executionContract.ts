@@ -1,4 +1,4 @@
-import type { SubmitTaskData, SubmitTaskParams } from './canvasTaskRequest'
+import type { CanvasTaskRequestData, CanvasTaskParams } from './canvasTaskRequest'
 import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeUrls'
 import { SERVICE } from '../../../../shared/domain/imageServices'
 
@@ -64,7 +64,7 @@ interface BuildExecutionTaskRequestOptions {
   referenceImageAssetIds?: number[] | undefined
   /** Opaque `asset_...` ids; the only media refs the v1 transport sends. */
   mediaAssetIds?: string[] | undefined
-  params?: SubmitTaskParams | undefined
+  params?: CanvasTaskParams | undefined
 }
 
 const CANVAS_INTERACTIVE_TASK_PRIORITY = 1
@@ -79,8 +79,8 @@ function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
 
 export function buildExecutionTaskRequest(
   options: BuildExecutionTaskRequestOptions,
-): SubmitTaskData {
-  const request: SubmitTaskData = {
+): CanvasTaskRequestData {
+  const request: CanvasTaskRequestData = {
     prompt: options.prompt,
     priority: CANVAS_INTERACTIVE_TASK_PRIORITY,
   }
@@ -100,7 +100,7 @@ export function buildExecutionTaskRequest(
       key,
       canonicalizeTaskMediaParam(key, value),
     ]),
-  ) as SubmitTaskParams
+  ) as CanvasTaskParams
   if (Object.keys(nextParams).length > 0) {
     request.params = nextParams
   }

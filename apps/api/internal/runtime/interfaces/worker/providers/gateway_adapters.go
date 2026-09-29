@@ -77,14 +77,10 @@ func (c *Executor) callGatewayModelImage(
 	}, nil
 }
 
-// resolveDialectImageURLs resolves media refs to public URLs in legacy
-// order (input images, then mask, then canvas ref). Dialects index this
-// order exactly as documented per shape.
+// resolveDialectImageURLs resolves input and mask media refs to public URLs.
+// Dialects index this order exactly as documented per shape.
 func resolveDialectImageURLs(c *Executor, providerReq providerRequest) ([]string, error) {
 	refs := append(append([]string{}, providerReq.ImageRefs...), providerReq.MaskRefs...)
-	if strings.TrimSpace(providerReq.CanvasRef) != "" {
-		refs = append(refs, providerReq.CanvasRef)
-	}
 	var resolvedPublicURLs []string
 	for _, ref := range refs {
 		if strings.TrimSpace(ref) == "" {
@@ -114,7 +110,6 @@ func buildUpscaleGatewayPayload(c *Executor, providerReq providerRequest) (map[s
 		return nil, fmt.Errorf(msgBuildUpscaleGatewayPayload)
 	}
 	scaleRequest := providerReq
-	scaleRequest.CanvasRef = ""
 	inputURL, err := c.imageTransformInputURL(scaleRequest, msgBuildUpscaleGatewayPayload2)
 	if err != nil {
 		return nil, err
@@ -227,11 +222,8 @@ func doGatewayImageCall(
 }
 
 func (c *ProviderExecutor) imageTransformInputURL(request providerRequest, label string) (string, error) {
-	ref := ""
-	if len(request.ImageRefs) > 0 {
-		ref = request.ImageRefs[0]
-	} else {
-		ref = request.CanvasRef
+	if len(request.ImageRefs) == 0 {
+		return "", fmt.Errorf("%s: image input is required", label)
 	}
-	return resolveProviderPublicImageURL(c, ref, label)
+	return resolveProviderPublicImageURL(c, request.ImageRefs[0], label)
 }

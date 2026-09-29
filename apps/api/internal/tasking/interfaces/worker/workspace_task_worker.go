@@ -467,7 +467,8 @@ func hasWorkspaceMaskParam(task *workspacetasks.WorkspaceTask) bool {
 	return ok
 }
 
-// claim fences pending -> running with the lease token. Lease-guarded
+// claim fences pending -> running with the lease token and lets a River
+// redelivery reacquire the same interrupted running lease. Lease-guarded
 // conflicts reconverge: terminal/cancelled rows drop the job, anything else
 // is transient and rides River backoff.
 func (w *WorkspaceTaskWorker) claim(ctx context.Context, args taskruntime.WorkspaceTaskArgs, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {

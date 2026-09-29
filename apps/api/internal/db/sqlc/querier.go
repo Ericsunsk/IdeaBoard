@@ -32,9 +32,12 @@ type Querier interface {
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
-	// ClaimTask fences one pending task for the worker: pending -> running with
-	// the lease token. Zero rows means already claimed/converged or invisible;
-	// the caller distinguishes via GetWorkspaceTaskByPublicID.
+	// ClaimTask fences one task execution with the lease token. A pending task is
+	// claimed normally; a River redelivery of the same job may reacquire its
+	// interrupted running lease because it carries the same execution token.
+	// A different token still gets zero rows, preserving the single-worker
+	// fence. The caller distinguishes already-converged/invisible rows via
+	// GetWorkspaceTaskByPublicID.
 	ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTaskParams) (Task, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)

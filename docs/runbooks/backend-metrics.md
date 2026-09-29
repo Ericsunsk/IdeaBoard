@@ -15,6 +15,7 @@
 | `ideaboard_http_request_duration_seconds` | Histogram | `method, route, status` | HTTP 请求延迟分布 |
 | `ideaboard_gateway_requests_total` | Counter | `feature, outcome` | 网关调用计数，`outcome=success/error` |
 | `ideaboard_gateway_retries_total` | Counter | `feature` | 网关内部重试耗尽后的 worker 层整任务重投计数 |
+| `ideaboard_model_fallback_total` | Counter | `service, outcome` | 有界模型兜底发送计数（快照 retry candidate，单任务至多一次），`outcome=success/error` 为兜底发送结果 |
 | `ideaboard_river_queue_depth` | Gauge | `queue` | 等待执行的 River job 数（available/scheduled/retryable），15s 刷新 |
 | `ideaboard_river_queue_lag_seconds` | Gauge | `queue` | 最老等待 job 的年龄（秒），15s 刷新 |
 | `outbound_requests_total` / `outbound_retries_total` | Counter | `target, outcome/reason` | 标准 outbound 客户端计数（网关走 `target=ai-gateway`，vision 走 `vision-search`） |
@@ -43,6 +44,10 @@ ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|task_retent
 # 4. 网关失败与 worker 重投速率
 sum by (feature) (rate(ideaboard_gateway_requests_total{outcome="error"}[5m]))
 sum by (feature) (rate(ideaboard_gateway_retries_total[5m]))
+
+# 4b. 模型兜底发送速率与结果（单任务至多一次；error 涨而 gateway error
+# 不涨时，检查兜底候选池是否系统性不可用）
+sum by (service, outcome) (rate(ideaboard_model_fallback_total[5m]))
 
 # 5. 网关 client 侧重试原因（与 #4 交叉验证）
 sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))

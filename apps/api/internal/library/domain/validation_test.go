@@ -1,4 +1,4 @@
-package library
+package domain
 
 import (
 	"testing"
@@ -23,9 +23,9 @@ func TestNormalizeAndValidateAssetNormalizesInput(t *testing.T) {
 	input.Provider = " UNSPLASH "
 	input.SourceID = " photo-123 "
 	input.SourceURL = " https://unsplash.com/photos/photo-123 "
-	got, err := normalizeAndValidateAsset(input)
+	got, err := NormalizeAndValidateAsset(input)
 	if err != nil {
-		t.Fatalf("normalizeAndValidateAsset returned error: %v", err)
+		t.Fatalf("NormalizeAndValidateAsset returned error: %v", err)
 	}
 	if got.Provider != ProviderUnsplash || got.SourceID != "photo-123" || got.SourceURL != "https://unsplash.com/photos/photo-123" {
 		t.Fatalf("normalized asset = %#v", got)
@@ -45,7 +45,7 @@ func TestNormalizeAndValidateAssetRejectsUntrustedURLs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			input := validAssetInput()
 			input.PreviewURL = tc.url
-			if _, err := normalizeAndValidateAsset(input); err != ErrInvalidSource {
+			if _, err := NormalizeAndValidateAsset(input); err != ErrInvalidSource {
 				t.Fatalf("error = %v, want %v", err, ErrInvalidSource)
 			}
 		})
@@ -55,18 +55,18 @@ func TestNormalizeAndValidateAssetRejectsUntrustedURLs(t *testing.T) {
 func TestNormalizeAndValidateAssetRejectsUnsupportedProvider(t *testing.T) {
 	input := validAssetInput()
 	input.Provider = "google"
-	if _, err := normalizeAndValidateAsset(input); err != ErrInvalidProvider {
+	if _, err := NormalizeAndValidateAsset(input); err != ErrInvalidProvider {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidProvider)
 	}
 }
 
 func TestNormalizeFolderName(t *testing.T) {
-	if got, err := normalizeFolderName("  Travel  "); err != nil || got != "Travel" {
-		t.Fatalf("normalizeFolderName = %q, %v", got, err)
+	if got, err := NormalizeFolderName("  Travel  "); err != nil || got != "Travel" {
+		t.Fatalf("NormalizeFolderName = %q, %v", got, err)
 	}
 	for _, raw := range []string{"", "   "} {
-		if _, err := normalizeFolderName(raw); err != ErrInvalidFolderName {
-			t.Fatalf("normalizeFolderName(%q) error = %v, want %v", raw, err, ErrInvalidFolderName)
+		if _, err := NormalizeFolderName(raw); err != ErrInvalidFolderName {
+			t.Fatalf("NormalizeFolderName(%q) error = %v, want %v", raw, err, ErrInvalidFolderName)
 		}
 	}
 }

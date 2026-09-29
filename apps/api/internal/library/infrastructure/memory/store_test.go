@@ -1,4 +1,4 @@
-package library
+package memory
 
 // In-memory job-listing tests (read-through scan + trigger dedup
 // backing for tests; postgres parity lives in service_test.go).
@@ -7,18 +7,20 @@ import (
 	"context"
 	"sync"
 	"testing"
+
+	"ideaboard/api/internal/library/domain"
 )
 
 func saveReadThroughAsset(t *testing.T, store *InMemoryWorkspaceLibraryStore, ws, sourceID string) string {
 	t.Helper()
-	publicID, err := NewV1AssetPublicID()
+	publicID, err := domain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
 	providerURL := "https://images.unsplash.com/" + sourceID
-	saved, created, err := store.SaveAsset(context.Background(), ws, V1SaveAssetInput{
-		Asset: AssetInput{
-			Provider: ProviderUnsplash, SourceID: sourceID,
+	saved, created, err := store.SaveAsset(context.Background(), ws, domain.V1SaveAssetInput{
+		Asset: domain.AssetInput{
+			Provider: domain.ProviderUnsplash, SourceID: sourceID,
 			SourceURL: providerURL, PreviewURL: providerURL, OriginalURL: providerURL,
 		},
 	}, publicID)
@@ -42,7 +44,7 @@ func TestInMemoryListMaterializations(t *testing.T) {
 
 	var ids []string
 	for range 2 {
-		matID, err := NewV1MaterializationPublicID()
+		matID, err := domain.NewV1MaterializationPublicID()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +61,7 @@ func TestInMemoryListMaterializations(t *testing.T) {
 		t.Fatalf("list order = %v, want creation order %v", all, ids)
 	}
 	for _, record := range all {
-		if record.AssetPublicID != asset || record.Status != V1MaterializationPending {
+		if record.AssetPublicID != asset || record.Status != domain.V1MaterializationPending {
 			t.Fatalf("record = %+v, want pending link to %q", record, asset)
 		}
 	}
@@ -71,7 +73,7 @@ func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {
 	asset := saveReadThroughAsset(t, store, "ws_claim", "photo-claim-1")
 	const callers = 16
 	results := make(chan struct {
-		job     *V1Materialization
+		job     *domain.V1Materialization
 		created bool
 		err     error
 	}, callers)
@@ -80,10 +82,10 @@ func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			id, err := NewV1MaterializationPublicID()
+			id, err := domain.NewV1MaterializationPublicID()
 			if err != nil {
 				results <- struct {
-					job     *V1Materialization
+					job     *domain.V1Materialization
 					created bool
 					err     error
 				}{err: err}
@@ -91,7 +93,7 @@ func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {
 			}
 			job, created, err := store.ClaimMaterialization(ctx, "ws_claim", asset, id)
 			results <- struct {
-				job     *V1Materialization
+				job     *domain.V1Materialization
 				created bool
 				err     error
 			}{job: job, created: created, err: err}
@@ -121,13 +123,13 @@ func TestInMemoryClaimMaterializationConvergesConcurrentCalls(t *testing.T) {
 		t.Fatalf("jobs = %+v, err=%v, want one job %q", all, err, publicID)
 	}
 
-	if _, err := store.SetMaterializationResult(ctx, "ws_claim", publicID, V1MaterializationRunning, "", "", ""); err != nil {
+	if _, err := store.SetMaterializationResult(ctx, "ws_claim", publicID, domain.V1MaterializationRunning, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.SetMaterializationResult(ctx, "ws_claim", publicID, V1MaterializationFailed, "", "", "retry"); err != nil {
+	if _, err := store.SetMaterializationResult(ctx, "ws_claim", publicID, domain.V1MaterializationFailed, "", "", "retry"); err != nil {
 		t.Fatal(err)
 	}
-	retryID, err := NewV1MaterializationPublicID()
+	retryID, err := domain.NewV1MaterializationPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}

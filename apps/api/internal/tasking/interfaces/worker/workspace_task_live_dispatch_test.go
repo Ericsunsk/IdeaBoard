@@ -85,9 +85,9 @@ func newLiveDispatchEnv() *liveDispatchEnv {
 	store := workspacetasks.NewInMemoryStoreForTests()
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Routing: allowTestRouting,
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Resolver: allowTestPoolResolver(),
 	})
 	return &liveDispatchEnv{
 		media: media, objects: &fakeRendererObjects{},
@@ -107,7 +107,7 @@ func (e *liveDispatchEnv) submit(t *testing.T, key string) *workspacetasks.Works
 		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "generation",
 		Params:          map[string]any{"output_count": 1},
 		Quantity:        1,
-		Resolution:      "default",
+		Resolution:      "",
 		CanonicalParams: canonical,
 	}, key)
 	if err != nil {
@@ -162,32 +162,25 @@ func allowLiveDispatchLoopback(t *testing.T) {
 	t.Cleanup(restore)
 }
 
-// pinLiveDispatchModel simulates the #848 RoutingSnapshot pin: submit no
-// longer mints a model, so tests that need a runnable task persist the
-// pinned target explicitly before dispatch.
-func pinLiveDispatchModel(t *testing.T, env *liveDispatchEnv, created *workspacetasks.WorkspaceTask, model string) *workspacetasks.WorkspaceTask {
+// pinLiveDispatchSnapshot pins the RoutingSnapshot for a submitted
+// task: submit mints no model (the durable envelope is removed in
+// #854), so tests that need a runnable task persist the pinned
+// snapshot explicitly before dispatch. The bridge consumes only the
+// snapshot selection, never a live lookup.
+func pinLiveDispatchSnapshot(t *testing.T, env *liveDispatchEnv, created *workspacetasks.WorkspaceTask, model string) *workspacetasks.WorkspaceTask {
 	t.Helper()
-	if err := env.store.DeleteTask(context.Background(), created.WorkspaceID, created.ID); err != nil {
-		t.Fatalf("DeleteTask: %v", err)
-	}
-	pinned := *created
-	pinned.ResolvedModel = model
-	stored, err := env.store.CreateTask(context.Background(), &pinned)
-	if err != nil {
-		t.Fatalf("CreateTask with pinned model: %v", err)
-	}
-	return stored
+	return pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "generation", []string{model}))
 }
 
 // Submit persists the plan, the fake gateway serves bytes, the materializer
 // ingests them, the renderer verifies, and settlement captures atomically.
-// The execution model is pinned explicitly (#848 snapshot stand-in): the
-// bridge consumes only the pinned task model, never a live lookup.
+// The execution model comes from the pinned RoutingSnapshot: the bridge
+// consumes only the snapshot selection, never a live lookup.
 func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	allowLiveDispatchLoopback(t)
 	env := newLiveDispatchEnv()
-	created := pinLiveDispatchModel(t, env, env.submit(t, "live-dispatch-key"), "openrouter/fake-test-image")
+	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-key"), "openrouter/fake-test-image")
 
 	if !strings.Contains(created.CanonicalParams, "execution_plan") {
 		t.Fatalf("canonical params lack the execution plan: %.120s", created.CanonicalParams)
@@ -238,7 +231,7 @@ func TestWorkspaceTaskLiveDispatchEndToEnd(t *testing.T) {
 func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testing.T) {
 	ctx := context.Background()
 	env := newLiveDispatchEnv()
-	created := pinLiveDispatchModel(t, env, env.submit(t, "live-dispatch-no-creds"), "openrouter/fake-test-image")
+	created := pinLiveDispatchSnapshot(t, env, env.submit(t, "live-dispatch-no-creds"), "openrouter/fake-test-image")
 
 	// The real missing-credential sentinel (no secret material, just the
 	// error the config seam returns when unconfigured).
@@ -271,15 +264,19 @@ func TestWorkspaceTaskLiveDispatchFailsClosedWithoutGatewayCredentials(t *testin
 	}
 }
 
-// A task without a pinned model fails closed in the worker: the failure is
-// deterministic (no retry budget consumed) and the full hold is released.
-// Submit itself succeeds; #848 restores model pinning via RoutingSnapshot.
-func TestWorkspaceTaskLiveDispatchFailsClosedWithoutPinnedModel(t *testing.T) {
+// A task without a pinned RoutingSnapshot fails closed in the worker:
+// the failure is deterministic (no retry budget consumed) and the full
+// hold is released. Submit itself succeeds; the snapshot pins in the
+// submit transaction.
+func TestWorkspaceTaskLiveDispatchFailsClosedWithoutRoutingSnapshot(t *testing.T) {
 	ctx := context.Background()
 	env := newLiveDispatchEnv()
 	created := env.submit(t, "live-dispatch-no-model")
+	if len(created.RoutingSnapshot) != 0 {
+		t.Fatal("fresh submit carries a snapshot, want none")
+	}
 	if created.ResolvedModel != "" {
-		t.Fatalf("resolved_model = %q, want empty until the #848 snapshot lands", created.ResolvedModel)
+		t.Fatalf("resolved_model = %q, want empty (no model is minted at submit)", created.ResolvedModel)
 	}
 	worker := env.liveWorker(t, liveDispatchGatewayFactory("http://127.0.0.1:1"))
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {

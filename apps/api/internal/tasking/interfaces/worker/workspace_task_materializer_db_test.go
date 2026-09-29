@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -65,11 +65,12 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	asset := completeUploadForIntegration(t, ctx, env.media, env.wsA, env.userA, "trigger-input.png")
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
+		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-trigger-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
 	}
+	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	store := &countingLibraryStore{WorkspaceLibraryStore: env.lib}
 	trigger, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
@@ -86,6 +87,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 			return []workspacetasks.OutputRef{{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0}}, nil
 		}),
 		Materializer: trigger,
+		Attempts:     env.tasks,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +114,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMaterialization: %v", err)
 	}
-	if record.Status != library.V1MaterializationCompleted {
+	if record.Status != librarydomain.V1MaterializationCompleted {
 		t.Fatalf("job status = %q, want completed", record.Status)
 	}
 	if record.MediaAssetID != asset.ID {
@@ -123,7 +125,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAsset: %v", err)
 	}
-	if !library.IsV1FolderID(strings.TrimSpace(saved.FolderPublicID)) {
+	if !librarydomain.IsV1FolderID(strings.TrimSpace(saved.FolderPublicID)) {
 		t.Fatalf("asset folder = %q, want the Quick Saves lfolder_ id", saved.FolderPublicID)
 	}
 }

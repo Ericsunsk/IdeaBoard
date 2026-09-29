@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { createUniqueId } from '../../../../../shared/utils/ids'
 
 export type ClientActionIdFactory = () => string
@@ -18,9 +18,9 @@ export function createCanvasActivationId(): string {
 }
 
 export function withTaskClientActionId(
-  request: SubmitTaskData,
+  request: CanvasTaskRequestData,
   clientActionId: string | undefined,
-): SubmitTaskData {
+): CanvasTaskRequestData {
   const normalizedClientActionId = `${clientActionId ?? ''}`.trim()
   if (!normalizedClientActionId) return request
   return {

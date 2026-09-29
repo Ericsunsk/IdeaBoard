@@ -11,7 +11,6 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/validation"
-	taskbilling "ideaboard/api/internal/tasking/application/billing"
 	tasksubmission "ideaboard/api/internal/tasking/application/submission"
 	tasks "ideaboard/api/internal/tasking/domain"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -19,34 +18,31 @@ import (
 	"ideaboard/api/internal/workflow/paramkeys"
 )
 
-// Canonical intake ordering.
+const (
+	maxSubmitTaskParamsBytes = 2 * 1024 * 1024
+	maxSubmitTaskParamsDepth = 24
+)
+
+// Canonical workspace compilation ordering.
 //
-// Submit and Readiness share one map→typed→plan→persisted-JSON sequence owned
-// by this module. The order is load-bearing:
+// Workspace submit owns one map→typed→plan→persisted-JSON sequence. The order
+// is load-bearing:
 //
 //  1. map: stamp feature, strip model, normalize structured prompt contracts,
 //     then validate generation/fusion contracts (normalizeSubmitExecutionMap).
 //  2. plan inputs + plan: derive FeatureExecutionParams from the normalized map
-//     and compile the Workflow plan (compileSubmitExecutionPlan or
-//     compileReadinessExecutionPlan).
+//     and compile the Workflow plan.
 //  3. typed: stamp plan-derived output facts back into the map, convert to the
 //     typed WorkflowTaskParams, and attach the encoded plan
 //     (finalizeSubmitTypedParams). The write-back must precede the conversion
 //     so typed Controls agree with the compiled plan.
-//  4. persisted JSON: marshal the typed params with generation snapshot and
-//     billing into the CanonicalRequest (assembleCanonicalTaskRequest).
+//  4. persisted JSON: marshal the typed params with the generation snapshot.
 //
 // Readiness diverges only at stage 2: it compiles a readiness plan with
 // synthesized media facts and never stamps plan facts back into the map.
 //
 // Workflow stays a pure plan/contract library: it never owns this sequencing,
 // performs I/O, or persists anything.
-type compiledTaskExecution struct {
-	featureSlug string
-	plan        workflow.FeatureExecutionPlan
-	typedParams *tasks.WorkflowTaskParams
-}
-
 // CompilerWorkspaceMediaAssetIDsParam carries workspace public asset ids into
 // canonical compilation without persisting the HTTP envelope field in Extra.
 const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
@@ -55,10 +51,10 @@ const CompilerWorkspaceMediaAssetIDsParam = "__workspace_media_asset_ids"
 // task envelope and returns the durable typed parameter JSON.
 //
 // Prompt contract (v1 data.prompt, bound: workspacetasks
-// .MaxWorkspaceTaskPromptBytes = 8KB, legacy parity): prompt-required
+// .MaxWorkspaceTaskPromptBytes = 8KB): prompt-required
 // features (generation, inpaint) reject an empty prompt; prompt-ignored
-// features (cutout, upscale) drop user text (binary media operations,
-// legacy parity); the rest carry it into the Generation snapshot
+// features (cutout, upscale) drop user text (binary media operations); the
+// rest carry it into the Generation snapshot
 // (UserPrompt + CompiledPrompt) that the worker bridges to the provider.
 func CompileWorkspaceParams(feature, userPrompt string, params map[string]interface{}) (string, error) {
 	feature = strings.TrimSpace(feature)
@@ -162,25 +158,6 @@ func compileSubmitExecutionPlan(params map[string]interface{}, featureSlug strin
 	return executionPlan, nil
 }
 
-// compileReadinessExecutionPlan runs stage 2 of the canonical readiness
-// ordering. It reads plan inputs from the raw submit map and compiles a
-// readiness plan with synthesized media facts. It never mutates params: plan
-// facts must not leak back into the readiness caller map.
-func compileReadinessExecutionPlan(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionPlan, error) {
-	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
-	if err != nil {
-		return workflow.FeatureExecutionPlan{}, err
-	}
-	executionPlan, err := workflow.CompileFeatureReadinessPlan(workflow.CompileFeatureExecutionInput{
-		Feature: featureSlug,
-		Params:  executionParams,
-	})
-	if err != nil {
-		return workflow.FeatureExecutionPlan{}, mapFeatureContractValidationError(err)
-	}
-	return executionPlan, nil
-}
-
 // finalizeSubmitTypedParams runs stage 3 of the canonical submit ordering.
 // Plan-derived output facts overwrite caller values in the map before the
 // typed conversion, so the persisted typed Controls cannot disagree with the
@@ -198,55 +175,6 @@ func finalizeSubmitTypedParams(params map[string]interface{}, featureSlug string
 	}
 	typedParams.ExecutionPlan = executionPlanJSON
 	return typedParams, nil
-}
-
-func assembleCanonicalTaskRequest(userID int64, req *tasks.SubmitTaskRequest, normalized normalizedTaskCompile, execution compiledTaskExecution, prompt compiledTaskPrompts) (CanonicalTaskRequest, error) {
-	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
-		Plan:                execution.plan,
-		UserPrompt:          req.Prompt,
-		SystemPrompt:        prompt.systemPrompt,
-		CompiledPrompt:      prompt.fullPrompt,
-		TemplateFingerprint: tasksubmission.TemplateFingerprint("", prompt.config.Prompt),
-		SeedMaterial:        normalized.clientActionID,
-		Params:              execution.typedParams,
-	})
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	billingRequest, err := resolveTaskBillingRequest(execution.plan)
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	if billingRequest != nil && normalized.clientActionID == "" {
-		return CanonicalTaskRequest{}, validation.New(msgAssembleCanonicalTaskRequest)
-	}
-	execution.typedParams.Generation = &generationSnapshot
-	paramsJSON, err := marshalWorkflowTaskParams(execution.typedParams, normalized.params)
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
-		UserID: userID, Service: execution.featureSlug, UserPrompt: req.Prompt, Prompt: prompt.fullPrompt,
-		Params: paramsJSON, ClientActionID: normalized.clientActionID, Priority: normalized.priority,
-		Generation:     &generationSnapshot,
-		BillingRequest: billingRequest,
-		ExecutionPlan:  &execution.plan,
-	})
-}
-
-func resolveTaskBillingRequest(plan workflow.FeatureExecutionPlan) (*taskbilling.Request, error) {
-	if !workflow.IsAIImageFeature(plan.Feature()) {
-		return nil, nil
-	}
-	request, err := taskbilling.AIImageRequest(
-		plan.Feature(),
-		plan.OutputResolution(),
-		int64(plan.RequestedOutputCount().Int()),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &request, nil
 }
 
 func compileFeatureExecutionParams(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionParams, error) {

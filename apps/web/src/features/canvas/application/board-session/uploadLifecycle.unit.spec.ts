@@ -45,12 +45,12 @@ describe('createBoardSessionUploadLifecycle', () => {
           x: 0,
           y: 0,
           width: 280,
-          sourceImageUrl: '  /uploads/canvas/user-uid/board-a/content/source.png  ',
+          sourceImageUrl: '  /uploads/tasks/user-uid/board-a/content/source.png  ',
           sourceImageRatio: 1,
           outputStatus: 'ready',
           outputImages: [
             {
-              url: '  /uploads/canvas/user-uid/board-a/content/output.png  ',
+              url: '  /uploads/tasks/user-uid/board-a/content/output.png  ',
               ratio: 1,
             },
           ],
@@ -68,10 +68,10 @@ describe('createBoardSessionUploadLifecycle', () => {
 
     expect(stabilized).toBe(snapshot)
     expect(snapshot.imageNodes[0]?.sourceImageUrl).toBe(
-      '/uploads/canvas/user-uid/board-a/content/source.png',
+      '/uploads/tasks/user-uid/board-a/content/source.png',
     )
     expect(snapshot.imageNodes[0]?.outputImages[0]?.url).toBe(
-      '/uploads/canvas/user-uid/board-a/content/output.png',
+      '/uploads/tasks/user-uid/board-a/content/output.png',
     )
   })
 
@@ -82,11 +82,11 @@ describe('createBoardSessionUploadLifecycle', () => {
     )
     vi.spyOn(uploadApi, 'upload')
       .mockResolvedValueOnce({
-        url: '/uploads/canvas/user-uid/board-a/content/image-output.png',
+        url: '/uploads/tasks/user-uid/board-a/content/image-output.png',
         asset_id: 'asset_201',
       })
       .mockResolvedValueOnce({
-        url: '/uploads/canvas/user-uid/board-a/content/fusion-output.png',
+        url: '/uploads/tasks/user-uid/board-a/content/fusion-output.png',
         asset_id: 'asset_202',
       })
     const snapshot = makeBoardSnapshot({
@@ -97,7 +97,7 @@ describe('createBoardSessionUploadLifecycle', () => {
           x: 0,
           y: 0,
           width: 280,
-          sourceImageUrl: '/uploads/canvas/user-uid/board-a/content/source.png',
+          sourceImageUrl: '/uploads/tasks/user-uid/board-a/content/source.png',
           sourceImageRatio: 1,
           outputStatus: 'ready',
           outputImages: [{ url: 'https://provider.example/image-output.png', ratio: 1 }],
@@ -146,11 +146,11 @@ describe('createBoardSessionUploadLifecycle', () => {
     )
     vi.spyOn(uploadApi, 'upload')
       .mockResolvedValueOnce({
-        url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
+        url: '/uploads/tasks/user-uid/board-a/content/prompt-input.png',
         asset_id: 'asset_301',
       })
       .mockResolvedValueOnce({
-        url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
+        url: '/uploads/tasks/user-uid/board-a/content/fusion-input.png',
         asset_id: 'asset_302',
       })
     const snapshot = makeBoardSnapshot({

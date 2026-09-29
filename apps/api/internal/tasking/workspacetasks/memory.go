@@ -166,12 +166,13 @@ func (s *InMemoryStore) DeleteTask(ctx context.Context, workspaceID, taskID stri
 	return nil
 }
 
-// ClaimTask fences one pending task for the worker: pending -> running
-// with the lease token. The lease is tracked separately from the envelope
-// execution token (mirroring the postgres lease_token column, which claim
-// sets and terminal/retry flips clear without touching the envelope). It
-// mirrors the postgres sibling's transition guards: unknown ids stay
-// ErrNotFound, claimed/terminal rows converge to ErrStateConflict.
+// ClaimTask fences one task execution with the lease token. A pending task is
+// claimed normally; a redelivery of the same River job may reacquire its
+// interrupted running lease because it carries the same token. A different
+// token remains fenced out. The lease is tracked separately from the
+// envelope execution token (mirroring the postgres lease_token column,
+// which claim sets and terminal/retry flips clear without touching the
+// envelope).
 func (s *InMemoryStore) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken string) (*WorkspaceTask, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -183,10 +184,14 @@ func (s *InMemoryStore) ClaimTask(ctx context.Context, workspaceID, taskID, leas
 	if strings.TrimSpace(leaseToken) == "" {
 		return nil, fmt.Errorf("workspacetasks: lease token required: %w", ErrValidation)
 	}
-	if stored.Status != StatusPending {
+	leaseToken = strings.TrimSpace(leaseToken)
+	if stored.Status == StatusRunning {
+		if held, ok := s.leases[key]; !ok || held != leaseToken {
+			return nil, ErrStateConflict
+		}
+	} else if stored.Status != StatusPending {
 		return nil, ErrStateConflict
-	}
-	if _, held := s.leases[key]; held {
+	} else if _, held := s.leases[key]; held {
 		return nil, ErrStateConflict
 	}
 	now := s.clock()

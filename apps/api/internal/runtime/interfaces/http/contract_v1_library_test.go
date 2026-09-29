@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 
@@ -64,7 +64,7 @@ func newV1LibraryTestEngine(store tenancy.Store, libDeps ContractV1LibraryDeps, 
 
 type v1LibraryFixture struct {
 	store  *tenancy.InMemoryStore
-	lib    *library.InMemoryWorkspaceLibraryStore
+	lib    *librarymemory.InMemoryWorkspaceLibraryStore
 	dir    *staticUserDirectory
 	engine *gin.Engine
 	ws     *tenancy.Workspace
@@ -79,9 +79,9 @@ func newV1LibraryFixture(t *testing.T, libDeps ContractV1LibraryDeps) *v1Library
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	if libDeps.Store == nil {
-		libDeps.Store = library.NewInMemoryWorkspaceLibraryStoreForTests()
+		libDeps.Store = librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	}
-	lib, _ := libDeps.Store.(*library.InMemoryWorkspaceLibraryStore)
+	lib, _ := libDeps.Store.(*librarymemory.InMemoryWorkspaceLibraryStore)
 	engine := newV1LibraryTestEngine(store, libDeps, dir)
 	const owner, member, other = 1, 2, 99
 	for _, id := range []int64{owner, member, other} {

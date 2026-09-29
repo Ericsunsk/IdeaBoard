@@ -524,6 +524,93 @@ Required outcomes:
 Do not introduce a second routing, retry, transaction, ORM, or orchestration framework. Reuse
 the repository primitives listed in the Architecture reset scope.
 
+### Issue #854 closure record (final integration + legacy removal)
+
+Removals applied (each verified present before acting; zero-remnant
+repository searches in the verification report):
+
+- Legacy drawing execution package
+  `apps/api/internal/runtime/interfaces/worker/execution` (unwired
+  orchestrator, processor, phase machine, convergence, presign, and the
+  snapshot-fallback interim): deleted. Workspace execution lives in
+  `apps/api/internal/tasking/interfaces/worker`; the gateway provider
+  package stays. Worker subpackage isolation test updated (5 remaining
+  subpackages).
+- `RoutingGate` / `RejectRoutingUntilPool` /
+  `workspacetasks.ErrRoutingUnavailable` and the old render site in
+  `contract_v1_tasks.go`: deleted. A nil resolver fails closed with the
+  canonical `service_resolution_unavailable` sentinel (with normalized
+  `details.fields`), never a gate. All HTTP and settlement fixtures now
+  wire the shared `RoutingResolver`.
+- Durable `resolved_model` key in the `workflow_input` JSONB envelope:
+  deleted (reads stay tolerant of old rows, so no migration).
+  `WorkspaceTask.ResolvedModel` is now a documented transient-only
+  worker handoff (never persisted); `task_execution_attempts`
+  `resolved_model` facts stay (observability, ADR-0012 rule 7).
+- `tasking/application/task` legacy submit path (`Service.SubmitTask`,
+  `CommandService.SubmitTask`, `TaskSubmissionStore` seam, submission
+  store fakes, submit message): deleted. Canonical workspace compilation
+  (`CompileWorkspaceParams`) and the workspace task settlement path remain;
+  readiness and availability now use the shared `RoutingResolver`.
+- Already gone on arrival (grep proof, no action taken):
+  `ResolveModel` / `SaveModelMapping` / `modelMapping` /
+  `ModelResolver` / `ModelStore`; `workflow_kind` runtime uses (only
+  migration comments, a negative unit assertion, and spec prose
+  remain); `model-reference` write routes (the remaining
+  `models-reference` GET is the read-only models.dev seam, not the old
+  mapping).
+
+Gap dispositions:
+
+- Canonical-resolution ingress enforcement: IMPLEMENTED (ADR-0012 rule 3).
+  Settlement `Quote`/`Create` and billing-quotes accept only `1k`, `2k`, or
+  `4k`; omitted resolutions are normalized by Service policy and explicit
+  policy mismatches return 422 `validation_failed` (`details.fields.resolution`
+  / `output_resolution`). OpenAPI prose updated (no shape change;
+  regen comment-only). Frontend needs no change.
+- `openapi.public.yaml` 422 prose for resolution mismatch and policy
+  normalization: ADDED for task create, task-quotes, and billing-quotes.
+- Startup reaper / `abandoned` status vocabulary: RE-DEFERRED. It
+  needs a status migration plus backfill, pressure-query, Admin, and
+  frontend updates — not small. Stale `running` attempts keep
+  surfacing as `normal_running` until River redelivery/worker
+  convergence; see residual risks.
+- Vision admin write surface: LEFT AS-IS. ADR-0012 rule 14 keeps
+  vision outside the pool with its isolated catalog/billing; the
+  search-provider PUT is that seam with no pool coupling.
+- Stats `feature_slug` presentation: NO-OP. The name survives only as
+  the DB column in the kept stat tables; Admin presentation already
+  uses `service`, and the backfill already attributes the final
+  resolved model (#852).
+- Legacy drawing pipeline: DELETED (see removals above); no new wiring.
+
+Rollback point: #854 makes no schema change, so rollback is code-only
+(no data migration to undo). The single schema boundary remains the
+#848 migration (`20260928000002_service_model_pool`), rehearsed with
+`atlas-migration-check` (validate + fresh replay) and `schemarelease`.
+The wire-contract behavior change is the removal of the legacy fallback
+resolution: only `1k`, `2k`, and `4k` are accepted, with fixed Service policy
+normalization for omitted input. Rolling back re-enables the old fallback.
+
+Residual operational risks (ops / follow-up):
+
+- In-flight drain: accepted tasks pin immutable snapshots, so deploy
+  is safe mid-flight; later pool edits never disturb them.
+- Draw-queue drain before rollout: stray old-kind River jobs fail
+  loudly as unknown kinds (never silently executed) — drain or let
+  them expire before rollout.
+- Dashboard label renames: stat tables keep the `feature_slug`
+  column name (no rename migration); existing downstream SQL keeps
+  working, new consumers should read Service semantics.
+- Startup `running` orphans: without a reaper, crash-orphaned
+  `running` attempts report `normal_running` pressure until
+  redelivery converges them; a future `abandoned` vocabulary needs
+  the migration + backfill + query + Admin/frontend chain above.
+- Full-suite shared-DB flakes: parallel `go test ./...` against one
+  test database shows order-dependent flakes in untouched packages
+  (boards/credits/usage/avatar); affected packages pass in isolation
+  and serialized (`-p 1`) runs are clean.
+
 ## API and error contract
 
 Use one canonical error for an empty eligible pool:

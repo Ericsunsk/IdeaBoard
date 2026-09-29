@@ -20,22 +20,22 @@ func (d stubDriverResolver) GetDriver(provider domain.StorageProvider) (ports.St
 }
 
 func TestPublicUploadURL(t *testing.T) {
-	svc := NewService(nil, stubDriverResolver{}, nil, "https://ideaboard.art")
-	url := svc.PublicUploadURL("uploads/canvas/sample.png")
-	if url != "https://ideaboard.art/uploads/canvas/sample.png" {
-		t.Fatalf("public URL = %q, want https://ideaboard.art/uploads/canvas/sample.png", url)
+	svc := NewService(nil, stubDriverResolver{}, "https://ideaboard.art")
+	url := svc.PublicUploadURL("uploads/site/assets/sample.png")
+	if url != "https://ideaboard.art/uploads/site/assets/sample.png" {
+		t.Fatalf("public URL = %q, want https://ideaboard.art/uploads/site/assets/sample.png", url)
 	}
 
-	svcNoOrigin := NewService(nil, stubDriverResolver{}, nil, "")
-	urlNoOrigin := svcNoOrigin.PublicUploadURL("uploads/canvas/sample.png")
-	if urlNoOrigin != "/uploads/canvas/sample.png" {
-		t.Fatalf("public URL = %q, want /uploads/canvas/sample.png", urlNoOrigin)
+	svcNoOrigin := NewService(nil, stubDriverResolver{}, "")
+	urlNoOrigin := svcNoOrigin.PublicUploadURL("uploads/site/assets/sample.png")
+	if urlNoOrigin != "/uploads/site/assets/sample.png" {
+		t.Fatalf("public URL = %q, want /uploads/site/assets/sample.png", urlNoOrigin)
 	}
 }
 
 func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 	t.Run("virtual host style", func(t *testing.T) {
-		parsed, err := url.Parse("https://img.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://img.example.com/uploads/tasks/42/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}
@@ -44,14 +44,14 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
-		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
+		want := "uploads/tasks/42/2026/04/24/demo.png"
 		if got != want {
 			t.Fatalf("object key = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("access domain base path is removed once", func(t *testing.T) {
-		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/tasks/42/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}
@@ -60,14 +60,14 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
-		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
+		want := "uploads/tasks/42/2026/04/24/demo.png"
 		if got != want {
 			t.Fatalf("object key = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("rejects mismatched host", func(t *testing.T) {
-		parsed, err := url.Parse("https://evil.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://evil.example.com/uploads/tasks/42/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}

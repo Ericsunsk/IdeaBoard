@@ -8,28 +8,6 @@ import (
 	"ideaboard/api/internal/media/storage/domain"
 )
 
-func TestCanvasContentUploadDirPrefix(t *testing.T) {
-	got, err := domain.CanvasContentUploadDirPrefix("OWNR1A", "board-1")
-	if err != nil {
-		t.Fatalf("CanvasContentUploadDirPrefix returned error: %v", err)
-	}
-	want := "canvas/OWNR1A/board-1/content"
-	if got != want {
-		t.Fatalf("dir prefix = %q, want %q", got, want)
-	}
-}
-
-func TestCanvasBoardUploadObjectPrefix(t *testing.T) {
-	got, err := domain.CanvasBoardUploadObjectPrefix("OWNR1A", "board-1")
-	if err != nil {
-		t.Fatalf("CanvasBoardUploadObjectPrefix returned error: %v", err)
-	}
-	want := "uploads/canvas/OWNR1A/board-1/"
-	if got != want {
-		t.Fatalf("object prefix = %q, want %q", got, want)
-	}
-}
-
 func TestProfileAvatarUploadPrefixes(t *testing.T) {
 	dirPrefix, err := domain.ProfileAvatarUploadDirPrefix("OWNR1A")
 	if err != nil {
@@ -45,25 +23,6 @@ func TestProfileAvatarUploadPrefixes(t *testing.T) {
 	}
 	if objectPrefix != "uploads/profile/OWNR1A/avatar/" {
 		t.Fatalf("object prefix = %q, want %q", objectPrefix, "uploads/profile/OWNR1A/avatar/")
-	}
-}
-
-func TestParseUploadResourceCanvas(t *testing.T) {
-	resource, err := domain.ParseUploadResource("/uploads/canvas/OWNR1A/board-1/thumb/demo.txt")
-	if err != nil {
-		t.Fatalf("ParseUploadResource returned error: %v", err)
-	}
-	if resource.Kind != domain.UploadResourceKindCanvas {
-		t.Fatalf("kind = %q, want %q", resource.Kind, domain.UploadResourceKindCanvas)
-	}
-	if resource.Canvas == nil {
-		t.Fatalf("canvas metadata is nil")
-	}
-	if resource.Canvas.OwnerSegment != "OWNR1A" || resource.Canvas.BoardSegment != "board-1" {
-		t.Fatalf("canvas = %+v, want owner=OWNR1A board=board-1", resource.Canvas)
-	}
-	if resource.Canvas.RelativePath != "thumb/demo.txt" {
-		t.Fatalf("relative path = %q, want %q", resource.Canvas.RelativePath, "thumb/demo.txt")
 	}
 }
 
@@ -151,7 +110,6 @@ func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
 		t.Fatalf("userUploadObjectPrefixes returned error: %v", err)
 	}
 	want := []string{
-		"uploads/canvas/OWNR1A/",
 		"uploads/profile/OWNR1A/avatar/",
 		"uploads/tasks/42/",
 		"uploads/library/42/",
@@ -194,7 +152,7 @@ func TestBuildObjectKeyRejectsTraversalDirPrefix(t *testing.T) {
 	}
 	// Interior ".." that resolves inside the root normalizes instead of
 	// failing (single-source traversal defense lives in Normalize*).
-	key, err := domain.BuildObjectKey("canvas/OWNER/../../private", ".png")
+	key, err := domain.BuildObjectKey("tasks/OWNER/../../private", ".png")
 	if err != nil {
 		t.Fatalf("expected contained traversal to normalize, got %v", err)
 	}

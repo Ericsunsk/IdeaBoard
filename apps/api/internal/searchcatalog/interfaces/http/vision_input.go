@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/platform/outbound"
@@ -108,7 +108,7 @@ func readMultipartVisionImage(header *multipart.FileHeader) (domain.VisionImage,
 }
 
 type VisionLibraryAssetReader interface {
-	GetAsset(context.Context, int64, int64) (library.Asset, error)
+	GetAsset(context.Context, int64, int64) (librarydomain.Asset, error)
 }
 
 // visionReferenceMaterializer owns every server-side reference ingress. The
@@ -149,7 +149,7 @@ func (m visionReferenceMaterializer) Materialize(
 	return images, nil
 }
 
-func readLibraryVisionImage(ctx context.Context, asset library.Asset) (domain.VisionImage, error) {
+func readLibraryVisionImage(ctx context.Context, asset librarydomain.Asset) (domain.VisionImage, error) {
 	rawURL := asset.OriginalURL
 	if strings.TrimSpace(rawURL) == "" {
 		rawURL = asset.PreviewURL

@@ -215,7 +215,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [commands.go](./apps/api/internal/tasking/application/task/commands.go)               | Task submission commands |
 | [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)        | River enqueue adapter         |
 | [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)         | River worker adapter          |
-| [processor.go](./apps/api/internal/runtime/interfaces/worker/execution/processor.go)     | Worker task processing        |
+| [workspace_task_worker.go](./apps/api/internal/tasking/interfaces/worker/workspace_task_worker.go) | Worker task processing        |
 | [request.go](./apps/api/internal/runtime/interfaces/worker/providers/request.go) | Provider request shaping      |
 
 ### Prompt config

@@ -1,6 +1,5 @@
 import type {
-  SubmitTaskData,
-  SubmitTaskReadinessRequestData,
+  CanvasTaskRequestData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
 import { assertTaskSubmitReady } from '../task-runner/taskReadiness'
@@ -11,11 +10,11 @@ export type CanvasTaskSubmission = {
 
 export type CanvasTaskSubmissionAdapter = {
   assertTaskRequestReady: (
-    request: SubmitTaskReadinessRequestData,
+    request: CanvasTaskRequestData,
     fallbackMessage?: string,
   ) => Promise<void>
   submitTaskRequest: (
-    request: SubmitTaskData,
+    request: CanvasTaskRequestData,
     fallbackMessage?: string,
   ) => Promise<CanvasTaskSubmission>
 }

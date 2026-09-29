@@ -18,18 +18,11 @@ const (
 type UploadResourceKind string
 
 const (
-	UploadResourceKindCanvas        UploadResourceKind = "canvas"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
 	UploadResourceKindLibrary       UploadResourceKind = "library"
 	UploadResourceKindSiteAsset     UploadResourceKind = "site_asset"
 )
-
-type UploadCanvasResource struct {
-	OwnerSegment string
-	BoardSegment string
-	RelativePath string
-}
 
 type UploadProfileAvatarResource struct {
 	OwnerSegment string
@@ -55,47 +48,14 @@ type UploadSiteAssetResource struct {
 type UploadResource struct {
 	Kind          UploadResourceKind
 	ObjectKey     string
-	Canvas        *UploadCanvasResource
 	ProfileAvatar *UploadProfileAvatarResource
 	TaskOutput    *UploadTaskOutputResource
 	Library       *UploadLibraryResource
 	SiteAsset     *UploadSiteAssetResource
 }
 
-func CanvasContentUploadDirPrefix(storageUID string, boardID string) (string, error) {
-	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
-	if err != nil {
-		return "", err
-	}
-	boardSegment, err := NormalizeCanvasBoardSegment(boardID)
-	if err != nil {
-		return "", err
-	}
-	return path.Join("canvas", ownerSegment, boardSegment, "content"), nil
-}
-
-func CanvasUserUploadObjectPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
-	if err != nil {
-		return "", err
-	}
-	return path.Join(UploadObjectRoot, "canvas", ownerSegment) + "/", nil
-}
-
-func CanvasBoardUploadObjectPrefix(storageUID string, boardID string) (string, error) {
-	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
-	if err != nil {
-		return "", err
-	}
-	boardSegment, err := NormalizeCanvasBoardSegment(boardID)
-	if err != nil {
-		return "", err
-	}
-	return path.Join(UploadObjectRoot, "canvas", ownerSegment, boardSegment) + "/", nil
-}
-
 func ProfileAvatarUploadDirPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
+	ownerSegment, err := NormalizeStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
@@ -103,7 +63,7 @@ func ProfileAvatarUploadDirPrefix(storageUID string) (string, error) {
 }
 
 func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
+	ownerSegment, err := NormalizeStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +81,7 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID <= 0 {
 		return "", fmt.Errorf(msgTaskOutputUserUploadObjectPrefix)
 	}
-	taskSegment, err := NormalizeCanvasBoardSegment(taskID)
+	taskSegment, err := NormalizeUploadSegment(taskID)
 	if err != nil {
 		return "", err
 	}
@@ -147,10 +107,6 @@ func SiteAssetUploadDirPrefix() string {
 }
 
 func UserUploadObjectPrefixes(userID int64, storageUID string) ([]string, error) {
-	canvasPrefix, err := CanvasUserUploadObjectPrefix(storageUID)
-	if err != nil {
-		return nil, err
-	}
 	profileAvatarPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {
 		return nil, err
@@ -163,7 +119,7 @@ func UserUploadObjectPrefixes(userID int64, storageUID string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	return []string{canvasPrefix, profileAvatarPrefix, taskOutputPrefix, libraryPrefix}, nil
+	return []string{profileAvatarPrefix, taskOutputPrefix, libraryPrefix}, nil
 }
 
 func ParseUploadResource(rawPath string) (UploadResource, error) {
@@ -189,8 +145,6 @@ func parseUploadResourceParts(parts []string) (UploadResource, error) {
 	var resource UploadResource
 	var ok bool
 	switch parts[0] {
-	case "canvas":
-		resource, ok = parseCanvasUploadResource(parts)
 	case "profile":
 		resource, ok = parseProfileAvatarUploadResource(parts)
 	case "tasks":
@@ -204,21 +158,6 @@ func parseUploadResourceParts(parts []string) (UploadResource, error) {
 		return UploadResource{}, fmt.Errorf(msgParseUploadResourceParts2)
 	}
 	return resource, nil
-}
-
-func parseCanvasUploadResource(parts []string) (UploadResource, bool) {
-	relativePath, ok := uploadRelativePath(parts, 3)
-	if len(parts) < 4 || parts[1] == "" || parts[2] == "" || !ok {
-		return UploadResource{}, false
-	}
-	return UploadResource{
-		Kind: UploadResourceKindCanvas,
-		Canvas: &UploadCanvasResource{
-			OwnerSegment: parts[1],
-			BoardSegment: parts[2],
-			RelativePath: relativePath,
-		},
-	}, true
 }
 
 func parseProfileAvatarUploadResource(parts []string) (UploadResource, bool) {

@@ -12,20 +12,20 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/library"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tenancy"
 )
 
-func newV1VisionGapsFixture(t *testing.T) (*v1MediaGapsFixture, *library.InMemoryWorkspaceLibraryStore, *fakeVisionExtractor, *fakeLibraryBilling) {
+func newV1VisionGapsFixture(t *testing.T) (*v1MediaGapsFixture, *librarymemory.InMemoryWorkspaceLibraryStore, *fakeVisionExtractor, *fakeLibraryBilling) {
 	t.Helper()
 	ctx := context.Background()
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	objects := &fakeV1MediaObjects{objects: make(map[string][]byte)}
-	lib := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	lib := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	extractor := &fakeVisionExtractor{query: "warm cafe"}
 	billing := &fakeLibraryBilling{}
 	quoter := &fakeLibraryQuoter{amount: 3}

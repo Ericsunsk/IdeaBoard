@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/media/workspacemedia"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -32,9 +34,9 @@ import (
 func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.Service, *integrationHolder, *integrationQueue) {
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		Tasks: env.tasks, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Routing: allowTestRouting,
+		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Resolver: allowTestPoolResolver(),
 	})
 	return service, holder, queue
 }
@@ -48,11 +50,24 @@ func newWorkerIntegrationWorker(
 		Store: env.tasks, Settler: service,
 		Assets:   &workspacemedia.TaskAssetAdapter{Store: env.media},
 		Provider: provider,
+		// The postgres store is the production attempt recorder:
+		// every send opens/closes a task_execution_attempts row.
+		Attempts: env.tasks,
 	})
 	if err != nil {
 		panic(err)
 	}
 	return worker
+}
+
+// pinIntegrationSnapshot pins the submit-time RoutingSnapshot through
+// the real catalog path (the same SaveRoutingSnapshot the submit
+// transaction calls), so the worker executes the pinned selection.
+func pinIntegrationSnapshot(t *testing.T, env *workspaceIntegrationEnv, created *workspacetasks.WorkspaceTask, models ...string) {
+	t.Helper()
+	if err := catalog.SaveRoutingSnapshot(context.Background(), dbsqlc.New(env.pool), created.ID, workerTestSnapshot(t, created.Service, models)); err != nil {
+		t.Fatalf("SaveRoutingSnapshot: %v", err)
+	}
 }
 
 // Success: submit (with a real media input, verified through the adapter)
@@ -67,11 +82,12 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "default",
+		Service: "render", MediaAssetIDs: []string{asset.ID}, Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-loop-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create with media input: %v", err)
 	}
+	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	// The args mirror exactly what workspaceTaskEnqueuer writes at submit.
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
@@ -121,11 +137,12 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		Service: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("worker-fail-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
 	}
+	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	worker := newWorkerIntegrationWorker(env, service, WorkspaceTaskGenerateFunc(
 		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {

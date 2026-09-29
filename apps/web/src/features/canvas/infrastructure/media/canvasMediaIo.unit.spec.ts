@@ -9,8 +9,8 @@ afterEach(() => {
 describe('flow media URL resolution', () => {
   it('uses the same-origin upload proxy for local API upload URLs', () => {
     expect(
-      resolveFetchUrl('http://localhost:6000/uploads/canvas/U123/board/content/image.png'),
-    ).toBe('http://localhost:3000/uploads/canvas/U123/board/content/image.png')
+      resolveFetchUrl('http://localhost:6000/uploads/tasks/U123/board/content/image.png'),
+    ).toBe('http://localhost:3000/uploads/tasks/U123/board/content/image.png')
   })
 
   it('keeps v1 workspace media asset URLs on the authenticated API origin', async () => {

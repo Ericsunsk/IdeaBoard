@@ -36,20 +36,10 @@ func (f *fakeHealthChecker) CheckHealth(context.Context) domain.ComponentStatus 
 	return f.status
 }
 
-type fakeRecoveryCoordinator struct {
-	recovered int
-	err       error
-}
-
-func (f *fakeRecoveryCoordinator) RecoverRunningTasks(context.Context) (int, error) {
-	return f.recovered, f.err
-}
-
 func TestExecuteStartupHappyPath(t *testing.T) {
 	ctx := context.Background()
 	coord := lifecycle.NewCoordinator(10 * time.Millisecond)
 
-	recovery := &fakeRecoveryCoordinator{recovered: 3}
 	runner := &fakeRunner{name: "river", kind: domain.ComponentKindRiver}
 	checker := &fakeHealthChecker{status: domain.ComponentStatus{
 		Name:     "river",
@@ -59,7 +49,6 @@ func TestExecuteStartupHappyPath(t *testing.T) {
 	}}
 
 	err := orchestration.ExecuteStartup(ctx, coord, orchestration.StartupDependencies{
-		Recovery:       recovery,
 		Runners:        []ports.Runner{runner},
 		HealthCheckers: []ports.HealthChecker{checker},
 	})
@@ -72,32 +61,6 @@ func TestExecuteStartupHappyPath(t *testing.T) {
 	}
 	if !runner.started {
 		t.Fatal("runner was not started")
-	}
-}
-
-func TestExecuteStartupFailsOnRecoveryError(t *testing.T) {
-	ctx := context.Background()
-	coord := lifecycle.NewCoordinator(10 * time.Millisecond)
-
-	recoveryErr := errors.New("recovery failed")
-	recovery := &fakeRecoveryCoordinator{err: recoveryErr}
-	runner := &fakeRunner{name: "river", kind: domain.ComponentKindRiver}
-
-	err := orchestration.ExecuteStartup(ctx, coord, orchestration.StartupDependencies{
-		Recovery: recovery,
-		Runners:  []ports.Runner{runner},
-	})
-	if err == nil {
-		t.Fatal("ExecuteStartup succeeded, want recovery error")
-	}
-	if !errors.Is(err, recoveryErr) {
-		t.Fatalf("error = %v, want %v", err, recoveryErr)
-	}
-	if runner.started {
-		t.Fatal("runner should not be started when recovery fails")
-	}
-	if coord.State() != domain.StateRecovering {
-		t.Fatalf("state = %s, want recovering", coord.State())
 	}
 }
 

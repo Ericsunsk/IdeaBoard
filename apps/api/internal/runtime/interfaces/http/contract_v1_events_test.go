@@ -25,7 +25,7 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
@@ -99,7 +99,7 @@ type v1EventsFixture struct {
 	tasks    *workspacetasks.InMemoryStore
 	boards   *boards.InMemoryWorkspaceBoardStore
 	boardID  string
-	lib      *library.InMemoryWorkspaceLibraryStore
+	lib      *librarymemory.InMemoryWorkspaceLibraryStore
 	eventLog *events.WorkspaceEventLog
 	webhooks *events.WebhookStore
 	sender   *fakeEventSender
@@ -114,7 +114,7 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	dir := newStaticUserDirectory()
 	tasks := workspacetasks.NewInMemoryStoreForTests()
 	boardsStore := boards.NewInMemoryWorkspaceBoardStoreForTests()
-	libStore := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	libStore := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	lib := libStore
 	quoter := &fakeTaskQuoter{}
 	holder := newFakeTaskHolder()

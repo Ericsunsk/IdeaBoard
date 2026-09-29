@@ -74,8 +74,10 @@ FROM workspaces AS w
 WHERE t.workspace_id = w.internal_id
 AND t.public_id = $2
 AND w.public_id = $3
-AND t.status = 'pending'
-AND t.lease_token = ''
+AND (
+  (t.status = 'pending' AND t.lease_token = '')
+  OR (t.status = 'running' AND t.lease_token = $1)
+)
 RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot
 `
 
@@ -85,9 +87,12 @@ type ClaimWorkspaceTaskParams struct {
 	WorkspacePublicID string `json:"workspace_public_id"`
 }
 
-// ClaimTask fences one pending task for the worker: pending -> running with
-// the lease token. Zero rows means already claimed/converged or invisible;
-// the caller distinguishes via GetWorkspaceTaskByPublicID.
+// ClaimTask fences one task execution with the lease token. A pending task is
+// claimed normally; a River redelivery of the same job may reacquire its
+// interrupted running lease because it carries the same execution token.
+// A different token still gets zero rows, preserving the single-worker
+// fence. The caller distinguishes already-converged/invisible rows via
+// GetWorkspaceTaskByPublicID.
 func (q *Queries) ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTaskParams) (Task, error) {
 	row := q.db.QueryRow(ctx, claimWorkspaceTask, arg.LeaseToken, arg.PublicID, arg.WorkspacePublicID)
 	var i Task

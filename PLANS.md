@@ -18,6 +18,15 @@ hard cut without weakening release guards.
   adapters, aliases, or dual-read/dual-write compatibility paths are kept.
 - #830: retain the grant audit as documentation only.
 - Restore the Board state contract guard removed by this diff.
+- Cleanup: remove the unreferenced pre-canonical `TaskIntake` readiness,
+  media-preparation, and submit-validation path. Keep the canonical workspace
+  compiler, Admin monitor DTOs, and event hubs that remain production-owned.
+- Routing: construct one `RoutingResolver` at the composition root and share it
+  with worker settlement, task submit/readiness, task quotes, and billing
+  quotes. Availability checks and routing snapshot persistence fail closed.
+- Consistency: read model pools from one database transaction snapshot and keep
+  task billing, routing snapshot, task insert, and River enqueue in the same
+  settlement transaction.
 
 ## Success Criteria
 
@@ -35,3 +44,6 @@ hard cut without weakening release guards.
 - Remote output fetching is constrained to trusted provider origins and size
   limits. A fetch or render failure remains terminal and releases task billing.
 - Each issue is committed independently, so rollback is a commit revert.
+- Legacy cleanup is a hard cut: deleted symbols and files have no compatibility
+  aliases, dual reads, dual writes, or fail-open fallbacks. Rollback is the
+  commit revert before deployment.

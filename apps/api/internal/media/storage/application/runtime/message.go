@@ -10,15 +10,6 @@ const (
 	msgPrepareUploadRefFromFile2            = "上传对象路径无效: %w"           // PrepareUploadRefFromFile @ service.go
 	msgChecksumMultipartFile                = "文件内容不合法"                // ChecksumMultipartFile @ service.go
 	msgPutObjectAtProfile                   = "读取存储配置失败: %w"           // PutObjectAtProfile @ service.go
-	msgResolveProviderDerivativeURL         = "媒体衍生图解析器未配置"            // ResolveProviderDerivativeURL @ service.go
-	msgResolveProviderDerivativeURL2        = "定位媒体衍生图失败: %w"          // ResolveProviderDerivativeURL @ service.go
-	msgResolveProviderDerivativeURL3        = "媒体衍生图尚未就绪"              // ResolveProviderDerivativeURL @ service.go
-	msgResolveProviderDerivativeURL4        = "媒体衍生图存储路径无效: %w"        // ResolveProviderDerivativeURL @ service.go
-	msgResolveProviderDerivativeURL5        = "读取媒体衍生图存储配置失败: %w"      // ResolveProviderDerivativeURL @ service.go
-	msgResolveStoredUploadTarget            = "定位媒体资产失败: %w"           // ResolveStoredUploadTarget @ service.go
-	msgResolveStoredUploadTarget2           = "媒体资产存储路径无效: %w"         // ResolveStoredUploadTarget @ service.go
-	msgResolveStoredUploadTarget3           = "媒体资产存储路径与请求不一致"         // ResolveStoredUploadTarget @ service.go
-	msgResolveStoredUploadTarget4           = "读取媒体资产存储配置失败: %w"       // ResolveStoredUploadTarget @ service.go
 	msgResolveProfileFromUploadURL          = "图片地址格式错误"               // ResolveProfileFromUploadURL @ service.go
 	msgFindS3ProfileForUploadURL            = "图片地址匹配多个存储配置"           // FindS3ProfileForUploadURL @ service.go
 	msgFindS3ProfileForUploadURL2           = "未找到图片所属的存储配置"           // FindS3ProfileForUploadURL @ service.go

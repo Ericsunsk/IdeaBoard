@@ -52,7 +52,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
 	derivativeports "ideaboard/api/internal/media/derivatives/ports"
@@ -81,7 +81,7 @@ const libraryReadThroughTimeout = 90 * time.Second
 // WorkspaceLibraryStore seam does not carry it, so callers
 // type-assert and fail closed (no trigger) when it is absent.
 type libraryMaterializationLister interface {
-	ListMaterializations(ctx context.Context, workspacePublicID string) ([]*library.V1Materialization, error)
+	ListMaterializations(ctx context.Context, workspacePublicID string) ([]*librarydomain.V1Materialization, error)
 }
 
 // libraryReadThroughTrigger runs one on-demand materialization: sync
@@ -90,7 +90,7 @@ type libraryMaterializationLister interface {
 // (production defaults in ContractV1Deps.normalize); tests inject
 // fakes.
 type libraryReadThroughTrigger struct {
-	Library  library.WorkspaceLibraryStore
+	Library  libraryports.WorkspaceLibraryStore
 	Media    WorkspaceMediaStore
 	Objects  WorkspaceMediaObjects
 	Fetcher  materializerassets.LibrarySourceFetcher
@@ -123,14 +123,14 @@ func newLibraryReadThroughTrigger(deps ContractV1Deps) *libraryReadThroughTrigge
 // newest completed link for the library asset. Malformed media links
 // read as a miss (never handed to the media store or the fetcher, both
 // of which require asset_ shape).
-func findCompletedLibraryMedia(jobs []*library.V1Materialization, assetPublicID string) (string, bool) {
+func findCompletedLibraryMedia(jobs []*librarydomain.V1Materialization, assetPublicID string) (string, bool) {
 	trimmed := strings.TrimSpace(assetPublicID)
 	for index := len(jobs) - 1; index >= 0; index-- {
 		job := jobs[index]
 		if job == nil || job.AssetPublicID != trimmed {
 			continue
 		}
-		if job.Status != library.V1MaterializationCompleted {
+		if job.Status != librarydomain.V1MaterializationCompleted {
 			continue
 		}
 		if !contract.IsAssetID(strings.TrimSpace(job.MediaAssetID)) {
@@ -175,7 +175,7 @@ func (t *libraryReadThroughTrigger) resolve(ctx context.Context, workspacePublic
 	if err != nil || stored == nil {
 		return nil, false
 	}
-	if strings.TrimSpace(stored.Provider) == library.ProviderWorkspaceMedia {
+	if strings.TrimSpace(stored.Provider) == librarydomain.ProviderWorkspaceMedia {
 		return nil, false
 	}
 	lister, ok := t.Library.(libraryMaterializationLister)
@@ -201,7 +201,7 @@ func (t *libraryReadThroughTrigger) resolve(ctx context.Context, workspacePublic
 // library asset. The detached context (owner-stamped, egress policy
 // via the global provider) outlives the request; panics are absorbed
 // with a log so the trigger can never take down the server.
-func (t *libraryReadThroughTrigger) spawnFetch(baseCtx context.Context, workspacePublicID string, stored *library.V1Asset, ownerUserID int64) {
+func (t *libraryReadThroughTrigger) spawnFetch(baseCtx context.Context, workspacePublicID string, stored *librarydomain.V1Asset, ownerUserID int64) {
 	if t == nil || t.Spawn == nil || stored == nil || ownerUserID <= 0 {
 		return
 	}
@@ -223,7 +223,7 @@ func (t *libraryReadThroughTrigger) spawnFetch(baseCtx context.Context, workspac
 // run executes one materialization attempt: atomic job claim
 // (pending -> running), fetch, terminal link. Every failure folds
 // into a failed job record; nothing propagates to the read path.
-func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID string, stored *library.V1Asset, ownerUserID int64) {
+func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID string, stored *librarydomain.V1Asset, ownerUserID int64) {
 	lister, ok := t.Library.(libraryMaterializationLister)
 	if !ok {
 		slog.Warn("library read-through skipped: library store cannot list materialization jobs",
@@ -236,7 +236,7 @@ func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID s
 			"workspace_id", workspacePublicID, "library_asset", stored.PublicID)
 		return
 	}
-	matID, err := library.NewV1MaterializationPublicID()
+	matID, err := librarydomain.NewV1MaterializationPublicID()
 	if err != nil {
 		slog.Warn("library read-through: job mint failed", "workspace_id", workspacePublicID, "err", err)
 		return
@@ -248,19 +248,19 @@ func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID s
 		return
 	}
 	matID = job.PublicID
-	if !created && job.Status == library.V1MaterializationCompleted {
+	if !created && job.Status == librarydomain.V1MaterializationCompleted {
 		slog.Info("library read-through converges: completed job already links media; skipping duplicate fetch",
 			"workspace_id", workspacePublicID, "library_asset", stored.PublicID, "materialization", matID)
 		return
 	}
-	if !created && (job.Status == library.V1MaterializationPending || job.Status == library.V1MaterializationRunning) {
+	if !created && (job.Status == librarydomain.V1MaterializationPending || job.Status == librarydomain.V1MaterializationRunning) {
 		slog.Info("library read-through converges: materialization already in flight",
 			"workspace_id", workspacePublicID, "library_asset", stored.PublicID, "materialization", matID)
 		return
 	}
-	if _, err := t.Library.SetMaterializationResult(ctx, workspacePublicID, matID, library.V1MaterializationRunning, "", "", ""); err != nil {
+	if _, err := t.Library.SetMaterializationResult(ctx, workspacePublicID, matID, librarydomain.V1MaterializationRunning, "", "", ""); err != nil {
 		_, _ = t.Library.SetMaterializationResult(ctx, workspacePublicID, matID,
-			library.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
+			librarydomain.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
 		slog.Warn("library read-through: job start failed",
 			"workspace_id", workspacePublicID, "materialization", matID, "err", err)
 		return
@@ -271,7 +271,7 @@ func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID s
 	})
 	if err != nil {
 		_, _ = t.Library.SetMaterializationResult(ctx, workspacePublicID, matID,
-			library.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
+			librarydomain.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
 		slog.Warn("library read-through: fetcher unavailable",
 			"workspace_id", workspacePublicID, "materialization", matID, "err", err)
 		return
@@ -280,13 +280,13 @@ func (t *libraryReadThroughTrigger) run(ctx context.Context, workspacePublicID s
 	mediaID, err := materializer.MaterializeWorkspaceAsset(fetchCtx, workspacePublicID, stored)
 	if err != nil {
 		_, _ = t.Library.SetMaterializationResult(ctx, workspacePublicID, matID,
-			library.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
+			librarydomain.V1MaterializationFailed, "", libraryMaterializationFailureCode, libraryMaterializationFailureMessage)
 		slog.Warn("library read-through: fetch failed",
 			"workspace_id", workspacePublicID, "materialization", matID,
 			"library_asset", stored.PublicID, "err", err)
 		return
 	}
-	if _, err := t.Library.SetMaterializationResult(ctx, workspacePublicID, matID, library.V1MaterializationCompleted, mediaID, "", ""); err != nil {
+	if _, err := t.Library.SetMaterializationResult(ctx, workspacePublicID, matID, librarydomain.V1MaterializationCompleted, mediaID, "", ""); err != nil {
 		slog.Error("library read-through: media link failed; repair required",
 			"workspace_id", workspacePublicID, "materialization", matID, "media_asset", mediaID, "err", err)
 		return
@@ -314,7 +314,7 @@ func (h *contractV1Handler) getLibraryMaterializedMediaAsset(c *gin.Context, wor
 		renderMediaStoreError(c, workspacemedia.ErrNotFound)
 		return
 	}
-	if strings.TrimSpace(stored.Provider) == library.ProviderWorkspaceMedia {
+	if strings.TrimSpace(stored.Provider) == librarydomain.ProviderWorkspaceMedia {
 		renderMediaStoreError(c, workspacemedia.ErrNotFound)
 		return
 	}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -64,9 +63,8 @@ type AuthDeps struct {
 }
 
 type StaticUploadDeps struct {
-	Auth         AuthDeps
-	BoardService *boards.Service
-	ReadAccess   storageports.ReadableUploadAccess
+	Auth       AuthDeps
+	ReadAccess storageports.ReadableUploadAccess
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024

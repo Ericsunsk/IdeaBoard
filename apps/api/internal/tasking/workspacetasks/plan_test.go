@@ -1,24 +1,27 @@
 package workspacetasks
 
-// Submit-time durable plan tests (#847): Create persists the task without a
-// submit-time model mint. The single-value admin mapping is removed; #848
-// pins the RoutingSnapshot in this transaction instead. Canonical params
-// ride CanonicalParams untouched, and an empty ResolvedModel fails the
-// worker closed until the snapshot lands.
+// Submit-time durable plan tests: Create persists the task with no
+// submit-time model mint. The single-value admin mapping is removed and
+// the durable envelope carries no model; the RoutingSnapshot pins in the
+// submit transaction instead. Canonical params ride
+// CanonicalParams untouched, and the transient ResolvedModel handoff
+// stays empty outside worker execution.
 
 import (
 	"context"
 	"errors"
 	"testing"
+
+	"ideaboard/api/internal/generation/routing"
 )
 
 func planTestService() (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
 	store := NewInMemoryStoreForTests()
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
-	service := NewService(ServiceDeps{
+	service := NewTestServiceForTests(ServiceDeps{
 		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-		Holder: holder, Queue: queue, Routing: allowTestRouting,
+		Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	return store, holder, queue, service
 }
@@ -69,22 +72,25 @@ func TestCreateRejectsUnknownService(t *testing.T) {
 
 func TestCreateRejectsBeforeHoldWhenRoutingIsUnavailable(t *testing.T) {
 	ctx := context.Background()
-	store, holder, queue, service := planTestService()
-	quoter := service.quoter.(*fakeQuoter)
-	service = NewService(ServiceDeps{
+	store, holder, queue, _ := planTestService()
+	quoter := &fakeQuoter{snapshot: testSnapshot()}
+	// No resolver wired: submit fails closed with the canonical
+	// unavailable sentinel before any quote, hold, task, or enqueue
+	// work.
+	service := NewTestServiceForTests(ServiceDeps{
 		Tasks: store, Quoter: quoter, Holder: holder, Queue: queue,
 	})
 
 	_, quoteErr := service.Quote(ctx, QuoteParams{Service: "render"})
-	if !errors.Is(quoteErr, ErrRoutingUnavailable) {
-		t.Fatalf("Quote err = %v, want ErrRoutingUnavailable", quoteErr)
+	if !errors.Is(quoteErr, routing.ErrServiceResolutionUnavailable) {
+		t.Fatalf("Quote err = %v, want ErrServiceResolutionUnavailable", quoteErr)
 	}
 
 	_, err := service.Create(ctx, CreateInput{
 		WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render",
 	}, "routing-key-1")
-	if !errors.Is(err, ErrRoutingUnavailable) {
-		t.Fatalf("Create err = %v, want ErrRoutingUnavailable", err)
+	if !errors.Is(err, routing.ErrServiceResolutionUnavailable) {
+		t.Fatalf("Create err = %v, want ErrServiceResolutionUnavailable", err)
 	}
 	count, _ := store.CountTasks(ctx, "ws_abc")
 	if count != 0 {

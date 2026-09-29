@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -40,6 +41,9 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/generation/catalog"
+	"ideaboard/api/internal/generation/routing"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/testdb"
@@ -48,7 +52,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func allowTestRouting(context.Context, string, string) error { return nil }
+// allowTestPoolResolver serves every service/resolution from one enabled
+// entry. Settlement tests run against real PG for the tx legs; the routing
+// decision itself needs no database.
+func allowTestPoolResolver() *routing.RoutingResolver {
+	seed := routing.SelectionSeed{9, 9, 9}
+	return routing.NewRoutingResolver(allowAllAtomicPoolStore{},
+		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
+}
+
+type allowAllAtomicPoolStore struct{}
+
+func (allowAllAtomicPoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
+	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
+		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
+		}},
+	}}, nil
+}
+
+func (allowAllAtomicPoolStore) ListPoolInTx(ctx context.Context, _ pgx.Tx, service string) (routing.Pool, error) {
+	return allowAllAtomicPoolStore{}.ListPool(ctx, service)
+}
 
 const atomicTestChecksum = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 
@@ -320,7 +345,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	billingStore := billingpostgres.NewStore(pool)
 	definition := billing.BillableItemDefinition{
 		SKU: "ai-image:render", Namespace: "ai-image", ProductKind: "workflow-feature",
-		DisplayName: "Render", PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
+		DisplayName: "Render", PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}
 	registry, err := billing.NewBillableItemRegistry([]billing.BillableItemDefinition{definition})
 	if err != nil {
@@ -334,8 +359,8 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	store := taskpostgres.NewStore(pool)
 	holder := &atomicHolder{credits: creditService}
 	queue := &atomicQueue{pool: pool}
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Routing: allowTestRouting,
+	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
+		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
 }
@@ -371,7 +396,7 @@ func (e *atomicEnv) createPaidTask(t *testing.T, quantity int64) *workspacetasks
 	t.Helper()
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: e.ws, OwnerUserID: e.userID,
-		Service: "render", Quantity: quantity, Resolution: "default",
+		Service: "render", Quantity: quantity, Resolution: "1k",
 	}, "atomic-key-"+randomAtomicHex(t, 4))
 	if err != nil {
 		t.Fatalf("atomic Create: %v", err)
@@ -430,7 +455,7 @@ func TestAtomicCreateRollsBackOnEnqueueFailure(t *testing.T) {
 
 	_, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: env.ws, OwnerUserID: env.userID,
-		Service: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "1k",
 	}, "atomic-key-"+randomAtomicHex(t, 4))
 	if err == nil {
 		t.Fatal("Create with failing enqueue must fail")
@@ -653,7 +678,7 @@ func TestAtomicFreeTaskSettlesWithoutLedger(t *testing.T) {
 	env := openAtomicEnv(t, 0)
 	created, err := env.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: env.ws, OwnerUserID: env.userID,
-		Service: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "1k",
 	}, "atomic-free-"+randomAtomicHex(t, 4))
 	if err != nil {
 		t.Fatalf("free Create: %v", err)
@@ -675,5 +700,163 @@ func TestAtomicFreeTaskSettlesWithoutLedger(t *testing.T) {
 	}
 	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
 		t.Fatalf("wallet = (%d, %d), want untouched (1000, 0)", available, reserved)
+	}
+}
+
+// Submit-path routing snapshot tests over the fixture database.
+// The resolver-wired service below shares openAtomicEnv's store, holder,
+// queue, wallet, and billing price; only the pool, resolver, and snapshot
+// saver are added, so the existing atomic tests continue to prove the
+// settlement transaction independently.
+
+// openRoutingAtomicEnv rebuilds the env service with the shared
+// RoutingResolver over a seeded render pool plus the production snapshot
+// saver (catalog.SaveRoutingSnapshot with the settlement tx's Queries).
+// The billing catalog is rebuilt over the same pool; the ai-image:render
+// 1k price published by openAtomicEnv persists in the database.
+func openRoutingAtomicEnv(t *testing.T) *atomicEnv {
+	t.Helper()
+	env := openAtomicEnv(t, 10)
+	ctx := context.Background()
+
+	poolRepo := catalog.NewRepository(env.pool)
+	if _, err := poolRepo.ReplacePool(ctx, "render", 0, []catalog.PoolEntryInput{
+		{ModelID: "atomic-test/model", Enabled: true, Resolutions: []string{"1k"}},
+	}); err != nil {
+		t.Fatalf("seed atomic routing pool: %v", err)
+	}
+	poolResolver := routing.NewRoutingResolver(poolRepo)
+	poolSaver := func(ctx context.Context, tx pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
+		if tx == nil {
+			return errors.New("routing snapshot saver requires the settlement tx")
+		}
+		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
+	}
+
+	billingStore := billingpostgres.NewStore(env.pool)
+	definition := billing.BillableItemDefinition{
+		SKU: "ai-image:render", Namespace: "ai-image", ProductKind: "workflow-feature",
+		DisplayName: "Render", PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
+	}
+	registry, err := billing.NewBillableItemRegistry([]billing.BillableItemDefinition{definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.service = workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
+		Tasks: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
+		Holder: env.holder, Queue: env.queue,
+		Resolver: poolResolver, SnapshotSaver: poolSaver,
+	})
+	return env
+}
+
+func loadAtomicSnapshot(t *testing.T, env *atomicEnv, taskID string) routing.RoutingSnapshot {
+	t.Helper()
+	snap, err := catalog.LoadRoutingSnapshot(context.Background(), dbsqlc.New(env.pool), taskID)
+	if err != nil {
+		t.Fatalf("LoadRoutingSnapshot(%s): %v", taskID, err)
+	}
+	return snap
+}
+
+// TestAtomicRoutingSnapshotPinnedInTx proves submit resolves via the shared
+// RoutingResolver and pins the snapshot atomically with Hold/task/enqueue:
+// the stored fact replays without the live pool.
+func TestAtomicRoutingSnapshotPinnedInTx(t *testing.T) {
+	env := openRoutingAtomicEnv(t)
+	created := env.createPaidTask(t, 1)
+
+	snap := loadAtomicSnapshot(t, env, created.ID)
+	if err := snap.Verify(); err != nil {
+		t.Fatalf("pinned snapshot must replay without the live pool: %v", err)
+	}
+	if snap.Service != "render" || snap.RequestedResolution != routing.Resolution1K || snap.PoolVersion != 1 {
+		t.Fatalf("pinned pinning = %+v, want render/1k/version 1", snap)
+	}
+	if len(snap.EligibleModels) != 1 || snap.EligibleModels[0] != "atomic-test/model" {
+		t.Fatalf("eligible = %v, want [atomic-test/model]", snap.EligibleModels)
+	}
+	if snap.SelectedModel != "atomic-test/model" || snap.HasRetryCandidate() {
+		t.Fatalf("selected = %q retry = %q, want the single candidate with no retry", snap.SelectedModel, snap.RetryCandidate)
+	}
+}
+
+// TestAtomicRoutingUnavailableReservesNothing proves an empty eligible set
+// converges to the canonical sentinel before Hold, task insert, or enqueue:
+// no task row, no hold ledger row, no reserved balance, no enqueue probe.
+func TestAtomicRoutingUnavailableReservesNothing(t *testing.T) {
+	env := openRoutingAtomicEnv(t)
+	ctx := context.Background()
+	poolRepo := catalog.NewRepository(env.pool)
+	version, err := poolRepo.GetVersion(ctx, "render")
+	if err != nil {
+		t.Fatalf("pool version: %v", err)
+	}
+	if _, err := poolRepo.ReplacePool(ctx, "render", version, nil); err != nil {
+		t.Fatalf("clear atomic routing pool: %v", err)
+	}
+
+	_, err = env.service.Create(ctx, workspacetasks.CreateInput{
+		WorkspaceID: env.ws, OwnerUserID: env.userID,
+		Service: "render", Quantity: 1, Resolution: "1k",
+	}, "atomic-routing-unavail-"+randomAtomicHex(t, 4))
+	if !errors.Is(err, routing.ErrServiceResolutionUnavailable) {
+		t.Fatalf("Create err = %v, want ErrServiceResolutionUnavailable", err)
+	}
+	var unavailable *routing.ResolutionUnavailableError
+	if !errors.As(err, &unavailable) || unavailable.Service != "render" || unavailable.Resolution != routing.Resolution1K {
+		t.Fatalf("Create fields = %+v, want normalized render/1k", unavailable)
+	}
+	count, err := env.store.CountTasks(ctx, env.ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("tasks = %d, want 0", count)
+	}
+	if env.ledgerCount(t, `wallet_user_id = $1 AND command_type = 'hold'`, env.userID) != 0 {
+		t.Fatal("hold ledger row leaked after unavailable Create")
+	}
+	if available, reserved := env.wallet(t); available != 1000 || reserved != 0 {
+		t.Fatalf("wallet = (%d, %d), want untouched (1000, 0)", available, reserved)
+	}
+	var probes int
+	if err := env.pool.QueryRow(ctx, `SELECT COUNT(*) FROM settle_enqueue_probe`).Scan(&probes); err != nil {
+		t.Fatalf("count enqueue probes: %v", err)
+	}
+	if probes != 0 {
+		t.Fatalf("enqueue probes = %d, want 0", probes)
+	}
+	if len(env.service.StagedEvents()) != 0 {
+		t.Fatal("events must not stage on unavailable Create")
+	}
+}
+
+// TestAtomicRoutingSnapshotSurvivesPoolEdits proves later Admin pool edits
+// never invalidate an accepted task nor change its candidate set: the
+// stored snapshot still replays byte-identical without the live pool.
+func TestAtomicRoutingSnapshotSurvivesPoolEdits(t *testing.T) {
+	env := openRoutingAtomicEnv(t)
+	ctx := context.Background()
+	created := env.createPaidTask(t, 1)
+	before := loadAtomicSnapshot(t, env, created.ID)
+
+	poolRepo := catalog.NewRepository(env.pool)
+	version, err := poolRepo.GetVersion(ctx, "render")
+	if err != nil {
+		t.Fatalf("pool version: %v", err)
+	}
+	if _, err := poolRepo.ReplacePool(ctx, "render", version, []catalog.PoolEntryInput{
+		{ModelID: "atomic-test/other", Enabled: true, Resolutions: []string{"2k", "4k"}},
+	}); err != nil {
+		t.Fatalf("edit atomic routing pool: %v", err)
+	}
+
+	after := loadAtomicSnapshot(t, env, created.ID)
+	if !reflect.DeepEqual(after, before) {
+		t.Fatalf("stored snapshot changed by the pool edit:\n%+v\n%+v", before, after)
+	}
+	if err := after.Verify(); err != nil {
+		t.Fatalf("Verify() after pool edit = %v; replay must not need the live pool", err)
 	}
 }

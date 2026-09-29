@@ -8,7 +8,7 @@ import (
 )
 
 // v1 prompt input (data.prompt): contract-typed, length-bounded at
-// MaxWorkspaceTaskPromptBytes (8KB, legacy parity). Empty means no prompt;
+// MaxWorkspaceTaskPromptBytes (8KB). Empty means no prompt;
 // feature policy is enforced at canonical compile time.
 func TestValidateWorkspacePromptBound(t *testing.T) {
 	for _, prompt := range []string{"", "   ", "a red bicycle", strings.Repeat("x", MaxWorkspaceTaskPromptBytes)} {
@@ -92,9 +92,9 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 			"ws_abc\x00asset_pending": {ID: "asset_pending", WorkspaceID: "ws_abc", Status: "pending"},
 			"ws_abc\x00asset_old":     {ID: "asset_old", WorkspaceID: "ws_abc", Status: "ready", Archived: true},
 		}}
-		service := NewService(ServiceDeps{
+		service := NewTestServiceForTests(ServiceDeps{
 			Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
-			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Routing: allowTestRouting,
+			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Resolver: allowTestPoolResolver(),
 		})
 		return store, service
 	}

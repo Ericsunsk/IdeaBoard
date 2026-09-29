@@ -34,7 +34,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog/domain"
 )
@@ -175,7 +175,7 @@ func ValidateV1VisionQueryInput(input V1VisionQueryInput) (V1VisionQueryInput, e
 	seen := make(map[string]struct{}, len(input.LibraryAssetIDs))
 	for _, raw := range input.LibraryAssetIDs {
 		trimmed := strings.TrimSpace(raw)
-		if !contract.IsValidPublicID(library.V1AssetPrefix, trimmed) {
+		if !contract.IsValidPublicID(librarydomain.V1AssetPrefix, trimmed) {
 			return V1VisionQueryInput{}, ErrV1VisionInput
 		}
 		if _, ok := seen[trimmed]; ok {

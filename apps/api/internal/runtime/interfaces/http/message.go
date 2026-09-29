@@ -148,6 +148,7 @@ const (
 	msgCreateBillingQuote2             = "输出规格非法"                      // CreateBillingQuote @ contract_v1_billing_gaps.go
 	msgCreateBillingQuote3             = "报价数量非法"                      // CreateBillingQuote @ contract_v1_billing_gaps.go
 	msgCreateBillingQuote4             = "报价超过允许上限"                    // CreateBillingQuote @ contract_v1_billing_gaps.go
+	msgBillingPoolUnavailable          = "该清晰度暂不可用"                    // CodeServiceResolutionUnavailable
 	msgServiceUnavailable45            = "奖励服务暂不可用"                    // CodeServiceUnavailable
 	msgRedeemReward                    = "兑换码不能为空"                     // RedeemReward @ contract_v1_billing_gaps.go
 	msgRewardCodeUnavailable           = "兑换码无效或已失效"                   // CodeRewardCodeUnavailable
@@ -205,6 +206,9 @@ const (
 	msgSearchVisionProviderError       = "视觉搜索暂不可用"                    // CodeSearchVisionProviderError
 	msgSearchVisionNotConfigured       = "视觉搜索暂未配置"                    // CodeSearchVisionNotConfigured
 	msgServiceUnavailable54            = "视觉搜索暂不可用"                    // CodeServiceUnavailable
+	msgConflict7                       = "模型池已被更新，请刷新后重试"              // CodeConflict
+	msgBadRequest34                    = "模型池配置非法"                     // CodeBadRequest
+	msgServiceUnavailable55            = "模型池服务暂不可用"                   // CodeServiceUnavailable
 	msgValidationFailed10              = "任务参数非法"                      // CodeValidationFailed
 	msgTaskStateConflict               = "任务状态不允许此操作"                  // CodeTaskStateConflict
 	msgMediaNotFound2                  = "媒体资源不存在"                     // CodeMediaNotFound
@@ -216,6 +220,6 @@ const (
 	msgReadyHandler                    = "服务尚未就绪"                      // ReadyHandler @ routes.go
 	msgPublicBrandingSettingsHandler   = "系统设置服务未配置"                   // PublicBrandingSettingsHandler @ routes.go
 	msgResolveStaticUploadReadAccess   = "读取上传资源失败"                    // ResolveStaticUploadReadAccess @ upload_static_handler.go
-	msgWriteCanvasUploadReadError      = "资源不存在"                       // WriteCanvasUploadReadError @ upload_static_handler.go
-	msgWriteCanvasUploadReadError2     = "无权访问该资源"                     // WriteCanvasUploadReadError @ upload_static_handler.go
+	msgWriteUploadReadError            = "资源不存在"                       // WriteOwnedUploadReadError @ upload_static_handler.go
+	msgWriteUploadReadError2           = "无权访问该资源"                     // WriteOwnedUploadReadError @ upload_static_handler.go
 )

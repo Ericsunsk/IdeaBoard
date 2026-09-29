@@ -1,4 +1,4 @@
-package library
+package postgres
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/testsupport/testenv"
+
+	"ideaboard/api/internal/library/domain"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -191,9 +193,9 @@ type libraryTestEnv struct {
 
 const libraryTestAssetURL = "https://images.unsplash.com/photo-test"
 
-func libraryTestAssetInput(sourceID string) AssetInput {
-	return AssetInput{
-		Provider:    ProviderUnsplash,
+func libraryTestAssetInput(sourceID string) domain.AssetInput {
+	return domain.AssetInput{
+		Provider:    domain.ProviderUnsplash,
 		SourceID:    sourceID,
 		SourceURL:   libraryTestAssetURL,
 		PreviewURL:  libraryTestAssetURL,
@@ -263,7 +265,7 @@ func openLibraryTestEnv(t *testing.T) *libraryTestEnv {
 
 func mustFolderID(t *testing.T, ctx context.Context, svc *Service, ws, name string) string {
 	t.Helper()
-	publicID, err := NewV1FolderPublicID()
+	publicID, err := domain.NewV1FolderPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,26 +273,26 @@ func mustFolderID(t *testing.T, ctx context.Context, svc *Service, ws, name stri
 	if err != nil {
 		t.Fatalf("create folder %q: %v", name, err)
 	}
-	if !IsV1FolderID(folder.PublicID) {
+	if !domain.IsV1FolderID(folder.PublicID) {
 		t.Fatalf("folder id = %q, want lfolder_ shape", folder.PublicID)
 	}
 	return folder.PublicID
 }
 
-func mustSaveAsset(t *testing.T, ctx context.Context, svc *Service, ws, sourceID, folderID string) *V1Asset {
+func mustSaveAsset(t *testing.T, ctx context.Context, svc *Service, ws, sourceID, folderID string) *domain.V1Asset {
 	t.Helper()
-	publicID, err := NewV1AssetPublicID()
+	publicID, err := domain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
-	asset, created, err := svc.SaveAsset(ctx, ws, V1SaveAssetInput{FolderPublicID: folderID, Asset: libraryTestAssetInput(sourceID)}, publicID)
+	asset, created, err := svc.SaveAsset(ctx, ws, domain.V1SaveAssetInput{FolderPublicID: folderID, Asset: libraryTestAssetInput(sourceID)}, publicID)
 	if err != nil {
 		t.Fatalf("save asset %q: %v", sourceID, err)
 	}
 	if !created {
 		t.Fatalf("save asset %q: created = false, want true", sourceID)
 	}
-	if !IsV1AssetID(asset.PublicID) {
+	if !domain.IsV1AssetID(asset.PublicID) {
 		t.Fatalf("asset id = %q, want lasset_ shape", asset.PublicID)
 	}
 	return asset
@@ -334,9 +336,9 @@ func mustSeedMediaAsset(t *testing.T, ctx context.Context, env *libraryTestEnv, 
 
 // mustCreateMaterialization opens a pending job and asserts the open
 // shape (pending, no link, no error).
-func mustCreateMaterialization(t *testing.T, ctx context.Context, svc *Service, ws, assetPublicID string) *V1Materialization {
+func mustCreateMaterialization(t *testing.T, ctx context.Context, svc *Service, ws, assetPublicID string) *domain.V1Materialization {
 	t.Helper()
-	publicID, err := NewV1MaterializationPublicID()
+	publicID, err := domain.NewV1MaterializationPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,10 +346,10 @@ func mustCreateMaterialization(t *testing.T, ctx context.Context, svc *Service, 
 	if err != nil {
 		t.Fatalf("create materialization: %v", err)
 	}
-	if !IsV1MaterializationID(record.PublicID) {
+	if !domain.IsV1MaterializationID(record.PublicID) {
 		t.Fatalf("materialization id = %q, want lmat_ shape", record.PublicID)
 	}
-	if record.Status != V1MaterializationPending || record.AssetPublicID != assetPublicID {
+	if record.Status != domain.V1MaterializationPending || record.AssetPublicID != assetPublicID {
 		t.Fatalf("materialization = %+v, want pending job for %s", record, assetPublicID)
 	}
 	if record.MediaAssetID != "" || record.ErrorMessage != "" {
@@ -361,45 +363,45 @@ func TestLibraryServicePublicIDShapes(t *testing.T) {
 		"lfolder_abc123": true, "lasset_abc123": false, "lmat_abc123": false,
 		"libf_abc123": false, "": false, "42": false,
 	} {
-		if got := IsV1FolderID(id); got != ok {
-			t.Errorf("IsV1FolderID(%q) = %v, want %v", id, got, ok)
+		if got := domain.IsV1FolderID(id); got != ok {
+			t.Errorf("domain.IsV1FolderID(%q) = %v, want %v", id, got, ok)
 		}
 	}
 	for id, ok := range map[string]bool{
 		"lasset_abc123": true, "liba_abc123": false, "": false, "42": false,
 	} {
-		if got := IsV1AssetID(id); got != ok {
-			t.Errorf("IsV1AssetID(%q) = %v, want %v", id, got, ok)
+		if got := domain.IsV1AssetID(id); got != ok {
+			t.Errorf("domain.IsV1AssetID(%q) = %v, want %v", id, got, ok)
 		}
 	}
 	for id, ok := range map[string]bool{
 		"lmat_abc123": true, "libm_abc123": false, "": false, "42": false,
 	} {
-		if got := IsV1MaterializationID(id); got != ok {
-			t.Errorf("IsV1MaterializationID(%q) = %v, want %v", id, got, ok)
+		if got := domain.IsV1MaterializationID(id); got != ok {
+			t.Errorf("domain.IsV1MaterializationID(%q) = %v, want %v", id, got, ok)
 		}
 	}
-	folderID, err := NewV1FolderPublicID()
-	if err != nil || !IsV1FolderID(folderID) {
-		t.Fatalf("NewV1FolderPublicID = %q, %v; want lfolder_ shape", folderID, err)
+	folderID, err := domain.NewV1FolderPublicID()
+	if err != nil || !domain.IsV1FolderID(folderID) {
+		t.Fatalf("domain.NewV1FolderPublicID = %q, %v; want lfolder_ shape", folderID, err)
 	}
-	assetID, err := NewV1AssetPublicID()
-	if err != nil || !IsV1AssetID(assetID) {
-		t.Fatalf("NewV1AssetPublicID = %q, %v; want lasset_ shape", assetID, err)
+	assetID, err := domain.NewV1AssetPublicID()
+	if err != nil || !domain.IsV1AssetID(assetID) {
+		t.Fatalf("domain.NewV1AssetPublicID = %q, %v; want lasset_ shape", assetID, err)
 	}
-	materializationID, err := NewV1MaterializationPublicID()
-	if err != nil || !IsV1MaterializationID(materializationID) {
-		t.Fatalf("NewV1MaterializationPublicID = %q, %v; want lmat_ shape", materializationID, err)
+	materializationID, err := domain.NewV1MaterializationPublicID()
+	if err != nil || !domain.IsV1MaterializationID(materializationID) {
+		t.Fatalf("domain.NewV1MaterializationPublicID = %q, %v; want lmat_ shape", materializationID, err)
 	}
 }
 
 func TestLibraryServiceNotConfigured(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService(nil)
-	if _, err := svc.ListFolders(ctx, "ws_missing"); !errors.Is(err, errNotConfigured) {
+	if _, err := svc.ListFolders(ctx, "ws_missing"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("ListFolders on unconfigured service = %v, want not configured", err)
 	}
-	if err := svc.DeleteAsset(ctx, "ws_missing", "lasset_missing"); !errors.Is(err, errNotConfigured) {
+	if err := svc.DeleteAsset(ctx, "ws_missing", "lasset_missing"); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("DeleteAsset on unconfigured service = %v, want not configured", err)
 	}
 }
@@ -420,8 +422,8 @@ func TestLibraryServiceFolderLifecycle(t *testing.T) {
 
 	// Exact + case-variant duplicates conflict.
 	for _, name := range []string{"inspo", "INSPO", " Inspo "} {
-		publicID, _ := NewV1FolderPublicID()
-		if _, err := env.svc.CreateFolder(ctx, env.wsA, name, publicID); !errors.Is(err, ErrV1FolderNameConflict) {
+		publicID, _ := domain.NewV1FolderPublicID()
+		if _, err := env.svc.CreateFolder(ctx, env.wsA, name, publicID); !errors.Is(err, domain.ErrV1FolderNameConflict) {
 			t.Fatalf("create duplicate %q = %v, want name conflict", name, err)
 		}
 	}
@@ -434,26 +436,26 @@ func TestLibraryServiceFolderLifecycle(t *testing.T) {
 		t.Fatalf("renamed = %+v, want inspo-2", renamed)
 	}
 	otherID := mustFolderID(t, ctx, env.svc, env.wsA, "other")
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, otherID, "INSPO-2"); !errors.Is(err, ErrV1FolderNameConflict) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, otherID, "INSPO-2"); !errors.Is(err, domain.ErrV1FolderNameConflict) {
 		t.Fatalf("rename to existing = %v, want name conflict", err)
 	}
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, "42", "x"); !errors.Is(err, ErrV1FolderNotFound) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, "42", "x"); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("rename malformed = %v, want not found", err)
 	}
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, "lfolder_doesnotexist0000", "x"); !errors.Is(err, ErrV1FolderNotFound) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, "lfolder_doesnotexist0000", "x"); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("rename unknown = %v, want not found", err)
 	}
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "  "); !errors.Is(err, ErrInvalidFolderName) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "  "); !errors.Is(err, domain.ErrInvalidFolderName) {
 		t.Fatalf("rename blank = %v, want invalid name", err)
 	}
 
 	if err := env.svc.DeleteFolder(ctx, env.wsA, folderID); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.svc.DeleteFolder(ctx, env.wsA, folderID); !errors.Is(err, ErrV1FolderNotFound) {
+	if err := env.svc.DeleteFolder(ctx, env.wsA, folderID); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("delete replay = %v, want not found", err)
 	}
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "x"); !errors.Is(err, ErrV1FolderNotFound) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "x"); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("rename deleted = %v, want not found", err)
 	}
 }
@@ -464,14 +466,14 @@ func TestLibraryServiceQuickSaves(t *testing.T) {
 
 	// Unfiled saves land in the ensured Quick Saves system folder.
 	asset := mustSaveAsset(t, ctx, env.svc, env.wsA, "u1", "")
-	if asset.FolderPublicID == "" || !IsV1FolderID(asset.FolderPublicID) {
+	if asset.FolderPublicID == "" || !domain.IsV1FolderID(asset.FolderPublicID) {
 		t.Fatalf("unfiled asset folder = %q, want ensured lfolder_", asset.FolderPublicID)
 	}
 	folders, err := env.svc.ListFolders(ctx, env.wsA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var quickSaves *V1Folder
+	var quickSaves *domain.V1Folder
 	for _, folder := range folders {
 		if folder.PublicID == asset.FolderPublicID {
 			quickSaves = folder
@@ -482,10 +484,10 @@ func TestLibraryServiceQuickSaves(t *testing.T) {
 	}
 
 	// System folders are immutable.
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, quickSaves.PublicID, "nope"); !errors.Is(err, ErrSystemFolderImmutable) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, quickSaves.PublicID, "nope"); !errors.Is(err, domain.ErrSystemFolderImmutable) {
 		t.Fatalf("rename Quick Saves = %v, want immutable", err)
 	}
-	if err := env.svc.DeleteFolder(ctx, env.wsA, quickSaves.PublicID); !errors.Is(err, ErrSystemFolderImmutable) {
+	if err := env.svc.DeleteFolder(ctx, env.wsA, quickSaves.PublicID); !errors.Is(err, domain.ErrSystemFolderImmutable) {
 		t.Fatalf("delete Quick Saves = %v, want immutable", err)
 	}
 
@@ -526,12 +528,12 @@ func TestLibraryServiceAssetDedup(t *testing.T) {
 	first := mustSaveAsset(t, ctx, env.svc, env.wsA, "u1", "")
 	otherFolder := mustFolderID(t, ctx, env.svc, env.wsA, "f")
 
-	publicID, err := NewV1AssetPublicID()
+	publicID, err := domain.NewV1AssetPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
 	dup, created, err := env.svc.SaveAsset(ctx, env.wsA,
-		V1SaveAssetInput{FolderPublicID: otherFolder, Asset: libraryTestAssetInput("u1")}, publicID)
+		domain.V1SaveAssetInput{FolderPublicID: otherFolder, Asset: libraryTestAssetInput("u1")}, publicID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,13 +547,13 @@ func TestLibraryServiceAssetDedup(t *testing.T) {
 	if err := env.svc.DeleteAsset(ctx, env.wsA, first.PublicID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.svc.GetAsset(ctx, env.wsA, first.PublicID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.GetAsset(ctx, env.wsA, first.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("get deleted = %v, want not found", err)
 	}
-	if err := env.svc.DeleteAsset(ctx, env.wsA, first.PublicID); !errors.Is(err, ErrV1AssetNotFound) {
+	if err := env.svc.DeleteAsset(ctx, env.wsA, first.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("delete replay = %v, want not found", err)
 	}
-	if _, err := env.svc.GetAsset(ctx, env.wsA, "42"); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.GetAsset(ctx, env.wsA, "42"); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("get malformed = %v, want not found", err)
 	}
 }
@@ -563,16 +565,16 @@ func TestLibraryServiceCrossWorkspaceIsolation(t *testing.T) {
 	folderID := mustFolderID(t, ctx, env.svc, env.wsB, "b-folder")
 	asset := mustSaveAsset(t, ctx, env.svc, env.wsB, "bx", folderID)
 
-	if _, err := env.svc.GetAsset(ctx, env.wsA, asset.PublicID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.GetAsset(ctx, env.wsA, asset.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("cross-workspace get = %v, want not found", err)
 	}
-	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "x"); !errors.Is(err, ErrV1FolderNotFound) {
+	if _, err := env.svc.RenameFolder(ctx, env.wsA, folderID, "x"); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("cross-workspace rename = %v, want not found", err)
 	}
-	if _, err := env.svc.MoveAsset(ctx, env.wsA, asset.PublicID, ""); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.MoveAsset(ctx, env.wsA, asset.PublicID, ""); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("cross-workspace move = %v, want not found", err)
 	}
-	if err := env.svc.DeleteAsset(ctx, env.wsA, asset.PublicID); !errors.Is(err, ErrV1AssetNotFound) {
+	if err := env.svc.DeleteAsset(ctx, env.wsA, asset.PublicID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("cross-workspace delete = %v, want not found", err)
 	}
 	folders, err := env.svc.ListFolders(ctx, env.wsA)
@@ -602,18 +604,18 @@ func TestLibraryServiceUnknownWorkspace(t *testing.T) {
 	if assets, err := env.svc.ListAssets(ctx, missing); err != nil || len(assets) != 0 {
 		t.Fatalf("unknown workspace assets = %v, %v; want empty", assets, err)
 	}
-	publicID, _ := NewV1FolderPublicID()
-	if _, err := env.svc.CreateFolder(ctx, missing, "x", publicID); !errors.Is(err, ErrV1FolderNotFound) {
+	publicID, _ := domain.NewV1FolderPublicID()
+	if _, err := env.svc.CreateFolder(ctx, missing, "x", publicID); !errors.Is(err, domain.ErrV1FolderNotFound) {
 		t.Fatalf("create in unknown workspace = %v, want not found", err)
 	}
-	assetID, _ := NewV1AssetPublicID()
-	if _, _, err := env.svc.SaveAsset(ctx, missing, V1SaveAssetInput{Asset: libraryTestAssetInput("u9")}, assetID); !errors.Is(err, ErrV1AssetNotFound) {
+	assetID, _ := domain.NewV1AssetPublicID()
+	if _, _, err := env.svc.SaveAsset(ctx, missing, domain.V1SaveAssetInput{Asset: libraryTestAssetInput("u9")}, assetID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("save in unknown workspace = %v, want not found", err)
 	}
-	if _, err := env.svc.GetAsset(ctx, missing, assetID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.GetAsset(ctx, missing, assetID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("get in unknown workspace = %v, want not found", err)
 	}
-	results, err := env.svc.ResolveAssets(ctx, missing, []V1ResolveItem{{Provider: "unsplash", SourceID: "u9"}})
+	results, err := env.svc.ResolveAssets(ctx, missing, []domain.V1ResolveItem{{Provider: "unsplash", SourceID: "u9"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +629,7 @@ func TestLibraryServiceResolve(t *testing.T) {
 	ctx := context.Background()
 
 	saved := mustSaveAsset(t, ctx, env.svc, env.wsA, "r1", "")
-	results, err := env.svc.ResolveAssets(ctx, env.wsA, []V1ResolveItem{
+	results, err := env.svc.ResolveAssets(ctx, env.wsA, []domain.V1ResolveItem{
 		{Provider: "unsplash", SourceID: "r1"},
 		{Provider: "unsplash", SourceID: "missing"},
 		{Provider: "bogus", SourceID: "x"},
@@ -656,11 +658,11 @@ func TestLibraryServiceResolve(t *testing.T) {
 		t.Fatalf("bad url resolves = %+v, want unresolved", results[4:6])
 	}
 
-	many := make([]V1ResolveItem, 0, V1MaxResolveItems+1)
-	for i := 0; i <= V1MaxResolveItems; i++ {
-		many = append(many, V1ResolveItem{Provider: "unsplash", SourceID: fmt.Sprintf("b%d", i)})
+	many := make([]domain.V1ResolveItem, 0, domain.V1MaxResolveItems+1)
+	for i := 0; i <= domain.V1MaxResolveItems; i++ {
+		many = append(many, domain.V1ResolveItem{Provider: "unsplash", SourceID: fmt.Sprintf("b%d", i)})
 	}
-	if _, err := env.svc.ResolveAssets(ctx, env.wsA, many); !errors.Is(err, ErrV1ResolveTooMany) {
+	if _, err := env.svc.ResolveAssets(ctx, env.wsA, many); !errors.Is(err, domain.ErrV1ResolveTooMany) {
 		t.Fatalf("oversize resolve = %v, want too many", err)
 	}
 }
@@ -679,33 +681,33 @@ func TestLibraryServiceMaterializationLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != V1MaterializationPending || got.AssetPublicID != asset.PublicID {
+	if got.Status != domain.V1MaterializationPending || got.AssetPublicID != asset.PublicID {
 		t.Fatalf("get = %+v, want pending job", got)
 	}
 
-	running, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", "")
+	running, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationRunning, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if running.Status != V1MaterializationRunning {
+	if running.Status != domain.V1MaterializationRunning {
 		t.Fatalf("start = %+v, want running", running)
 	}
-	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationRunning {
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != domain.V1MaterializationRunning {
 		t.Fatalf("get running = %+v, %v; want running", got, err)
 	}
 
 	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "life")
-	completed, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", "")
+	completed, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, mediaPublicID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Status != V1MaterializationCompleted || completed.MediaAssetID != mediaPublicID {
+	if completed.Status != domain.V1MaterializationCompleted || completed.MediaAssetID != mediaPublicID {
 		t.Fatalf("complete = %+v, want completed with link %s", completed, mediaPublicID)
 	}
 	if !completed.UpdatedAt.After(completed.CreatedAt) && !completed.UpdatedAt.Equal(completed.CreatedAt) {
 		t.Fatalf("complete updated_at = %v, want >= created_at %v", completed.UpdatedAt, completed.CreatedAt)
 	}
-	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationCompleted || got.MediaAssetID != mediaPublicID {
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != domain.V1MaterializationCompleted || got.MediaAssetID != mediaPublicID {
 		t.Fatalf("get completed = %+v, %v; want completed with link", got, err)
 	}
 }
@@ -719,23 +721,23 @@ func TestLibraryServiceMaterializationGuards(t *testing.T) {
 
 	// Create gates: malformed job ids, unknown/malformed assets, and
 	// unknown workspaces converge to their operation's not-found error.
-	matID, err := NewV1MaterializationPublicID()
+	matID, err := domain.NewV1MaterializationPublicID()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, asset.PublicID, "42"); !errors.Is(err, ErrV1MaterializationNotFound) {
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, asset.PublicID, "42"); !errors.Is(err, domain.ErrV1MaterializationNotFound) {
 		t.Fatalf("create malformed job id = %v, want not found", err)
 	}
-	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "lasset_doesnotexist0000", matID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "lasset_doesnotexist0000", matID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("create unknown asset = %v, want asset not found", err)
 	}
-	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "42", matID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, "42", matID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("create malformed asset = %v, want asset not found", err)
 	}
-	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, other.PublicID, matID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.CreateMaterialization(ctx, env.wsA, other.PublicID, matID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("create cross-workspace asset = %v, want asset not found", err)
 	}
-	if _, err := env.svc.CreateMaterialization(ctx, "ws_missing00000001", asset.PublicID, matID); !errors.Is(err, ErrV1AssetNotFound) {
+	if _, err := env.svc.CreateMaterialization(ctx, "ws_missing00000001", asset.PublicID, matID); !errors.Is(err, domain.ErrV1AssetNotFound) {
 		t.Fatalf("create unknown workspace = %v, want asset not found", err)
 	}
 
@@ -749,71 +751,71 @@ func TestLibraryServiceMaterializationGuards(t *testing.T) {
 		"unknown ws":      {"ws_missing00000001", record.PublicID},
 	} {
 		ws, id := pair[0], pair[1]
-		if _, err := env.svc.GetMaterialization(ctx, ws, id); !errors.Is(err, ErrV1MaterializationNotFound) {
+		if _, err := env.svc.GetMaterialization(ctx, ws, id); !errors.Is(err, domain.ErrV1MaterializationNotFound) {
 			t.Fatalf("get %s = %v, want not found", name, err)
 		}
-		if _, err := env.svc.SetMaterializationResult(ctx, ws, id, V1MaterializationRunning, "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+		if _, err := env.svc.SetMaterializationResult(ctx, ws, id, domain.V1MaterializationRunning, "", "", ""); !errors.Is(err, domain.ErrV1MaterializationNotFound) {
 			t.Fatalf("set %s = %v, want not found", name, err)
 		}
 	}
 
 	// Unknown transition words never advance a non-terminal job.
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationPending, "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationPending, "", "", ""); !errors.Is(err, domain.ErrV1MaterializationNotFound) {
 		t.Fatalf("set pending word = %v, want not found", err)
 	}
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, "bogus", "", "", ""); !errors.Is(err, ErrV1MaterializationNotFound) {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, "bogus", "", "", ""); !errors.Is(err, domain.ErrV1MaterializationNotFound) {
 		t.Fatalf("set bogus word = %v, want not found", err)
 	}
-	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationPending {
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != domain.V1MaterializationPending {
 		t.Fatalf("job after bad words = %+v, %v; want still pending", got, err)
 	}
 
 	// Completion needs a resolvable workspace-scoped asset_... link:
 	// the job stays non-terminal so the trigger can retry once Media
 	// settles.
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, "asset_missing00000001", "", ""); err == nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, "asset_missing00000001", "", ""); err == nil {
 		t.Fatal("complete unknown media link = nil, want link error")
 	}
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, "nope", "", ""); err == nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, "nope", "", ""); err == nil {
 		t.Fatal("complete malformed media link = nil, want link error")
 	}
 	foreignMedia := mustSeedMediaAsset(t, ctx, env, env.wsB, "guard-foreign")
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, foreignMedia, "", ""); err == nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, foreignMedia, "", ""); err == nil {
 		t.Fatal("complete cross-workspace media link = nil, want link error")
 	}
-	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != V1MaterializationPending {
+	if got, err := env.svc.GetMaterialization(ctx, env.wsA, record.PublicID); err != nil || got.Status != domain.V1MaterializationPending {
 		t.Fatalf("job after bad links = %+v, %v; want still pending", got, err)
 	}
 
 	// Terminal records are immutable: attempts to move them report the
 	// stored snapshot with state, link, and error untouched.
 	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "guard")
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationRunning, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
 		t.Fatal(err)
 	}
-	replay, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationCompleted, mediaPublicID, "", "")
+	replay, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationCompleted, mediaPublicID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replay.Status != V1MaterializationCompleted || replay.MediaAssetID != mediaPublicID {
+	if replay.Status != domain.V1MaterializationCompleted || replay.MediaAssetID != mediaPublicID {
 		t.Fatalf("completed replay = %+v, want stored snapshot", replay)
 	}
-	for _, status := range []V1MaterializationStatus{V1MaterializationRunning, V1MaterializationFailed} {
+	for _, status := range []domain.V1MaterializationStatus{domain.V1MaterializationRunning, domain.V1MaterializationFailed} {
 		snapshot, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, status, "", "x", "y")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if snapshot.Status != V1MaterializationCompleted || snapshot.MediaAssetID != mediaPublicID || snapshot.ErrorMessage != "" {
+		if snapshot.Status != domain.V1MaterializationCompleted || snapshot.MediaAssetID != mediaPublicID || snapshot.ErrorMessage != "" {
 			t.Fatalf("terminal %s = %+v, want immutable completed snapshot", status, snapshot)
 		}
 	}
 	// Unknown words against terminal records still report the stored
 	// snapshot (in-memory parity).
 	snapshot, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, "bogus", "", "", "")
-	if err != nil || snapshot.Status != V1MaterializationCompleted {
+	if err != nil || snapshot.Status != domain.V1MaterializationCompleted {
 		t.Fatalf("terminal bogus word = %+v, %v; want stored snapshot", snapshot, err)
 	}
 }
@@ -824,15 +826,15 @@ func TestLibraryServiceMaterializationFailedAndReplay(t *testing.T) {
 
 	asset := mustSaveAsset(t, ctx, env.svc, env.wsA, "mat-fail", "")
 	record := mustCreateMaterialization(t, ctx, env.svc, env.wsA, asset.PublicID)
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID, domain.V1MaterializationRunning, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	failed, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
-		V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
+		domain.V1MaterializationFailed, "", "library_materialization_failed", "素材转存失败，请稍后重试")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if failed.Status != V1MaterializationFailed {
+	if failed.Status != domain.V1MaterializationFailed {
 		t.Fatalf("fail = %+v, want failed", failed)
 	}
 	if failed.ErrorMessage != "素材转存失败，请稍后重试" {
@@ -850,20 +852,20 @@ func TestLibraryServiceMaterializationFailedAndReplay(t *testing.T) {
 	// Failed replays converge on the first failure; resurrection to
 	// completed is rejected with the stored snapshot.
 	replay, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
-		V1MaterializationFailed, "", "other", "changed")
+		domain.V1MaterializationFailed, "", "other", "changed")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replay.Status != V1MaterializationFailed || replay.ErrorMessage != "素材转存失败，请稍后重试" {
+	if replay.Status != domain.V1MaterializationFailed || replay.ErrorMessage != "素材转存失败，请稍后重试" {
 		t.Fatalf("failed replay = %+v, want first failure", replay)
 	}
 	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "fail-resurrect")
 	resurrect, err := env.svc.SetMaterializationResult(ctx, env.wsA, record.PublicID,
-		V1MaterializationCompleted, mediaPublicID, "", "")
+		domain.V1MaterializationCompleted, mediaPublicID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resurrect.Status != V1MaterializationFailed || resurrect.MediaAssetID != "" {
+	if resurrect.Status != domain.V1MaterializationFailed || resurrect.MediaAssetID != "" {
 		t.Fatalf("failed->completed = %+v, want immutable failed snapshot", resurrect)
 	}
 }
@@ -880,10 +882,10 @@ func TestLibraryServiceListMaterializations(t *testing.T) {
 	mustCreateMaterialization(t, ctx, env.svc, env.wsB, foreignAsset.PublicID)
 
 	mediaPublicID := mustSeedMediaAsset(t, ctx, env, env.wsA, "list")
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, V1MaterializationRunning, "", "", ""); err != nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, domain.V1MaterializationRunning, "", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
+	if _, err := env.svc.SetMaterializationResult(ctx, env.wsA, job1.PublicID, domain.V1MaterializationCompleted, mediaPublicID, "", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -894,10 +896,10 @@ func TestLibraryServiceListMaterializations(t *testing.T) {
 	if len(all) != 2 || all[0].PublicID != job1.PublicID || all[1].PublicID != job2.PublicID {
 		t.Fatalf("list = %v, want creation-ordered [job1 job2]", publicIDs(all))
 	}
-	if all[0].Status != V1MaterializationCompleted || all[0].MediaAssetID != mediaPublicID {
+	if all[0].Status != domain.V1MaterializationCompleted || all[0].MediaAssetID != mediaPublicID {
 		t.Fatalf("list[0] = %+v, want completed with link", all[0])
 	}
-	if all[1].Status != V1MaterializationPending {
+	if all[1].Status != domain.V1MaterializationPending {
 		t.Fatalf("list[1] = %+v, want pending", all[1])
 	}
 	if empty, err := env.svc.ListMaterializations(ctx, "ws_missing00000001"); err != nil || len(empty) != 0 {
@@ -905,7 +907,7 @@ func TestLibraryServiceListMaterializations(t *testing.T) {
 	}
 }
 
-func publicIDs(records []*V1Materialization) []string {
+func publicIDs(records []*domain.V1Materialization) []string {
 	out := make([]string, 0, len(records))
 	for _, record := range records {
 		out = append(out, record.PublicID)

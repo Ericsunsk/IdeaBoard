@@ -49,7 +49,7 @@ export function createBillingCatalogHandlers(state: BillingCatalogMswState): Htt
 
 export function makeCatalogItems() {
   const price = {
-    output_resolution: 'default' as const,
+    output_resolution: '1k' as const,
     price_version_id: 1,
     version: 1,
     unit_credits: 1,
@@ -64,7 +64,7 @@ export function makeCatalogItems() {
       display_name: '局部重绘',
       sort_order: 10,
       status: 'unpriced',
-      pricing_variants: ['default'],
+      pricing_variants: ['1k'],
     },
     {
       sku: 'ai-image:cutout',
@@ -73,8 +73,8 @@ export function makeCatalogItems() {
       display_name: '抠图',
       sort_order: 20,
       status: 'active',
-      pricing_variants: ['default'],
-      current_prices: { default: price },
+      pricing_variants: ['1k'],
+      current_prices: { '1k': price },
     },
     {
       sku: 'ai-image:upscale',
@@ -83,8 +83,8 @@ export function makeCatalogItems() {
       display_name: 'Upscale',
       sort_order: 30,
       status: 'disabled',
-      pricing_variants: ['default'],
-      current_prices: { default: price },
+      pricing_variants: ['1k'],
+      current_prices: { '1k': price },
     },
     {
       sku: 'legacy:removed',

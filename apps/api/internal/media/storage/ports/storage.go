@@ -6,7 +6,6 @@ import (
 	"mime/multipart"
 	"time"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage/domain"
 )
@@ -52,22 +51,6 @@ type StoredUploadObject struct {
 	Data        []byte
 }
 
-type StoredUploadLookup struct {
-	AssetID   int64
-	URL       string
-	ObjectKey string
-}
-
-type StoredDerivativeLookup struct {
-	AssetID int64
-	Tier    string
-}
-
-type StoredUploadLocation struct {
-	StorageProfileID string
-	StorageKey       string
-}
-
 // --- Driver Interface ---
 
 type StorageDriver interface {
@@ -87,23 +70,6 @@ type StorageDriver interface {
 	SignedURL(ctx context.Context, profile *domain.StorageProfile, objectKey string, expiry time.Duration) (string, error)
 	ProviderURL(profile *domain.StorageProfile, objectKey string) (string, error)
 	VerifyObjectGeneration(ctx context.Context, profile *domain.StorageProfile, objectKey string, expected int64) error
-}
-
-// --- Locators & Ingestion ---
-
-type StoredUploadLocator interface {
-	LocateStoredUpload(context.Context, StoredUploadLookup) (StoredUploadLocation, bool, error)
-}
-
-type StoredDerivativeLocator interface {
-	LocateStoredDerivative(context.Context, StoredDerivativeLookup) (StoredUploadLocation, bool, error)
-}
-
-type MediaIngestionRegistry interface {
-	Begin(context.Context, ingestion.Request) (ingestion.Handle, error)
-	Complete(context.Context, ingestion.Handle, ingestion.Completion) error
-	Fail(context.Context, ingestion.Handle, error) error
-	FindReadyOwnedMediaAssetByChecksum(context.Context, int64, string, string) (dbsqlc.MediaAsset, bool, error)
 }
 
 // --- Presigning ---
@@ -147,10 +113,6 @@ type ObjectStore interface {
 }
 
 // --- Upload Authorization ---
-
-type UploadBoardAccessResolver interface {
-	ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (ownerUserID int64, err error)
-}
 
 type UploadOwnerStorageUIDResolver interface {
 	GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error)

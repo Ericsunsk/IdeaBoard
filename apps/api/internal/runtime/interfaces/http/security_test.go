@@ -72,8 +72,8 @@ func TestRequestTimeoutMiddlewareEnforcesDeadline(t *testing.T) {
 
 func TestRequestTimeoutMiddlewareExemptsStreamsAndUploads(t *testing.T) {
 	for path, method := range map[string]string{
-		RoutePaymentStripeWebhook:                 http.MethodPost,
-		UploadsStaticRoutePrefix + "canvas/a.png": http.MethodGet,
+		RoutePaymentStripeWebhook:                      http.MethodPost,
+		UploadsStaticRoutePrefix + "site/assets/a.png": http.MethodGet,
 	} {
 		req := httptest.NewRequest(method, path, nil)
 		if method == http.MethodPost {

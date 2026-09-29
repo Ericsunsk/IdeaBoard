@@ -216,7 +216,7 @@ func TestS3CompatibleReadUsesAccessDomainDeliveryPlane(t *testing.T) {
 	var deliveryCalls atomic.Int64
 	delivery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		deliveryCalls.Add(1)
-		if r.URL.Path != "/uploads/canvas/OWNER/board/content/image.png" {
+		if r.URL.Path != "/uploads/tasks/42/task/content/image.png" {
 			http.NotFound(w, r)
 			return
 		}
@@ -239,7 +239,7 @@ func TestS3CompatibleReadUsesAccessDomainDeliveryPlane(t *testing.T) {
 			"access_domain":            delivery.URL,
 			"force_path_style":         true,
 		},
-	}, "uploads/canvas/OWNER/board/content/image.png", 50*1024*1024)
+	}, "uploads/tasks/42/task/content/image.png", 50*1024*1024)
 	if err != nil {
 		t.Fatalf("public delivery read failed: %v", err)
 	}

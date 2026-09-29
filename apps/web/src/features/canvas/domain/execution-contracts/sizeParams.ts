@@ -1,4 +1,4 @@
-import type { SubmitTaskParams } from './canvasTaskRequest'
+import type { CanvasTaskParams } from './canvasTaskRequest'
 
 export interface ExecutionImageSize {
   width: number
@@ -6,7 +6,7 @@ export interface ExecutionImageSize {
 }
 
 type ExecutionSizeTaskParams = Pick<
-  SubmitTaskParams,
+  CanvasTaskParams,
   'custom_width' | 'custom_height' | 'original_image_width' | 'original_image_height'
 >
 

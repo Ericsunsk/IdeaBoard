@@ -299,17 +299,18 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	store := workspacetasks.NewInMemoryStoreForTests()
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Routing: allowTestRouting,
+		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Resolver: allowTestPoolResolver(),
 	})
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "",
 	}, "worker-render-key")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
+	created = pinWorkerSnapshot(t, store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	png := fixturePNGBytes(t)
 	sum := fixtureChecksum(png)
 	objects := &fakeRendererObjects{}
@@ -358,6 +359,7 @@ func TestWorkspaceTaskWorkerRenderFailureFailsTerminal(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
 	renderer, err := taskruntime.NewWorkspaceTaskRenderer(taskruntime.WorkspaceTaskRendererDeps{

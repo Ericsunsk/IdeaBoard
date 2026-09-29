@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type { TaskImageResult } from '../../../../../shared/query/taskResult'
 import { mapCanvasBillingRequestError } from './canvasBillingPreflight'
 import { i18n } from '../../../../../shared/i18n'
@@ -8,7 +8,7 @@ import {
 } from '../workspace/canvasWorkspaceTaskAdapter'
 
 export async function submitTaskRequest(
-  request: SubmitTaskData,
+  request: CanvasTaskRequestData,
   fallbackMessage: string = i18n.global.t('common.errors.taskSubmitFailed'),
 ): Promise<{ taskId: string }> {
   let submission: Awaited<ReturnType<typeof submitCanvasWorkspaceTask>>

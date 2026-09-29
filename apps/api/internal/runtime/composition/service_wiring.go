@@ -9,7 +9,6 @@ import (
 	billingapplication "ideaboard/api/internal/billing/application"
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
 	"ideaboard/api/internal/billingrecords"
-	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	"ideaboard/api/internal/identity/auth"
@@ -19,7 +18,6 @@ import (
 	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
 	identityports "ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/media/storage"
-	storageintegrity "ideaboard/api/internal/media/storage/application/integrity"
 	"ideaboard/api/internal/payments"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	"ideaboard/api/internal/payments/infrastructure/stripe"
@@ -43,7 +41,6 @@ type appDomainServices struct {
 	runtimeSettings      *settings.RuntimeSettingsService
 	storageService       *storage.Service
 	userService          *administration.Service
-	boardService         *boards.Service
 	billingService       *billingpostgres.Store
 	billingCatalog       *billingapplication.BillableItemCatalog
 	billableItemRegistry *billing.BillableItemRegistry
@@ -60,14 +57,12 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	outbound.ConfigurePolicyProvider(runtimeSettings)
 	storageService := storage.NewServiceWithLocalRoot(
 		repos.storageProfileRepo,
-		repos.mediaAssetRegistry,
 		// Browser-visible upload references must resolve through the same-origin
 		// gateway. API_BASE_URL remains reserved for webhooks and server-side
 		// integrations; using it here would leak a separate API host into the SPA.
 		cfg.PublicOrigins.Web,
 		cfg.Storage.LocalRoot,
 	)
-	repos.mediaAssetRegistry.SetIntegrityVerifier(storageintegrity.NewIntegrityVerifier(storageService, storageintegrity.IntegrityConfig{}))
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}
@@ -145,7 +140,6 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		runtimeSettings:      runtimeSettings,
 		storageService:       storageService,
 		userService:          userService,
-		boardService:         boards.NewService(repos.boardRepo, repos.userRepo, storageService),
 		billingService:       billingService,
 		billingCatalog:       billingCatalog,
 		billableItemRegistry: billableItemRegistry,

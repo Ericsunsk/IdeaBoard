@@ -25,6 +25,18 @@ type controlTaskListCursor struct {
 	Page int `json:"page"`
 }
 
+// controlTaskListCountsMeta extends the cursor page meta with the
+// global status breakdown (#852): the monitor pills need per-status
+// totals that cursor pagination cannot derive from one page. Counts
+// honor the user/keyword filters but never the status filter (see
+// CountControlTasks), so pills keep their global breakdown while a
+// status is active. Read-only projection; task state untouched.
+type controlTaskListCountsMeta struct {
+	NextCursor string                     `json:"next_cursor,omitempty"`
+	HasMore    bool                       `json:"has_more"`
+	Counts     tasksdomain.TaskListCounts `json:"counts"`
+}
+
 func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext) {
 	if d == nil || d.Tasks == nil {
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable25)
@@ -91,7 +103,14 @@ func (d *ContractControlDeps) listControlTasks(c *gin.Context, _ controlContext)
 		}
 		nextCursor = encoded
 	}
-	contract.RenderPaginated(c, items, contract.NewPageMeta(nextCursor, hasMore))
+	// The counts ride the list meta (#852) so monitor pills render
+	// without a second round trip. Shape stays the unified
+	// {data, meta} envelope; only this endpoint's meta carries counts.
+	contract.RenderPaginatedWithMeta(c, items, controlTaskListCountsMeta{
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+		Counts:     counts,
+	})
 }
 
 func (d *ContractControlDeps) getControlTask(c *gin.Context, _ controlContext) {

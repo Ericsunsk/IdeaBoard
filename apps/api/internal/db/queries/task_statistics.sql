@@ -18,7 +18,10 @@
 --   credential_id        <- 0 (same: no credential assignment on tasks)
 --   feature_slug         <- tasks.service
 --   api_type             <- '' (no provider api_type on workspace tasks)
---   model_name           <- latest execution attempt resolved_model, else
+--   model_name           <- final execution attempt resolved_model
+--                           (latest terminal completed/failed/cancelled
+--                           attempt first, then latest of any status so
+--                           in-flight tasks still attribute; #852), else
 --                           '未识别模型' (attempts are empty until the
 --                           worker records them; the fallback is honest)
 --   output_count         <- latest billing snapshot quantity clamped to
@@ -201,7 +204,12 @@ WITH candidate_tasks AS (
     SELECT resolved_model
     FROM task_execution_attempts
     WHERE task_id = t.public_id
-    ORDER BY (status = 'running') DESC, attempt_no DESC, id DESC
+    -- Final-model attribution (#852): the latest terminal attempt
+    -- owns the final model. A stale 'running' row (best-effort
+    -- finalize, crash between start and finish) must not shadow the
+    -- terminal send's model; tasks with no terminal attempt yet fall
+    -- back to their latest send.
+    ORDER BY (status IN ('completed', 'failed', 'cancelled')) DESC, attempt_no DESC, id DESC
     LIMIT 1
   ) AS latest_attempt ON TRUE
   WHERE COALESCE(t.completed_at, t.cancelled_at, t.updated_at) >= sqlc.arg(started_at)

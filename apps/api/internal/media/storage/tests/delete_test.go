@@ -12,8 +12,8 @@ import (
 )
 
 func TestPublicUploadURLUsesCanonicalRelativePath(t *testing.T) {
-	got := PublicUploadURL("uploads/canvas/U123/board/content/demo.png")
-	if got != "/uploads/canvas/U123/board/content/demo.png" {
+	got := PublicUploadURL("uploads/tasks/42/task/content/demo.png")
+	if got != "/uploads/tasks/42/task/content/demo.png" {
 		t.Fatalf("publicUploadURL = %q", got)
 	}
 }
@@ -22,7 +22,7 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	withTempWorkingDir(t)
 
 	service, _ := newStorageServiceTest(t)
-	objectKey := filepath.ToSlash(filepath.Join("uploads", "canvas", "AB12C3", "2026", "04", "24", "demo.png"))
+	objectKey := filepath.ToSlash(filepath.Join("uploads", "tasks", "42", "2026", "04", "24", "demo.png"))
 	localPath := filepath.FromSlash(objectKey)
 
 	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
@@ -33,7 +33,7 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_ = os.Remove(localPath)
-		_ = os.RemoveAll(filepath.FromSlash(filepath.Join("uploads", "canvas", "AB12C3")))
+		_ = os.RemoveAll(filepath.FromSlash(filepath.Join("uploads", "tasks", "42")))
 	})
 
 	if err := service.DeleteObjectByKey(context.Background(), objectKey); err != nil {
@@ -102,45 +102,15 @@ func TestLocalStoredUploadURLUsesConfiguredWebOrigin(t *testing.T) {
 	}
 }
 
-func TestDeleteLocalByPrefixRemovesCanvasTree(t *testing.T) {
-	withTempWorkingDir(t)
-
-	service, _ := newStorageServiceTest(t)
-	targetFile := filepath.FromSlash(filepath.Join("uploads", "canvas", "AB12C3", "board1", "content", "demo.png"))
-	otherFile := filepath.FromSlash(filepath.Join("uploads", "canvas", "XY89ZT", "board2", "content", "keep.png"))
-
-	for _, file := range []string{targetFile, otherFile} {
-		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-			t.Fatalf("mkdir failed: %v", err)
-		}
-		if err := os.WriteFile(file, []byte("demo"), 0o644); err != nil {
-			t.Fatalf("write file failed: %v", err)
-		}
-	}
-
-	if err := service.DeleteUploadObjectPrefix(context.Background(), filepath.ToSlash(filepath.Join("uploads", "canvas", "AB12C3"))+"/"); err != nil {
-		t.Fatalf("DeleteUploadObjectPrefix returned error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Dir(targetFile)); !os.IsNotExist(err) {
-		t.Fatalf("expected canvas AB12C3 to be removed, stat err = %v", err)
-	}
-	if _, err := os.Stat(otherFile); err != nil {
-		t.Fatalf("expected unrelated canvas file to exist, stat err = %v", err)
-	}
-}
-
 func TestDeleteLocalByPrefixRemovesUserUploadTrees(t *testing.T) {
 	withTempWorkingDir(t)
 
 	service, _ := newStorageServiceTest(t)
 	targetFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "canvas", "CLN123", "board1", "content", "demo.png")),
 		filepath.FromSlash(filepath.Join("uploads", "profile", "CLN123", "avatar", "avatar.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "42", "task-owned", "result.png")),
 	}
 	otherFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "canvas", "OTHER1", "board1", "content", "keep.png")),
 		filepath.FromSlash(filepath.Join("uploads", "profile", "OTHER1", "avatar", "keep.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "43", "task-owned", "keep.png")),
 	}

@@ -19,11 +19,6 @@ type HealthChecker interface {
 	CheckHealth(ctx context.Context) domain.ComponentStatus
 }
 
-// StartupRecoveryCoordinator recovers leftover running tasks from previous process lifecycle.
-type StartupRecoveryCoordinator interface {
-	RecoverRunningTasks(ctx context.Context) (int, error)
-}
-
 // ResourceCloser manages explicit resource closing at process termination.
 type ResourceCloser interface {
 	Close() error

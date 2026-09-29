@@ -168,6 +168,25 @@ VALUES ($1,$2,'render','test:render','Render',$3,$4,$5,$6,$7,$8,$9)`,
 	insertTask("task_stat_test_e", "completed", &createdE, &completedE, &completedE, nil)
 	insertSnapshot("task_stat_test_e", freePriceVersionID, 2, 0, 3, createdE)
 
+	// Execution attempts for final-model attribution (#852): task A
+	// completed on its first send; task B exhausted its gateway send
+	// then its single bounded fallback. Task A also carries a stale
+	// running row (best-effort finalize orphan) that must never shadow
+	// the terminal send's model.
+	insertAttempt := func(taskID string, attemptNo int, layer, status, resolvedModel, failureStage, failureCategory string, completed *time.Time) {
+		t.Helper()
+		if _, err := db.Exec(ctx, `
+INSERT INTO task_execution_attempts (task_id, river_job_id, attempt_no, execution_token, service, requested_model, resolved_model, provider, retry_layer, gateway_retry_count, status, failure_stage, failure_category, error_msg, completed_at)
+VALUES ($1, 0, $2, $3, 'render', $4, $4, 'openrouter', $5, 0, $6, $7, $8, '', $9)`,
+			taskID, attemptNo, "tok_"+taskID+"_"+string(rune('0'+attemptNo)), resolvedModel, layer, status, failureStage, failureCategory, completed); err != nil {
+			t.Fatalf("seed attempt %s#%d failed: %v", taskID, attemptNo, err)
+		}
+	}
+	insertAttempt("task_stat_test_a", 1, "gateway", "completed", "stat-model-a", "", "", &completedA)
+	insertAttempt("task_stat_test_a", 2, "gateway", "running", "stat-model-stale", "", "", nil)
+	insertAttempt("task_stat_test_b", 1, "gateway", "failed", "stat-model-a", "provider", "provider_error", &failedB)
+	insertAttempt("task_stat_test_b", 2, "model_fallback", "failed", "stat-model-b", "provider", "timeout", &failedB)
+
 	insertTxn("stat-cap-1", "txn_stat_cap_1", "capture", "test", "cap-1", 100, yesterdayStart.Add(4*time.Hour))
 	insertTxn("stat-ref-1", "txn_stat_ref_1", "refund", "test", "ref-1", 30, yesterdayStart.Add(5*time.Hour))
 	insertTxn("stat-cap-2", "txn_stat_cap_2", "capture", "test", "cap-2", 50, todayStart.Add(2*time.Hour))
@@ -260,25 +279,40 @@ func TestStatisticsStoreBackfillIsIdempotent(t *testing.T) {
 	}
 
 	// Frozen aggregates: yesterday groups completed 2 + failed 1 (snapshot
-	// quantities), model falls back to 未识别模型 without attempts.
+	// quantities), attributed to the final resolved model per task (#852):
+	// task A completed on its first send (stat-model-a; the stale running
+	// row never shadows the terminal send), task B exhausted its bounded
+	// fallback (stat-model-b).
 	rows, err := store.ListDailyStatsByDateRange(ctx, seed.dayBeforeStart, seed.todayStart)
 	if err != nil {
 		t.Fatalf("ListDailyStatsByDateRange failed: %v", err)
 	}
 	var yesterdayTotal, yesterdayCompleted, yesterdayFailed, dayBeforeCancelled int64
+	yesterdayModels := map[string]int64{}
 	for _, row := range rows {
 		key := row.StatDate.Format("2006-01-02")
 		switch key {
 		case seed.yesterdayStart.Format("2006-01-02"):
-			if row.ModelName != "未识别模型" {
-				t.Fatalf("yesterday model = %q, want fallback model", row.ModelName)
-			}
 			yesterdayTotal += row.Total
 			yesterdayCompleted += row.Completed
 			yesterdayFailed += row.Failed
+			yesterdayModels[row.ModelName] += row.Total
 		case seed.dayBeforeStart.Format("2006-01-02"):
+			if row.ModelName != "未识别模型" {
+				t.Fatalf("day-before model = %q, want fallback model (task C has no attempts)", row.ModelName)
+			}
 			dayBeforeCancelled += row.Cancelled
 		}
+	}
+	if yesterdayTotal != 3 || yesterdayCompleted != 2 || yesterdayFailed != 1 {
+		t.Fatalf("yesterday aggregates = total %d completed %d failed %d, want 3/2/1",
+			yesterdayTotal, yesterdayCompleted, yesterdayFailed)
+	}
+	if yesterdayModels["stat-model-a"] != 2 || yesterdayModels["stat-model-b"] != 1 {
+		t.Fatalf("yesterday model attribution = %+v, want stat-model-a:2 stat-model-b:1", yesterdayModels)
+	}
+	if _, stale := yesterdayModels["stat-model-stale"]; stale {
+		t.Fatalf("stale running attempt shadowed terminal attribution: %+v", yesterdayModels)
 	}
 	if yesterdayTotal != 3 || yesterdayCompleted != 2 || yesterdayFailed != 1 {
 		t.Fatalf("yesterday aggregates = total %d completed %d failed %d, want 3/2/1",
@@ -323,8 +357,10 @@ func TestStatisticsStoreMonitorReads(t *testing.T) {
 	store, seed := seedStatisticsFixture(t)
 	now := time.Now()
 
-	// Pending pressure is live immediately; attempt buckets stay empty
-	// until the worker records attempts.
+	// Pending pressure is live immediately; terminal attempt rows land
+	// outside the 6h pressure window, while the seeded stale running
+	// orphan (task A#2, created now) honestly surfaces as one
+	// normal_running attempt until a reaper converges it (#852 residual).
 	pressure, err := store.ListMonitorExecutionPressureByRange(ctx, now.Add(-6*time.Hour), now)
 	if err != nil {
 		t.Fatalf("ListMonitorExecutionPressureByRange failed: %v", err)
@@ -334,7 +370,11 @@ func TestStatisticsStoreMonitorReads(t *testing.T) {
 		switch row.Key {
 		case "normal_pending", "backlog_pending":
 			pendingTotal += row.Total
-		case "fast_completed", "slow_completed", "normal_running", "stuck_running",
+		case "normal_running":
+			if row.Total != 1 {
+				t.Fatalf("attempt bucket normal_running = %d, want 1 (seeded stale running orphan)", row.Total)
+			}
+		case "fast_completed", "slow_completed", "stuck_running",
 			"fast_failed", "slow_failed", "cancelled", "retrying", "other":
 			if row.Total != 0 {
 				t.Fatalf("attempt bucket %s = %d, want 0 without worker attempts", row.Key, row.Total)

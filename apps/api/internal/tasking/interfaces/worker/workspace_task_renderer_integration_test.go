@@ -50,11 +50,12 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
 		WorkspaceID: env.wsA, OwnerUserID: env.userA,
-		Service: "render", Quantity: 1, Resolution: "default",
+		Service: "render", Quantity: 1, Resolution: "",
 	}, fmt.Sprintf("renderer-loop-%d", time.Now().UnixNano()))
 	if err != nil {
 		t.Fatalf("settlement Create: %v", err)
 	}
+	pinIntegrationSnapshot(t, env, created, "openrouter/fake-test-image")
 
 	png, sum := rendererIntegrationPNG(t)
 	objects := &fakeRendererObjects{}
@@ -87,6 +88,7 @@ func TestWorkspaceTaskRendererPostgres(t *testing.T) {
 		Assets:   &workspacemedia.TaskAssetAdapter{Store: env.media},
 		Provider: worker.provider,
 		Renderer: renderer,
+		Attempts: env.tasks,
 	})
 	if err != nil {
 		t.Fatalf("NewWorkspaceTaskWorker: %v", err)

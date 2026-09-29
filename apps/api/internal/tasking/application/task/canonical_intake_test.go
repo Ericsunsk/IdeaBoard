@@ -1,7 +1,6 @@
 package task
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -254,49 +253,15 @@ func TestCanonicalSubmitOrderingPersistsPlanMatchingJSON(t *testing.T) {
 	}
 }
 
-func TestCanonicalReadinessOrderingDoesNotStampPlanFacts(t *testing.T) {
-	params := map[string]interface{}{"feature": workflow.FeatureSlugInpaint}
-	plan, err := compileReadinessExecutionPlan(params, workflow.FeatureSlugInpaint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, exists := params["output_count"]; exists {
-		t.Fatalf("readiness stamped output_count into caller map: %#v", params)
-	}
-	if _, exists := params["output_resolution"]; exists {
-		t.Fatalf("readiness stamped output_resolution into caller map: %#v", params)
-	}
-	if plan.RuntimeInputs().ImageInputCount() != 1 || !plan.RuntimeInputs().HasMaskInput() {
-		t.Fatalf("readiness plan lacks synthesized media facts: inputs=%d mask=%v",
-			plan.RuntimeInputs().ImageInputCount(), plan.RuntimeInputs().HasMaskInput())
-	}
-	typed, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugInpaint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(typed.ExecutionPlan) != 0 {
-		t.Fatalf("readiness typed params must not attach a persisted plan: %s", typed.ExecutionPlan)
-	}
-}
-
 func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
-	intake := NewTaskIntake(TaskIntakeDeps{
-		Media: testSubmitMediaValidator{},
-	})
-	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
-		Prompt:         "draw a chair",
-		Service:        workflow.FeatureSlugRender,
-		ImageURLs:      []string{"https://example.com/sketch.png"},
-		ClientActionID: "ordering-e2e",
-		Params: map[string]interface{}{
-			"model":        "gpt-image-1",
-			"output_count": 2,
-		},
+	raw, err := CompileWorkspaceParams(workflow.FeatureSlugRender, "draw a chair", map[string]interface{}{
+		"output_count": 2,
+		"image_urls":   []string{"https://example.com/sketch.png"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	typed, err := tasks.UnmarshalParams(canonical.Params())
+	typed, err := tasks.UnmarshalParams(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,19 +269,15 @@ func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := canonical.GenerationSnapshot()
+	snapshot := typed.Generation
 	if snapshot == nil {
 		t.Fatal("missing generation snapshot")
-	}
-	billing := canonical.BillingRequest()
-	if billing == nil {
-		t.Fatal("missing billing request")
 	}
 	counts := map[string]int{
 		"plan":       plan.RequestedOutputCount().Int(),
 		"typed":      typed.Controls.OutputCount,
 		"generation": snapshot.RequestedOutputCount,
-		"billing":    int(billing.Quantity),
+		"billing":    int(snapshot.RequestedOutputCount),
 	}
 	for name, count := range counts {
 		if count != 2 {
@@ -324,15 +285,15 @@ func TestCanonicalSubmitOrderingEndToEndFactsAgree(t *testing.T) {
 		}
 	}
 	var persisted map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(canonical.Params()), &persisted); err != nil {
+	if err := json.Unmarshal([]byte(raw), &persisted); err != nil {
 		t.Fatal(err)
 	}
 	for _, legacy := range []string{"model", "image_urls", "mask_image_url", "mask_image_urls", "original_image_url"} {
 		if _, exists := persisted[legacy]; exists {
-			t.Fatalf("persisted params leaked %q: %s", legacy, canonical.Params())
+			t.Fatalf("persisted params leaked %q: %s", legacy, raw)
 		}
 	}
 	if _, exists := persisted["execution_plan"]; !exists {
-		t.Fatalf("persisted params lack execution_plan: %s", canonical.Params())
+		t.Fatalf("persisted params lack execution_plan: %s", raw)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -125,21 +124,6 @@ func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 	return ok
 }
 
-type staticUploadBoardAccessResolver struct {
-	service *boards.Service
-}
-
-func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
-	if r.service == nil {
-		return 0, domain.ErrUploadAccessDependencyMissing
-	}
-	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
-	if err != nil {
-		return 0, err
-	}
-	return board.OwnerUserID, nil
-}
-
 func authorizeStaticUploadResourceRead(
 	c *gin.Context,
 	deps StaticUploadDeps,
@@ -149,7 +133,7 @@ func authorizeStaticUploadResourceRead(
 	if !ok {
 		return storageports.ReadableUploadAccessResult{}, false
 	}
-	readAccess, ok := resolveStaticUploadReadAccess(c, deps, resource.Kind)
+	readAccess, ok := resolveStaticUploadReadAccess(c, deps)
 	if !ok {
 		return storageports.ReadableUploadAccessResult{}, false
 	}
@@ -165,32 +149,21 @@ func authorizeStaticUploadResourceRead(
 func resolveStaticUploadReadAccess(
 	c *gin.Context,
 	deps StaticUploadDeps,
-	kind domain.UploadResourceKind,
 ) (storageports.ReadableUploadAccess, bool) {
 	if deps.ReadAccess != nil {
 		return deps.ReadAccess, true
 	}
 
-	if kind == domain.UploadResourceKindCanvas {
-		if deps.BoardService == nil || deps.Auth.UserRepo == nil {
-			response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, fmt.Errorf("canvas upload dependencies not configured"))
-			return nil, false
-		}
-	} else if deps.Auth.UserRepo == nil {
+	if deps.Auth.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, fmt.Errorf("upload dependencies not configured"))
 		return nil, false
 	}
 
-	return authorization.NewReadableUploadAccess(
-		staticUploadBoardAccessResolver{service: deps.BoardService},
-		staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo},
-	), true
+	return authorization.NewReadableUploadAccess(staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo}), true
 }
 
 func writeStaticUploadReadError(c *gin.Context, kind domain.UploadResourceKind, err error) {
 	switch kind {
-	case domain.UploadResourceKindCanvas:
-		writeCanvasUploadReadError(c, err)
 	case domain.UploadResourceKindProfileAvatar, domain.UploadResourceKindTaskOutput:
 		writeOwnedUploadReadError(c, err)
 	default:
@@ -198,29 +171,12 @@ func writeStaticUploadReadError(c *gin.Context, kind domain.UploadResourceKind, 
 	}
 }
 
-func writeCanvasUploadReadError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, domain.ErrUploadAccessInvalidPath):
-		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
-	case errors.Is(err, boards.ErrInvalidInput):
-		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
-	case errors.Is(err, boards.ErrNotFound):
-		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
-	case errors.Is(err, boards.ErrPermissionDenied), errors.Is(err, domain.ErrUploadAccessDenied):
-		response.Error(c, http.StatusForbidden, msgWriteCanvasUploadReadError2)
-	case errors.Is(err, domain.ErrUploadAccessOwnerMismatch):
-		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
-	default:
-		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, err)
-	}
-}
-
 func writeOwnedUploadReadError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUploadAccessInvalidPath):
-		response.Error(c, http.StatusNotFound, msgWriteCanvasUploadReadError)
+		response.Error(c, http.StatusNotFound, msgWriteUploadReadError)
 	case errors.Is(err, domain.ErrUploadAccessDenied), errors.Is(err, domain.ErrUploadAccessOwnerMismatch):
-		response.Error(c, http.StatusForbidden, msgWriteCanvasUploadReadError2)
+		response.Error(c, http.StatusForbidden, msgWriteUploadReadError2)
 	default:
 		response.InternalError(c, http.StatusInternalServerError, msgResolveStaticUploadReadAccess, err)
 	}

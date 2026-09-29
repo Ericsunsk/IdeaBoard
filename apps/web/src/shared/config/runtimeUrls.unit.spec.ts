@@ -9,16 +9,16 @@ describe('runtime URL helpers', () => {
   it('keeps upload refs same-origin and canonicalizes known upload hosts', async () => {
     const { canonicalizeRuntimeUploadRef, resolveAssetUrl } = await import('./runtimeUrls')
 
-    expect(resolveAssetUrl('/uploads/canvas/U123/board/content/a.png')).toBe(
-      '/uploads/canvas/U123/board/content/a.png',
+    expect(resolveAssetUrl('/uploads/tasks/U123/board/content/a.png')).toBe(
+      '/uploads/tasks/U123/board/content/a.png',
     )
     expect(
       canonicalizeRuntimeUploadRef(
-        'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
+        'https://assets.example.com/uploads/tasks/U123/board/content/a.png',
       ),
-    ).toBe('https://assets.example.com/uploads/canvas/U123/board/content/a.png')
-    expect(canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/canvas/U123/a.png')).toBe(
-      'https://cdn.example.com/uploads/canvas/U123/a.png',
+    ).toBe('https://assets.example.com/uploads/tasks/U123/board/content/a.png')
+    expect(canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/tasks/U123/a.png')).toBe(
+      'https://cdn.example.com/uploads/tasks/U123/a.png',
     )
   })
 
@@ -54,14 +54,14 @@ describe('runtime URL helpers', () => {
 
     expect(
       canonicalizeRuntimeUploadRef(
-        'http://localhost:6000/uploads/canvas/U123/board/content/image.png',
+        'http://localhost:6000/uploads/tasks/U123/board/content/image.png',
       ),
-    ).toBe('/uploads/canvas/U123/board/content/image.png')
+    ).toBe('/uploads/tasks/U123/board/content/image.png')
     expect(
       normalizeRuntimeMediaRefs({
-        sourceImageUrl: 'http://localhost:6000/uploads/canvas/U123/board/content/image.png',
+        sourceImageUrl: 'http://localhost:6000/uploads/tasks/U123/board/content/image.png',
       }),
-    ).toEqual({ sourceImageUrl: '/uploads/canvas/U123/board/content/image.png' })
+    ).toEqual({ sourceImageUrl: '/uploads/tasks/U123/board/content/image.png' })
   })
 
   it('ignores malformed development API and asset overrides', async () => {

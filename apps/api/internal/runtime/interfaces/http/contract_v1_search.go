@@ -64,7 +64,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
@@ -146,7 +146,7 @@ const V1VisionSKU = "ai-search:vision"
 // (#807/#809).
 type ContractV1SearchDeps struct {
 	Backend     V1SearchBackend
-	Library     library.WorkspaceLibraryStore
+	Library     libraryports.WorkspaceLibraryStore
 	Quoter      V1BillingQuoter
 	Settler     V1CreditSettler
 	Extractor   V1VisionExtractor

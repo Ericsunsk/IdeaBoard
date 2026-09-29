@@ -1,6 +1,6 @@
 import { SERVICE, type Service } from '../../../../../shared/domain/imageServices'
 import type {
-  SubmitTaskData,
+  CanvasTaskRequestData,
   SubmitTaskReadinessData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
 import {
@@ -20,7 +20,7 @@ import {
   fetchCanvasWorkspaceTaskReadinessMatrix,
 } from '../workspace/canvasWorkspaceTaskAdapter'
 
-function buildCanvasBillingReadinessRequest(service: Service): SubmitTaskData {
+function buildCanvasBillingReadinessRequest(service: Service): CanvasTaskRequestData {
   switch (service) {
     case SERVICE.inpaint:
       return buildInpaintReadinessRequest()
@@ -43,7 +43,7 @@ function buildCanvasBillingReadinessRequest(service: Service): SubmitTaskData {
 
 export async function fetchCanvasBillingReadiness(
   service: Service,
-  request?: SubmitTaskData,
+  request?: CanvasTaskRequestData,
 ): Promise<SubmitTaskReadinessData> {
   return fetchCanvasWorkspaceTaskReadiness(
     withTaskClientActionId(
@@ -65,7 +65,7 @@ export function buildFusionBillingReadinessRequest(input: {
   aspectRatio: Parameters<typeof buildFusionTaskRequest>[0]['aspectRatio']
   outputCount?: Parameters<typeof buildFusionTaskRequest>[0]['outputCount']
   outputResolution?: OutputResolution | undefined
-}): SubmitTaskData | null {
+}): CanvasTaskRequestData | null {
   const imageUrls = input.imageUrls
     .map((url) => url.trim())
     .filter(Boolean)

@@ -22,7 +22,9 @@ import (
 	"sync"
 	"testing"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
+	libraryports "ideaboard/api/internal/library/ports"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
@@ -31,19 +33,19 @@ import (
 // deterministic source identity per (task, result index) saved
 // through a real WorkspaceLibraryStore with Quick Saves targeting ("").
 type fakeTaskOutputSaver struct {
-	store library.WorkspaceLibraryStore
+	store libraryports.WorkspaceLibraryStore
 }
 
-func (f *fakeTaskOutputSaver) SaveTaskOutputAsset(ctx context.Context, workspacePublicID, taskID string, resultIndex int, mediaAssetID string) (*library.V1Asset, bool, error) {
+func (f *fakeTaskOutputSaver) SaveTaskOutputAsset(ctx context.Context, workspacePublicID, taskID string, resultIndex int, mediaAssetID string) (*librarydomain.V1Asset, bool, error) {
 	sourceID := fmt.Sprintf("%s:%d", taskID, resultIndex)
 	remote := fmt.Sprintf("https://images.unsplash.com/task-output-%s-%d", taskID, resultIndex)
-	assetID, err := library.NewV1AssetPublicID()
+	assetID, err := librarydomain.NewV1AssetPublicID()
 	if err != nil {
 		return nil, false, err
 	}
-	return f.store.SaveAsset(ctx, workspacePublicID, library.V1SaveAssetInput{
+	return f.store.SaveAsset(ctx, workspacePublicID, librarydomain.V1SaveAssetInput{
 		FolderPublicID: "",
-		Asset: library.AssetInput{
+		Asset: librarydomain.AssetInput{
 			Provider: "unsplash", SourceID: sourceID,
 			SourceURL: remote, PreviewURL: remote, OriginalURL: remote,
 		},
@@ -53,14 +55,14 @@ func (f *fakeTaskOutputSaver) SaveTaskOutputAsset(ctx context.Context, workspace
 // countingLibraryStore decorates the store to observe job creation
 // (the in-memory store has no list API).
 type countingLibraryStore struct {
-	library.WorkspaceLibraryStore
+	libraryports.WorkspaceLibraryStore
 	mu      sync.Mutex
 	created []string
 }
 
-func (s *countingLibraryStore) ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*library.V1Materialization, bool, error) {
+func (s *countingLibraryStore) ClaimMaterialization(ctx context.Context, workspacePublicID, assetPublicID, publicID string) (*librarydomain.V1Materialization, bool, error) {
 	claim, ok := s.WorkspaceLibraryStore.(interface {
-		ClaimMaterialization(context.Context, string, string, string) (*library.V1Materialization, bool, error)
+		ClaimMaterialization(context.Context, string, string, string) (*librarydomain.V1Materialization, bool, error)
 	})
 	if !ok {
 		return nil, false, errors.New("claimer unavailable")
@@ -83,10 +85,10 @@ func (s *countingLibraryStore) jobCount() int {
 // failCreateLibraryStore fails job creation after a successful hold to
 // prove compensation (hold released, no orphan).
 type failCreateLibraryStore struct {
-	library.WorkspaceLibraryStore
+	libraryports.WorkspaceLibraryStore
 }
 
-func (s *failCreateLibraryStore) ClaimMaterialization(context.Context, string, string, string) (*library.V1Materialization, bool, error) {
+func (s *failCreateLibraryStore) ClaimMaterialization(context.Context, string, string, string) (*librarydomain.V1Materialization, bool, error) {
 	return nil, false, errors.New("store down")
 }
 
@@ -103,13 +105,13 @@ func completedTriggerTask() *workspacetasks.WorkspaceTask {
 
 type triggerEnv struct {
 	store   *countingLibraryStore
-	raw     *library.InMemoryWorkspaceLibraryStore
+	raw     *librarymemory.InMemoryWorkspaceLibraryStore
 	saver   *fakeTaskOutputSaver
 	trigger taskruntime.WorkspaceTaskAutoMaterializer
 }
 
 func newTriggerEnv() *triggerEnv {
-	raw := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	raw := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	store := &countingLibraryStore{WorkspaceLibraryStore: raw}
 	trigger, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Store: store, Saver: &fakeTaskOutputSaver{store: raw},
@@ -121,7 +123,7 @@ func newTriggerEnv() *triggerEnv {
 		saver: &fakeTaskOutputSaver{store: raw}, trigger: trigger}
 }
 
-func materializationFor(t *testing.T, store *library.InMemoryWorkspaceLibraryStore, ws, matID string) *library.V1Materialization {
+func materializationFor(t *testing.T, store *librarymemory.InMemoryWorkspaceLibraryStore, ws, matID string) *librarydomain.V1Materialization {
 	t.Helper()
 	record, err := store.GetMaterialization(context.Background(), ws, matID)
 	if err != nil {
@@ -144,7 +146,7 @@ func TestTaskAutoMaterializeSuccess(t *testing.T) {
 	}
 	for i, matID := range env.store.created {
 		record := materializationFor(t, env.raw, task.WorkspaceID, matID)
-		if record.Status != library.V1MaterializationCompleted {
+		if record.Status != librarydomain.V1MaterializationCompleted {
 			t.Fatalf("job %d status = %q, want completed", i, record.Status)
 		}
 		wantMedia := task.OutputRefs[i].AssetID
@@ -183,7 +185,7 @@ func TestTaskAutoMaterializeDoubleTriggerIsIdempotent(t *testing.T) {
 // Job-create failure: the per-output failure is absorbed (task stays
 // complete, trigger returns nil), no job recorded.
 func TestTaskAutoMaterializeJobCreateFailureAbsorbed(t *testing.T) {
-	raw := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	raw := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	trigger, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Store: &failCreateLibraryStore{WorkspaceLibraryStore: raw},
 		Saver: &fakeTaskOutputSaver{store: raw},
@@ -217,7 +219,7 @@ func TestTaskAutoMaterializeSkipsRemoteOutputs(t *testing.T) {
 }
 
 func TestTaskAutoMaterializerRequiresStore(t *testing.T) {
-	raw := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	raw := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	if _, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Saver: &fakeTaskOutputSaver{store: raw},
 	}); err == nil {
@@ -227,7 +229,7 @@ func TestTaskAutoMaterializerRequiresStore(t *testing.T) {
 
 // Nil saver degrades to a no-op: task complete, nothing persisted.
 func TestTaskAutoMaterializerNilSaverIsNoop(t *testing.T) {
-	raw := library.NewInMemoryWorkspaceLibraryStoreForTests()
+	raw := librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	store := &countingLibraryStore{WorkspaceLibraryStore: raw}
 	trigger, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Store: store,
@@ -269,6 +271,7 @@ func TestWorkerReplaysMaterializerAfterCompleteRedelivery(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	recorder := &recordingWorkerMaterializer{}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
@@ -311,6 +314,7 @@ func TestWorkerSwallowsMaterializerError(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: env.store, Settler: env.service,
 		Assets: &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},

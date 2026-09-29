@@ -49,8 +49,16 @@ type Set struct {
 	httpRequestTime   *prometheus.HistogramVec
 	gatewayRequests   *prometheus.CounterVec
 	gatewayRetries    *prometheus.CounterVec
-	riverQueueDepth   *prometheus.GaugeVec
-	riverQueueLag     *prometheus.GaugeVec
+	// modelFallbacks counts bounded model-fallback sends (#852,
+	// ADR-0012 rule 6): exactly one retry-candidate send per task after
+	// a retryable upstream failure. Labels mirror gatewayRequests
+	// ({service, outcome}) so fallback success/error splits stay
+	// comparable with gateway outcomes; retry_layer stays out of the
+	// labels (one counter per layer would triple series for no new
+	// signal: gatewayRetries and this counter already separate them).
+	modelFallbacks  *prometheus.CounterVec
+	riverQueueDepth *prometheus.GaugeVec
+	riverQueueLag   *prometheus.GaugeVec
 }
 
 // NewSet registers the RED collectors on reg. A nil reg builds an
@@ -74,6 +82,10 @@ func NewSet(reg prometheus.Registerer) *Set {
 			Name: "ideaboard_gateway_retries_total",
 			Help: "Worker-level task requeues after retryable gateway failures, by service.",
 		}, []string{"service"}),
+		modelFallbacks: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ideaboard_model_fallback_total",
+			Help: "Bounded model-fallback sends to the snapshot retry candidate, by service and fallback-send outcome (success/error).",
+		}, []string{"service", "outcome"}),
 		riverQueueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "ideaboard_river_queue_depth",
 			Help: "River jobs waiting for execution (available/scheduled/retryable), by queue.",
@@ -88,6 +100,7 @@ func NewSet(reg prometheus.Registerer) *Set {
 		s.httpRequestTime = registerHistogramVec(reg, s.httpRequestTime)
 		s.gatewayRequests = registerCounterVec(reg, s.gatewayRequests)
 		s.gatewayRetries = registerCounterVec(reg, s.gatewayRetries)
+		s.modelFallbacks = registerCounterVec(reg, s.modelFallbacks)
 		s.riverQueueDepth = registerGaugeVec(reg, s.riverQueueDepth)
 		s.riverQueueLag = registerGaugeVec(reg, s.riverQueueLag)
 	}
@@ -198,6 +211,24 @@ func (s *Set) IncGatewayRetry(service string) {
 		return
 	}
 	s.gatewayRetries.WithLabelValues(normalizeService(service)).Inc()
+}
+
+// IncModelFallback records one bounded model-fallback send to the
+// snapshot's retry candidate (#852, ADR-0012 rule 6). err == nil means
+// the fallback send succeeded; any error means outcome "error". The
+// observation fires once per fallback send (at most once per task), at
+// send completion when the outcome is known — never at fallback
+// decision time, so decided-but-unrecorded fallbacks (missing
+// model_fallback row) never inflate the counter.
+func (s *Set) IncModelFallback(service string, err error) {
+	if s == nil {
+		return
+	}
+	outcome := "success"
+	if err != nil {
+		outcome = "error"
+	}
+	s.modelFallbacks.WithLabelValues(normalizeService(service), outcome).Inc()
 }
 
 // SetRiverQueue publishes the latest River queue snapshot for one queue.

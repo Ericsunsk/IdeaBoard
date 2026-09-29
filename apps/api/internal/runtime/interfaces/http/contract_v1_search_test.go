@@ -20,7 +20,8 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
+	librarymemory "ideaboard/api/internal/library/infrastructure/memory"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tenancy"
@@ -136,7 +137,7 @@ func (f *fakeVisionExtractor) ExtractVisionQuery(ctx context.Context, input V1Vi
 
 type v1SearchFixture struct {
 	store  *tenancy.InMemoryStore
-	lib    *library.InMemoryWorkspaceLibraryStore
+	lib    *librarymemory.InMemoryWorkspaceLibraryStore
 	dir    *staticUserDirectory
 	engine *gin.Engine
 	ws     *tenancy.Workspace
@@ -151,9 +152,9 @@ func newV1SearchFixture(t *testing.T, searchDeps ContractV1SearchDeps) *v1Search
 	store := tenancy.NewInMemoryStoreForTests()
 	dir := newStaticUserDirectory()
 	if searchDeps.Library == nil {
-		searchDeps.Library = library.NewInMemoryWorkspaceLibraryStoreForTests()
+		searchDeps.Library = librarymemory.NewInMemoryWorkspaceLibraryStoreForTests()
 	}
-	lib, _ := searchDeps.Library.(*library.InMemoryWorkspaceLibraryStore)
+	lib, _ := searchDeps.Library.(*librarymemory.InMemoryWorkspaceLibraryStore)
 	engine := newV1SearchTestEngine(store, searchDeps, dir)
 	const owner, member, other = 1, 2, 99
 	for _, id := range []int64{owner, member, other} {
@@ -296,7 +297,7 @@ func TestV1VisionQueryLifecycle(t *testing.T) {
 	// (direct store save: this fixture wires the library store into the
 	// search deps only, keeping the library HTTP surface out of scope).
 	asset, _, err := fx.lib.SaveAsset(context.Background(), fx.ws.PublicID,
-		library.V1SaveAssetInput{Asset: library.AssetInput{
+		librarydomain.V1SaveAssetInput{Asset: librarydomain.AssetInput{
 			Provider: "unsplash", SourceID: "v1",
 			SourceURL: v1TestAssetURL, PreviewURL: v1TestAssetURL, OriginalURL: v1TestAssetURL,
 			Title: "dunes", Width: 100, Height: 80,
@@ -364,7 +365,7 @@ func TestV1VisionQueryLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	foreign, _, err := fx.lib.SaveAsset(context.Background(), otherWS.PublicID,
-		library.V1SaveAssetInput{Asset: library.AssetInput{
+		librarydomain.V1SaveAssetInput{Asset: librarydomain.AssetInput{
 			Provider: "unsplash", SourceID: "foreign",
 			SourceURL: v1TestAssetURL, PreviewURL: v1TestAssetURL, OriginalURL: v1TestAssetURL,
 		}}, "lasset_foreign00000000001")

@@ -56,7 +56,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"ideaboard/api/internal/library"
+	librarydomain "ideaboard/api/internal/library/domain"
 	libraryports "ideaboard/api/internal/library/ports"
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
@@ -68,7 +68,7 @@ import (
 // dedup signal. Sibling A (#828-A) provides the production
 // implementation; tests inject fakes.
 type TaskOutputLibrarySaver interface {
-	SaveTaskOutputAsset(ctx context.Context, workspacePublicID, taskID string, resultIndex int, mediaAssetID string) (*library.V1Asset, bool, error)
+	SaveTaskOutputAsset(ctx context.Context, workspacePublicID, taskID string, resultIndex int, mediaAssetID string) (*librarydomain.V1Asset, bool, error)
 }
 
 // WorkspaceTaskAutoMaterializer runs the post-commit trigger for one
@@ -82,12 +82,12 @@ type WorkspaceTaskAutoMaterializer interface {
 // Saver nil degrades to a logged no-op until the task-originated save
 // path is available.
 type WorkspaceTaskAutoMaterializerDeps struct {
-	Store library.WorkspaceLibraryStore
+	Store libraryports.WorkspaceLibraryStore
 	Saver TaskOutputLibrarySaver
 }
 
 type workspaceTaskAutoMaterializer struct {
-	store library.WorkspaceLibraryStore
+	store libraryports.WorkspaceLibraryStore
 	saver TaskOutputLibrarySaver
 }
 
@@ -141,7 +141,7 @@ func (m *workspaceTaskAutoMaterializer) materializeOne(ctx context.Context, task
 			"task_id", task.ID, "result_index", ref.ResultIndex, "err", err)
 		return
 	}
-	matID, mintErr := library.NewV1MaterializationPublicID()
+	matID, mintErr := librarydomain.NewV1MaterializationPublicID()
 	if mintErr != nil {
 		slog.Warn("task auto-materialize: mint failed", "task_id", task.ID, "err", mintErr)
 		return
@@ -159,20 +159,20 @@ func (m *workspaceTaskAutoMaterializer) materializeOne(ctx context.Context, task
 		return
 	}
 	matID = job.PublicID
-	if job.Status == library.V1MaterializationCompleted {
+	if job.Status == librarydomain.V1MaterializationCompleted {
 		slog.Info("task auto-materialize converges: materialization already completed",
 			"task_id", task.ID, "materialization", matID, "asset", saved.PublicID)
 		return
 	}
-	if _, runningErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationRunning, "", "", ""); runningErr != nil {
-		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationFailed, "", "library_materialization_failed", msgMaterializeOne)
+	if _, runningErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, librarydomain.V1MaterializationRunning, "", "", ""); runningErr != nil {
+		_, _ = m.store.SetMaterializationResult(ctx, workspaceID, matID, librarydomain.V1MaterializationFailed, "", "library_materialization_failed", msgMaterializeOne)
 		slog.Warn("task auto-materialize: job start failed",
 			"task_id", task.ID, "materialization", matID, "err", runningErr)
 		return
 	}
 	// The output media already exists as a managed asset (post-renderer),
 	// so linking is immediate: no byte fetch, no second media write.
-	if _, linkErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, library.V1MaterializationCompleted, mediaAssetID, "", ""); linkErr != nil {
+	if _, linkErr := m.store.SetMaterializationResult(ctx, workspaceID, matID, librarydomain.V1MaterializationCompleted, mediaAssetID, "", ""); linkErr != nil {
 		slog.Error("task auto-materialize: media link failed; repair required",
 			"task_id", task.ID, "materialization", matID, "err", linkErr)
 		return
