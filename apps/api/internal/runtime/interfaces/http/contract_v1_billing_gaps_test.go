@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/generation/routing"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
@@ -561,8 +562,8 @@ func TestV1GapsBillingQuote(t *testing.T) {
 	engine := fx.engine()
 	base := "/api/v1/workspaces/" + wsID + "/billing-quotes"
 
-	// Vision price preflight (the visionBillingResource path): defaults
-	// resolve to output_resolution=default, quantity=1.
+	// Vision price preflight (the visionBillingResource path): omitted
+	// resolution resolves to canonical 1k, quantity=1.
 	status, _, quoted := doV1(t, engine, v1Call{
 		method: http.MethodPost, path: base,
 		body: `{"data":{"sku":"ai-search:vision"}}`, userID: 11,
@@ -574,7 +575,7 @@ func TestV1GapsBillingQuote(t *testing.T) {
 	if vision["sku"] != "ai-search:vision" || vision["total_credits"] != float64(3) || vision["quantity"] != float64(1) {
 		t.Fatalf("vision quote = %v, want immutable snapshot total 3", vision)
 	}
-	if vision["output_resolution"] != "default" || vision["quoted_at"] == "" {
+	if vision["output_resolution"] != "1k" || vision["quoted_at"] == "" {
 		t.Fatalf("vision quote must pin resolution + quoted_at: %v", vision)
 	}
 	if fx.quoter.lastSKU != "ai-search:vision" {
@@ -635,6 +636,152 @@ func TestV1GapsBillingQuote(t *testing.T) {
 	if status != http.StatusNotFound || v1ErrorCode(t, hidden) != string(contract.CodeWorkspaceNotFound) {
 		t.Fatalf("outsider quote = %d %v, want 404 workspace_not_found", status, hidden)
 	}
+}
+
+func TestV1GapsBillingQuoteImagePoolGate(t *testing.T) {
+	// #851: billing-quotes shares the pool availability decision with
+	// task-quotes/readiness/submit for ai-image SKUs. Without an eligible
+	// Model the quote fails with the canonical sentinel before the
+	// catalog is consulted; other SKUs keep their quote-only path.
+	newImagePoolRouter := func(pools map[string]routing.Pool) *routing.RoutingResolver {
+		return routing.NewRoutingResolver(&gapPoolStore{pools: pools})
+	}
+	newImageFixture := func(pools map[string]routing.Pool, router bool) (*gapsTestFixture, string) {
+		fx := newGapsTestFixture()
+		if router {
+			fx.deps.PoolRouter = newImagePoolRouter(pools)
+		}
+		return fx, gapsWorkspace(t, fx)
+	}
+	quote := func(engine *gin.Engine, wsID, body string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: "/api/v1/workspaces/" + wsID + "/billing-quotes",
+			body: body, userID: 11,
+		})
+		return status, payload
+	}
+
+	// Empty pool: omitted resolution applies the scalable policy default
+	// (1k), and the error reports the normalized values without touching
+	// the catalog.
+	fx, wsID := newImageFixture(map[string]routing.Pool{}, true)
+	engine := fx.engine()
+	before := fx.quoter.calls
+	status, payload := quote(engine, wsID, `{"data":{"sku":"ai-image:render"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeServiceResolutionUnavailable) {
+		t.Fatalf("image quote without pool = %d %v, want 422 service_resolution_unavailable", status, payload)
+	}
+	if fields := v1ErrorFields(t, payload); fields["service"] != "render" || fields["resolution"] != "1k" {
+		t.Fatalf("image quote fields = %v, want normalized render/1k", fields)
+	}
+	if fx.quoter.calls != before {
+		t.Fatal("unavailable image quote consulted the catalog (availability must precede pricing)")
+	}
+
+	// Explicit resolutions report themselves.
+	status, payload = quote(engine, wsID, `{"data":{"sku":"ai-image:render","output_resolution":"2k"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeServiceResolutionUnavailable) {
+		t.Fatalf("image 2k quote without pool = %d %v, want 422 service_resolution_unavailable", status, payload)
+	}
+	if fields := v1ErrorFields(t, payload); fields["resolution"] != "2k" {
+		t.Fatalf("image 2k fields = %v, want resolution 2k", fields)
+	}
+
+	// Seeded pool: the same quote mints a price; fixed-resolution
+	// Services use the same canonical resolution variants.
+	seeded, seededWS := newImageFixture(map[string]routing.Pool{
+		"render": {Service: "render", Version: 1, Entries: []routing.ModelPoolEntry{
+			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution2K}},
+		}},
+		"cutout": {Service: "cutout", Version: 1, Entries: []routing.ModelPoolEntry{
+			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+		}},
+	}, true)
+	seededEngine := seeded.engine()
+	status, payload = quote(seededEngine, seededWS, `{"data":{"sku":"ai-image:render","output_resolution":"2k"}}`)
+	if status != http.StatusOK {
+		t.Fatalf("gated image quote = %d %v, want 200", status, payload)
+	}
+	if got := v1Data(t, payload).(map[string]any); got["sku"] != "ai-image:render" || got["output_resolution"] != "2k" {
+		t.Fatalf("gated image quote = %v, want ai-image:render @2k", got)
+	}
+	status, payload = quote(seededEngine, seededWS, `{"data":{"sku":"ai-image:cutout"}}`)
+	if status != http.StatusOK || v1Data(t, payload).(map[string]any)["output_resolution"] != "1k" {
+		t.Fatalf("gated fixed-service quote = %d %v, want 200 @1k", status, payload)
+	}
+
+	// Non-image SKUs never consult the pool, even when it is empty.
+	status, payload = quote(engine, wsID, `{"data":{"sku":"ai-search:vision"}}`)
+	if status != http.StatusOK {
+		t.Fatalf("vision quote with empty pool = %d %v, want 200 (outside the pool contract)", status, payload)
+	}
+
+	// Unknown image services converge to pricing, never availability.
+	if fx.quoter.errFor == nil {
+		fx.quoter.errFor = map[string]error{}
+	}
+	fx.quoter.errFor["ai-image:nope"] = billing.ErrSKUNotFound
+	status, payload = quote(engine, wsID, `{"data":{"sku":"ai-image:nope"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeBillingPricingUnavailable) {
+		t.Fatalf("unknown image service = %d %v, want 422 billing_pricing_unavailable", status, payload)
+	}
+
+	// A nil router is a production wiring error and fails closed for image
+	// services before pricing is consulted.
+	noRouter, noRouterWS := newImageFixture(map[string]routing.Pool{}, false)
+	status, payload = quote(noRouter.engine(), noRouterWS, `{"data":{"sku":"ai-image:render"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeServiceResolutionUnavailable) {
+		t.Fatalf("image quote without router = %d %v, want 422 service_resolution_unavailable", status, payload)
+	}
+}
+
+func TestV1GapsBillingQuoteExplicitDefaultForScalable(t *testing.T) {
+	// Explicit "default" is invalid for every service. Omitted resolutions
+	// use the canonical 1k ingress value.
+	fx := newGapsTestFixture()
+	fx.deps.PoolRouter = routing.NewRoutingResolver(&gapPoolStore{pools: map[string]routing.Pool{
+		"render": {Service: "render", Version: 1, Entries: []routing.ModelPoolEntry{
+			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+		}},
+		"cutout": {Service: "cutout", Version: 1, Entries: []routing.ModelPoolEntry{
+			{Model: "a/first", Enabled: true, SupportedResolutions: []routing.Resolution{routing.Resolution1K}},
+		}},
+	}})
+	engine := fx.engine()
+	wsID := gapsWorkspace(t, fx)
+	quote := func(body string) (int, map[string]any) {
+		status, _, payload := doV1(t, engine, v1Call{
+			method: http.MethodPost, path: "/api/v1/workspaces/" + wsID + "/billing-quotes",
+			body: body, userID: 11,
+		})
+		return status, payload
+	}
+	status, payload := quote(`{"data":{"sku":"ai-image:render","output_resolution":"default"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+		t.Fatalf("explicit default for scalable = %d %v, want 422 validation_failed", status, payload)
+	}
+	if fields := v1ErrorFields(t, payload); fields["output_resolution"] != "invalid" {
+		t.Fatalf("explicit default fields = %v, want output_resolution=invalid", fields)
+	}
+	status, payload = quote(`{"data":{"sku":"ai-image:render"}}`)
+	if status != http.StatusOK {
+		t.Fatalf("omitted resolution for scalable = %d %v, want 200 @1k policy default", status, payload)
+	}
+	status, payload = quote(`{"data":{"sku":"ai-image:cutout","output_resolution":"default"}}`)
+	if status != http.StatusUnprocessableEntity || v1ErrorCode(t, payload) != string(contract.CodeValidationFailed) {
+		t.Fatalf("explicit default for fixed service = %d %v, want 422 validation_failed", status, payload)
+	}
+}
+
+type gapPoolStore struct {
+	pools map[string]routing.Pool
+}
+
+func (s *gapPoolStore) ListPool(ctx context.Context, service string) (routing.Pool, error) {
+	if p, ok := s.pools[service]; ok {
+		return p, nil
+	}
+	return routing.Pool{Service: service}, nil
 }
 
 func gapsRedeemCall(wsID, code, key string, userID int64) v1Call {

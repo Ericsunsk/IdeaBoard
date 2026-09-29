@@ -46,6 +46,7 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
@@ -162,6 +163,14 @@ type ContractV1BillingDeps struct {
 	Usage           billingUsageReader
 	Quoter          billingQuoter
 	Checkout        workspaceCheckoutService
+	// PoolRouter is the shared RoutingResolver the billing-quotes seam
+	// consults for ai-image SKUs (ADR-0012 rule 10, #851): an image quote
+	// without an eligible Model fails with the same 422
+	// service_resolution_unavailable as task-quotes/readiness/submit
+	// before any price is minted. Non-image SKUs (ai-search:vision and
+	// future products outside the pool) never consult it. Nil fails closed
+	// for image quotes so test and production wiring share the same contract.
+	PoolRouter *routing.RoutingResolver
 	// Gaps batch (#809-close, backend B): purchase options, pending
 	// orders (continue/abandon), recharge history, billing quotes, and
 	// rewards redeem/history. Zero values keep each route fail-closed;
