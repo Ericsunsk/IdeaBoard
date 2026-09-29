@@ -1,6 +1,6 @@
 import { computed, nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
+import { TaskStatus } from '../../shared/lib/taskMetricTokens'
 import type {
   ApiResponseAdminTaskListData,
   AdminMonitorListItem,
@@ -81,7 +81,7 @@ describe('useMonitor polling', () => {
     useAdminTaskList()
     const polling = mockState.pollingOptions[0] as { isEnabled: () => boolean }
 
-    data.value = makeTaskList([makeTask(ListAdminTasksStatus.completed, 1)], {
+    data.value = makeTaskList([makeTask(TaskStatus.completed, 1)], {
       pending: 1,
       running: 0,
     })
@@ -89,7 +89,7 @@ describe('useMonitor polling', () => {
 
     expect(polling.isEnabled()).toBe(true)
 
-    data.value = makeTaskList([makeTask(ListAdminTasksStatus.running, 2)], {
+    data.value = makeTaskList([makeTask(TaskStatus.running, 2)], {
       pending: 0,
       running: 0,
     })
@@ -164,7 +164,7 @@ describe('useMonitor polling', () => {
     data.value = makeTaskList([], { pending: 0, running: 0 }, 20)
     expect(pagination.currentPage.value).toBe(2)
 
-    monitor.filterStatus.value = ListAdminTasksStatus.failed
+    monitor.filterStatus.value = TaskStatus.failed
     expect(pagination.currentPage.value).toBe(1)
   })
 

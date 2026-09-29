@@ -93,7 +93,7 @@ func TestCreateVerifiesMaskAsset(t *testing.T) {
 			"ws_abc\x00asset_old":     {ID: "asset_old", WorkspaceID: "ws_abc", Status: "ready", Archived: true},
 		}}
 		service := NewTestServiceForTests(ServiceDeps{
-			Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+			TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 			Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Resolver: allowTestPoolResolver(),
 		})
 		return store, service

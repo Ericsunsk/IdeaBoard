@@ -92,7 +92,7 @@ func TestWorkerAutoMaterializeEndToEndPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
+	if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {

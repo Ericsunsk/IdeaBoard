@@ -1,10 +1,13 @@
 import { uploadApi } from '../../../../shared/api/upload'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { i18n } from '../../../../shared/i18n'
-import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board'
+import { rebuildBoardMediaRefs, type BoardSnapshot } from '../../../board/ports/canvas'
 import {
+  fetchImageBlobFromUrl,
   filenameFromImageUrl,
+  ImageBlobFetchError,
   isDataUrl,
+  isStableBoardUploadUrl,
   resolveFetchUrl,
 } from '../../infrastructure/media/canvasMediaIo.ts'
 import { prepareImageAssetForUpload } from '../../../../shared/media/imageAssetPipeline'
@@ -28,46 +31,6 @@ interface BoardSessionUploadLifecycleOptions {
 
 function t(key: string, params?: Record<string, unknown>): string {
   return i18n.global.t(key, params ?? {})
-}
-
-function parsePathname(raw: string): string | null {
-  const trimmed = raw.trim()
-  if (!trimmed) return null
-  if (trimmed.startsWith('/')) return trimmed
-  try {
-    return new URL(trimmed, window.location.origin).pathname || null
-  } catch {
-    return null
-  }
-}
-
-function encodePathSegment(segment: string): string {
-  return encodeURIComponent(segment).replace(
-    /[!'()*]/g,
-    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`,
-  )
-}
-
-function pathSegmentMatches(segment: string, expected: string): boolean {
-  const encoded = encodePathSegment(expected)
-  if (segment === expected || segment === encoded) return true
-  try {
-    return decodeURIComponent(segment) === expected
-  } catch {
-    return false
-  }
-}
-
-function isBoardTaskUploadPath(path: string, userUid: string, boardId: string): boolean {
-  const segments = path.split('/').filter(Boolean)
-  for (let i = 0; i + 4 < segments.length; i += 1) {
-    if (segments[i] !== 'uploads' || segments[i + 1] !== 'tasks') continue
-    if (!pathSegmentMatches(segments[i + 2] ?? '', userUid)) continue
-    if (!pathSegmentMatches(segments[i + 3] ?? '', boardId)) continue
-    if (segments[i + 4] !== 'content') continue
-    return true
-  }
-  return false
 }
 
 type StableImageItem = { url: string; mediaRef?: MediaRef | undefined }
@@ -157,11 +120,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   const normalizedWorkspaceId = options.workspaceId?.trim() || ''
 
   function isStableCanvasUrl(raw: string): boolean {
-    const trimmed = raw.trim()
-    if (!trimmed) return true
-    const path = parsePathname(trimmed)
-    if (!path) return false
-    return isBoardTaskUploadPath(path, normalizedUserUid, normalizedBoardId)
+    return isStableBoardUploadUrl(raw, normalizedUserUid, normalizedBoardId)
   }
 
   async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaRef: MediaRef }> {
@@ -212,10 +171,15 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
         )
       }
     }
-    let response: Response
+    let blob: Blob
     try {
-      response = await fetch(resolveFetchUrl(raw), { credentials: 'include' })
+      blob = await fetchImageBlobFromUrl(resolveFetchUrl(raw))
     } catch (error) {
+      if (error instanceof ImageBlobFetchError && error.status !== null) {
+        throw new Error(t('canvas.session.downloadImageHttpFailed', { code: error.status }), {
+          cause: error,
+        })
+      }
       throw new Error(
         t('canvas.session.downloadImageFailed', {
           reason: userFacingErrorCopy(error, t('canvas.session.networkError')),
@@ -225,10 +189,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
         },
       )
     }
-    if (!response.ok) {
-      throw new Error(t('canvas.session.downloadImageHttpFailed', { code: response.status }))
-    }
-    return await response.blob()
+    return blob
   }
 
   async function stabilizeSnapshotForSave(snapshot: BoardSnapshot): Promise<BoardSnapshot> {

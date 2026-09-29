@@ -29,10 +29,9 @@
       </div>
 
       <div :class="adminChartGridClass">
-        <RangedLineChartCard
+        <AdminRangedLineChartCard
           v-model="timeRange"
           :title="STATISTICS_MESSAGES.trendTitle"
-          variant="admin"
           class="xl:col-span-12"
           :ranges="rangeOptions"
           :data="trendChartData"
@@ -53,10 +52,9 @@
           />
         </AdminChartCard>
 
-        <RangedLineChartCard
+        <AdminRangedLineChartCard
           v-model="timeRange"
           :title="STATISTICS_MESSAGES.qualityTrendTitle"
-          variant="admin"
           class="xl:col-span-5"
           :ranges="rangeOptions"
           :data="qualityTrendChartData"
@@ -88,9 +86,9 @@
 import { computed } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
+import AdminRangedLineChartCard from '../../shared/components/AdminRangedLineChartCard.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import ChartRenderer from '../../../../shared/components/ChartRenderer.vue'
-import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/chart'
 import {

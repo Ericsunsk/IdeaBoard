@@ -1,4 +1,4 @@
-import type { CanvasCreatableNodeKind, CanvasNodeItem, ImageNodeItem } from '../../../board'
+import type { CanvasCreatableNodeKind, CanvasNodeItem, ImageNodeItem } from '../../../board/ports/canvas'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
@@ -8,7 +8,7 @@ import { preloadImage } from '../../../../shared/media/preloadImage'
 import { buildMediaBrowserURL, type MediaRef } from '../../../../shared/media/mediaRef'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { i18n } from '../../../../shared/i18n'
-import { resolveImageNodeFrameSize } from '../../../board'
+import { resolveImageNodeFrameSize } from '../../../board/ports/canvas'
 import { readCurrentBoardIdRef } from '../board-session/currentBoardId.ts'
 import type { CanvasGraphNodeIdForKind } from '../../domain/graph'
 import type { FlowLocalUploadState } from '../../domain/nodes/flowTypes.ts'

@@ -97,7 +97,7 @@ func newAvailabilityTestEnv(quoter Quoter, pools map[string]routing.Pool) *avail
 	resolver := routing.NewRoutingResolver(&stubPoolStore{pools: pools},
 		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
 	env.service = NewTestServiceForTests(ServiceDeps{
-		Tasks: env.store, Quoter: quoter, Holder: env.holder, Queue: env.queue,
+		TaskRead: env.store, TaskLifecycle: env.store, Quoter: quoter, Holder: env.holder, Queue: env.queue,
 		Resolver: resolver,
 		SnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
 			env.saveCalls++

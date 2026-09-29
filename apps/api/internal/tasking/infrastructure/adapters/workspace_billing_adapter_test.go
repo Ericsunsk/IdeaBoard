@@ -1,4 +1,4 @@
-package runtime
+package adapters
 
 // Adapter tests: WorkspaceTaskQuoter billing-cause preservation (#804
 // 422-vs-503 convergence). The quoter keeps the ErrQuoteUnavailable

@@ -29,6 +29,107 @@ function toAbsoluteUrl(raw: string): URL | null {
 }
 
 /**
+ * Parses any image URL to its pathname for stable-upload matching.
+ * Bare `/...` paths pass through; absolute URLs resolve with the page
+ * origin as fallback. Returns null for empty or unparseable input.
+ * Single owner of URL→pathname parsing for canvas media flows (replaces
+ * the former per-module twins).
+ */
+export function parseImageUrlPathname(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('/')) return trimmed
+  return toAbsoluteUrl(trimmed)?.pathname ?? null
+}
+
+function encodePathSegment(segment: string): string {
+  return encodeURIComponent(segment).replace(
+    /[!'()*]/g,
+    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+}
+
+function pathSegmentMatches(segment: string, expected: string): boolean {
+  const encoded = encodePathSegment(expected)
+  if (segment === expected || segment === encoded) return true
+  try {
+    return decodeURIComponent(segment) === expected
+  } catch {
+    return false
+  }
+}
+
+function isBoardTaskUploadPath(path: string, userUid: string, boardId: string): boolean {
+  const segments = path.split('/').filter(Boolean)
+  for (let i = 0; i + 4 < segments.length; i += 1) {
+    if (segments[i] !== 'uploads' || segments[i + 1] !== 'tasks') continue
+    if (!pathSegmentMatches(segments[i + 2] ?? '', userUid)) continue
+    if (!pathSegmentMatches(segments[i + 3] ?? '', boardId)) continue
+    if (segments[i + 4] !== 'content') continue
+    return true
+  }
+  return false
+}
+
+/**
+ * Returns true when a canvas image URL is already a stable board-owned
+ * upload (`/uploads/tasks/{userUid}/{boardId}/content/...`) that needs no
+ * stabilization re-upload. Empty refs count as stable (nothing to fetch).
+ * Absolute CDN/loopback upload refs canonicalize before matching.
+ */
+export function isStableBoardUploadUrl(raw: string, userUid: string, boardId: string): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed) return true
+  const path = parseImageUrlPathname(trimmed)
+  if (!path) return false
+  return isBoardTaskUploadPath(path, userUid.trim(), boardId.trim())
+}
+
+/**
+ * Transport error for shared image-blob reads. `status` is the HTTP
+ * status for non-ok responses, or null when the network fetch itself
+ * failed. Callers map this to surface copy; the helper never touches
+ * i18n so domain and display layers keep their own messages.
+ */
+export class ImageBlobFetchError extends Error {
+  readonly status: number | null
+
+  constructor(status: number | null, options?: { cause?: unknown }) {
+    super(
+      status === null ? 'Image download failed' : `Image download failed with status ${status}`,
+      options,
+    )
+    this.name = 'ImageBlobFetchError'
+    this.status = status
+  }
+}
+
+/**
+ * Shared image-blob fetch core: same-origin/API URLs ride the gateway
+ * with credentials, data:/external URLs pass through untouched. Throws
+ * `ImageBlobFetchError` on network failure (`status: null`) or non-ok
+ * responses; callers translate to their own copy.
+ */
+export async function fetchImageBlobFromUrl(
+  fetchUrl: string,
+  options?: { signal?: AbortSignal | undefined },
+): Promise<Blob> {
+  let response: Response
+  try {
+    response = await fetch(
+      fetchUrl,
+      options?.signal ? { credentials: 'include', signal: options.signal } : { credentials: 'include' },
+    )
+  } catch (error) {
+    throw new ImageBlobFetchError(null, { cause: error })
+  }
+  if (!response.ok) {
+    throw new ImageBlobFetchError(response.status)
+  }
+  return response.blob()
+}
+
+/**
  * Resolves an image URL for fetch.
  * - Data URLs pass through.
  * - Same-origin /uploads paths can pass through for local mask/inpaint read.

@@ -6,7 +6,7 @@ import {
   type BoardSnapshot,
   type CanvasNodeItem,
   type ImageNodeItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import type { CanvasVueFlowGraphAdapter } from '../../infrastructure/vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../../domain/graph'

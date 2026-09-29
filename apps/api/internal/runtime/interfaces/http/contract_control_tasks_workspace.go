@@ -401,7 +401,8 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 		reason = "cancelled"
 	}
 	settler := workspacetasks.NewService(workspacetasks.ServiceDeps{
-		Tasks: a.store, Holder: a.holder,
+		TaskRead: a.store, TaskLifecycle: a.store,
+		TaskBilling: a.store, Holder: a.holder,
 	})
 	_, _, err = settler.Cancel(ctx, row.WorkspacePublicID, taskID, adminID, reason)
 	return err

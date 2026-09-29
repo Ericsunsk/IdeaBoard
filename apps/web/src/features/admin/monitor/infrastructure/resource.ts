@@ -16,7 +16,7 @@ import type {
 import type { ControlTaskEnvelope } from '../../../../shared/api/generated-query/control/model/controlTaskEnvelope'
 import { adminControlUnavailable } from '../../shared/lib/controlGuidance'
 import { keepPrevious } from '../../../../shared/query/queryDefaults'
-import type { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricTokens'
+import type { TaskStatus } from '../../shared/lib/taskMetricTokens'
 
 // Admin monitor/task boundary (#852: task list/detail ride the live
 // Control task read model). The runtime snapshot rides the Control
@@ -32,7 +32,7 @@ import type { ListAdminTasksStatus } from '../../../../shared/domain/taskMetricT
 // The SSE monitor stream stays a raw protocol exception, never a JSON
 // envelope.
 export type ListAdminTasksParams = {
-  status?: ListAdminTasksStatus
+  status?: TaskStatus
   user_public_id?: string
   account_id?: number
   keyword?: string

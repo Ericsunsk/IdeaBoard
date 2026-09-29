@@ -23,14 +23,17 @@ import (
 // surface carries no priority input; every insert uses the default.
 const defaultTaskPriority = int32(2)
 
-// Store is the postgres workspacetasks.WorkspaceTaskStore.
+// Store implements the split workspace-task persistence seams.
 type Store struct {
 	db *pgxpool.Pool
 	q  *dbsqlc.Queries
 }
 
-// Compile-time convergence with the v1-consumed seam.
-var _ workspacetasks.WorkspaceTaskStore = (*Store)(nil)
+// Compile-time convergence with each minimal persistence seam.
+var _ workspacetasks.TaskReadStore = (*Store)(nil)
+var _ workspacetasks.TaskLifecycleStore = (*Store)(nil)
+var _ workspacetasks.TaskOutputStore = (*Store)(nil)
+var _ workspacetasks.TaskBillingStore = (*Store)(nil)
 
 type repositoryQueryer struct {
 	ctx context.Context
@@ -63,7 +66,7 @@ func (s *Store) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
 }
 
 // Compile-time convergence with the settlement tx seam.
-var _ workspacetasks.TxTaskStore = (*Store)(nil)
+var _ workspacetasks.TxTaskLifecycleStore = (*Store)(nil)
 
 // workflowInputEnvelope is the tasks.workflow_input JSONB shape. Billing
 // snapshots are quote-time facts (the credits ledger owns settlement

@@ -1,4 +1,4 @@
-import type { CanvasConnection, CanvasNodeItem } from '../../../board'
+import type { CanvasConnection, CanvasNodeItem } from '../../../board/ports/canvas'
 import {
   createChangeSet,
   createCommitPatch,

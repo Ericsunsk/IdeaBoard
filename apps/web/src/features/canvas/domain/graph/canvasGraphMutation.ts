@@ -1,4 +1,4 @@
-import type { CanvasConnection, CanvasNodeItem } from '../../../board'
+import type { CanvasConnection, CanvasNodeItem } from '../../../board/ports/canvas'
 import { cloneJsonValue } from './canvasGraphClone'
 import { hasSameGroupRecord, isSameGroupGeometry } from './canvasGraphRecordEquality'
 import {

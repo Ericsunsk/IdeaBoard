@@ -1,6 +1,11 @@
 <template>
   <div :class="spanClass">
-    <ChartCard :title="title" variant="admin">
+    <ChartCard
+      :title="title"
+      class="shadow-none"
+      header-class="p-6 pb-4"
+      title-class="text-base font-bold text-admin-text-1"
+    >
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
       </template>

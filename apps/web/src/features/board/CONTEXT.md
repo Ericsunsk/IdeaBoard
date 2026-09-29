@@ -33,6 +33,7 @@ It does NOT own Canvas session orchestration, Vue Flow runtime instances, or vie
 - Gallery copy keys live only under `workspace.boards.*` in the shared locale bundles; there is no `board.*` namespace (the h1 included: `workspace.boards.title`).
 - `board/testing` — snapshot/state factories for tests only; never enters the production barrel.
 - `board/index.ts` — sole cross-feature entry; Canvas `board-session` orchestrates session lifecycle through this seam.
+- `board/ports/canvas.ts` — narrow BoardCanvas port for Canvas callers (issue #861): snapshot facts, local persistence, revision-gated sync, preview rendering, and media-ref extraction only; Canvas production code must use this subpath, never the full barrel.
 
 ## Invariants
 

@@ -360,7 +360,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	holder := &atomicHolder{credits: creditService}
 	queue := &atomicQueue{pool: pool}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
+		TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
 }
@@ -743,7 +743,7 @@ func openRoutingAtomicEnv(t *testing.T) *atomicEnv {
 		t.Fatal(err)
 	}
 	env.service = workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
+		TaskRead: env.store, TaskLifecycle: env.store, TaskBilling: env.store, Quoter: &atomicQuoter{catalog: billingapplication.NewBillableItemCatalog(registry, billingStore)},
 		Holder: env.holder, Queue: env.queue,
 		Resolver: poolResolver, SnapshotSaver: poolSaver,
 	})

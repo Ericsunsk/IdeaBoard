@@ -9,24 +9,34 @@ import (
 	"time"
 )
 
-// WorkspaceTaskStore is the persistence seam for workspace-scoped tasks.
+// TaskReadStore exposes the minimal read projection needed by task use cases.
 // Repository methods take context.Context first and use the dbWithContext
-// pattern in the PostgreSQL implementation. The in-memory sibling below is
-// test-only.
-type WorkspaceTaskStore interface {
-	CreateTask(ctx context.Context, task *WorkspaceTask) (*WorkspaceTask, error)
+// pattern in the PostgreSQL implementation.
+type TaskReadStore interface {
 	GetTask(ctx context.Context, workspaceID, taskID string) (*WorkspaceTask, error)
 	ListTasks(ctx context.Context, workspaceID string, limit, offset int) ([]*WorkspaceTask, error)
+	CountTasks(ctx context.Context, workspaceID string) (int, error)
+}
+
+// TaskLifecycleStore exposes task creation and state transitions. Billing and
+// output persistence are deliberately kept on separate seams below.
+type TaskLifecycleStore interface {
+	CreateTask(ctx context.Context, task *WorkspaceTask) (*WorkspaceTask, error)
 	CancelTask(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error)
-	AddOutputs(ctx context.Context, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error)
 	TransitionForRetry(ctx context.Context, workspaceID, taskID, newToken string) (*WorkspaceTask, error)
 	CompleteTask(ctx context.Context, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error)
 	FailTask(ctx context.Context, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error)
 	DeleteTask(ctx context.Context, workspaceID, taskID string) error
-	CountTasks(ctx context.Context, workspaceID string) (int, error)
 }
 
-// InMemoryStore is a mutex-guarded WorkspaceTaskStore for tests. Tasks are
+// TaskOutputStore owns task output reference persistence independently from
+// task state transitions.
+type TaskOutputStore interface {
+	AddOutputs(ctx context.Context, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error)
+}
+
+// InMemoryStore is a mutex-guarded implementation of the task persistence
+// seams for tests. Tasks are
 // keyed by (workspace_id, task_id); cross-workspace ids stay invisible
 // (ErrNotFound), never 403. Leases mirror the postgres lease_token column:
 // held separately from the envelope execution token, set on claim, cleared
@@ -37,6 +47,10 @@ type InMemoryStore struct {
 	leases map[string]string
 	now    func() time.Time
 }
+
+var _ TaskReadStore = (*InMemoryStore)(nil)
+var _ TaskLifecycleStore = (*InMemoryStore)(nil)
+var _ TaskOutputStore = (*InMemoryStore)(nil)
 
 // NewInMemoryStoreForTests builds an empty store.
 func NewInMemoryStoreForTests() *InMemoryStore {

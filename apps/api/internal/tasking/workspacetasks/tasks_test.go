@@ -161,7 +161,7 @@ func TestCreateAtomicityRollbackOnEnqueueFailure(t *testing.T) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{failNext: errors.New("river down")}
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
@@ -187,7 +187,7 @@ func TestCreateAtomicityRollbackOnHoldFailure(t *testing.T) {
 	holder.holdErr = ErrInsufficientCredits
 	queue := &fakeEnqueuer{}
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	_, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
@@ -209,7 +209,7 @@ func TestCancelTerminalSettleReleases(t *testing.T) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	created, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render"}, "k1")
@@ -282,7 +282,7 @@ func TestInputAssetsRequireReady(t *testing.T) {
 		"ws_abc\x00asset_pending": {ID: "asset_pending", WorkspaceID: "ws_abc", Status: "pending"},
 	}}
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: newFakeHolder(), Queue: &fakeEnqueuer{}, Assets: assets, Resolver: allowTestPoolResolver(),
 	})
 	if _, err := service.Create(ctx, CreateInput{WorkspaceID: "ws_abc", OwnerUserID: 7, Service: "render", MediaAssetIDs: []string{"asset_ready"}}, "k1"); err != nil {
@@ -349,7 +349,7 @@ func newRoutingTestEnv(pools map[string]routing.Pool) *routingTestEnv {
 	resolver := routing.NewRoutingResolver(&stubPoolStore{pools: pools},
 		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
 	env.service = NewTestServiceForTests(ServiceDeps{
-		Tasks: env.store, Quoter: env.quoter, Holder: env.holder, Queue: env.queue,
+		TaskRead: env.store, TaskLifecycle: env.store, Quoter: env.quoter, Holder: env.holder, Queue: env.queue,
 		Resolver: resolver,
 		SnapshotSaver: func(_ context.Context, _ pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
 			env.saveCalls++

@@ -1,5 +1,5 @@
 import type { Edge } from '@vue-flow/core'
-import type { CanvasConnection, CanvasConnectionEndpoint } from '../../../board'
+import type { CanvasConnection, CanvasConnectionEndpoint } from '../../../board/ports/canvas'
 import {
   shouldReplaceCanvasConnection,
   toCanvasGraphEdgeId,

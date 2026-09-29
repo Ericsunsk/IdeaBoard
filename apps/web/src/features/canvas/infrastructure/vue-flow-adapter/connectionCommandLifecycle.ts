@@ -11,7 +11,7 @@ import {
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
 } from '../../domain/graph'
-import type { BoardSnapshot } from '../../../board'
+import type { BoardSnapshot } from '../../../board/ports/canvas'
 import {
   createFlowEdgeProjectionIndex,
   resolveFlowEdgeProjectionReplacement,

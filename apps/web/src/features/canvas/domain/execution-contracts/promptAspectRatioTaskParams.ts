@@ -1,5 +1,5 @@
 import type { CanvasTaskParams } from './canvasTaskRequest'
-import type { PromptAspectRatio } from '../../../board'
+import type { PromptAspectRatio } from '../../../board/ports/canvas'
 
 export function buildPromptAspectRatioTaskParams(
   ratio: PromptAspectRatio,

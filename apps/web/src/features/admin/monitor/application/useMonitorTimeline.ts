@@ -11,16 +11,16 @@ import { adminTaskStatuses } from '../domain/status'
 import {
   taskMetricDefinitions,
   monitorChartSpecs,
-} from '../../../../shared/domain/taskMetricTokens'
+} from '../../shared/lib/taskMetricTokens'
 import { timeRangePresets, type TimeRangePresetKey } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
-import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
+import type { TaskStatus } from '../../shared/lib/taskMetricTokens'
 
 type MonitorTimelineOptions = {
   isDemoMode: Ref<boolean>
   demoRows: MaybeRefOrGetter<readonly AdminTaskRow[]>
   chartRows: Ref<readonly AdminTaskRow[]>
-  filterStatus: Ref<ListAdminTasksStatusValue | null>
+  filterStatus: Ref<TaskStatus | null>
 }
 
 // GMT+8 wall-clock single source: every part comes from Intl with a fixed

@@ -1,5 +1,4 @@
 import { orvalMutator } from './orvalMutator'
-import type { ErrorType, BodyType } from './orvalMutator'
 
 // Public Data Plane transport prefix (issue #809).
 //
@@ -21,5 +20,3 @@ export function publicMutator<T>(
   const normalized = url.startsWith('/') ? `${PUBLIC_API_PREFIX}${url}` : url
   return orvalMutator<T>(normalized, options)
 }
-
-export type { ErrorType, BodyType }

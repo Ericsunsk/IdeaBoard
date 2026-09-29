@@ -25,7 +25,7 @@ import {
 import { buildPromptAspectRatioTaskParams } from '../../../domain/execution-contracts/promptAspectRatioTaskParams.ts'
 import { assertRequestedOutputCount } from '../../../../../shared/domain/generationContract'
 import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import type { PromptAspectRatio } from '../../../../board'
+import type { PromptAspectRatio } from '../../../../board/ports/canvas'
 import { i18n } from '../../../../../shared/i18n'
 import {
   IMAGE_OUTPAINT_ACTION,

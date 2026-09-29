@@ -5,10 +5,10 @@ import { createDemoTaskDetail, createDemoMonitorList, createDemoMonitorStats } f
 import type { TimeRangePreset } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'
-import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
+import type { TaskStatus } from '../../shared/lib/taskMetricTokens'
 
 type MonitorDemoOptions = {
-  filterStatus: Ref<ListAdminTasksStatusValue | null>
+  filterStatus: Ref<TaskStatus | null>
   appliedSearchKeyword: Ref<string>
   isDemoMode: Ref<boolean>
   selectedPreset: Ref<TimeRangePreset>
@@ -16,7 +16,7 @@ type MonitorDemoOptions = {
 
 function filterDemoRows(
   list: AdminTaskRow[],
-  filterStatus: ListAdminTasksStatusValue | null,
+  filterStatus: TaskStatus | null,
   appliedKeyword: string,
 ) {
   // 与真实模式保持同一语义：只认已应用的 keyword（Enter 生效）。

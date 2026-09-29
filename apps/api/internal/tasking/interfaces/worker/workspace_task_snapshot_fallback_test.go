@@ -19,7 +19,6 @@ import (
 
 	"ideaboard/api/internal/generation/routing"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -608,7 +607,7 @@ func TestWorkspaceRiverJobIDDefaultsWithoutJobRow(t *testing.T) {
 	if got := workspaceRiverJobID(nil); got != 0 {
 		t.Fatalf("nil job id = %d, want 0", got)
 	}
-	job := &river.Job[taskruntime.WorkspaceTaskArgs]{}
+	job := &river.Job[workspacetasks.WorkspaceTaskArgs]{}
 	if got := workspaceRiverJobID(job); got != 0 {
 		t.Fatalf("synthetic job id = %d, want 0", got)
 	}

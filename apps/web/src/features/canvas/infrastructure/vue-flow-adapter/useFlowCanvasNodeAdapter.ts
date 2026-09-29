@@ -5,7 +5,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { resolveImageNodeDisplayPayload } from './flowImageNodeSelectors.ts'

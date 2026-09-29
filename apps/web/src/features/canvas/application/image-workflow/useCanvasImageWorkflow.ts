@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import type { PromptAspectRatio } from '../../../board'
+import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type {
   ActiveNodePanel,
   ActiveNodePanelKind,

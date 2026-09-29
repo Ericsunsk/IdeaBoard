@@ -3,7 +3,7 @@ import {
   type BoardSnapshot,
   type ImageNodeOutputItem,
   type PromptNodeInputImage,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 type MediaAssetReference = Pick<ImageNodeOutputItem, 'url' | 'mediaAssetId'>
 

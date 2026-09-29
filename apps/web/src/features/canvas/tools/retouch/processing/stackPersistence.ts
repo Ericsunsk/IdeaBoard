@@ -1,5 +1,5 @@
 import { toRaw } from 'vue'
-import type { ImageRetouchStack } from '../../../../board'
+import type { ImageRetouchStack } from '../../../../board/ports/canvas'
 import type { RetouchEffectLayer, RetouchLayer } from '../model.ts'
 
 const STACK_VERSION = 1 as const

@@ -1,13 +1,13 @@
 import { computed } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { ImageNodeItem } from '../../../board'
+import type { ImageNodeItem } from '../../../board/ports/canvas'
 import type { CanvasInteractionKey } from '../../presentation/screens/useFlowCanvasInteractionState.ts'
 import type {
   CanvasFlowViewportControls,
   CanvasVueFlowConnectionAdapter,
 } from '../../infrastructure/vue-flow-adapter'
-import type { CanvasNodeItem } from '../../../board'
+import type { CanvasNodeItem } from '../../../board/ports/canvas'
 import { useRetouchMode } from '../retouch/useRetouchMode'
 import { useRetouchSession } from '../retouch/useRetouchSession'
 import { useRetouchCoordinateAdapter } from '../retouch'

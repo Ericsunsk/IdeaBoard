@@ -87,6 +87,4 @@ function mapAdminThemeTokenField<Field extends AdminThemeTokenField>(
   ) as AdminThemeTokenFieldMap<Field>
 }
 
-export const adminThemeTokens = mapAdminThemeTokenField('value')
 export const adminThemeTokenFallbacks = mapAdminThemeTokenField('fallback')
-export const adminThemeTokenCssVars = mapAdminThemeTokenField('cssVar')

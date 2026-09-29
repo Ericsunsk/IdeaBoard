@@ -8,8 +8,8 @@ import type {
   FusionNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../../../board'
-import { getCanvasNodeImageInputLimit } from '../../../board'
+} from '../../../board/ports/canvas'
+import { getCanvasNodeImageInputLimit } from '../../../board/ports/canvas'
 import { type ImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import {
   type CanvasGraphEdgeRecord,

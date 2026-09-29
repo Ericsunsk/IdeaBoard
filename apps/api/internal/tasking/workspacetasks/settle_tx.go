@@ -54,9 +54,9 @@ type TxEnqueuer interface {
 	EnqueueInTx(ctx context.Context, tx pgx.Tx, task *WorkspaceTask) error
 }
 
-// TxTaskStore persists workspace task facts inside the settlement
+// TxTaskLifecycleStore persists task state transitions inside the settlement
 // transaction. The postgres Store implements it over dbsqlc.WithTx(tx).
-type TxTaskStore interface {
+type TxTaskLifecycleStore interface {
 	CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *WorkspaceTask) (*WorkspaceTask, error)
 	CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error)
 	FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error)
@@ -64,26 +64,30 @@ type TxTaskStore interface {
 	TransitionForRetryInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, newToken string) (*WorkspaceTask, error)
 }
 
-// TxBillingFacts persists the immutable task billing snapshot and its
-// settlement read model in the same transaction as task state and Credits.
-type TxBillingFacts interface {
+// TaskBillingStore persists immutable billing facts and the settlement read
+// model in the same transaction as task state and Credits.
+type TaskBillingStore interface {
 	CreateBillingFactsInTx(context.Context, pgx.Tx, *WorkspaceTask) error
 	SetBillingSettlementInTx(context.Context, pgx.Tx, string, string, int64, int64, int64, string, string) error
 }
 
+// TxBillingFacts is retained as a descriptive alias for callers that refer to
+// the transaction-only billing projection.
+type TxBillingFacts = TaskBillingStore
+
 func (s *Service) billingFacts() TxBillingFacts {
-	if s == nil || s.tasks == nil {
+	if s == nil || s.taskBilling == nil {
 		return nil
 	}
-	facts, _ := s.tasks.(TxBillingFacts)
+	facts := s.taskBilling
 	return facts
 }
 
-func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskStore, TxEnqueuer, bool) {
-	if s == nil || s.tasks == nil {
+func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskLifecycleStore, TxEnqueuer, bool) {
+	if s == nil || s.taskLifecycle == nil {
 		return nil, nil, nil, nil, nil, false
 	}
-	transactor, ok := s.tasks.(SettlementTransactor)
+	transactor, ok := s.taskLifecycle.(SettlementTransactor)
 	if !ok {
 		return nil, nil, nil, nil, nil, false
 	}
@@ -95,7 +99,7 @@ func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, T
 	if !ok {
 		return nil, nil, nil, nil, nil, false
 	}
-	txStore, ok := s.tasks.(TxTaskStore)
+	txStore, ok := s.taskLifecycle.(TxTaskLifecycleStore)
 	if !ok {
 		return nil, nil, nil, nil, nil, false
 	}
@@ -106,11 +110,11 @@ func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, T
 	return transactor, txQuoter, txHolder, txStore, txQueue, true
 }
 
-func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskStore, bool) {
-	if s == nil || s.tasks == nil || s.holder == nil {
+func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskLifecycleStore, bool) {
+	if s == nil || s.taskLifecycle == nil || s.holder == nil {
 		return nil, nil, nil, false
 	}
-	transactor, ok := s.tasks.(SettlementTransactor)
+	transactor, ok := s.taskLifecycle.(SettlementTransactor)
 	if !ok {
 		return nil, nil, nil, false
 	}
@@ -118,7 +122,7 @@ func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskStore, 
 	if !ok {
 		return nil, nil, nil, false
 	}
-	txStore, ok := s.tasks.(TxTaskStore)
+	txStore, ok := s.taskLifecycle.(TxTaskLifecycleStore)
 	if !ok {
 		return nil, nil, nil, false
 	}
@@ -414,14 +418,14 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 // atomically with the River requeue in ONE transaction, so a requeue failure
 // cannot strand a token-bumped pending task without its job.
 func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken string) (*WorkspaceTask, bool, error) {
-	if s == nil || s.tasks == nil || s.queue == nil {
+	if s == nil || s.taskLifecycle == nil || s.queue == nil {
 		return nil, false, nil
 	}
-	transactor, ok := s.tasks.(SettlementTransactor)
+	transactor, ok := s.taskLifecycle.(SettlementTransactor)
 	if !ok {
 		return nil, false, nil
 	}
-	txStore, ok := s.tasks.(TxTaskStore)
+	txStore, ok := s.taskLifecycle.(TxTaskLifecycleStore)
 	if !ok {
 		return nil, false, nil
 	}

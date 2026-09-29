@@ -4,7 +4,7 @@ import TaskControlToolbar from './TaskControlToolbar.vue'
 import TaskEventsCard from './TaskEventsCard.vue'
 import TaskActivityTable from './TaskActivityTable.vue'
 import { timeRangePresets } from '../../domain/timeRange'
-import type { TaskMetricStatsSnapshot } from '../../../../../shared/domain/taskMetricTokens'
+import type { TaskMetricStatsSnapshot } from '../../../shared/lib/taskMetricTokens'
 import type { AdminTaskRow } from '../../application/useAdminTaskList'
 
 describe('Monitor Components', () => {

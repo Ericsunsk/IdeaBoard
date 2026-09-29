@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import type { ListAdminTasksStatus as ListAdminTasksStatusValue } from '../../../../shared/domain/taskMetricTokens'
+import type { TaskStatus } from '../../shared/lib/taskMetricTokens'
 import { usePagePagination } from '../../shared/composables/usePagePagination'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { useQueryPolling } from '../../shared/composables/useQueryPolling'
@@ -26,7 +26,7 @@ type TaskStatusStats = {
 export type AdminTaskRow = AdminMonitorListItemModel
 
 export type AdminTaskListParamsInput = {
-  status: ListAdminTasksStatusValue | null
+  status: TaskStatus | null
   keyword: string
   page: number
   pageSize: number
@@ -49,7 +49,7 @@ export function buildAdminTaskListParams(input: AdminTaskListParamsInput): ListA
 
 export function useAdminTaskList() {
   const pageState = ref(1)
-  const filterStatus = ref<ListAdminTasksStatusValue | null>(null)
+  const filterStatus = ref<TaskStatus | null>(null)
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
   const hasActiveTasks = ref(true)

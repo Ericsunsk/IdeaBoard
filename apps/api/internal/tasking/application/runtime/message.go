@@ -5,7 +5,6 @@ package runtime
 // sites reference these names so copy changes stay in one place.
 // Values are byte-identical to the previously inline literals.
 const (
-	msgTaskCommandMetadata              = "AI 生图任务 Idea 预授权"                        // TaskCommandMetadata @ workspace_task_adapters.go
 	msgMaterializeOne                   = "素材转存失败，请稍后重试"                            // MaterializeOne @ workspace_task_materializer.go
 	msgRenderOutputs                    = "任务结果渲染器未配置"                              // RenderOutputs @ workspace_task_renderer.go
 	msgRenderOutputs2                   = "任务标识缺失，无法渲染结果"                           // RenderOutputs @ workspace_task_renderer.go

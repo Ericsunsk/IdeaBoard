@@ -3,7 +3,7 @@ import {
   type CanvasCreatableNodeKind,
   type CanvasNodeItemByKind,
   type CanvasPoint,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 let lastCanvasEntityId = 0
 

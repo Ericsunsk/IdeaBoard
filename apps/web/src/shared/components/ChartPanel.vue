@@ -5,7 +5,7 @@
 </template>
 
 <script lang="ts">
-export type ChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'
+export type ChartPanelSize = 'hero' | 'standard' | 'compact'
 </script>
 
 <script setup lang="ts">
@@ -23,7 +23,6 @@ const heightClassBySize: Record<ChartPanelSize, string> = {
   hero: 'h-[240px] md:h-[278px]',
   standard: 'h-[300px] md:h-[320px] xl:h-[360px]',
   compact: 'h-[220px]',
-  monitor: 'h-[380px]',
 }
 
 const sizeClass = computed(() => (props.height ? '' : heightClassBySize[props.size]))

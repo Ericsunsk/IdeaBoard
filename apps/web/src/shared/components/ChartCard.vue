@@ -1,16 +1,9 @@
 <template>
-  <Card :class="cn(variant === 'admin' && 'shadow-none', props.class)">
-    <CardHeader :class="variant === 'admin' ? 'p-6 pb-4' : 'p-6 pb-2'">
+  <Card :class="props.class">
+    <CardHeader :class="headerClass">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <CardTitle
-            :as="titleTag"
-            :class="
-              variant === 'admin'
-                ? 'text-base font-bold text-admin-text-1'
-                : 'text-ib-icon font-medium text-ib-text'
-            "
-          >
+          <CardTitle :as="titleTag" :class="titleClass">
             {{ title }}
           </CardTitle>
         </div>
@@ -28,18 +21,24 @@
 <script setup lang="ts">
 import { useSlots } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
 
+// Neutral chart card primitive (#863): header/title skin rides explicit
+// class props with user-surface defaults. Admin pages use
+// `features/admin/shared` wrappers (`AdminChartCard`,
+// `AdminRangedLineChartCard`) to supply the Admin skin instead of a
+// feature-specific `variant` flag.
 const props = withDefaults(
   defineProps<{
     title: string
     titleTag?: 'h2' | 'h3' | 'span'
-    variant?: 'default' | 'admin'
+    headerClass?: string | undefined
+    titleClass?: string | undefined
     class?: string | undefined
   }>(),
   {
     titleTag: 'span',
-    variant: 'default',
+    headerClass: 'p-6 pb-2',
+    titleClass: 'text-ib-icon font-medium text-ib-text',
     class: undefined,
   },
 )

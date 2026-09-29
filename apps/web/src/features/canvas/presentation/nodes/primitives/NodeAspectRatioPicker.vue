@@ -54,7 +54,7 @@ import {
   PROMPT_ASPECT_RATIO_OPTIONS,
   normalizePromptAspectRatio,
   type PromptAspectRatio,
-} from '../../../../board'
+} from '../../../../board/ports/canvas'
 import NodeToolPopover from './NodeToolPopover.vue'
 
 const props = withDefaults(

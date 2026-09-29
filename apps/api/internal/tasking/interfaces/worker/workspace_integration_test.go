@@ -48,7 +48,7 @@ import (
 	librarydomain "ideaboard/api/internal/library/domain"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/testsupport/testenv"
@@ -687,7 +687,7 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: env.tasks, Quoter: quoter, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
+		TaskRead: env.tasks, TaskLifecycle: env.tasks, TaskBilling: env.tasks, Quoter: quoter, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 
 	created, err := service.Create(ctx, workspacetasks.CreateInput{
@@ -736,22 +736,22 @@ func TestWorkspaceIntegrationSettlement(t *testing.T) {
 // Adapter fail-closed unit coverage (no DB): nil seams stay 501/503-class.
 func TestWorkspaceTaskAdaptersFailClosed(t *testing.T) {
 	ctx := context.Background()
-	var quoter *taskruntime.WorkspaceTaskQuoter
+	var quoter *taskadapters.WorkspaceTaskQuoter
 	if _, err := quoter.Quote(ctx, "render", "default", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil quoter = %v, want quote unavailable", err)
 	}
-	var holder *taskruntime.WorkspaceTaskHolder
+	var holder *taskadapters.WorkspaceTaskHolder
 	if _, err := holder.Hold(ctx, 1, 10, "k", "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Hold = %v, want quote unavailable", err)
 	}
 	if err := holder.Release(ctx, "hold_x", 10, "task_x"); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil holder Release = %v, want quote unavailable", err)
 	}
-	var queue *taskruntime.WorkspaceTaskEnqueuer
+	var queue *taskadapters.WorkspaceTaskEnqueuer
 	if err := queue.Enqueue(ctx, &workspacetasks.WorkspaceTask{ID: "task_x"}); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil queue = %v, want quote unavailable", err)
 	}
-	if got := (taskruntime.WorkspaceTaskArgs{}).Kind(); got != "workspace_task_execute" {
+	if got := (workspacetasks.WorkspaceTaskArgs{}).Kind(); got != "workspace_task_execute" {
 		t.Fatalf("job kind = %q, want workspace_task_execute", got)
 	}
 }

@@ -1,4 +1,4 @@
-import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../board'
+import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../board/ports/canvas'
 import {
   cloneEdgeRecord,
   cloneGroupRecord,

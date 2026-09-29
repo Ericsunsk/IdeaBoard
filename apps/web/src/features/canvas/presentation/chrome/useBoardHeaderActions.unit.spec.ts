@@ -2,17 +2,16 @@ import { computed, ref } from 'vue'
 import type { Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createBoardRepository,
   fetchBoardArchivedAt,
   syncRestoreBoardToServer,
   type BoardRepository,
-} from '../../../board'
-import { replaceBoards } from '../../../board'
+} from '../../../board/ports/canvas'
+import { createBoardRepository, replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 
-vi.mock('../../../board', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../board')>()
+vi.mock('../../../board/ports/canvas', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../board/ports/canvas')>()
   return {
     ...actual,
     fetchBoardArchivedAt: vi.fn(async () => null),

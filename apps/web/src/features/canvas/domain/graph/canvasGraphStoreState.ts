@@ -3,7 +3,7 @@ import {
   type BoardSnapshot,
   type CanvasGroup,
   type CanvasNodeItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import { cloneJsonValue } from './canvasGraphClone'
 import { toCanvasGraphEdgeId, toCanvasGraphNodeId } from './canvasGraphStoreIds'
 import { rebuildIndexes } from './canvasGraphStoreIndexes'

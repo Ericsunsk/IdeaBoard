@@ -7,7 +7,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import {
   formatCanvasNodePortLabel,
   getCanvasNodeExecutionActionLabels,
@@ -19,7 +19,7 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import type { NodeUiState, PromptNodeUiState } from '../../domain/nodes/canvasNodeUi.ts'
 import {
   parseHandlePort,

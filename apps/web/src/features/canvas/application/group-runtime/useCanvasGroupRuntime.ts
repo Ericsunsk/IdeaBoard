@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import { i18n } from '../../../../shared/i18n'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import type { BoardSnapshot, CanvasGroup } from '../../../board'
+import type { BoardSnapshot, CanvasGroup } from '../../../board/ports/canvas'
 import type { PendingImageExecutionLease } from '../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,

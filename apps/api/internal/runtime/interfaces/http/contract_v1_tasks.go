@@ -24,11 +24,13 @@ import (
 // Workspace task store seams (aliases so ContractV1Deps stays in one
 // package without import cycles in dependents).
 type (
-	WorkspaceTaskStore       = workspacetasks.WorkspaceTaskStore
-	WorkspaceTaskQuoter      = workspacetasks.Quoter
-	WorkspaceTaskHolder      = workspacetasks.Holder
-	WorkspaceTaskEnqueuer    = workspacetasks.Enqueuer
-	WorkspaceTaskAssetReader = workspacetasks.AssetReader
+	WorkspaceTaskReadStore      = workspacetasks.TaskReadStore
+	WorkspaceTaskLifecycleStore = workspacetasks.TaskLifecycleStore
+	WorkspaceTaskBillingStore   = workspacetasks.TaskBillingStore
+	WorkspaceTaskQuoter         = workspacetasks.Quoter
+	WorkspaceTaskHolder         = workspacetasks.Holder
+	WorkspaceTaskEnqueuer       = workspacetasks.Enqueuer
+	WorkspaceTaskAssetReader    = workspacetasks.AssetReader
 	// WorkspaceTaskSnapshotSaver pins the submit-time RoutingSnapshot
 	// (catalog.SaveRoutingSnapshot in production, capture fakes in tests).
 	WorkspaceTaskSnapshotSaver = workspacetasks.RoutingSnapshotSaver
@@ -108,8 +110,10 @@ func (h *contractV1Handler) taskWorkspaceContext(c *gin.Context, identityPrincip
 
 func (h *contractV1Handler) taskService() *workspacetasks.Service {
 	deps := workspacetasks.ServiceDeps{
-		Tasks: h.deps.Tasks, Quoter: h.deps.TaskQuoter,
-		Holder: h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
+		TaskRead: h.deps.Tasks, TaskLifecycle: h.deps.TaskLifecycle,
+		TaskBilling: h.deps.TaskBilling,
+		Quoter:      h.deps.TaskQuoter,
+		Holder:      h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
 		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
 	}
 	if h.deps.AllowNonTransactionalTaskSettlement {

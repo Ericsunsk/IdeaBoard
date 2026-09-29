@@ -7,7 +7,7 @@ package worker
 // API_TEST_DATABASE_DSN (same harness as workspace_integration_test.go).
 //
 // What this proves: the River job payload the enqueuer writes
-// (taskruntime.WorkspaceTaskArgs with the submit-time execution token) drives the
+// (workspacetasks.WorkspaceTaskArgs with the submit-time execution token) drives the
 // worker through ClaimTask (lease-guarded), read-only media resolution,
 // the provider seam, and terminal Complete with task_outputs mapping
 // (ListTaskAssets reads the output back). The provider itself is an
@@ -25,7 +25,6 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/media/workspacemedia"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/riverqueue/river"
@@ -35,7 +34,7 @@ func newWorkerIntegrationService(env *workspaceIntegrationEnv) (*workspacetasks.
 	holder := newIntegrationHolder()
 	queue := &integrationQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: env.tasks, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
+		TaskRead: env.tasks, TaskLifecycle: env.tasks, TaskBilling: env.tasks, Quoter: &integrationQuoter{}, Holder: holder, Queue: queue,
 		Assets: &workspacemedia.TaskAssetAdapter{Store: env.media}, Resolver: allowTestPoolResolver(),
 	})
 	return service, holder, queue
@@ -102,7 +101,7 @@ func TestWorkspaceWorkerLoopPostgres(t *testing.T) {
 				{Kind: workspacetasks.OutputKindAsset, AssetID: asset.ID, Role: "result", ResultIndex: 0},
 			}, nil
 		}))
-	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
+	if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {
@@ -148,7 +147,7 @@ func TestWorkspaceWorkerDeterministicFailurePostgres(t *testing.T) {
 		func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 			return nil, fmt.Errorf("上游图像服务未配置，请联系管理员")
 		}))
-	if err := worker.Work(ctx, &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
+	if err := worker.Work(ctx, &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
 		TaskID: created.ID, WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: created.ExecutionToken,
 	}}); err != nil {

@@ -15,7 +15,7 @@ import { computed } from 'vue'
 import {
   taskMetricDefinitions,
   type TaskMetricKey,
-} from '../../../../shared/domain/taskMetricTokens'
+} from '../../shared/lib/taskMetricTokens'
 import type { AdminBillableItemStatus } from './billableCatalogTypes'
 
 const props = defineProps<{

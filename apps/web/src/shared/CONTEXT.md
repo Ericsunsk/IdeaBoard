@@ -17,7 +17,7 @@ It does NOT depend on any concrete feature module at runtime (except 3 contract-
 
 ## Public Seams
 
-- `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`.
+- `shared/api` sole HTTP exit (same-origin ofetch to `/api`, 10s timeout, converged auth failure), `requireContractData`/`resolveContractData` envelope parsing, task/upload/media dispatch, SSE user stream, `stripUndefined`; never depends on `features/*`. Media delivery is split by responsibility: `mediaAssetUrls` (pure URL parsing/generation), `mediaAssetMetadata` (HTTP/cache/invalidation transport), `useMediaAssetDelivery` (Vue lifecycle binding); `mediaAssetDelivery` remains the stable import seam.
 - `shared/auth` Better Auth singleton, safe-redirect policy (`normalizeSafeInternalRedirectPath` against `//`, `\`, `%5c`, `..`), password and OAuth provider policy; never depends on feature route components.
 - `shared/components` pure display components (account menu, balance button, confirm box, language picker, table frame, chart card); balance numbers are injected, never self-fetched; never depends on feature stores/resources.
 - `shared/composables` `useAppToast`, `useAsyncAction` (pending count + lifecycle hooks), confirm box, overlay lifecycle, brand, logout redirect; never depends on feature composables. `useAsyncAction` is for plain async actions; ad-hoc flags stay where the semantics differ — reentrancy guards that must throw (`useRewardRedemption.pending`), overlay dismiss guards (`busy` wired into `useOverlayInteractionLifecycle`), and page-lifecycle `loading` states.

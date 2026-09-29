@@ -20,7 +20,7 @@ func planTestService() (*InMemoryStore, *fakeHolder, *fakeEnqueuer, *Service) {
 	holder := newFakeHolder()
 	queue := &fakeEnqueuer{}
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
+		TaskRead: store, TaskLifecycle: store, Quoter: &fakeQuoter{snapshot: testSnapshot()},
 		Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
 	})
 	return store, holder, queue, service
@@ -78,7 +78,7 @@ func TestCreateRejectsBeforeHoldWhenRoutingIsUnavailable(t *testing.T) {
 	// unavailable sentinel before any quote, hold, task, or enqueue
 	// work.
 	service := NewTestServiceForTests(ServiceDeps{
-		Tasks: store, Quoter: quoter, Holder: holder, Queue: queue,
+		TaskRead: store, TaskLifecycle: store, Quoter: quoter, Holder: holder, Queue: queue,
 	})
 
 	_, quoteErr := service.Quote(ctx, QuoteParams{Service: "render"})

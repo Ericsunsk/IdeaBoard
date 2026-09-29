@@ -300,7 +300,7 @@ func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
+		TaskRead: store, TaskLifecycle: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Resolver: allowTestPoolResolver(),
 	})
 	created, err := service.Create(ctx, workspacetasks.CreateInput{

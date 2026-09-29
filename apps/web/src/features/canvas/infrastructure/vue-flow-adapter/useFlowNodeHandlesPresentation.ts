@@ -6,7 +6,7 @@ import {
   getCanvasNodeVisibleOutputPorts,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import { useCanvasHandleProximity } from './useCanvasHandleProximity'
 import { resolveCanvasNodeUiScale, useCanvasViewportContext } from './useCanvasViewportContext'
 

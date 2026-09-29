@@ -27,11 +27,13 @@ import (
 // txn (NATS fanout itself is #807). In-memory implementations are test-only
 // fixtures for exercising the service contract.
 type Service struct {
-	tasks  WorkspaceTaskStore
-	quoter Quoter
-	holder Holder
-	queue  Enqueuer
-	assets AssetReader
+	taskRead      TaskReadStore
+	taskLifecycle TaskLifecycleStore
+	taskBilling   TaskBillingStore
+	quoter        Quoter
+	holder        Holder
+	queue         Enqueuer
+	assets        AssetReader
 	// resolver is the authoritative Service Model Pool decision point
 	// (ADR-0012 rule 10, #848). Quote and Create consult it; a nil
 	// resolver fails closed with the canonical unavailable sentinel.
@@ -45,16 +47,20 @@ type Service struct {
 	now                   func() time.Time
 }
 
-// ServiceDeps wires the settlement seams. Tasks is required; Quoter,
-// Holder, Enqueuer, and Assets are required for production creates.
+// ServiceDeps wires the settlement seams. TaskRead and TaskLifecycle are
+// independent by design; TaskBilling is an optional projection used by the
+// transactional settlement path. Output refs remain part of the atomic
+// lifecycle completion operation so state and outputs commit together.
 // (#847: the submit-time single-value model mint is removed; the
 // RoutingSnapshot pins in this transaction instead.)
 type ServiceDeps struct {
-	Tasks  WorkspaceTaskStore
-	Quoter Quoter
-	Holder Holder
-	Queue  Enqueuer
-	Assets AssetReader
+	TaskRead      TaskReadStore
+	TaskLifecycle TaskLifecycleStore
+	TaskBilling   TaskBillingStore
+	Quoter        Quoter
+	Holder        Holder
+	Queue         Enqueuer
+	Assets        AssetReader
 	// Resolver is the shared RoutingResolver quote/submit/readiness
 	// consume (same instance, never an independent lookup). Nil fails
 	// closed with the canonical unavailable sentinel.
@@ -66,7 +72,9 @@ type ServiceDeps struct {
 // NewService builds the settlement orchestrator.
 func NewService(deps ServiceDeps) *Service {
 	return &Service{
-		tasks: deps.Tasks, quoter: deps.Quoter, holder: deps.Holder,
+		taskRead: deps.TaskRead, taskLifecycle: deps.TaskLifecycle,
+		taskBilling: deps.TaskBilling,
+		quoter:      deps.Quoter, holder: deps.Holder,
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
 	}
@@ -184,7 +192,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	ctx, span := telemetry.Start(ctx, "generation.submit.settlement",
 		attribute.String("service", input.Service), attribute.String("resolution", input.Resolution))
 	defer telemetry.End(span, nil)
-	if s.tasks == nil {
+	if s.taskLifecycle == nil {
 		return nil, fmt.Errorf("workspacetasks: store unavailable: %w", ErrNotFound)
 	}
 	kind, err := ValidateCreate(input.Service, input.MediaAssetIDs, input.Params)
@@ -252,7 +260,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		Status:     StatusPending,
 		RetryCount: 0, ExecutionToken: token, BillingSnapshot: snapshot,
 	}
-	created, err := s.tasks.CreateTask(ctx, task)
+	created, err := s.taskLifecycle.CreateTask(ctx, task)
 	if err != nil {
 		if holdTxID != "" {
 			_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
@@ -261,7 +269,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	if s.saveSnapshot != nil {
 		if err := s.saveSnapshot(ctx, nil, created.ID, routingSnap); err != nil {
-			_ = s.tasks.DeleteTask(ctx, created.WorkspaceID, created.ID)
+			_ = s.taskLifecycle.DeleteTask(ctx, created.WorkspaceID, created.ID)
 			if holdTxID != "" {
 				_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
 			}
@@ -269,7 +277,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		}
 	}
 	if err := s.queue.Enqueue(ctx, created); err != nil {
-		_ = s.tasks.DeleteTask(ctx, created.WorkspaceID, created.ID)
+		_ = s.taskLifecycle.DeleteTask(ctx, created.WorkspaceID, created.ID)
 		if holdTxID != "" {
 			_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
 		}
@@ -331,7 +339,7 @@ func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids
 func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error) {
 	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.cancel")
 	defer telemetry.End(span, nil)
-	if s.tasks == nil {
+	if s.taskRead == nil || s.taskLifecycle == nil {
 		return nil, false, ErrNotFound
 	}
 	if flipped, already, handled, err := s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason); handled {
@@ -340,14 +348,14 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 	if !s.allowNonTransactional {
 		return nil, false, ErrSettlementUnavailable
 	}
-	before, err := s.tasks.GetTask(ctx, workspaceID, taskID)
+	before, err := s.taskRead.GetTask(ctx, workspaceID, taskID)
 	if err != nil {
 		return nil, false, err
 	}
 	if before.IsTerminal() {
 		return before, true, nil
 	}
-	flipped, already, err := s.tasks.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
+	flipped, already, err := s.taskLifecycle.CancelTask(ctx, workspaceID, taskID, actorUserID, reason)
 	if err != nil {
 		return nil, false, err
 	}
@@ -369,7 +377,7 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error) {
 	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.complete")
 	defer telemetry.End(span, nil)
-	if s.tasks == nil {
+	if s.taskLifecycle == nil {
 		return nil, ErrNotFound
 	}
 	for _, ref := range outputs {
@@ -386,7 +394,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 	if !s.allowNonTransactional {
 		return nil, ErrSettlementUnavailable
 	}
-	completed, err := s.tasks.CompleteTask(ctx, workspaceID, taskID, outputs)
+	completed, err := s.taskLifecycle.CompleteTask(ctx, workspaceID, taskID, outputs)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +424,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error) {
 	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.fail")
 	defer telemetry.End(span, nil)
-	if s.tasks == nil {
+	if s.taskLifecycle == nil {
 		return nil, ErrNotFound
 	}
 	if failed, handled, err := s.failInTx(ctx, workspaceID, taskID, errorMsg); handled {
@@ -425,7 +433,7 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 	if !s.allowNonTransactional {
 		return nil, ErrSettlementUnavailable
 	}
-	failed, err := s.tasks.FailTask(ctx, workspaceID, taskID, errorMsg)
+	failed, err := s.taskLifecycle.FailTask(ctx, workspaceID, taskID, errorMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -445,10 +453,10 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*WorkspaceTask, error) {
 	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.retry")
 	defer telemetry.End(span, nil)
-	if s.tasks == nil {
+	if s.taskRead == nil || s.taskLifecycle == nil {
 		return nil, ErrNotFound
 	}
-	current, err := s.tasks.GetTask(ctx, workspaceID, taskID)
+	current, err := s.taskRead.GetTask(ctx, workspaceID, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +476,7 @@ func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryab
 	if !s.allowNonTransactional {
 		return nil, ErrSettlementUnavailable
 	}
-	retried, err := s.tasks.TransitionForRetry(ctx, workspaceID, taskID, token)
+	retried, err := s.taskLifecycle.TransitionForRetry(ctx, workspaceID, taskID, token)
 	if err != nil {
 		return nil, err
 	}

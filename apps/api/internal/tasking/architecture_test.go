@@ -9,6 +9,24 @@ import (
 func TestApplicationDoesNotImportConcreteInfrastructure(t *testing.T) {
 	archtest.AssertNoForbiddenImports(t, "application", []string{
 		"ideaboard/api/internal/tasking/infrastructure",
+		// #860: application services stay port-driven. The concrete
+		// Billing catalog, Credits service, River client, and Telemetry
+		// bridges live in infrastructure/adapters (and the River worker
+		// adapter); application code must not import them.
+		"ideaboard/api/internal/billing/application",
+		"github.com/riverqueue/river",
+		"ideaboard/api/internal/platform/telemetry",
+	})
+}
+
+// TestApplicationDoesNotImportConcreteCreditsService locks the credits
+// boundary: application code may use credits domain/ports, but the ledger
+// writer (credits.Service, package credits root) is only composed in
+// infrastructure/adapters. Prefix matching cannot express "root only", so
+// this asserts on the exact quoted import path.
+func TestApplicationDoesNotImportConcreteCreditsService(t *testing.T) {
+	archtest.AssertNoForbiddenText(t, "application", []string{
+		`"ideaboard/api/internal/credits"`,
 	})
 }
 

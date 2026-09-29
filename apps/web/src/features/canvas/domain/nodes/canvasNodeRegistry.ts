@@ -3,7 +3,7 @@ import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
   CanvasExecutionOutputNodeType,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 /** Copy resolver injected by the caller (application/presentation own i18n). */
 export type CanvasNodeCopyResolver = (labelKey: string) => string

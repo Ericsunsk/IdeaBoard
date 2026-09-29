@@ -1,7 +1,7 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
 import { stringParam } from '../../../../../shared/router/queryParams'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import type { CanvasConnectionPort } from '../../../../board'
+import type { CanvasConnectionPort } from '../../../../board/ports/canvas'
 import { useCanvasKeyboardShortcuts } from '../useCanvasKeyboardShortcuts'
 import { useCanvasLeaveGuard } from '../useCanvasLeaveGuard'
 import type { CanvasGraphNodeId } from '../../../domain/graph'

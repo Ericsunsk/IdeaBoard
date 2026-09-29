@@ -1,5 +1,5 @@
-// Package postgres implements workspacetasks.WorkspaceTaskStore against
-// PostgreSQL/sqlc (#819 Phase 4-02).
+// Package postgres implements the split workspacetasks persistence seams
+// against PostgreSQL/sqlc (#819 Phase 4-02).
 //
 // Mapping contract (schema.sql truth):
 //   - WorkspaceTask.ID <-> tasks.public_id (task_...)

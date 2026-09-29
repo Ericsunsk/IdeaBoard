@@ -4,7 +4,7 @@ import {
   createEmptyBoardSnapshot,
   type BoardSnapshot,
   type BoardState,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 export function makeBoardSnapshot(overrides: Partial<BoardSnapshot> = {}): BoardSnapshot {
   return assertLatestBoardSnapshot(

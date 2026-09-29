@@ -11,7 +11,7 @@ import {
   withAlpha,
 } from '../../../../shared/lib/chartPrimitives'
 import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
-import { adminThemeTokenFallbacks } from '../../../../shared/theme/adminThemeTokens'
+import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
 const adminChartPointClipPadding = 6

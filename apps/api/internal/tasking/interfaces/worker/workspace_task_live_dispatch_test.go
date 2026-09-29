@@ -86,7 +86,7 @@ func newLiveDispatchEnv() *liveDispatchEnv {
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
+		TaskRead: store, TaskLifecycle: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets: &workspacemedia.TaskAssetAdapter{Store: media}, Resolver: allowTestPoolResolver(),
 	})
 	return &liveDispatchEnv{

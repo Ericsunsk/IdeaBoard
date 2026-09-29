@@ -1,7 +1,7 @@
 import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board'
+import { createEmptyBoardSnapshot, type BoardSnapshot } from '../../../../board/ports/canvas'
 import { HOME_PATH, USER_BOARDS_PATH } from '../../../../../shared/constants/routePaths'
 import { stringParam } from '../../../../../shared/router/queryParams'
 import { useBoardSession, type SaveStatus } from '../../board-session'

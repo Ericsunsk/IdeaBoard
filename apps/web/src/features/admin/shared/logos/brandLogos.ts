@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
-import { CONTROL_API_PREFIX } from '../../../../shared/api/controlMutator'
+import { CONTROL_API_PREFIX } from '../lib/controlTransport'
 import { getGetControlAIGatewayBrandLogoUrl } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
 
 // Brand logo override vocabulary (issue #809). The legacy generated models

@@ -1,8 +1,10 @@
-// Task status filter vocabulary (issue #809). The legacy generated
-// `ListAdminTasksStatus` enum is gone; the Control Plane types the status
-// filter as a plain string, so this shared domain module owns the frozen
-// value set. Feature code imports it from here, never generated code.
-export const ListAdminTasksStatus = {
+// Task status filter vocabulary (issue #809, moved under the Admin shared
+// boundary by #863). The legacy generated `TaskStatus` enum is
+// gone; the Control Plane types the status filter as a plain string, so this
+// Admin-owned domain module owns the frozen value set. Feature code imports
+// it from here, never generated code, and generic `shared` modules must not
+// depend on it.
+export const TaskStatus = {
   pending: 'pending',
   running: 'running',
   completed: 'completed',
@@ -10,9 +12,7 @@ export const ListAdminTasksStatus = {
   cancelled: 'cancelled',
 } as const
 
-export type ListAdminTasksStatus = (typeof ListAdminTasksStatus)[keyof typeof ListAdminTasksStatus]
-
-export type ListAdminTasksStatusValue = ListAdminTasksStatus
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]
 
 export type TaskMetricKey = 'all' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -27,7 +27,7 @@ export interface TaskMetricStatsSnapshot {
 
 export interface TaskMetricDefinition {
   readonly key: TaskMetricKey
-  readonly status: ListAdminTasksStatusValue | null
+  readonly status: TaskStatus | null
   readonly label: string
   readonly pillTitle: string
   readonly dotClass: string
@@ -53,8 +53,7 @@ export const monitorChartSpecs = {
 
 /**
  * 任务指标元定义与视觉 Token (Single Source of Truth)
- * chartColor 与 Admin 主题对齐（shared 禁止 import admin token，
- * 此处写 fallback 十六进制，源头见 style.css --color-admin-*）：
+ * chartColor 与 Admin 主题对齐（Admin shared 内聚，源头见 style.css --color-admin-*）：
  * pending/info, running/warning, completed/success, failed/danger,
  * cancelled/mist。
  */
@@ -72,7 +71,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   },
   {
     key: 'pending',
-    status: ListAdminTasksStatus.pending,
+    status: TaskStatus.pending,
     label: 'Pending',
     pillTitle: 'Filter pending tasks',
     dotClass: 'bg-admin-info',
@@ -84,7 +83,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   },
   {
     key: 'running',
-    status: ListAdminTasksStatus.running,
+    status: TaskStatus.running,
     label: 'Running',
     pillTitle: 'Filter running tasks',
     dotClass: 'bg-admin-warning',
@@ -97,7 +96,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   },
   {
     key: 'completed',
-    status: ListAdminTasksStatus.completed,
+    status: TaskStatus.completed,
     label: 'Success',
     pillTitle: 'Filter completed tasks',
     dotClass: 'bg-admin-success',
@@ -110,7 +109,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   },
   {
     key: 'failed',
-    status: ListAdminTasksStatus.failed,
+    status: TaskStatus.failed,
     label: 'Errors',
     pillTitle: 'Filter failed tasks',
     dotClass: 'bg-admin-danger',
@@ -123,7 +122,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   },
   {
     key: 'cancelled',
-    status: ListAdminTasksStatus.cancelled,
+    status: TaskStatus.cancelled,
     label: 'Cancelled',
     pillTitle: 'Filter cancelled tasks',
     dotClass: 'bg-admin-text-3 opacity-60',

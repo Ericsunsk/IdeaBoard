@@ -1,5 +1,5 @@
-import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../../../board'
-import { computeFusionBlendWeights, type FusionBlendPoint } from '../../../../board'
+import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../../../board/ports/canvas'
+import { computeFusionBlendWeights, type FusionBlendPoint } from '../../../../board/ports/canvas'
 import {
   normalizeExecutionImageSize,
   type ExecutionImageSize,

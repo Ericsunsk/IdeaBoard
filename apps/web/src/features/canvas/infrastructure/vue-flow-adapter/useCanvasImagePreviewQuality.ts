@@ -1,5 +1,5 @@
 import { computed, getCurrentScope, onScopeDispose, ref, type MaybeRefOrGetter, toValue } from 'vue'
-import { IMAGE_NODE_EMPTY_SIZE } from '../../../board'
+import { IMAGE_NODE_EMPTY_SIZE } from '../../../board/ports/canvas'
 import { resolveCanvasViewportZoomScale } from './useCanvasViewportContext'
 
 export const CANVAS_IMAGE_PREVIEW_MAX_SIDE = {

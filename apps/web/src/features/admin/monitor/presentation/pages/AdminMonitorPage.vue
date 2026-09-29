@@ -105,7 +105,7 @@ import { useMonitorTimeline } from '../../application/useMonitorTimeline'
 import {
   monitorChartSpecs,
   type TaskMetricStatsSnapshot,
-} from '../../../../../shared/domain/taskMetricTokens'
+} from '../../../shared/lib/taskMetricTokens'
 import { stringParam } from '../../../../../shared/router/queryParams'
 import { MONITOR_MESSAGES } from './messages'
 

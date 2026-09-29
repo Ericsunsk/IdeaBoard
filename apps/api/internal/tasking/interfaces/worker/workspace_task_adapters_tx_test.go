@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
+	taskadapters "ideaboard/api/internal/tasking/infrastructure/adapters"
 	"ideaboard/api/internal/tasking/workspacetasks"
 
 	"github.com/jackc/pgx/v5"
@@ -45,7 +45,7 @@ func (s *stubWorkspaceRiverClient) InsertTx(_ context.Context, tx pgx.Tx, args r
 func TestWorkspaceTaskEnqueuerForwardsAmbientTx(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubWorkspaceRiverClient{}
-	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
+	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txforward1", WorkspaceID: "ws_txforward1",
 		Service: "render", ExecutionToken: "exec_txforward1",
@@ -60,15 +60,15 @@ func TestWorkspaceTaskEnqueuerForwardsAmbientTx(t *testing.T) {
 	if stub.insertTxArgs != nil {
 		t.Fatal("Enqueue must not touch InsertTx")
 	}
-	if _, ok := stub.insertArgs.(taskruntime.WorkspaceTaskArgs); !ok {
-		t.Fatalf("enqueued args = %T, want taskruntime.WorkspaceTaskArgs", stub.insertArgs)
+	if _, ok := stub.insertArgs.(workspacetasks.WorkspaceTaskArgs); !ok {
+		t.Fatalf("enqueued args = %T, want workspacetasks.WorkspaceTaskArgs", stub.insertArgs)
 	}
 }
 
 func TestWorkspaceTaskEnqueueInTxJoinsRiverTx(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubWorkspaceRiverClient{}
-	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
+	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txjoin1", WorkspaceID: "ws_txjoin1",
 		Service: "render", ExecutionToken: "exec_txjoin1",
@@ -95,7 +95,7 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 	env := openWorkspaceIntegrationEnv(t)
 	ctx := context.Background()
 	stub := &stubWorkspaceRiverClient{}
-	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
+	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(stub, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{
 		ID: "task_txfwd1", WorkspaceID: env.wsA,
 		Service: "render", ExecutionToken: "exec_txfwd1",
@@ -112,9 +112,9 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 	if stub.insertTx == nil {
 		t.Fatal("EnqueueInTx must forward a tx to River.InsertTx")
 	}
-	args, ok := stub.insertTxArgs.(taskruntime.WorkspaceTaskArgs)
+	args, ok := stub.insertTxArgs.(workspacetasks.WorkspaceTaskArgs)
 	if !ok {
-		t.Fatalf("forwarded args = %T, want taskruntime.WorkspaceTaskArgs", stub.insertTxArgs)
+		t.Fatalf("forwarded args = %T, want workspacetasks.WorkspaceTaskArgs", stub.insertTxArgs)
 	}
 	if args.TaskID != task.ID || args.WorkspaceID != task.WorkspaceID || args.ExecutionToken != task.ExecutionToken {
 		t.Fatalf("forwarded args = %+v, want task identity", args)
@@ -126,7 +126,7 @@ func TestWorkspaceTaskEnqueueInTxForwardsAmbientTx(t *testing.T) {
 
 func TestWorkspaceTaskEnqueueInTxFailsClosedWithoutClient(t *testing.T) {
 	ctx := context.Background()
-	enqueuer := taskruntime.NewWorkspaceTaskEnqueuer(nil, "drawing_default", 25)
+	enqueuer := taskadapters.NewWorkspaceTaskEnqueuer(nil, "drawing_default", 25)
 	task := &workspacetasks.WorkspaceTask{ID: "task_txjoin2", WorkspaceID: "ws_txjoin2"}
 
 	var tx pgx.Tx

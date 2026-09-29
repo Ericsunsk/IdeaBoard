@@ -10,7 +10,7 @@ import {
   InvalidBoardStateError,
   type BoardSnapshot,
   type BoardState,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 export type BoardSessionRepository = {
   exists: (boardId: string) => boolean

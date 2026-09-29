@@ -1,7 +1,7 @@
 import {
-  ListAdminTasksStatus,
-  type ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../../../../shared/domain/taskMetricTokens'
+  TaskStatus,
+  type TaskStatus as TaskStatusValue,
+} from '../../shared/lib/taskMetricTokens'
 
 type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
 
@@ -24,17 +24,17 @@ const PENDING_BANNER_CLASS =
   'bg-[linear-gradient(135deg,rgba(71,117,168,0.1),rgba(255,255,255,0.74))] before:bg-admin-info'
 const PENDING_DOT_CLASS = 'bg-admin-info shadow-[0_0_0_4px_rgba(71,117,168,0.15)]'
 
-export const adminTaskStatuses = ListAdminTasksStatus
+export const adminTaskStatuses = TaskStatus
 
-const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinition> = {
-  [ListAdminTasksStatus.pending]: {
+const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
+  [TaskStatus.pending]: {
     severity: 'secondary',
     text: '等待中',
     color: PENDING_STATUS_COLOR,
     bannerClass: PENDING_BANNER_CLASS,
     dotClass: PENDING_DOT_CLASS,
   },
-  [ListAdminTasksStatus.running]: {
+  [TaskStatus.running]: {
     severity: 'warn',
     text: '执行中',
     color: 'var(--color-admin-warning)',
@@ -42,7 +42,7 @@ const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinit
       'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
     dotClass: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
   },
-  [ListAdminTasksStatus.completed]: {
+  [TaskStatus.completed]: {
     severity: 'success',
     text: '已完成',
     color: 'var(--color-admin-success)',
@@ -50,7 +50,7 @@ const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinit
       'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
     dotClass: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
   },
-  [ListAdminTasksStatus.failed]: {
+  [TaskStatus.failed]: {
     severity: 'danger',
     text: '失败',
     color: 'var(--color-admin-danger)',
@@ -58,7 +58,7 @@ const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinit
       'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
     dotClass: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
   },
-  [ListAdminTasksStatus.cancelled]: {
+  [TaskStatus.cancelled]: {
     severity: 'secondary',
     text: '已停止',
     color: DEFAULT_STATUS_COLOR,
@@ -69,7 +69,7 @@ const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinit
 
 export function getTaskStatusDefinition(status: string): TaskStatusDefinition {
   return (
-    taskStatusDefinitions[status as ListAdminTasksStatusValue] || {
+    taskStatusDefinitions[status as TaskStatusValue] || {
       severity: 'secondary',
       text: status,
       color: DEFAULT_STATUS_COLOR,

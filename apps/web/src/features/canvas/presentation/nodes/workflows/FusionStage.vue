@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { FusionNodeItem } from '../../../../board'
+import type { FusionNodeItem } from '../../../../board/ports/canvas'
 import {
   FUSION_SLOT_LAYOUT,
   buildFusionDisplayPercentages,
@@ -101,7 +101,7 @@ import {
   getFusionSlotAnchor,
   getFusionSlotAnchors,
   type FusionBlendPoint,
-} from '../../../../board'
+} from '../../../../board/ports/canvas'
 import { useFusionBlendControl } from './useFusionBlendControl'
 import NodeEmptyStateIcon from '../primitives/NodeEmptyStateIcon.vue'
 import NodeInputThumbnail from '../primitives/NodeInputThumbnail.vue'

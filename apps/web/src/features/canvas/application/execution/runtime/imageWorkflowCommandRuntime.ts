@@ -1,4 +1,4 @@
-import type { PromptAspectRatio } from '../../../../board'
+import type { PromptAspectRatio } from '../../../../board/ports/canvas'
 import type { ImageTaskAction } from '../../../domain/execution-contracts/imageActionExecution.ts'
 import {
   isImageExecutionPlanError,

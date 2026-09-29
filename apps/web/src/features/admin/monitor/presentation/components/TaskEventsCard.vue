@@ -72,7 +72,7 @@ import { adminCompactIconButtonClass } from '../../../shared/lib/uiClasses'
 import {
   taskMetricDefinitions,
   type TaskMetricStatsSnapshot,
-} from '../../../../../shared/domain/taskMetricTokens'
+} from '../../../shared/lib/taskMetricTokens'
 import type { useMonitorTimeline } from '../../application/useMonitorTimeline'
 import { MONITOR_MESSAGES } from '../pages/messages'
 

@@ -23,7 +23,7 @@ import {
   toNonNegativeNumber,
 } from './usageStatisticsChartBase'
 import { formatCount, formatPercent1 } from './usageStatisticsTooltipText'
-import { monitorChartSpecs, taskMetricDefinitions } from '../../../shared/domain/taskMetricTokens'
+import { monitorChartSpecs, taskMetricDefinitions } from '../shared/lib/taskMetricTokens'
 
 // 系列命名与颜色复用任务监控的状态定义（completed/failed），单源，改名只改一处。
 function qualitySeriesStyle(key: 'completed' | 'failed') {

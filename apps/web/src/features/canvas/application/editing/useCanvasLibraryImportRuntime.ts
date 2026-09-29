@@ -1,6 +1,6 @@
 import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board'
+import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../board/ports/canvas'
 import { i18n } from '../../../../shared/i18n'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import type { BoardAttachment } from '../execution/board-attachment'

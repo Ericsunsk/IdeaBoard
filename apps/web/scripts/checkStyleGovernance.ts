@@ -85,7 +85,14 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Task status palette is a domain visual contract shared by table and detail views.',
   },
-  'src/shared/domain/taskMetricTokens.ts': {
+  'src/features/admin/shared/lib/adminThemeTokens.ts': {
+    counts: {
+      'raw-color': 56,
+    },
+    reason:
+      'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
+  },
+  'src/features/admin/shared/lib/taskMetricTokens.ts': {
     counts: {
       'raw-color': 5,
     },
@@ -144,7 +151,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 
 // ── Token budgets (repo-wide) ─────────────────────────────────────────────
 // Hex colors and font stacks live in the token source of truth
-// (`src/app/style.css`, `src/shared/theme/**`, `src/shared/domain/taskMetricTokens.ts`);
+// (`src/app/style.css`, `src/shared/theme/**`, `src/features/admin/shared/lib/taskMetricTokens.ts`);
 // call sites reference tokens. Type sizes use the type scale (`text-ib-*` /
 // `text-admin-*`); display/optical one-offs outside the scale carry explicit
 // waivers with reasons instead of forced mappings. Breakpoints use the named
@@ -156,7 +163,8 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 function isTokenOwnerFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
-    file.sourcePath === 'src/shared/domain/taskMetricTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/lib/taskMetricTokens.ts' ||
+    file.sourcePath === 'src/features/admin/shared/lib/adminThemeTokens.ts' ||
     file.sourcePath.startsWith('src/shared/theme/')
   )
 }

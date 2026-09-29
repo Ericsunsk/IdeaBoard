@@ -3,7 +3,7 @@ import {
   getTaskMetricByStatus,
   taskMetricDefinitions,
   monitorChartSpecs,
-  ListAdminTasksStatus,
+  TaskStatus,
   type TaskMetricStatsSnapshot,
 } from './taskMetricTokens'
 
@@ -19,11 +19,11 @@ describe('taskMetricTokens', () => {
     )
     expect(statusMap).toEqual({
       all: null,
-      pending: ListAdminTasksStatus.pending,
-      running: ListAdminTasksStatus.running,
-      completed: ListAdminTasksStatus.completed,
-      failed: ListAdminTasksStatus.failed,
-      cancelled: ListAdminTasksStatus.cancelled,
+      pending: TaskStatus.pending,
+      running: TaskStatus.running,
+      completed: TaskStatus.completed,
+      failed: TaskStatus.failed,
+      cancelled: TaskStatus.cancelled,
     })
   })
 

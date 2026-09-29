@@ -6,7 +6,7 @@ import {
   type CanvasConnectionEndpoint,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import type { FlowNodeData } from '../../domain/nodes/flowTypes.ts'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import {

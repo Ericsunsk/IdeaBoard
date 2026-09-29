@@ -13,7 +13,6 @@ import (
 
 	"ideaboard/api/internal/generation/routing"
 	runtimeports "ideaboard/api/internal/runtime/ports"
-	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -140,8 +139,8 @@ func newWorkerTestEnv() *workerTestEnv {
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
-		Assets:  &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
+		TaskRead: store, TaskLifecycle: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
+		Assets:   &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
 		Resolver: allowTestPoolResolver(),
 	})
 	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service, attempts: workspacetasks.NewInMemoryAttemptRecorderForTests()}
@@ -177,8 +176,8 @@ func (e *workerTestEnv) submitService(t *testing.T, service string, inputs []str
 	return created
 }
 
-func workerJobFor(task *workspacetasks.WorkspaceTask) *river.Job[taskruntime.WorkspaceTaskArgs] {
-	return &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
+func workerJobFor(task *workspacetasks.WorkspaceTask) *river.Job[workspacetasks.WorkspaceTaskArgs] {
+	return &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
 		TaskID: task.ID, WorkspaceID: task.WorkspaceID,
 		Service: task.Service, ExecutionToken: task.ExecutionToken,
 	}}
@@ -442,7 +441,7 @@ func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 		t.Fatal("provider must not run for an unknown task")
 		return nil, nil
 	}), nil)
-	if err := worker.Work(context.Background(), &river.Job[taskruntime.WorkspaceTaskArgs]{Args: taskruntime.WorkspaceTaskArgs{
+	if err := worker.Work(context.Background(), &river.Job[workspacetasks.WorkspaceTaskArgs]{Args: workspacetasks.WorkspaceTaskArgs{
 		TaskID: "task_missing", WorkspaceID: "ws_test",
 		Service: "render", ExecutionToken: "exec_missing",
 	}}); err != nil {
@@ -454,7 +453,7 @@ func TestWorkspaceTaskWorkerUnknownTaskDropped(t *testing.T) {
 func TestWorkspaceTaskWorkerMalformedJobDropped(t *testing.T) {
 	env := newWorkerTestEnv()
 	worker := env.newWorker(nil, nil)
-	if err := worker.Work(context.Background(), &river.Job[taskruntime.WorkspaceTaskArgs]{}); err != nil {
+	if err := worker.Work(context.Background(), &river.Job[workspacetasks.WorkspaceTaskArgs]{}); err != nil {
 		t.Fatalf("Work: %v", err)
 	}
 }

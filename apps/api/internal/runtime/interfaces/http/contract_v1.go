@@ -15,6 +15,7 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,9 @@ type ContractV1Deps struct {
 	// Tasks is the workspace-scoped async job surface (issue #805).
 	// Production wires the postgres store and settlement adapters; tests
 	// inject the in-memory implementation plus quoter/holder/queue/asset fakes.
-	Tasks                 WorkspaceTaskStore
+	Tasks                 WorkspaceTaskReadStore
+	TaskLifecycle         WorkspaceTaskLifecycleStore
+	TaskBilling           WorkspaceTaskBillingStore
 	TaskQuoter            WorkspaceTaskQuoter
 	TaskHolder            WorkspaceTaskHolder
 	TaskQueue             WorkspaceTaskEnqueuer
@@ -148,6 +151,18 @@ func (d usersRepositoryDirectory) GetUserPublicID(ctx context.Context, userID in
 }
 
 func (d *ContractV1Deps) normalize() {
+	if d.Tasks != nil {
+		if d.TaskLifecycle == nil {
+			if store, ok := d.Tasks.(workspacetasks.TaskLifecycleStore); ok {
+				d.TaskLifecycle = store
+			}
+		}
+		if d.TaskBilling == nil {
+			if store, ok := d.Tasks.(workspacetasks.TaskBillingStore); ok {
+				d.TaskBilling = store
+			}
+		}
+	}
 	if d.Idempotency == nil {
 		d.Idempotency = contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions())
 	}

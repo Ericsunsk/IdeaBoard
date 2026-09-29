@@ -27,7 +27,7 @@ import {
   type CanvasCreatableNodeKind,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>

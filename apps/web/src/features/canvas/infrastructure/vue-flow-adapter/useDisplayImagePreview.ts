@@ -7,7 +7,11 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import { canvasToBlob, resolveFetchUrl } from '../../infrastructure/media/canvasMediaIo.ts'
+import {
+  canvasToBlob,
+  fetchImageBlobFromUrl,
+  resolveFetchUrl,
+} from '../../infrastructure/media/canvasMediaIo.ts'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
@@ -150,18 +154,10 @@ async function fetchPreviewSourceBlob(
   if (signal?.aborted) return null
   const fetchUrl = resolveFetchUrl(sourceUrl)
   if (!fetchUrl) return null
-  let response: Response
   try {
-    response = await fetch(
-      fetchUrl,
-      signal ? { credentials: 'include', signal } : { credentials: 'include' },
-    )
-  } catch {
-    return null
-  }
-  if (signal?.aborted || !response.ok) return null
-  try {
-    return await response.blob()
+    const blob = await fetchImageBlobFromUrl(fetchUrl, signal ? { signal } : undefined)
+    if (signal?.aborted) return null
+    return blob
   } catch {
     return null
   }

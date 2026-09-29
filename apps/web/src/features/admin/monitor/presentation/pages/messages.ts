@@ -6,7 +6,7 @@
 // toolbar/table/dialog/cell copy for `components/TaskActivityTable.vue` /
 // `components/TaskControlToolbar.vue` / `components/TaskEventsCard.vue` /
 // `AdminTaskResultDialog.vue` / `TaskResultCell.vue` lives here. Metric labels
-// stay in `shared/domain/taskMetricTokens`; status/attempt labels stay in
+// stay in `features/admin/shared/lib/taskMetricTokens`; status/attempt labels stay in
 // `domain/status.ts` / `taskResultLabels.ts`; time-range presets stay in
 // `domain/timeRange.ts`; `t('admin.*')` keys in `TaskControlToolbar.vue` belong
 // to the cross-surface locale bundle and stay as-is.

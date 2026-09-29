@@ -263,7 +263,7 @@ import {
   adminTableFrameClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
-import { taskMetricDefinitions } from '../../../../shared/domain/taskMetricTokens'
+import { taskMetricDefinitions } from '../../shared/lib/taskMetricTokens'
 import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import { useAdminPromptConfigWorkspace } from '../workspace'
 import type { FeaturePromptVariable } from '../workspace'

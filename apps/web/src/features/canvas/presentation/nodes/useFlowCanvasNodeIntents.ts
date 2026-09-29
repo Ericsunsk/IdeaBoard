@@ -1,4 +1,4 @@
-import type { PromptAspectRatio } from '../../../board'
+import type { PromptAspectRatio } from '../../../board/ports/canvas'
 import type { CanvasNodePresentationIntent } from '.'
 import type { FlowSnapshotParamPatch } from '../../infrastructure/vue-flow-adapter/flowSnapshotParamMutations.ts'
 import type { OutpaintDragAnchor } from '../../application/image-workflow/useImageOutpaintOverlay.ts'

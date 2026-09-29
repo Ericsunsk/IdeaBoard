@@ -1,14 +1,16 @@
 <template>
-  <ChartCard :title="title" :title-tag="titleTag" :variant="variant">
+  <ChartCard
+    :title="title"
+    :title-tag="titleTag"
+    :header-class="headerClass"
+    :title-class="titleClass"
+    :class="cardClass"
+  >
     <template #actions>
       <div
         role="radiogroup"
         :aria-label="rangeAriaLabel ?? t('common.a11y.chartTimeRange')"
-        :class="
-          variant === 'admin'
-            ? 'inline-flex h-8 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-1 text-xs text-admin-text-3'
-            : 'inline-flex items-center rounded-lg border border-ib-border-soft bg-ib-surface-muted p-0.5 text-xs'
-        "
+        :class="rangeGroupClass"
       >
         <button
           v-for="range in ranges"
@@ -17,15 +19,7 @@
           role="radio"
           :aria-checked="selectedRange === range.key"
           class="cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
-          :class="
-            variant === 'admin'
-              ? selectedRange === range.key
-                ? 'bg-white font-semibold text-admin-text-1 shadow-xs focus-visible:ring-admin-accent'
-                : 'text-admin-text-2 hover:text-admin-text-1 focus-visible:ring-admin-accent'
-              : selectedRange === range.key
-                ? 'bg-ib-surface font-semibold text-ib-text shadow-xs focus-visible:ring-ib-focus'
-                : 'text-ib-text-muted hover:text-ib-text focus-visible:ring-ib-focus'
-          "
+          :class="selectedRange === range.key ? rangeSelectedClass : rangeUnselectedClass"
           @click="selectedRange = range.key"
         >
           {{ range.label }}
@@ -50,33 +44,55 @@
   </ChartCard>
 </template>
 
-<script setup lang="ts" generic="TRange extends string">
+<script lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { useI18n } from 'vue-i18n'
 import type { Plugin } from 'chart.js'
 import type { ChartData, ChartOptions } from '../lib/chartPrimitives'
+import type { ChartPanelSize } from './ChartPanel.vue'
+
+export interface RangedLineChartProps<TRange extends string> {
+  title: string
+  titleTag?: 'h2' | 'h3' | 'span' | undefined
+  headerClass?: string | undefined
+  titleClass?: string | undefined
+  cardClass?: string | undefined
+  rangeGroupClass?: string | undefined
+  rangeSelectedClass?: string | undefined
+  rangeUnselectedClass?: string | undefined
+  ranges: Array<{ label: string; key: TRange }>
+  rangeAriaLabel?: string | undefined
+  data: ChartData
+  options: ChartOptions
+  plugins?: Plugin[] | undefined
+  canvasProps?: HTMLAttributes | undefined
+  size?: ChartPanelSize | undefined
+  height?: string | undefined
+  showChart?: boolean | undefined
+}
+</script>
+
+<script setup lang="ts" generic="TRange extends string">
+import { useI18n } from 'vue-i18n'
 import ChartCard from './ChartCard.vue'
-import ChartPanel, { type ChartPanelSize } from './ChartPanel.vue'
+import ChartPanel from './ChartPanel.vue'
 import ChartRenderer from './ChartRenderer.vue'
 
+// Neutral ranged chart primitive (#863): range-switch and card skin ride
+// explicit class props with user-surface defaults. Admin pages use the
+// `features/admin/shared` `AdminRangedLineChartCard` wrapper to supply
+// the Admin skin instead of a feature-specific `variant` flag.
 withDefaults(
-  defineProps<{
-    title: string
-    titleTag?: 'h2' | 'h3' | 'span'
-    variant?: 'default' | 'admin'
-    ranges: Array<{ label: string; key: TRange }>
-    rangeAriaLabel?: string | undefined
-    data: ChartData
-    options: ChartOptions
-    plugins?: Plugin[]
-    canvasProps?: HTMLAttributes | undefined
-    size?: ChartPanelSize
-    height?: string
-    showChart?: boolean
-  }>(),
+  defineProps<RangedLineChartProps<TRange>>(),
   {
     titleTag: 'span',
-    variant: 'default',
+    headerClass: undefined,
+    titleClass: undefined,
+    cardClass: undefined,
+    rangeGroupClass:
+      'inline-flex items-center rounded-lg border border-ib-border-soft bg-ib-surface-muted p-0.5 text-xs',
+    rangeSelectedClass:
+      'bg-ib-surface font-semibold text-ib-text shadow-xs focus-visible:ring-ib-focus',
+    rangeUnselectedClass: 'text-ib-text-muted hover:text-ib-text focus-visible:ring-ib-focus',
     rangeAriaLabel: undefined,
     plugins: () => [],
     canvasProps: undefined,

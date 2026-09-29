@@ -7,7 +7,7 @@ import {
   type CanvasNodeItem,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 import type { CanvasFeedback } from '../workspace/useCanvasFeedback.ts'
 import {
   isCanvasGraphNodeId,

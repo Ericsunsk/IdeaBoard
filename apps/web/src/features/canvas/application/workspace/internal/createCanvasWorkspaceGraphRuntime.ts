@@ -1,4 +1,4 @@
-import type { ImageNodeItem } from '../../../../board'
+import type { ImageNodeItem } from '../../../../board/ports/canvas'
 import { onScopeDispose, ref } from 'vue'
 import type { useBoardRuntime } from './useBoardRuntime'
 import type { CanvasFeedback } from '../useCanvasFeedback.ts'

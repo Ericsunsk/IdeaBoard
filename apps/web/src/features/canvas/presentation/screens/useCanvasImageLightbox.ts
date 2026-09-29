@@ -1,5 +1,5 @@
 import { onBeforeUnmount } from 'vue'
-import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board'
+import type { ImageNodeItem, ImageNodeOutputItem } from '../../../board/ports/canvas'
 import {
   canonicalizeRuntimeUploadRef,
   resolveAssetUrl,

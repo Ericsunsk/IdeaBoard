@@ -6,10 +6,15 @@ const canvasMediaIOMocks = vi.hoisted(() => ({
   resolveFetchUrl: vi.fn((url: string) => url),
 }))
 
-vi.mock('../../infrastructure/media/canvasMediaIo.ts', () => ({
-  canvasToBlob: canvasMediaIOMocks.canvasToBlob,
-  resolveFetchUrl: canvasMediaIOMocks.resolveFetchUrl,
-}))
+vi.mock('../../infrastructure/media/canvasMediaIo.ts', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../infrastructure/media/canvasMediaIo.ts')>()
+  return {
+    ...actual,
+    canvasToBlob: canvasMediaIOMocks.canvasToBlob,
+    resolveFetchUrl: canvasMediaIOMocks.resolveFetchUrl,
+  }
+})
 
 vi.mock('../../../../shared/api/workspaceEventStream', () => ({
   subscribeWorkspaceMediaInvalidation: vi.fn(() => vi.fn()),

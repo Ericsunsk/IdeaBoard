@@ -1,4 +1,4 @@
-import type { CanvasGroup } from '../../../board'
+import type { CanvasGroup } from '../../../board/ports/canvas'
 import {
   isCanvasGraphNodeId,
   type CanvasGraphGroupId,

@@ -1,4 +1,4 @@
-import type { BoardSnapshot } from '../../../board'
+import type { BoardSnapshot } from '../../../board/ports/canvas'
 import {
   CanvasGraphStore,
   type CanvasGraphCommitEvent,

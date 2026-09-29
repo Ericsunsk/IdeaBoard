@@ -73,7 +73,7 @@ func TestWorkspaceTaskWorkerMaskAssetLoop(t *testing.T) {
 		env := newWorkerTestEnv()
 		assets := &workerTestAssets{ready: map[string]bool{"asset_mask1": true}, archived: map[string]bool{}}
 		env.service = workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-			Tasks: env.store, Quoter: workerTestQuoter{}, Holder: env.holder, Queue: env.queue,
+			TaskRead: env.store, TaskLifecycle: env.store, Quoter: workerTestQuoter{}, Holder: env.holder, Queue: env.queue,
 			Assets: assets, Resolver: allowTestPoolResolver(),
 		})
 		return env, assets

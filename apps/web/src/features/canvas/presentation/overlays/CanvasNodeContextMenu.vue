@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { CanvasCreatableNodeKind } from '../../../board'
+import type { CanvasCreatableNodeKind } from '../../../board/ports/canvas'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 
 const props = defineProps<{

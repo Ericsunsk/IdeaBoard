@@ -33,11 +33,22 @@ const mocks = vi.hoisted(() => ({
   selectedId: { value: 'ws_test123' as string | null },
 }))
 
-vi.mock('../../../../../shared/api/workspaceTasks', () => ({
-  cancelWorkspaceTask: mocks.cancelWorkspaceTask,
-  createWorkspaceTask: mocks.createWorkspaceTask,
-  getWorkspaceTask: mocks.getWorkspaceTask,
-  quoteWorkspaceTask: mocks.quoteWorkspaceTask,
+// Seams import the narrow transport/waiter modules directly (issue #859);
+// the mock targets those specifiers so network stays stubbed while the
+// shared gone-detection keeps its real behavior.
+vi.mock('../../../../../shared/api/workspaceTaskTransport', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../../shared/api/workspaceTaskTransport')>()
+  return {
+    cancelWorkspaceTask: mocks.cancelWorkspaceTask,
+    createWorkspaceTask: mocks.createWorkspaceTask,
+    getWorkspaceTask: mocks.getWorkspaceTask,
+    quoteWorkspaceTask: mocks.quoteWorkspaceTask,
+    isWorkspaceTaskGoneError: actual.isWorkspaceTaskGoneError,
+  }
+})
+
+vi.mock('../../../../../shared/api/workspaceTaskWaiter', () => ({
   waitWorkspaceTaskTerminal: mocks.waitWorkspaceTaskTerminal,
 }))
 

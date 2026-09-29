@@ -6,7 +6,7 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../../board'
+} from '../../../board/ports/canvas'
 
 export type CanvasGraphNodeKind = CanvasConnectionNodeType
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
