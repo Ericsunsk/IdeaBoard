@@ -134,7 +134,7 @@ export function normalizeGroupGeometry(
 
 export { hasSameGroupRecord, isSameGroupGeometry }
 
-export function readDraftRecord<Id extends string, Record>(
+function readDraftRecord<Id extends string, Record>(
   writes: TransactionRecordWrites<Id, Record>,
   baseRecords: Map<Id, Record>,
   id: Id,
@@ -143,21 +143,21 @@ export function readDraftRecord<Id extends string, Record>(
   return baseRecords.get(id)
 }
 
-export function readDraftNodeRecord(
+function readDraftNodeRecord(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
 ): CanvasGraphNodeRecord | undefined {
   return readDraftRecord(draft.nodeWrites, draft.base.nodesById, nodeId)
 }
 
-export function readDraftEdgeRecord(
+function readDraftEdgeRecord(
   draft: CanvasGraphTransactionDraft,
   edgeId: CanvasGraphEdgeId,
 ): CanvasGraphEdgeRecord | undefined {
   return readDraftRecord(draft.edgeWrites, draft.base.edgesById, edgeId)
 }
 
-export function readDraftGroupRecord(
+function readDraftGroupRecord(
   draft: CanvasGraphTransactionDraft,
   groupId: CanvasGraphGroupId,
 ): CanvasGraphGroupRecord | undefined {
@@ -199,23 +199,23 @@ export function getDraftGroupIdForNode(
   return group?.nodeIds.includes(nodeId) ? groupId : undefined
 }
 
-export function readDraftGroupOrder(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId[] {
+function readDraftGroupOrder(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId[] {
   return draft.groupOrder ?? draft.base.groupOrder
 }
 
-export function ensureNodeOrder(draft: CanvasGraphTransactionDraft): CanvasGraphNodeId[] {
+function ensureNodeOrder(draft: CanvasGraphTransactionDraft): CanvasGraphNodeId[] {
   return (draft.nodeOrder ??= [...draft.base.nodeOrder])
 }
 
-export function ensureEdgeOrder(draft: CanvasGraphTransactionDraft): CanvasGraphEdgeId[] {
+function ensureEdgeOrder(draft: CanvasGraphTransactionDraft): CanvasGraphEdgeId[] {
   return (draft.edgeOrder ??= [...draft.base.edgeOrder])
 }
 
-export function ensureGroupOrder(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId[] {
+function ensureGroupOrder(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId[] {
   return (draft.groupOrder ??= [...draft.base.groupOrder])
 }
 
-export function recordOrderAdded<Id extends string>(
+function recordOrderAdded<Id extends string>(
   patches: Map<Id, CanvasGraphOrderPatch<Id>>,
   id: Id,
   order: readonly Id[],
@@ -234,7 +234,7 @@ export function recordOrderAdded<Id extends string>(
   )
 }
 
-export function removeFromOrder<Id extends string>(
+function removeFromOrder<Id extends string>(
   order: Id[],
   id: Id,
   patches: Map<Id, CanvasGraphOrderPatch<Id>>,
@@ -261,7 +261,7 @@ export function removeFromOrder<Id extends string>(
   order.splice(index, 1)
 }
 
-export function assertDraftConnectionEndpointsExist(
+function assertDraftConnectionEndpointsExist(
   draft: CanvasGraphTransactionDraft,
   connection: CanvasConnection,
 ) {
@@ -272,7 +272,7 @@ export function assertDraftConnectionEndpointsExist(
   }
 }
 
-export function createNextGroupId(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId {
+function createNextGroupId(draft: CanvasGraphTransactionDraft): CanvasGraphGroupId {
   let maxId = 0
   for (const groupId of readDraftGroupOrder(draft)) {
     const match = /^group-(\d+)$/.exec(groupId)
@@ -282,7 +282,7 @@ export function createNextGroupId(draft: CanvasGraphTransactionDraft): CanvasGra
   return toCanvasGraphGroupId(maxId + 1)
 }
 
-export function normalizeNewGroupNodeIds(
+function normalizeNewGroupNodeIds(
   draft: CanvasGraphTransactionDraft,
   nodeIds: CanvasGraphNodeId[],
 ): CanvasGraphNodeId[] {
@@ -410,7 +410,7 @@ export function stageUpdateGroupGeometry(
   })
 }
 
-export function removeGroupWrite(
+function removeGroupWrite(
   draft: CanvasGraphTransactionDraft,
   groupId: CanvasGraphGroupId,
 ): void {
@@ -426,7 +426,7 @@ export function stageUngroup(
   removeGroupWrite(draft, groupId)
 }
 
-export function addNodeToGroupWrite(
+function addNodeToGroupWrite(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
   groupId: CanvasGraphGroupId,
@@ -442,7 +442,7 @@ export function addNodeToGroupWrite(
   })
 }
 
-export function removeNodeFromGroupWrite(
+function removeNodeFromGroupWrite(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
   groupId: CanvasGraphGroupId,
@@ -456,7 +456,7 @@ export function removeNodeFromGroupWrite(
   })
 }
 
-export function removeNodeFromGroupsWrite(
+function removeNodeFromGroupsWrite(
   draft: CanvasGraphTransactionDraft,
   nodeId: CanvasGraphNodeId,
 ): void {

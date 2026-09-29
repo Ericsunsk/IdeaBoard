@@ -3,18 +3,19 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
-const repoRoot = path.resolve(webRoot, '../..')
 const files = {
   domain: path.join(webRoot, 'src/features/board/domain/document/nodes.ts'),
   schema: path.join(webRoot, 'src/features/board/domain/schema/stateSchema.ts'),
-  backend: path.join(repoRoot, 'apps/api/internal/boards/state.go'),
 } as const
 
 async function main() {
-  const [domain, schema, backend] = await Promise.all([
+  // The legacy backend mirror (`apps/api/internal/boards/state.go`) was
+  // removed when the old boards surface was retired. Board state validation
+  // is now owned by the frontend Board domain; do not reintroduce a dead
+  // backend source just to satisfy this guardrail.
+  const [domain, schema] = await Promise.all([
     readFile(files.domain, 'utf8'),
     readFile(files.schema, 'utf8'),
-    readFile(files.backend, 'utf8'),
   ])
   const violations: string[] = []
   const fields = ['id', 'nodeIds', 'x', 'y', 'width', 'height']
@@ -32,16 +33,6 @@ async function main() {
   }
   if (!schema.includes('positiveFiniteNumberSchema'))
     violations.push('frontend positive geometry guard missing')
-  if (!backend.includes('CurrentBoardStateSchemaVersion = 4'))
-    violations.push('backend schema version drift')
-  if (!backend.includes('boardStateGroupIDPattern'))
-    violations.push('backend group id validator missing')
-  if (!backend.includes('boardStateGroupNodeIDPattern'))
-    violations.push('backend group node id validator missing')
-  if (!backend.includes('width <= 0') || !backend.includes('height <= 0')) {
-    violations.push('backend group geometry positivity guard missing')
-  }
-
   if (violations.length > 0) {
     console.error('BoardStateGroup contract drift check failed.')
     for (const violation of violations) console.error(`- ${violation}`)
