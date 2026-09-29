@@ -79,15 +79,7 @@ export function removeGroupFromIndexes(
   }
 }
 
-export function hasSameGroupMembership(
-  left: CanvasGraphGroupRecord,
-  right: CanvasGraphGroupRecord,
-): boolean {
-  return (
-    left.nodeIds.length === right.nodeIds.length &&
-    left.nodeIds.every((nodeId, index) => nodeId === right.nodeIds[index])
-  )
-}
+export { hasSameGroupMembership } from './canvasGraphRecordEquality'
 
 function createEmptyIndexes(): CanvasGraphIndexes {
   return {

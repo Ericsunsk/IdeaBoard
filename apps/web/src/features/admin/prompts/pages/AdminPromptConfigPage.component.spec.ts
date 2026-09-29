@@ -97,7 +97,7 @@ describe('AdminPromptConfigPage', () => {
     expect(screen.getByRole('heading', { name: 'Image' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Prompt' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Fusion' })).toBeInTheDocument()
-    expect(screen.getByText('共 4 个功能')).toBeInTheDocument()
+    expect(screen.getByText('共 5 个功能')).toBeInTheDocument()
     expect(screen.getAllByText('共 1 个功能')).toHaveLength(2)
   })
 

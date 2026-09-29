@@ -155,6 +155,7 @@ import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import type {
   AdminBillableItemCard,
   AdminModelPoolEntry,
@@ -198,7 +199,7 @@ const emit = defineEmits<{
   reloadCatalog: []
 }>()
 
-const POOL_RESOLUTIONS: readonly PoolResolution[] = ['1k', '2k', '4k']
+const POOL_RESOLUTIONS: readonly PoolResolution[] = OUTPUT_RESOLUTION_OPTIONS
 
 const draft = ref<AdminModelPoolEntry[]>([])
 const selectedCatalogId = ref('')

@@ -12,7 +12,6 @@ import (
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/secrets"
 )
 
 // paymentOrderReturnStatusWords are the user-facing return-status words
@@ -299,11 +298,7 @@ func paymentOrderReturnStatus(order paymentsdomain.PaymentOrder) paymentcontract
 }
 
 func (s *Service) CredentialForOrder(ctx context.Context, order paymentsdomain.PaymentOrder) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-	configuration, err := s.configuration.GetStripeCredential(ctx, order.StripeCredentialID)
-	if err != nil {
-		return paymentconfiguration.StoredStripeConfiguration{}, "", paymentsdomain.ErrPurchasesUnavailable
-	}
-	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	configuration, apiKey, err := s.resolver.ForCredentialID(ctx, order.StripeCredentialID)
 	if err != nil {
 		return paymentconfiguration.StoredStripeConfiguration{}, "", paymentsdomain.ErrPurchasesUnavailable
 	}

@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/payments/application/configuration"
 	"ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/payments/application/credentials"
 	"ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/secrets"
 )
 
 type Store interface {
@@ -24,27 +23,22 @@ type Store interface {
 	RecordPaymentRefundAnomaly(context.Context, ports.StripeRefund, string, time.Time) (int64, error)
 }
 
-type Configuration interface {
-	GetStripeCredentialForOrderNumber(context.Context, string) (configuration.StoredStripeConfiguration, error)
-	GetStripeCredentialForOrder(context.Context, string) (configuration.StoredStripeConfiguration, error)
-}
-
 type Service struct {
-	store         Store
-	configuration Configuration
-	gateway       ports.RefundGateway
-	events        ports.PaymentEventPublisher
-	now           func() time.Time
+	store    Store
+	resolver *credentials.Resolver
+	gateway  ports.RefundGateway
+	events   ports.PaymentEventPublisher
+	now      func() time.Time
 }
 
-func NewService(store Store, config Configuration, gateway ports.RefundGateway, events ports.PaymentEventPublisher, now func() time.Time) (*Service, error) {
-	if store == nil || config == nil || gateway == nil {
-		return nil, fmt.Errorf("refund service requires store, configuration, and gateway")
+func NewService(store Store, gateway ports.RefundGateway, events ports.PaymentEventPublisher, now func() time.Time, resolver *credentials.Resolver) (*Service, error) {
+	if store == nil || resolver == nil || gateway == nil {
+		return nil, fmt.Errorf("refund service requires store, credential resolver, and gateway")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{store: store, configuration: config, gateway: gateway, events: events, now: now}, nil
+	return &Service{store: store, resolver: resolver, gateway: gateway, events: events, now: now}, nil
 }
 
 func (s *Service) CreatePaymentRefund(ctx context.Context, command contracts.CreatePaymentRefundCommand) (domain.PaymentRefund, error) {
@@ -141,11 +135,7 @@ func (s *Service) RefundAPIKey(ctx context.Context, orderNumber string) (string,
 }
 
 func (s *Service) RefundAPIKeyForOrder(ctx context.Context, orderID string) (string, error) {
-	credential, err := s.configuration.GetStripeCredentialForOrder(ctx, orderID)
-	if err != nil {
-		return "", contracts.ErrStripeConfigurationInvalid
-	}
-	apiKey, err := secrets.DecryptMaterialString(credential.APIKeyCiphertext, credential.SecretMaterialKind)
+	_, apiKey, err := s.resolver.ForOrder(ctx, orderID)
 	if err != nil {
 		return "", contracts.ErrStripeConfigurationInvalid
 	}
@@ -159,12 +149,11 @@ func (s *Service) publish(userID int64) {
 }
 
 func (s *Service) refundAPIKey(ctx context.Context, orderNumber string) (string, error) {
-	credential, err := s.configuration.GetStripeCredentialForOrderNumber(ctx, orderNumber)
+	_, apiKey, err := s.resolver.ForOrderNumber(ctx, orderNumber)
 	if err != nil {
-		return "", contracts.ErrRefundOrderNotEligible
-	}
-	apiKey, err := secrets.DecryptMaterialString(credential.APIKeyCiphertext, credential.SecretMaterialKind)
-	if err != nil {
+		if errors.Is(err, contracts.ErrRefundOrderNotEligible) {
+			return "", err
+		}
 		return "", contracts.ErrStripeConfigurationInvalid
 	}
 	return apiKey, nil

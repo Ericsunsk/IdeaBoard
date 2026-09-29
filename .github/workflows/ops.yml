@@ -71,6 +71,8 @@ jobs:
           bash -n scripts/ci-legacy-media-zero-scan.sh
           bash -n scripts/ci-legacy-media-zero-scan-test.sh
           bash -n scripts/ci-workflow-contract-test.sh
+          bash -n scripts/handbook-version-contract.sh
+          bash -n scripts/handbook-version-contract-test.sh
           bash -n scripts/sql-workspace-scope-check.sh
           bash -n scripts/sql-workspace-scope-check-test.sh
           bash -n scripts/openapi-pattern-check.sh
@@ -133,6 +135,8 @@ jobs:
             scripts/ci-legacy-media-zero-scan.sh \
             scripts/ci-legacy-media-zero-scan-test.sh \
             scripts/ci-workflow-contract-test.sh \
+            scripts/handbook-version-contract.sh \
+            scripts/handbook-version-contract-test.sh \
             scripts/sql-workspace-scope-check.sh \
             scripts/sql-workspace-scope-check-test.sh \
             scripts/openapi-pattern-check.sh \

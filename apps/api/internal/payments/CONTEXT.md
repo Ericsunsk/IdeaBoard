@@ -32,6 +32,7 @@ It does not own platform Idea balances or the ledger; Wallet, the double-entry L
 - `Service.EventHub` publishes only this instance's committed user top-up status hints; the frontend re-reads Wallet, orders, or recharge history from it, and SSE is never a payment fact source.
 - `Service.ReconcileDuePaymentOrders` is the River recovery seam and converges Checkout, Refund, and durable Dispute; `ListPaymentReconciliationAnomalies`, `ListAdminPaymentOrders`, `GetAdminPaymentOrder` are Admin read seams, HTTP/Admin presentation owns no reconciliation transition, and Admin detail returns only redacted Stripe identity, durable recovery facts, and a safe Dashboard URL.
 - `Credits typed Commands` carry every Idea balance change caused by a payment outcome; Payments never writes the Ledger or balance projections directly.
+- `credentials.Resolver` (`application/credentials`) is the sole Stripe credential read boundary: API-key / webhook-secret lookup and plaintext recovery for webhook intake/dispatch, checkout, refund, dispute, and reconciliation all funnel through it. The configuration service remains the only credential writer (encryption on publish).
 
 ## Invariants
 

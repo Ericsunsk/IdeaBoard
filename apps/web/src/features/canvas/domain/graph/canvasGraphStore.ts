@@ -8,18 +8,17 @@ import {
 } from './canvasGraphStoreState'
 import {
   applyCommitPatchOrder,
-  commitEdgeWrites,
-  commitGroupWrites,
-  commitNodeWrites,
+  canApplyCommitPatch,
   createChangeSet,
   createCommitPatch,
-  createSummary,
-  isSameJsonValue,
+  hasVisibleChanges,
   normalizeTransactionChanges,
   recordAppliedOrderPatch,
   selectCommitPatchRecords,
-} from './canvasGraphStoreTransaction'
-import { CanvasGraphTransaction } from './canvasGraphStoreTransaction'
+} from './canvasGraphPatchAlgebra'
+import { commitEdgeWrites, commitGroupWrites, commitNodeWrites } from './canvasGraphMutation'
+import { createSummary } from './canvasGraphHistoryProjection'
+import { CanvasGraphTransaction } from './canvasGraphTransactionPort'
 import {
   type CanvasGraphCommitEvent,
   type CanvasGraphCommitPatch,
@@ -28,13 +27,9 @@ import {
   type CanvasGraphNodeId,
   type CanvasGraphNodeKind,
   type CanvasGraphNodeRecord,
-  type CanvasGraphOrderPatch,
-  type CanvasGraphOrderPlacement,
-  type CanvasGraphCollectionPatch,
   type CanvasGraphEdgeRecord,
   type CanvasGraphGroupRecord,
   type CanvasGraphPatchDirection,
-  type CanvasGraphRecordPatch,
   CanvasGraphStaleTransactionError,
   type CanvasGraphStoreState,
   type CanvasGraphTransactionDraft,
@@ -76,7 +71,7 @@ export {
   type CanvasGraphTransactionReason,
   type CanvasGraphTransactionSummary,
 } from './canvasGraphStoreTypes'
-export { CanvasGraphTransaction } from './canvasGraphStoreTransaction'
+export { CanvasGraphTransaction } from './canvasGraphTransactionPort'
 export {
   toCanvasGraphEdgeId,
   toCanvasGraphGroupId,
@@ -133,7 +128,7 @@ export class CanvasGraphStore {
     direction: CanvasGraphPatchDirection,
     options: CanvasGraphTransactionOptions = {},
   ): CanvasGraphTransactionSummary {
-    if (!this._canApplyCommitPatch(patch, direction)) {
+    if (!canApplyCommitPatch(this.state, patch, direction)) {
       const draft = this._createTransactionDraft()
       return createSummary(
         direction === 'forward' ? 'history-redo' : 'history-undo',
@@ -162,10 +157,7 @@ export class CanvasGraphStore {
       markDirty: options.markDirty ?? true,
     }
     const changes = normalizeTransactionChanges(draft)
-    const didChange =
-      changes.hasDomainChanges ||
-      changes.selectedNodeIds.size > 0 ||
-      changes.selectedEdgeIds.size > 0
+    const didChange = hasVisibleChanges(changes)
     const commitPatch = createCommitPatch(draft)
     if (didChange) this._commitTransaction(draft)
     const summary = createSummary(
@@ -283,55 +275,6 @@ export class CanvasGraphStore {
         console.error('[Canvas] Graph commit listener failed', error)
       }
     })
-  }
-
-  _canApplyCommitPatch(
-    patch: CanvasGraphCommitPatch,
-    direction: CanvasGraphPatchDirection,
-  ): boolean {
-    const source = <Record, Id extends string>(recordPatch: CanvasGraphRecordPatch<Record, Id>) =>
-      direction === 'forward' ? recordPatch.before : recordPatch.after
-    const matchesRecords = <Record, Id extends string>(
-      records: ReadonlyMap<Id, Record>,
-      collection: CanvasGraphCollectionPatch<Record, Id>,
-    ) =>
-      collection.records.every((recordPatch) => {
-        const expected = source(recordPatch)
-        const current = records.get(recordPatch.id)
-        return expected === undefined
-          ? current === undefined
-          : !!current && isSameJsonValue(current, expected)
-      })
-    const matchesPlacement = <Id extends string>(
-      order: readonly Id[],
-      placement: CanvasGraphOrderPlacement<Id> | undefined,
-      id: Id,
-    ) => {
-      const index = order.indexOf(id)
-      if (!placement) return index < 0
-      if (index < 0) return false
-      const previousId = order[index - 1]
-      const nextId = order[index + 1]
-      return (
-        (placement.previousId === undefined || placement.previousId === previousId) &&
-        (placement.nextId === undefined || placement.nextId === nextId)
-      )
-    }
-    const matchesOrder = <Id extends string>(
-      order: readonly Id[],
-      changes: readonly CanvasGraphOrderPatch<Id>[],
-    ) =>
-      changes.every((change) =>
-        matchesPlacement(order, direction === 'forward' ? change.before : change.after, change.id),
-      )
-    return (
-      matchesRecords(this.state.nodesById, patch.nodes) &&
-      matchesRecords(this.state.edgesById, patch.edges) &&
-      matchesRecords(this.state.groupsById, patch.groups) &&
-      matchesOrder(this.state.nodeOrder, patch.nodes.order) &&
-      matchesOrder(this.state.edgeOrder, patch.edges.order) &&
-      matchesOrder(this.state.groupOrder, patch.groups.order)
-    )
   }
 
   _assertTransactionCurrent(draft: CanvasGraphTransactionDraft) {

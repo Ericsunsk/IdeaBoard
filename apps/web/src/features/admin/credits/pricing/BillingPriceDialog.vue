@@ -68,6 +68,7 @@ import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
+import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
@@ -93,9 +94,9 @@ const emit = defineEmits<{
 const maxPriceCredits = 9_000_000_000_000_000
 
 const resolutions = computed<PricingVariant[]>(
-  () => props.item?.pricingVariants ?? ['1k', '2k', '4k'],
+  () => props.item?.pricingVariants ?? [...OUTPUT_RESOLUTION_OPTIONS],
 )
-const requiredVariant = computed(() => resolutions.value[0] ?? '1k')
+const requiredVariant = computed(() => resolutions.value[0] ?? OUTPUT_RESOLUTION_OPTIONS[0])
 const prices = ref<Record<PricingVariant, number | null>>({
   '1k': null,
   '2k': null,
@@ -122,7 +123,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (!visible) return
-    for (const variant of ['1k', '2k', '4k'] as PricingVariant[]) {
+    for (const variant of OUTPUT_RESOLUTION_OPTIONS) {
       prices.value[variant] = props.item?.currentPrices[variant]?.unitCredits ?? null
     }
     showError.value = false

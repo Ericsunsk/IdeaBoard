@@ -13,17 +13,16 @@ import (
 
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/payments/application/credentials"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentports "ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/secrets"
 
 	"github.com/google/uuid"
 )
 
 type ConfigurationStore interface {
 	GetStripeConfiguration(context.Context) (paymentconfiguration.StoredStripeConfiguration, error)
-	GetStripeCredential(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, error)
 	GetPaymentCheckoutShutdown(context.Context, string) (paymentconfiguration.PaymentCheckoutShutdown, error)
 	ListActivePaymentCheckoutShutdowns(context.Context) ([]paymentconfiguration.PaymentCheckoutShutdown, error)
 	ListPaymentOrdersForCheckoutShutdown(context.Context, paymentconfiguration.PaymentCheckoutShutdown, int32) ([]paymentsdomain.PaymentOrder, error)
@@ -66,7 +65,7 @@ func (s *Service) PrepareRequest(ctx context.Context, command paymentsdomain.Cre
 	if err := s.requireWallet(ctx, command.UserID); err != nil {
 		return Request{}, err
 	}
-	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	configuration, apiKey, err := s.resolver.ForCredentialID(ctx, configuration.CredentialID)
 	if err != nil {
 		return Request{}, paymentsdomain.ErrPurchasesUnavailable
 	}
@@ -153,6 +152,7 @@ type Store interface {
 
 type Service struct {
 	configuration ConfigurationStore
+	resolver      *credentials.Resolver
 	store         Store
 	gateway       paymentports.CheckoutGateway
 	wallets       ports.WalletReader
@@ -160,14 +160,14 @@ type Service struct {
 	now           func() time.Time
 }
 
-func NewService(configuration ConfigurationStore, store Store, gateway paymentports.CheckoutGateway, wallets ports.WalletReader, lifecycle *paymentorder.PaymentOrderLifecycle, now func() time.Time) (*Service, error) {
-	if configuration == nil || store == nil || gateway == nil || wallets == nil || lifecycle == nil {
-		return nil, fmt.Errorf("checkout service requires configuration, store, gateway, wallet reader, and lifecycle")
+func NewService(configuration ConfigurationStore, store Store, gateway paymentports.CheckoutGateway, wallets ports.WalletReader, lifecycle *paymentorder.PaymentOrderLifecycle, now func() time.Time, resolver *credentials.Resolver) (*Service, error) {
+	if configuration == nil || resolver == nil || store == nil || gateway == nil || wallets == nil || lifecycle == nil {
+		return nil, fmt.Errorf("checkout service requires configuration, credential resolver, store, gateway, wallet reader, and lifecycle")
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{configuration: configuration, store: store, gateway: gateway, wallets: wallets, lifecycle: lifecycle, now: now}, nil
+	return &Service{configuration: configuration, resolver: resolver, store: store, gateway: gateway, wallets: wallets, lifecycle: lifecycle, now: now}, nil
 }
 
 func (s *Service) RefreshActivePaymentOrders(ctx context.Context, userID int64, now time.Time, resolve func(context.Context, paymentsdomain.PaymentOrder) (paymentsdomain.PaymentOrder, error)) ([]paymentsdomain.PaymentOrder, error) {
@@ -321,16 +321,12 @@ func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID str
 }
 
 func (s *Service) shutdownAPIKey(ctx context.Context, shutdown paymentconfiguration.PaymentCheckoutShutdown) (string, error) {
-	configuration, err := s.configuration.GetStripeCredential(ctx, shutdown.StripeCredentialID)
+	configuration, apiKey, err := s.resolver.ForCredentialID(ctx, shutdown.StripeCredentialID)
 	if err != nil {
 		return "", err
 	}
 	if configuration.AccountID != shutdown.StripeAccountID {
 		return "", paymentsdomain.ErrPurchasesUnavailable
-	}
-	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
-	if err != nil {
-		return "", paymentcontracts.ErrStripeConfigurationInvalid
 	}
 	return apiKey, nil
 }

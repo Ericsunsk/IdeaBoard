@@ -23,7 +23,7 @@ export interface FeatureGroup {
 const PROMPT_CONFIG_FEATURES_BY_GROUP: Readonly<
   Partial<Record<AdminServiceGroupKey, readonly FeatureSlug[]>>
 > = {
-  image: ['render', 'variations', 'inpaint', 'outpaint'],
+  image: ['render', 'variations', 'inpaint', 'outpaint', 'upscale'],
   prompt: ['generation'],
   fusion: ['fusion'],
 }

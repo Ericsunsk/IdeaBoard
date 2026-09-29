@@ -127,10 +127,24 @@ jobs:
         run: ./scripts/ci-media-package-boundary.sh
       - name: Run legacy media cutover zero-result scan
         run: ./scripts/ci-legacy-media-zero-scan.sh
+  handbook-contract:
+    # Issue #855 version/link contract gate. This always runs so the
+    # required CI Gate cannot silently accept version drift or stale
+    # handbook entry points on docs-only or workflow-only changes.
+    name: Handbook Contract
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Run handbook version and link contract
+        run: ./scripts/handbook-version-contract.sh
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops, media-contract]
+    needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops, media-contract, handbook-contract]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -155,4 +169,6 @@ jobs:
           OPS_RESULT: ${{ needs.ops.result }}
           MEDIA_CONTRACT_REQUIRED: 'true'
           MEDIA_CONTRACT_RESULT: ${{ needs.media-contract.result }}
+          HANDBOOK_CONTRACT_REQUIRED: 'true'
+          HANDBOOK_CONTRACT_RESULT: ${{ needs.handbook-contract.result }}
         run: ./scripts/ci-gate.sh

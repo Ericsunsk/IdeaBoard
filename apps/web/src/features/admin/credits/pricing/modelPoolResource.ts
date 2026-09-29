@@ -8,6 +8,10 @@ import {
   requireContractData,
 } from '../../../../shared/api/contractKernel'
 import { createAdminGatewayResource } from '../../models/infrastructure/adminGatewayResource'
+import {
+  OUTPUT_RESOLUTION_OPTIONS,
+  parseOutputResolution,
+} from '../../../../shared/domain/generationContract'
 import type {
   AdminModelPool,
   AdminModelPoolEntry,
@@ -117,7 +121,7 @@ type AdminModelPoolSaveWire = AdminModelPoolWire & {
   changed: boolean
 }
 
-const POOL_RESOLUTIONS: readonly PoolResolution[] = ['1k', '2k', '4k']
+const POOL_RESOLUTIONS: readonly PoolResolution[] = OUTPUT_RESOLUTION_OPTIONS
 
 function normalizePool(wire: AdminModelPoolWire, fallbackSku: string): AdminModelPool {
   return {
@@ -136,7 +140,8 @@ function normalizeResolutions(raw: unknown): PoolResolution[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<PoolResolution>()
   for (const value of raw) {
-    if (value === '1k' || value === '2k' || value === '4k') seen.add(value)
+    const parsed = parseOutputResolution(value)
+    if (parsed !== null) seen.add(parsed)
   }
   return POOL_RESOLUTIONS.filter((resolution) => seen.has(resolution))
 }

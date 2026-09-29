@@ -1,5 +1,10 @@
+import type { OutputResolution as CatalogResolution } from '../../../../shared/domain/generationContract'
+
 export type AdminBillableItemStatus = 'unpriced' | 'active' | 'disabled' | 'archived'
-export type PricingVariant = '1k' | '2k' | '4k'
+// Pricing and pool resolutions are the shared catalog values (1k/2k/4k):
+// this module aliases the single source instead of declaring a competing
+// enum. Never add a "default" variant here.
+export type PricingVariant = CatalogResolution
 export type OutputResolution = PricingVariant
 
 export interface AdminBillableItemPrice {
@@ -31,7 +36,8 @@ export interface AdminBillableItemCard {
 // unordered set of {model, enabled, supported_resolutions} entries plus
 // a monotonic pool version pinned into routing snapshots. Entries carry
 // no priority, fallback, or weight — never add those fields here.
-export type PoolResolution = '1k' | '2k' | '4k'
+// Resolutions alias the shared catalog values, never a local copy.
+export type PoolResolution = CatalogResolution
 
 export interface AdminModelPoolEntry {
   modelId: string

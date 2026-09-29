@@ -26,7 +26,10 @@ var outputResolutions = [...]OutputResolution{
 	OutputResolution4K,
 }
 
-var defaultPricingVariants = [...]OutputResolution{
+// canonicalPricingVariants is the registry fallback when a definition omits
+// its variant list: exactly 1k, 2k, and 4k. It names catalog values, never a
+// "default" resolution.
+var canonicalPricingVariants = [...]OutputResolution{
 	OutputResolution1K,
 	OutputResolution2K,
 	OutputResolution4K,
@@ -103,7 +106,7 @@ type PublishPricesInput struct {
 
 func normalizePricingVariants(raw []OutputResolution) ([]OutputResolution, error) {
 	if len(raw) == 0 {
-		raw = defaultPricingVariants[:]
+		raw = canonicalPricingVariants[:]
 	}
 	variants := make([]OutputResolution, 0, len(raw))
 	seen := make(map[OutputResolution]struct{}, len(raw))

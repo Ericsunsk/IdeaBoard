@@ -236,7 +236,7 @@ export type TransactionChangeSet = {
 }
 
 /**
- * Narrow view of the store that {@link import('./canvasGraphStoreTransaction').CanvasGraphTransaction}
+ * Narrow view of the store that {@link import('./canvasGraphTransactionPort').CanvasGraphTransaction}
  * needs. Declared here (rather than importing `CanvasGraphStore`) so the store
  * and its transaction subsystem do not form an import cycle.
  */

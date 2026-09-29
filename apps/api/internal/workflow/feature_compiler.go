@@ -312,10 +312,15 @@ func compileOutputResolution(feature string, policy OutputResolutionPolicy, raw 
 	if raw != nil {
 		value = *raw
 	}
-	resolution, ok := NormalizeOutputResolution(value)
-	if policy == OutputResolutionPolicyFixed && strings.TrimSpace(value) == "" {
-		resolution, ok = OutputResolution1K, true
+	// An omitted (nil) or blank request carries no explicit resolution:
+	// normalize it once to the Service policy's canonical value (1k for
+	// both fixed and scalable policies, ADR-0012 rule 3). An explicit
+	// non-blank value — including "default" — must be one of 1k/2k/4k,
+	// and a fixed-policy Service additionally accepts only 1k.
+	if strings.TrimSpace(value) == "" {
+		return OutputResolution1K, nil
 	}
+	resolution, ok := NormalizeOutputResolution(value)
 	if !ok || policy == OutputResolutionPolicyFixed && resolution != OutputResolution1K {
 		return "", newFeatureContractValidationError(
 			FeatureContractUnsupportedResolution, feature, "output_resolution", value,

@@ -61,7 +61,7 @@ Pages 项目建议配置：
 | Root directory | `apps/web` |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Environment variable | `NODE_VERSION=22.23.2` |
+| Environment variable | `NODE_VERSION`（与根目录 `.node-version` 一致） |
 | Environment variable | Leave `VITE_API_BASE_URL` and `VITE_PUBLIC_ASSET_BASE_URL` empty (same-origin Gateway) |
 | Pages Function variable | `IDEABOARD_API_ORIGIN=<current VPS API HTTPS origin>` (required; no retired-host fallback) |
 | Auth public origin | Derived from the current browser origin (`ideaboard.art`) |

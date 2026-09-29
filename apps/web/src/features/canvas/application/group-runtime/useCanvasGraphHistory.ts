@@ -5,7 +5,7 @@ import type {
   CanvasGraphNodeRecord,
   CanvasGraphPatchDirection,
 } from '../../domain/graph'
-import { isSameJsonValue } from '../../domain/graph/canvasGraphStoreTransaction.ts'
+import { isSameJsonValue } from '../../domain/graph/canvasGraphValueEquality.ts'
 import { recordCanvasInteractionCount } from '../../infrastructure/browser/canvasInteractionMetrics.ts'
 import { measureCanvasPerf } from '../../infrastructure/browser/canvasPerfProbe.ts'
 

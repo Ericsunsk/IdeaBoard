@@ -168,7 +168,7 @@ sequenceDiagram
 ## 🛠️ 快速开始 (Quickstart Guide)
 
 > [!TIP]
-> **环境要求**：Node.js `>= 22.23.2` \| Go `>= 1.26.5` \| PostgreSQL `>= 17`
+> **环境要求**：Node.js（见根目录 `.node-version`）| Go（见 `apps/api/go.mod`）| PostgreSQL `>= 17`
 
 <details open>
 <summary><b>1️⃣ 启动本地数据库与依赖 (Docker Compose)</b></summary>

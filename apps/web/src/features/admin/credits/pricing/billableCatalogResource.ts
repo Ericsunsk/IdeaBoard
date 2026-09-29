@@ -10,6 +10,10 @@ import {
   requireContractData,
 } from '../../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
+import {
+  OUTPUT_RESOLUTION_OPTIONS,
+  parseOutputResolution,
+} from '../../../../shared/domain/generationContract'
 import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
@@ -223,12 +227,11 @@ function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItem
 }
 
 function normalizePricingVariants(raw: unknown): PricingVariant[] {
-  if (!Array.isArray(raw)) return ['1k', '2k', '4k']
+  if (!Array.isArray(raw)) return [...OUTPUT_RESOLUTION_OPTIONS]
   const variants = raw.filter(
-    (value): value is PricingVariant =>
-      value === '1k' || value === '2k' || value === '4k',
+    (value): value is PricingVariant => parseOutputResolution(value) !== null,
   )
-  return variants.length > 0 ? variants : ['1k', '2k', '4k']
+  return variants.length > 0 ? variants : [...OUTPUT_RESOLUTION_OPTIONS]
 }
 
 function normalizePrice(price: BillingPrice): AdminBillableItemPrice {

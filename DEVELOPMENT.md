@@ -6,12 +6,12 @@
 
 环境要求：
 
-| 组件       | 建议版本  |
-| ---------- | --------- |
-| Node.js    | `22.23.2` |
-| Go         | `1.26.6+` |
-| PostgreSQL | `17+`     |
-| Atlas CLI  | `1.3.2`   |
+| 组件       | 建议版本                                |
+| ---------- | --------------------------------------- |
+| Node.js    | 以根目录 `.node-version` 为准           |
+| Go         | 以 `apps/api/go.mod` 的 `go` directive 为准 |
+| PostgreSQL | `17+`                                   |
+| Atlas CLI  | `1.3.2`                                 |
 
 启动本地依赖：
 
@@ -155,12 +155,13 @@ GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` 
 bash scripts/ci-change-classifier-test.sh
 bash scripts/ci-gate-test.sh
 bash scripts/ci-workflow-contract-test.sh
+bash scripts/handbook-version-contract-test.sh
 bash scripts/ci-parity-test.sh
 bash scripts/ci-migration-integration-test.sh
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 ```
 
-Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。
+Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。Dockerfile 中的 `NODE_VERSION` / `golang` pin 只是可独立构建的 fallback，必须与 canonical source 一致；handbook 入口链接与版本一致性由 `scripts/handbook-version-contract.sh` 在 CI 强制校验（见 `Handbook Contract` lane）。
 
 Migration Integration 的 Auth build、runtime role 初始化与 API/Auth 两轮幂等迁移统一由 `scripts/ci-migration-integration.sh` 编排；workflow 只负责准备 PostgreSQL、Node、Go 与 locked dependencies，不复制迁移顺序。
 
@@ -204,7 +205,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [executionContract.ts](./apps/web/src/features/canvas/domain/execution-contracts/executionContract.ts)                   | 前端 workflow feature contract      |
 | [generationIntent.ts](./apps/web/src/features/canvas/application/image-workflow/generationIntent.ts)                          | Prompt/node execution orchestration |
 | [useCanvasImageWorkflow.ts](./apps/web/src/features/canvas/application/image-workflow/useCanvasImageWorkflow.ts) | Image node direct actions           |
-| [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)                                                          | Task SSE events                     |
+| [workspaceEventStream.ts](./apps/web/src/shared/api/workspaceEventStream.ts)                                                          | Task SSE events                     |
 | [features.go](./apps/api/internal/workflow/features.go)                                                           | 后端 canonical feature contract     |
 
 ### Task runtime
@@ -212,7 +213,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | 入口                                                                          | 用途                          |
 | ----------------------------------------------------------------------------- | ----------------------------- |
 | [service.go](./apps/api/internal/tasking/application/task/service.go)              | Task service                  |
-| [commands.go](./apps/api/internal/tasking/application/task/commands.go)               | Task submission commands |
+| [canonical_intake.go](./apps/api/internal/tasking/application/task/canonical_intake.go)               | Task submission intake |
 | [river_queue.go](./apps/api/internal/tasking/infrastructure/queue/river_queue.go)        | River enqueue adapter         |
 | [worker.go](./apps/api/internal/runtime/interfaces/worker/river/worker.go)         | River worker adapter          |
 | [workspace_task_worker.go](./apps/api/internal/tasking/interfaces/worker/workspace_task_worker.go) | Worker task processing        |

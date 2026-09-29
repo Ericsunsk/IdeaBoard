@@ -54,6 +54,35 @@ export function isOutputResolution(value: unknown): value is OutputResolution {
   return typeof value === 'string' && OUTPUT_RESOLUTION_OPTIONS.includes(value as OutputResolution)
 }
 
+/**
+ * Canonical catalog parser: only 1k/2k/4k are accepted, never a default.
+ * Matching API ingress, case and surrounding whitespace are normalized once
+ * at this boundary and the canonical lowercase value is returned.
+ */
+export function parseOutputResolution(value: unknown): OutputResolution | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return isOutputResolution(normalized) ? normalized : null
+}
+
+export function assertOutputResolution(value: unknown): OutputResolution {
+  const parsed = parseOutputResolution(value)
+  if (parsed === null) {
+    throw new Error('output resolution must be one of 1k, 2k, 4k')
+  }
+  return parsed
+}
+
+/**
+ * Snapshot repair normalizer for persisted graph state: a missing, blank,
+ * or corrupt resolution reads as the Service policy default 1k (ADR-0012
+ * rule 3) so legacy boards stay loadable. It is NOT a catalog validation
+ * seam — catalog writes (submit, quote, pool save) and form validation
+ * must use parseOutputResolution and surface the error instead of
+ * coercing.
+ */
 export function normalizeOutputResolution(value: unknown): OutputResolution {
-  return isOutputResolution(value) ? value : '1k'
+  if (value === null || value === undefined) return '1k'
+  if (typeof value === 'string' && value.trim() === '') return '1k'
+  return parseOutputResolution(value) ?? '1k'
 }

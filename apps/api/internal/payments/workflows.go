@@ -10,6 +10,7 @@ import (
 	paymentcheckout "ideaboard/api/internal/payments/application/checkout"
 	paymentconfiguration "ideaboard/api/internal/payments/application/configuration"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
+	"ideaboard/api/internal/payments/application/credentials"
 	paymentdispute "ideaboard/api/internal/payments/application/dispute"
 	paymentorder "ideaboard/api/internal/payments/application/order"
 	paymentreadmodel "ideaboard/api/internal/payments/application/readmodel"
@@ -19,7 +20,6 @@ import (
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	paymentevents "ideaboard/api/internal/payments/infrastructure/events"
 	paymentports "ideaboard/api/internal/payments/ports"
-	"ideaboard/api/internal/platform/secrets"
 )
 
 // checkoutApplicationService gives the embedded checkout service a distinct field name
@@ -115,7 +115,11 @@ func NewCheckoutWorkflow(deps CheckoutWorkflowDependencies) (*CheckoutWorkflow, 
 	if deps.Transitions == nil || deps.Transitions.orderLifecycle == nil || deps.Transitions.runtime == nil {
 		return nil, fmt.Errorf("checkout workflow requires shared payment order transitions")
 	}
-	checkoutService, err := paymentcheckout.NewService(deps.Configuration, deps.Store, deps.CheckoutGateway, deps.Wallets, deps.Transitions.orderLifecycle, deps.Transitions.runtime.now)
+	resolver, err := newCredentialResolver(deps.Configuration)
+	if err != nil {
+		return nil, err
+	}
+	checkoutService, err := paymentcheckout.NewService(deps.Configuration, deps.Store, deps.CheckoutGateway, deps.Wallets, deps.Transitions.orderLifecycle, deps.Transitions.runtime.now, resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -159,20 +163,12 @@ type StripeFactsWorkflow struct {
 	*paymentWebhookService
 }
 
-type stripeCredentialLoader func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, error)
-
-func credentialAccess(load stripeCredentialLoader) func(context.Context, string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-	return func(ctx context.Context, id string) (paymentconfiguration.StoredStripeConfiguration, string, error) {
-		configuration, err := load(ctx, id)
-		if err != nil {
-			return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-		}
-		key, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
-		if err != nil {
-			return paymentconfiguration.StoredStripeConfiguration{}, "", paymentcontracts.ErrStripeConfigurationInvalid
-		}
-		return configuration, key, nil
-	}
+// newCredentialResolver builds the single credential boundary shared by the
+// Stripe facts workflow. All request-time credential lookup and plaintext
+// normalization funnels through it; the deleted per-service assembly closures
+// must not reappear.
+func newCredentialResolver(store credentials.Store) (*credentials.Resolver, error) {
+	return credentials.NewResolver(store)
 }
 
 func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsWorkflow, error) {
@@ -182,14 +178,18 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 	if deps.Transitions == nil || deps.Transitions.orderLifecycle == nil || deps.Transitions.runtime == nil {
 		return nil, fmt.Errorf("stripe facts workflow requires shared payment order transitions")
 	}
-	refundService, err := paymentrefund.NewService(deps.Convergence, deps.Configuration, deps.RefundGateway, deps.Transitions.runtime.events, deps.Transitions.runtime.now)
+	resolver, err := newCredentialResolver(deps.Configuration)
+	if err != nil {
+		return nil, err
+	}
+	refundService, err := paymentrefund.NewService(deps.Convergence, deps.RefundGateway, deps.Transitions.runtime.events, deps.Transitions.runtime.now, resolver)
 	if err != nil {
 		return nil, err
 	}
 	disputeService, err := paymentdispute.NewService(paymentdispute.Dependencies{
 		CheckoutStore: deps.CheckoutStore, CheckoutGateway: deps.CheckoutGateway,
 		OrderLifecycle:   deps.Transitions.orderLifecycle,
-		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
+		CredentialAccess: resolver.ForCredentialID,
 	})
 	if err != nil {
 		return nil, err
@@ -198,8 +198,8 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 		Configuration: deps.Configuration, Convergence: deps.Convergence, CheckoutRecovery: deps.CheckoutRecovery,
 		CheckoutStore: deps.CheckoutStore, CheckoutGateway: deps.CheckoutGateway, RefundGateway: deps.RefundGateway,
 		DisputeGateway: deps.DisputeGateway, DisputeExpiry: disputeService, OrderLifecycle: deps.Transitions.orderLifecycle,
-		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
-		OrderAccess:      credentialAccess(deps.Configuration.GetStripeCredentialForOrder),
+		CredentialAccess: resolver.ForCredentialID,
+		OrderAccess:      resolver.ForOrder,
 		Publish: func(userID int64, status paymentports.PaymentEventStatus) {
 			deps.Transitions.runtime.events.Publish(userID, paymentports.PaymentEvent{Status: status})
 		}, Now: deps.Transitions.runtime.now,
@@ -208,11 +208,12 @@ func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsW
 		return nil, err
 	}
 	webhookService, err := paymentwebhook.NewService(paymentwebhook.Dependencies{
-		Configuration: deps.Configuration, Inbox: deps.Inbox, Convergence: deps.Convergence,
+		Inbox: deps.Inbox, Convergence: deps.Convergence,
 		Verifier: deps.Verifier, CheckoutStore: deps.CheckoutStore, Checkout: deps.Transitions.orderLifecycle,
 		Refund: refundService, Dispute: disputeService, CheckoutGateway: deps.CheckoutGateway, DisputeGateway: deps.DisputeGateway,
-		CredentialAccess: credentialAccess(deps.Configuration.GetStripeCredential),
-		Events:           deps.Transitions.runtime.events, Now: deps.Transitions.runtime.now,
+		CredentialAccess:   resolver.ForCredentialID,
+		WebhookCredentials: resolver.ListWebhookCredentials,
+		Events:             deps.Transitions.runtime.events, Now: deps.Transitions.runtime.now,
 	})
 	if err != nil {
 		return nil, err
