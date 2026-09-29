@@ -339,8 +339,8 @@ func (r *ConfigRepository) SaveCatalog(ctx context.Context, items []CatalogItem,
 		return fmt.Errorf("encode AI gateway model catalog: %w", err)
 	}
 	return r.settings.WithAIGatewayCatalogWrite(ctx, func(tx settings.SystemConfigWriteTx) (settings.SystemConfigAdminAudit, error) {
-		// Read and prune under the same lock as mapping writes so a valid
-		// mapping update cannot be deleted using a stale pre-lock snapshot.
+		// Read and prune under the same catalog-write lock so a valid mapping
+		// update cannot be deleted using a stale pre-lock snapshot.
 		removedMappingKeys, err := staleMappingKeysForRemovedModels(ctx, tx, items)
 		if err != nil {
 			return settings.SystemConfigAdminAudit{}, fmt.Errorf("read AI gateway catalog mappings: %w", err)

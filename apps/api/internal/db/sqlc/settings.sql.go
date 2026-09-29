@@ -415,7 +415,9 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 
 const lockAIGatewayCatalogWrite = `-- name: LockAIGatewayCatalogWrite :exec
 SELECT pg_advisory_xact_lock(
-  hashtextextended('ai_gateway_catalog_write', 0)
+  -- Keep the historical namespace so rolling deployments share one lock
+  -- across binaries while the query/API name reflects catalog writes.
+  hashtextextended('ai_gateway_model_mapping_write', 0)
 )
 `
 

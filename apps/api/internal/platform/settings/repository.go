@@ -166,8 +166,10 @@ func (r *SystemConfigRepository) SetManyWithAdminAudit(ctx context.Context, valu
 	})
 }
 
-// WithAIGatewayCatalogWrite serializes one settings read-modify-write
-// with every AI Gateway mapping writer and commits its audit record atomically.
+// WithAIGatewayCatalogWrite serializes one AI Gateway catalog read-modify-write
+// and commits its audit record atomically. The underlying advisory lock keeps
+// its historical namespace so old and new binaries remain mutually exclusive
+// during a rolling deployment.
 func (r *SystemConfigRepository) WithAIGatewayCatalogWrite(
 	ctx context.Context,
 	mutate func(SystemConfigWriteTx) (SystemConfigAdminAudit, error),
