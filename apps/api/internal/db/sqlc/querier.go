@@ -76,7 +76,10 @@ type Querier interface {
 	//   credential_id        <- 0 (same: no credential assignment on tasks)
 	//   feature_slug         <- tasks.service
 	//   api_type             <- '' (no provider api_type on workspace tasks)
-	//   model_name           <- latest execution attempt resolved_model, else
+	//   model_name           <- final execution attempt resolved_model
+	//                           (latest terminal completed/failed/cancelled
+	//                           attempt first, then latest of any status so
+	//                           in-flight tasks still attribute; #852), else
 	//                           '未识别模型' (attempts are empty until the
 	//                           worker records them; the fallback is honest)
 	//   output_count         <- latest billing snapshot quantity clamped to
@@ -196,6 +199,8 @@ type Querier interface {
 	// the workspace model and stay removed; their Go call sites fail closed.
 	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
 	DeleteOrganizationMembership(ctx context.Context, arg DeleteOrganizationMembershipParams) (int64, error)
+	DeleteServiceModelPoolEntries(ctx context.Context, service string) error
+	DeleteServiceModelPoolResolutions(ctx context.Context, service string) error
 	DeleteSystemConfigsByKeys(ctx context.Context, configKeys []string) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	DeleteWorkspaceBoardMembership(ctx context.Context, arg DeleteWorkspaceBoardMembershipParams) (int64, error)
@@ -256,7 +261,9 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetQuickSavesFolder(ctx context.Context, workspaceID int64) (LibraryFolder, error)
+	GetServiceModelPoolVersion(ctx context.Context, service string) (int64, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
+	GetTaskRoutingSnapshot(ctx context.Context, publicID string) ([]byte, error)
 	GetUploadSessionByPublicID(ctx context.Context, arg GetUploadSessionByPublicIDParams) (UploadSession, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Text) (User, error)
@@ -293,6 +300,8 @@ type Querier interface {
 	// ux_workspaces_personal_owner: concurrent inserts for the same owner collapse
 	// to a single row, and the follow-up select always reads the winner.
 	InsertPersonalWorkspaceIgnore(ctx context.Context, arg InsertPersonalWorkspaceIgnoreParams) (int64, error)
+	InsertServiceModelPoolEntry(ctx context.Context, arg InsertServiceModelPoolEntryParams) (ServiceModelPoolEntry, error)
+	InsertServiceModelPoolResolution(ctx context.Context, arg InsertServiceModelPoolResolutionParams) error
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
 	InsertWorkspaceBoardMembershipIgnore(ctx context.Context, arg InsertWorkspaceBoardMembershipIgnoreParams) (int64, error)
@@ -311,6 +320,7 @@ type Querier interface {
 	ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]ListBoardShareTokensRow, error)
 	ListControlTasks(ctx context.Context, arg ListControlTasksParams) ([]ListControlTasksRow, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
+	ListEligibleServicePoolModels(ctx context.Context, arg ListEligibleServicePoolModelsParams) ([]string, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]ListLibraryAssetsRow, error)
 	ListLibraryAssetsByFolder(ctx context.Context, arg ListLibraryAssetsByFolderParams) ([]ListLibraryAssetsByFolderRow, error)
@@ -335,6 +345,8 @@ type Querier interface {
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
+	ListServiceModelPoolEntries(ctx context.Context, service string) ([]ServiceModelPoolEntry, error)
+	ListServiceModelPoolResolutions(ctx context.Context, service string) ([]ServiceModelPoolResolution, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error)
 	ListStorageProfileSecretVersions(ctx context.Context, arg ListStorageProfileSecretVersionsParams) ([]StorageProfileSecretVersion, error)
@@ -388,6 +400,17 @@ type Querier interface {
 	// created_at) as updated_at. No dedup key: one asset may back many
 	// jobs; request idempotency stays handler-side (library:materialize).
 	LockLibraryMaterializationAsset(ctx context.Context, arg LockLibraryMaterializationAssetParams) error
+	// Service Model Pool catalog queries (#848, ADR-0012).
+	//
+	// The pool repository (internal/generation/catalog) drives every write
+	// inside one transaction: per-service advisory lock, version
+	// compare-and-swap, then full entry/resolution replacement. No query
+	// here bumps the version on its own; the repository computes the next
+	// version (1 on first write, current+1 on effective change) and upserts
+	// it with the replacement. Reads never take the lock.
+	// Snapshot helpers persist the immutable RoutingSnapshot JSONB on the
+	// task row; wave 2 submit calls them inside the submit transaction.
+	LockServiceModelPool(ctx context.Context, service string) error
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	LockWorkspaceBoard(ctx context.Context, arg LockWorkspaceBoardParams) (LockWorkspaceBoardRow, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id pgtype.UUID) (PaymentOrder, error)
@@ -416,6 +439,7 @@ type Querier interface {
 	RetryWorkspaceTask(ctx context.Context, arg RetryWorkspaceTaskParams) (Task, error)
 	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) (int64, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
+	SetTaskRoutingSnapshot(ctx context.Context, arg SetTaskRoutingSnapshotParams) (int64, error)
 	// Transitions read their result back through the data-modifying
 	// CTE's RETURNING list (joined to the untouched asset/media tables):
 	// the outer statement shares the CTE snapshot, so re-scanning the
@@ -448,6 +472,7 @@ type Querier interface {
 	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertOrganizationMembership(ctx context.Context, arg UpsertOrganizationMembershipParams) error
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
+	UpsertServiceModelPoolVersion(ctx context.Context, arg UpsertServiceModelPoolVersionParams) (int64, error)
 	// #809 hard cut: the locator-immutability guard used to consult
 	// media_assets.storage_profile_id, which no longer exists in the
 	// workspace model (the prevent_referenced_storage_profile_locator_change

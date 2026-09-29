@@ -1275,7 +1275,7 @@ export const getCreateWorkspaceBillingQuoteUrl = (workspaceId: string) => {
 }
 
 /**
- * Mints an immutable price snapshot with no persistence (preflight, like task-quotes): the quote path is the only place a price is ever shown, and settlement re-quotes authoritatively. Covers the ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and read total_credits). No price fields are accepted (unknown fields rejected with 400); unpriced or unregistered SKUs converge to billing_pricing_unavailable (422, deterministic, no SKU oracle), transient quote failures to billing_quote_unavailable (503). No Idempotency-Key: pure read, safe to retry.
+ * Mints an immutable price snapshot with no persistence (preflight, like task-quotes): the quote path is the only place a price is ever shown, and settlement re-quotes authoritatively. Covers the ai-search:vision SKU (post {data:{sku:"ai-search:vision"}} and read total_credits). No price fields are accepted (unknown fields rejected with 400); unpriced or unregistered SKUs converge to billing_pricing_unavailable (422, deterministic, no SKU oracle), transient quote failures to billing_quote_unavailable (503). No Idempotency-Key: pure read, safe to retry. For ai-image SKUs an omitted output_resolution is normalized to the Service policy's canonical 1k/2k/4k value and availability is checked before pricing (empty pool renders service_resolution_unavailable 422). The only accepted resolutions are 1k, 2k, and 4k.
  * @summary Mint a server-side billing quote (members only, no persistence)
  */
 export const createWorkspaceBillingQuote = async (

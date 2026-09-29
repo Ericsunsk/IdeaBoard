@@ -272,7 +272,7 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 	if _, ok := raw["schema_version"]; !ok || alias.SchemaVersion != CurrentParamsSchemaVersion {
 		return fmt.Errorf("unsupported task params schema version %d: expected %d", alias.SchemaVersion, CurrentParamsSchemaVersion)
 	}
-	if err := rejectLegacyPersistedMediaFields(raw); err != nil {
+	if err := rejectPersistedMediaFields(raw); err != nil {
 		return err
 	}
 	extra := map[string]interface{}{}
@@ -298,29 +298,29 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func rejectLegacyPersistedMediaFields(raw map[string]json.RawMessage) error {
-	if err := rejectLegacyTopLevelFields(raw); err != nil {
+func rejectPersistedMediaFields(raw map[string]json.RawMessage) error {
+	if err := rejectPersistedTopLevelFields(raw); err != nil {
 		return err
 	}
-	if err := rejectLegacyExtraFields(raw["extra"]); err != nil {
+	if err := rejectPersistedExtraFields(raw["extra"]); err != nil {
 		return err
 	}
-	if err := rejectLegacyMediaFields(raw["media"]); err != nil {
+	if err := rejectPersistedMediaFieldsInShape(raw["media"]); err != nil {
 		return err
 	}
-	return rejectLegacyGenerationFields(raw["generation"])
+	return rejectPersistedGenerationFields(raw["generation"])
 }
 
-func rejectLegacyTopLevelFields(raw map[string]json.RawMessage) error {
+func rejectPersistedTopLevelFields(raw map[string]json.RawMessage) error {
 	for key := range raw {
-		if paramkeys.IsLegacyPersistedMediaKey(key) {
-			return fmt.Errorf("legacy persisted media field %q is unsupported", key)
+		if paramkeys.IsPersistedMediaURLKey(key) {
+			return fmt.Errorf("persisted media URL field %q is unsupported", key)
 		}
 	}
 	return nil
 }
 
-func rejectLegacyExtraFields(value json.RawMessage) error {
+func rejectPersistedExtraFields(value json.RawMessage) error {
 	if value == nil {
 		return nil
 	}
@@ -329,14 +329,14 @@ func rejectLegacyExtraFields(value json.RawMessage) error {
 		return fmt.Errorf("decode task extra: %w", err)
 	}
 	for key := range extra {
-		if paramkeys.IsLegacyPersistedMediaKey(key) {
-			return fmt.Errorf("legacy task extra media field %q is unsupported", key)
+		if paramkeys.IsPersistedMediaURLKey(key) {
+			return fmt.Errorf("task extra media URL field %q is unsupported", key)
 		}
 	}
 	return nil
 }
 
-func rejectLegacyMediaFields(value json.RawMessage) error {
+func rejectPersistedMediaFieldsInShape(value json.RawMessage) error {
 	if value == nil {
 		return nil
 	}
@@ -344,13 +344,13 @@ func rejectLegacyMediaFields(value json.RawMessage) error {
 	if err := json.Unmarshal(value, &media); err != nil {
 		return fmt.Errorf("decode task media: %w", err)
 	}
-	if err := rejectLegacyMediaLists(media); err != nil {
+	if err := rejectPersistedMediaLists(media); err != nil {
 		return err
 	}
-	return rejectLegacyMediaSingles(media)
+	return rejectPersistedMediaSingles(media)
 }
 
-func rejectLegacyMediaLists(media map[string]json.RawMessage) error {
+func rejectPersistedMediaLists(media map[string]json.RawMessage) error {
 	for _, key := range []string{"inputs", "references"} {
 		value, found := media[key]
 		if !found {
@@ -361,7 +361,7 @@ func rejectLegacyMediaLists(media map[string]json.RawMessage) error {
 			return fmt.Errorf("decode task media %s: %w", key, err)
 		}
 		if mediaRefsContainURL(refs) {
-			return fmt.Errorf("legacy persisted media URL is unsupported")
+			return fmt.Errorf("persisted media URL is unsupported")
 		}
 	}
 	return nil
@@ -376,7 +376,7 @@ func mediaRefsContainURL(refs []map[string]json.RawMessage) bool {
 	return false
 }
 
-func rejectLegacyMediaSingles(media map[string]json.RawMessage) error {
+func rejectPersistedMediaSingles(media map[string]json.RawMessage) error {
 	for _, key := range []string{"mask", "original"} {
 		value, found := media[key]
 		if !found || string(value) == "null" {
@@ -387,13 +387,13 @@ func rejectLegacyMediaSingles(media map[string]json.RawMessage) error {
 			return fmt.Errorf("decode task media %s: %w", key, err)
 		}
 		if _, found := ref["url"]; found {
-			return fmt.Errorf("legacy persisted media URL is unsupported")
+			return fmt.Errorf("persisted media URL is unsupported")
 		}
 	}
 	return nil
 }
 
-func rejectLegacyGenerationFields(value json.RawMessage) error {
+func rejectPersistedGenerationFields(value json.RawMessage) error {
 	if value == nil {
 		return nil
 	}
@@ -405,7 +405,7 @@ func rejectLegacyGenerationFields(value json.RawMessage) error {
 	}
 	for _, media := range generation.Media {
 		if _, found := media["ref"]; found {
-			return fmt.Errorf("legacy persisted generation media ref is unsupported")
+			return fmt.Errorf("persisted generation media ref is unsupported")
 		}
 	}
 	return nil

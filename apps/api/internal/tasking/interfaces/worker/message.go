@@ -26,4 +26,6 @@ const (
 	msgWorkspaceBridgeTaskPayload4  = "任务 canonical 参数编码失败: %w"        // WorkspaceBridgeTaskPayload @ workspace_task_worker.go
 	msgMapWorkspaceProviderOutputs  = "上游结果缺少可持久化的输出引用"                // MapWorkspaceProviderOutputs @ workspace_task_worker.go
 	msgMapWorkspaceProviderOutputs2 = "上游输出不符合任务输出契约: %w"              // MapWorkspaceProviderOutputs @ workspace_task_worker.go
+	msgSnapshotMissing              = "任务路由快照缺失，请重新提交任务"               // ResolveExecutionSnapshot @ workspace_task_routing.go
+	msgSnapshotCorrupt              = "任务路由快照无效，请重新提交任务"               // ResolveExecutionSnapshot @ workspace_task_routing.go
 )

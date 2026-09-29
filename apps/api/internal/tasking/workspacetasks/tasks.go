@@ -4,15 +4,19 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	creditsdomain "ideaboard/api/internal/credits/domain"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/workflow"
 	"ideaboard/api/internal/workflow/paramkeys"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Status is the workspace task lifecycle state. The underlying wire and
@@ -83,10 +87,10 @@ const MaxOutputsPerTask = 4
 const MaxMediaInputs = 8
 
 // MaxWorkspaceTaskPromptBytes bounds the v1 data.prompt input in bytes.
-// It mirrors the legacy submit bound (maxSubmitTaskPromptBytes, 8KB):
+// It matches the canonical submit bound (8KB):
 // generation/inpaint require a prompt, render/variations/fusion/outpaint
-// accept an optional prompt, cutout/upscale ignore it (dropped at
-// canonical compile, legacy parity).
+// accept an optional prompt, and cutout/upscale ignore it (dropped at
+// canonical compile).
 const MaxWorkspaceTaskPromptBytes = 8 * 1024
 
 var (
@@ -112,9 +116,9 @@ var (
 	// underlying billing cause via multi-%w, and the 422-vs-503 split in
 	// renderTaskError depends on that pairing.
 	ErrQuoteUnavailable = errors.New("workspacetasks: quote unavailable")
-	// ErrRoutingUnavailable prevents accepting a task before a durable
-	// Service Model Pool decision exists.
-	ErrRoutingUnavailable = errors.New("workspacetasks: service routing unavailable")
+	// ErrSettlementUnavailable reports a missing atomic settlement seam.
+	// Production task mutation never falls back to compensating writes.
+	ErrSettlementUnavailable = errors.New("workspacetasks: settlement unavailable")
 	// ErrWalletRestricted is the canonical credits restriction failure
 	// (403 billing_wallet_restricted). Alias, not a copy: see
 	// ErrInsufficientCredits for the multi-%w pairing.
@@ -127,15 +131,13 @@ var (
 	ErrMediaArchived = errors.New("workspacetasks: media archived")
 )
 
-// RoutingGate is the pre-settlement availability seam. Routing must be
-// accepted before credits are held.
-type RoutingGate func(ctx context.Context, service, resolution string) error
-
-// RejectRoutingUntilPool is the production fail-closed gate used until #848
-// wires the authoritative Service Model Pool resolver.
-func RejectRoutingUntilPool(context.Context, string, string) error {
-	return ErrRoutingUnavailable
-}
+// RoutingSnapshotSaver persists the immutable submit-time RoutingSnapshot.
+// Production joins the settlement transaction (tx non-nil) via
+// catalog.SaveRoutingSnapshot so the snapshot commits atomically with the
+// Credit Hold, task insert, and River enqueue. Tests stub it to capture the
+// pinned fact. A nil saver is only valid for test fixtures; production wiring
+// always supplies the saver and the worker fails closed on a missing snapshot.
+type RoutingSnapshotSaver func(ctx context.Context, tx pgx.Tx, taskID string, snap routing.RoutingSnapshot) error
 
 // FieldError carries one field-level validation failure for
 // details.fields (Baseline 5.3).
@@ -206,18 +208,31 @@ const (
 // ExecutionToken, OutputRefs, and BillingSnapshot persist as durable
 // facts; the store never exposes internal numeric keys.
 //
-// ResolvedModel is retained as the execution target field for the upcoming
-// Service Model Pool snapshot. Until that snapshot is wired, production
-// routing rejects submissions and an empty target fails the worker closed.
+// ResolvedModel is the transient execution-target handoff inside the
+// worker only (#854: the durable workflow_input envelope key is
+// removed). It is never set at submit, never persisted, and never read
+// back from a store: the worker stamps the snapshot-derived target onto
+// its in-memory claimed copy before calling the provider bridge, which
+// consumes only this field. Readers must treat any stored value as
+// absent; the snapshot is the sole routing fact.
 type WorkspaceTask struct {
-	ID              string          `json:"id"`
-	WorkspaceID     string          `json:"workspace_id"`
-	OwnerUserID     int64           `json:"owner_user_id"`
-	Service         string          `json:"service"`
-	MediaAssetIDs   []string        `json:"media_asset_ids,omitempty"`
-	Params          map[string]any  `json:"params,omitempty"`
-	CanonicalParams string          `json:"canonical_params,omitempty"`
-	ResolvedModel   string          `json:"resolved_model,omitempty"`
+	ID              string         `json:"id"`
+	WorkspaceID     string         `json:"workspace_id"`
+	OwnerUserID     int64          `json:"owner_user_id"`
+	Service         string         `json:"service"`
+	MediaAssetIDs   []string       `json:"media_asset_ids,omitempty"`
+	Params          map[string]any `json:"params,omitempty"`
+	CanonicalParams string         `json:"canonical_params,omitempty"`
+	ResolvedModel   string         `json:"resolved_model,omitempty"`
+	// RoutingSnapshot carries the immutable submit-time RoutingSnapshot
+	// JSONB pinned on the task row (#848, ADR-0012 rule 9): the exact
+	// routing.RoutingSnapshot JSON shape, raw so readers that do not
+	// execute (HTTP views, Admin) never parse it. The worker is the only
+	// consumer: it parses and Verify()s these bytes and executes the
+	// pinned selected model, never the live pool and never the transient
+	// ResolvedModel handoff. Nil means "never pinned" and fails
+	// the worker closed.
+	RoutingSnapshot json.RawMessage `json:"routing_snapshot,omitempty"`
 	Status          Status          `json:"status"`
 	RetryCount      int             `json:"retry_count"`
 	ExecutionToken  string          `json:"execution_token"`
@@ -376,7 +391,7 @@ func ValidateParams(params map[string]any) error {
 		if !paramkeys.IsKnownSubmitTaskParamKey(key) && !paramkeys.IsCanonicalTaskParamKey(key) {
 			return newValidationError(FieldError{Field: "params." + key, Message: "unknown_field"})
 		}
-		if paramkeys.IsLegacyPersistedMediaKey(key) {
+		if paramkeys.IsPersistedMediaURLKey(key) {
 			return newValidationError(FieldError{Field: "params." + key, Message: "raw_media_url_forbidden"})
 		}
 		if key == paramkeys.MaskAssetID {

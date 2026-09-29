@@ -72,7 +72,7 @@ func newDeferredVisionService(t *testing.T, stub *deferredCatalogStub) *VisionBi
 		Namespace:       "ai-search",
 		ProductKind:     "search-feature",
 		DisplayName:     "vision",
-		PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
+		PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}})
 	if err != nil {
 		t.Fatalf("registry: %v", err)

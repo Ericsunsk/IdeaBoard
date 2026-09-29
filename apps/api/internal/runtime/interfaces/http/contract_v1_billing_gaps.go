@@ -68,12 +68,14 @@ import (
 	"time"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/generation/routing"
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	paymentsdomain "ideaboard/api/internal/payments/domain"
 	"ideaboard/api/internal/platform/contract"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -426,6 +428,45 @@ type v1BillingQuoteDTO struct {
 	QuotedAt         string `json:"quoted_at"`
 }
 
+// aiImagePoolService maps a billing quote SKU onto its pool service for
+// the shared availability gate (#851, ADR-0012 rule 10). It reports false
+// for non-image SKUs (ai-search:vision and future products outside the
+// pool keep their quote-only path), for unparseable SKUs, and for unknown
+// image services (the quoter converges those to billing_pricing_unavailable
+// or validation, never availability).
+func aiImagePoolService(rawSKU string) (string, bool) {
+	canonical, err := billing.CanonicalizeSKU(rawSKU)
+	if err != nil {
+		return "", false
+	}
+	namespace, local, found := strings.Cut(string(canonical), ":")
+	if !found || namespace != "ai-image" {
+		return "", false
+	}
+	service, ok := workflow.ParseAIImageFeatureSlug(local)
+	if !ok {
+		return "", false
+	}
+	return service, true
+}
+
+// renderBillingPoolUnavailable maps the shared pool sentinel onto the same
+// 422 service_resolution_unavailable shape the task edge renders
+// (details.fields.service/details.fields.resolution with the normalized
+// request values). Non-sentinel resolver failures (store outages,
+// deterministic input bugs that survived validation) stay 503: an outage
+// is not an empty pool and must never render the availability code.
+func renderBillingPoolUnavailable(c *gin.Context, err error) {
+	var unavailable *routing.ResolutionUnavailableError
+	fields := map[string]string{"service": "", "resolution": ""}
+	if errors.As(err, &unavailable) && unavailable != nil {
+		fields["service"] = unavailable.Service
+		fields["resolution"] = string(unavailable.Resolution)
+	}
+	contract.RenderErrorWithDetails(c, http.StatusUnprocessableEntity, contract.CodeServiceResolutionUnavailable, msgBillingPoolUnavailable,
+		contract.FieldErrors{Fields: fields})
+}
+
 // createBillingQuote mints a server-side immutable price snapshot with no
 // persistence (preflight, like task-quotes): the quote path is the only
 // place a price is ever shown, and settlement re-quotes authoritatively.
@@ -450,8 +491,12 @@ func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 			return
 		}
 		resolutionRaw := strings.TrimSpace(body.Data.OutputResolution)
+		// Image quotes share the pool availability decision with
+		// task-quotes/readiness/submit. Omitted resolution is canonicalized
+		// to 1k; all accepted values are exactly 1k/2k/4k.
+		imageService, isImageQuote := aiImagePoolService(sku)
 		if resolutionRaw == "" {
-			resolutionRaw = string(billing.OutputResolutionDefault)
+			resolutionRaw = string(billing.OutputResolution1K)
 		}
 		resolution, err := billing.NormalizeOutputResolution(resolutionRaw)
 		if err != nil {
@@ -469,6 +514,27 @@ func (h *contractV1BillingHandler) createBillingQuote(c *gin.Context) {
 				msgCreateBillingQuote3, contract.FieldErrors{Fields: map[string]string{"quantity": "invalid"}})
 			c.Abort()
 			return
+		}
+		// Availability precedes pricing for image quotes: without an
+		// eligible Model the quote fails with the canonical sentinel
+		// before the catalog is ever consulted (no price is minted for
+		// an unservable resolution).
+		if isImageQuote {
+			var resolveErr error
+			if h.deps.PoolRouter == nil {
+				resolveErr = &routing.ResolutionUnavailableError{Service: imageService, Resolution: routing.Resolution(resolution)}
+			} else {
+				_, resolveErr = h.deps.PoolRouter.Resolve(c.Request.Context(), imageService, string(resolution))
+			}
+			if resolveErr != nil {
+				if errors.Is(resolveErr, routing.ErrServiceResolutionUnavailable) {
+					renderBillingPoolUnavailable(c, resolveErr)
+				} else {
+					contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
+				}
+				c.Abort()
+				return
+			}
 		}
 		quote, err := h.deps.Quoter.QuoteAtResolution(c.Request.Context(), sku, resolution, quantity)
 		if err != nil {
@@ -709,7 +775,7 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 //	WorkspacePendingOrderList: {items: WorkspacePendingOrder[]}
 //	WorkspacePendingOrder: {public_token: {format: uuid}, idea_quantity: int64, checkout_url?: uri, status: {enum: [checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed]}, expires_at: date-time, updated_at: date-time}
 //	WorkspaceRechargeHistoryItem: {occurred_at: date-time, idea_quantity: int64, paid_amount_minor?: int64, paid_currency?: string, status: {enum: [credited, refunded, cancelled]}, refunded_idea_quantity?: int64, refunded_amount_minor?: int64, receipt_url?: uri}
-//	CreateWorkspaceBillingQuoteRequest: {data: {sku: string (pattern ^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$), output_resolution?: {enum: [default, 1k, 2k, 4k], default: default}, quantity?: {type: integer, minimum: 1, default: 1}}} (no price fields; unpriced/unregistered SKUs converge to billing_pricing_unavailable 422 deterministic, transient quote failures to billing_quote_unavailable 503, no oracle)
+//	CreateWorkspaceBillingQuoteRequest: {data: {sku: string (pattern ^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$), output_resolution?: {enum: [1k, 2k, 4k], default: 1k}, quantity?: {type: integer, minimum: 1, default: 1}}} (no price fields; unpriced/unregistered SKUs converge to billing_pricing_unavailable 422 deterministic, transient quote failures to billing_quote_unavailable 503, no oracle)
 //	WorkspaceBillingQuote: {sku, display_name, price_version_id: int64, price_version: int64, output_resolution, unit_credits: int64>=0, quantity: int64>=1, total_credits: int64>=0, quoted_at: date-time}
 //	RedeemWorkspaceRewardRequest: {data: {code: {type: string, minLength: 1}}}
 //	WorkspaceRewardRedemption: {id: int64, reward_code_id: int64, user_public_id: {format: uuid}, display_name, credit_amount: int64, credit_transaction_id, available_balance_after: int64, redeemed_at: date-time}
@@ -736,7 +802,7 @@ func (h *contractV1BillingHandler) listRewardRedemptions(c *gin.Context) {
 //     envelope: meta.next_cursor/has_more replaces the legacy
 //     next_cursor/next_before_id fields.
 //   - fetchVisionSearchPrice posts {data:{sku:"ai-search:vision"}} to
-//     billing-quotes (output_resolution defaults to default, quantity to
+//     billing-quotes (output_resolution defaults to 1k, quantity to
 //     1) and reads total_credits; unpriced/unregistered SKUs stay 422
 //     billing_pricing_unavailable, transient failures 503.
 //   - redeemRewardCode posts {data:{code}} with Idempotency-Key and reads

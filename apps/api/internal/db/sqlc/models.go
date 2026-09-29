@@ -770,6 +770,27 @@ type RewardRedemption struct {
 	RedeemedAt            pgtype.Timestamptz `json:"redeemed_at"`
 }
 
+type ServiceModelPoolEntry struct {
+	ID        int64              `json:"id"`
+	Service   string             `json:"service"`
+	ModelID   string             `json:"model_id"`
+	Enabled   bool               `json:"enabled"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ServiceModelPoolResolution struct {
+	PoolEntryID int64  `json:"pool_entry_id"`
+	Resolution  string `json:"resolution"`
+}
+
+type ServiceModelPoolVersion struct {
+	Service   string             `json:"service"`
+	Version   int64              `json:"version"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type StorageProfile struct {
 	ProfileID string             `json:"profile_id"`
 	Name      string             `json:"name"`
@@ -840,6 +861,7 @@ type Task struct {
 	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
 	CancelledAt       pgtype.Timestamptz `json:"cancelled_at"`
 	CancelledByUserID pgtype.Int8        `json:"cancelled_by_user_id"`
+	RoutingSnapshot   []byte             `json:"routing_snapshot"`
 }
 
 type TaskBillingSettlement struct {
@@ -930,6 +952,8 @@ type TaskExecutionAttempt struct {
 	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	RetryLayer         string             `json:"retry_layer"`
+	GatewayRetryCount  int32              `json:"gateway_retry_count"`
 }
 
 type TaskExecutionMetric struct {

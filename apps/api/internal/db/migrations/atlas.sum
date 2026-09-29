@@ -1,4 +1,4 @@
-h1:5l+UoFF0I0haqZ135wamB+iO9UP5QB1MxIn6J4vApII=
+h1:+GMjb6Znwel4EZEZx8QdQBkow0XU8e01Q2gs/cHF02A=
 20260924000001_baseline.sql h1:GybISD0x6RAoxNvufRMGxI0ccXE47THODLbLalut5Jg=
 20260924000002_drop_task_submission_claims.sql h1:hhkoO9VibQf0H+Hjne37MX8QQsFzLWddBqqaDj+gWNs=
 20260924000003_fix_reconciliation_tasks_public_id.sql h1:MZNfkEOs/ZV29+lIe6sTgFRXo21AHrLp2TPxIX+pDzo=
@@ -7,3 +7,4 @@ h1:5l+UoFF0I0haqZ135wamB+iO9UP5QB1MxIn6J4vApII=
 20260925000003_webhook_delivery_durability.sql h1:4KwAKCIMbS4Q0AozSXX+nEyv/GL7zRifUQuG5EeF29w=
 20260926000001_webhook_signing_secret_encryption.sql h1:a4PjEA4MVIePFA7T95VRxioF0LogWCe9fNJvoAEnZVQ=
 20260928000001_service_rename.sql h1:GxXe4Fv2yCU8KHfKMFsOIfgsoJp4VQq5kdqxeQiqejo=
+20260928000002_service_model_pool.sql h1:I6H616f92+6MejN92LJKqpXxD1tBmCaygjg6aibadoU=

@@ -65,6 +65,6 @@ func VisionSearchItem() billing.BillableItemDefinition {
 		DisplayName:     msgVisionSearchItem,
 		Description:     msgVisionSearchItem2,
 		SortOrder:       10,
-		PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
+		PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}
 }

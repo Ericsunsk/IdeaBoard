@@ -9,11 +9,10 @@ import (
 	"time"
 )
 
-// WorkspaceTaskStore is the additive persistence seam for workspace-scoped
-// tasks. Repository methods take context.Context first and use the
-// dbWithContext pattern in the postgres sibling (#809); the in-memory
-// sibling below is the test backend (and the fail-closed stand-in until
-// the postgres mapping lands).
+// WorkspaceTaskStore is the persistence seam for workspace-scoped tasks.
+// Repository methods take context.Context first and use the dbWithContext
+// pattern in the PostgreSQL implementation. The in-memory sibling below is
+// test-only.
 type WorkspaceTaskStore interface {
 	CreateTask(ctx context.Context, task *WorkspaceTask) (*WorkspaceTask, error)
 	GetTask(ctx context.Context, workspaceID, taskID string) (*WorkspaceTask, error)
@@ -80,6 +79,7 @@ func copyTask(in *WorkspaceTask) *WorkspaceTask {
 		completed := *in.CompletedAt
 		out.CompletedAt = &completed
 	}
+	out.RoutingSnapshot = append([]byte(nil), in.RoutingSnapshot...)
 	return &out
 }
 

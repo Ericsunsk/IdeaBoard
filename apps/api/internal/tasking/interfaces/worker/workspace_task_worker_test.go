@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"ideaboard/api/internal/generation/routing"
 	runtimeports "ideaboard/api/internal/runtime/ports"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	taskservice "ideaboard/api/internal/tasking/application/task"
@@ -24,7 +25,24 @@ import (
 // workerTestQuoter mints a fixed-price snapshot (10 credits).
 type workerTestQuoter struct{}
 
-func allowTestRouting(context.Context, string, string) error { return nil }
+// allowTestPoolResolver serves every service/resolution from one enabled
+// entry (#854: replaces the legacy allowTestRouting gate; the resolver is
+// the only availability seam).
+func allowTestPoolResolver() *routing.RoutingResolver {
+	seed := routing.SelectionSeed{8, 8, 8}
+	return routing.NewRoutingResolver(allowAllWorkerPoolStore{},
+		routing.WithSeedGenerator(func() (routing.SelectionSeed, error) { return seed, nil }))
+}
+
+type allowAllWorkerPoolStore struct{}
+
+func (allowAllWorkerPoolStore) ListPool(_ context.Context, service string) (routing.Pool, error) {
+	return routing.Pool{Service: service, Version: 1, Entries: []routing.ModelPoolEntry{
+		{Model: "openrouter/test-model", Enabled: true, SupportedResolutions: []routing.Resolution{
+			routing.Resolution1K, routing.Resolution2K, routing.Resolution4K,
+		}},
+	}}, nil
+}
 
 func (workerTestQuoter) Quote(ctx context.Context, kind, resolution string, quantity int64) (workspacetasks.BillingSnapshot, error) {
 	if quantity <= 0 {
@@ -110,22 +128,23 @@ func (a *workerTestAssets) GetAsset(ctx context.Context, workspaceID, assetID st
 }
 
 type workerTestEnv struct {
-	store   *workspacetasks.InMemoryStore
-	holder  *workerTestHolder
-	queue   *workerTestQueue
-	service *workspacetasks.Service
+	store    *workspacetasks.InMemoryStore
+	holder   *workerTestHolder
+	queue    *workerTestQueue
+	service  *workspacetasks.Service
+	attempts *workspacetasks.InMemoryAttemptRecorder
 }
 
 func newWorkerTestEnv() *workerTestEnv {
 	store := workspacetasks.NewInMemoryStoreForTests()
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
-	service := workspacetasks.NewService(workspacetasks.ServiceDeps{
+	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
 		Tasks: store, Quoter: workerTestQuoter{}, Holder: holder, Queue: queue,
 		Assets:  &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
-		Routing: allowTestRouting,
+		Resolver: allowTestPoolResolver(),
 	})
-	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service}
+	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service, attempts: workspacetasks.NewInMemoryAttemptRecorderForTests()}
 }
 
 func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspacetasks.AssetReader) *WorkspaceTaskWorker {
@@ -134,6 +153,7 @@ func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspa
 	}
 	worker, err := NewWorkspaceTaskWorker(WorkspaceTaskWorkerDeps{
 		Store: e.store, Settler: e.service, Assets: assets, Provider: provider,
+		Attempts: e.attempts,
 	})
 	if err != nil {
 		panic(err)
@@ -142,10 +162,14 @@ func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspa
 }
 
 func (e *workerTestEnv) submit(t *testing.T, inputs []string) *workspacetasks.WorkspaceTask {
+	return e.submitService(t, "render", inputs)
+}
+
+func (e *workerTestEnv) submitService(t *testing.T, service string, inputs []string) *workspacetasks.WorkspaceTask {
 	t.Helper()
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: "ws_test", OwnerUserID: 7,
-		Service: "render", MediaAssetIDs: inputs, Quantity: 1, Resolution: "default",
+		Service: service, MediaAssetIDs: inputs, Quantity: 1, Resolution: "",
 	}, "worker-key-"+t.Name())
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -176,6 +200,7 @@ func TestWorkspaceTaskWorkerSuccessLoop(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
 	calls := 0
 	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
@@ -219,6 +244,7 @@ func TestWorkspaceTaskWorkerDeterministicFailure(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/model-a", "openrouter/model-b"}))
 
 	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(400, "bad prompt", 0)
@@ -252,6 +278,7 @@ func TestWorkspaceTaskWorkerRetryableRequeues(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	attempts := 0
 	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
@@ -297,6 +324,7 @@ func TestWorkspaceTaskWorkerRetryBudgetExhaustionFails(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 
 	worker := env.newWorker(WorkspaceTaskGenerateFunc(func(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 		return nil, runtimeports.NewUpstreamHTTPError(503, "busy", 0)
@@ -474,7 +502,7 @@ func TestWorkspaceTaskWorkerMissingMediaFails(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created, err := env.service.Create(ctx, workspacetasks.CreateInput{
-		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "render", Quantity: 1, Resolution: "default",
+		WorkspaceID: "ws_test", OwnerUserID: 7, Service: "render", Quantity: 1, Resolution: "",
 	}, "worker-media-key")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -514,6 +542,7 @@ func TestWorkspaceTaskWorkerNilProviderFailsClosed(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	worker := env.newWorker(nil, nil)
 	if err := worker.Work(ctx, workerJobFor(created)); err != nil {
 		t.Fatalf("Work: %v", err)
@@ -533,6 +562,7 @@ func TestWorkspaceTaskWorkerClaimConflictRetries(t *testing.T) {
 	env := newWorkerTestEnv()
 	ctx := context.Background()
 	created := env.submit(t, nil)
+	created = pinWorkerSnapshot(t, env.store, created, workerTestSnapshot(t, "render", []string{"openrouter/only-model"}))
 	if _, err := env.store.ClaimTask(ctx, "ws_test", created.ID, created.ExecutionToken); err != nil {
 		t.Fatalf("ClaimTask: %v", err)
 	}

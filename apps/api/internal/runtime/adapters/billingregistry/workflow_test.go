@@ -50,7 +50,7 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 			t.Fatalf("pricing variants for %s=%v, want %v", item.SKU, item.PricingVariants, want)
 		}
 		if (slug == workflow.FeatureSlugInpaint || slug == workflow.FeatureSlugOutpaint) &&
-			!slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolutionDefault}) {
+			!slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolution1K}) {
 			t.Fatalf("fixed-price variants for %s=%v", item.SKU, item.PricingVariants)
 		}
 	}

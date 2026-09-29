@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/db/dbutil"
+	"ideaboard/api/internal/generation/routing"
 
 	"github.com/jackc/pgx/v5"
 )
 
 // SettlementTransactor demarcates the settlement transaction. The postgres
-// workspace task Store implements it over its pool; the in-memory test
-// sibling does not, so unit tests keep exercising the compensating fallback
-// while production and PG integration tests settle in one transaction.
+// workspace task Store implements it over its pool. In-memory stores are
+// test fixtures and are intentionally outside this production seam.
 //
 // The transaction is opened on the task store's pool, but every participant
 // shares the same PostgreSQL database (tasks, credits ledger, billing
@@ -55,8 +55,7 @@ type TxEnqueuer interface {
 }
 
 // TxTaskStore persists workspace task facts inside the settlement
-// transaction. The postgres Store implements it over dbsqlc.WithTx(tx);
-// the in-memory sibling does not (unit-test fallback).
+// transaction. The postgres Store implements it over dbsqlc.WithTx(tx).
 type TxTaskStore interface {
 	CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *WorkspaceTask) (*WorkspaceTask, error)
 	CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error)
@@ -185,8 +184,8 @@ func (s *Service) holderSettles(holdID string, total int64) bool {
 // createInTx settles Quote -> Hold -> Insert -> Enqueue in ONE PostgreSQL
 // transaction. Any failure rolls the whole transaction back: no task row
 // without its Hold, no Hold without its task, no River job without task
-// facts. It reports handled=false when the tx seams are absent so the
-// caller falls back to the compensating path.
+// facts. It reports handled=false for test-only service fixtures that do not
+// expose PostgreSQL transaction seams.
 func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, taskID, token string) (*WorkspaceTask, bool, error) {
 	transactor, txQuoter, txHolder, txStore, txQueue, ok := s.settlementSeams()
 	if !ok {
@@ -202,6 +201,18 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
+	// Resolve inside the settlement transaction before Quote/Hold so
+	// an empty pool fails before any ledger, task, or queue write (the
+	// rollback below then removes nothing because nothing was written).
+	// The snapshot pins atomically with the rows that follow. A nil
+	// resolver fails closed with the canonical unavailable sentinel.
+	if s.resolver == nil {
+		return nil, true, &routing.ResolutionUnavailableError{Service: kind, Resolution: routing.Resolution(resolution)}
+	}
+	routingSnap, err := s.resolver.ResolveInTx(ctx, tx, kind, resolution)
+	if err != nil {
+		return nil, true, err
+	}
 	snapshot, err := txQuoter.QuoteInTx(ctx, tx, kind, resolution, quantity)
 	if err != nil {
 		return nil, true, err
@@ -228,6 +239,15 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	created, err := txStore.CreateTaskInTx(ctx, tx, task)
 	if err != nil {
 		return nil, true, err
+	}
+	// Pin the snapshot in the same tx so it commits atomically with
+	// Hold/task/enqueue. Later Admin pool edits never invalidate this
+	// accepted task (the worker replays selection from the pinned fact,
+	// never the live pool).
+	if s.saveSnapshot != nil {
+		if err := s.saveSnapshot(ctx, tx, created.ID, routingSnap); err != nil {
+			return nil, true, fmt.Errorf("workspacetasks: pin routing snapshot: %w", err)
+		}
 	}
 	if facts := s.billingFacts(); facts != nil {
 		if err := facts.CreateBillingFactsInTx(ctx, tx, created); err != nil {

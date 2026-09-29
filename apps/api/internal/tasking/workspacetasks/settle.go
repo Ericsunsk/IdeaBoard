@@ -2,9 +2,13 @@ package workspacetasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/workflow"
 )
 
 // Service orchestrates the workspace task settlement boundary:
@@ -13,52 +17,66 @@ import (
 //	writes) -> Task insert (pending, retry_count, execution_token,
 //	output_refs, billing_snapshot) -> River enqueue (via Enqueuer).
 //
-// When the store, quoter, holder, and queue all expose their Tx seams
-// (see settle_tx.go) plus a SettlementTransactor, settlement commits in
-// ONE shared PostgreSQL transaction: a billing failure rolls the state
-// flip back and a state-guard failure rolls the billing writes back.
-// Without those seams (in-memory test backend, stub adapters) the Service
-// falls back to compensating rollback (Release + Delete), so a River job
-// is never enqueued without its durable task facts and a Hold is never
-// stranded without its task. Terminal settle (Capture on success /
-// Release on fail/cancel/timeout) follows the same tx-first rule: a
-// settle failure reverts the flip. Events stage during settlement and
-// flush ONLY after commit; staging never publishes inside the txn (NATS
-// fanout itself is #807).
+// Production settlement commits in ONE shared PostgreSQL transaction: a
+// billing failure rolls the state flip back and a state-guard failure rolls
+// the billing writes back. Terminal settle (Capture on success / Release on
+// fail/cancel/timeout) follows the same tx-first rule. Events stage during
+// settlement and flush ONLY after commit; staging never publishes inside the
+// txn (NATS fanout itself is #807). In-memory implementations are test-only
+// fixtures for exercising the service contract.
 type Service struct {
-	tasks   WorkspaceTaskStore
-	quoter  Quoter
-	holder  Holder
-	queue   Enqueuer
-	assets  AssetReader
-	routing RoutingGate
-	events  []TaskEvent
-	now     func() time.Time
+	tasks  WorkspaceTaskStore
+	quoter Quoter
+	holder Holder
+	queue  Enqueuer
+	assets AssetReader
+	// resolver is the authoritative Service Model Pool decision point
+	// (ADR-0012 rule 10, #848). Quote and Create consult it; a nil
+	// resolver fails closed with the canonical unavailable sentinel.
+	resolver *routing.RoutingResolver
+	// saveSnapshot persists the pinned snapshot in the settlement transaction.
+	saveSnapshot RoutingSnapshotSaver
+	// allowNonTransactional is set only by NewTestServiceForTests. Production
+	// settlement must always use the atomic PostgreSQL seams below.
+	allowNonTransactional bool
+	events                []TaskEvent
+	now                   func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. Tasks is required; Quoter,
-// Holder, Enqueuer, Assets, and Routing are required for production creates.
-// (#847: the submit-time single-value model mint is removed; #848 pins the
-// RoutingSnapshot in this transaction instead.)
+// Holder, Enqueuer, and Assets are required for production creates.
+// (#847: the submit-time single-value model mint is removed; the
+// RoutingSnapshot pins in this transaction instead.)
 type ServiceDeps struct {
-	Tasks   WorkspaceTaskStore
-	Quoter  Quoter
-	Holder  Holder
-	Queue   Enqueuer
-	Assets  AssetReader
-	Routing RoutingGate
+	Tasks  WorkspaceTaskStore
+	Quoter Quoter
+	Holder Holder
+	Queue  Enqueuer
+	Assets AssetReader
+	// Resolver is the shared RoutingResolver quote/submit/readiness
+	// consume (same instance, never an independent lookup). Nil fails
+	// closed with the canonical unavailable sentinel.
+	Resolver *routing.RoutingResolver
+	// SnapshotSaver pins the Resolve snapshot in the settlement transaction.
+	SnapshotSaver RoutingSnapshotSaver
 }
 
 // NewService builds the settlement orchestrator.
 func NewService(deps ServiceDeps) *Service {
-	routing := deps.Routing
-	if routing == nil {
-		routing = RejectRoutingUntilPool
-	}
 	return &Service{
 		tasks: deps.Tasks, quoter: deps.Quoter, holder: deps.Holder,
-		queue: deps.Queue, assets: deps.Assets, routing: routing, now: time.Now,
+		queue: deps.Queue, assets: deps.Assets,
+		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
 	}
+}
+
+// NewTestServiceForTests builds a service for unit fixtures that do not have
+// PostgreSQL transaction seams. It is intentionally separate from NewService
+// so production wiring cannot silently use compensating settlement writes.
+func NewTestServiceForTests(deps ServiceDeps) *Service {
+	service := NewService(deps)
+	service.allowNonTransactional = true
+	return service
 }
 
 // SetClockForTests injects a deterministic clock.
@@ -87,6 +105,32 @@ func (s *Service) stage(taskID, workspaceID string, status Status) {
 	})
 }
 
+// resolveSnapshot runs the authoritative pool availability check
+// (ADR-0012 rule 10): readiness, quote, and submit consume this same
+// seam, never an independent lookup. An empty eligible set returns the
+// sentinel (errors.Is ErrServiceResolutionUnavailable, fields via
+// errors.As) before any quote, hold, task, or enqueue work.
+// Deterministic caller bugs (empty service, non-canonical resolution)
+// translate to ValidationError: they are never availability outcomes and
+// never trigger model fallback. Store outages propagate unwrapped: an
+// outage is not an empty pool and must never render the sentinel. A nil
+// resolver fails closed with the same sentinel (no pool configured).
+func (s *Service) resolveSnapshot(ctx context.Context, service, resolution string) (routing.RoutingSnapshot, error) {
+	if s.resolver == nil {
+		requested := routing.Resolution(strings.ToLower(strings.TrimSpace(resolution)))
+		return routing.RoutingSnapshot{}, &routing.ResolutionUnavailableError{Service: service, Resolution: requested}
+	}
+	snap, err := s.resolver.Resolve(ctx, service, resolution)
+	if err != nil {
+		var inputErr *routing.InvalidRoutingInputError
+		if errors.As(err, &inputErr) {
+			return routing.RoutingSnapshot{}, newValidationError(FieldError{Field: inputErr.Field, Message: "invalid"})
+		}
+		return routing.RoutingSnapshot{}, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
+	}
+	return snap, nil
+}
+
 // Quote mints an immutable price snapshot with no persistence (preflight,
 // separate from authoritative create).
 func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapshot, error) {
@@ -103,10 +147,10 @@ func (s *Service) Quote(ctx context.Context, params QuoteParams) (BillingSnapsho
 	}
 	resolution := strings.TrimSpace(params.Resolution)
 	if resolution == "" {
-		resolution = "default"
+		resolution = workflow.OutputResolution1K
 	}
-	if err := s.routing(ctx, kind, resolution); err != nil {
-		return BillingSnapshot{}, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
+	if _, err := s.resolveSnapshot(ctx, kind, resolution); err != nil {
+		return BillingSnapshot{}, err
 	}
 	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
 	if err != nil {
@@ -154,18 +198,12 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	resolution := strings.TrimSpace(input.Resolution)
 	if resolution == "" {
-		resolution = "default"
+		resolution = workflow.OutputResolution1K
 	}
-	if err := s.routing(ctx, kind, resolution); err != nil {
-		return nil, fmt.Errorf("workspacetasks: routing unavailable: %w", err)
-	}
-	// #847: no submit-time model mint. The task persists without a pinned
-	// model; #848 resolves via RoutingResolver and pins the RoutingSnapshot
-	// in this transaction. The worker fails closed on an empty model.
-	snapshot, err := s.quoter.Quote(ctx, kind, resolution, quantity)
-	if err != nil {
-		return nil, err
-	}
+	// Availability resolves authoritatively below and the snapshot pins
+	// atomically with the settlement transaction. The worker fails closed on a
+	// missing snapshot, and credits.Commands stays the sole ledger writer.
+	var snapshot BillingSnapshot
 	taskID, err := NewTaskPublicID()
 	if err != nil {
 		return nil, err
@@ -176,6 +214,20 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token); handled {
 		return created, err
+	}
+	if !s.allowNonTransactional {
+		return nil, ErrSettlementUnavailable
+	}
+	var routingSnap routing.RoutingSnapshot
+	// Test-only fixtures without transaction seams resolve before Quote/Hold so
+	// an empty pool reserves nothing. Production cannot enter this branch.
+	routingSnap, err = s.resolveSnapshot(ctx, kind, resolution)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err = s.quoter.Quote(ctx, kind, resolution, quantity)
+	if err != nil {
+		return nil, err
 	}
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
@@ -201,6 +253,15 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 			_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
 		}
 		return nil, err
+	}
+	if s.saveSnapshot != nil {
+		if err := s.saveSnapshot(ctx, nil, created.ID, routingSnap); err != nil {
+			_ = s.tasks.DeleteTask(ctx, created.WorkspaceID, created.ID)
+			if holdTxID != "" {
+				_ = s.holder.Release(ctx, holdTxID, snapshot.TotalCredits, taskID)
+			}
+			return nil, fmt.Errorf("workspacetasks: pin routing snapshot: %w", err)
+		}
 	}
 	if err := s.queue.Enqueue(ctx, created); err != nil {
 		_ = s.tasks.DeleteTask(ctx, created.WorkspaceID, created.ID)
@@ -269,6 +330,9 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 	if flipped, already, handled, err := s.cancelInTx(ctx, workspaceID, taskID, actorUserID, reason); handled {
 		return flipped, already, err
 	}
+	if !s.allowNonTransactional {
+		return nil, false, ErrSettlementUnavailable
+	}
 	before, err := s.tasks.GetTask(ctx, workspaceID, taskID)
 	if err != nil {
 		return nil, false, err
@@ -310,6 +374,9 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 	if completed, handled, err := s.completeInTx(ctx, workspaceID, taskID, outputs); handled {
 		return completed, err
 	}
+	if !s.allowNonTransactional {
+		return nil, ErrSettlementUnavailable
+	}
 	completed, err := s.tasks.CompleteTask(ctx, workspaceID, taskID, outputs)
 	if err != nil {
 		return nil, err
@@ -343,6 +410,9 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 	}
 	if failed, handled, err := s.failInTx(ctx, workspaceID, taskID, errorMsg); handled {
 		return failed, err
+	}
+	if !s.allowNonTransactional {
+		return nil, ErrSettlementUnavailable
 	}
 	failed, err := s.tasks.FailTask(ctx, workspaceID, taskID, errorMsg)
 	if err != nil {
@@ -381,6 +451,9 @@ func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryab
 	}
 	if retried, handled, err := s.retryInTx(ctx, workspaceID, taskID, token); handled {
 		return retried, err
+	}
+	if !s.allowNonTransactional {
+		return nil, ErrSettlementUnavailable
 	}
 	retried, err := s.tasks.TransitionForRetry(ctx, workspaceID, taskID, token)
 	if err != nil {

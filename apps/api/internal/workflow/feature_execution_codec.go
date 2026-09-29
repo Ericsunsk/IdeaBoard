@@ -94,7 +94,7 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 	case FeatureSlugCutout:
 		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
-			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputResolutionPolicy: OutputResolutionPolicyFixed,
 			routingCapability:      RoutingCapabilityCutout, modelRequirement: RoutingModelNotRequired,
 			runtimeOperation: RuntimeOperationCutout, runtimeInvocation: RuntimeInvocationTransform,
 			imageInputPolicy: ImageInputRequired, maskInputPolicy: MaskInputIgnored,
@@ -104,7 +104,7 @@ func durableFeatureDefinitionForCurrentSchema(feature string) (durableFeatureDef
 	case FeatureSlugUpscale:
 		return durableFeatureDefinition{
 			promptPolicy: PromptPolicyIgnored, outputCountPolicy: OutputCountPolicyFixed,
-			outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputResolutionPolicy: OutputResolutionPolicyFixed,
 			routingCapability:      RoutingCapabilityUpscale, modelRequirement: RoutingModelNotRequired,
 			runtimeOperation: RuntimeOperationUpscale, runtimeInvocation: RuntimeInvocationTransform,
 			imageInputPolicy: ImageInputRequired, maskInputPolicy: MaskInputIgnored,
@@ -145,7 +145,7 @@ func durableImageFillDefinition(
 ) durableFeatureDefinition {
 	return durableFeatureDefinition{
 		promptPolicy: promptPolicy, outputCountPolicy: OutputCountPolicyFixed,
-		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+		outputResolutionPolicy: OutputResolutionPolicyFixed,
 		routingCapability:      RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 		runtimeOperation: operation, runtimeInvocation: RuntimeInvocationTransform,
 		imageInputPolicy: ImageInputRequired, maxImageInputCount: 1,
@@ -331,11 +331,11 @@ func validateDurableOutputV1(feature string, output durableOutputPlan, routing d
 	}
 	validResolution := false
 	switch output.ResolutionPolicy {
-	case OutputResolutionPolicyDefaultOnly:
-		validResolution = output.Resolution == OutputResolutionDefault
+	case OutputResolutionPolicyFixed:
+		validResolution = output.Resolution == OutputResolution1K
 	case OutputResolutionPolicyScalable:
 		switch output.Resolution {
-		case OutputResolutionDefault, OutputResolution1K, OutputResolution2K, OutputResolution4K:
+		case OutputResolution1K, OutputResolution2K, OutputResolution4K:
 			validResolution = true
 		}
 	}

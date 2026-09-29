@@ -220,14 +220,12 @@ func sortedPriceVariants(prices map[billing.OutputResolution]billing.PriceInfo) 
 
 func pricingVariantOrder(variant billing.OutputResolution) int {
 	switch variant {
-	case billing.OutputResolutionDefault:
-		return 0
 	case billing.OutputResolution1K:
-		return 1
+		return 0
 	case billing.OutputResolution2K:
-		return 2
+		return 1
 	case billing.OutputResolution4K:
-		return 3
+		return 2
 	default:
 		return 4
 	}

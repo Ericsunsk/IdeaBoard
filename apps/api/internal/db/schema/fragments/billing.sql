@@ -431,7 +431,8 @@ CREATE TABLE billing_admin_actions (
     CONSTRAINT ck_billing_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
     CONSTRAINT ck_billing_admin_actions_price_scope CHECK (((((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('delete_archived'::character varying)::text])) AND (price_version_id IS NULL)) OR (((action_type)::text = ANY (ARRAY[('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text])) AND (price_version_id IS NOT NULL)))),
     CONSTRAINT ck_billing_admin_actions_reason CHECK ((((reason)::text = btrim((reason)::text, '
-'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
+
+'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
 
@@ -473,7 +474,7 @@ CREATE TABLE billing_price_versions (
     created_by bigint NOT NULL,
     created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT billing_price_versions_created_by_check CHECK ((created_by > 0)),
-    CONSTRAINT billing_price_versions_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text]))),
+    CONSTRAINT billing_price_versions_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text]))),
     CONSTRAINT billing_price_versions_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
     CONSTRAINT billing_price_versions_version_check CHECK ((version > 0))
 );
@@ -519,7 +520,7 @@ CREATE TABLE billing_current_prices (
     price_version_id bigint NOT NULL,
     updated_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT billing_current_prices_pkey PRIMARY KEY (sku, output_resolution),
-    CONSTRAINT billing_current_prices_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text])))
+    CONSTRAINT billing_current_prices_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text])))
 );
 
 
@@ -566,7 +567,7 @@ CREATE TABLE task_billing_snapshots (
     CONSTRAINT task_billing_snapshot_hold_check CHECK ((((total_credits = 0) AND (hold_transaction_id IS NULL)) OR ((total_credits > 0) AND (hold_transaction_id IS NOT NULL) AND (btrim(hold_transaction_id) <> ''::text)))),
     CONSTRAINT task_billing_snapshot_total_check CHECK ((total_credits = (unit_credits * quantity))),
     CONSTRAINT task_billing_snapshots_price_version_check CHECK ((price_version > 0)),
-    CONSTRAINT task_billing_snapshots_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text]))),
+    CONSTRAINT task_billing_snapshots_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text]))),
     CONSTRAINT task_billing_snapshots_quantity_check CHECK ((quantity > 0)),
     CONSTRAINT task_billing_snapshots_total_credits_check CHECK (((total_credits >= 0) AND (total_credits <= '9000000000000000'::bigint))),
     CONSTRAINT task_billing_snapshots_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
@@ -805,13 +806,13 @@ BEGIN
      OR char_length(p_display_name) NOT BETWEEN 1 AND 120
      OR char_length(p_description) > 1000 OR p_prices IS NULL
      OR jsonb_typeof(p_prices) <> 'object' OR p_actor_id IS NULL OR p_actor_id <= 0
-     OR NOT (p_prices ? '1k' OR p_prices ? 'default') THEN
+     OR NOT (p_prices ? '1k') THEN
     RAISE EXCEPTION USING ERRCODE = 'IB101', MESSAGE = 'invalid billing prices publish command';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM jsonb_object_keys(p_prices) AS keys(key)
-    WHERE key NOT IN ('default', '1k', '2k', '4k')
+    WHERE key NOT IN ('1k', '2k', '4k')
   ) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB101', MESSAGE = 'invalid billing prices resolution';
   END IF;
@@ -828,12 +829,12 @@ BEGIN
       enabled = CASE WHEN NOT EXISTS (
         SELECT 1 FROM billing_current_prices AS current_prices
         WHERE current_prices.sku = p_sku
-          AND current_prices.output_resolution IN ('default', '1k')
+          AND current_prices.output_resolution IN ('1k')
       ) THEN TRUE ELSE enabled END,
       updated_by = p_actor_id, updated_at = clock_timestamp()
   WHERE sku = p_sku;
 
-  FOREACH v_resolution IN ARRAY ARRAY['default', '1k', '2k', '4k'] LOOP
+  FOREACH v_resolution IN ARRAY ARRAY['1k', '2k', '4k'] LOOP
     v_value := p_prices -> v_resolution;
     IF v_value IS NULL THEN
       DELETE FROM billing_current_prices
@@ -867,7 +868,7 @@ BEGIN
     VALUES (p_sku, v_resolution, v_new_id)
     ON CONFLICT ON CONSTRAINT billing_current_prices_pkey DO UPDATE
       SET price_version_id = EXCLUDED.price_version_id, updated_at = clock_timestamp();
-    IF v_resolution IN ('default', '1k') THEN
+    IF v_resolution IN ('1k') THEN
       UPDATE billing_skus SET current_price_version_id = v_new_id WHERE sku = p_sku;
     END IF;
     INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, reason, metadata)

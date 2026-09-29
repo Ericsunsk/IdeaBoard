@@ -19,7 +19,7 @@ func TestBillableItemRegistryRejectsDuplicateSKUs(t *testing.T) {
 
 func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
-		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
+		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolution1K}},
 		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", SortOrder: 10},
 	})
 	if err != nil {
@@ -38,7 +38,7 @@ func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 		t.Fatalf("registry leaked caller mutation: %q", got)
 	}
 	removeBg, _ := registry.Find("ai-image:cutout")
-	if removeBg.PricingVariants[0] != OutputResolutionDefault {
+	if removeBg.PricingVariants[0] != OutputResolution1K {
 		t.Fatalf("registry leaked pricing variants mutation: %v", removeBg.PricingVariants)
 	}
 }

@@ -1,15 +1,20 @@
 package composition
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"ideaboard/api/internal/aigateway"
 	"ideaboard/api/internal/boards"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/generation/catalog"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
-	"ideaboard/api/internal/library"
+	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
@@ -37,6 +42,7 @@ import (
 	tenancypg "ideaboard/api/internal/tenancy/postgres"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -61,10 +67,7 @@ func newAppRouter(
 		UserRepo:          repos.userRepo,
 		UserLifecycle:     services.userLifecycle,
 	}
-	uploadReadAccess := storageauth.NewReadableUploadAccess(
-		uploadBoardAccessResolver{service: services.boardService},
-		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
-	)
+	uploadReadAccess := storageauth.NewReadableUploadAccess(uploadOwnerStorageUIDResolver{repo: repos.userRepo})
 	searchProviderConfig := searchinfra.NewConfigRepository(repos.systemConfigRepo)
 	aiGatewayRepo := aigateway.NewConfigRepository(repos.systemConfigRepo)
 	aiGatewayHandler := aigateway.NewHandler(aiGatewayRepo)
@@ -95,7 +98,7 @@ func newAppRouter(
 			// public materialization route or emitter is wired here;
 			// only the library Store is supplied.
 			Library: httpapi.ContractV1LibraryDeps{
-				Store: library.NewService(repos.db),
+				Store: librarypostgres.NewService(repos.db),
 			},
 			Media: taskServices.workspaceTaskMedia,
 			// Binary reads ride the storage service. Upload completion
@@ -124,9 +127,14 @@ func newAppRouter(
 			TaskHolder: taskServices.workspaceTaskHolder,
 			TaskQueue:  taskServices.workspaceTaskQueue,
 			TaskAssets: taskServices.workspaceTaskAssets,
-			// #847 fails closed before Quote/Hold until #848 supplies the
-			// authoritative Service Model Pool routing snapshot.
-			TaskRoutingGate:       workspacetasks.RejectRoutingUntilPool,
+			// #848: quote, submit, and readiness share one RoutingResolver
+			// over the catalog pool (ADR-0012 rule 10, single seam).
+			// Submit pins its snapshot atomically via
+			// catalog.SaveRoutingSnapshot with the settlement tx's
+			// Queries. The fail-closed fallback for an unset resolver is
+			// the canonical unavailable sentinel (#854: no legacy gate).
+			TaskRouter:            taskServices.workspaceTaskRouter,
+			TaskSnapshotSaver:     newPoolRoutingSnapshotSaver(),
 			TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
 			// #833: the webhook store is shared with the River delivery
 			// worker (built in task_wiring.go where the client exists),
@@ -149,6 +157,10 @@ func newAppRouter(
 			Records:         services.billingRecords,
 			Usage:           services.usageService,
 			Quoter:          services.billingCatalog,
+			// #851: billing-quotes shares the pool availability decision
+			// with task-quotes/readiness/submit for ai-image SKUs
+			// (same RoutingResolver instance, never a second lookup).
+			PoolRouter: taskServices.workspaceTaskRouter,
 			Checkout: httpapi.NewPaymentsCheckoutAdapter(services.paymentService,
 				cfg.PublicOrigins.WebURL("/user/boards")),
 			// Gaps batch (#809-close, backend B): the Payments service
@@ -192,6 +204,7 @@ func newAppRouter(
 			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
 			Catalog:           services.billingCatalog,
+			ModelPools:        catalog.NewRepository(repos.db), // #849: Admin pool reads/replaces; no second model catalog.
 			Payments:          services.paymentService,
 			Settings:          services.runtimeSettings,
 			PaymentWebhookURL: cfg.PublicOrigins.APIURL("/api/webhooks/stripe"),
@@ -210,20 +223,30 @@ func newAppRouter(
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		PaymentWebhook:      paymentWebhookHandler,
 		Internal:            httpapi.InternalRouteDeps{UserHandler: identityhttp.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
-		StaticUploads: httpapi.StaticUploadDeps{Auth: authDeps,
-			BoardService: services.boardService,
-			ReadAccess:   uploadReadAccess,
-		},
-		CORSMiddleware: httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
-		RateLimit:      services.runtimeSettings,
-		Branding:       services.runtimeSettings,
-		REDMetrics:     redMetrics,
-		ReadyChecker:   readyChecker,
+		StaticUploads:       httpapi.StaticUploadDeps{Auth: authDeps, ReadAccess: uploadReadAccess},
+		CORSMiddleware:      httpinfra.BuildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
+		RateLimit:           services.runtimeSettings,
+		Branding:            services.runtimeSettings,
+		REDMetrics:          redMetrics,
+		ReadyChecker:        readyChecker,
 	}, httpapi.FrontendRouteOptions{
 		WarnMissingIndex: configinfra.IsProductionRuntime(cfg.App.Env),
 	})
 
 	return router, nil
+}
+
+// newPoolRoutingSnapshotSaver pins the submit-time RoutingSnapshot with the
+// settlement transaction's Queries. A missing transaction is a production
+// wiring error and fails closed; snapshots must never be persisted outside
+// the settlement transaction.
+func newPoolRoutingSnapshotSaver() workspacetasks.RoutingSnapshotSaver {
+	return func(ctx context.Context, tx pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
+		if tx == nil {
+			return errors.New("routing snapshot saver requires the settlement transaction")
+		}
+		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
+	}
 }
 
 // newControlMonitorHandler wires the workspace-backed statistics store

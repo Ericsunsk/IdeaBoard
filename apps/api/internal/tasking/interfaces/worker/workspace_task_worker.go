@@ -12,14 +12,24 @@ package worker
 //	load -> drop dirty work (unknown id / terminal / cancelled / stale token)
 //	-> validate workflow input (deterministic Fail)
 //	-> resolve media refs read-only via the TaskAssets adapter (deterministic Fail)
+//	-> resolve the pinned RoutingSnapshot: parse + Verify, missing/corrupt
+//	   fails closed deterministically (hold released, no retry burn), the
+//	   live pool is never consulted
 //	-> ClaimTask with the lease token (pending -> running)
-//	-> Generate through the provider seam (injected; production bridges the
-//	   EXISTING gateway executor, never reimplements dialects)
+//	-> Generate through the provider seam against the snapshot's current
+//	   model (injected; production bridges the EXISTING gateway executor,
+//	   never reimplements dialects)
+//	-> on a retryable failure with an unspent retry candidate: ONE bounded
+//	   model fallback in the same claim (model_fallback attempt fact first,
+//	   then the second send; no second charge, no duplicate task)
 //	-> terminal Complete / Fail via workspacetasks.Service (single-tx
 //	   Capture/Release settlement, #826: state flip + outputs + billing
 //	   commit atomically, billing failure reverts the flip)
 //	-> transient provider failures consume the retry budget via Service.Retry
 //	   (fresh token + new job); anything else terminal-fails.
+//	-> every send opens/closes a durable attempt fact (retry_layer +
+//	   gateway_retry_count); gateway request retries stay inside the
+//	   gateway and never look like model fallback.
 //
 // Settlement note: the worker shares ONE workspaceTaskHolder with the HTTP
 // submit path (built once in task_wiring.go). The holder maps
@@ -29,8 +39,11 @@ package worker
 // Provider-creds boundary (deliberate): the production Generate bridge
 // consumes the canonical execution plan and calls
 // providers.Executor.CallGatewayAPI (transport/auth/retries stay inside
-// the gateway). Missing gateway credentials or an unresolved pool route
-// fail the task deterministically with a clear message. Result materialization
+// the gateway). Missing gateway credentials fail the task
+// deterministically with a clear message. The execution model is the
+// snapshot's pinned selection, stamped onto the transient claimed copy
+// by Work: the bridge consumes only that field and never performs a
+// live pool or mapping lookup. Result materialization
 // into workspace media assets runs inside the executor finalize seam
 // (workspace result materializer) and through the WorkspaceTaskRenderer
 // below: once a provider (real or fake) yields output refs, the renderer
@@ -47,6 +60,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/generation/routing"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -98,7 +112,13 @@ func (f WorkspaceTaskGenerateFunc) Generate(ctx context.Context, task *workspace
 // atomic Complete. Materializer is optional: nil keeps completion bare;
 // set, settled outputs auto-materialize into library Quick Saves (#828)
 // AFTER the atomic Complete, best-effort (failures logged, task stays
-// complete, River never retries a completed task).
+// complete, River never retries a completed task). Attempts is optional:
+// nil disables durable attempt facts (unit paths); production always
+// wires the postgres store so retry_layer/gateway_retry_count facts
+// distinguish the gateway, model_fallback, and river_task layers (#848).
+// Metrics is optional: nil disables model-fallback observations (unit
+// paths); production wires the RED set so bounded fallback sends land in
+// ideaboard_model_fallback_total (#852).
 type WorkspaceTaskWorkerDeps struct {
 	Store        WorkspaceTaskWorkerStore
 	Settler      WorkspaceTaskWorkerSettler
@@ -106,6 +126,17 @@ type WorkspaceTaskWorkerDeps struct {
 	Provider     WorkspaceTaskProvider
 	Renderer     taskruntime.WorkspaceTaskRenderer
 	Materializer taskruntime.WorkspaceTaskAutoMaterializer
+	Attempts     workspacetasks.AttemptRecorder
+	Metrics      ModelFallbackObserver
+}
+
+// ModelFallbackObserver receives one observation per completed
+// model-fallback send (nil error means the fallback send succeeded).
+// The production implementation is the RED metrics set; the narrow
+// interface keeps the tasking worker free of the runtime metrics
+// package. Implementations must be nil-receiver safe or nil.
+type ModelFallbackObserver interface {
+	IncModelFallback(service string, err error)
 }
 
 // WorkspaceTaskWorker consumes WorkspaceTaskArgs jobs. It rides the existing
@@ -119,6 +150,8 @@ type WorkspaceTaskWorker struct {
 	provider     WorkspaceTaskProvider
 	renderer     taskruntime.WorkspaceTaskRenderer
 	materializer taskruntime.WorkspaceTaskAutoMaterializer
+	attempts     workspacetasks.AttemptRecorder
+	metrics      ModelFallbackObserver
 }
 
 var _ river.Worker[taskruntime.WorkspaceTaskArgs] = (*WorkspaceTaskWorker)(nil)
@@ -135,7 +168,8 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 	return &WorkspaceTaskWorker{
 		store: deps.Store, settler: deps.Settler,
 		assets: deps.Assets, provider: deps.Provider, renderer: deps.Renderer,
-		materializer: deps.Materializer,
+		materializer: deps.Materializer, attempts: deps.Attempts,
+		metrics: deps.Metrics,
 	}, nil
 }
 
@@ -196,39 +230,156 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 	if err := w.resolveMediaRefs(ctx, task); err != nil {
 		return w.failTerminal(ctx, task, err.Error())
 	}
+	// Snapshot-only execution (#848, ADR-0012 rule 9): the pinned
+	// submit-time snapshot is the sole routing fact. Missing or corrupt
+	// snapshots fail closed here, before claiming, so the hold is
+	// released with no retry burn and the live pool is never consulted.
+	snap, err := resolveExecutionSnapshot(task)
+	if err != nil {
+		return w.failTerminal(ctx, task, err.Error())
+	}
 
 	claimed, err := w.claim(ctx, args, task)
 	if err != nil || claimed == nil {
 		return err
 	}
 
+	// The execution's gateway target comes from the verified snapshot
+	// alone. A redelivery that already consumed the fallback runs the
+	// retry candidate directly and never falls back again.
+	tracker := newWorkspaceSendTracker(w.attempts, claimed.ID, workspaceRiverJobID(job), snap.Service)
+	layer := workspacetasks.AttemptRetryLayerGateway
+	if claimed.RetryCount > 0 {
+		layer = workspacetasks.AttemptRetryLayerRiverTask
+	}
+	model, allowFallback := selectExecutionModel(snap, tracker.fallbackConsumed(ctx))
+
+	send := tracker.startSend(ctx, model, layer)
+	// Stamp the snapshot-derived target onto the transient claimed copy
+	// (never persisted): the provider bridge consumes only this field,
+	// so stamping is what keeps execution snapshot-only. The legacy
+	// envelope value is ignored even when set.
+	claimed.ResolvedModel = model
 	outputs, genErr := w.generate(ctx, claimed)
 	if genErr == nil {
-		if w.renderer != nil {
-			rendered, renderErr := w.renderer.RenderOutputs(ctx, claimed, outputs)
-			if renderErr != nil {
-				return w.failTerminal(ctx, claimed, workspaceFailureMessage(renderErr))
-			}
-			outputs = rendered
-		}
-		completed, err := w.settler.Complete(ctx, workspaceID, taskID, outputs)
-		if err != nil {
-			if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
-				slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
-				return nil
-			}
-			return fmt.Errorf("workspace task complete: %w", err)
-		}
-		// #828: auto-materialize AFTER the atomic Complete commit. The
-		// task is complete regardless of the outcome; trigger failures
-		// are logged and never retried through River.
-		w.materializeCompletedTask(ctx, completed)
-		slog.Info("workspace task completed", "task_id", taskID, "outputs", len(outputs))
-		return nil
+		return w.completeExecution(ctx, send, claimed, outputs, model)
 	}
 
-	retryable := isWorkspaceProviderRetryable(genErr)
+	failure := workspaceAttemptFailure(genErr)
+	if failure.Retryable() && allowFallback {
+		if result, done := w.executeModelFallback(ctx, tracker, send, snap, claimed, model, genErr); done {
+			return result
+		}
+		// The fallback row could not be persisted: at-most-once cannot
+		// be proven, so no second send. Converge the original failure
+		// through the river/terminal policy below.
+	}
+	return w.convergeSendFailure(ctx, send, claimed, failure, genErr, false)
+}
+
+// completeExecution renders (when configured) and terminally completes
+// one successful send. Renderer failures are deterministic finalize
+// failures: failed, hold released, no retry burn.
+func (w *WorkspaceTaskWorker) completeExecution(
+	ctx context.Context,
+	send *workspaceSend,
+	claimed *workspacetasks.WorkspaceTask,
+	outputs []workspacetasks.OutputRef,
+	model string,
+) error {
+	workspaceID, taskID := claimed.WorkspaceID, claimed.ID
+	if w.renderer != nil {
+		rendered, renderErr := w.renderer.RenderOutputs(ctx, claimed, outputs)
+		if renderErr != nil {
+			send.finishFailed(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, workspaceFailureMessage(renderErr))
+			return w.failTerminal(ctx, claimed, workspaceFailureMessage(renderErr))
+		}
+		outputs = rendered
+	}
+	send.finishCompleted(model)
+	completed, err := w.settler.Complete(ctx, workspaceID, taskID, outputs)
+	if err != nil {
+		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+			slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
+			return nil
+		}
+		return fmt.Errorf("workspace task complete: %w", err)
+	}
+	// #828: auto-materialize AFTER the atomic Complete commit. The
+	// task is complete regardless of the outcome; trigger failures
+	// are logged and never retried through River.
+	w.materializeCompletedTask(ctx, completed)
+	slog.Info("workspace task completed", "task_id", taskID, "outputs", len(outputs),
+		"model", model, "retry_layer", send.layer)
+	return nil
+}
+
+// executeModelFallback runs the single bounded model fallback (#848,
+// ADR-0012 rule 6): exactly one more send to the snapshot's retry
+// candidate, in the same claim, with no second charge (billing captures
+// once at Complete) and no duplicate task (no enqueue here).
+//
+// The model_fallback attempt row is inserted BEFORE the second send; a
+// missing row fails the fallback itself (ok=false) so a later
+// redelivery can never spend the budget twice. A retryable fallback
+// failure still rides the river_task requeue budget; a deterministic
+// one goes terminal directly, never further.
+func (w *WorkspaceTaskWorker) executeModelFallback(
+	ctx context.Context,
+	tracker *workspaceSendTracker,
+	first *workspaceSend,
+	snap routing.RoutingSnapshot,
+	claimed *workspacetasks.WorkspaceTask,
+	model string,
+	firstErr error,
+) (error, bool) {
+	stage, category := workspaceFailureStageCategory(workspaceAttemptFailure(firstErr))
+	first.finishFailed(stage, category, workspaceFailureMessage(firstErr))
+	fallback, ok := tracker.startFallbackSend(ctx, snap.RetryCandidate)
+	if !ok {
+		slog.Warn("workspace task model fallback unavailable; converging without it",
+			"task_id", claimed.ID, "model", model)
+		return nil, false
+	}
+	slog.Info("workspace task trying model fallback",
+		"task_id", claimed.ID, "from_model", model, "to_model", snap.RetryCandidate)
+	claimed.ResolvedModel = snap.RetryCandidate
+	outputs, genErr := w.generate(ctx, claimed)
+	// The fallback observation fires at send completion when the
+	// outcome is known (#852): decided-but-unrecorded fallbacks (the
+	// ok=false branch above) never inflate the counter. Nil metrics
+	// keeps unit paths uninstrumented.
+	if w.metrics != nil {
+		w.metrics.IncModelFallback(tracker.service, genErr)
+	}
+	if genErr == nil {
+		return w.completeExecution(ctx, fallback, claimed, outputs, snap.RetryCandidate), true
+	}
+	failure := workspaceAttemptFailure(genErr)
+	stage, category = workspaceFailureStageCategory(failure)
+	fallback.finishFailed(stage, category, workspaceFailureMessage(genErr))
+	return w.convergeSendFailure(ctx, fallback, claimed, failure, genErr, true), true
+}
+
+// convergeSendFailure converges one failed send: transient provider
+// failures consume the retry budget via Service.Retry (fresh token +
+// new job, recorded as a requeued attempt fact); anything else
+// terminal-fails. fallbackUsed only routes logging today; the persisted
+// model_fallback row (not this flag) enforces at-most-once across
+// redeliveries.
+func (w *WorkspaceTaskWorker) convergeSendFailure(
+	ctx context.Context,
+	send *workspaceSend,
+	claimed *workspacetasks.WorkspaceTask,
+	failure routing.AttemptFailure,
+	genErr error,
+	fallbackUsed bool,
+) error {
+	workspaceID, taskID := claimed.WorkspaceID, claimed.ID
+	retryable := failure.Retryable()
 	if workspacetasks.ShouldRetry(claimed.RetryCount, retryable) {
+		stage, category := workspaceFailureStageCategory(failure)
+		send.finishRequeued(stage, category, workspaceFailureMessage(genErr))
 		if _, err := w.settler.Retry(ctx, workspaceID, taskID, retryable); err != nil {
 			if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
 				slog.Info("workspace task converged during retry; dropping", "task_id", taskID, "err", err)
@@ -237,9 +388,12 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 			return fmt.Errorf("workspace task retry: %w", err)
 		}
 		slog.Info("workspace task requeued after transient provider failure",
-			"task_id", taskID, "retry_count", claimed.RetryCount, "err", genErr)
+			"task_id", taskID, "retry_count", claimed.RetryCount,
+			"retry_layer", send.layer, "fallback_used", fallbackUsed, "err", genErr)
 		return nil
 	}
+	stage, category := workspaceFailureStageCategory(failure)
+	send.finishFailed(stage, category, workspaceFailureMessage(genErr))
 	return w.failTerminal(ctx, claimed, workspaceFailureMessage(genErr))
 }
 
@@ -392,21 +546,6 @@ type workspaceHTTPStatusCoder interface {
 	HTTPStatus() int
 }
 
-// isWorkspaceProviderRetryable classifies gateway errors with the
-// workspace-domain budget: HTTP 429/5xx/408 and transport timeouts may
-// requeue; deterministic failures (4xx, validation, auth, quota) never do.
-func isWorkspaceProviderRetryable(err error) bool {
-	if err == nil {
-		return false
-	}
-	status := 0
-	var coder workspaceHTTPStatusCoder
-	if errors.As(err, &coder) {
-		status = coder.HTTPStatus()
-	}
-	return workspacetasks.IsRetryableProviderError(status, err)
-}
-
 // workspaceFailureMessage keeps the terminal error row inspectable without
 // persisting unbounded provider bodies.
 func workspaceFailureMessage(err error) string {
@@ -426,6 +565,16 @@ func redactToken(token string) string {
 		return "***"
 	}
 	return token[:4] + "***" + token[len(token)-4:]
+}
+
+// workspaceRiverJobID extracts the River job id for attempt facts.
+// Synthetic jobs in unit tests carry no JobRow: they record 0, which
+// the column accepts (river_job_id >= 0).
+func workspaceRiverJobID(job *river.Job[taskruntime.WorkspaceTaskArgs]) int64 {
+	if job == nil || job.JobRow == nil {
+		return 0
+	}
+	return job.JobRow.ID
 }
 
 // workspaceGatewayProvider bridges the EXISTING provider gateway seam for
@@ -475,7 +624,10 @@ func NewWorkspaceGatewayProvider(caller WorkspaceGatewayCaller) WorkspaceTaskPro
 	return &workspaceGatewayProvider{caller: caller}
 }
 
-// Generate implements WorkspaceTaskProvider.
+// Generate implements WorkspaceTaskProvider. The model is the
+// snapshot-derived target the worker stamped onto the transient task
+// copy before calling: the bridge never resolves a model itself and
+// never consults the live pool or admin mapping.
 func (p *workspaceGatewayProvider) Generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
 	if p == nil || p.caller == nil {
 		return nil, errors.New(msgGenerate4)

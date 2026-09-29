@@ -6,10 +6,11 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/aigateway"
-	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/generation/catalog"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/users/ports"
-	"ideaboard/api/internal/library"
+	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/domain"
@@ -53,6 +54,7 @@ type appTaskServices struct {
 	workspaceTaskQuoter *taskruntime.WorkspaceTaskQuoter
 	workspaceTaskMedia  *workspacemedia.Service
 	workspaceTaskAssets *workspacemedia.TaskAssetAdapter
+	workspaceTaskRouter *routing.RoutingResolver
 	// webhooks owns signed webhook subscriptions + River-driven
 	// delivery (issue #833). Built here where the riverClient exists
 	// so the same store instance serves HTTP views and the worker;
@@ -171,9 +173,10 @@ func newAppTaskRuntime(
 	workspaceMedia := workspacemedia.NewService(dbs.db)
 	workspaceAssets := &workspacemedia.TaskAssetAdapter{Store: workspaceMedia}
 	workspaceEnqueuer := taskruntime.NewWorkspaceTaskEnqueuer(nil, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault)
+	workspaceRouter := routing.NewRoutingResolver(catalog.NewRepository(dbs.db))
 	workspaceSettler := workspacetasks.NewService(workspacetasks.ServiceDeps{
 		Tasks: workspaceStore, Quoter: workspaceQuoter, Holder: workspaceHolder,
-		Queue: workspaceEnqueuer, Assets: workspaceAssets,
+		Queue: workspaceEnqueuer, Assets: workspaceAssets, Resolver: workspaceRouter,
 	})
 	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
 	// Live dispatch finalize seam: provider image bytes land directly in
@@ -210,7 +213,7 @@ func newAppTaskRuntime(
 	// Saves folder. The trigger is unbilled (permanent free tier): the
 	// saver ensures the Quick Saves asset and the trigger records the
 	// durable job directly, with no quote, hold, capture, or release.
-	workspaceLibraryStore := library.NewService(repos.db)
+	workspaceLibraryStore := librarypostgres.NewService(repos.db)
 	workspaceAutoMaterializer, err := taskruntime.NewWorkspaceTaskAutoMaterializer(taskruntime.WorkspaceTaskAutoMaterializerDeps{
 		Store: workspaceLibraryStore,
 		Saver: taskruntime.NewWorkspaceTaskLibrarySaver(workspaceLibraryStore),
@@ -222,6 +225,16 @@ func newAppTaskRuntime(
 		Store: workspaceStore, Settler: workspaceSettler, Assets: workspaceAssets,
 		Provider: taskworker.NewWorkspaceGatewayProvider(&workspaceGatewayCallerAdapter{executor: workspaceGateway}),
 		Renderer: workspaceRenderer, Materializer: workspaceAutoMaterializer,
+		// The postgres store is the durable attempt-fact recorder
+		// (retry_layer/gateway_retry_count, #848): it also gates the
+		// single bounded model fallback, which requires its persisted
+		// model_fallback row.
+		Attempts: workspaceStore,
+		// #852: bounded model-fallback sends land in
+		// ideaboard_model_fallback_total with the fallback-send
+		// outcome. A nil set keeps local/test runtimes
+		// uninstrumented (the worker guards the seam).
+		Metrics: redMetrics,
 	})
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize workspace task worker: %w", err)
@@ -320,6 +333,7 @@ func newAppTaskRuntime(
 		workspaceTaskQuoter: workspaceQuoter,
 		workspaceTaskMedia:  workspaceMedia,
 		workspaceTaskAssets: workspaceAssets,
+		workspaceTaskRouter: workspaceRouter,
 		webhooks:            webhookStore,
 	}, appWorkerRuntime{
 		riverClient:  riverClient,
@@ -351,18 +365,6 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 		}
 	}
 	return stats
-}
-
-type uploadBoardAccessResolver struct {
-	service *boards.Service
-}
-
-func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
-	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
-	if err != nil {
-		return 0, err
-	}
-	return board.OwnerUserID, nil
 }
 
 type uploadOwnerStorageUIDResolver struct {

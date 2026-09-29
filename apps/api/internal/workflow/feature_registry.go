@@ -25,8 +25,8 @@ const (
 type OutputResolutionPolicy string
 
 const (
-	OutputResolutionPolicyScalable    OutputResolutionPolicy = "scalable"
-	OutputResolutionPolicyDefaultOnly OutputResolutionPolicy = "default-only"
+	OutputResolutionPolicyScalable OutputResolutionPolicy = "scalable"
+	OutputResolutionPolicyFixed    OutputResolutionPolicy = "fixed"
 )
 
 // RoutingCapability is the provider-independent capability that an eligible
@@ -148,7 +148,7 @@ var registeredImageFeatures = []registeredImageFeature{
 	{slug: FeatureSlugCutout, definition: featureExecutionDefinition{
 		promptPolicy:           PromptPolicyIgnored,
 		outputCountPolicy:      OutputCountPolicyFixed,
-		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+		outputResolutionPolicy: OutputResolutionPolicyFixed,
 		routingCapability:      RoutingCapabilityCutout,
 		modelRequirement:       RoutingModelNotRequired,
 		runtimeOperation:       RuntimeOperationCutout,
@@ -166,7 +166,7 @@ var registeredImageFeatures = []registeredImageFeature{
 	{slug: FeatureSlugUpscale, definition: featureExecutionDefinition{
 		promptPolicy:           PromptPolicyIgnored,
 		outputCountPolicy:      OutputCountPolicyFixed,
-		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+		outputResolutionPolicy: OutputResolutionPolicyFixed,
 		routingCapability:      RoutingCapabilityUpscale,
 		modelRequirement:       RoutingModelNotRequired,
 		runtimeOperation:       RuntimeOperationUpscale,
@@ -236,7 +236,7 @@ func imageFillDefinition(
 	return featureExecutionDefinition{
 		promptPolicy:           promptPolicy,
 		outputCountPolicy:      OutputCountPolicyFixed,
-		outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+		outputResolutionPolicy: OutputResolutionPolicyFixed,
 		routingCapability:      RoutingCapabilityFill,
 		modelRequirement:       RoutingModelNotRequired,
 		runtimeOperation:       operation,
@@ -261,14 +261,13 @@ func SupportedFeatureOutputResolutions(feature string) []string {
 		return nil
 	}
 	switch definition.outputResolutionPolicy {
-	case OutputResolutionPolicyDefaultOnly:
-		return []string{OutputResolutionDefault}
+	case OutputResolutionPolicyFixed:
+		return []string{OutputResolution1K}
 	case OutputResolutionPolicyScalable:
 		return []string{
 			OutputResolution1K,
 			OutputResolution2K,
 			OutputResolution4K,
-			OutputResolutionDefault,
 		}
 	default:
 		return nil

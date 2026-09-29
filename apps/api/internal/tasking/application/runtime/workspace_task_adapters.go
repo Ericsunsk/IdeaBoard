@@ -3,18 +3,16 @@ package runtime
 // Workspace task production adapters (#821, Phase 4-04 of #809).
 //
 // The v1 task surface (contract_v1_tasks.go) settles through the
-// workspacetasks.Service seams (Quoter/Holder/Enqueuer/AssetReader) with
-// compensating rollback (Quote -> Hold -> Insert -> Enqueue). This file
-// adapts the production billing catalog, credits Commands, River client,
-// and workspace media store to those seams so http_wiring.go can take the
-// Tasks surface live (replacing the 501 fail-closed).
+// workspacetasks.Service seams. This file adapts the production billing
+// catalog, credits Commands, River client, and workspace media store to
+// those seams so http_wiring.go can take the Tasks surface live.
 //
 // Transactional note: DESIGN.md requires Quote snapshot + Credit Hold +
 // Task insert + River enqueue in ONE PostgreSQL transaction, and terminal
 // Complete/Cancel/Fail to settle Capture/Release atomically with the state
-// flip. The seams below expose both halves: the plain Quoter/Holder/
-// Enqueuer methods (compensating fallback for test backends) and the
-// TxQuoter/TxHolder/TxEnqueuer variants that join the Service-owned
+// flip. The seams below expose the plain Quote/Hold/Enqueue contracts used
+// by preflight and terminal operations, plus the TxQuoter/TxHolder/TxEnqueuer
+// variants that join the Service-owned
 // settlement transaction (opened on the task store pool via
 // workspacetasks.SettlementTransactor). Credits converge through
 // credits.Service.InTx(tx) — the sole ledger writer — the billing catalog
@@ -75,7 +73,7 @@ func (q *WorkspaceTaskQuoter) Quote(ctx context.Context, service, resolution str
 	}
 	outputResolution, err := billing.NormalizeOutputResolution(resolution)
 	if err != nil {
-		outputResolution = billing.OutputResolutionDefault
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
 	quote, err := q.Catalog.QuoteAtResolution(ctx, sku, outputResolution, quantity)
@@ -120,7 +118,7 @@ func (q *WorkspaceTaskQuoter) QuoteInTx(ctx context.Context, tx pgx.Tx, service,
 	}
 	outputResolution, err := billing.NormalizeOutputResolution(resolution)
 	if err != nil {
-		outputResolution = billing.OutputResolutionDefault
+		return workspacetasks.BillingSnapshot{}, fmt.Errorf("workspace task quoter: invalid output resolution: %w", err)
 	}
 	sku := "ai-image:" + canonical
 	quote, err := q.Catalog.QuoteAtResolutionInTx(ctx, tx, sku, outputResolution, quantity)

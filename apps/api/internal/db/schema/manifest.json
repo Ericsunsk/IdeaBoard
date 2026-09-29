@@ -15,6 +15,7 @@
     {"name": "search", "path": "fragments/search.sql", "depends_on": ["identity", "credits"]},
     {"name": "usage", "path": "fragments/usage.sql", "depends_on": ["tasks"]},
     {"name": "workflow", "path": "fragments/workflow.sql", "depends_on": ["platform"]},
+    {"name": "modelpool", "path": "fragments/modelpool.sql", "depends_on": ["tasks"]},
     {"name": "boards", "path": "fragments/boards.sql", "depends_on": ["identity", "media"]},
     {"name": "rewards", "path": "fragments/rewards.sql", "depends_on": ["identity", "credits"]},
     {"name": "billing", "path": "fragments/billing.sql", "depends_on": ["credits"]},

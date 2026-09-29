@@ -19,6 +19,6 @@ export type QuoteWorkspaceTaskRequestData = {
   service: Service
   /** @minimum 1 */
   quantity?: number
-  /** Output resolution; defaults to default when omitted. */
+  /** Output resolution; omitted input is normalized to the Service policy canonical value. */
   resolution?: string
 }

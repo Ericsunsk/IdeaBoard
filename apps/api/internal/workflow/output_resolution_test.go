@@ -9,7 +9,7 @@ func TestNormalizeOutputResolution(t *testing.T) {
 		ok   bool
 	}{
 		{raw: "", want: OutputResolution1K, ok: true},
-		{raw: "default", want: OutputResolutionDefault, ok: true},
+		{raw: "default", ok: false},
 		{raw: " 2K ", want: OutputResolution2K, ok: true},
 		{raw: "4k", want: OutputResolution4K, ok: true},
 		{raw: "8k", ok: false},
@@ -30,7 +30,6 @@ func TestSupportsOutputResolutionUsesExclusiveModelCapabilities(t *testing.T) {
 		supports2K, supports4K bool
 		want                   bool
 	}{
-		{name: "default uses baseline model", resolution: OutputResolutionDefault, want: true},
 		{name: "1k uses baseline model", resolution: OutputResolution1K, want: true},
 		{name: "baseline model rejects 2k", resolution: OutputResolution2K, want: false},
 		{name: "baseline model rejects 4k", resolution: OutputResolution4K, want: false},

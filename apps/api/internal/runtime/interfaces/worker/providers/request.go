@@ -28,7 +28,6 @@ type providerRequest struct {
 	OutputCount      int
 	ImageRefs        []string
 	MaskRefs         []string
-	CanvasRef        string
 	Scale            float64
 	OriginalWidth    int
 	OriginalHeight   int
@@ -60,9 +59,6 @@ func (p providerTaskParams) providerRequest(prompt string, resolvedModel string)
 	runtimeInputs := plan.RuntimeInputs()
 	width, height := p.imageSize()
 	outputResolution := plan.OutputResolution()
-	if outputResolution == workflow.OutputResolutionDefault {
-		outputResolution = workflow.OutputResolution1K
-	}
 	request := newProviderRequest(
 		prompt, width, height, p.Provider, resolvedModel,
 		resolvedProviderRequestFacts{
@@ -294,7 +290,6 @@ func newProviderRequest(
 	providerParams := params
 	imageRefs := collectOrderedProviderRefs(providerParams, imageInputRefKeys)
 	maskRefs := collectOrderedProviderRefs(providerParams, []string{"mask_image_urls", "mask_image_url"})
-	canvasRef := firstProviderRef(providerParams, "canvas_image_ref")
 	return providerRequest{
 		Primitive:        facts.primitive,
 		Prompt:           prompt,
@@ -304,7 +299,6 @@ func newProviderRequest(
 		OutputCount:      facts.outputCount,
 		ImageRefs:        imageRefs,
 		MaskRefs:         maskRefs,
-		CanvasRef:        canvasRef,
 		Scale:            readUpscaleScale(providerParams, controlContract),
 	}
 }
@@ -318,14 +312,6 @@ func readUpscaleScale(params map[string]interface{}, controlContract workflow.Ru
 		return 0
 	}
 	return contract.Scale
-}
-
-func firstProviderRef(params map[string]interface{}, key string) string {
-	refs := collectOrderedProviderRefs(params, []string{key})
-	if len(refs) == 0 {
-		return ""
-	}
-	return refs[0]
 }
 
 func providerImageSize(width, height int) string {

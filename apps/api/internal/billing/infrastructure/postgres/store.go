@@ -49,7 +49,7 @@ func (s *Store) PublishPrices(ctx context.Context, input billing.PublishPricesIn
 	}
 	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
 	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
-	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, command.sku, command.displayName, command.description, string(encodedPrices), command.actorID)
+	ORDER BY CASE output_resolution WHEN '1k' THEN 1 WHEN '2k' THEN 2 WHEN '4k' THEN 3 ELSE 4 END`, command.sku, command.displayName, command.description, string(encodedPrices), command.actorID)
 	if err != nil {
 		return nil, mapDatabaseError("publish price version", err)
 	}

@@ -313,10 +313,10 @@ func compileOutputResolution(feature string, policy OutputResolutionPolicy, raw 
 		value = *raw
 	}
 	resolution, ok := NormalizeOutputResolution(value)
-	if policy == OutputResolutionPolicyDefaultOnly && strings.TrimSpace(value) == "" {
-		resolution, ok = OutputResolutionDefault, true
+	if policy == OutputResolutionPolicyFixed && strings.TrimSpace(value) == "" {
+		resolution, ok = OutputResolution1K, true
 	}
-	if !ok || policy == OutputResolutionPolicyDefaultOnly && resolution != OutputResolutionDefault {
+	if !ok || policy == OutputResolutionPolicyFixed && resolution != OutputResolution1K {
 		return "", newFeatureContractValidationError(
 			FeatureContractUnsupportedResolution, feature, "output_resolution", value,
 		)

@@ -64,7 +64,7 @@ func testTaskCatalog(amount int64, err error) *billingapplication.BillableItemCa
 		DisplayName:     "Render",
 		Description:     "test",
 		SortOrder:       10,
-		PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
+		PricingVariants: []billing.OutputResolution{billing.OutputResolution1K},
 	}})
 	if registryErr != nil {
 		panic(registryErr)
@@ -76,7 +76,7 @@ func testTaskCatalog(amount int64, err error) *billingapplication.BillableItemCa
 				DisplayName:      "Render",
 				PriceVersionID:   1,
 				PriceVersion:     1,
-				OutputResolution: billing.OutputResolutionDefault,
+				OutputResolution: billing.OutputResolution1K,
 				UnitCredits:      amount,
 			},
 			TotalCredits: amount,
@@ -98,7 +98,7 @@ func TestWorkspaceTaskQuoterPreservesPricingCause(t *testing.T) {
 		{billing.ErrSKUNotFound, billing.ErrPricingUnavailable},
 	} {
 		quoter := &WorkspaceTaskQuoter{Catalog: testTaskCatalog(10, tc.storeErr)}
-		_, err := quoter.Quote(context.Background(), "render", "default", 1)
+		_, err := quoter.Quote(context.Background(), "render", "1k", 1)
 		if err == nil {
 			t.Fatalf("Quote pricing failure (%v) = nil, want error", tc.storeErr)
 		}
@@ -113,7 +113,7 @@ func TestWorkspaceTaskQuoterPreservesPricingCause(t *testing.T) {
 
 func TestWorkspaceTaskQuoterTransientKeepsQuoteUnavailable(t *testing.T) {
 	quoter := &WorkspaceTaskQuoter{Catalog: testTaskCatalog(10, errors.New("catalog down"))}
-	_, err := quoter.Quote(context.Background(), "render", "default", 1)
+	_, err := quoter.Quote(context.Background(), "render", "1k", 1)
 	if err == nil {
 		t.Fatal("Quote transient failure = nil, want error")
 	}
@@ -127,11 +127,11 @@ func TestWorkspaceTaskQuoterTransientKeepsQuoteUnavailable(t *testing.T) {
 
 func TestWorkspaceTaskQuoterFailsClosed(t *testing.T) {
 	var nilQuoter *WorkspaceTaskQuoter
-	if _, err := nilQuoter.Quote(context.Background(), "render", "default", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := nilQuoter.Quote(context.Background(), "render", "1k", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("nil quoter err = %v, want quote-unavailable", err)
 	}
 	unsupported := &WorkspaceTaskQuoter{Catalog: testTaskCatalog(10, nil)}
-	if _, err := unsupported.Quote(context.Background(), "nope", "default", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
+	if _, err := unsupported.Quote(context.Background(), "nope", "1k", 1); !errors.Is(err, workspacetasks.ErrQuoteUnavailable) {
 		t.Fatalf("unsupported kind err = %v, want quote-unavailable", err)
 	}
 }

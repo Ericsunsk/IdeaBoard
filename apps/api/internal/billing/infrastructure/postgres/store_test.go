@@ -29,7 +29,6 @@ type (
 )
 
 const (
-	OutputResolutionDefault    = billing.OutputResolutionDefault
 	OutputResolution1K         = billing.OutputResolution1K
 	BillableItemStatusActive   = billing.BillableItemStatusActive
 	BillableItemStatusDisabled = billing.BillableItemStatusDisabled
@@ -102,11 +101,11 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	}
 
 	removeBgDefinition := testBillableDefinition("ai-image:cutout", "抠图")
-	removeBgDefinition.PricingVariants = []OutputResolution{OutputResolutionDefault}
+	removeBgDefinition.PricingVariants = []OutputResolution{OutputResolution1K}
 	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: removeBgDefinition, UnitCredits: 0, ActorID: 7}); err != nil {
 		t.Fatalf("PublishPrice(free) error = %v", err)
 	}
-	freeQuote, err := service.QuoteAtResolution(ctx, "ai-image:cutout", OutputResolutionDefault, 99)
+	freeQuote, err := service.QuoteAtResolution(ctx, "ai-image:cutout", OutputResolution1K, 99)
 	if err != nil || freeQuote.UnitCredits != 0 || freeQuote.TotalCredits != 0 {
 		t.Fatalf("Quote(free) = %+v, %v", freeQuote, err)
 	}

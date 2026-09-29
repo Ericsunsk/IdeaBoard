@@ -34,8 +34,8 @@ func TestAIImageWorkflowBillingConsumesCompiledPlan(t *testing.T) {
 }
 
 func TestAIImageRequestConsumesExplicitCompiledResolution(t *testing.T) {
-	request, err := AIImageRequest(workflow.FeatureSlugCutout, "default", 5)
-	if err != nil || request.OutputResolution != billing.OutputResolutionDefault {
+	request, err := AIImageRequest(workflow.FeatureSlugCutout, "1k", 5)
+	if err != nil || request.OutputResolution != billing.OutputResolution1K {
 		t.Fatalf("default resolution request=%+v err=%v", request, err)
 	}
 	if request.Quantity != 5 {
@@ -47,11 +47,11 @@ func TestAIImageRequestConsumesExplicitCompiledResolution(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugInpaint, "default", 1)
+	first, err := AIImageRequest(workflow.FeatureSlugInpaint, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugInpaint, "default", 1)
+	second, err := AIImageRequest(workflow.FeatureSlugInpaint, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

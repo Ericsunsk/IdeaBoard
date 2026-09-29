@@ -1,9 +1,12 @@
 package domain
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/generation/routing"
 )
 
 type Task struct {
@@ -73,20 +76,122 @@ type AdminTaskExecutionSnapshot struct {
 // Admin Task details. It intentionally excludes credentials and queue metadata.
 // Finalize timing is not recorded per attempt: result materialization is part
 // of the terminal write itself, so there is no separate finalize phase to report.
+//
+// Routing observability (#852, ADR-0012 rule 7): Service, RequestedModel,
+// RetryLayer, and GatewayRetryCount distinguish gateway request retries,
+// model fallback attempts, and River/task retries in Admin presentation.
+// ErrorMsg is the truncated per-send failure reason (bounded at write;
+// never prompts, payloads, credentials, or storage URLs).
 type AdminTaskAttempt struct {
 	AttemptNo          int        `json:"attempt_no"`
 	Status             string     `json:"status"`
 	Stage              string     `json:"stage"`
 	FailureCategory    string     `json:"failure_category"`
+	Service            string     `json:"service"`
+	RequestedModel     string     `json:"requested_model"`
 	ResolvedModel      string     `json:"resolved_model"`
 	Provider           string     `json:"provider"`
 	GatewayStep        string     `json:"gateway_step"`
+	RetryLayer         string     `json:"retry_layer"`
+	GatewayRetryCount  int        `json:"gateway_retry_count"`
+	ErrorMsg           string     `json:"error_msg,omitempty"`
 	ProviderStartedAt  *time.Time `json:"provider_started_at"`
 	ProviderFinishedAt *time.Time `json:"provider_finished_at"`
 	CompletedAt        *time.Time `json:"completed_at"`
 	CancelledAt        *time.Time `json:"cancelled_at"`
 	ProviderLatencyMS  int64      `json:"provider_latency_ms"`
 	TotalLatencyMS     int64      `json:"total_latency_ms"`
+}
+
+// AdminRoutingSnapshot is the read-only Admin projection over the
+// immutable submit-time RoutingSnapshot pinned on the task row (#852,
+// ADR-0012 rule 9). It carries the requested service/resolution, the
+// eligible pool entries, the deterministic selection, the single retry
+// candidate, and the pool version — everything needed to replay and
+// diagnose selection plus fallback without the live pool. A nil pointer
+// means the task never pinned a snapshot (pre-pool row); Admin renders
+// it as missing model data, never as an error.
+type AdminRoutingSnapshot struct {
+	Service             string   `json:"service"`
+	RequestedResolution string   `json:"requested_resolution"`
+	EligibleModels      []string `json:"eligible_models"`
+	SelectedModel       string   `json:"selected_model"`
+	RetryCandidate      string   `json:"retry_candidate,omitempty"`
+	PoolVersion         uint64   `json:"pool_version"`
+}
+
+// ParseAdminRoutingSnapshot projects raw task-row snapshot bytes onto
+// the Admin view. Empty bytes report ok=false (never pinned). Malformed
+// JSON also reports ok=false: observability degrades to "missing model
+// data" instead of failing the whole detail read. Deliberately no
+// Verify: Admin diagnosis must render even a non-replaying snapshot.
+func ParseAdminRoutingSnapshot(raw []byte) (*AdminRoutingSnapshot, bool) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, false
+	}
+	var snap routing.RoutingSnapshot
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		return nil, false
+	}
+	return &AdminRoutingSnapshot{
+		Service:             strings.TrimSpace(snap.Service),
+		RequestedResolution: string(snap.RequestedResolution),
+		EligibleModels:      append([]string(nil), snap.EligibleModels...),
+		SelectedModel:       strings.TrimSpace(snap.SelectedModel),
+		RetryCandidate:      strings.TrimSpace(snap.RetryCandidate),
+		PoolVersion:         snap.PoolVersion,
+	}, true
+}
+
+// FinalAttempt resolves the execution attempt that owns the task's final
+// model (#852): the highest attempt number in a terminal status
+// (completed/failed/cancelled) wins; a task with no terminal attempt
+// falls back to its highest attempt of any status so in-flight tasks
+// still attribute to their latest send. Nil when no attempt carries a
+// resolved model (missing model data), never a fabricated zero value.
+func FinalAttempt(attempts []AdminTaskAttempt) *AdminTaskAttempt {
+	var best *AdminTaskAttempt
+	for i := range attempts {
+		candidate := &attempts[i]
+		if strings.TrimSpace(candidate.ResolvedModel) == "" {
+			continue
+		}
+		if best == nil {
+			best = candidate
+			continue
+		}
+		bestTerminal := isTerminalAttemptStatus(best.Status)
+		candidateTerminal := isTerminalAttemptStatus(candidate.Status)
+		if candidateTerminal != bestTerminal {
+			if candidateTerminal {
+				best = candidate
+			}
+			continue
+		}
+		if candidate.AttemptNo >= best.AttemptNo {
+			best = candidate
+		}
+	}
+	return best
+}
+
+// FinalResolvedModel attributes execution to the resolved (final) model:
+// the FinalAttempt's resolved model, or "" when attempts carry no model
+// data. Read-only projection: it never changes task or billing state.
+func FinalResolvedModel(attempts []AdminTaskAttempt) string {
+	if final := FinalAttempt(attempts); final != nil {
+		return strings.TrimSpace(final.ResolvedModel)
+	}
+	return ""
+}
+
+func isTerminalAttemptStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "completed", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 type TaskOutput struct {

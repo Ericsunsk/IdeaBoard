@@ -18,7 +18,6 @@ export type CreateWorkspaceBillingQuoteRequestDataOutputResolution =
   (typeof CreateWorkspaceBillingQuoteRequestDataOutputResolution)[keyof typeof CreateWorkspaceBillingQuoteRequestDataOutputResolution]
 
 export const CreateWorkspaceBillingQuoteRequestDataOutputResolution = {
-  default: 'default',
   '1k': '1k',
   '2k': '2k',
   '4k': '4k',

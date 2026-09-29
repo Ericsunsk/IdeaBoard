@@ -1759,7 +1759,11 @@ paths:
         rejected with 400); unpriced or unregistered SKUs converge to
         billing_pricing_unavailable (422, deterministic, no SKU oracle),
         transient quote failures to billing_quote_unavailable (503). No
-        Idempotency-Key: pure read, safe to retry.
+        Idempotency-Key: pure read, safe to retry. For ai-image SKUs an
+        omitted output_resolution is normalized to the Service policy's
+        canonical 1k/2k/4k value and availability is checked before pricing
+        (empty pool renders service_resolution_unavailable 422). The only
+        accepted resolutions are 1k, 2k, and 4k.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -1785,7 +1789,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          description: SKU unpriced or unregistered (billing_pricing_unavailable, deterministic, do not retry).
+          description: SKU unpriced or unregistered (billing_pricing_unavailable, deterministic, do not retry), invalid resolution (validation_failed), or unavailable Service resolution for ai-image SKUs (service_resolution_unavailable).
           headers:
             Request-Id:
               $ref: '#/components/headers/RequestId'
@@ -1959,6 +1963,13 @@ paths:
         quote failures billing_quote_unavailable 503,
         billing_wallet_restricted 403). Missing Service Model Pool routing
         returns service_resolution_unavailable 422 before Quote/Hold.
+        Resolution semantics: params.output_resolution is the client
+        source of truth; an explicit top-level resolution must agree
+        with it exactly (case-insensitive) or submit fails 422
+        validation_failed on details.fields.resolution. An omitted
+        resolution is normalized once to the Service policy's canonical
+        1k/2k/4k value. Only 1k, 2k, and 4k are accepted; default is not a
+        request or billing variant.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2132,7 +2143,9 @@ paths:
         Unpriced or unregistered SKU renders billing_pricing_unavailable
         422 deterministic; transient quote failures render
         billing_quote_unavailable 503. Missing Service Model Pool routing
-        renders service_resolution_unavailable 422.
+        renders service_resolution_unavailable 422. An omitted resolution
+        is normalized to the Service policy canonical value; only 1k, 2k,
+        and 4k are accepted.
       parameters:
         - $ref: '#/components/parameters/WorkspaceId'
       requestBody:
@@ -4624,8 +4637,8 @@ components:
               description: Billable SKU (no price fields accepted; unpriced or unregistered SKUs converge to billing_pricing_unavailable 422, transient failures to billing_quote_unavailable 503, no oracle).
             output_resolution:
               type: string
-              enum: [default, 1k, 2k, 4k]
-              default: default
+              enum: [1k, 2k, 4k]
+              default: 1k
             quantity:
               type: integer
               format: int64
@@ -5004,7 +5017,7 @@ components:
               default: 1
             resolution:
               type: string
-              description: Output resolution; defaults to default when omitted.
+              description: Output resolution; omitted input is normalized to the Service policy canonical value.
     QuoteWorkspaceTaskRequest:
       type: object
       required: [data]
@@ -5024,7 +5037,7 @@ components:
               default: 1
             resolution:
               type: string
-              description: Output resolution; defaults to default when omitted.
+              description: Output resolution; omitted input is normalized to the Service policy canonical value.
     CancelWorkspaceTaskRequest:
       type: object
       additionalProperties: false

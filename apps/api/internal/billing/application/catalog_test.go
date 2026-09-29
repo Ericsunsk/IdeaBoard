@@ -26,7 +26,6 @@ type (
 )
 
 const (
-	OutputResolutionDefault    = billing.OutputResolutionDefault
 	OutputResolution1K         = billing.OutputResolution1K
 	BillableItemStatusActive   = billing.BillableItemStatusActive
 	BillableItemStatusArchived = billing.BillableItemStatusArchived
@@ -47,12 +46,12 @@ var (
 func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	now := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
 	activePrice := PriceInfo{PriceVersionID: 11, Version: 2, OutputResolution: OutputResolution1K, UnitCredits: 25, CreatedAt: now}
-	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, OutputResolution: OutputResolutionDefault, UnitCredits: 10, CreatedAt: now}
+	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 10, CreatedAt: now}
 	activePriceTwo := PriceInfo{PriceVersionID: 14, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 12, CreatedAt: now}
 	archivedPrice := PriceInfo{PriceVersionID: 13, Version: 3, OutputResolution: OutputResolution1K, UnitCredits: 50, CreatedAt: now}
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
 		{SKU: "ai-image:inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
-		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
+		{SKU: "ai-image:cutout", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolution1K}},
 		{SKU: "ai-image:upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "Upscale", SortOrder: 30},
 		{SKU: "ai-image:outpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "扩图", SortOrder: 40},
 	})
@@ -61,7 +60,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	}
 	facts := catalogFactReaderStub{items: []CatalogItem{
 		{SKU: "ai-image:inpaint", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePrice}, UpdatedAt: now},
-		{SKU: "ai-image:cutout", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolutionDefault: disabledPrice}, UpdatedAt: now},
+		{SKU: "ai-image:cutout", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: disabledPrice}, UpdatedAt: now},
 		{SKU: "ai-image:outpaint", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePriceTwo}, UpdatedAt: now},
 		{SKU: "legacy:removed", DisplayName: "旧功能", Description: "已从 Registry 移除", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: archivedPrice}, UpdatedAt: now},
 	}}

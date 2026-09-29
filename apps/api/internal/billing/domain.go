@@ -15,14 +15,12 @@ const (
 type OutputResolution string
 
 const (
-	OutputResolutionDefault OutputResolution = "default"
-	OutputResolution1K      OutputResolution = "1k"
-	OutputResolution2K      OutputResolution = "2k"
-	OutputResolution4K      OutputResolution = "4k"
+	OutputResolution1K OutputResolution = "1k"
+	OutputResolution2K OutputResolution = "2k"
+	OutputResolution4K OutputResolution = "4k"
 )
 
 var outputResolutions = [...]OutputResolution{
-	OutputResolutionDefault,
 	OutputResolution1K,
 	OutputResolution2K,
 	OutputResolution4K,

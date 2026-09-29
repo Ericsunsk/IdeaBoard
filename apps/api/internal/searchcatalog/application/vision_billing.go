@@ -220,7 +220,7 @@ func (s *VisionBillingService) reserve(ctx context.Context, userID int64, key, r
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return visionReservation{}, fmt.Errorf("load vision operation: %w", err)
 	}
-	quote, err := s.catalog.QuoteAtResolutionInTx(ctx, tx, visionSearchSKU, billing.OutputResolutionDefault, 1)
+	quote, err := s.catalog.QuoteAtResolutionInTx(ctx, tx, visionSearchSKU, billing.OutputResolution1K, 1)
 	if err != nil || quote.TotalCredits <= 0 {
 		if err != nil {
 			if reason, ok := visionBillingDeferredReason(err); ok {

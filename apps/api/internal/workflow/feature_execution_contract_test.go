@@ -37,7 +37,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 		{
 			feature: FeatureSlugInpaint, promptPolicy: PromptPolicyRequired,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyFixed,
 			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationInpaint, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
@@ -64,7 +64,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 		{
 			feature: FeatureSlugCutout, promptPolicy: PromptPolicyIgnored,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyFixed,
 			capability: RoutingCapabilityCutout, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationCutout, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
@@ -82,7 +82,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 		{
 			feature: FeatureSlugUpscale, promptPolicy: PromptPolicyIgnored,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyFixed,
 			capability: RoutingCapabilityUpscale, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationUpscale, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
@@ -91,7 +91,7 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 		{
 			feature: FeatureSlugOutpaint, promptPolicy: PromptPolicyOptional,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyFixed,
 			capability: RoutingCapabilityFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationOutpaint, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
@@ -136,17 +136,16 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 				OutputResolution1K,
 				OutputResolution2K,
 				OutputResolution4K,
-				OutputResolutionDefault,
 			}
-			if test.outputResolutionPolicy == OutputResolutionPolicyDefaultOnly {
-				wantSupportedResolutions = []string{OutputResolutionDefault}
+			if test.outputResolutionPolicy == OutputResolutionPolicyFixed {
+				wantSupportedResolutions = []string{OutputResolution1K}
 			}
 			if got := SupportedFeatureOutputResolutions(test.feature); !slices.Equal(got, wantSupportedResolutions) {
 				t.Fatalf("supported resolutions=%v, want=%v", got, wantSupportedResolutions)
 			}
 			wantResolution := OutputResolution1K
-			if test.outputResolutionPolicy == OutputResolutionPolicyDefaultOnly {
-				wantResolution = OutputResolutionDefault
+			if test.outputResolutionPolicy == OutputResolutionPolicyFixed {
+				wantResolution = OutputResolution1K
 			}
 			if plan.OutputResolution() != wantResolution {
 				t.Fatalf("default output resolution=%q, want=%q", plan.OutputResolution(), wantResolution)
@@ -334,9 +333,9 @@ func TestCompileFeatureExecutionPlanUsesFeatureVersionedImageLimits(t *testing.T
 	}
 }
 
-func TestCompileFeatureExecutionPlanFixedPriceTransformsUseDefaultResolution(t *testing.T) {
+func TestCompileFeatureExecutionPlanFixedPriceTransformsUse1KResolution(t *testing.T) {
 	count := 1
-	resolution := " DEFAULT "
+	resolution := " 1K "
 	for _, test := range []struct {
 		feature    string
 		capability RoutingCapability
@@ -361,7 +360,7 @@ func TestCompileFeatureExecutionPlanFixedPriceTransformsUseDefaultResolution(t *
 			if err != nil {
 				t.Fatalf("compile: %v", err)
 			}
-			if plan.RequestedOutputCount().Int() != 1 || plan.OutputResolution() != OutputResolutionDefault {
+			if plan.RequestedOutputCount().Int() != 1 || plan.OutputResolution() != OutputResolution1K {
 				t.Fatalf("fixed-price plan=(count=%d,resolution=%q)", plan.RequestedOutputCount().Int(), plan.OutputResolution())
 			}
 			routing := plan.RoutingRequirement()

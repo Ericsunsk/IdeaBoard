@@ -28,9 +28,8 @@ const (
 	// and MaskImageURL(s) (legacy URLs, never persisted), MaskAssetID is
 	// the durable contract: the mask bytes arrive via the existing
 	// upload-session flow and the task links the resulting asset id.
-	MaskAssetID    = "mask_asset_id"
-	CanvasImageRef = "canvas_image_ref"
-	UseMask        = "use_mask"
+	MaskAssetID = "mask_asset_id"
+	UseMask     = "use_mask"
 
 	CustomWidth         = "custom_width"
 	CustomHeight        = "custom_height"
@@ -103,7 +102,6 @@ var providerReservedKeys = keySet(
 	ReferenceImageAssetIDs,
 	OriginalImageAssetID,
 	MaskImageAssetID,
-	CanvasImageRef,
 	UseMask,
 	CustomWidth,
 	CustomHeight,
@@ -140,6 +138,12 @@ var submitTaskParamKeys = keySet(
 	Ratio,
 	Quality,
 	OutputCount,
+	// OutputResolution is the client resolution source of truth
+	// (ADR-0012 rule 11): v1 submits carry it in params, the edge
+	// checks it for exact agreement with the top-level billing
+	// resolution, and canonical compilation normalizes it into the
+	// execution plan (#851).
+	OutputResolution,
 	PromptUpsampling,
 	Variation,
 	Outpaint,
@@ -157,9 +161,9 @@ func IsProviderReservedKey(key string) bool {
 	return ok
 }
 
-// IsLegacyPersistedMediaKey identifies submit-time URL keys that must never
-// appear in durable Task Params after the AssetID media contract cutover.
-func IsLegacyPersistedMediaKey(key string) bool {
+// IsPersistedMediaURLKey identifies submit-time URL keys that must never
+// appear in durable Task Params; durable media uses AssetID facts instead.
+func IsPersistedMediaURLKey(key string) bool {
 	switch key {
 	case ImageURL, ImageURLs, ReferenceImageURLs, MaskImageURL, MaskImageURLs:
 		return true
