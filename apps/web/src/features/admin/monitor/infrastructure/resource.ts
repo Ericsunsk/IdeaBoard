@@ -436,7 +436,6 @@ function mapControlTaskToDetail(task: ControlTask): AdminMonitorDetail {
     billing: mapControlBilling(task.billing),
     outputs: (task.outputs ?? []).map(mapControlOutput),
     execution_metrics: mapControlExecutionMetrics(task.execution_metrics),
-    latest_execution: mapControlLatestExecution(task),
     execution_attempts: (task.execution_attempts ?? []).map(mapControlAttempt),
     routing: mapControlRouting(task.routing),
     final_resolved_model: task.final_resolved_model,
