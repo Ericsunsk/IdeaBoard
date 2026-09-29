@@ -247,7 +247,8 @@ that the migration has been rehearsed, and that legacy routing paths are deleted
 - After a retryable upstream failure, retry one remaining eligible candidate. Do not retry deterministic business errors such as invalid parameters, insufficient credits, or content-safety rejection.
 - If there are no eligible Models, return `422 service_resolution_unavailable` before task creation or billing.
 - Billing remains keyed by `Service + resolution + quantity`; switching Models does not change price.
-- Fixed-resolution Services may continue to use the `default` billing variant.
+- Fixed-resolution Services select one of `1k`, `2k`, or `4k` in their Service
+  policy; there is no separate `default` billing variant.
 - The frontend continues to show resolutions already launched in the product. It does not dynamically hide `1K`, `2K`, or `4K` merely because the current pool is empty. Runtime unavailability is a backend error surfaced as a toast.
 - Provider-specific resolution parameters belong in the gateway/runtime adapter. Admins configure canonical resolutions, not provider JSON.
 - A submit-time routing snapshot pins the eligible pool entries, requested Service and resolution, selection seed, and pool version. Later pool edits do not invalidate an accepted task or change its retry candidate set.
@@ -278,7 +279,8 @@ This ticket is the shared design gate. Record the contract in an ADR or equivale
 The contract must define:
 
 - Service -> pool entry -> Model shape
-- canonical `1k`, `2k`, and `4k` resolutions, plus fixed `default` semantics
+- canonical `1k`, `2k`, and `4k` resolutions, including fixed-resolution
+  Service policy normalization
 - eligibility and disabled-entry rules
 - balanced selection and one-candidate retry classification
 - `service_resolution_unavailable` response shape
@@ -461,7 +463,8 @@ Rules:
 - Model changes do not change price.
 - Availability must be checked before Credit Hold and task creation.
 - Quote, readiness, and submit must converge on the same error code and semantics.
-- Fixed-resolution Services continue to use `default` where appropriate.
+- Fixed-resolution Services continue to use their policy-selected canonical
+  resolution; no separate billing resolution is introduced.
 - Billing snapshots must retain the requested Service and resolution.
 - Availability uses the shared routing contract; it does not introduce a second frontend availability source.
 - Submit persists the routing snapshot atomically with the billing/task/enqueue transaction.

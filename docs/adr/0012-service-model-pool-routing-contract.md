@@ -79,13 +79,13 @@ No `service_resolution_unavailable` code exists today
      state.
    `RoutingResolver` is the sole cross-context routing seam; these owners may
    consume its result but may not perform a second live Model lookup.
-3. **Canonical resolutions.** The pool speaks exactly `1k`, `2k`, `4k`
-   (today `workflow/output_resolution.go:6`, `billing/domain.go:17`) plus a
-   `default` billing variant for fixed-resolution Services. `default` means
-   "this Service has no scalable resolution choice": it is valid only for
-   `default-only` policy Services (today `feature_registry.go:28`,
-   `feature_compiler.go:317`, `feature_execution_codec.go:334`), never a
-   wildcard for scalable Services, and never a pool entry capability value.
+3. **Canonical resolutions.** The contract speaks exactly `1k`, `2k`, and
+   `4k` (today `workflow/output_resolution.go:6`, `billing/domain.go:17`).
+   There is no `default` request, billing, or pool capability value. A
+   fixed-resolution Service still selects one of these three canonical values
+   in its Service policy; an omitted request is normalized to that policy
+   value, while an explicit different value is rejected. Pool entries use the
+   same three values as their capability set.
 4. **Eligibility.** For a requested resolution, the eligible set is exactly:
    entries with `enabled == true` AND `requested_resolution ∈
    supported_resolutions`. Disabled entries are invisible to routing (they
