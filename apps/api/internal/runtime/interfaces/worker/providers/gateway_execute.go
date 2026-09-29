@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"
@@ -26,6 +28,10 @@ const (
 // parameter validation, media resolution, dialect shaping/parsing, and
 // result materialization. It never touches accounts, endpoints, or keys.
 func (c *Executor) CallGatewayAPI(ctx context.Context, input runtimeports.GatewayCallInput) (runtimeports.ProviderCallOutput, error) {
+	ctx, span := telemetry.Start(ctx, "generation.gateway.request",
+		attribute.String("selected_model", input.Model),
+		attribute.Int("attempt_number", int(input.AttemptNo)))
+	defer telemetry.End(span, nil)
 	if c == nil {
 		return runtimeports.ProviderCallOutput{}, fmt.Errorf("provider executor is not initialized")
 	}

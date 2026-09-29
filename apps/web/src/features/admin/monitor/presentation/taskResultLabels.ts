@@ -73,6 +73,24 @@ export function getAttemptFailureLabel(category: string) {
   )
 }
 
+// Retry-layer presentation labels (#852, ADR-0012 rule 7): gateway
+// request retries, model fallback attempts, and River/task retries stay
+// distinguishable in Admin views.
+export function getAttemptRetryLayerLabel(layer: string | undefined) {
+  if (!layer) return '-'
+  return (
+    {
+      gateway: '网关请求',
+      model_fallback: '模型兜底',
+      river_task: '任务重投',
+    }[layer] || layer
+  )
+}
+
+export function getDetailFinalModelLabel(task: AdminMonitorDetailModel) {
+  return task.final_resolved_model || getDetailExecutionModelLabel(task)
+}
+
 export function formatAttemptLatency(milliseconds: number) {
   if (milliseconds <= 0) return '-'
   if (milliseconds < 1000) return `${milliseconds} ms`

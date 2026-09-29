@@ -61,7 +61,9 @@ type AdminBillingSnapshot struct {
 	QuotedAt         time.Time  `json:"quoted_at"`
 	SettlementState  string     `json:"settlement_state"`
 	SettledAt        *time.Time `json:"settled_at"`
-	FeatureExists    bool       `json:"feature_exists"`
+	// FeatureExists is nil when the read model cannot resolve the current
+	// catalog. A pointer keeps "unknown" distinct from a definite false.
+	FeatureExists *bool `json:"feature_exists"`
 }
 
 // AdminTaskExecutionSnapshot is the immutable lease snapshot used by Admin

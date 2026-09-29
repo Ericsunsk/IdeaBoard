@@ -23,7 +23,7 @@ vi.mock('../../../../shared/composables/useAppClipboard', () => ({
 
 describe('task result image URL validation', () => {
   it.each([
-    '/uploads/canvas/user/board/content/image.webp',
+    '/uploads/tasks/user/board/content/image.webp',
     '/uploads/tasks/1/task/output.png?version=1',
     new URL('/uploads/tasks/1/task/output.png', window.location.origin).toString(),
   ])('allows %s', (url) => {
@@ -38,7 +38,7 @@ describe('task result image URL validation', () => {
     'blob:https://example.com/id',
     '//example.com/image.png',
     'ftp://example.com/image.png',
-    'uploads/canvas/image.png',
+    'uploads/tasks/image.png',
     '/assets/admin-preview.png',
     '/api/v1/workspaces/ws_test123/media-assets/asset_123/content',
     '/uploads/../admin-secret.png',

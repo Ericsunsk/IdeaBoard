@@ -3,6 +3,7 @@ import type { AdminMonitorListItemModel } from '../infrastructure/resource'
 import {
   TASK_MESSAGE_MAX_LENGTH,
   getTaskServiceIcon,
+  getTaskServiceResolution,
   getTaskServiceSlug,
   getTaskMessageText,
   getTaskModelLabel,
@@ -25,6 +26,25 @@ describe('task monitor model column', () => {
     })
 
     expect(getTaskModelLabel(task)).toBe('imagen-4')
+  })
+
+  it('prefers the final resolved model over the selected model', () => {
+    const task = makeTask({
+      selected_model: 'imagen-4',
+      final_resolved_model: 'imagen-4-fallback',
+      latest_execution: {
+        provider: 'openai',
+        gateway_step: 'text',
+        resolved_model: 'imagen-4',
+      },
+    })
+
+    expect(getTaskModelLabel(task)).toBe('imagen-4-fallback')
+  })
+
+  it('exposes the requested resolution for the service badge', () => {
+    expect(getTaskServiceResolution(makeTask())).toBe('')
+    expect(getTaskServiceResolution(makeTask({ requested_resolution: '2k' }))).toBe('2k')
   })
 
   it('keeps pending Tasks without an attempt in an explicit empty state', () => {

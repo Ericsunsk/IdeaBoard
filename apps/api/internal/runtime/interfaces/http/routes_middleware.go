@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,6 +15,7 @@ func registerGlobalMiddleware(r *gin.Engine, deps Dependencies) {
 	// share one correlation ID. Recovery stays ahead of CORS/rate-limit
 	// so panics there also render the shared error envelope.
 	r.Use(RequestIDMiddleware())
+	r.Use(telemetry.HTTPMiddleware())
 	r.Use(REDMetricsMiddleware(deps.REDMetrics))
 	r.Use(AccessLogMiddleware())
 	r.Use(RecoveryMiddleware())

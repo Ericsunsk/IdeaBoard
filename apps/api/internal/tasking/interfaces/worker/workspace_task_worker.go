@@ -61,6 +61,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"
@@ -68,6 +69,7 @@ import (
 	"ideaboard/api/internal/workflow/paramkeys"
 
 	"github.com/riverqueue/river"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // WorkspaceTaskWorkerStore is the narrow persistence seam the worker needs:
@@ -190,6 +192,14 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 		return errors.New("workspace task job is nil")
 	}
 	args := job.Args
+	attemptNumber := 0
+	if job.JobRow != nil {
+		attemptNumber = job.Attempt
+	}
+	ctx, workerSpan := telemetry.StartLinked(ctx, args.TraceParent, "generation.worker.handoff",
+		attribute.String("service", args.Service), attribute.String("queue", "drawing_default"),
+		attribute.Int("attempt_number", attemptNumber))
+	defer telemetry.End(workerSpan, nil)
 	taskID := strings.TrimSpace(args.TaskID)
 	workspaceID := strings.TrimSpace(args.WorkspaceID)
 	if taskID == "" || workspaceID == "" {
@@ -260,7 +270,7 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[taskrunti
 	// so stamping is what keeps execution snapshot-only. The legacy
 	// envelope value is ignored even when set.
 	claimed.ResolvedModel = model
-	outputs, genErr := w.generate(ctx, claimed)
+	outputs, genErr := w.generate(ctx, claimed, send.layer, send.attemptNo)
 	if genErr == nil {
 		return w.completeExecution(ctx, send, claimed, outputs, model)
 	}
@@ -344,7 +354,7 @@ func (w *WorkspaceTaskWorker) executeModelFallback(
 	slog.Info("workspace task trying model fallback",
 		"task_id", claimed.ID, "from_model", model, "to_model", snap.RetryCandidate)
 	claimed.ResolvedModel = snap.RetryCandidate
-	outputs, genErr := w.generate(ctx, claimed)
+	outputs, genErr := w.generate(ctx, claimed, fallback.layer, fallback.attemptNo)
 	// The fallback observation fires at send completion when the
 	// outcome is known (#852): decided-but-unrecorded fallbacks (the
 	// ok=false branch above) never inflate the counter. Nil metrics
@@ -492,7 +502,14 @@ func (w *WorkspaceTaskWorker) claim(ctx context.Context, args taskruntime.Worksp
 
 // generate runs the provider seam. A nil provider fails closed with a clear
 // message (tasks converge to failed, never strand).
-func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks.WorkspaceTask) ([]workspacetasks.OutputRef, error) {
+func (w *WorkspaceTaskWorker) generate(ctx context.Context, task *workspacetasks.WorkspaceTask, retryLayer string, attemptNumber int32) ([]workspacetasks.OutputRef, error) {
+	if attemptNumber <= 0 {
+		attemptNumber = int32(task.RetryCount + 1)
+	}
+	ctx, span := telemetry.Start(ctx, "generation.execution_attempt",
+		attribute.String("service", task.Service), attribute.String("selected_model", task.ResolvedModel),
+		attribute.Int("attempt_number", int(attemptNumber)), attribute.String("retry_layer", retryLayer))
+	defer telemetry.End(span, nil)
 	if w.provider == nil {
 		return nil, errors.New(msgGenerate)
 	}

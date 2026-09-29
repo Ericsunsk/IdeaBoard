@@ -129,6 +129,10 @@ export function createDemoMonitorList(durationMs: number, count = 42): AdminTask
       user_display_name: template.user,
       prompt: failed ? template.failedPrompt! : template.prompt,
       service: template.service,
+      requested_resolution: '2k',
+      pool_version: 3,
+      selected_model: template.model,
+      final_resolved_model: template.model,
       credits: completed ? 2 + Math.floor(random() * 3) : 0,
       result: resultImages.length > 0 ? JSON.stringify({ image_urls: resultImages }) : '',
       latest_execution: {
@@ -169,7 +173,7 @@ export function createDemoTaskDetail(row: AdminTaskRow): AdminMonitorDetailModel
   const settled = row.status === adminTaskStatuses.completed
   const billing: AdminTaskBillingSnapshot = {
     sku: `${row.service || 'render'}:demo`,
-    output_resolution: 'default',
+    output_resolution: '1k',
     display_name: meta?.label ?? row.service,
     price_version_id: 1,
     price_version: 1,
@@ -209,5 +213,20 @@ export function createDemoTaskDetail(row: AdminTaskRow): AdminMonitorDetailModel
       resolved_model: row.latest_execution?.resolved_model ?? '',
     },
     execution_attempts: [],
+    routing: buildDemoRouting(row),
+    final_resolved_model: row.final_resolved_model ?? '',
+  }
+}
+
+function buildDemoRouting(row: AdminTaskRow): AdminMonitorDetailModel['routing'] {
+  const models = [row.selected_model ?? '', row.final_resolved_model ?? ''].filter(
+    (model, index, all) => model !== '' && all.indexOf(model) === index,
+  )
+  return {
+    service: row.service,
+    requested_resolution: row.requested_resolution ?? '2k',
+    eligible_models: models,
+    selected_model: row.selected_model ?? '',
+    pool_version: row.pool_version ?? 3,
   }
 }

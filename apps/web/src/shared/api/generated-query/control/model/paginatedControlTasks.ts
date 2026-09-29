@@ -31,10 +31,10 @@
  *
  * OpenAPI spec version: 0.1.0
  */
-import type { ControlPaginationMeta } from './controlPaginationMeta'
 import type { ControlTask } from './controlTask'
+import type { ControlTaskListMeta } from './controlTaskListMeta'
 
 export interface PaginatedControlTasks {
   data: ControlTask[]
-  meta: ControlPaginationMeta
+  meta: ControlTaskListMeta
 }

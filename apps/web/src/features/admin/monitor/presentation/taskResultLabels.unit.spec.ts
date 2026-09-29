@@ -3,12 +3,14 @@ import {
   formatAttemptLatency,
   getAttemptFailureLabel,
   getAttemptProviderLabel,
+  getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
   getAttemptStatusSeverity,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,
+  getDetailFinalModelLabel,
 } from './taskResultLabels'
 
 describe('taskResultLabels', () => {
@@ -46,5 +48,27 @@ describe('taskResultLabels', () => {
     expect(formatAttemptLatency(250)).toBe('250 ms')
     expect(formatAttemptLatency(1500)).toBe('1.5 s')
     expect(formatAttemptLatency(12000)).toBe('12 s')
+  })
+
+  it('labels retry layers distinctly with passthrough fallback', () => {
+    expect(getAttemptRetryLayerLabel(undefined)).toBe('-')
+    expect(getAttemptRetryLayerLabel('')).toBe('-')
+    expect(getAttemptRetryLayerLabel('gateway')).toBe('网关请求')
+    expect(getAttemptRetryLayerLabel('model_fallback')).toBe('模型兜底')
+    expect(getAttemptRetryLayerLabel('river_task')).toBe('任务重投')
+    expect(getAttemptRetryLayerLabel('mystery')).toBe('mystery')
+  })
+
+  it('prefers the final resolved model over the selected model', () => {
+    expect(getDetailFinalModelLabel({} as never)).toBe('-')
+    expect(
+      getDetailFinalModelLabel({
+        final_resolved_model: 'model-b',
+        latest_execution: { resolved_model: 'model-a' },
+      } as never),
+    ).toBe('model-b')
+    expect(
+      getDetailFinalModelLabel({ latest_execution: { resolved_model: 'model-a' } } as never),
+    ).toBe('model-a')
   })
 })

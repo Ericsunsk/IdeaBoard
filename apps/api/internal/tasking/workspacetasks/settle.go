@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"ideaboard/api/internal/generation/routing"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -179,6 +181,9 @@ type CreateInput struct {
 // Any failure compensates all prior steps. On success it stages a
 // pending status event (flushed by the caller after commit).
 func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey string) (*WorkspaceTask, error) {
+	ctx, span := telemetry.Start(ctx, "generation.submit.settlement",
+		attribute.String("service", input.Service), attribute.String("resolution", input.Resolution))
+	defer telemetry.End(span, nil)
 	if s.tasks == nil {
 		return nil, fmt.Errorf("workspacetasks: store unavailable: %w", ErrNotFound)
 	}
@@ -324,6 +329,8 @@ func (s *Service) verifyInputAssets(ctx context.Context, workspaceID string, ids
 // Terminal tasks replay idempotently (already=true). The caller stages
 // the cancelled event only on a fresh flip.
 func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error) {
+	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.cancel")
+	defer telemetry.End(span, nil)
 	if s.tasks == nil {
 		return nil, false, ErrNotFound
 	}
@@ -360,6 +367,8 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 // Complete flips running to completed atomically with Capture. Outputs
 // must reference ready assets or the explicit remote-output contract.
 func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outputs []OutputRef) (*WorkspaceTask, error) {
+	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.complete")
+	defer telemetry.End(span, nil)
 	if s.tasks == nil {
 		return nil, ErrNotFound
 	}
@@ -405,6 +414,8 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 
 // Fail flips running/pending to failed atomically with Release.
 func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error) {
+	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.fail")
+	defer telemetry.End(span, nil)
 	if s.tasks == nil {
 		return nil, ErrNotFound
 	}
@@ -432,6 +443,8 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 // bounded by retry_count). Transient provider failures (retryable=true)
 // below the budget requeue; deterministic failures must call Fail instead.
 func (s *Service) Retry(ctx context.Context, workspaceID, taskID string, retryable bool) (*WorkspaceTask, error) {
+	ctx, span := telemetry.Start(ctx, "generation.terminal.settlement.retry")
+	defer telemetry.End(span, nil)
 	if s.tasks == nil {
 		return nil, ErrNotFound
 	}

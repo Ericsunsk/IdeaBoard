@@ -38,13 +38,19 @@ export const adminMonitorColumnWidths = {
   more: '64px',
 } as const
 
+// Model 列展示最终解析模型 (#852)：优先 attempt 事实归因的
+// final_resolved_model，回退到 latest_execution（快照选中模型）。
 export function getTaskModelLabel(row: AdminMonitorListItemModel) {
-  return row.latest_execution?.resolved_model || ''
+  return row.final_resolved_model || row.latest_execution?.resolved_model || ''
 }
 
-// Service 列展示 service：图标 + slug。
+// Service 列展示 service + 请求清晰度：图标 + slug + resolution。
 export function getTaskServiceSlug(row: AdminMonitorListItemModel) {
   return row.service || ''
+}
+
+export function getTaskServiceResolution(row: AdminMonitorListItemModel) {
+  return row.requested_resolution || ''
 }
 
 // Service 列图标单源已上移 shared/domain：此处保留别名，调用方不动。

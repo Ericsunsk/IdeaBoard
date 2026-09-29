@@ -7,6 +7,8 @@ import (
 	"sort"
 
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 )
 
 // seedGenerator mints selection seeds. It is a field (defaulting to
@@ -72,7 +74,7 @@ func normalizeRoutingRequest(service, resolution string) (string, Resolution, er
 // Eligibility is exactly: enabled entries whose supported resolutions
 // contain the requested canonical resolution. Eligible model references are
 // sorted lexicographically before selection.
-func (r *RoutingResolver) Resolve(ctx context.Context, service, resolution string) (RoutingSnapshot, error) {
+func (r *RoutingResolver) Resolve(ctx context.Context, service, resolution string) (snapshot RoutingSnapshot, err error) {
 	if r == nil || r.store == nil {
 		return RoutingSnapshot{}, ErrPoolStoreUnavailable
 	}
@@ -83,6 +85,9 @@ func (r *RoutingResolver) Resolve(ctx context.Context, service, resolution strin
 	if err != nil {
 		return RoutingSnapshot{}, err
 	}
+	ctx, span := telemetry.Start(ctx, "generation.routing.resolve",
+		attribute.String("service", normalizedService), attribute.String("resolution", string(requested)))
+	defer func() { telemetry.End(span, err) }()
 	pool, err := r.store.ListPool(ctx, normalizedService)
 	if err != nil {
 		return RoutingSnapshot{}, wrapStoreError(err)
@@ -93,7 +98,7 @@ func (r *RoutingResolver) Resolve(ctx context.Context, service, resolution strin
 // ResolveInTx performs the submit-time routing decision against the caller's
 // settlement transaction. A non-transactional store is rejected instead of
 // silently falling back to a separate connection and snapshot.
-func (r *RoutingResolver) ResolveInTx(ctx context.Context, tx pgx.Tx, service, resolution string) (RoutingSnapshot, error) {
+func (r *RoutingResolver) ResolveInTx(ctx context.Context, tx pgx.Tx, service, resolution string) (snapshot RoutingSnapshot, err error) {
 	if r == nil || r.store == nil {
 		return RoutingSnapshot{}, ErrTransactionalPoolStoreUnavailable
 	}
@@ -111,6 +116,9 @@ func (r *RoutingResolver) ResolveInTx(ctx context.Context, tx pgx.Tx, service, r
 	if err != nil {
 		return RoutingSnapshot{}, err
 	}
+	ctx, span := telemetry.Start(ctx, "generation.routing.resolve_in_tx",
+		attribute.String("service", normalizedService), attribute.String("resolution", string(requested)))
+	defer func() { telemetry.End(span, err) }()
 	pool, err := store.ListPoolInTx(ctx, tx, normalizedService)
 	if err != nil {
 		return RoutingSnapshot{}, wrapStoreError(err)

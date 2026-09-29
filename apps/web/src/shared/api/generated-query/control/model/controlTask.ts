@@ -31,6 +31,12 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { ControlTaskAttempt } from './controlTaskAttempt'
+import type { ControlTaskBilling } from './controlTaskBilling'
+import type { ControlTaskExecutionMetrics } from './controlTaskExecutionMetrics'
+import type { ControlTaskExecutionSnapshot } from './controlTaskExecutionSnapshot'
+import type { ControlTaskOutputsItem } from './controlTaskOutputsItem'
+import type { ControlTaskRoutingSnapshot } from './controlTaskRoutingSnapshot'
 
 export interface ControlTask {
   /** @pattern ^task_[A-Za-z0-9_-]+$ */
@@ -38,4 +44,42 @@ export interface ControlTask {
   status?: string
   /** Registered AI image service slug (#847 rename). */
   service?: string
+  /** Submit-time snapshot requested resolution (#852). Empty when the task never pinned a routing snapshot (pre-pool row). */
+  requested_resolution?: string
+  /**
+   * Per-service pool version pinned by the submit-time routing snapshot (ADR-0012 rule 9). Zero means never pinned.
+   * @minimum 0
+   */
+  pool_version?: number
+  /** Snapshot deterministic selection: the first send's model, not necessarily the final one (#852). */
+  selected_model?: string
+  /** Execution attributed to the resolved (final) model derived from attempt facts (#852). Empty when attempts carry no model data. */
+  final_resolved_model?: string
+  user_public_id?: string
+  user_display_name?: string
+  prompt?: string
+  user_prompt?: string
+  params?: string
+  correlation_id?: string
+  priority?: number
+  retry_count?: number
+  credits?: number
+  error_msg?: string
+  cancel_reason?: string
+  result?: string
+  created_at?: string
+  updated_at?: string
+  /** @nullable */
+  completed_at?: string | null
+  /** @nullable */
+  cancelled_at?: string | null
+  latest_execution?: ControlTaskExecutionSnapshot
+  routing?: ControlTaskRoutingSnapshot
+  execution_attempts?: ControlTaskAttempt[]
+  /** Immutable task billing snapshot projection (SKU, price version, quantity, settlement state). Shape owned by the tasking read model. */
+  billing?: ControlTaskBilling
+  /** Task output refs (asset/remote contracts). */
+  outputs?: ControlTaskOutputsItem[]
+  /** Task execution metrics row (stages, bottleneck source, failure stage/category, latencies). */
+  execution_metrics?: ControlTaskExecutionMetrics
 }

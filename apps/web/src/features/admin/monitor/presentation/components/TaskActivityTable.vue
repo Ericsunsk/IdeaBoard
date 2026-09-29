@@ -56,7 +56,7 @@
         </template>
       </AdminColumn>
 
-      <!-- 第 3 列：Service (service 图标 + slug) -->
+      <!-- 第 3 列：Service (service 图标 + slug + 请求清晰度) -->
       <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
         <template #body="{ data }">
           <div class="flex items-center gap-1.5 font-mono text-xs text-admin-text-1">
@@ -69,6 +69,13 @@
             <span class="truncate text-slate-700">{{
               getTaskRowView(data).serviceSlug || '-'
             }}</span>
+            <span
+              v-if="getTaskServiceResolution(data)"
+              class="shrink-0 rounded border border-admin-border-soft bg-admin-surface-muted px-1 font-mono text-admin-caption text-admin-text-2"
+              :title="getTaskServiceResolution(data)"
+            >
+              {{ getTaskServiceResolution(data) }}
+            </span>
           </div>
         </template>
       </AdminColumn>
@@ -193,6 +200,7 @@ import {
   formatTaskExactTimestamp,
   getTaskModelLabel,
   getTaskRowView,
+  getTaskServiceResolution,
 } from '../columns'
 import { formatTaskDuration } from '../../domain/taskResultPresentation'
 import type { AdminTaskRow } from '../../application/useAdminTaskList'

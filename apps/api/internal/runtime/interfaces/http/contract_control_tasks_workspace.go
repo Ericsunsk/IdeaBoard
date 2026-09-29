@@ -188,17 +188,26 @@ func (a *workspaceControlTaskAdapter) GetTask(ctx context.Context, taskID string
 	}
 	if attempts, err := a.loadControlTaskAttempts(ctx, row.PublicID); err == nil {
 		detail.ExecutionAttempts = attempts
-		if len(attempts) > 0 {
-			latest := attempts[len(attempts)-1]
+		// Final-model projection (#852): LatestExecution points at the
+		// attempt owning the final model (terminal first), so the
+		// selected-vs-final distinction stays consistent in one read.
+		if final := tasksdomain.FinalAttempt(attempts); final != nil {
+			detail.FinalResolvedModel = strings.TrimSpace(final.ResolvedModel)
 			detail.LatestExecution = &tasksdomain.AdminTaskExecutionSnapshot{
-				ResolvedModel: latest.ResolvedModel,
-				Provider:      latest.Provider,
-				GatewayStep:   latest.GatewayStep,
+				ResolvedModel: final.ResolvedModel,
+				Provider:      final.Provider,
+				GatewayStep:   final.GatewayStep,
 			}
 		}
 	}
 	if detail.ExecutionAttempts == nil {
 		detail.ExecutionAttempts = []tasksdomain.AdminTaskAttempt{}
+	}
+	// Read-only routing projection over the pinned submit-time
+	// snapshot (#852, ADR-0012 rule 9). Missing or malformed snapshots
+	// degrade to nil (missing model data), never a failed detail read.
+	if routing, ok := tasksdomain.ParseAdminRoutingSnapshot(row.RoutingSnapshot); ok {
+		detail.Routing = routing
 	}
 	return detail, nil
 }
@@ -266,6 +275,10 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 		}
 	}
 	items := make([]taskapp.AdminMonitorListItem, 0, len(rows))
+	finalModels, err := a.loadControlTaskFinalModels(ctx, controlTaskListIDs(rows))
+	if err != nil {
+		finalModels = map[string]string{}
+	}
 	for _, row := range rows {
 		envelope := parseControlTaskEnvelope(row.WorkflowInput)
 		publicID, displayName := a.resolveControlTaskIdentity(ctx, row.SubmitterUserID)
@@ -285,12 +298,70 @@ func (a *workspaceControlTaskAdapter) ListTasks(ctx context.Context, req *tasksd
 			CreatedAt:       dbutil.TimeValue(row.CreatedAt),
 			CompletedAt:     completed,
 		}
+		// Read-only routing projection (#852): the monitor list
+		// records the requested Service + resolution, snapshot pool
+		// version, and selected model from the already-selected
+		// routing_snapshot bytes (no extra query per row).
+		if routing, ok := tasksdomain.ParseAdminRoutingSnapshot(row.RoutingSnapshot); ok {
+			item.RequestedResolution = routing.RequestedResolution
+			item.PoolVersion = routing.PoolVersion
+			item.SelectedModel = routing.SelectedModel
+		}
+		if final, ok := finalModels[row.PublicID]; ok {
+			item.FinalResolvedModel = final
+		}
 		if row.SettlementState.Valid && row.SettlementState.String == "captured" && row.SettlementCapturedCredits.Valid {
 			item.Credits = row.SettlementCapturedCredits.Int64
 		}
 		items = append(items, item)
 	}
 	return items, counts, nil
+}
+
+// controlTaskListIDs collects page task ids for the bulk final-model lookup.
+func controlTaskListIDs(rows []dbsqlc.ListControlTasksRow) []string {
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.PublicID) != "" {
+			ids = append(ids, row.PublicID)
+		}
+	}
+	return ids
+}
+
+// loadControlTaskFinalModels attributes one page of tasks to their
+// resolved (final) model in a single query (#852): per task, the latest
+// terminal attempt carrying a model wins, falling back to the latest
+// attempt of any status so in-flight tasks still attribute. Read-only
+// projection over attempt facts; task and billing state untouched.
+// Degrades to an empty map (missing model data), never a failed list.
+func (a *workspaceControlTaskAdapter) loadControlTaskFinalModels(ctx context.Context, taskIDs []string) (map[string]string, error) {
+	finals := map[string]string{}
+	if a == nil || a.db == nil || len(taskIDs) == 0 {
+		return finals, nil
+	}
+	rows, err := a.db.Query(ctx, `
+SELECT DISTINCT ON (task_id) task_id, resolved_model
+FROM task_execution_attempts
+WHERE task_id = ANY($1) AND btrim(resolved_model) <> ''
+ORDER BY task_id, (status IN ('completed', 'failed', 'cancelled')) DESC, attempt_no DESC, id DESC`, taskIDs)
+	if err != nil {
+		return finals, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var taskID, model string
+		if err := rows.Scan(&taskID, &model); err != nil {
+			return finals, err
+		}
+		if strings.TrimSpace(taskID) != "" && strings.TrimSpace(model) != "" {
+			finals[taskID] = strings.TrimSpace(model)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return finals, err
+	}
+	return finals, nil
 }
 
 func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error) {
@@ -449,7 +520,8 @@ func (a *workspaceControlTaskAdapter) loadControlTaskAttempts(ctx context.Contex
 		return nil, workspacetasks.ErrNotFound
 	}
 	rows, err := a.db.Query(ctx, `
-SELECT attempt_no, status, failure_stage, failure_category, resolved_model, provider, gateway_step,
+SELECT attempt_no, status, failure_stage, failure_category, service, requested_model,
+  resolved_model, provider, gateway_step, retry_layer, gateway_retry_count, error_msg,
   provider_started_at, provider_finished_at, completed_at, created_at
 FROM task_execution_attempts
 WHERE task_id = $1
@@ -465,7 +537,9 @@ ORDER BY attempt_no ASC`, taskPublicID)
 		var createdAt time.Time
 		if err := rows.Scan(
 			&attempt.AttemptNo, &attempt.Status, &failureStage, &attempt.FailureCategory,
+			&attempt.Service, &attempt.RequestedModel,
 			&attempt.ResolvedModel, &attempt.Provider, &attempt.GatewayStep,
+			&attempt.RetryLayer, &attempt.GatewayRetryCount, &attempt.ErrorMsg,
 			&attempt.ProviderStartedAt, &attempt.ProviderFinishedAt, &attempt.CompletedAt, &createdAt,
 		); err != nil {
 			return nil, err

@@ -230,6 +230,68 @@
         </div>
       </section>
 
+      <!-- 2. 路由快照 (Routing Snapshot, #852) -->
+      <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-routing">
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
+          <FastArrowRight class="size-3.5 text-admin-text-2" />
+          <span id="task-detail-routing">{{ MONITOR_MESSAGES.routingTitle }}</span>
+        </div>
+        <div
+          v-if="detailTask.routing"
+          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+        >
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingServiceLabel }}</span>
+            <span class="font-mono text-admin-text-1">{{ detailTask.routing.service }}</span>
+          </div>
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingResolutionLabel }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              detailTask.routing.requested_resolution || '-'
+            }}</span>
+          </div>
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingPoolVersionLabel }}</span>
+            <span class="font-mono text-admin-text-1">v{{ detailTask.routing.pool_version }}</span>
+          </div>
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingSelectedLabel }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              detailTask.routing.selected_model || '-'
+            }}</span>
+          </div>
+          <div class="flex items-center justify-between py-1.5">
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingFinalLabel }}</span>
+            <span class="font-mono font-medium text-admin-text-1">{{
+              getDetailFinalModelLabel(detailTask)
+            }}</span>
+          </div>
+          <div
+            v-if="detailTask.routing.retry_candidate"
+            class="flex items-center justify-between py-1.5"
+          >
+            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingRetryCandidateLabel }}</span>
+            <span class="font-mono text-admin-text-1">{{
+              detailTask.routing.retry_candidate
+            }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3 py-1.5">
+            <span class="shrink-0 text-admin-text-3">{{
+              MONITOR_MESSAGES.routingEligibleLabel
+            }}</span>
+            <span class="truncate font-mono text-admin-text-1" :title="eligibleModelsText">
+              {{ eligibleModelsText }}
+            </span>
+          </div>
+        </div>
+        <div
+          v-else
+          class="rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-3.5 py-2.5 text-xs text-admin-text-3"
+        >
+          {{ MONITOR_MESSAGES.routingMissing }}
+        </div>
+      </section>
+
       <!-- 3. 生成结果 (Result) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-result">
         <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
@@ -315,6 +377,19 @@
                 <span>{{ getAttemptFailureLabel(attempt.failure_category) }}</span>
               </div>
               <div class="flex items-center justify-between">
+                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptLayerLabel }}</span>
+                <span>{{ getAttemptRetryLayerLabel(attempt.retry_layer) }}</span>
+              </div>
+              <div
+                v-if="(attempt.gateway_retry_count ?? 0) > 0"
+                class="flex items-center justify-between"
+              >
+                <span class="text-admin-text-3">{{
+                  MONITOR_MESSAGES.attemptGatewayRetriesLabel
+                }}</span>
+                <span class="font-mono">{{ attempt.gateway_retry_count }}</span>
+              </div>
+              <div class="flex items-center justify-between">
                 <span class="text-admin-text-3">{{
                   MONITOR_MESSAGES.attemptProviderLatencyLabel
                 }}</span>
@@ -351,7 +426,7 @@
             <span id="task-detail-billing">{{ MONITOR_MESSAGES.billingTitle }}</span>
           </div>
           <span
-            v-if="!detailTask.billing.feature_exists"
+            v-if="detailTask.billing.feature_exists === false"
             class="text-admin-caption font-normal text-admin-text-3"
           >
             {{ MONITOR_MESSAGES.billingFeatureGone }}
@@ -464,13 +539,14 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import {
   ChatBubble,
   CheckCircle,
   Clock,
   CodeBrackets,
   Copy,
+  FastArrowRight,
   Fingerprint,
   LightBulb,
   MediaImage,
@@ -495,12 +571,14 @@ import {
   formatAttemptLatency,
   getAttemptFailureLabel,
   getAttemptProviderLabel,
+  getAttemptRetryLayerLabel,
   getAttemptStageLabel,
   getAttemptStatusLabel,
   getAttemptStatusSeverity,
   getBillingSettlementLabel,
   getDetailExecutionModelLabel,
   getDetailExecutionProviderLabel,
+  getDetailFinalModelLabel,
 } from './taskResultLabels'
 
 const props = withDefaults(
@@ -552,4 +630,9 @@ const {
 function handleVisibleUpdate(visible: boolean) {
   emit('update:visible', visible)
 }
+
+const eligibleModelsText = computed(() => {
+  const models = props.task?.routing?.eligible_models ?? []
+  return models.length > 0 ? models.join(', ') : '-'
+})
 </script>

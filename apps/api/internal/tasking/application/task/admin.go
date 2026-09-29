@@ -25,20 +25,36 @@ type AdminQueryService interface {
 }
 
 type AdminMonitorListItem struct {
-	TaskID          string                         `json:"task_id"`
-	UserPublicID    uuid.UUID                      `json:"user_public_id"`
-	UserDisplayName string                         `json:"user_display_name"`
-	Prompt          string                         `json:"prompt"`
-	Service         string                         `json:"service"`
-	Credits         int64                          `json:"credits"`
-	Priority        int                            `json:"priority"`
-	Status          string                         `json:"status"`
-	ErrorMsg        string                         `json:"error_msg"`
-	Result          string                         `json:"result"`
-	CreatedAt       time.Time                      `json:"created_at"`
-	CompletedAt     *time.Time                     `json:"completed_at"`
-	LatestExecution *AdminMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
-	internalUserID  int64
+	TaskID          string    `json:"task_id"`
+	UserPublicID    uuid.UUID `json:"user_public_id"`
+	UserDisplayName string    `json:"user_display_name"`
+	Prompt          string    `json:"prompt"`
+	Service         string    `json:"service"`
+	// RequestedResolution is the submit-time snapshot's requested
+	// resolution (#852): the monitor list records the requested
+	// Service + resolution without leaking pool internals beyond the
+	// selection facts below. Empty when the task never pinned a
+	// snapshot (pre-pool row).
+	RequestedResolution string `json:"requested_resolution,omitempty"`
+	// PoolVersion is the per-Service pool version the task's snapshot
+	// pinned (ADR-0012 rule 9). Zero means "never pinned".
+	PoolVersion uint64 `json:"pool_version,omitempty"`
+	// SelectedModel is the snapshot's deterministic selection; it is
+	// the first send's model, not necessarily the final one.
+	SelectedModel string `json:"selected_model,omitempty"`
+	// FinalResolvedModel attributes the list row to the resolved
+	// (final) model derived from attempt facts. Empty when attempts
+	// carry no model data yet.
+	FinalResolvedModel string                         `json:"final_resolved_model,omitempty"`
+	Credits            int64                          `json:"credits"`
+	Priority           int                            `json:"priority"`
+	Status             string                         `json:"status"`
+	ErrorMsg           string                         `json:"error_msg"`
+	Result             string                         `json:"result"`
+	CreatedAt          time.Time                      `json:"created_at"`
+	CompletedAt        *time.Time                     `json:"completed_at"`
+	LatestExecution    *AdminMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+	internalUserID     int64
 }
 
 type AdminMonitorDetail struct {
@@ -65,7 +81,18 @@ type AdminMonitorDetail struct {
 	Billing           *tasks.AdminBillingSnapshot    `json:"billing,omitempty"`
 	LatestExecution   *AdminMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
 	ExecutionAttempts []tasks.AdminTaskAttempt       `json:"execution_attempts"`
-	internalUserID    int64
+	// Routing is the read-only projection over the immutable
+	// submit-time RoutingSnapshot (#852, ADR-0012 rule 9): requested
+	// service/resolution, eligible models, selected + retry candidate,
+	// and pool version. Nil when the task never pinned a snapshot.
+	// Read-only: rendering it never changes task or billing state.
+	Routing *tasks.AdminRoutingSnapshot `json:"routing,omitempty"`
+	// FinalResolvedModel attributes execution to the resolved (final)
+	// model derived from attempt facts (#852). Empty when attempts
+	// carry no model data. Selected (first-send) vs final (terminal)
+	// stays distinguishable via Routing.SelectedModel.
+	FinalResolvedModel string `json:"final_resolved_model,omitempty"`
+	internalUserID     int64
 }
 
 type AdminMonitorExecutionSnapshot = tasks.AdminTaskExecutionSnapshot
@@ -151,7 +178,8 @@ func (s *Service) loadAdminBillingSnapshots(ctx context.Context, taskIDs []strin
 	}
 	for taskID, snapshot := range snapshots {
 		if s.billableItems != nil {
-			snapshot.FeatureExists = s.billableItems.Contains(snapshot.SKU)
+			exists := s.billableItems.Contains(snapshot.SKU)
+			snapshot.FeatureExists = &exists
 		}
 		snapshots[taskID] = snapshot
 	}
@@ -244,7 +272,14 @@ func adminMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBillingSnap
 	if hasBilling {
 		detail.Billing = &billing
 	}
-	if len(attempts) > 0 {
+	// Final-model projection (#852): attribute execution to the
+	// resolved (final) model derived from attempt facts, and point
+	// LatestExecution at the same owning attempt so the selected-vs-final
+	// distinction stays consistent in one read.
+	if final := tasks.FinalAttempt(attempts); final != nil {
+		detail.FinalResolvedModel = strings.TrimSpace(final.ResolvedModel)
+		detail.LatestExecution = adminMonitorExecutionSnapshotFromAttempt(*final)
+	} else if len(attempts) > 0 {
 		detail.LatestExecution = adminMonitorExecutionSnapshotFromAttempt(attempts[len(attempts)-1])
 	}
 	return detail

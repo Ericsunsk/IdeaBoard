@@ -106,7 +106,6 @@ import {
   monitorChartSpecs,
   type TaskMetricStatsSnapshot,
 } from '../../../../../shared/domain/taskMetricTokens'
-import { keepPrevious } from '../../../../../shared/query/queryDefaults'
 import { stringParam } from '../../../../../shared/router/queryParams'
 import { MONITOR_MESSAGES } from './messages'
 
@@ -174,7 +173,6 @@ const chartListParams = computed(() =>
 const chartListQuery = useAdminTaskListResource(chartListParams, {
   query: {
     enabled: computed(() => !isDemoMode.value),
-    ...keepPrevious(),
     refetchInterval: ADMIN_MONITOR_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,

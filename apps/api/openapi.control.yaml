@@ -3988,6 +3988,183 @@ components:
         service:
           type: string
           description: Registered AI image service slug (#847 rename).
+        requested_resolution:
+          type: string
+          description: >-
+            Submit-time snapshot requested resolution (#852). Empty when the
+            task never pinned a routing snapshot (pre-pool row).
+        pool_version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            Per-service pool version pinned by the submit-time routing
+            snapshot (ADR-0012 rule 9). Zero means never pinned.
+        selected_model:
+          type: string
+          description: >-
+            Snapshot deterministic selection: the first send's model, not
+            necessarily the final one (#852).
+        final_resolved_model:
+          type: string
+          description: >-
+            Execution attributed to the resolved (final) model derived
+            from attempt facts (#852). Empty when attempts carry no model
+            data.
+        user_public_id:
+          type: string
+        user_display_name:
+          type: string
+        prompt:
+          type: string
+        user_prompt:
+          type: string
+        params:
+          type: string
+        correlation_id:
+          type: string
+        priority:
+          type: integer
+        retry_count:
+          type: integer
+        credits:
+          type: integer
+          format: int64
+        error_msg:
+          type: string
+        cancel_reason:
+          type: string
+        result:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        latest_execution:
+          $ref: '#/components/schemas/ControlTaskExecutionSnapshot'
+        routing:
+          $ref: '#/components/schemas/ControlTaskRoutingSnapshot'
+        execution_attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlTaskAttempt'
+        billing:
+          type: object
+          description: >-
+            Immutable task billing snapshot projection (SKU, price
+            version, quantity, settlement state). Shape owned by the
+            tasking read model.
+        outputs:
+          type: array
+          items:
+            type: object
+          description: Task output refs (asset/remote contracts).
+        execution_metrics:
+          type: object
+          description: >-
+            Task execution metrics row (stages, bottleneck source,
+            failure stage/category, latencies).
+    ControlTaskExecutionSnapshot:
+      type: object
+      additionalProperties: false
+      properties:
+        resolved_model:
+          type: string
+        provider:
+          type: string
+        gateway_step:
+          type: string
+    ControlTaskRoutingSnapshot:
+      type: object
+      required: [service, requested_resolution, eligible_models, selected_model, pool_version]
+      additionalProperties: false
+      description: >-
+        Read-only projection over the immutable submit-time routing
+        snapshot pinned on the task row (#852, ADR-0012 rule 9).
+      properties:
+        service:
+          type: string
+        requested_resolution:
+          type: string
+        eligible_models:
+          type: array
+          items:
+            type: string
+        selected_model:
+          type: string
+        retry_candidate:
+          type: string
+        pool_version:
+          type: integer
+          format: int64
+          minimum: 0
+    ControlTaskAttempt:
+      type: object
+      required: [attempt_no, status]
+      additionalProperties: false
+      description: >-
+        Per-send execution attempt fact (#852, ADR-0012 rule 7).
+        retry_layer is exactly gateway, model_fallback, or river_task;
+        gateway_retry_count records same-model gateway-internal retries.
+      properties:
+        attempt_no:
+          type: integer
+        status:
+          type: string
+        stage:
+          type: string
+        failure_category:
+          type: string
+        service:
+          type: string
+        requested_model:
+          type: string
+        resolved_model:
+          type: string
+        provider:
+          type: string
+        gateway_step:
+          type: string
+        retry_layer:
+          type: string
+          enum: ['', gateway, model_fallback, river_task]
+        gateway_retry_count:
+          type: integer
+          minimum: 0
+        error_msg:
+          type: string
+        provider_started_at:
+          type: string
+          format: date-time
+          nullable: true
+        provider_finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        provider_latency_ms:
+          type: integer
+          format: int64
+        total_latency_ms:
+          type: integer
+          format: int64
     ControlSetRoleRequest:
       type: object
       required: [role]
@@ -4342,7 +4519,50 @@ components:
           items:
             $ref: '#/components/schemas/ControlTask'
         meta:
-          $ref: '#/components/schemas/ControlPaginationMeta'
+          $ref: '#/components/schemas/ControlTaskListMeta'
+    ControlTaskListMeta:
+      type: object
+      required: [has_more, counts]
+      additionalProperties: false
+      description: >-
+        Cursor page meta plus the global task status breakdown (#852).
+        Counts honor the user/keyword filters but never the status
+        filter, so monitor pills keep their global breakdown while a
+        status is active.
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+        counts:
+          $ref: '#/components/schemas/ControlTaskListCounts'
+    ControlTaskListCounts:
+      type: object
+      required: [total, pending_count, running_count, completed_count, failed_count, cancelled_count, other_count]
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          format: int64
+        pending_count:
+          type: integer
+          format: int64
+        running_count:
+          type: integer
+          format: int64
+        completed_count:
+          type: integer
+          format: int64
+        failed_count:
+          type: integer
+          format: int64
+        cancelled_count:
+          type: integer
+          format: int64
+        other_count:
+          type: integer
+          format: int64
     ControlUserEnvelope:
       type: object
       required: [data]

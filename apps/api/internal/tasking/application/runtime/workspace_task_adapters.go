@@ -38,6 +38,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/runtime/infrastructure/telemetry"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow"
 
@@ -395,6 +396,7 @@ type WorkspaceTaskArgs struct {
 	WorkspaceID    string `json:"workspace_id"`
 	Service        string `json:"service"`
 	ExecutionToken string `json:"execution_token"`
+	TraceParent    string `json:"traceparent,omitempty"`
 }
 
 // Kind implements river.JobArgs.
@@ -464,6 +466,7 @@ func (e *WorkspaceTaskEnqueuer) Enqueue(ctx context.Context, task *workspacetask
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
 		Service:        strings.TrimSpace(task.Service),
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
+		TraceParent:    telemetry.Inject(ctx),
 	}, &river.InsertOpts{
 		Queue:       e.queue,
 		MaxAttempts: e.maxAttempts,
@@ -500,6 +503,7 @@ func (e *WorkspaceTaskEnqueuer) EnqueueInTx(ctx context.Context, tx pgx.Tx, task
 		WorkspaceID:    strings.TrimSpace(task.WorkspaceID),
 		Service:        strings.TrimSpace(task.Service),
 		ExecutionToken: strings.TrimSpace(task.ExecutionToken),
+		TraceParent:    telemetry.Inject(ctx),
 	}, &river.InsertOpts{
 		Queue:       e.queue,
 		MaxAttempts: e.maxAttempts,
