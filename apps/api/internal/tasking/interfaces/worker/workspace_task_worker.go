@@ -74,11 +74,14 @@ import (
 )
 
 // WorkspaceTaskWorkerStore is the narrow persistence seam the worker needs:
-// lease-guarded claim plus reads. *taskpostgres.Store satisfies it; the
-// in-memory sibling satisfies it once ClaimTask lands there (test backend).
+// one read plus the kernel lease-fence claim. It embeds TaskClaimStore so
+// the claim contract is owned once by the workspacetasks kernel; GetTask is
+// redeclared (not the full TaskReadStore) because the worker must not
+// observe List/Count. *taskpostgres.Store and
+// *workspacetasks.InMemoryStore both satisfy it.
 type WorkspaceTaskWorkerStore interface {
 	GetTask(ctx context.Context, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error)
-	ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken string) (*workspacetasks.WorkspaceTask, error)
+	workspacetasks.TaskClaimStore
 }
 
 // WorkspaceTaskWorkerSettler is the terminal settlement seam. The worker

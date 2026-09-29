@@ -34,7 +34,6 @@ import (
 	"ideaboard/api/internal/platform/database"
 	taskapp "ideaboard/api/internal/tasking/application/task"
 	tasksdomain "ideaboard/api/internal/tasking/domain"
-	taskpostgres "ideaboard/api/internal/tasking/infrastructure/postgres"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
@@ -42,12 +41,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// WorkspaceControlTaskStores is the minimal settlement seam the control
+// adapter needs: CancelAdminTask settles through workspacetasks.Service,
+// which reads via TaskRead and flips via TaskLifecycle (TaskBilling feeds
+// the optional atomic billing projection). The adapter never touches the
+// concrete postgres store.
+type WorkspaceControlTaskStores interface {
+	workspacetasks.TaskReadStore
+	workspacetasks.TaskLifecycleStore
+	workspacetasks.TaskBillingStore
+}
+
 // workspaceControlTaskAdapter is the ControlTaskAdmin implementation over
 // workspace task stores. Repository methods take context.Context first.
 type workspaceControlTaskAdapter struct {
 	db     *pgxpool.Pool
 	q      *dbsqlc.Queries
-	store  *taskpostgres.Store
+	store  WorkspaceControlTaskStores
 	holder workspacetasks.Holder
 	users  ControlCreditDirectory
 }
@@ -55,7 +65,7 @@ type workspaceControlTaskAdapter struct {
 // NewWorkspaceControlTasks builds the control task read model. A nil db
 // keeps every method fail-closed (the handlers converge to 503), matching
 // the nil-dep convention of the other control seams.
-func NewWorkspaceControlTasks(db *pgxpool.Pool, store *taskpostgres.Store, holder workspacetasks.Holder, users ControlCreditDirectory) *workspaceControlTaskAdapter {
+func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.Holder, users ControlCreditDirectory) *workspaceControlTaskAdapter {
 	if db == nil {
 		return &workspaceControlTaskAdapter{store: store, holder: holder, users: users}
 	}

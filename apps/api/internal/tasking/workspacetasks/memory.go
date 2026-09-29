@@ -29,6 +29,15 @@ type TaskLifecycleStore interface {
 	DeleteTask(ctx context.Context, workspaceID, taskID string) error
 }
 
+// TaskClaimStore exposes the worker-only lease fence (pending -> running).
+// It stays separate from TaskLifecycleStore: the HTTP surface never claims,
+// so HTTP callers must not observe the claim method. Repository methods take
+// context.Context first and use the dbWithContext pattern in the PostgreSQL
+// implementation.
+type TaskClaimStore interface {
+	ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken string) (*WorkspaceTask, error)
+}
+
 // TaskOutputStore owns task output reference persistence independently from
 // task state transitions.
 type TaskOutputStore interface {
@@ -50,6 +59,7 @@ type InMemoryStore struct {
 
 var _ TaskReadStore = (*InMemoryStore)(nil)
 var _ TaskLifecycleStore = (*InMemoryStore)(nil)
+var _ TaskClaimStore = (*InMemoryStore)(nil)
 var _ TaskOutputStore = (*InMemoryStore)(nil)
 
 // NewInMemoryStoreForTests builds an empty store.

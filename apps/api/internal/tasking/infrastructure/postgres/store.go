@@ -32,6 +32,7 @@ type Store struct {
 // Compile-time convergence with each minimal persistence seam.
 var _ workspacetasks.TaskReadStore = (*Store)(nil)
 var _ workspacetasks.TaskLifecycleStore = (*Store)(nil)
+var _ workspacetasks.TaskClaimStore = (*Store)(nil)
 var _ workspacetasks.TaskOutputStore = (*Store)(nil)
 var _ workspacetasks.TaskBillingStore = (*Store)(nil)
 
