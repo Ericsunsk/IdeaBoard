@@ -782,6 +782,73 @@ paths:
           $ref: '#/components/responses/ControlNotFound'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /billing/catalog/{sku}/pool:
+    get:
+      tags: [ControlBilling]
+      operationId: getControlCatalogModelPool
+      summary: Get the Service Model Pool for a billing SKU
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_sku
+        reason: false
+        outcome: read
+      parameters:
+        - $ref: '#/components/parameters/ControlSku'
+      responses:
+        '200':
+          description: Complete pool with its current version (0 with empty entries when never written).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlModelPoolEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlBilling]
+      operationId: replaceControlCatalogModelPool
+      summary: Replace the Service Model Pool atomically (operator reason required)
+      x-capability: control:billing
+      x-audit:
+        operator: true
+        target: billing_sku
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/ControlSku'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlReplaceModelPoolRequest'
+      responses:
+        '200':
+          description: Pool replaced (or no-op when already effective).
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlReplaceModelPoolEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /credits/grants:
     post:
       tags: [ControlCredits]
@@ -3994,6 +4061,80 @@ components:
           type: boolean
         reason:
           type: string
+    ControlModelPoolEntry:
+      type: object
+      required: [model_id, enabled, resolutions]
+      additionalProperties: false
+      properties:
+        model_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        enabled:
+          type: boolean
+        resolutions:
+          type: array
+          items:
+            type: string
+            enum: [1k, 2k, 4k]
+    ControlModelPoolEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [service, sku, version, entries]
+          additionalProperties: false
+          properties:
+            service:
+              type: string
+            sku:
+              type: string
+            version:
+              type: integer
+              minimum: 0
+            entries:
+              type: array
+              items:
+                $ref: '#/components/schemas/ControlModelPoolEntry'
+    ControlReplaceModelPoolRequest:
+      type: object
+      required: [expected_version, entries]
+      additionalProperties: false
+      properties:
+        expected_version:
+          type: integer
+          minimum: 0
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ControlModelPoolEntry'
+        reason:
+          type: string
+    ControlReplaceModelPoolEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [service, sku, version, changed, entries]
+          additionalProperties: false
+          properties:
+            service:
+              type: string
+            sku:
+              type: string
+            version:
+              type: integer
+              minimum: 0
+            changed:
+              type: boolean
+            entries:
+              type: array
+              items:
+                $ref: '#/components/schemas/ControlModelPoolEntry'
     ControlCreditCommandRequest:
       type: object
       required: [user_id, amount_credits, business_reference_id]

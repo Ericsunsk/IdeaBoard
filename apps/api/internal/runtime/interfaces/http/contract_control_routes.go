@@ -109,6 +109,10 @@ func (d *ContractControlDeps) registerControlBillingRoutes(control *gin.RouterGr
 		controlRoute{Operation: "billing.set_availability", Route: "PUT /billing/catalog/{sku}/availability", Mutation: true, Target: skuTarget}, d.setControlCatalogAvailability))
 	control.DELETE("/billing/catalog/:sku", d.guard(ControlCapabilityBilling,
 		controlRoute{Operation: "billing.delete_item", Route: "DELETE /billing/catalog/{sku}", Mutation: true, Target: skuTarget}, d.deleteControlCatalogItem))
+	control.GET("/billing/catalog/:sku/pool", d.guard(ControlCapabilityBilling,
+		controlRoute{Operation: "billing.get_model_pool", Route: "GET /billing/catalog/{sku}/pool", Target: skuTarget}, d.getControlModelPool))
+	control.PUT("/billing/catalog/:sku/pool", d.guard(ControlCapabilityBilling,
+		controlRoute{Operation: "billing.replace_model_pool", Route: "PUT /billing/catalog/{sku}/pool", Mutation: true, Target: skuTarget}, d.replaceControlModelPool))
 }
 
 func (d *ContractControlDeps) registerControlCreditRoutes(control *gin.RouterGroup) {

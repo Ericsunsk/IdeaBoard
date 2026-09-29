@@ -226,7 +226,7 @@ function normalizePricingVariants(raw: unknown): PricingVariant[] {
   if (!Array.isArray(raw)) return ['1k', '2k', '4k']
   const variants = raw.filter(
     (value): value is PricingVariant =>
-      value === 'default' || value === '1k' || value === '2k' || value === '4k',
+      value === '1k' || value === '2k' || value === '4k',
   )
   return variants.length > 0 ? variants : ['1k', '2k', '4k']
 }

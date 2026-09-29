@@ -23,7 +23,7 @@ describe('Admin Billable Catalog resource', () => {
               display_name: '局部重绘',
               sort_order: 30,
               status: 'unpriced',
-              pricing_variants: ['default'],
+              pricing_variants: ['1k'],
             },
           ],
           wrapItems: (items) => ({ data: { items } }),
@@ -39,7 +39,7 @@ describe('Admin Billable Catalog resource', () => {
         displayName: '局部重绘',
         sortOrder: 30,
         status: 'unpriced',
-        pricingVariants: ['default'],
+        pricingVariants: ['1k'],
         currentPrices: {},
         updatedAt: undefined,
       },
@@ -60,8 +60,8 @@ describe('Admin Billable Catalog resource', () => {
         return HttpResponse.json({
           data: {
             prices: {
-              default: {
-                output_resolution: 'default',
+              '1k': {
+                output_resolution: '1k',
                 price_version_id: 9,
                 version: 1,
                 unit_credits: 0,
@@ -74,16 +74,16 @@ describe('Admin Billable Catalog resource', () => {
     )
 
     await expect(
-      publishBillableItemPrices('ai-image:inpaint', { default: 0 }, reason),
+      publishBillableItemPrices('ai-image:inpaint', { '1k': 0 }, reason),
     ).resolves.toEqual({
-      default: {
+      '1k': {
         priceVersionId: 9,
         version: 1,
         unitCredits: 0,
         createdAt: '2026-07-16T08:00:00Z',
       },
     })
-    expect(requestBody).toEqual({ prices: { default: 0 }, reason: 'pricing review' })
+    expect(requestBody).toEqual({ prices: { '1k': 0 }, reason: 'pricing review' })
     expect(seenHeaders.idempotencyKey).toMatch(/.+/)
     expect(seenHeaders.operatorReason).toBe('pricing review')
   })
@@ -126,7 +126,7 @@ describe('Admin Billable Catalog resource', () => {
 
   it('requires an operator reason before mutating the catalog', async () => {
     await expect(
-      publishBillableItemPrices('ai-image:inpaint', { default: 0 }, { operatorReason: '  ' }),
+      publishBillableItemPrices('ai-image:inpaint', { '1k': 0 }, { operatorReason: '  ' }),
     ).rejects.toMatchObject({ code: 'control_reason_required' })
   })
 })

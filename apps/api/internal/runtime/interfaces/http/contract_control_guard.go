@@ -108,8 +108,13 @@ type ContractControlDeps struct {
 	UserDirectory   V1UserDirectory
 	BillingAccounts ControlBillingAccountStore
 	Catalog         billinghttp.BillableCatalogService
-	Payments        paymentcontracts.AdminService
-	Settings        *settings.RuntimeSettingsService
+	// ModelPools is the Service Model Pool catalog seam (#849): Admin
+	// pool reads and atomic replaces. *catalog.Repository is the
+	// production implementation; nil keeps the pool routes fail-closed
+	// with 501-style 503 (never a second model catalog).
+	ModelPools ControlModelPoolStore
+	Payments   paymentcontracts.AdminService
+	Settings   *settings.RuntimeSettingsService
 	// PaymentWebhookURL is the Stripe webhook endpoint recorded into the
 	// provider configuration (composition wires the public API URL).
 	PaymentWebhookURL string

@@ -42,18 +42,6 @@
 
         <!-- 价格档位列必须显式展开：AdminTable 只认直系 AdminColumn vnode，v-for 会被 Fragment 包一层整体过滤。 -->
         <AdminColumn
-          field="price-default"
-          :header="BILLING_PRICING_MESSAGES.priceVariantLabel('default')"
-          :style="{ width: billingPricingColumnWidths.variant }"
-        >
-          <template #body="{ data }">
-            <span :class="priceValueClass(formatPricingCellValue(data, 'default'))">{{
-              formatPricingCellValue(data, 'default')
-            }}</span>
-          </template>
-        </AdminColumn>
-
-        <AdminColumn
           field="price-1k"
           header="1K"
           :style="{ width: billingPricingColumnWidths.variant }"
@@ -86,6 +74,33 @@
             <span :class="priceValueClass(formatPricingCellValue(data, '4k'))">{{
               formatPricingCellValue(data, '4k')
             }}</span>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn
+          field="model-pool"
+          :header="BILLING_PRICING_MESSAGES.poolColumn"
+          :style="{ width: billingPricingColumnWidths.pool }"
+        >
+          <template #body="{ data }">
+            <div class="flex min-w-0 items-start gap-2">
+              <ModelPoolSummaryCell
+                :display-name="data.displayName"
+                :pool="props.poolBySku[data.sku]"
+                :failed="props.poolFailed[data.sku] === true"
+                class="min-w-0 flex-1"
+              />
+              <AdminButton
+                v-if="serviceOfSku(data.sku)"
+                size="small"
+                variant="outline"
+                :class="adminActionButtonClass"
+                :aria-label="BILLING_PRICING_MESSAGES.poolEdit"
+                @click="emit('pool', data)"
+              >
+                {{ BILLING_PRICING_MESSAGES.poolEdit }}
+              </AdminButton>
+            </div>
           </template>
         </AdminColumn>
 
@@ -157,7 +172,9 @@ import {
 import BillingStatusCell from './BillingStatusCell.vue'
 import { billingPricingColumnWidths, formatPricingCellValue } from './billingPricingColumns'
 import BillingServiceCell from './BillingServiceCell.vue'
-import type { AdminBillableItemCard } from './billableCatalogTypes'
+import ModelPoolSummaryCell from './ModelPoolSummaryCell.vue'
+import type { AdminBillableItemCard, AdminModelPool } from './billableCatalogTypes'
+import { serviceOfSku } from './skuFeature'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
 // 对齐任务监控页事件表：同壳、同列模式；分组与状态语义归 pricingColumns 单源。
@@ -168,12 +185,16 @@ const props = withDefaults(
     loading?: boolean | undefined
     availabilityPending?: Record<string, boolean | undefined> | undefined
     deletePending?: Record<string, boolean | undefined> | undefined
+    poolBySku?: Record<string, AdminModelPool | undefined> | undefined
+    poolFailed?: Record<string, boolean | undefined> | undefined
   }>(),
   {
     loading: false,
     availabilityPending: () => ({}),
     deletePending: () => ({}),
     title: undefined,
+    poolBySku: () => ({}),
+    poolFailed: () => ({}),
   },
 )
 
@@ -181,6 +202,7 @@ const emit = defineEmits<{
   publish: [item: AdminBillableItemCard]
   availability: [item: AdminBillableItemCard, enabled: boolean]
   delete: [item: AdminBillableItemCard]
+  pool: [item: AdminBillableItemCard]
 }>()
 
 // 未设置态与 Model 列未配置同样式（灰 mono 非粗体），有值才高亮。

@@ -97,7 +97,6 @@ const resolutions = computed<PricingVariant[]>(
 )
 const requiredVariant = computed(() => resolutions.value[0] ?? '1k')
 const prices = ref<Record<PricingVariant, number | null>>({
-  default: null,
   '1k': null,
   '2k': null,
   '4k': null,
@@ -123,7 +122,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (!visible) return
-    for (const variant of ['default', '1k', '2k', '4k'] as PricingVariant[]) {
+    for (const variant of ['1k', '2k', '4k'] as PricingVariant[]) {
       prices.value[variant] = props.item?.currentPrices[variant]?.unitCredits ?? null
     }
     showError.value = false

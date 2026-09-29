@@ -38,6 +38,19 @@ describe('AdminBillingPricingPage', () => {
       http.get('/api/control/v1/platform/ai-gateway/catalog', () =>
         HttpResponse.json({ data: [] }),
       ),
+      // The pool summary column loads one pool per ai-image SKU; default
+      // to empty pools so pricing-only tests stay focused.
+      http.get('/api/control/v1/billing/catalog/:sku/pool', ({ params }) => {
+        const sku = String(params.sku)
+        return HttpResponse.json({
+          data: {
+            service: sku.startsWith('ai-image:') ? sku.slice('ai-image:'.length) : sku,
+            sku,
+            version: 0,
+            entries: [],
+          },
+        })
+      }),
     )
   })
   it('preserves the grid surface while the Catalog is loading', () => {
@@ -131,14 +144,14 @@ describe('AdminBillingPricingPage', () => {
         publishRequests += 1
         expect(params.sku).toBe('ai-image:inpaint')
         await expect(request.json()).resolves.toEqual({
-          prices: { default: 0 },
+          prices: { '1k': 0 },
           reason: 'pricing review',
         })
         return HttpResponse.json({
           data: {
             prices: {
-              default: {
-                output_resolution: 'default',
+              '1k': {
+                output_resolution: '1k',
                 price_version_id: 8,
                 version: 1,
                 unit_credits: 0,
@@ -152,7 +165,7 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置' }))
-    const priceInput = screen.getByRole('spinbutton', { name: '固定' })
+    const priceInput = screen.getByRole('spinbutton', { name: '1K' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0')
     priceInput.blur()
@@ -212,8 +225,8 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           data: {
             prices: {
-              default: {
-                output_resolution: 'default',
+              '1k': {
+                output_resolution: '1k',
                 price_version_id: 9,
                 version: 1,
                 unit_credits: 3,
@@ -227,7 +240,7 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置' }))
-    await user.type(screen.getByRole('spinbutton', { name: '固定' }), '3')
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
     await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
@@ -251,8 +264,8 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           data: {
             prices: {
-              default: {
-                output_resolution: 'default',
+              '1k': {
+                output_resolution: '1k',
                 price_version_id: 10,
                 version: 1,
                 unit_credits: 5,
@@ -271,7 +284,7 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('请输入价格')).toBeVisible()
     expect(publishRequests).toBe(0)
 
-    await user.type(screen.getByRole('spinbutton', { name: /固定/ }), '5')
+    await user.type(screen.getByRole('spinbutton', { name: /1K/ }), '5')
     await user.click(publishButton)
     expect(publishButton).toBeDisabled()
     await user.click(publishButton)

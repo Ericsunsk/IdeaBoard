@@ -44,15 +44,19 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
+import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   BadRequestResponse,
+  ConflictResponse,
   ControlAckEnvelope,
   ControlCatalogEnvelope,
+  ControlModelPoolEnvelope,
   ControlNotFoundResponse,
   ControlPublishPricesRequest,
+  ControlReplaceModelPoolEnvelope,
+  ControlReplaceModelPoolRequest,
   ControlSetAvailabilityRequest,
   ForbiddenResponse,
   IdempotencyConflictResponse,
@@ -594,4 +598,204 @@ export const useDeleteControlCatalogItem = <
   TContext
 > => {
   return useMutation(getDeleteControlCatalogItemMutationOptions(options), queryClient)
+}
+export const getGetControlCatalogModelPoolUrl = (sku: string) => {
+  return `/billing/catalog/${encodeURIComponent(String(sku))}/pool`
+}
+
+/**
+ * @summary Get the Service Model Pool for a billing SKU
+ */
+export const getControlCatalogModelPool = async (
+  sku: string,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlModelPoolEnvelope> => {
+  return controlMutator<ControlModelPoolEnvelope>(getGetControlCatalogModelPoolUrl(sku), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlCatalogModelPoolQueryKey = (sku: MaybeRefOrGetter<string>) => {
+  return ['billing', 'catalog', sku, 'pool'] as const
+}
+
+export const getGetControlCatalogModelPoolQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlCatalogModelPool>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  sku: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlCatalogModelPool>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlCatalogModelPoolQueryKey(sku)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlCatalogModelPool>>> = ({
+    signal,
+  }) => getControlCatalogModelPool(toValue(sku), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getControlCatalogModelPool>>, TError, TData>
+}
+
+export type GetControlCatalogModelPoolQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlCatalogModelPool>>
+>
+export type GetControlCatalogModelPoolQueryError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Get the Service Model Pool for a billing SKU
+ */
+
+export function useGetControlCatalogModelPool<
+  TData = Awaited<ReturnType<typeof getControlCatalogModelPool>>,
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse,
+>(
+  sku: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlCatalogModelPool>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlCatalogModelPoolQueryOptions(sku, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getReplaceControlCatalogModelPoolUrl = (sku: string) => {
+  return `/billing/catalog/${encodeURIComponent(String(sku))}/pool`
+}
+
+/**
+ * @summary Replace the Service Model Pool atomically (operator reason required)
+ */
+export const replaceControlCatalogModelPool = async (
+  sku: string,
+  controlReplaceModelPoolRequest: ControlReplaceModelPoolRequest,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<ControlReplaceModelPoolEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<ControlReplaceModelPoolEnvelope>(
+    getReplaceControlCatalogModelPoolUrl(sku),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(controlReplaceModelPoolRequest),
+    },
+  )
+}
+
+export const getReplaceControlCatalogModelPoolMutationKey = () =>
+  ['replaceControlCatalogModelPool'] as const
+
+export const getReplaceControlCatalogModelPoolMutationOptions = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof replaceControlCatalogModelPool>>,
+    TError,
+    ReplaceControlCatalogModelPoolMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof replaceControlCatalogModelPool>>,
+  TError,
+  ReplaceControlCatalogModelPoolMutationVariables,
+  TContext
+> => {
+  const mutationKey = getReplaceControlCatalogModelPoolMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof replaceControlCatalogModelPool>>,
+    ReplaceControlCatalogModelPoolMutationVariables
+  > = (props) => {
+    const { sku, data } = props ?? {}
+
+    return replaceControlCatalogModelPool(sku, data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type ReplaceControlCatalogModelPoolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof replaceControlCatalogModelPool>>
+>
+export type ReplaceControlCatalogModelPoolMutationBody = ControlReplaceModelPoolRequest
+export type ReplaceControlCatalogModelPoolMutationError =
+  BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse
+export type ReplaceControlCatalogModelPoolMutationVariables = {
+  sku: string
+  data: ControlReplaceModelPoolRequest
+}
+
+/**
+ * @summary Replace the Service Model Pool atomically (operator reason required)
+ */
+export const useReplaceControlCatalogModelPool = <
+  TError = BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof replaceControlCatalogModelPool>>,
+      TError,
+      ReplaceControlCatalogModelPoolMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof replaceControlCatalogModelPool>>,
+  TError,
+  ReplaceControlCatalogModelPoolMutationVariables,
+  TContext
+> => {
+  return useMutation(getReplaceControlCatalogModelPoolMutationOptions(options), queryClient)
 }

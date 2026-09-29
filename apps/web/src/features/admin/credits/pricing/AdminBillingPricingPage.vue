@@ -109,9 +109,12 @@
         :loading="isLoading"
         :availability-pending="availabilityPending"
         :delete-pending="deletePending"
+        :pool-by-sku="poolBySku"
+        :pool-failed="poolFailed"
         @availability="setAvailability"
         @publish="openPriceDialog"
         @delete="confirmArchivedDelete"
+        @pool="openPoolEditor"
       >
       </BillingPricingTable>
     </div>
@@ -123,6 +126,24 @@
       :pending="publishPending"
       :error-message="publishError"
       @submit="publishPrice"
+    />
+
+    <!-- 7. 服务模型池编辑弹窗 -->
+    <ModelPoolEditorDialog
+      v-model:visible="poolDialogVisible"
+      :item="poolEditItem"
+      :version="poolEditVersion"
+      :entries="poolEditEntries"
+      :catalog-models="poolCatalogModels"
+      :catalog-loading="poolCatalogLoading"
+      :catalog-error="poolCatalogError"
+      :save-disabled="!poolEditReady"
+      :pending="poolSavePending"
+      :error-message="poolSaveError"
+      :stale="poolSaveStale"
+      @submit="savePool"
+      @reload="reloadPool"
+      @reload-catalog="loadPoolCatalog"
     />
   </div>
 </template>
@@ -139,21 +160,47 @@ import { adminDashboardRootClass, adminEmptyStateClass } from '../../shared/lib/
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
+import ModelPoolEditorDialog from './ModelPoolEditorDialog.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
+import { createAdminModelPoolResource } from './modelPoolResource'
+import { serviceOfSku } from './skuFeature'
 import {
   PRICING_NAMESPACE_TABLES,
   PRICING_OTHER_TABLE,
   pricingNamespaceRank,
   pricingTableKeyOfSku,
 } from './groups'
-import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
+import type {
+  AdminBillableItemCard,
+  AdminModelPool,
+  AdminModelPoolEntry,
+  AdminPoolCatalogModel,
+  PricingVariant,
+} from './billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
 const resource = createAdminBillableCatalogResource()
+const poolResource = createAdminModelPoolResource()
 const items = ref<AdminBillableItemCard[]>([])
 const sortedItems = computed(() => [...items.value].sort(compareCatalogCards))
+
+// 每 Service 模型池快照（key 为 billing SKU）：定价表摘要列与编辑器共享。
+// 加载失败按 SKU 标记，摘要列就地展示失败态，刷新按钮可整体重试。
+const poolBySku = ref<Record<string, AdminModelPool>>({})
+const poolFailed = reactive<Record<string, boolean>>({})
+const poolDialogVisible = ref(false)
+const poolEditItem = ref<AdminBillableItemCard | null>(null)
+const poolEditVersion = ref(0)
+const poolEditEntries = ref<AdminModelPoolEntry[]>([])
+const poolEditReady = ref(false)
+const poolCatalogModels = ref<AdminPoolCatalogModel[]>([])
+const poolCatalogLoading = ref(false)
+const poolCatalogError = ref('')
+const poolSavePending = ref(false)
+const poolSaveError = ref('')
+const poolSaveStale = ref(false)
 
 const isLoading = ref(true)
 const errorMessage = ref('')
@@ -240,11 +287,124 @@ async function loadCatalog() {
   errorMessage.value = ''
   try {
     items.value = await resource.list()
+    await loadModelPools()
   } catch (error) {
     errorMessage.value =
       error instanceof Error && error.message ? error.message : BILLING_PRICING_MESSAGES.retryLater
   } finally {
     isLoading.value = false
+  }
+}
+
+// 模型池摘要与目录加载解耦：定价失败仍整体报错；池按 ai-image SKU 并行
+// 拉取，单池失败只污染该行摘要（poolFailed），不阻塞整页。
+async function loadModelPools() {
+  const skus = sortedItems.value.map((item) => item.sku).filter((sku) => serviceOfSku(sku))
+  const settled = await Promise.allSettled(skus.map((sku) => poolResource.get(sku)))
+  settled.forEach((result, index) => {
+    const sku = skus[index]!
+    if (result.status === 'fulfilled') {
+      poolBySku.value[sku] = result.value
+      poolFailed[sku] = false
+    } else {
+      poolFailed[sku] = true
+    }
+  })
+}
+
+async function openPoolEditor(item: AdminBillableItemCard) {
+  if (!serviceOfSku(item.sku)) return
+  poolEditItem.value = item
+  poolEditReady.value = false
+  poolSaveError.value = ''
+  poolSaveStale.value = false
+  poolDialogVisible.value = true
+  await reloadPool()
+  if (poolCatalogModels.value.length === 0 && !poolCatalogLoading.value) {
+    await loadPoolCatalog()
+  }
+}
+
+async function loadPoolCatalog() {
+  if (poolCatalogLoading.value) return
+  poolCatalogLoading.value = true
+  poolCatalogError.value = ''
+  try {
+    poolCatalogModels.value = await poolResource.listCatalogModels()
+  } catch (error) {
+    poolCatalogModels.value = []
+    poolCatalogError.value = formatAdminDisplayError(error, '加载模型目录失败，请重试')
+  } finally {
+    poolCatalogLoading.value = false
+  }
+}
+
+async function reloadPool() {
+  const item = poolEditItem.value
+  if (!item) return
+  poolEditReady.value = false
+  poolSavePending.value = true
+  poolSaveError.value = ''
+  poolSaveStale.value = false
+  try {
+    const pool = await poolResource.get(item.sku)
+    poolBySku.value[item.sku] = pool
+    poolFailed[item.sku] = false
+    poolEditVersion.value = pool.version
+    poolEditEntries.value = pool.entries.map((entry) => ({
+      modelId: entry.modelId,
+      enabled: entry.enabled,
+      resolutions: [...entry.resolutions],
+    }))
+    poolEditReady.value = true
+  } catch (error) {
+    poolEditVersion.value = 0
+    poolEditEntries.value = []
+    poolEditReady.value = false
+    poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
+    poolSaveStale.value = true
+  } finally {
+    poolSavePending.value = false
+  }
+}
+
+async function savePool(entries: AdminModelPoolEntry[]) {
+  const item = poolEditItem.value
+  if (!item || poolSavePending.value || !poolEditReady.value) return
+  // Control writes require an operator reason (audit); a cancelled dialog
+  // aborts silently. The save replaces the complete Service pool
+  // atomically against the loaded version (409 on concurrent edits).
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: BILLING_PRICING_MESSAGES.poolSaveTitle,
+    message: BILLING_PRICING_MESSAGES.poolSaveMessage(item.displayName),
+    confirmLabel: BILLING_PRICING_MESSAGES.poolSaveConfirm,
+  })
+  if (!operatorReason) return
+  poolSavePending.value = true
+  poolSaveError.value = ''
+  poolSaveStale.value = false
+  try {
+    const saved = await poolResource.replace(
+      item.sku,
+      { version: poolEditVersion.value, entries },
+      { operatorReason },
+    )
+    poolBySku.value[item.sku] = saved
+    poolFailed[item.sku] = false
+    poolEditVersion.value = saved.version
+    poolEditEntries.value = saved.entries.map((entry) => ({
+      modelId: entry.modelId,
+      enabled: entry.enabled,
+      resolutions: [...entry.resolutions],
+    }))
+    poolDialogVisible.value = false
+    toast.success(BILLING_PRICING_MESSAGES.poolSaved)
+  } catch (error) {
+    poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
+    poolSaveStale.value =
+      error instanceof Error && (error as { code?: unknown }).code === 'conflict'
+  } finally {
+    poolSavePending.value = false
   }
 }
 
