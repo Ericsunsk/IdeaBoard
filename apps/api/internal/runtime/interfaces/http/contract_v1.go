@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/principal"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -53,6 +54,16 @@ type ContractV1Deps struct {
 	TaskQueue             WorkspaceTaskEnqueuer
 	TaskAssets            WorkspaceTaskAssetReader
 	TaskCanonicalCompiler func(service, userPrompt string, params map[string]interface{}) (string, error)
+	// AllowNonTransactionalTaskSettlement is test-only wiring for in-memory
+	// HTTP fixtures. Production must leave it false so task mutations require
+	// the PostgreSQL transaction seams.
+	AllowNonTransactionalTaskSettlement bool
+	// TaskRouter is the shared RoutingResolver quote/submit consume (same
+	// instance, never an independent lookup). Nil fails closed with the
+	// canonical service_resolution_unavailable sentinel.
+	TaskRouter *routing.RoutingResolver
+	// TaskSnapshotSaver pins the Resolve snapshot (nil skips pinning).
+	TaskSnapshotSaver WorkspaceTaskSnapshotSaver
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the
 	// workspace postgres store; tests inject the in-memory implementation.
@@ -91,7 +102,6 @@ type ContractV1Deps struct {
 	// tests inject an inline runner for determinism. Unexported:
 	// production never overrides it.
 	libraryMaterializeSpawn func(func())
-	TaskRoutingGate         WorkspaceTaskRoutingGate
 }
 
 // V1UserDirectory translates between internal numeric user ids and the

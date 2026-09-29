@@ -4,7 +4,7 @@ import {
   TaskResultPendingError,
 } from '../task-runner/taskResultErrors'
 import { i18n } from '../../../../../shared/i18n'
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
@@ -28,9 +28,9 @@ import {
 type PendingImageResultOptions = ImageExecutionResultOptions
 
 export type PendingImageWorkflowTaskTransport = Readonly<{
-  assertReady: (request: SubmitTaskData, fallbackMessage: string) => Promise<void>
+  assertReady: (request: CanvasTaskRequestData, fallbackMessage: string) => Promise<void>
   submit: (
-    request: SubmitTaskData,
+    request: CanvasTaskRequestData,
     clientActionId: string,
     fallbackMessage: string,
   ) => Promise<{ taskId: string }>
@@ -47,8 +47,8 @@ export type PendingImageWorkflowIntent = {
   attachment: BoardAttachment
   outputCount: number
   resultOptions?: PendingImageResultOptions
-  taskRequest: SubmitTaskData
-  readinessRequest?: SubmitTaskData
+  taskRequest: CanvasTaskRequestData
+  readinessRequest?: CanvasTaskRequestData
   fallbackRatio: number
 }
 
@@ -82,7 +82,10 @@ function imageGenerationFailureMessage(): string {
 /** Presentation boundary: transport errors carry a kind; copy is resolved here. */
 function taskExecutionWarning(error: unknown): string {
   // Fail-closed guidance is user-safe by construction: surface it verbatim
-  // instead of collapsing to the generic failure copy.
+  // instead of collapsing to the generic failure copy. Billing preflight
+  // errors carry resolved user copy for the same reason (including the
+  // `resolution-unavailable` toast for an empty Service Model Pool).
+  if (isCanvasBillingPreflightError(error)) return error.message
   if (isCanvasWorkspaceUnavailableError(error) || isCanvasWorkspaceTaskUnmappableError(error)) {
     return error.message
   }

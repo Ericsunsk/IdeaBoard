@@ -2,7 +2,7 @@ import type { ApiClientError } from '../../../../../shared/api/client'
 import { i18n } from '../../../../../shared/i18n'
 
 export type CanvasBillingPreflightFailureKind =
-  'insufficient-credits' | 'network' | 'pricing-unavailable'
+  'insufficient-credits' | 'network' | 'pricing-unavailable' | 'resolution-unavailable'
 
 export class CanvasBillingPreflightError extends Error {
   readonly kind: CanvasBillingPreflightFailureKind
@@ -21,20 +21,36 @@ export function insufficientCreditsPreflightError(): CanvasBillingPreflightError
   )
 }
 
-export function mapCanvasBillingRequestError(error: unknown): Error {
-  const apiError = error as ApiClientError
+function preflightErrorForCode(code: unknown): CanvasBillingPreflightError | null {
   // Legacy user-plane codes (`insufficient_credits`, `pricing_unavailable`)
   // plus workspace v1 codes (`task_insufficient_credits` 402,
-  // `billing_quote_unavailable` 503). Both transports converge here so the
-  // feedback boundary keeps one copy per kind.
-  if (apiError?.code === 'insufficient_credits' || apiError?.code === 'task_insufficient_credits')
+  // `billing_quote_unavailable` 503, `service_resolution_unavailable` 422).
+  // Both transports converge here so the feedback boundary keeps one copy
+  // per kind.
+  if (code === 'insufficient_credits' || code === 'task_insufficient_credits')
     return insufficientCreditsPreflightError()
-  if (apiError?.code === 'pricing_unavailable' || apiError?.code === 'billing_quote_unavailable') {
+  if (code === 'pricing_unavailable' || code === 'billing_quote_unavailable') {
     return new CanvasBillingPreflightError(
       'pricing-unavailable',
       i18n.global.t('errorCodes.pricing_unavailable'),
     )
   }
+  // Empty Service Model Pool at submit (HTTP 422): the backend guarantees
+  // no task and no billing hold on this path, so the client maps it to a
+  // clear user toast and performs no retry (only `network` retries).
+  if (code === 'service_resolution_unavailable') {
+    return new CanvasBillingPreflightError(
+      'resolution-unavailable',
+      i18n.global.t('errorCodes.service_resolution_unavailable'),
+    )
+  }
+  return null
+}
+
+export function mapCanvasBillingRequestError(error: unknown): Error {
+  const mapped = preflightErrorForCode((error as ApiClientError)?.code)
+  if (mapped) return mapped
+  const apiError = error as ApiClientError
   if (apiError?.status == null && apiError?.code == null) {
     return new CanvasBillingPreflightError(
       'network',

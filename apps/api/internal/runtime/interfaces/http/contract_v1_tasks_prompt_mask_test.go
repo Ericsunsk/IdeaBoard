@@ -64,8 +64,9 @@ func newV1PromptMaskFixture(t *testing.T) *v1PromptMaskFixture {
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
 		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: assets,
-		TaskCanonicalCompiler: taskservice.CompileWorkspaceParams,
-		TaskRoutingGate:       allowTestRouting,
+		AllowNonTransactionalTaskSettlement: true,
+		TaskCanonicalCompiler:               taskservice.CompileWorkspaceParams,
+		TaskRouter:                          allowTestPoolResolver(),
 	})
 	ws, err := store.CreateWorkspace(ctx, tenancy.CreateWorkspaceParams{Name: "prompt-mask", OwnerUserID: 1})
 	if err != nil {

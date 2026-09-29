@@ -1,6 +1,6 @@
 // Canvas workspace task adapter spec (W2 stream 1).
 //
-// Covers the explicit SubmitTaskData -> v1 semantic mapping: submit input
+// Covers the explicit CanvasTaskRequestData -> v1 semantic mapping: submit input
 // mapping + fail-closed rules, quote -> readiness mapping, output-ref image
 // extraction, terminal settlement, and cancel workspace resolution. The
 // central `shared/api/workspaceTasks` resource is mocked (its own contract
@@ -16,6 +16,7 @@ import {
   fetchCanvasWorkspaceTaskReadinessMatrix,
   registerCanvasWorkspaceTask,
   resetCanvasWorkspaceTaskRegistryForTests,
+  normalizeCanvasOutputResolution,
   submitCanvasWorkspaceTask,
   toSubmitTaskReadiness,
   toWorkspaceCreateInput,
@@ -61,7 +62,7 @@ function taskItem(overrides: Record<string, unknown> = {}) {
       display_name: 'Upscale',
       price_version_id: 2,
       price_version: 2,
-      output_resolution: 'default',
+      output_resolution: '1k',
       unit_credits: 6,
       quantity: 1,
       total_credits: 6,
@@ -287,6 +288,98 @@ describe('toWorkspaceCreateInput', () => {
         }),
       'media-ids',
     )
+  })
+})
+
+describe('canonical output resolution ingress (#850)', () => {
+  it('submits service with identical prompt/ratio/dims/count/media semantics', () => {
+    const input = toWorkspaceCreateInput({
+      prompt: 'a red house',
+      service: 'generation',
+      media_asset_ids: ['asset_aaa1'],
+      params: {
+        output_count: 2,
+        output_resolution: '2k',
+        ratio: '1:1',
+        custom_width: 1024,
+        custom_height: 1024,
+      },
+    })
+    expect(input.service).toBe('generation')
+    expect(input).not.toHaveProperty('workflow_kind')
+    expect(input.prompt).toBe('a red house')
+    expect(input.media_asset_ids).toEqual(['asset_aaa1'])
+    expect(input.params).toMatchObject({
+      output_count: 2,
+      output_resolution: '2k',
+      ratio: '1:1',
+      custom_width: 1024,
+      custom_height: 1024,
+    })
+    expect(input.quantity).toBe(2)
+    expect(input.resolution).toBe('2k')
+  })
+
+  it('normalizes params.output_resolution once and derives the billing resolution from it', () => {
+    const input = toWorkspaceCreateInput({
+      prompt: 'a cat',
+      service: 'generation',
+      params: { output_count: 1, output_resolution: '2K' },
+    })
+    expect(input.params).toMatchObject({ output_resolution: '2k' })
+    expect(input.resolution).toBe('2k')
+  })
+
+  it('preserves the canonical 1k variant for fixed-resolution services', () => {
+    const input = toWorkspaceCreateInput({
+      prompt: 'redraw',
+      service: 'inpaint',
+      params: {
+        output_count: 1,
+        output_resolution: '1K',
+        use_mask: true,
+        mask_asset_id: 'asset_mask1',
+      },
+    })
+    expect(input.params).toMatchObject({ output_resolution: '1k' })
+    expect(input.resolution).toBe('1k')
+  })
+
+  it('omits resolution when the plan carries none', () => {
+    const input = toWorkspaceCreateInput({
+      prompt: '',
+      service: 'upscale',
+      media_asset_ids: ['asset_aaa1'],
+      params: { upscale: { scale: 2 } },
+    })
+    expect(input.params).not.toHaveProperty('output_resolution')
+    expect(input).not.toHaveProperty('resolution')
+  })
+
+  it('fails closed on unknown resolutions before any network call', () => {
+    mocks.createWorkspaceTask.mockClear()
+    expectUnmappable(
+      () =>
+        toWorkspaceCreateInput({
+          prompt: 'a cat',
+          service: 'generation',
+          params: { output_count: 1, output_resolution: '8k' },
+        }),
+      'params',
+    )
+    expect(normalizeCanvasOutputResolution(' 4K ')).toBe('4k')
+    expect(normalizeCanvasOutputResolution(undefined)).toBeUndefined()
+    expect(mocks.createWorkspaceTask).not.toHaveBeenCalled()
+  })
+
+  it('canonicalizes quote resolutions from the same source of truth', () => {
+    expect(
+      toWorkspaceQuoteInput({
+        prompt: '',
+        service: 'generation',
+        params: { output_count: 2, output_resolution: ' 4K ' },
+      }),
+    ).toEqual({ service: 'generation', quantity: 2, resolution: '4k' })
   })
 })
 

@@ -189,6 +189,24 @@ describe('pendingImageWorkflowRunner', () => {
     expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
   })
 
+  it('surfaces a submit-time empty pool as the clear resolution toast with one attempt', async () => {
+    // 422 service_resolution_unavailable creates no task and no hold
+    // backend-side; the runner maps it to the clear copy (not the generic
+    // failure) and never retries the submit.
+    const harness = createHarness()
+    harness.transport.submit.mockRejectedValueOnce(
+      new CanvasBillingPreflightError(
+        'resolution-unavailable',
+        'This resolution is unavailable right now.',
+      ),
+    )
+    await harness.runner.execute(harness.intent)
+    expect(harness.transport.submit).toHaveBeenCalledTimes(1)
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith('This resolution is unavailable right now.')
+  })
+
   it('does not remove a superseding slot after a stale failure or late submit', async () => {
     const harness = createHarness()
     let resolveSubmit!: (value: { taskId: string }) => void

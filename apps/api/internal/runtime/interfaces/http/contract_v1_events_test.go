@@ -156,11 +156,12 @@ func newV1EventsFixture(t *testing.T) *v1EventsFixture {
 	RegisterContractV1Routes(v1, AuthDeps{}, ContractV1Deps{
 		Store: store, Users: dir,
 		Tasks: tasks, TaskQuoter: quoter, TaskHolder: holder, TaskQueue: queue, TaskAssets: taskAssets,
-		TaskRoutingGate: allowTestRouting,
-		Boards:          boardsStore,
-		Library:         ContractV1LibraryDeps{Store: libStore},
-		Events:          eventLog,
-		Webhooks:        webhooks,
+		AllowNonTransactionalTaskSettlement: true,
+		TaskRouter:                          allowTestPoolResolver(),
+		Boards:                              boardsStore,
+		Library:                             ContractV1LibraryDeps{Store: libStore},
+		Events:                              eventLog,
+		Webhooks:                            webhooks,
 	})
 	const owner, admin, member, outsider = 1, 2, 3, 9
 	for _, id := range []int64{owner, admin, member, outsider, 4} {

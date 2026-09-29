@@ -19,7 +19,7 @@ describe('task readiness billing updates', () => {
     const readiness = {
       ready: false,
       message: 'Idea不足',
-      feature: 'generation',
+      service: 'generation',
       billing: {
         sku: 'ai-image:generation',
         price_version_id: 2,
@@ -40,7 +40,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'final prompt',
-        feature: 'generation',
+        service: 'generation',
         client_action_id: 'canvas:action-1',
         params: { output_count: 4 },
       }),
@@ -53,7 +53,7 @@ describe('task readiness billing updates', () => {
   it('keeps an explicit free quote ready without requiring wallet coverage', async () => {
     const readiness = {
       ready: true,
-      feature: 'generation',
+      service: 'generation',
       billing: {
         sku: 'ai-image:generation.test',
         price_version_id: 2,
@@ -72,7 +72,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'free prompt',
-        feature: 'generation',
+        service: 'generation',
         client_action_id: 'canvas:free-action',
         params: { output_count: 4 },
       }),
@@ -85,7 +85,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'network prompt',
-        feature: 'generation',
+        service: 'generation',
         params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({ kind: 'network', message: 'The request could not be completed.' })
@@ -100,12 +100,29 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'quote prompt',
-        feature: 'generation',
+        service: 'generation',
         params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({
       kind: 'pricing-unavailable',
       message: 'Pricing is temporarily unavailable. Please try again shortly.',
     })
+  })
+
+  it('blocks an unavailable resolution with the clear pool copy', async () => {
+    mocks.fetchReadiness.mockResolvedValue({
+      ready: false,
+      service: 'generation',
+      error_code: 'service_resolution_unavailable',
+      message: 'This resolution is unavailable right now.',
+    })
+
+    await expect(
+      assertTaskSubmitReady({
+        prompt: 'a cat',
+        service: 'generation',
+        params: { output_count: 1, output_resolution: '2k' },
+      }),
+    ).rejects.toThrow('This resolution is unavailable right now.')
   })
 })

@@ -102,8 +102,9 @@ func newPhase4Fixture(t *testing.T) *phase4Fixture {
 		// Production-shaped asset gate: the real adapter over the
 		// media store, so task input/output verification runs the
 		// same ready/archived/invisible mapping as production.
-		TaskAssets:      &workspacemedia.TaskAssetAdapter{Store: media},
-		TaskRoutingGate: allowTestRouting,
+		TaskAssets:                          &workspacemedia.TaskAssetAdapter{Store: media},
+		AllowNonTransactionalTaskSettlement: true,
+		TaskRouter:                          allowTestPoolResolver(),
 	})
 	return &phase4Fixture{engine: router, store: store, dir: dir, ws: ws, tasks: tasks, media: media, lib: lib, queue: queue}
 }
@@ -174,9 +175,12 @@ func TestPhase4SurfacesLive(t *testing.T) {
 
 	// Task creation gates on the produced asset through the production
 	// TaskAssetAdapter (invisible asset ids 404 as media_not_found).
+	// The resolution is omitted so the scalable policy default (1k)
+	// applies: an explicit "default" is rejected for scalable services
+	// (ADR-0012 rule 3).
 	status, taskBody := phase4Call(t, fx, http.MethodPost,
 		ContractV1GroupPath+"/workspaces/"+ws+"/tasks",
-		`{"data":{"service":"render","inputs":{"media_asset_ids":["`+assetID+`"]},"params":{},"quantity":1,"resolution":"default"}}`, 1)
+		`{"data":{"service":"render","inputs":{"media_asset_ids":["`+assetID+`"]},"params":{},"quantity":1}}`, 1)
 	if status != http.StatusAccepted {
 		t.Fatalf("create task = %d (%v), want 202", status, taskBody)
 	}
@@ -201,7 +205,7 @@ func TestPhase4SurfacesLive(t *testing.T) {
 		if get.name == "quote" {
 			status, body := phase4Call(t, fx, http.MethodPost,
 				ContractV1GroupPath+"/workspaces/"+ws+"/task-quotes",
-				`{"data":{"service":"render","quantity":1,"resolution":"default"}}`, 1)
+				`{"data":{"service":"render","quantity":1}}`, 1)
 			if status != http.StatusOK {
 				t.Fatalf("quote task = %d (%v), want 200", status, body)
 			}

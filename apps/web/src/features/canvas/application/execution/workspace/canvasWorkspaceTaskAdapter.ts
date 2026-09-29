@@ -9,7 +9,7 @@
 // stays feature-free.
 //
 // Semantic mappings (#809 audit):
-// - submit: `SubmitTaskData` prompt/service/image inputs/params ->
+// - submit: `CanvasTaskRequestData` prompt/service/image inputs/params ->
 //   `CreateWorkspaceTaskInput` service/media_asset_ids/prompt
 //   (+params incl. `mask_asset_id`, quantity, resolution).
 //   `client_action_id` becomes the header-only `Idempotency-Key` (never
@@ -63,7 +63,7 @@ import { sanitizeApiErrorMessage } from '../../../../../shared/utils/errorMessag
 import { requireWorkspaceId as requireSharedWorkspaceId } from '../../../../../shared/utils/workspaceId'
 import { getWorkspaceSelectionStore } from '../../../../workspace'
 import type {
-  SubmitTaskData,
+  CanvasTaskRequestData,
   SubmitTaskReadinessData,
 } from '../../../domain/execution-contracts/canvasTaskRequest'
 import {
@@ -159,7 +159,7 @@ function isTaskStateConflict(error: unknown): boolean {
   return errorCode(error) === 'task_state_conflict'
 }
 
-// Submit mapping: SubmitTaskData -> CreateWorkspaceTaskInput.
+// Submit mapping: CanvasTaskRequestData -> CreateWorkspaceTaskInput.
 //
 // Prompt contract (mirrors the backend v1 `data.prompt` input,
 // `workspacetasks.MaxWorkspaceTaskPromptBytes` = 8KB, legacy parity):
@@ -237,6 +237,8 @@ function assertOpaqueAssetIds(values: readonly string[]): string[] {
 // v1-safe param keys (mirrors backend ValidateParams minus everything the
 // durable contract forbids). Legacy media URL keys, numeric asset id keys,
 // and unknown keys fail closed here so callers never see a cryptic 422.
+// `output_resolution` is canonicalized separately below: it is the single
+// client resolution source of truth (ADR-0012 rule 11).
 const WORKSPACE_SAFE_PARAM_KEYS: ReadonlySet<string> = new Set([
   'custom_width',
   'custom_height',
@@ -320,13 +322,21 @@ function toWorkspaceMaskAssetId(value: unknown): string | undefined {
   return maskId
 }
 
-function toWorkspaceParams(params: SubmitTaskData['params']): Record<string, unknown> | undefined {
+function toWorkspaceParams(params: CanvasTaskRequestData['params']): Record<string, unknown> | undefined {
   if (params == null) return undefined
   const next: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(params)) {
     if (key === 'mask_asset_id') {
       const maskId = toWorkspaceMaskAssetId(value)
       if (maskId != null) next[key] = maskId
+      continue
+    }
+    if (key === 'output_resolution') {
+      // Single ingress canonicalization point: the normalized value is
+      // written back so body params and the derived top-level billing
+      // resolution agree exactly (never two authoritative values).
+      const canonical = normalizeCanvasOutputResolution(value)
+      if (canonical != null) next[key] = canonical
       continue
     }
     if (LEGACY_MEDIA_PARAM_KEYS.has(key)) {
@@ -364,7 +374,7 @@ function toWorkspaceParams(params: SubmitTaskData['params']): Record<string, unk
   return Object.keys(next).length > 0 ? next : undefined
 }
 
-function toWorkspaceQuantity(params: SubmitTaskData['params']): number | undefined {
+function toWorkspaceQuantity(params: CanvasTaskRequestData['params']): number | undefined {
   const raw = params?.output_count
   if (raw == null) return undefined
   const count = Number(raw)
@@ -372,13 +382,31 @@ function toWorkspaceQuantity(params: SubmitTaskData['params']): number | undefin
   return count
 }
 
-function toWorkspaceResolution(params: SubmitTaskData['params']): string | undefined {
-  const raw = params?.output_resolution
-  if (typeof raw !== 'string' || !raw.trim()) return undefined
-  return raw.trim()
+// ONE canonical normalized resolution at ingress (ADR-0012 rule 11):
+// `params.output_resolution` is the client source of truth. Both the body
+// params (written back above) and the top-level billing `resolution`
+// derive from this single canonicalizer, so they agree exactly by
+// construction. Mirrors backend `NormalizeResolution` (case-insensitive
+// `1k`/`2k`/`4k`); unknown values fail closed before any network
+// call, so no task is created and no hold is taken.
+const CANVAS_OUTPUT_RESOLUTIONS: ReadonlySet<string> = new Set(['1k', '2k', '4k'])
+
+export function normalizeCanvasOutputResolution(value: unknown): string | undefined {
+  if (value == null) return undefined
+  const text = `${value}`.trim().toLowerCase()
+  if (!text) return undefined
+  if (CANVAS_OUTPUT_RESOLUTIONS.has(text)) return text
+  throw new CanvasWorkspaceTaskUnmappableError(
+    'params',
+    `Unsupported canvas task resolution ${JSON.stringify(value)}: params.output_resolution accepts 1k, 2k, or 4k only.`,
+  )
 }
 
-export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspaceTaskInput {
+function toWorkspaceResolution(params: CanvasTaskRequestData['params']): string | undefined {
+  return normalizeCanvasOutputResolution(params?.output_resolution)
+}
+
+export function toWorkspaceCreateInput(request: CanvasTaskRequestData): CreateWorkspaceTaskInput {
   const service = assertService(request.service)
   const prompt = toWorkspacePrompt(service, request.prompt)
   if (nonEmptyStrings(request.image_urls).length > 0) {
@@ -399,6 +427,8 @@ export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspace
   }
   const mediaAssetIds = assertOpaqueAssetIds(nonEmptyStrings(request.media_asset_ids))
   const params = toWorkspaceParams(request.params)
+  const quantity = toWorkspaceQuantity(request.params)
+  const resolution = toWorkspaceResolution(request.params)
   // NOTE: legacy `priority` (interactive hint) has no v1 field and is
   // dropped; `client_action_id` becomes the header-only Idempotency-Key.
   return {
@@ -406,17 +436,13 @@ export function toWorkspaceCreateInput(request: SubmitTaskData): CreateWorkspace
     ...(mediaAssetIds.length > 0 ? { media_asset_ids: mediaAssetIds } : {}),
     ...(prompt == null ? {} : { prompt }),
     ...(params == null ? {} : { params }),
-    ...(toWorkspaceQuantity(request.params) == null
-      ? {}
-      : { quantity: toWorkspaceQuantity(request.params) as number }),
-    ...(toWorkspaceResolution(request.params) == null
-      ? {}
-      : { resolution: toWorkspaceResolution(request.params) as string }),
+    ...(quantity == null ? {} : { quantity }),
+    ...(resolution == null ? {} : { resolution }),
   }
 }
 
 export async function submitCanvasWorkspaceTask(
-  request: SubmitTaskData,
+  request: CanvasTaskRequestData,
   options?: { idempotencyKey?: string | undefined },
 ): Promise<{ taskId: string; workspaceId: string }> {
   const workspaceId = requireCanvasWorkspaceId()
@@ -431,10 +457,10 @@ export async function submitCanvasWorkspaceTask(
 }
 
 // ---------------------------------------------------------------------------
-// Readiness mapping: SubmitTaskData -> task-quotes -> SubmitTaskReadinessData.
+// Readiness mapping: CanvasTaskRequestData -> task-quotes -> SubmitTaskReadinessData.
 // ---------------------------------------------------------------------------
 
-export function toWorkspaceQuoteInput(request: SubmitTaskData): {
+export function toWorkspaceQuoteInput(request: CanvasTaskRequestData): {
   service: Service
   quantity?: number | undefined
   resolution?: string | undefined
@@ -442,14 +468,12 @@ export function toWorkspaceQuoteInput(request: SubmitTaskData): {
   // Quotes are price-only: prompt/media never ride a quote, so readiness
   // preflight never throws unmappable for them (submit does, fail-closed).
   const service = assertService(request.service)
+  const quantity = toWorkspaceQuantity(request.params)
+  const resolution = toWorkspaceResolution(request.params)
   return {
     service,
-    ...(toWorkspaceQuantity(request.params) == null
-      ? {}
-      : { quantity: toWorkspaceQuantity(request.params) as number }),
-    ...(toWorkspaceResolution(request.params) == null
-      ? {}
-      : { resolution: toWorkspaceResolution(request.params) as string }),
+    ...(quantity == null ? {} : { quantity }),
+    ...(resolution == null ? {} : { resolution }),
   }
 }
 
@@ -488,7 +512,7 @@ function toNotReady(service: Service, message: string, errorCode: string): Submi
 }
 
 export async function fetchCanvasWorkspaceTaskReadiness(
-  request: SubmitTaskData,
+  request: CanvasTaskRequestData,
   options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData> {
   const workspaceId = requireCanvasWorkspaceId()
@@ -519,7 +543,7 @@ export async function fetchCanvasWorkspaceTaskReadiness(
 }
 
 export async function fetchCanvasWorkspaceTaskReadinessMatrix(
-  requests: readonly SubmitTaskData[],
+  requests: readonly CanvasTaskRequestData[],
   options?: { signal?: AbortSignal | null | undefined },
 ): Promise<SubmitTaskReadinessData[]> {
   if (requests.length === 0) return []

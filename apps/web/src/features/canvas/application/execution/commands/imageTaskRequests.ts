@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import type {
   OutpaintExecutionPlan,
   ImageActionExecutionPlan,
@@ -100,14 +100,14 @@ function buildOutputBillingParams(options: ImageActionReadinessOptions = {}, ser
   const isRemoveBg = service === EXECUTION_SERVICE.cutout
   return {
     output_count: assertRequestedOutputCount(isRemoveBg ? 1 : (options.outputCount ?? 1)),
-    output_resolution: isRemoveBg ? ('default' as const) : (options.outputResolution ?? '1k'),
+    output_resolution: isRemoveBg ? ('1k' as const) : (options.outputResolution ?? '1k'),
   }
 }
 
 function buildDirectActionReadinessRequest(
   action: ImageDirectTaskAction,
   options: ImageActionReadinessOptions = {},
-): SubmitTaskData {
+): CanvasTaskRequestData {
   const execution = requireImageActionExecution(action)
   const strengthConfig = execution.strength
   const params = {
@@ -123,26 +123,26 @@ function buildDirectActionReadinessRequest(
   })
 }
 
-export function buildInpaintReadinessRequest(): SubmitTaskData {
+export function buildInpaintReadinessRequest(): CanvasTaskRequestData {
   return buildExecutionTaskRequest({
     prompt: '[inpaint] submit readiness',
     service: EXECUTION_PARTIAL_EDIT_META.service,
     params: {
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       ...buildExecutionSizeParams({ width: 1024, height: 1024 }, { width: 1024, height: 1024 }),
     },
   })
 }
 
-export function buildOutpaintReadinessRequest(): SubmitTaskData {
+export function buildOutpaintReadinessRequest(): CanvasTaskRequestData {
   const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     service: execution.service,
     params: {
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       original_image_width: 1024,
       original_image_height: 1024,
       outpaint: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
@@ -150,7 +150,7 @@ export function buildOutpaintReadinessRequest(): SubmitTaskData {
   })
 }
 
-function buildUpscaleReadinessRequest(): SubmitTaskData {
+function buildUpscaleReadinessRequest(): CanvasTaskRequestData {
   const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
@@ -166,7 +166,7 @@ function buildUpscaleReadinessRequest(): SubmitTaskData {
 export function buildImageActionReadinessRequest(
   action: ImageExecutionAction,
   options: ImageActionReadinessOptions = {},
-): SubmitTaskData {
+): CanvasTaskRequestData {
   if (action === IMAGE_OUTPAINT_ACTION) return buildOutpaintReadinessRequest()
   if (action === IMAGE_UPSCALE_ACTION) return buildUpscaleReadinessRequest()
   if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
@@ -184,7 +184,7 @@ export function buildGenerationTaskRequest(input: {
   outputCount: number
   outputResolution?:
     import('../../../../../shared/domain/generationContract').OutputResolution | undefined
-}): SubmitTaskData {
+}): CanvasTaskRequestData {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
     prompt: `${input.prompt ?? ''}`.trim(),
@@ -209,7 +209,7 @@ export function buildDirectActionTaskRequest(input: {
   outputCount: number
   strength?: number | undefined
   outputResolution?: OutputResolution | undefined
-}): SubmitTaskData {
+}): CanvasTaskRequestData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(input.action)
   const sizeParams = buildExecutionSizeParams(input.imageSize)
@@ -260,7 +260,7 @@ export function buildDirectActionTaskRequest(input: {
   })
 }
 
-export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): SubmitTaskData {
+export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): CanvasTaskRequestData {
   const originalOpaqueId = opaqueAssetId({ assetId: input.originalImageMediaAssetId })
   const maskAssetId = `${input.maskAssetId ?? ''}`.trim()
   return buildExecutionTaskRequest({
@@ -269,7 +269,7 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
     mediaAssetIds: originalOpaqueId ? [originalOpaqueId] : undefined,
     params: {
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       // v1 durable mask path wins when the mask has been uploaded to a
       // workspace asset; otherwise the legacy URL rides along and fails
@@ -289,7 +289,7 @@ export function buildOutpaintTaskRequest(input: {
   frameRect: OutpaintRect
   originalImageRect: OutpaintRect
   prompt?: string
-}): SubmitTaskData {
+}): CanvasTaskRequestData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_OUTPAINT_ACTION)
@@ -313,7 +313,7 @@ export function buildOutpaintTaskRequest(input: {
     mediaAssetIds: opaqueId ? [opaqueId] : undefined,
     params: {
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       original_image_width: input.imageSize.width,
       original_image_height: input.imageSize.height,
       outpaint: {
@@ -333,7 +333,7 @@ export function buildUpscaleTaskRequest(input: {
   outputCount: number
   strength?: number | undefined
   outputResolution?: OutputResolution | undefined
-}): SubmitTaskData {
+}): CanvasTaskRequestData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_UPSCALE_ACTION)
   const opaqueId = opaqueAssetId(input.source)
@@ -356,7 +356,7 @@ export function buildUpscaleTaskRequest(input: {
   })
 }
 
-export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTaskData {
+export function buildFusionTaskRequest(input: FusionTaskRequestInput): CanvasTaskRequestData {
   const outputCount =
     input.outputCount === undefined ? undefined : assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
@@ -387,7 +387,7 @@ type ImageExecutionTaskRequestPlan =
 export function buildImageExecutionTaskRequest(
   plan: ImageExecutionTaskRequestPlan,
   imageSize: ExecutionImageSize | null = null,
-): SubmitTaskData {
+): CanvasTaskRequestData {
   switch (plan.kind) {
     case 'image-action':
       if (plan.action === IMAGE_UPSCALE_ACTION) {
@@ -457,7 +457,7 @@ export function buildPreparedImageInpaintTaskRequest(input: {
   maskImageUrl?: string | undefined
   maskAssetId?: string | undefined
   imageSize: ExecutionImageSize | null
-}): SubmitTaskData {
+}): CanvasTaskRequestData {
   return buildImageInpaintTaskRequest({
     prompt: input.plan.prompt,
     originalImageUrl: input.plan.source.url,

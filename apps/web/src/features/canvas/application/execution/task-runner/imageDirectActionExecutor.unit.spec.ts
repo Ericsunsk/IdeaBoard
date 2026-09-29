@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { TaskResultPendingError } from './taskResultErrors'
 import { submitTaskRequest, waitExistingOrLiveTaskImageResults } from './imageDirectActionExecutor'
 
@@ -20,9 +20,9 @@ describe('imageDirectActionExecutor', () => {
   })
 
   it('submits a prepared task request and returns the task id', async () => {
-    const request: SubmitTaskData = {
+    const request: CanvasTaskRequestData = {
       prompt: '',
-      feature: 'upscale',
+      service: 'upscale',
       media_asset_ids: ['asset_aaa1'],
     }
 
@@ -79,6 +79,25 @@ describe('imageDirectActionExecutor', () => {
       kind: 'pricing-unavailable',
       message: 'Pricing is temporarily unavailable. Please try again shortly.',
     })
+  })
+
+  it('maps a submit-time empty pool (422) to the resolution toast copy with no retry', async () => {
+    // The backend guarantees no task and no billing hold on this path; the
+    // client surfaces the clear copy and issues no second submit attempt.
+    mocks.submit.mockRejectedValueOnce(
+      Object.assign(new Error('no eligible model'), {
+        status: 422,
+        code: 'service_resolution_unavailable',
+      }),
+    )
+
+    await expect(
+      submitTaskRequest({ prompt: 'a cat', service: 'generation' }),
+    ).rejects.toMatchObject({
+      kind: 'resolution-unavailable',
+      message: 'This resolution is unavailable right now.',
+    })
+    expect(mocks.submit).toHaveBeenCalledTimes(1)
   })
 
   it('delegates result waiting to the workspace waiter', async () => {

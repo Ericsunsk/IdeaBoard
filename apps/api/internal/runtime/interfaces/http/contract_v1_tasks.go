@@ -8,12 +8,15 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/validation"
 	taskservice "ideaboard/api/internal/tasking/application/task"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
+	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,7 +29,9 @@ type (
 	WorkspaceTaskHolder      = workspacetasks.Holder
 	WorkspaceTaskEnqueuer    = workspacetasks.Enqueuer
 	WorkspaceTaskAssetReader = workspacetasks.AssetReader
-	WorkspaceTaskRoutingGate = workspacetasks.RoutingGate
+	// WorkspaceTaskSnapshotSaver pins the submit-time RoutingSnapshot
+	// (catalog.SaveRoutingSnapshot in production, capture fakes in tests).
+	WorkspaceTaskSnapshotSaver = workspacetasks.RoutingSnapshotSaver
 )
 
 // Workspace task lifecycle (issue #805). Additive only: legacy
@@ -102,11 +107,15 @@ func (h *contractV1Handler) taskWorkspaceContext(c *gin.Context, identityPrincip
 }
 
 func (h *contractV1Handler) taskService() *workspacetasks.Service {
-	return workspacetasks.NewService(workspacetasks.ServiceDeps{
+	deps := workspacetasks.ServiceDeps{
 		Tasks: h.deps.Tasks, Quoter: h.deps.TaskQuoter,
 		Holder: h.deps.TaskHolder, Queue: h.deps.TaskQueue, Assets: h.deps.TaskAssets,
-		Routing: h.deps.TaskRoutingGate,
-	})
+		Resolver: h.deps.TaskRouter, SnapshotSaver: h.deps.TaskSnapshotSaver,
+	}
+	if h.deps.AllowNonTransactionalTaskSettlement {
+		return workspacetasks.NewTestServiceForTests(deps)
+	}
+	return workspacetasks.NewService(deps)
 }
 
 func renderTaskError(c *gin.Context, err error) {
@@ -149,8 +158,18 @@ func renderTaskError(c *gin.Context, err error) {
 			contract.CodeTaskInsufficientCredits, msgValidationFailed2)
 	case errors.Is(err, workspacetasks.ErrQuoteUnavailable):
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeBillingQuoteUnavailable, msgBillingQuoteUnavailable)
-	case errors.Is(err, workspacetasks.ErrRoutingUnavailable):
-		contract.RenderError(c, http.StatusUnprocessableEntity, contract.CodeServiceResolutionUnavailable, "该清晰度暂不可用")
+	// An empty eligible pool converges to 422
+	// service_resolution_unavailable with the normalized request values at
+	// details.fields.service/details.fields.resolution (ADR-0012 rule 8).
+	case errors.Is(err, routing.ErrServiceResolutionUnavailable):
+		var unavailable *routing.ResolutionUnavailableError
+		fields := map[string]string{"service": "", "resolution": ""}
+		if errors.As(err, &unavailable) && unavailable != nil {
+			fields["service"] = unavailable.Service
+			fields["resolution"] = string(unavailable.Resolution)
+		}
+		contract.RenderErrorWithDetails(c, http.StatusUnprocessableEntity, contract.CodeServiceResolutionUnavailable, "该清晰度暂不可用",
+			contract.FieldErrors{Fields: fields})
 	case errors.Is(err, workspacetasks.ErrWalletRestricted):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeBillingWalletRestricted, msgBillingWalletRestricted2)
 	case errors.Is(err, workspacetasks.ErrMediaNotFound):
@@ -181,7 +200,7 @@ func taskLocation(workspaceID, taskID string) string {
 // validation_failed on details.fields.service.
 //
 // Prompt rides the explicit data.prompt field (bound:
-// workspacetasks.MaxWorkspaceTaskPromptBytes = 8KB, legacy parity), never
+// workspacetasks.MaxWorkspaceTaskPromptBytes = 8KB), never
 // params.prompt (still 422 unknown_field): it threads into the canonical
 // Generation snapshot (UserPrompt + CompiledPrompt) that the worker
 // bridges to the provider. The v1 mask rides params.mask_asset_id
@@ -306,18 +325,75 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		if body.Data.Quantity != nil {
 			quantity = *body.Data.Quantity
 		}
+		// Canonicalize the request once at ingress. `params.output_resolution`
+		// is the durable source of truth; the top-level field is accepted as
+		// an envelope convenience and is folded into the params map before
+		// compile, hashing, routing, billing, and persistence.
+		params := make(map[string]any, len(body.Data.Params)+1)
+		for field, value := range body.Data.Params {
+			params[field] = value
+		}
 		resolution := ""
 		if body.Data.Resolution != nil {
 			resolution = strings.TrimSpace(*body.Data.Resolution)
 		}
+		if raw, ok := params[paramkeys.OutputResolution]; ok && raw != nil {
+			planResolution, isString := raw.(string)
+			if isString && strings.TrimSpace(planResolution) != "" {
+				canonical, valid := workflow.NormalizeOutputResolution(planResolution)
+				if !valid {
+					// Preserve malformed values for the canonical compiler or
+					// reject them here when the envelope also supplied a value.
+					if resolution != "" {
+						renderTaskError(c, &workspacetasks.ValidationError{
+							Fields: map[string]string{"resolution": "invalid"},
+						})
+						return
+					}
+					resolution = strings.TrimSpace(planResolution)
+				} else {
+					params[paramkeys.OutputResolution] = canonical
+					if resolution == "" {
+						resolution = canonical
+					} else if resolutionCanonical, topValid := workflow.NormalizeOutputResolution(resolution); !topValid || resolutionCanonical != canonical {
+						renderTaskError(c, &workspacetasks.ValidationError{
+							Fields: map[string]string{"resolution": "mismatch"},
+						})
+						return
+					} else {
+						resolution = resolutionCanonical
+					}
+				}
+			} else if resolution != "" {
+				// Keep the canonical compiler as the authority for malformed
+				// params values; a top-level value must not silently override it.
+				renderTaskError(c, &workspacetasks.ValidationError{
+					Fields: map[string]string{"resolution": "mismatch"},
+				})
+				return
+			}
+		}
+		if resolution != "" {
+			canonical, valid := workflow.NormalizeOutputResolution(resolution)
+			if !valid {
+				renderTaskError(c, &workspacetasks.ValidationError{
+					Fields: map[string]string{"resolution": "invalid"},
+				})
+				return
+			}
+			resolution = canonical
+			if _, exists := params[paramkeys.OutputResolution]; !exists {
+				params[paramkeys.OutputResolution] = canonical
+			}
+		}
 		// Canonical request hash for idempotent replay (same key+hash ->
 		// same task_id; conflict hash -> 409).
-		paramsJSON, _ := json.Marshal(body.Data.Params)
+		paramsJSON, _ := json.Marshal(params)
 		canonicalParams := ""
 		if h.deps.TaskCanonicalCompiler != nil {
 			var compileErr error
-			canonicalInput := make(map[string]interface{}, len(body.Data.Params)+1)
-			for key, value := range body.Data.Params {
+			canonicalInput := make(map[string]interface{}, len(params)+1)
+			for key, value := range params {
 				canonicalInput[key] = value
 			}
 			if len(assetIDs) > 0 {
@@ -338,7 +414,7 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 			created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
 				WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
-				Service: kind, MediaAssetIDs: assetIDs, Params: body.Data.Params,
+				Service: kind, MediaAssetIDs: assetIDs, Params: params,
 				Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
 			}, key)
 			if err != nil {
@@ -563,7 +639,7 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 		if body.Data.Quantity != nil {
 			quantity = *body.Data.Quantity
 		}
-		resolution := "default"
+		resolution := ""
 		if body.Data.Resolution != nil && strings.TrimSpace(*body.Data.Resolution) != "" {
 			resolution = strings.TrimSpace(*body.Data.Resolution)
 		}
@@ -628,6 +704,12 @@ func (h *contractV1Handler) quoteWorkspaceTask(c *gin.Context) {
 //	  Breaking rename (#847): the old `workflow_kind` field is rejected by
 //	  strict decoding as 400 bad_request; a missing `service` renders 422
 //	  validation_failed on details.fields.service.
+//	  Resolution agreement (#851, ADR-0012 rule 11): params.output_resolution
+//	  is the client source of truth. An explicit top-level `resolution` must
+//	  agree with it exactly (case-insensitive) or submit fails 422
+//	  validation_failed on details.fields.resolution; an absent top level
+//	  carries the params value through, and an absent pair applies the
+//	  service policy default (1k scalable, default fixed-resolution).
 //	QuoteWorkspaceTaskRequest: {data: {service: string, quantity?: int64>=1, resolution?: string}}
 //
 // Prompt/mask spec notes for the merger (v1 task creation gap batch):

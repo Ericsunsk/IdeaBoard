@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SubmitTaskData } from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { IMAGE_NODE_ACTION } from '../../../../../shared/domain/imageActions'
 import {
   IMAGE_OUTPAINT_ACTION,
@@ -90,7 +90,7 @@ describe('imageTaskRequests', () => {
         outputResolution: '4k',
       }),
     ).toMatchObject({
-      params: { output_count: 1, output_resolution: 'default' },
+      params: { output_count: 1, output_resolution: '1k' },
     })
   })
 
@@ -100,7 +100,7 @@ describe('imageTaskRequests', () => {
       service: EXECUTION_SERVICE.inpaint,
       params: {
         output_count: 1,
-        output_resolution: 'default',
+        output_resolution: '1k',
         original_image_width: 1024,
         original_image_height: 1024,
         custom_width: 1024,
@@ -112,7 +112,7 @@ describe('imageTaskRequests', () => {
       service: EXECUTION_SERVICE.outpaint,
       params: {
         output_count: 1,
-        output_resolution: 'default',
+        output_resolution: '1k',
         original_image_width: 1024,
         original_image_height: 1024,
         outpaint: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
@@ -184,7 +184,7 @@ describe('imageTaskRequests', () => {
 
     expect(request.params).toMatchObject({
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       custom_width: 1024,
       custom_height: 1024,
       original_image_width: 1024,
@@ -285,7 +285,7 @@ describe('imageTaskRequests', () => {
         request.service === EXECUTION_SERVICE.cutout ? 1 : 4,
       )
       if (request.service === EXECUTION_SERVICE.cutout) {
-        expect(request.params?.output_resolution).toBe('default')
+        expect(request.params?.output_resolution).toBe('1k')
       }
     }
   })
@@ -341,7 +341,7 @@ describe('imageTaskRequests', () => {
     expect(request.service).toBe(EXECUTION_SERVICE.outpaint)
     expect(request.params).toMatchObject({
       output_count: 1,
-      output_resolution: 'default',
+      output_resolution: '1k',
       original_image_width: 1000,
       original_image_height: 750,
       outpaint: {
@@ -420,7 +420,7 @@ describe('imageTaskRequests', () => {
       },
     })
 
-    expect((request as SubmitTaskData).params).toBeDefined()
+    expect((request as CanvasTaskRequestData).params).toBeDefined()
   })
 
   it('adapts a prepared Fusion execution plan to the backend request contract', () => {
