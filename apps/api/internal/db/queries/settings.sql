@@ -25,9 +25,9 @@ SET value = EXCLUDED.value;
 DELETE FROM system_configs
 WHERE config_key = ANY(sqlc.arg(config_keys)::text[]);
 
--- name: LockAIGatewayModelMappingWrite :exec
+-- name: LockAIGatewayCatalogWrite :exec
 SELECT pg_advisory_xact_lock(
-  hashtextextended('ai_gateway_model_mapping_write', 0)
+  hashtextextended('ai_gateway_catalog_write', 0)
 );
 
 -- name: UpsertStorageProfile :execrows

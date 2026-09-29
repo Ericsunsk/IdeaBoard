@@ -63,13 +63,6 @@ func TestReplacePoolCreateStartsAtVersionOne(t *testing.T) {
 		t.Fatalf("b/second resolutions = %+v, want [2k 4k] normalized", pool.Entries[1].SupportedResolutions)
 	}
 
-	eligible, eligibleVersion, err := r.EligibleModels(ctx, "generation", "2k")
-	if err != nil {
-		t.Fatalf("EligibleModels failed: %v", err)
-	}
-	if eligibleVersion != 1 || len(eligible) != 1 || eligible[0] != "b/second" {
-		t.Fatalf("eligible = %v@%d, want [b/second]@1", eligible, eligibleVersion)
-	}
 }
 
 func TestReplacePoolNoOpSaveDoesNotBump(t *testing.T) {
@@ -121,7 +114,6 @@ func TestReplacePoolVersionConflictWritesNothing(t *testing.T) {
 
 func TestReplacePoolEffectiveChangeBumps(t *testing.T) {
 	r := newCatalogTestRepo(t)
-	ctx := context.Background()
 	mustReplace(t, r, "variations", 0, []PoolEntryInput{
 		{ModelID: "a/first", Enabled: true, Resolutions: []string{"1k"}},
 		{ModelID: "b/second", Enabled: true, Resolutions: []string{"1k"}},
@@ -135,19 +127,10 @@ func TestReplacePoolEffectiveChangeBumps(t *testing.T) {
 	if result.Version != 2 || !result.Changed {
 		t.Fatalf("result = %+v, want {Version:2 Changed:true}", result)
 	}
-
-	eligible, version, err := r.EligibleModels(ctx, "variations", "1k")
-	if err != nil {
-		t.Fatalf("EligibleModels failed: %v", err)
-	}
-	if version != 2 || len(eligible) != 1 || eligible[0] != "a/first" {
-		t.Fatalf("eligible = %v@%d, want [a/first]@2 (disabled invisible)", eligible, version)
-	}
 }
 
 func TestReplacePoolClearAndEmptyRead(t *testing.T) {
 	r := newCatalogTestRepo(t)
-	ctx := context.Background()
 
 	// Clearing a never-written pool is a no-op at version 0.
 	cleared := mustReplace(t, r, "cutout", 0, nil)
@@ -162,13 +145,6 @@ func TestReplacePoolClearAndEmptyRead(t *testing.T) {
 	cleared = mustReplace(t, r, "cutout", 1, nil)
 	if cleared.Version != 2 || !cleared.Changed {
 		t.Fatalf("clear = %+v, want {Version:2 Changed:true}", cleared)
-	}
-	eligible, version, err := r.EligibleModels(ctx, "cutout", "1k")
-	if err != nil {
-		t.Fatalf("EligibleModels failed: %v", err)
-	}
-	if len(eligible) != 0 || version != 2 {
-		t.Fatalf("eligible = %v@%d, want []@2", eligible, version)
 	}
 }
 
@@ -210,37 +186,11 @@ func TestReplacePoolValidation(t *testing.T) {
 
 func TestReplacePoolDisabledEntryMayOmitResolutions(t *testing.T) {
 	r := newCatalogTestRepo(t)
-	ctx := context.Background()
 	result := mustReplace(t, r, "upscale", 0, []PoolEntryInput{
 		{ModelID: "a/first", Enabled: false},
 	})
 	if result.Version != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want {Version:1 Changed:true}", result)
-	}
-	eligible, _, err := r.EligibleModels(ctx, "upscale", "1k")
-	if err != nil {
-		t.Fatalf("EligibleModels failed: %v", err)
-	}
-	if len(eligible) != 0 {
-		t.Fatalf("eligible = %v, want [] (disabled invisible)", eligible)
-	}
-}
-
-func TestEligibleModelsDefaultResolution(t *testing.T) {
-	r := newCatalogTestRepo(t)
-	ctx := context.Background()
-	mustReplace(t, r, "outpaint", 0, []PoolEntryInput{
-		{ModelID: "a/first", Enabled: true, Resolutions: []string{"2k"}},
-		{ModelID: "b/second", Enabled: false, Resolutions: []string{"4k"}},
-	})
-	// `default` matches every enabled entry advertising >= 1
-	// resolution; disabled entries stay invisible.
-	eligible, version, err := r.EligibleModels(ctx, "outpaint", "default")
-	if err != nil {
-		t.Fatalf("EligibleModels failed: %v", err)
-	}
-	if version != 1 || len(eligible) != 1 || eligible[0] != "a/first" {
-		t.Fatalf("eligible = %v@%d, want [a/first]@1", eligible, version)
 	}
 }
 

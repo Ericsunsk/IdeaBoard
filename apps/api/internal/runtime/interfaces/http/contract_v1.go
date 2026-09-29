@@ -62,7 +62,8 @@ type ContractV1Deps struct {
 	// instance, never an independent lookup). Nil fails closed with the
 	// canonical service_resolution_unavailable sentinel.
 	TaskRouter *routing.RoutingResolver
-	// TaskSnapshotSaver pins the Resolve snapshot (nil skips pinning).
+	// TaskSnapshotSaver pins the Resolve snapshot. Production wiring must
+	// provide it; atomic settlement fails closed when it is absent.
 	TaskSnapshotSaver WorkspaceTaskSnapshotSaver
 	// Media is the workspace-scoped upload-session + media-asset
 	// surface (issue #803, restored in #820). Production wires the

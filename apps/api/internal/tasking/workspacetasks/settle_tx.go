@@ -191,6 +191,9 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	if !ok {
 		return nil, false, nil
 	}
+	if s.saveSnapshot == nil {
+		return nil, true, errors.New("workspacetasks: routing snapshot saver is required for atomic settlement")
+	}
 	tx, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, true, err
@@ -244,10 +247,8 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	// Hold/task/enqueue. Later Admin pool edits never invalidate this
 	// accepted task (the worker replays selection from the pinned fact,
 	// never the live pool).
-	if s.saveSnapshot != nil {
-		if err := s.saveSnapshot(ctx, tx, created.ID, routingSnap); err != nil {
-			return nil, true, fmt.Errorf("workspacetasks: pin routing snapshot: %w", err)
-		}
+	if err := s.saveSnapshot(ctx, tx, created.ID, routingSnap); err != nil {
+		return nil, true, fmt.Errorf("workspacetasks: pin routing snapshot: %w", err)
 	}
 	if facts := s.billingFacts(); facts != nil {
 		if err := facts.CreateBillingFactsInTx(ctx, tx, created); err != nil {

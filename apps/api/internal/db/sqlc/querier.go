@@ -379,7 +379,7 @@ type Querier interface {
 	ListWorkspaceTasks(ctx context.Context, arg ListWorkspaceTasksParams) ([]Task, error)
 	ListWorkspacesByOrganizationID(ctx context.Context, arg ListWorkspacesByOrganizationIDParams) ([]Workspace, error)
 	ListWorkspacesByUserID(ctx context.Context, arg ListWorkspacesByUserIDParams) ([]Workspace, error)
-	LockAIGatewayModelMappingWrite(ctx context.Context) error
+	LockAIGatewayCatalogWrite(ctx context.Context) error
 	// Materialization durable jobs (#828 slice A, Phase 4 of #809).
 	//
 	// Status words: the public API exposes pending/running/completed/failed

@@ -413,14 +413,14 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 	return items, nil
 }
 
-const lockAIGatewayModelMappingWrite = `-- name: LockAIGatewayModelMappingWrite :exec
+const lockAIGatewayCatalogWrite = `-- name: LockAIGatewayCatalogWrite :exec
 SELECT pg_advisory_xact_lock(
-  hashtextextended('ai_gateway_model_mapping_write', 0)
+  hashtextextended('ai_gateway_catalog_write', 0)
 )
 `
 
-func (q *Queries) LockAIGatewayModelMappingWrite(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, lockAIGatewayModelMappingWrite)
+func (q *Queries) LockAIGatewayCatalogWrite(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockAIGatewayCatalogWrite)
 	return err
 }
 

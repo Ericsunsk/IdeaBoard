@@ -406,33 +406,3 @@ func (r *Repository) ListPoolInTx(ctx context.Context, tx pgx.Tx, service string
 	}
 	return poolFromEntries(normalizedService, version, stored), nil
 }
-
-// EligibleModels returns the sorted eligible model references for a
-// Service + resolution with the pool version that produced them.
-// Eligibility matches the resolver exactly (enabled entries whose
-// capability set serves the requested 1k/2k/4k resolution) because both
-// filter through routing.ModelPoolEntry.Supports. An empty result with nil
-// error means unavailable (the resolver's 422 sentinel owns that
-// mapping in wave 2); the version is still returned for diagnosis.
-func (r *Repository) EligibleModels(ctx context.Context, service, resolution string) ([]string, uint64, error) {
-	normalizedService, err := normalizeService(service)
-	if err != nil {
-		return nil, 0, err
-	}
-	requested, err := routing.NormalizeResolution(resolution)
-	if err != nil {
-		return nil, 0, fmt.Errorf("%w: %v", ErrInvalidPoolInput, err)
-	}
-	pool, err := r.ListPool(ctx, normalizedService)
-	if err != nil {
-		return nil, 0, err
-	}
-	eligible := make([]string, 0, len(pool.Entries))
-	for _, entry := range pool.Entries {
-		if entry.Supports(requested) {
-			eligible = append(eligible, entry.Model)
-		}
-	}
-	sort.Strings(eligible)
-	return eligible, pool.Version, nil
-}

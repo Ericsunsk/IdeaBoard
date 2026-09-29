@@ -166,32 +166,9 @@ func (r *SystemConfigRepository) SetManyWithAdminAudit(ctx context.Context, valu
 	})
 }
 
-// SetAndDeleteManyWithAdminAudit upserts values and deletes keys in one
-// transaction with a single audit record. Used when one admin write must
-// retire dependent rows (e.g. catalog save cascading to stale mappings).
-// It always holds the model-mapping write lock so concurrent mapping and
-// catalog writes cannot interleave with the cascade's read and write.
-func (r *SystemConfigRepository) SetAndDeleteManyWithAdminAudit(ctx context.Context, values []SystemConfigValue, deleteKeys []string, audit SystemConfigAdminAudit) error {
-	if r == nil || r.db == nil || r.q == nil {
-		return ErrRuntimeSettingsRepositoryUnavailable
-	}
-	if len(values) == 0 && len(deleteKeys) == 0 {
-		return nil
-	}
-	return r.WithAIGatewayModelMappingWrite(ctx, func(tx SystemConfigWriteTx) (SystemConfigAdminAudit, error) {
-		if err := tx.SetMany(ctx, values); err != nil {
-			return audit, err
-		}
-		if err := tx.DeleteMany(ctx, deleteKeys); err != nil {
-			return audit, err
-		}
-		return audit, nil
-	})
-}
-
-// WithAIGatewayModelMappingWrite serializes one settings read-modify-write
+// WithAIGatewayCatalogWrite serializes one settings read-modify-write
 // with every AI Gateway mapping writer and commits its audit record atomically.
-func (r *SystemConfigRepository) WithAIGatewayModelMappingWrite(
+func (r *SystemConfigRepository) WithAIGatewayCatalogWrite(
 	ctx context.Context,
 	mutate func(SystemConfigWriteTx) (SystemConfigAdminAudit, error),
 ) error {
@@ -202,7 +179,7 @@ func (r *SystemConfigRepository) WithAIGatewayModelMappingWrite(
 		return errors.New("system config mutation is nil")
 	}
 	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx pgx.Tx) error {
-		if err := q.LockAIGatewayModelMappingWrite(ctx); err != nil {
+		if err := q.LockAIGatewayCatalogWrite(ctx); err != nil {
 			return err
 		}
 		audit, err := mutate(systemConfigWriteTx{q: q})
