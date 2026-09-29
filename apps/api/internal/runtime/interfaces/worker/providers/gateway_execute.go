@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	"ideaboard/api/internal/runtime/infrastructure/telemetry"
+	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/dialects"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/domain"
 	runtimeports "ideaboard/api/internal/runtime/ports"

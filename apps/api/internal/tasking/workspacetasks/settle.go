@@ -9,7 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"ideaboard/api/internal/generation/routing"
-	"ideaboard/api/internal/runtime/infrastructure/telemetry"
+	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/workflow"
 )
 

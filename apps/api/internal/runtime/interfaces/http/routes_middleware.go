@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/runtime/infrastructure/telemetry"
+	"ideaboard/api/internal/platform/telemetry"
 
 	"github.com/gin-gonic/gin"
 )

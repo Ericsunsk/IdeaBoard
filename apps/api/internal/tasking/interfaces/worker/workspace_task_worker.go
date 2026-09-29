@@ -61,7 +61,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/generation/routing"
-	"ideaboard/api/internal/runtime/infrastructure/telemetry"
+	"ideaboard/api/internal/platform/telemetry"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
 	tasks "ideaboard/api/internal/tasking/domain"
 	taskqueue "ideaboard/api/internal/tasking/infrastructure/queue"

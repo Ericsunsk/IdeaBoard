@@ -38,7 +38,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/credits/domain"
 	"ideaboard/api/internal/credits/ports"
-	"ideaboard/api/internal/runtime/infrastructure/telemetry"
+	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/workflow"
 

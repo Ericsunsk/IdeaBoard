@@ -24,9 +24,9 @@ function observed(overrides: Partial<ModelObservedSnapshot> = {}): ModelObserved
       {
         sku: 'ai-image:gpt-image-1',
         displayName: 'GPT Image 1',
-        feature: 'generation',
+        service: 'generation',
         onSale: true,
-        unitCreditsByVariant: { default: 100 },
+        unitCreditsByVariant: { '1k': 100 },
         actualCostCredits: null,
         hasActualCost: false,
         costSource: 'unavailable',
@@ -78,7 +78,7 @@ describe('ObservedStatsPanel', () => {
             {
               sku: 'ai-image:off',
               displayName: 'Off Sale',
-              feature: 'generation',
+              service: 'generation',
               onSale: false,
               unitCreditsByVariant: {},
               actualCostCredits: null,
