@@ -22,22 +22,22 @@
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
+import type { FormFieldContractProps, FormFieldContractSlotProps } from '@/shared/components/formFieldContract'
 
-export interface AdminFormFieldSlotProps {
-  describedbyId?: string | undefined
-  invalid: boolean
-}
+/** Admin adapter for the neutral field contract. Admin owns markup and tokens. */
+export type AdminFormFieldSlotProps = Pick<
+  FormFieldContractSlotProps,
+  'describedbyId' | 'invalid'
+>
 
 const props = withDefaults(
-  defineProps<{
-    label: string
+  defineProps<
+    Omit<FormFieldContractProps, 'fieldId'> & {
     for?: string | undefined
-    error?: string | undefined
-    hint?: string | undefined
-    required?: boolean | undefined
     labelClass?: string | undefined
     bodyClass?: string | undefined
-  }>(),
+    }
+  >(),
   {
     for: undefined,
     error: '',

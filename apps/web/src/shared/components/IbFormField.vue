@@ -33,29 +33,24 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 import { displayErrorMessage, isRequiredErrorMessage } from '../utils/formValidation'
+import type { FormFieldContractProps, FormFieldContractSlotProps } from './formFieldContract'
 
-export type IbFormFieldSlotProps = {
+export type IbFormFieldSlotProps = FormFieldContractSlotProps & {
   ariaInvalid: true | undefined
-  describedbyId?: string | undefined
-  errorId?: string | undefined
-  fieldId: string
   inlineError: boolean
   inlineErrorText: string
-  invalid: boolean
-  required: boolean
 }
 
 const props = withDefaults(
-  defineProps<{
-    label: string
-    error?: string
-    fieldId?: string | undefined
+  defineProps<
+    FormFieldContractProps & {
     required?: boolean
     inlineRequired?: boolean
     showMessage?: boolean
     fieldClass?: string
     labelClass?: string
-  }>(),
+    }
+  >(),
   {
     error: '',
     fieldId: undefined,
