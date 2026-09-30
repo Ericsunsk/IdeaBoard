@@ -3,7 +3,7 @@
  *
  * `board` is the only Board repository/synchronization fact source.
  * Cross-feature consumers import Board facts through this barrel;
- * Canvas `board-session` orchestrates on top of it.
+ * Canvas `board-session` orchestrates through the narrow `ports/canvas` entry.
  *
  * Export groups are intentionally classified by responsibility:
  * - domain: durable Board document facts and pure validation rules

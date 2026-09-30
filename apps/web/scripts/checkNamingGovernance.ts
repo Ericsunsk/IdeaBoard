@@ -153,7 +153,6 @@ const keptComposableFamilies: Record<string, string> = {
 const keptMultiFamilyTypes: Record<string, string> = {
   'features/admin/payments/stripe-settings/types.ts':
     'admin: stripe configuration/summary/input families',
-  'features/admin/provider-config/types.ts': 'admin: provider value/limit/input families',
 }
 
 /** Permanent documented keeps: index.ts files that are module boundaries, not barrels. */
