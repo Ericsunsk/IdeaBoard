@@ -30,26 +30,45 @@ body.canvas-overscroll-guard {
   --canvas-font-size-micro: 10px;
 
   /* ── Canvas Elevation & Glass Tokens ── */
-  --canvas-shadow-floating:
-    0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+  --canvas-shadow-floating: var(--shadow-ib-overlay);
   --canvas-glass-bg: color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent);
   --canvas-glass-blur: var(--ib-glass-blur);
   --canvas-glass-border: var(--canvas-accent-border-soft);
 
   --canvas-surface-page-bg: var(--color-canvas-workspace-bg);
   --canvas-surface-bg: var(--color-canvas-surface-bg);
-  --canvas-surface-muted: #f4f7fb;
-  --canvas-surface-border: #d8ddea;
-  --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
-  --canvas-minimap-node: #b8bec9;
-  --canvas-minimap-viewport: #c9ced8;
-  --canvas-minimap-mask: rgb(201 206 216 / 0.26);
+  --canvas-surface-muted: color-mix(
+    in srgb,
+    var(--color-canvas-surface-bg) 92%,
+    var(--color-canvas-neutral-line) 8%
+  );
+  --canvas-surface-border: var(--color-canvas-node-border);
+  --canvas-surface-border-soft: color-mix(
+    in srgb,
+    var(--color-canvas-neutral-line) 32%,
+    transparent
+  );
+  --canvas-minimap-node: color-mix(
+    in srgb,
+    var(--color-canvas-text-muted) 55%,
+    var(--color-canvas-surface-bg)
+  );
+  --canvas-minimap-viewport: color-mix(
+    in srgb,
+    var(--color-canvas-text-muted) 40%,
+    var(--color-canvas-surface-bg)
+  );
+  --canvas-minimap-mask: color-mix(in srgb, var(--canvas-minimap-viewport) 26%, transparent);
   --canvas-panel-content-gap: 10px;
-  --canvas-panel-border: rgba(34, 42, 54, 0.14);
-  --canvas-text-strong: #111827;
-  --canvas-text-body: #334155;
+  --canvas-panel-border: color-mix(
+    in srgb,
+    var(--color-canvas-neutral-line) 55%,
+    transparent
+  );
+  --canvas-text-strong: var(--color-canvas-text-primary);
+  --canvas-text-body: var(--color-canvas-text-secondary);
   --canvas-text-muted: var(--color-canvas-text-secondary);
-  --canvas-text-subtle: #94a3b8;
+  --canvas-text-subtle: var(--color-canvas-text-muted);
   --canvas-node-text-primary: var(--color-canvas-text-primary);
   --canvas-node-text-muted: var(--color-canvas-text-muted);
   --canvas-text-control: var(--color-canvas-text-control);
@@ -60,7 +79,7 @@ body.canvas-overscroll-guard {
   --canvas-node-border: var(--color-canvas-node-border);
   --canvas-accent: var(--color-canvas-accent);
   --canvas-accent-hover: var(--color-canvas-accent-hover);
-  --canvas-accent-strong: #6757c8;
+  --canvas-accent-strong: var(--color-canvas-accent-hover);
   --canvas-node-accent-soft: var(--color-canvas-accent-soft);
   --canvas-accent-border: var(--color-canvas-accent-border);
   --canvas-accent-border-soft: var(--color-canvas-accent-border-soft);
@@ -69,8 +88,8 @@ body.canvas-overscroll-guard {
   --canvas-accent-glow: var(--color-canvas-accent-glow);
   --canvas-accent-soft: color-mix(in srgb, var(--color-canvas-accent) 12%, transparent);
   --canvas-accent-soft-strong: color-mix(in srgb, var(--color-canvas-accent) 16%, transparent);
-  --canvas-accent-wash: #f8f7ff;
-  --canvas-accent-outline: rgba(122, 107, 213, 0.22);
+  --canvas-accent-wash: var(--color-canvas-accent-soft);
+  --canvas-accent-outline: var(--color-canvas-accent-border-soft);
   --canvas-running-from: var(--color-canvas-running-from);
   --canvas-running-to: var(--color-canvas-running-to);
   --flow-edge-color: var(--color-canvas-edge);
