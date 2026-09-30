@@ -28,9 +28,11 @@
         }}</Button>
         <label :class="catalogClasses.searchWrap">
           <Search :class="catalogClasses.searchIcon" />
+          <span class="sr-only">{{ t('workspace.boards.searchLabel') }}</span>
           <input
             :value="searchKeyword"
             type="text"
+            :aria-label="t('workspace.boards.searchLabel')"
             :placeholder="t('workspace.boards.searchPlaceholder')"
             :class="catalogClasses.searchInput"
             @input="onSearchInput(($event.target as HTMLInputElement).value)"
@@ -66,9 +68,15 @@
         </DropdownMenu>
       </section>
 
-      <div v-if="catalogRecoveryBoardId" :class="catalogClasses.recoveryState" role="alert">
+      <div
+        v-if="catalogRecoveryBoardId || catalogHydrationFailed"
+        :class="catalogClasses.recoveryState"
+        role="alert"
+      >
         <span :class="catalogClasses.recoveryText">{{
-          t('workspace.catalog.reloadRequired')
+          catalogHydrationFailed
+            ? t('workspace.catalog.loadFailed')
+            : t('workspace.catalog.reloadRequired')
         }}</span>
         <Button
           type="button"
@@ -78,7 +86,9 @@
           >{{
             isCatalogReloadPending
               ? t('workspace.catalog.reloading')
-              : t('workspace.catalog.reload')
+              : catalogHydrationFailed
+                ? t('common.actions.retry')
+                : t('workspace.catalog.reload')
           }}</Button
         >
       </div>
@@ -245,6 +255,7 @@ const {
   visibleBoards,
   previewMap: boardPreviewMap,
   isBoardsLoading,
+  catalogHydrationFailed,
   searchKeyword,
   sortMode,
   activeMenuBoardId,

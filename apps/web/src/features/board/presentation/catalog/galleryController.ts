@@ -16,6 +16,7 @@ type GalleryControllerDependencies = {
 export function createGalleryController(dependencies: GalleryControllerDependencies): Catalog {
   const activeMenuBoardId = ref<string | null>(null)
   const isBoardsLoading = ref(true)
+  const catalogHydrationFailed = ref(false)
   const searchKeyword = ref('')
   const sortMode = ref<CatalogSortMode>('recent')
   const renamingBoardId = ref<string | null>(null)
@@ -76,15 +77,20 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
     resetDeleteState,
   })
 
-  function initialize(): Promise<void> {
+  function initialize(options: { force?: boolean } = {}): Promise<void> {
+    if (options.force) initializePromise = null
     if (initializePromise) return initializePromise
     initializePromise = (async () => {
       try {
         const result = await dependencies.catalog.commands.hydrate()
         if (!result.ok) {
+          catalogHydrationFailed.value = true
           dependencies.feedback.catalogSyncFailed()
+          return
         }
+        catalogHydrationFailed.value = false
       } catch (error) {
+        catalogHydrationFailed.value = true
         dependencies.warn('[boards] failed to hydrate catalog', error)
         dependencies.feedback.catalogSyncFailed()
       } finally {
@@ -92,6 +98,21 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       }
     })()
     return initializePromise
+  }
+
+  async function reloadCatalog() {
+    if (catalogHydrationFailed.value && !catalogRecoveryBoardId.value) {
+      if (isCatalogReloadPending.value) return
+      isCatalogReloadPending.value = true
+      try {
+        await initialize({ force: true })
+        if (!catalogHydrationFailed.value) dependencies.feedback.catalogReloaded()
+      } finally {
+        isCatalogReloadPending.value = false
+      }
+      return
+    }
+    await commandHandlers.reloadCatalog()
   }
 
   function setSearchKeyword(value: string | undefined) {
@@ -170,6 +191,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       visibleBoards,
       previewMap: readonly(dependencies.preview.previewMap),
       isBoardsLoading: readonly(isBoardsLoading),
+      catalogHydrationFailed: readonly(catalogHydrationFailed),
       searchKeyword: readonly(searchKeyword),
       sortMode: readonly(sortMode),
       activeMenuBoardId: readonly(activeMenuBoardId),
@@ -193,7 +215,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       updateRenameDraft,
       commitRename: commandHandlers.commitRename,
       cancelRename,
-      reloadCatalog: commandHandlers.reloadCatalog,
+      reloadCatalog,
       openBoardFromCard,
       requestDelete,
       closeDeleteDialog,

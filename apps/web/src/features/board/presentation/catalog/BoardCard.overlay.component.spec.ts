@@ -21,6 +21,18 @@ function renderCard() {
 }
 
 describe('BoardCard overlay lifecycle', () => {
+  it('opens the board from the card with Enter and Space', async () => {
+    const view = renderCard()
+    const card = view.container.querySelector('article')
+    expect(card).not.toBeNull()
+
+    card?.focus()
+    await view.user.keyboard('{Enter}')
+    await view.user.keyboard(' ')
+
+    expect(view.emitted()['click-board']).toHaveLength(2)
+  })
+
   it('cleans up on Escape, restores focus, and can reopen without stale state', async () => {
     const view = renderCard()
     const trigger = screen.getByRole('button', { name: 'More actions' })

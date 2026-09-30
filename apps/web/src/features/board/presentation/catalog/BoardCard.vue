@@ -1,7 +1,12 @@
 <template>
   <article
-    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover"
+    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover focus-visible:outline-none focus-visible:shadow-board-focus"
+    role="button"
+    tabindex="0"
+    :aria-label="board.name"
     @click="emit('click-board')"
+    @keydown.enter.prevent="onCardKeyboardActivate"
+    @keydown.space.prevent="onCardKeyboardActivate"
   >
     <div
       class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
@@ -152,6 +157,11 @@ watch(
 
 function onRenameInput(event: Event) {
   emit('rename-input', (event.target as HTMLInputElement).value)
+}
+
+function onCardKeyboardActivate(event: KeyboardEvent) {
+  if (event.target !== event.currentTarget) return
+  emit('click-board')
 }
 
 const isMenuOverlayOpen = ref(false)

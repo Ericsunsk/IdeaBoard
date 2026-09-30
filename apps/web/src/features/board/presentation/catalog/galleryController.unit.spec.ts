@@ -226,7 +226,13 @@ describe('createGalleryController', () => {
     })
     await harness.controller.commands.initialize()
     expect(harness.controller.viewModel.isBoardsLoading.value).toBe(false)
+    expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(true)
     expect(harness.feedback.catalogSyncFailed).toHaveBeenCalledOnce()
+
+    vi.mocked(harness.catalog.commands.hydrate).mockResolvedValueOnce({ ok: true })
+    await harness.controller.commands.reloadCatalog()
+    expect(harness.controller.viewModel.catalogHydrationFailed.value).toBe(false)
+    expect(harness.feedback.catalogReloaded).toHaveBeenCalledOnce()
 
     harness.controller.dispose()
     expect(harness.preview.dispose).toHaveBeenCalledOnce()

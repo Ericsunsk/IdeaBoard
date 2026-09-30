@@ -1,6 +1,7 @@
 /** 工作区（画布列表）与共享画布同步文案。 */
 export default {
   catalog: {
+    loadFailed: '无法加载画布列表，请重试。',
     reloadRequired: '画布列表需要重新加载',
     reloading: '正在重新加载…',
     reload: '重新加载',
@@ -46,6 +47,7 @@ export default {
     subtitle: '探索、扩展并打磨你的创意',
     newCanvas: '新建画布',
     searchPlaceholder: '搜索画布…',
+    searchLabel: '搜索画布',
     sortLabel: '排序画布',
     sortRecent: '最近',
     sortName: '名称',

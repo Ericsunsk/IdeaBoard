@@ -1,6 +1,7 @@
 /** Workspace (board catalog) y sincronización de tablero compartido. */
 export default {
   catalog: {
+    loadFailed: 'No se pudo cargar la lista de lienzos. Inténtelo de nuevo.',
     reloadRequired: 'La lista de lienzos necesita recargarse',
     reloading: 'Recargando…',
     reload: 'Recargar',
@@ -49,6 +50,7 @@ export default {
     subtitle: 'Explora, amplía y perfecciona tus ideas',
     newCanvas: 'Nuevo lienzo',
     searchPlaceholder: 'Buscar lienzos...',
+    searchLabel: 'Buscar lienzos',
     sortLabel: 'Ordenar lienzos',
     sortRecent: 'Reciente',
     sortName: 'Nombre',

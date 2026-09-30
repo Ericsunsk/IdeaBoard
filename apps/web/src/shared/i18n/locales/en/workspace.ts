@@ -1,6 +1,7 @@
 /** Workspace (board catalog) and shared board sync copy. */
 export default {
   catalog: {
+    loadFailed: 'Could not load the canvas list. Please try again.',
     reloadRequired: 'The canvas list needs to be reloaded',
     reloading: 'Reloading…',
     reload: 'Reload',
@@ -48,6 +49,7 @@ export default {
     subtitle: 'Explore, expand, and refine your ideas',
     newCanvas: 'New Canvas',
     searchPlaceholder: 'Search canvases...',
+    searchLabel: 'Search canvases',
     sortLabel: 'Sort canvases',
     sortRecent: 'Recent',
     sortName: 'Name',

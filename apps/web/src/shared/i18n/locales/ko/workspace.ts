@@ -1,6 +1,7 @@
 /** 워크스페이스(캔버스 목록) 및 공유 캔버스 동기화 문구. */
 export default {
   catalog: {
+    loadFailed: '캔버스 목록을 불러오지 못했습니다. 다시 시도해 주세요.',
     reloadRequired: '캔버스 목록을 새로고침해야 합니다',
     reloading: '새로고침 중…',
     reload: '새로고침',
@@ -48,6 +49,7 @@ export default {
     subtitle: '아이디어를 탐색하고 확장하며 다듬어 보세요',
     newCanvas: '새 캔버스',
     searchPlaceholder: '캔버스 검색...',
+    searchLabel: '캔버스 검색',
     sortLabel: '캔버스 정렬',
     sortRecent: '최근',
     sortName: '이름',

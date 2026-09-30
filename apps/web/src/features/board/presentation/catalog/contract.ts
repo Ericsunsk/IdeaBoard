@@ -18,6 +18,7 @@ export type Catalog = {
     visibleBoards: ComputedRef<readonly CatalogEntry[]>
     previewMap: Readonly<Ref<Record<string, string>>>
     isBoardsLoading: Readonly<Ref<boolean>>
+    catalogHydrationFailed: Readonly<Ref<boolean>>
     searchKeyword: Readonly<Ref<string>>
     sortMode: Readonly<Ref<CatalogSortMode>>
     activeMenuBoardId: Readonly<Ref<string | null>>
