@@ -376,7 +376,9 @@ function openFolderMenu(event: MouseEvent, folder: LibraryFolderTab) {
 }
 
 function openRenameFolder(folder: LibraryFolderTab) {
-  closeFolderMenu(true)
+  // Let the follow-up Dialog own focus; restoring the folder trigger here
+  // would race its autofocus and move focus back behind the modal.
+  closeFolderMenu(false)
   renameFolderKey.value = folder.folderKey
   renameInitialName.value = folder.name
   renameDialogVisible.value = true
@@ -402,7 +404,8 @@ async function handleRenameFolder(name: string) {
 }
 
 async function deleteFolder(folder: LibraryFolderTab) {
-  closeFolderMenu(true)
+  // The confirmation Dialog takes over focus after the context menu closes.
+  closeFolderMenu(false)
   if (!folder.isMutable) return
   try {
     const confirmed = await confirmDialog.confirmAsync(deleteFolderConfirmation(folder.name))
