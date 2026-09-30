@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '../../../../test/render'
+import { render, screen, waitFor } from '../../../../test/render'
+import { fireEvent } from '@testing-library/vue'
 import CanvasNodeContextMenu from './CanvasNodeContextMenu.vue'
 import NodeToolPopover from '../nodes/primitives/NodeToolPopover.vue'
 
@@ -52,7 +53,7 @@ describe('Canvas transient overlay motion', () => {
     )
 
     screen
-      .getByRole('button', { name: '提示词' })
+      .getByRole('menuitem', { name: '提示词' })
       .dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }))
     expect(onCreate).toHaveBeenCalledWith('prompt')
   })
@@ -77,6 +78,40 @@ describe('Canvas transient overlay motion', () => {
       const menu = document.querySelector('.canvas-node-context-menu')
       expect(menu).toHaveStyle({ left: '856px', top: '714px' })
     })
+  })
+
+  it('exposes menu semantics, focuses the first action, and supports keyboard navigation', async () => {
+    const trigger = document.createElement('button')
+    document.body.appendChild(trigger)
+    trigger.focus()
+    const onCreate = vi.fn()
+    const { rerender } = render(CanvasNodeContextMenu, {
+      props: {
+        visible: true,
+        x: 24,
+        y: 36,
+        items: [
+          { key: 'prompt', label: '提示词' },
+          { key: 'image', label: '图像' },
+        ],
+        onCreate,
+      },
+      global: { stubs: { transition: TransitionStub } },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('menu')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: '提示词' })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: '提示词' }), { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitem', { name: '图像' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: '图像' }), { key: 'Enter' })
+    expect(onCreate).toHaveBeenCalledWith('image')
+
+    await rerender({ visible: false })
+    expect(trigger).toHaveFocus()
+    trigger.remove()
   })
 
   it('keeps Node tool Popover layout, attrs, and show/hide behavior', async () => {

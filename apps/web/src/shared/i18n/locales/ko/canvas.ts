@@ -138,6 +138,7 @@ export default {
     zoomOut: '축소',
   },
   contextMenu: {
+    label: '캔버스 노드 작업',
     addNode: '+ {title} 노드',
   },
   execution: {

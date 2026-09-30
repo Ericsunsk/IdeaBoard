@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '../../../../test/render'
+import { render, screen, waitFor } from '../../../../test/render'
 import userEvent from '@testing-library/user-event'
 import SearchLightboxModal from './SearchLightboxModal.vue'
 import SearchEmptyState from './SearchEmptyState.vue'
@@ -33,6 +33,34 @@ describe('Search presentation subcomponents', () => {
       expect(screen.getByText('Mountain Sunset')).toBeInTheDocument()
       expect(screen.getByText(/John Doe/)).toBeInTheDocument()
       expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/orig.jpg')
+    })
+
+    it('traps focus, closes on Escape, and restores the opening trigger focus', async () => {
+      const user = userEvent.setup()
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      const { emitted, rerender } = render(SearchLightboxModal, {
+        props: {
+          visible: true,
+          activeResult: mockItem,
+        },
+      })
+
+      await screen.findByRole('dialog')
+      const closeButton = screen.getByRole('button', { name: /关闭|close/i })
+      expect(closeButton).toHaveFocus()
+
+      await user.keyboard('{Tab}')
+      expect(screen.getByRole('link', { name: /来源|source/i })).toHaveFocus()
+      await user.keyboard('{Tab}')
+      expect(closeButton).toHaveFocus()
+      await user.keyboard('{Escape}')
+      expect(emitted().close).toHaveLength(1)
+
+      await rerender({ visible: false, activeResult: null })
+      await waitFor(() => expect(trigger).toHaveFocus())
+      trigger.remove()
     })
   })
 

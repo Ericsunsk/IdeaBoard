@@ -6,7 +6,7 @@
       class="ib-page-chrome-surface z-40 flex flex-col overflow-hidden rounded-[28px] p-5 text-board-page-text will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
       :aria-label="t('library.title')"
-      @click="closeFolderMenu"
+      @click="closeFolderMenu(false)"
       @dragover.prevent="handleIslandDragOver"
       @drop.prevent="handleIslandDrop"
     >
@@ -86,6 +86,7 @@
                   type="button"
                   role="tab"
                   :aria-selected="workspace.selectedFolder.value === folder.folderKey"
+                  :aria-haspopup="folder.isMutable ? 'menu' : undefined"
                   class="h-7 rounded-full border px-2.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
                   :class="[
                     workspace.selectedFolder.value === folder.folderKey
@@ -174,7 +175,10 @@
     ]"
     :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
     role="menu"
+    tabindex="-1"
+    :aria-label="contextMenu.folder.name"
     @click.stop
+    @keydown="handleFolderMenuKeydown"
   >
     <button
       type="button"
@@ -228,7 +232,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Bookmark,
@@ -314,7 +318,12 @@ const isHeaderCollapsed = ref(false)
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const galleryRef = ref<InstanceType<typeof LibraryAssetGallery> | null>(null)
 const folderMenuRef = ref<HTMLElement | null>(null)
-const contextMenu = ref<{ folder: LibraryFolderTab; x: number; y: number } | null>(null)
+const contextMenu = ref<{
+  folder: LibraryFolderTab
+  x: number
+  y: number
+  trigger: HTMLElement | null
+} | null>(null)
 
 // 文件夹弹窗状态
 const folderDialogVisible = ref(false)
@@ -332,18 +341,26 @@ function selectReference(asset: LibraryAssetView) {
 }
 
 function selectFolder(folderKey: string) {
-  closeFolderMenu()
+  closeFolderMenu(false)
   galleryRef.value?.scrollToTop()
   workspace.selectFolder(folderKey)
 }
 
-function closeFolderMenu() {
+function closeFolderMenu(restoreFocus = false) {
+  const trigger = contextMenu.value?.trigger
   contextMenu.value = null
+  if (restoreFocus && trigger?.isConnected) {
+    void requestAnimationFrame(() => trigger.focus())
+  }
 }
 
 function openFolderMenu(event: MouseEvent, folder: LibraryFolderTab) {
   if (!folder.isMutable) return
   event.preventDefault()
+  const trigger =
+    event.currentTarget instanceof HTMLElement
+      ? event.currentTarget.querySelector<HTMLElement>('button')
+      : null
   const menuWidth = 160
   const menuHeight = 84
   const edge = 8
@@ -353,11 +370,13 @@ function openFolderMenu(event: MouseEvent, folder: LibraryFolderTab) {
     folder,
     x: Math.min(Math.max(event.clientX, edge), maxX),
     y: Math.min(Math.max(event.clientY, edge), maxY),
+    trigger,
   }
+  void nextTick(() => folderMenuRef.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus())
 }
 
 function openRenameFolder(folder: LibraryFolderTab) {
-  closeFolderMenu()
+  closeFolderMenu(true)
   renameFolderKey.value = folder.folderKey
   renameInitialName.value = folder.name
   renameDialogVisible.value = true
@@ -383,7 +402,7 @@ async function handleRenameFolder(name: string) {
 }
 
 async function deleteFolder(folder: LibraryFolderTab) {
-  closeFolderMenu()
+  closeFolderMenu(true)
   if (!folder.isMutable) return
   try {
     const confirmed = await confirmDialog.confirmAsync(deleteFolderConfirmation(folder.name))
@@ -406,7 +425,32 @@ async function requestRemove(asset: LibraryAssetView) {
 
 function handleDocumentPointerDown(event: PointerEvent) {
   if (folderMenuRef.value?.contains(event.target as Node)) return
-  closeFolderMenu()
+  closeFolderMenu(false)
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (!contextMenu.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    closeFolderMenu(true)
+  }
+}
+
+function handleFolderMenuKeydown(event: KeyboardEvent) {
+  const items = Array.from(
+    folderMenuRef.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+  )
+  if (!items.length) return
+  const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLElement))
+  let nextIndex: number | null = null
+  if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
+  if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = items.length - 1
+  if (nextIndex === null) return
+  event.preventDefault()
+  items[nextIndex]?.focus()
 }
 
 function handleWindowResize() {
@@ -452,11 +496,13 @@ onMounted(() => {
     void workspace.loadAssets(true)
   })
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleDocumentKeydown)
   window.addEventListener('resize', handleWindowResize)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleDocumentKeydown)
   window.removeEventListener('resize', handleWindowResize)
   unsubscribeMutation()
 })

@@ -141,6 +141,7 @@ export default {
     zoomOut: 'Alejar',
   },
   contextMenu: {
+    label: 'Acciones de nodos del lienzo',
     addNode: '+ Nodo {title}',
   },
   execution: {

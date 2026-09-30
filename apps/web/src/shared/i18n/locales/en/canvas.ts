@@ -134,6 +134,7 @@ export default {
     zoomOut: 'Zoom Out',
   },
   contextMenu: {
+    label: 'Canvas node actions',
     addNode: '+ {title} node',
   },
   execution: {

@@ -8,8 +8,14 @@
     >
       <div
         v-if="visible && activeResult"
+        ref="dialogRef"
         class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="search-lightbox-title"
+        tabindex="-1"
         @click="$emit('close')"
+        @keydown="handleKeydown"
       >
         <!-- 顶部极简悬浮信息与操作栏 -->
         <div
@@ -19,6 +25,7 @@
           <!-- 左上角：纯净悬浮文字 (Title + Author) -->
           <div class="min-w-0 pr-4">
             <h3
+              id="search-lightbox-title"
               class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
             >
               {{ activeResult.title || t('search.lightbox.inspiration') }}
@@ -41,6 +48,7 @@
             </a>
 
             <button
+              ref="closeButtonRef"
               type="button"
               class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
               :aria-label="t('search.lightbox.close')"
@@ -69,18 +77,81 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
 import type { SearchResult } from '../../domain/models'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   activeResult: SearchResult | null
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
 const { t } = useI18n()
+const dialogRef = ref<HTMLElement | null>(null)
+const closeButtonRef = ref<HTMLButtonElement | null>(null)
+const isOpen = computed(() => props.visible && props.activeResult !== null)
+let wasOpen = false
+let focusReturnTarget: HTMLElement | null = null
+
+watch(
+  isOpen,
+  (open) => {
+    if (open && !wasOpen) {
+      const activeElement = document.activeElement
+      focusReturnTarget =
+        activeElement instanceof HTMLElement && activeElement !== document.body
+          ? activeElement
+          : null
+      void nextTick(() => closeButtonRef.value?.focus())
+    }
+    if (!open && wasOpen) {
+      const target = focusReturnTarget
+      focusReturnTarget = null
+      if (target?.isConnected) void nextTick(() => target.focus())
+    }
+    wasOpen = open
+  },
+  { immediate: true },
+)
+
+function requestClose() {
+  emit('close')
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    requestClose()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  const focusable = Array.from(
+    dialogRef.value?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',
+    ) ?? [],
+  )
+  if (!focusable.length) {
+    event.preventDefault()
+    dialogRef.value?.focus()
+    return
+  }
+
+  const currentIndex = focusable.indexOf(document.activeElement as HTMLElement)
+  const nextIndex = event.shiftKey
+    ? currentIndex <= 0
+      ? focusable.length - 1
+      : currentIndex - 1
+    : currentIndex === focusable.length - 1
+      ? 0
+      : currentIndex + 1
+  event.preventDefault()
+  focusable[nextIndex]?.focus()
+}
 </script>

@@ -5,15 +5,22 @@
       ref="menuRef"
       class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-[var(--canvas-radius-xl)] bg-[var(--canvas-glass-bg)] p-1.5 shadow-[var(--canvas-shadow-floating)] backdrop-blur-[var(--canvas-glass-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-glass-border)]"
       :style="menuStyle"
+      role="menu"
+      :aria-label="t('canvas.contextMenu.label')"
+      tabindex="-1"
       @mousedown.stop
       @click.stop
+      @keydown="handleMenuKeydown"
     >
       <button
         v-for="item in items"
         :key="item.key"
         type="button"
+        role="menuitem"
         class="h-[34px] w-full cursor-pointer rounded-[var(--canvas-radius-md)] border-0 bg-transparent px-2.5 text-left text-ib-body font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
         @pointerdown.stop.prevent="emit('create', item.key)"
+        @keydown.enter.stop.prevent="emit('create', item.key)"
+        @keydown.space.stop.prevent="emit('create', item.key)"
       >
         {{ item.label }}
       </button>
@@ -23,6 +30,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { CanvasCreatableNodeKind } from '../../../board/ports/canvas'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 
@@ -37,10 +45,13 @@ const emit = defineEmits<{
   create: [kind: CanvasCreatableNodeKind]
 }>()
 
+const { t } = useI18n()
+
 const transientOverlayMotion = createPopoverMotionTransition()
 const menuRef = ref<HTMLElement | null>(null)
 const position = ref({ x: props.x, y: props.y })
 const menuStyle = computed(() => ({ left: `${position.value.x}px`, top: `${position.value.y}px` }))
+let focusReturnTarget: HTMLElement | null = null
 let resizeObserver: ResizeObserver | null = null
 let positionContainer: HTMLElement | null = null
 
@@ -98,8 +109,18 @@ watch(
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) void nextTick(startPositionTracking)
-    else stopPositionTracking()
+    if (visible) {
+      focusReturnTarget = resolveFocusReturnTarget()
+      void nextTick(() => {
+        startPositionTracking()
+        menuRef.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+      })
+    } else {
+      stopPositionTracking()
+      const target = focusReturnTarget
+      focusReturnTarget = null
+      if (target?.isConnected) target.focus()
+    }
   },
   { immediate: true },
 )
@@ -110,4 +131,27 @@ onMounted(() => {
 onBeforeUnmount(stopPositionTracking)
 
 void props
+
+function handleMenuKeydown(event: KeyboardEvent) {
+  const items = Array.from(menuRef.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+  if (!items.length) return
+  const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLElement))
+  let nextIndex: number | null = null
+
+  if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
+  if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = items.length - 1
+  if (nextIndex === null) return
+
+  event.preventDefault()
+  items[nextIndex]?.focus()
+}
+
+function resolveFocusReturnTarget() {
+  const activeElement = document.activeElement
+  return activeElement instanceof HTMLElement && activeElement !== document.body
+    ? activeElement
+    : null
+}
 </script>
