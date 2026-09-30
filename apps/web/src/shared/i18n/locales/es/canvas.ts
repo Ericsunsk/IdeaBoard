@@ -34,6 +34,10 @@ export default {
   },
   homeHero: {
     legalNavAria: 'Enlaces legales',
+    kicker: 'Espacio de trabajo del lienzo',
+    description:
+      'Explora, compara y perfecciona direcciones visuales en un espacio de trabajo conectado.',
+    start: 'Empezar a crear',
   },
   task: {
     stillProcessing: 'Aún se está procesando; vuelva a comprobarlo en un momento.',

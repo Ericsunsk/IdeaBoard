@@ -34,6 +34,9 @@ export default {
   },
   homeHero: {
     legalNavAria: '法律条款链接',
+    kicker: '画布工作区',
+    description: '在一个连贯的工作区中探索、比较并完善图像方向。',
+    start: '开始创作',
   },
   task: {
     stillProcessing: '仍在此处理中 — 请稍后查看。',

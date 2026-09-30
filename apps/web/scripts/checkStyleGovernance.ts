@@ -271,12 +271,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Canvas node tool buttons use canvas drawing constants.',
   },
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
-    counts: {
-      'hex-color': 7,
-    },
-    reason: 'Marketing landing page owns a bespoke one-off palette outside app surfaces.',
-  },
   'src/features/canvas/presentation/screens/CanvasScreen.vue': {
     counts: {
       'hex-color': 1,
@@ -328,15 +322,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
 }
 
-const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
-    counts: {
-      'font-stack': 2,
-    },
-    reason:
-      'Landing page system stacks are marketing one-offs; display/handwriting stacks use font-ib-* tokens.',
-  },
-}
+const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {}
 
 const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   'src/components/ui/form/FormDescription.vue': {
@@ -380,12 +366,6 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
       'text-px': 3,
     },
     reason: 'Board catalog hero/display sizes sit outside the type scale.',
-  },
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
-    counts: {
-      'text-px': 1,
-    },
-    reason: 'Landing hero display size; marketing one-off.',
   },
   'src/features/legal/components/PublicLegalPage.vue': {
     counts: {
