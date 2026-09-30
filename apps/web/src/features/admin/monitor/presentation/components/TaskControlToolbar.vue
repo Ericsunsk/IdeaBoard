@@ -5,22 +5,20 @@
       <!-- 侧边栏按钮 (样式占位，后续接功能) -->
       <button
         type="button"
-        aria-disabled="true"
-        tabindex="-1"
-        class="relative flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-white text-admin-text-2"
+        disabled
+        class="relative flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card-strong text-admin-text-2 opacity-60"
         :title="MONITOR_MESSAGES.sidebarToggleTitle"
       >
         <SidebarCollapse class="size-4" />
-        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-blue-500"></span>
+        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-admin-info"></span>
       </button>
 
       <!-- 数据集选择器 (样式占位，后续接功能) -->
       <div class="relative inline-flex items-center">
         <button
           type="button"
-          aria-disabled="true"
-          tabindex="-1"
-          class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-semibold text-admin-text-1"
+          disabled
+          class="flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-admin-border-soft bg-admin-card-strong px-3 text-xs font-semibold text-admin-text-1 opacity-60"
         >
           <Table class="size-3.5 text-admin-text-2" />
           <span>Events</span>
@@ -37,7 +35,7 @@
           :value="searchKeyword"
           type="text"
           :aria-label="t('admin.common.search')"
-          class="h-9 w-full rounded-lg border border-admin-border-soft bg-white pr-9 pl-9 text-xs text-admin-text-1 placeholder:text-admin-text-3 transition-colors focus-visible:border-admin-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20"
+          class="h-9 w-full rounded-lg border border-admin-border-soft bg-admin-card-strong pr-9 pl-9 text-xs text-admin-text-1 placeholder:text-admin-text-3 transition-colors focus-visible:border-admin-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20"
           :placeholder="t('admin.common.search')"
           @input="emit('update:searchKeyword', ($event.target as HTMLInputElement).value)"
           @keydown.enter="emit('search')"
@@ -53,7 +51,7 @@
       <!-- 实时按钮 -->
       <button
         type="button"
-        class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+        class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-admin-card-strong px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
         @click="emit('liveRefresh')"
       >
         <Play class="size-3 fill-admin-text-1 text-admin-text-1" />
@@ -68,7 +66,7 @@
         <AdminPopoverTrigger as-child>
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-admin-card-strong px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
             :aria-expanded="timeRangePopoverOpen"
             aria-haspopup="listbox"
             :aria-label="MONITOR_MESSAGES.timeRangeAria"
@@ -93,7 +91,7 @@
               :class="[
                 'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
                 selectedTimeRangeKey === preset.key
-                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  ? 'bg-admin-info-soft text-admin-info font-semibold'
                   : 'text-admin-text-2 hover:bg-admin-surface-muted hover:text-admin-text-1',
               ]"
               @click="emit('selectTimeRange', preset.key)"
@@ -101,7 +99,7 @@
               <span>{{ preset.label }}</span>
               <Check
                 v-if="selectedTimeRangeKey === preset.key"
-                class="size-3.5 text-blue-600 shrink-0"
+                class="size-3.5 text-admin-info shrink-0"
               />
             </button>
           </div>
@@ -111,10 +109,9 @@
       <!-- 更多按钮 (样式占位，后续接功能) -->
       <AdminButton
         variant="ghost"
-        class="size-9 rounded-lg border border-admin-border-soft bg-white p-0 text-admin-text-2"
+        class="size-9 rounded-lg border border-admin-border-soft bg-admin-card-strong p-0 text-admin-text-2"
         :aria-label="MONITOR_MESSAGES.moreActionsAria"
-        aria-disabled="true"
-        tabindex="-1"
+        disabled
       >
         <MoreHoriz class="size-4 text-admin-text-2" />
       </AdminButton>

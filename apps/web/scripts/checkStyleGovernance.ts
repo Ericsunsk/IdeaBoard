@@ -65,13 +65,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
-  'src/features/admin/shared/lib/uiClasses.ts': {
-    counts: {
-      'raw-color': 1,
-      'raw-shadow': 1,
-    },
-    reason: 'Admin shared UI helpers own metric/control shadow primitives.',
-  },
   'src/features/admin/shared/styles/admin-user-avatar-button.css': {
     counts: {
       'raw-color': 1,
@@ -271,6 +264,12 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Canvas node tool buttons use canvas drawing constants.',
   },
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'hex-color': 7,
+    },
+    reason: 'Marketing landing page owns a bespoke one-off palette outside app surfaces.',
+  },
   'src/features/canvas/presentation/screens/CanvasScreen.vue': {
     counts: {
       'hex-color': 1,
@@ -283,12 +282,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
       'hex-color': 2,
     },
     reason: 'Canvas chrome overlay uses canvas drawing constants.',
-  },
-  'src/features/canvas/presentation/styles/canvas-surface-skin.css': {
-    counts: {
-      'hex-color': 9,
-    },
-    reason: 'Canvas surface skin uses canvas drawing constants.',
   },
   'src/features/canvas/presentation/styles/editing-controls.css': {
     counts: {
@@ -322,7 +315,15 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
 }
 
-const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {}
+const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'font-stack': 2,
+    },
+    reason:
+      'Landing page system stacks are marketing one-offs; display/handwriting stacks use font-ib-* tokens.',
+  },
+}
 
 const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   'src/components/ui/form/FormDescription.vue': {
@@ -366,6 +367,12 @@ const textPxAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
       'text-px': 3,
     },
     reason: 'Board catalog hero/display sizes sit outside the type scale.',
+  },
+  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
+    counts: {
+      'text-px': 1,
+    },
+    reason: 'Landing hero display size; marketing one-off.',
   },
   'src/features/legal/components/PublicLegalPage.vue': {
     counts: {
