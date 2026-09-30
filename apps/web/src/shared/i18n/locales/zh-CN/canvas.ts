@@ -129,6 +129,7 @@ export default {
     zoomOut: '缩小',
   },
   contextMenu: {
+    label: '画布节点操作',
     addNode: '+ {title} 节点',
   },
   execution: {
