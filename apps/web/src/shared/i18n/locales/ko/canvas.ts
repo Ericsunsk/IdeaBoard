@@ -35,9 +35,6 @@ export default {
   },
   homeHero: {
     legalNavAria: '법적 링크',
-    kicker: '캔버스 작업 공간',
-    description: '하나의 연결된 작업 공간에서 이미지 방향을 탐색하고 비교하며 다듬어 보세요.',
-    start: '만들기 시작',
   },
   task: {
     stillProcessing: '아직 처리 중입니다 — 잠시 후 다시 확인해 주세요.',
@@ -138,7 +135,6 @@ export default {
     zoomOut: '축소',
   },
   contextMenu: {
-    label: '캔버스 노드 작업',
     addNode: '+ {title} 노드',
   },
   execution: {

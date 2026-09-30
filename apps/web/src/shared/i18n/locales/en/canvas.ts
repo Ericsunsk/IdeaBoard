@@ -35,9 +35,6 @@ export default {
   },
   homeHero: {
     legalNavAria: 'Legal links',
-    kicker: 'Canvas workspace',
-    description: 'Explore, compare, and refine image directions in one connected workspace.',
-    start: 'Start creating',
   },
   task: {
     stillProcessing: 'Still processing — check back in a moment.',
@@ -134,7 +131,6 @@ export default {
     zoomOut: 'Zoom Out',
   },
   contextMenu: {
-    label: 'Canvas node actions',
     addNode: '+ {title} node',
   },
   execution: {
