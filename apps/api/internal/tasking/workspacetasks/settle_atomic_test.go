@@ -351,7 +351,7 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog := billingapplication.NewBillableItemCatalog(registry, billingStore)
+	billingCatalog := billingapplication.NewBillableItemCatalog(registry, billingStore)
 	if _, err := billingStore.PublishPrice(ctx, billing.PublishPriceInput{Definition: definition, UnitCredits: unitCost, ActorID: userID}); err != nil {
 		t.Fatalf("publish atomic settle price: %v", err)
 	}
@@ -359,8 +359,14 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 	store := taskpostgres.NewStore(pool)
 	holder := &atomicHolder{credits: creditService}
 	queue := &atomicQueue{pool: pool}
+	snapshotSaver := func(ctx context.Context, tx pgx.Tx, taskID string, snap routing.RoutingSnapshot) error {
+		if tx == nil {
+			return errors.New("routing snapshot saver requires the settlement transaction")
+		}
+		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
+	}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
-		TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: catalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(),
+		TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
 	})
 	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
 }

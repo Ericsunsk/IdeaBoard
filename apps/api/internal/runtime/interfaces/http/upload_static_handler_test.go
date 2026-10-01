@@ -132,6 +132,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	db := testdb.Open(t)
 	userRepo := identitypostgres.NewRepository(db)
 	owner := mustCreateUploadStaticUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
+	mustCreateUploadStaticUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	mustCreateUploadStaticUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
 	ownerIDPath := strconv.FormatInt(owner.ID, 10)
 	taskOutputURL := "/uploads/tasks/" + ownerIDPath + "/task-demo/output.png"
