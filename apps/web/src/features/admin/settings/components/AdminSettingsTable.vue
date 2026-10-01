@@ -3,7 +3,7 @@
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex items-center gap-2">
         <h2 class="text-admin-title font-bold text-admin-title-color">{{ title }}</h2>
-        <span class="text-admin-meta text-admin-subtitle-color">{{ subtitle }}</span>
+        <span class="text-admin-meta text-admin-text-2">{{ subtitle }}</span>
       </div>
       <AdminButton
         variant="outline"

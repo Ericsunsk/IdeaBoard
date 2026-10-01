@@ -5,17 +5,23 @@
       role="listbox"
       :aria-label="t('canvas.retouch.layersListLabel')"
     >
+      <!--
+        Roving tabindex: only the active descendant is tabbable, which is what a
+        listbox is supposed to do. `interactive-supports-focus` reads a static
+        `tabindex` attribute and cannot see through the binding.
+      -->
+      <!-- eslint-disable-next-line vuejs-accessibility/interactive-supports-focus -->
       <div
-        v-for="layer in layers"
+        v-for="(layer, index) in layers"
         :key="layer.id"
+        :ref="(el) => setRowRef(el, index)"
         class="retouch-layer-row"
         :class="{ active: selectedLayerId === layer.id }"
         role="option"
         :aria-selected="selectedLayerId === layer.id"
-        tabindex="0"
+        :tabindex="isSelectedLayer(layer.id) ? 0 : -1"
         @click="selectLayer(layer.id)"
-        @keydown.enter.prevent="selectLayer(layer.id)"
-        @keydown.space.prevent="selectLayer(layer.id)"
+        @keydown="onRowKeydown($event, index)"
       >
         <span class="retouch-layer-row__thumb" :class="`kind-${resolveLayerKind(layer)}`">
           <component :is="resolveLayerIcon(layer)" class="retouch-layer-row__thumb-icon" />
@@ -26,12 +32,15 @@
         </span>
         <button
           v-else
+          :ref="(el) => setVisibilityButtonRef(el, index)"
           type="button"
-          class="retouch-layer-row__visibility canvas-tool-tooltip-trigger"
+          class="retouch-layer-row__visibility ib-hit-target-32-inline canvas-tool-tooltip-trigger"
           :aria-label="
             layer.visible ? t('canvas.retouch.hideLayer') : t('canvas.retouch.showLayer')
           "
+          tabindex="-1"
           @click.stop="onToggleVisibility(layer)"
+          @keydown.stop="onVisibilityKeydown($event, index)"
         >
           <Eye v-if="layer.visible" class="retouch-layer-row__icon" />
           <EyeClosed v-else class="retouch-layer-row__icon" />
@@ -45,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import './styles/retouch-panel.css'
 import type { Component } from 'vue'
@@ -63,7 +73,7 @@ import {
 } from '@iconoir/vue'
 import type { RetouchLayer } from '../model.ts'
 
-defineProps<{
+const props = defineProps<{
   layers: RetouchLayer[]
   selectedLayerId: string
 }>()
@@ -74,6 +84,108 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+/*
+ * The panel declares `role="listbox"`, which promises a composite widget: one Tab
+ * stop, arrow keys between options, Home/End to jump. It used to declare the
+ * role and then hand every option `tabindex="0"` with only Enter and Space bound,
+ * so Tab walked all five layers and no arrow key did anything — the same
+ * advertised-but-absent keyboard model that AdminOptionFilter had.
+ *
+ * Roving tabindex is the APG answer: the active descendant is the single tab stop,
+ * arrows move focus *and* selection, and Tab leaves the widget entirely.
+ */
+
+type RowElement = HTMLElement | null
+const rowRefs = ref<RowElement[]>([])
+const visibilityButtonRefs = ref<(HTMLButtonElement | null)[]>([])
+
+function setRowRef(el: unknown, index: number) {
+  rowRefs.value[index] = (el as RowElement) ?? null
+}
+
+function setVisibilityButtonRef(el: unknown, index: number) {
+  visibilityButtonRefs.value[index] = (el as HTMLButtonElement) ?? null
+}
+
+function isSelectedLayer(layerId: string): boolean {
+  return layerId === props.selectedLayerId
+}
+
+function focusRow(index: number) {
+  const bounded = Math.min(Math.max(index, 0), props.layers.length - 1)
+  const layer = props.layers[bounded]
+  if (!layer) return
+  selectLayer(layer.id)
+  void nextTick(() => rowRefs.value[bounded]?.focus())
+}
+
+function onRowKeydown(event: KeyboardEvent, index: number) {
+  // The visibility action is an independent control. Its key events must not
+  // activate the row's listbox behavior when it is focused programmatically.
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      focusRow(index + 1)
+      return
+    case 'ArrowUp':
+      event.preventDefault()
+      focusRow(index - 1)
+      return
+    case 'Home':
+      event.preventDefault()
+      focusRow(0)
+      return
+    case 'End':
+      event.preventDefault()
+      focusRow(props.layers.length - 1)
+      return
+    case 'ArrowRight':
+      if (visibilityButtonRefs.value[index]) {
+        event.preventDefault()
+        visibilityButtonRefs.value[index]?.focus()
+      }
+      return
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      selectLayer(props.layers[index]?.id ?? '')
+      return
+    default:
+  }
+}
+
+function onVisibilityKeydown(event: KeyboardEvent, index: number) {
+  // Keep activation explicit because this button is programmatically focused
+  // from the composite listbox and intentionally removed from the Tab order.
+  const layer = props.layers[index]
+  switch (event.key) {
+    case 'Enter':
+    case ' ':
+    case 'Space':
+      event.preventDefault()
+      if (layer) onToggleVisibility(layer)
+      return
+    case 'ArrowLeft':
+      event.preventDefault()
+      rowRefs.value[index]?.focus()
+      return
+    default:
+  }
+}
+
+// If the selection moves without keyboard focus (a click elsewhere, an undo),
+// keep the tab stop pointing at the active option.
+watch(
+  () => props.selectedLayerId,
+  (selectedId) => {
+    const index = props.layers.findIndex((layer) => layer.id === selectedId)
+    if (index < 0 || index >= rowRefs.value.length) return
+    const active = document.activeElement
+    if (active && active !== document.body && !rowRefs.value.includes(active as RowElement)) return
+    rowRefs.value[index]?.focus()
+  },
+)
 
 function onToggleVisibility(layer: RetouchLayer) {
   if (layer.type === 'source') return

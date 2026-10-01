@@ -252,11 +252,6 @@
   opacity: 0.6;
 }
 
-.canvas-chrome-control-group {
-  display: flex;
-  gap: var(--canvas-chrome-control-gap);
-}
-
 .canvas-chrome-action-group {
   pointer-events: auto;
 }

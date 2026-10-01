@@ -1,7 +1,6 @@
 /*
  * Canvas node CSS contract.
- * Public classes: workflow-node-header, node-header-title, node-execution-body,
- * node-primary-action-slot, node-mode-card, node-control-*, and node-option-row.
+ * Public classes: workflow-node-header and node-header-title.
  * These are shared by Canvas node components only.
  * Component-private classes stay in their owning .vue file.
  */
@@ -86,59 +85,6 @@
   display: flex;
   align-items: center;
   gap: 7px;
-}
-
-.node-execution-body {
-  --node-tool-border-width: var(--canvas-control-border-width);
-  --node-tool-button-accent: var(--canvas-accent);
-  --node-tool-button-brand: var(--canvas-accent-hover);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.node-primary-action-slot {
-  padding-top: 0;
-}
-
-.node-mode-card {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.node-control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 7px 8px;
-  border: var(--node-tool-border-width) solid var(--canvas-node-border);
-  border-radius: var(--canvas-radius-lg);
-  background: var(--canvas-node-bg);
-}
-
-.node-control-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.node-option-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.node-control-label {
-  font-size: var(--canvas-font-size-caption);
-  font-weight: 600;
-  color: var(--canvas-node-text-muted);
-  letter-spacing: 0;
 }
 
 /* Interactive node chrome stays screen-sized while graph content remains zoomable. */

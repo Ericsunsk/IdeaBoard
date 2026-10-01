@@ -95,7 +95,9 @@ body.canvas-overscroll-guard {
   --flow-edge-color: var(--color-canvas-edge);
   --flow-edge-selected-color: var(--color-canvas-edge-selected);
   --flow-edge-running-color: var(--color-canvas-edge-running);
-  --flow-edge-width: var(--color-canvas-edge-width);
+  /* Unitless on purpose: consumers scale it via calc(var(--flow-edge-width) * 1px). */
+  --canvas-edge-width: 2;
+  --flow-edge-width: var(--canvas-edge-width);
   --flow-edge-dasharray: 5;
   /* Execution edges need a continuous cycle rather than a finite interaction duration. */
   --flow-edge-running-duration: 0.5s;

@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[var(--canvas-node-border)] bg-[var(--canvas-node-bg)] px-2.5 text-ib-caption leading-none font-medium text-[var(--canvas-text-option)] transition-[background-color,border-color,color,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:cursor-not-allowed disabled:opacity-[0.45]"
+    class="node-action-btn ib-hit-target-32-inline inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[var(--canvas-node-border)] bg-[var(--canvas-node-bg)] px-2.5 text-ib-caption leading-none font-medium text-[var(--canvas-text-option)] transition-[background-color,border-color,color,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
       variantClass,
       {

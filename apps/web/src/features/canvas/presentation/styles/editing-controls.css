@@ -153,6 +153,20 @@
 
 .editing-controls-select {
   padding: 0 8px;
+  cursor: pointer;
+}
+
+/*
+ * `.editing-controls-control` sets `outline: none` for every Canvas control, so
+ * each one that can take focus has to re-declare a visible indicator. Native
+ * `<select>` cannot carry a Tailwind class here, and browsers suppress the UA
+ * ring once `outline: none` is set, which left the retouch preset and channel
+ * dropdowns keyboard-invisible (WCAG 2.4.7). This is the same gap PasswordInput
+ * had on the user shell.
+ */
+.editing-controls-select:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
 }
 
 .editing-controls-toggle-button,

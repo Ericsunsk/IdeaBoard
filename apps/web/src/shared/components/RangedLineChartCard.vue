@@ -5,6 +5,7 @@
     :header-class="headerClass"
     :title-class="titleClass"
     :class="cardClass"
+    :elevated="elevated"
   >
     <template #actions>
       <div
@@ -18,7 +19,7 @@
           type="button"
           role="radio"
           :aria-checked="selectedRange === range.key"
-          class="cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
+          class="ib-hit-target-32-inline cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
           :class="selectedRange === range.key ? rangeSelectedClass : rangeUnselectedClass"
           @click="selectedRange = range.key"
         >
@@ -56,6 +57,8 @@ export interface RangedLineChartProps<TRange extends string> {
   headerClass?: string | undefined
   titleClass?: string | undefined
   cardClass?: string | undefined
+  /** Forwarded to `Card`. Flat surfaces pass `false` instead of cancelling a default shadow. */
+  elevated?: boolean | undefined
   rangeGroupClass?: string | undefined
   rangeSelectedClass?: string | undefined
   rangeUnselectedClass?: string | undefined
@@ -88,6 +91,7 @@ withDefaults(
     headerClass: undefined,
     titleClass: undefined,
     cardClass: undefined,
+    elevated: undefined,
     rangeGroupClass:
       'inline-flex items-center rounded-lg border border-ib-border-soft bg-ib-surface-muted p-0.5 text-xs',
     rangeSelectedClass:

@@ -38,34 +38,49 @@
             @input="onSearchInput(($event.target as HTMLInputElement).value)"
           />
         </label>
-        <DropdownMenu v-slot="{ open }">
-          <DropdownMenuTrigger as-child>
-            <button
-              type="button"
-              :class="catalogClasses.sortMenuTrigger"
-              :aria-label="t('workspace.boards.sortLabel')"
-              aria-haspopup="menu"
-              :aria-expanded="open ? 'true' : 'false'"
-            >
-              <span class="truncate">{{ activeSortLabel }}</span>
+        <label :for="sortSelectId" class="sr-only">
+          {{ t('workspace.boards.sortLabel') }}
+        </label>
+        <!--
+          sortMode comes from the controller's readonly viewModel, so v-model
+          cannot write it; selection goes through the setSortMode command, the
+          same shape searchKeyword uses above. The trigger's accessible name
+          comes from the sr-only <label :for> above, which this rule cannot
+          follow across the Select primitive.
+        -->
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <Select
+          :model-value="sortMode"
+          @update:model-value="onSortModeChange"
+        >
+          <SelectTrigger
+            :id="sortSelectId"
+            :class="catalogClasses.sortSelectTrigger"
+          >
+            <SelectValue />
+            <SelectIcon>
               <NavArrowDown
-                class="size-3.5 shrink-0 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
-                :class="open ? 'rotate-180' : ''"
+                class="size-3.5 shrink-0 text-board-control-icon transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
                 aria-hidden="true"
               />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" class="w-[140px]">
-            <DropdownMenuItem
-              v-for="item in sortMenuItems"
-              :key="item.value"
-              :class="item.value === sortMode ? 'font-medium bg-accent' : ''"
-              @select="item.command?.()"
-            >
-              {{ item.label }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </SelectIcon>
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            :side-offset="appOverlayMenuSideOffset"
+            class="w-[140px]"
+          >
+            <SelectViewport>
+              <SelectItem
+                v-for="item in sortOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                <SelectItemText>{{ item.label }}</SelectItemText>
+              </SelectItem>
+            </SelectViewport>
+          </SelectContent>
+        </Select>
       </section>
 
       <div
@@ -232,11 +247,16 @@ import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
 import { ibDialogMaskClass } from '../../../../shared/theme/dialogMask'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Select,
+  SelectContent,
+  SelectIcon,
+  SelectItem,
+  SelectItemText,
+  SelectTrigger,
+  SelectValue,
+  SelectViewport,
+} from '@/components/ui/select'
+import { appOverlayMenuSideOffset } from '../../../../shared/theme/appOverlayMenu'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalog'
 
@@ -269,7 +289,7 @@ const {
 } = controller.viewModel
 const {
   setSearchKeyword: onSearchInput,
-  setSortMode,
+  setSortMode: onSortModeCommand,
   toggleBoardMenu,
   handleBoardMenuHidden,
   createAndOpenBoard,
@@ -330,15 +350,16 @@ const sortOptions = computed<Array<{ label: string; value: CatalogSortMode }>>((
   { label: t('workspace.boards.sortRecent'), value: 'recent' },
   { label: t('workspace.boards.sortName'), value: 'name' },
 ])
-const activeSortLabel = computed(
-  () => sortOptions.value.find((option) => option.value === sortMode.value)?.label ?? '',
-)
-const sortMenuItems = computed(() =>
-  sortOptions.value.map((option) => ({
-    ...option,
-    command: () => setSortMode(option.value),
-  })),
-)
+
+// Select emits a loose value; only accept one the option list actually offers so
+// a stray emission cannot put the catalog into a mode it has no label for.
+function onSortModeChange(value: unknown) {
+  const match = sortOptions.value.find((option) => option.value === value)
+  if (match) onSortModeCommand(match.value)
+}
+
+// The sort trigger is a real form control, so it needs a programmatic label.
+const sortSelectId = 'board-catalog-sort-select'
 
 const accountControls = useWorkspaceAccountControls({
   navigation: {

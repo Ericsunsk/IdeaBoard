@@ -16,7 +16,7 @@
     "bundle:visualize": "ANALYZE=true vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:naming-governance && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:admin-form-validation && npm run lint:duplication && npm run lint:knip && npm run api:surface:check && npm run audit:complexity",
+    "lint": "eslint . && npm run test:guardrails && npm run lint:user-copy && npm run lint:locale-parity && npm run lint:style-governance && npm run lint:card-elevation && npm run lint:admin-dropdown && npm run lint:touch-target && npm run lint:naming-governance && npm run lint:import-boundaries && npm run lint:dependencies && npm run lint:admin-form-validation && npm run lint:duplication && npm run lint:knip && npm run api:surface:check && npm run audit:complexity",
     "lint:user-copy": "tsx scripts/checkUserCopyLocale.ts",
     "lint:locale-parity": "tsx scripts/checkLocaleParity.ts",
     "lint:import-boundaries": "tsx scripts/checkEslintImportBoundaries.ts",
@@ -25,6 +25,7 @@
     "lint:duplication": "jscpd src",
     "audit:complexity": "tsx scripts/checkComplexityHotspots.ts",
     "lint:style-governance": "tsx scripts/checkStyleGovernance.ts",
+    "lint:card-elevation": "tsx scripts/checkCardElevationContract.ts",
     "lint:naming-governance": "tsx scripts/checkNamingGovernance.ts",
     "lint:style": "stylelint \"src/**/*.{css,vue}\" --allow-empty-input",
     "lint:knip": "knip --include files,duplicates,dependencies,exports",
@@ -38,7 +39,9 @@
     "test:typecheck": "vue-tsc -p tsconfig.test.json --noEmit && vue-tsc -p tsconfig.test-node.json --noEmit",
     "test:run": "vitest run",
     "quality:check": "npm run format:check && npm run lint && npm run test:typecheck && npm run test:run && npm run build",
-    "quality:full": "npm run quality:check && npm run lint:style && npm run api:check-generated && npm run test:browser && npm run test:accessibility"
+    "quality:full": "npm run quality:check && npm run lint:style && npm run api:check-generated && npm run test:browser && npm run test:accessibility",
+    "lint:admin-dropdown": "tsx scripts/checkAdminDropdownContract.ts",
+    "lint:touch-target": "tsx scripts/checkTouchTargetContract.ts"
   },
   "dependencies": {
     "@iconoir/vue": "^7.12.1",

@@ -63,7 +63,14 @@
   top: 0;
   bottom: calc(var(--retouch-histogram-marker-size, 12px) * -0.36);
   box-sizing: border-box;
-  width: var(--retouch-histogram-marker-size, 12px);
+  /*
+   * The painted dot (::after) stays 11px and centred, but the transparent
+   * button box is 24px wide so the grab target reaches the WCAG 2.2 AA floor.
+   * Both pseudos already paint the marker, so a hit-area overlay has nowhere
+   * to live; growing the transparent box is the only route that keeps the dot
+   * exactly where it was.
+   */
+  width: var(--spacing-ib-touch-target-aa);
   padding: 0;
   border: 0;
   background: transparent;

@@ -5,7 +5,7 @@ import {
 } from '../../../shared/theme/formControls'
 import './auth-modal-motion.css'
 
-// Dialog 以 content-class 拥有造型：mask 沿用 Dialog 内置 ibDialogMaskClass，
+// Dialog 以 :class/cn() 组合造型：mask 沿用 Dialog 内置 ibDialogMaskClass，
 // 动画走 reka data-state + Tailwind animate；m-4 在 reka 居中定位下会偏移，不再保留。
 export const authDialogContentClass =
   'w-[min(390px,calc(100vw-32px))] overflow-visible border-0 bg-transparent p-0 shadow-none'
@@ -33,7 +33,7 @@ export const authFieldClass =
 
 export const authInputIconClass = ibFormInputIconClass
 
-export const authInputClass = `${ibFormInputClass} !h-10 !text-ib-content`
+export const authInputClass = `${ibFormInputClass} !text-ib-content`
 
 export const authInputErrorClass = ibFormInputErrorClass
 
@@ -47,7 +47,7 @@ export const authFooterClass =
   'relative z-[1] text-center text-ib-meta text-[var(--color-ib-auth-muted)]'
 
 export const authSwitchButtonClass =
-  'ib-control-state [--ib-control-disabled-opacity:0.7] ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
+  'ib-control-state [--ib-control-disabled-opacity:0.7] -my-1 ml-1.5 inline-flex min-h-8 cursor-pointer items-center border-0 bg-transparent px-1 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
 
 export const authCloseButtonClass =
-  'ib-control-state ib-auth-close-action [--ib-control-active-transform:scale(0.95)] [--ib-control-disabled-opacity:0.5] absolute top-3.5 right-3.5 z-[2] inline-flex size-7 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-[color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-close-hover)]'
+  'ib-control-state ib-auth-close-action [--ib-control-active-transform:scale(0.95)] [--ib-control-disabled-opacity:0.5] absolute top-3 right-3.5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-[color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-close-hover)]'

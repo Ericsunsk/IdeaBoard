@@ -47,7 +47,7 @@ const adminBadgeColorOverrides: Record<string, string> = {
   warn: 'bg-admin-warning-soft text-admin-warning border-admin-warning/20 font-bold',
   info: 'bg-admin-info-soft text-admin-info border-admin-info/20 font-bold',
   secondary:
-    'bg-admin-surface-muted text-admin-text-2-strong border-admin-border-soft font-semibold',
+    'bg-admin-surface-muted text-admin-text-label border-admin-border-soft font-semibold',
   outline: 'border-admin-border text-admin-text-1 bg-white font-medium',
 }
 

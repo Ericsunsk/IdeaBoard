@@ -48,7 +48,7 @@
       <div class="text-admin-title font-semibold text-admin-title-color">
         {{ PROMPTS_MESSAGES.loadFailedTitle }}
       </div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+      <div class="mt-2 text-admin-meta text-admin-text-2">
         {{ PROMPTS_MESSAGES.loadFailedHint }}
       </div>
       <AdminButton class="mt-4" variant="outline" :disabled="loading" @click="loadPrompts()">

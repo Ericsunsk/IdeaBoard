@@ -18,7 +18,7 @@
         <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">
           {{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}
         </h2>
-        <p class="mt-2 text-admin-body text-admin-subtitle-color">
+        <p class="mt-2 text-admin-body text-admin-text-2">
           {{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}
         </p>
         <AdminButton
@@ -53,7 +53,7 @@
                   {{ CREDIT_HEALTH_MESSAGES.activeRunBadge(health.active_run.id) }}
                 </span>
               </div>
-              <p class="mt-1.5 text-admin-body leading-6 text-admin-subtitle-color">
+              <p class="mt-1.5 text-admin-body leading-6 text-admin-text-2">
                 {{ presentation.summary }}
               </p>
             </div>

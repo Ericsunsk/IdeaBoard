@@ -6,6 +6,7 @@ import {
   TaskStatus,
   type TaskMetricStatsSnapshot,
 } from './taskMetricTokens'
+import { adminThemeTokenFallbacks } from './adminThemeTokens'
 
 describe('taskMetricTokens', () => {
   it('defines the 6 core observability metrics in canonical lifecycle order', () => {
@@ -83,9 +84,12 @@ describe('taskMetricTokens', () => {
   })
 
   it('assigns unique and consistent chart colors matching status pill definitions', () => {
-    expect(getTaskMetricByStatus('pending')?.chartColor).toBe('#4775a8')
-    expect(getTaskMetricByStatus('running')?.chartColor).toBe('#d48830')
-    expect(getTaskMetricByStatus('completed')?.chartColor).toBe('#2f9e73')
-    expect(getTaskMetricByStatus('failed')?.chartColor).toBe('#d14d5a')
+    // Chart colors resolve from the Admin theme token fallbacks, so this asserts
+    // the shared source of truth rather than restating hex values.
+    const { danger, info, success, warning } = adminThemeTokenFallbacks
+    expect(getTaskMetricByStatus('pending')?.chartColor).toBe(info)
+    expect(getTaskMetricByStatus('running')?.chartColor).toBe(warning)
+    expect(getTaskMetricByStatus('completed')?.chartColor).toBe(success)
+    expect(getTaskMetricByStatus('failed')?.chartColor).toBe(danger)
   })
 })

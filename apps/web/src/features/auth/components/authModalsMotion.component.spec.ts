@@ -155,10 +155,10 @@ function stubMotionPreference(reduced: boolean) {
   )
 }
 
-function renderAuthHost(busy = false) {
+function renderAuthHost(busy = false, slot = '<div>Auth panel</div>') {
   return renderWithUser(AuthModalHost, {
     props: { busy },
-    slots: { default: '<div>Auth panel</div>' },
+    slots: { default: slot },
     global: {
       stubs: {
         DialogRoot: DialogRootStub,
@@ -218,6 +218,17 @@ describe('AuthModalHost motion', () => {
     renderAuthHost(true)
 
     expect(screen.getByRole('dialog')).toBeVisible()
+  })
+
+  it('autofocuses the first form control instead of the close action', () => {
+    renderAuthHost(false, '<button type="button">Close</button><input aria-label="Email" />')
+
+    const dialog = screen.getByRole('dialog')
+    const autofocusEvent = new Event('open-auto-focus', { bubbles: true, cancelable: true })
+    dialog.dispatchEvent(autofocusEvent)
+
+    expect(autofocusEvent.defaultPrevented).toBe(true)
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveFocus()
   })
 
   it('dismisses from the mask while idle', async () => {

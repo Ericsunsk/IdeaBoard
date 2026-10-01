@@ -4,6 +4,8 @@
 // Admin-owned domain module owns the frozen value set. Feature code imports
 // it from here, never generated code, and generic `shared` modules must not
 // depend on it.
+import { adminThemeTokenFallbacks } from './adminThemeTokens'
+
 export const TaskStatus = {
   pending: 'pending',
   running: 'running',
@@ -53,10 +55,14 @@ export const monitorChartSpecs = {
 
 /**
  * 任务指标元定义与视觉 Token (Single Source of Truth)
+ *
  * chartColor 与 Admin 主题对齐（Admin shared 内聚，源头见 style.css --color-admin-*）：
- * pending/info, running/warning, completed/success, failed/danger,
- * cancelled/mist。
+ * pending/info, running/warning, completed/success, failed/danger, cancelled/mist。
+ * Chart.js 绘制 canvas 需要具体色值，withAlpha 也无法处理 var()，因此这里取
+ * adminThemeTokenFallbacks 里的 fallback，而不是就地再写一份 hex。
  */
+const { chartMist, danger, info, success, warning } = adminThemeTokenFallbacks
+
 export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
   {
     key: 'all',
@@ -77,7 +83,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     dotClass: 'bg-admin-info',
     activePillClass: 'bg-admin-info-soft text-admin-info font-semibold ring-1 ring-admin-info-soft',
     hasChartLine: true,
-    chartColor: '#4775a8',
+    chartColor: info,
     chartLabel: 'Pending',
     getCount: (stats) => stats.pending,
   },
@@ -90,7 +96,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     activePillClass:
       'bg-admin-warning-soft text-admin-warning font-semibold ring-1 ring-admin-warning-soft',
     hasChartLine: true,
-    chartColor: '#d48830',
+    chartColor: warning,
     chartLabel: 'Running',
     getCount: (stats) => stats.running,
   },
@@ -103,7 +109,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     activePillClass:
       'bg-admin-success-soft text-admin-success font-semibold ring-1 ring-admin-success-soft',
     hasChartLine: true,
-    chartColor: '#2f9e73',
+    chartColor: success,
     chartLabel: 'Success',
     getCount: (stats) => stats.completed,
   },
@@ -116,7 +122,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     activePillClass:
       'bg-admin-danger-soft text-admin-danger font-semibold ring-1 ring-admin-danger-soft',
     hasChartLine: true,
-    chartColor: '#d14d5a',
+    chartColor: danger,
     chartLabel: 'Errors',
     getCount: (stats) => stats.failed,
   },
@@ -129,7 +135,7 @@ export const taskMetricDefinitions: readonly TaskMetricDefinition[] = [
     activePillClass:
       'bg-admin-surface-muted text-admin-text-2 font-semibold ring-1 ring-admin-border-soft',
     hasChartLine: true,
-    chartColor: '#8f8f8f',
+    chartColor: chartMist,
     chartLabel: 'Cancelled',
     getCount: (stats) => stats.cancelled,
   },

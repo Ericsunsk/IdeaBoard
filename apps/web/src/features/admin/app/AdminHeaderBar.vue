@@ -17,7 +17,7 @@
         <button
           type="button"
           title="回到顶部"
-          class="hidden min-w-0 items-center gap-2 text-left transition lg:flex"
+          class="hidden min-h-8 min-w-0 items-center gap-2 text-left transition lg:flex"
           :class="
             stickyTitleVisible
               ? 'translate-y-0 opacity-100'
@@ -107,7 +107,7 @@
 
                 <div v-else class="px-5 py-8 text-center">
                   <div class="text-admin-content font-bold text-admin-title-color">运行正常</div>
-                  <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">
+                  <div class="mt-1.5 text-admin-meta text-admin-text-2">
                     当前没有活跃异常
                   </div>
                 </div>

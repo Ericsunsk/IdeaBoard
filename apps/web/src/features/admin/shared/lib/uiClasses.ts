@@ -44,7 +44,7 @@ export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-admin-card-strong px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-xs'
 
 const adminFramedIconButtonBaseClass =
-  '!h-9 !w-9 !border !border-ib-border !bg-ib-surface !text-admin-text-2 hover:!bg-ib-surface-muted hover:!text-admin-text-1 disabled:!text-admin-text-3 transition-colors flex items-center justify-center p-0'
+  '!h-9 !w-9 !border !border-ib-border !bg-ib-surface !text-admin-text-2 hover:!bg-ib-surface-muted hover:!text-admin-text-1 disabled:!text-admin-text-3 transition-colors flex items-center justify-center p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/30'
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
 
@@ -53,7 +53,7 @@ export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !ro
  * 供 Events 折叠按钮、表格底栏翻页按钮等共享同一套视觉 Token
  */
 export const adminCompactIconButtonClass =
-  'flex !size-7 shrink-0 items-center justify-center !rounded-lg !border !border-admin-border-soft !bg-admin-card-strong !p-0 !text-admin-text-2 transition-colors hover:!bg-admin-surface-muted hover:!text-admin-text-1 cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
+  'flex !size-8 shrink-0 items-center justify-center !rounded-lg !border !border-admin-border-soft !bg-admin-card-strong !p-0 !text-admin-text-2 transition-colors hover:!bg-admin-surface-muted hover:!text-admin-text-1 cursor-pointer disabled:!cursor-not-allowed disabled:!opacity-40'
 
 export const adminToolbarPageLabelClass =
   'flex h-7 items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card-strong px-2.5 text-xs font-medium text-admin-text-2'

@@ -39,24 +39,24 @@ const taskStatusDefinitions: Record<TaskStatusValue, TaskStatusDefinition> = {
     text: '执行中',
     color: 'var(--color-admin-warning)',
     bannerClass:
-      'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
-    dotClass: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
+      'bg-[linear-gradient(135deg,rgba(164,105,37,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
+    dotClass: 'bg-admin-warning shadow-[0_0_0_4px_rgba(164,105,37,0.15)]',
   },
   [TaskStatus.completed]: {
     severity: 'success',
     text: '已完成',
     color: 'var(--color-admin-success)',
     bannerClass:
-      'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
-    dotClass: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
+      'bg-[linear-gradient(135deg,rgba(40,134,97,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
+    dotClass: 'bg-admin-success shadow-[0_0_0_4px_rgba(40,134,97,0.14)]',
   },
   [TaskStatus.failed]: {
     severity: 'danger',
     text: '失败',
     color: 'var(--color-admin-danger)',
     bannerClass:
-      'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
-    dotClass: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
+      'bg-[linear-gradient(135deg,rgba(201,74,86,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
+    dotClass: 'bg-admin-danger shadow-[0_0_0_4px_rgba(201,74,86,0.14)]',
   },
   [TaskStatus.cancelled]: {
     severity: 'secondary',

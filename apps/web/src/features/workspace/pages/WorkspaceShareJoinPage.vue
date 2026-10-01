@@ -1,7 +1,8 @@
 <template>
   <div class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text">
     <Card
-      class="w-[min(520px,100%)] p-6 rounded-ib-overlay border border-ib-border-soft bg-ib-surface shadow-ib-panel"
+      :elevated="false"
+      class="w-[min(520px,100%)] p-6 rounded-ib-overlay border border-ib-border-soft bg-ib-surface"
     >
       <div class="flex flex-col items-start gap-4">
         <Spinner

@@ -4,7 +4,7 @@
     class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text"
   >
     <div class="ib-board-page-background ib-page-dot-bg"></div>
-    <header class="sticky top-0 z-40 flex items-center justify-between pointer-events-none pb-2">
+    <header class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2">
       <StudioName class="pointer-events-auto" />
       <WorkspaceNavigation class="pointer-events-auto" />
       <UserAccountMenu
@@ -99,7 +99,7 @@
               <input
                 v-model="draftQuery"
                 type="text"
-                class="min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
+                class="min-h-8 min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
                 :placeholder="
                   references.length > 0
                     ? t('search.placeholders.queryWithReferences')

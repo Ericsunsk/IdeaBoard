@@ -32,7 +32,7 @@
       :key="point.id"
       :ref="(element) => setPointButtonRef(point.id, element)"
       type="button"
-      class="retouch-curves__point"
+      class="retouch-curves__point ib-hit-target-drag"
       :class="{ active: selectedPointId === point.id }"
       :data-point-id="point.id"
       :style="resolvePointStyle(point)"

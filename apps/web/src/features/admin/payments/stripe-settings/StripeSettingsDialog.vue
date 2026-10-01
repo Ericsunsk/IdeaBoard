@@ -59,7 +59,7 @@
           maxlength="255"
           aria-label="Payment Method Configuration ID"
           :disabled="isBusy"
-          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('paymentMethodConfigurationId')"
         />
@@ -82,7 +82,7 @@
           aria-label="Stripe API Key"
           :placeholder="apiKeyPlaceholder"
           :disabled="isBusy"
-          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('apiKey')"
         />
@@ -102,7 +102,7 @@
           :placeholder="PAYMENTS_MESSAGES.taxCodePlaceholder"
           aria-label="Product Tax Code"
           :disabled="isBusy"
-          :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('productTaxCode')"
         />

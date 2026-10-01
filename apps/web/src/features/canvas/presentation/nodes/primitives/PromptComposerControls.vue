@@ -4,6 +4,7 @@
     v-model="draft"
     name="canvas-prompt"
     :class="textareaClass"
+    class="focus-visible:shadow-ib-focus"
     :rows="rows"
     :placeholder="placeholder"
     :aria-label="placeholder || t('canvas.controls.prompt')"

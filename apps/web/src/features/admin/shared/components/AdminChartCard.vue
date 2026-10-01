@@ -2,7 +2,7 @@
   <div :class="spanClass">
     <ChartCard
       :title="title"
-      class="shadow-none"
+      :elevated="false"
       header-class="p-6 pb-4"
       title-class="text-base font-bold text-admin-text-1"
     >

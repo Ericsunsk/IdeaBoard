@@ -1,6 +1,6 @@
 export { default as Dialog } from './Dialog.vue'
 export { DialogRoot } from 'reka-ui'
-export { dialogContentBaseClass, dialogContentStyle } from './dialogClasses'
+export { dialogContentBaseClass } from './dialogClasses'
 export { default as DialogTrigger } from './DialogTrigger.vue'
 export { default as DialogPortal } from './DialogPortal.vue'
 export { default as DialogOverlay } from './DialogOverlay.vue'

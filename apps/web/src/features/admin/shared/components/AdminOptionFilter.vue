@@ -1,55 +1,26 @@
 <template>
-  <PopoverRoot v-model:open="isOpen">
-    <PopoverTrigger as-child>
-      <button
-        type="button"
-        class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
-        :class="active ? 'border-admin-accent text-admin-accent bg-admin-accent/5' : ''"
-        :aria-label="label"
-        :aria-expanded="isOpen"
-        aria-haspopup="listbox"
-      >
-        <span>{{ selectedLabel }}</span>
-        <NavArrowDown
-          class="size-3.5 text-admin-text-3 transition-transform"
-          :class="isOpen ? 'rotate-180' : ''"
-        />
-      </button>
-    </PopoverTrigger>
-    <PopoverPortal>
-      <PopoverContent
-        align="start"
-        :side-offset="4"
-        class="z-50 rounded-xl border border-admin-border bg-admin-card-strong p-1 text-admin-text-1 outline-none"
-      >
-        <div class="flex min-w-[130px] flex-col gap-0.5" role="listbox" :aria-label="label">
-          <button
-            v-for="option in options"
-            :key="option.value"
-            type="button"
-            role="option"
-            :aria-selected="modelValue === option.value"
-            :class="[
-              'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-              modelValue === option.value
-                ? 'bg-admin-accent/10 text-admin-accent font-semibold'
-                : 'text-admin-text-2 hover:bg-admin-surface-muted hover:text-admin-text-1',
-            ]"
-            @click="select(option.value)"
-          >
-            <span>{{ option.label }}</span>
-            <Check v-if="modelValue === option.value" class="size-3.5 text-admin-accent shrink-0" />
-          </button>
-        </div>
-      </PopoverContent>
-    </PopoverPortal>
-  </PopoverRoot>
+  <!--
+    Filter-style dropdown. Builds on AdminSelect (reka `Select`) rather than a
+    hand-rolled Popover: the previous implementation declared `role="listbox"`
+    and `aria-haspopup="listbox"` on a plain Popover, which advertised a
+    composite widget it did not implement — no arrow-key navigation, no
+    typeahead, no Home/End. Reka's Select supplies the whole keyboard model.
+    `active` carries the non-default filter state onto the shared trigger skin.
+  -->
+  <AdminSelect
+    :model-value="selectValue"
+    :options="normalizedOptions"
+    :active="active"
+    :aria-label="label"
+    size="small"
+    class="w-auto"
+    @update:model-value="handleUpdate"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Check, NavArrowDown } from '@iconoir/vue'
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { computed } from 'vue'
+import AdminSelect from './AdminSelect.vue'
 
 export type AdminOptionFilterOption = {
   label: string
@@ -70,17 +41,35 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const isOpen = ref(false)
+/**
+ * reka `Select` reserves the empty string for "show the placeholder", so it
+ * refuses a `<SelectItem value="">`. Filter lists legitimately carry an "all"
+ * option whose value is `''` (see `statusFilterOptions` in
+ * AdminBillingPricingPage), so the "all" value is mapped to a sentinel at this
+ * boundary and translated back on the way out. Keeping the sentinel here means
+ * callers keep passing their real domain values and never learn about it.
+ */
+const ALL_SENTINEL = '__all__'
+
+/** True when the selection is a real filter rather than the "all" default. */
 const active = computed(() => props.modelValue !== props.allValue)
-const selectedLabel = computed(
-  () =>
-    props.options.find((option) => option.value === props.modelValue)?.label ??
-    props.options[0]?.label ??
-    '',
+
+const normalizedOptions = computed(() =>
+  props.options.map((option) => ({
+    label: option.label,
+    value: option.value === props.allValue ? ALL_SENTINEL : option.value,
+  })),
 )
 
-function select(value: string) {
-  emit('update:modelValue', value)
-  isOpen.value = false
+/** Selected value in reka's value space (sentinel-aware). */
+const selectValue = computed(() => {
+  const value = props.modelValue === props.allValue ? ALL_SENTINEL : props.modelValue
+  return normalizedOptions.value.some((option) => option.value === value)
+    ? value
+    : normalizedOptions.value[0]?.value ?? ''
+})
+
+function handleUpdate(value: string | number) {
+  emit('update:modelValue', value === ALL_SENTINEL ? props.allValue : String(value))
 }
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <Card :class="props.class">
+  <Card :class="props.class" :elevated="props.elevated">
     <CardHeader :class="headerClass">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
@@ -34,12 +34,15 @@ const props = withDefaults(
     headerClass?: string | undefined
     titleClass?: string | undefined
     class?: string | undefined
+    /** Forwarded to `Card`. Flat surfaces pass `false` instead of cancelling a default shadow. */
+    elevated?: boolean | undefined
   }>(),
   {
     titleTag: 'span',
     headerClass: 'p-6 pb-2',
     titleClass: 'text-ib-icon font-medium text-ib-text',
     class: undefined,
+    elevated: undefined,
   },
 )
 

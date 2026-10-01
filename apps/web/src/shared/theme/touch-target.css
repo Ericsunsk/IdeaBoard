@@ -1,0 +1,77 @@
+@layer components {
+  /*
+   * Touch-target floor.
+   *
+   * WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA) asks for 24x24 CSS px. This repo
+   * holds a stricter 32px floor for anything a pointer has to hit.
+   *
+   * Some controls are legitimately smaller than that on screen: a switch track,
+   * a chart range segment, a canvas zoom button. Inflating those to 32px would
+   * change the design, so instead the *hit area* grows past the visual box. The
+   * pseudo-element belongs to the control itself, so pointer and keyboard
+   * activation still route to the real element and the accessible name, role
+   * and focus ring are untouched.
+   *
+   * `.ib-hit-target-32` grows both axes to the floor and leaves anything already
+   * larger alone, which is why it is safe to apply to a whole family. Measured
+   * spacing on the densest consumer (`/admin/credits`, nine stacked switches)
+   * is 57px between rows, so a 6px overhang cannot reach a neighbour.
+   *
+   * Prefer a real 32px box when the visual can afford it — use this only for
+   * controls that are visually small by design.
+   */
+  .ib-hit-target-32 {
+    position: relative;
+  }
+
+  .ib-hit-target-32::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, var(--spacing-ib-touch-target-min));
+    height: max(100%, var(--spacing-ib-touch-target-min));
+  }
+
+  /*
+   * Inline variant for controls laid out in a row (segmented groups, chip
+   * rails). Only the block axis grows, so the row keeps its rhythm while each
+   * target reaches the floor vertically.
+   */
+  .ib-hit-target-32-inline {
+    position: relative;
+  }
+
+  .ib-hit-target-32-inline::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: max(100%, var(--spacing-ib-touch-target-min));
+    transform: translateY(-50%);
+  }
+
+  /*
+   * Drag-handle variant: grows the hit area to the WCAG 2.2 AA floor (24px),
+   * not the repo floor. Reserved for drag handles that must stay visually
+   * small (curve points, histogram markers) AND are fully keyboard-operable
+   * (arrow keys move, Delete removes). A full 32px overlay on handles that can
+   * sit pixels apart would steal each other's grabs, which is a functional
+   * regression, not an improvement.
+   */
+  .ib-hit-target-drag {
+    position: relative;
+  }
+
+  .ib-hit-target-drag::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, var(--spacing-ib-touch-target-aa));
+    height: max(100%, var(--spacing-ib-touch-target-aa));
+  }
+}

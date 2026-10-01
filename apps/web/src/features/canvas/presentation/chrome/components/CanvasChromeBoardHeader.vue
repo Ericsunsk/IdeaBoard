@@ -3,7 +3,7 @@
     <div class="ib-page-chrome-surface canvas-chrome-board-control">
       <button
         type="button"
-        class="canvas-chrome-board-icon-button"
+        class="canvas-chrome-board-icon-button ib-hit-target-32"
         :aria-label="t('canvas.chrome.backToBoards')"
         @click.stop="emit('navigate-back')"
       >
@@ -37,7 +37,7 @@
       <div class="canvas-chrome-board-menu-slot">
         <button
           type="button"
-          class="canvas-chrome-board-icon-button"
+          class="canvas-chrome-board-icon-button ib-hit-target-32"
           :aria-label="t('canvas.chrome.selectBoard')"
           @click.stop="emit('toggle-board-menu')"
         >
@@ -89,7 +89,7 @@
       }}</span>
       <button
         type="button"
-        class="canvas-chrome-catalog-recovery-action"
+        class="canvas-chrome-catalog-recovery-action ib-hit-target-32-inline"
         :aria-label="t('canvas.chrome.restoreArchivedBoard')"
         :disabled="board.archived.isRestoring"
         @click="emit('restore-archived-board')"
@@ -115,7 +115,7 @@
       </span>
       <button
         type="button"
-        class="canvas-chrome-catalog-recovery-action"
+        class="canvas-chrome-catalog-recovery-action ib-hit-target-32-inline"
         :aria-label="t('canvas.chrome.reloadCatalog')"
         :disabled="board.catalogRecovery.status === 'reloading'"
         @click="emit('reload-catalog')"

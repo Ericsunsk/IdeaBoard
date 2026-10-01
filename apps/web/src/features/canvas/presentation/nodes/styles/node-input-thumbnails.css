@@ -94,7 +94,7 @@
   width: var(--node-input-thumbnail-size);
   height: var(--node-input-thumbnail-size);
   border-style: dashed;
-  color: #64748b;
+  color: var(--color-canvas-text-secondary);
   cursor: copy;
 }
 

@@ -3,7 +3,7 @@
     class="flex flex-col justify-between rounded-xl border border-admin-border-soft bg-admin-card p-5 text-admin-text-1"
   >
     <div class="flex flex-col gap-1">
-      <span class="text-admin-body font-medium text-admin-subtitle-color tracking-normal">
+      <span class="text-admin-body font-medium text-admin-text-2 tracking-normal">
         {{ label }}
       </span>
       <span class="text-admin-modal-title font-[780] text-admin-title-color leading-[1.05]">

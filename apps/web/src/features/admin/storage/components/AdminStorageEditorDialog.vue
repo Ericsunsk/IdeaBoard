@@ -40,7 +40,7 @@
             <h2 class="m-0 text-admin-title-sm font-bold text-admin-title-color">
               {{ editorMode === 'create' ? STORAGE_MESSAGES.editorCreateTitle : form.name }}
             </h2>
-            <p class="m-0 text-admin-caption text-admin-subtitle-color">
+            <p class="m-0 text-admin-caption text-admin-text-2">
               {{
                 editorMode === 'create'
                   ? STORAGE_MESSAGES.editorCreateSubtitle

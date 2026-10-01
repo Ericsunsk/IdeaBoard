@@ -4,7 +4,6 @@
     :error="error"
     :field-id="fieldId"
     :required="required"
-    :inline-required="inlineRequired"
     :field-class="fieldClass"
   >
     <template
@@ -12,8 +11,6 @@
         ariaInvalid,
         describedbyId,
         fieldId: slotFieldId,
-        inlineError,
-        inlineErrorText,
         invalid,
         required: slotRequired,
       }"
@@ -26,9 +23,9 @@
         maxlength="6"
         v-bind="controlState(invalid)"
         :required="slotRequired"
-        :class="[inputClass, inlineError ? inputErrorClass : '']"
+        :class="[inputClass, invalid ? inputErrorClass : '']"
         :invalid="invalid"
-        :placeholder="inlineError ? inlineErrorText : placeholder"
+        :placeholder="placeholder"
         :aria-invalid="ariaInvalid"
         :aria-describedby="describedbyId"
         @blur="emit('blur')"
@@ -54,7 +51,6 @@ const props = withDefaults(
     inputErrorClass?: string
     disabled?: boolean
     required?: boolean
-    inlineRequired?: boolean
   }>(),
   {
     error: '',
@@ -65,7 +61,6 @@ const props = withDefaults(
     inputErrorClass: '',
     disabled: false,
     required: true,
-    inlineRequired: true,
   },
 )
 

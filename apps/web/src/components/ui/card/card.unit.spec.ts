@@ -43,4 +43,27 @@ describe('Card compound components', () => {
     expect(footer.exists()).toBe(true)
     expect(footer.text()).toBe('Footer Content')
   })
+
+  describe('elevation contract', () => {
+    it('elevates by default', () => {
+      const wrapper = mount(Card)
+      expect(wrapper.classes()).toContain('shadow')
+    })
+
+    it('opts out when elevated is false, without needing a class override', () => {
+      const wrapper = mount(Card, { props: { elevated: false } })
+      expect(wrapper.classes()).not.toContain('shadow')
+      // A caller must never have to cancel the default with `shadow-none`;
+      // that only wins by accident of cn() class ordering.
+      expect(wrapper.classes().join(' ')).not.toContain('shadow-none')
+    })
+
+    it('keeps the base surface classes when elevation is off', () => {
+      const wrapper = mount(Card, { props: { elevated: false, class: 'p-6' } })
+      for (const base of ['rounded-xl', 'border', 'bg-card']) {
+        expect(wrapper.classes()).toContain(base)
+      }
+      expect(wrapper.classes()).toContain('p-6')
+    })
+  })
 })

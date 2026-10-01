@@ -8,9 +8,10 @@
         :aria-label="props.ariaLabel"
         :aria-busy="props.busy || undefined"
         @escape-key-down="handleEscape"
+        @open-auto-focus="handleOpenAutoFocus"
         @pointer-down-outside="blockOutsideDismiss"
       >
-        <div class="min-h-0 overflow-y-auto">
+        <div ref="panelRef" class="min-h-0 overflow-y-auto">
           <DialogTitle class="sr-only">
             {{ props.ariaLabel ?? t('auth.signIn') }}
           </DialogTitle>
@@ -35,6 +36,7 @@ import {
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
 import {
@@ -77,6 +79,23 @@ function handleMaskClick() {
 
 function handleEscape(event: KeyboardEvent) {
   if (!canDismiss('escape')) event.preventDefault()
+}
+
+/*
+ * reka-ui autofocuses the first tabbable node in the dialog, which is the
+ * trailing close action. Landing there puts a focus ring on a dismiss control
+ * instead of the first field, so redirect autofocus to the first form control.
+ */
+const FIRST_FORM_CONTROL =
+  'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+
+const panelRef = ref<HTMLElement | null>(null)
+
+function handleOpenAutoFocus(event: Event) {
+  const target = panelRef.value?.querySelector<HTMLElement>(FIRST_FORM_CONTROL)
+  if (!target) return
+  event.preventDefault()
+  target.focus()
 }
 
 function blockOutsideDismiss(event: Event) {

@@ -10,7 +10,7 @@
           <h3 class="text-admin-title font-bold text-admin-title-color">
             {{ SETTINGS_MESSAGES.uploadTitle }}
           </h3>
-          <span class="text-admin-meta text-admin-subtitle-color">{{
+          <span class="text-admin-meta text-admin-text-2">{{
             SETTINGS_MESSAGES.uploadSubtitle
           }}</span>
         </div>

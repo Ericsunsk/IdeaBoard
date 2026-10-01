@@ -37,7 +37,7 @@
             <h1 class="m-0 text-2xl font-bold tracking-wide text-admin-title-color">
               {{ currentMeta.title }}
             </h1>
-            <p class="mt-1 text-sm text-admin-subtitle-color">
+            <p class="mt-1 text-sm text-admin-text-2">
               {{ currentMeta.subtitle }}
             </p>
           </div>

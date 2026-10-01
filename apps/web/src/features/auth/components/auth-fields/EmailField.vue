@@ -4,7 +4,6 @@
     :error="error"
     :field-id="fieldId"
     :required="required"
-    :inline-required="inlineRequired"
     :field-class="fieldClass"
   >
     <template v-if="$slots['header-extra']" #header-extra>
@@ -15,8 +14,6 @@
         ariaInvalid,
         describedbyId,
         fieldId: slotFieldId,
-        inlineError,
-        inlineErrorText,
         invalid,
         required: slotRequired,
       }"
@@ -32,9 +29,9 @@
           v-bind="controlState(invalid)"
           :autocomplete="autocomplete"
           :required="slotRequired"
-          :class="[inputClass, $slots.prefix ? 'pl-10' : '', inlineError ? inputErrorClass : '']"
+          :class="[inputClass, $slots.prefix ? 'pl-10' : '', invalid ? inputErrorClass : '']"
           :invalid="invalid"
-          :placeholder="inlineError ? inlineErrorText : placeholder"
+          :placeholder="placeholder"
           :aria-invalid="ariaInvalid"
           :aria-describedby="describedbyId"
           @blur="emit('blur')"
@@ -64,7 +61,6 @@ const props = withDefaults(
     autocomplete?: string | undefined
     disabled?: boolean
     required?: boolean
-    inlineRequired?: boolean
   }>(),
   {
     error: '',
@@ -78,7 +74,6 @@ const props = withDefaults(
     autocomplete: undefined,
     disabled: false,
     required: true,
-    inlineRequired: true,
   },
 )
 

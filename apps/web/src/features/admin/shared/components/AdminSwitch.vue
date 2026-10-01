@@ -4,7 +4,10 @@
     :disabled="disabled"
     :class="
       cn(
-        'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-admin-accent data-[state=unchecked]:bg-admin-border',
+        // The 20px track is the design; `ib-hit-target-32` grows the hit area to
+        // the repo floor without inflating it. Without this the switch is the
+        // only target in most rows and fell under WCAG 2.2 AA 2.5.8.
+        'ib-hit-target-32 peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-admin-accent data-[state=unchecked]:bg-admin-border',
         props.class,
       )
     "

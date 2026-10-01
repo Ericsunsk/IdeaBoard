@@ -116,7 +116,7 @@
 
       <div
         v-else-if="detailTask.status === adminTaskStatuses.cancelled"
-        class="flex items-start gap-2 rounded-xl border border-admin-border-soft bg-admin-surface-muted p-3 text-xs leading-relaxed text-admin-text-2-strong"
+        class="flex items-start gap-2 rounded-xl border border-admin-border-soft bg-admin-surface-muted p-3 text-xs leading-relaxed text-admin-text-label"
       >
         <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-admin-text-3" />
         <div class="flex min-w-0 flex-1 flex-col">

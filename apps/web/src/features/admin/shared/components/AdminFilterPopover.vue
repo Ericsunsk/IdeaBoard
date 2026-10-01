@@ -16,8 +16,8 @@
     </PopoverTrigger>
     <PopoverPortal>
       <PopoverContent
-        class="z-50 w-[260px] max-w-[calc(100vw_-_48px)] rounded-xl border border-admin-border bg-admin-card-strong p-4 text-admin-text-1 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
-        :side-offset="6"
+        :class="adminSelectPanelClass"
+        :side-offset="ADMIN_SELECT_SIDE_OFFSET"
         align="start"
         @interact-outside="handleInteractOutside"
       >
@@ -47,6 +47,7 @@ import { ref } from 'vue'
 import { Filter } from '@iconoir/vue'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { adminFramedIconButtonClass } from '../lib/uiClasses'
+import { ADMIN_SELECT_SIDE_OFFSET, adminSelectPanelClass } from '../lib/adminSelectSkin'
 
 withDefaults(
   defineProps<{

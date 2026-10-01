@@ -120,7 +120,7 @@
     <div class="ib-page-chrome-surface canvas-chrome-status-control">
       <button
         type="button"
-        class="canvas-chrome-status-button"
+        class="canvas-chrome-status-button ib-hit-target-32"
         :aria-label="t('canvas.viewport.zoomOut')"
         @click="emit('zoom-out')"
       >
@@ -133,7 +133,7 @@
       </span>
       <button
         type="button"
-        class="canvas-chrome-status-button"
+        class="canvas-chrome-status-button ib-hit-target-32"
         :aria-label="t('canvas.viewport.zoomIn')"
         @click="emit('zoom-in')"
       >

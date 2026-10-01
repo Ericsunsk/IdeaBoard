@@ -1,6 +1,7 @@
 .retouch-panel {
   --retouch-panel-border-width: var(--node-tool-border-width);
-  --retouch-panel-row-height: 31px;
+  /* The repo touch-target floor is 32px; 31px was one pixel under it. */
+  --retouch-panel-row-height: 32px;
   --retouch-panel-control-radius: 8px;
   --retouch-panel-control-focus-border-color: var(--ib-focus-border-color);
   --retouch-panel-inset: 7px;

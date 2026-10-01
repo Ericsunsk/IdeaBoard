@@ -63,7 +63,7 @@ describe('Admin base control adapters', () => {
         props: { invalid: true, size: 'small' },
       })
       const input = wrapper.find('input')
-      expect(input.classes()).toContain('border-admin-danger')
+      expect(input.classes()).toContain('!border-admin-danger')
       expect(input.classes()).toContain('text-admin-meta')
       expect(input.attributes('aria-invalid')).toBe('true')
     })

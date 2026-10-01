@@ -21,7 +21,7 @@
         <div class="pt-6 pb-0">
           <form class="flex flex-col gap-4" novalidate @submit.prevent="handleLogin">
             <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
-              <span>Email</span>
+              <span>{{ ADMIN_LOGIN_MESSAGES.emailLabel }}</span>
               <div class="relative flex items-center">
                 <span
                   class="pointer-events-none absolute left-3 flex items-center text-admin-text-3"
@@ -50,11 +50,10 @@
                   :type="showPassword ? 'text' : 'password'"
                   autocomplete="current-password"
                   class="!min-h-11 pr-10"
-                  placeholder="password"
                 />
                 <button
                   type="button"
-                  class="absolute right-3 flex items-center text-admin-text-3 hover:text-admin-text-1 cursor-pointer transition-colors"
+                  class="absolute right-0 flex size-8 items-center justify-center text-admin-text-3 hover:text-admin-text-1 cursor-pointer transition-colors"
                   :aria-label="
                     showPassword
                       ? ADMIN_LOGIN_MESSAGES.hidePassword

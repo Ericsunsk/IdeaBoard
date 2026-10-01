@@ -20,8 +20,6 @@
             ariaInvalid,
             describedbyId,
             fieldId,
-            inlineError,
-            inlineErrorText,
             invalid,
             required,
           }"
@@ -29,7 +27,6 @@
           :error="errors.displayName"
           field-id="register-display-name"
           required
-          inline-required
           :field-class="authFieldClass"
         >
           <div class="relative w-full">
@@ -42,9 +39,9 @@
               v-bind="resolveFieldControlState(invalid)"
               autocomplete="name"
               :required="required"
-              :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
+              :class="[authInputClass, 'pl-10', invalid ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : t('auth.placeholders.username')"
+              :placeholder="t('auth.placeholders.username')"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
               @blur="handleFieldBlur('displayName')"

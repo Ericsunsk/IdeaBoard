@@ -18,17 +18,28 @@
             autocapitalize="characters"
             :spellcheck="false"
             :disabled="pending"
-            :class="ibFormInputClass"
+            :class="[ibFormInputClass, redeemFailed ? ibFormInputErrorClass : '']"
+            :aria-invalid="redeemFailed || undefined"
+            :aria-describedby="redeemFailed ? 'account-reward-code-error' : undefined"
             :placeholder="t('account.rewards.codePlaceholder')"
+            @update:model-value="redeemFailed = false"
           />
           <Button
             type="submit"
             :disabled="!canSubmit"
             :loading="pending"
-            :class="accountPrimaryActionButtonClass"
+            :class="[accountPrimaryActionButtonClass, 'h-10']"
             >{{ t('account.rewards.redeem') }}</Button
           >
         </div>
+        <p
+          v-if="redeemFailed"
+          id="account-reward-code-error"
+          class="m-0 border-0 bg-transparent p-0 text-xs font-semibold text-ib-danger"
+          role="alert"
+        >
+          {{ redeemErrorText }}
+        </p>
       </form>
     </section>
 
@@ -173,7 +184,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'
 import { ACCOUNT_GUIDANCE_COPY_KEYS } from '../../infrastructure'
-import { ibFormInputClass } from '../../../../shared/theme/formControls'
+import { ibFormInputClass, ibFormInputErrorClass } from '../../../../shared/theme/formControls'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { useProfileFeedback } from '../../application/profile/useProfileFeedback'
 import { formatAccountShanghaiDateTime } from '../../domain'
@@ -203,6 +214,11 @@ const {
 } = useRewardHistory()
 const normalizedCode = computed(() => code.value.trim())
 const canSubmit = computed(() => normalizedCode.value.length > 0 && !pending.value)
+// Submit failures surface inline next to the control (the Admin invalid +
+// error-text contract), not only as a toast: the user needs to see which field
+// failed without hunting a transient message.
+const redeemFailed = ref(false)
+const redeemErrorText = ref('')
 
 type RewardSkeletonRow = {
   id: string
@@ -239,11 +255,14 @@ function errorMessage(error: unknown): string {
 
 async function submitCode() {
   if (!canSubmit.value) return
+  redeemFailed.value = false
   try {
     const result = await redeem(normalizedCode.value)
     code.value = ''
     profileFeedback.rewardRedemptionSucceeded(result.credited_amount, result.replayed)
   } catch (error) {
+    redeemFailed.value = true
+    redeemErrorText.value = errorMessage(error)
     profileFeedback.rewardRedemptionFailed(error)
   }
 }

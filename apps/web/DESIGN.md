@@ -52,6 +52,57 @@ Token ownership:
 - `--color-ib-*`: cross-feature semantic aliases.
 - `--color-ib-auth-*`: Auth/User Shell.
 
+### Text Color Ramp Standard
+
+Every surface names its text ramp by **role**, never by ordinal. Ordinal names
+(`text-1/2/3`) force a renumber whenever a level is added or removed, and they
+invite the mistake of reading a higher number as "more important". Role names
+stay meaningful as the ramp grows.
+
+| Role            | Use for                                              | Minimum ratio |
+| --------------- | ---------------------------------------------------- | ------------- |
+| `text-primary`  | Headings, body copy, the main reading color           | 7:1 (AAA)     |
+| `text-secondary`| Labels, supporting copy, field values                 | 4.5:1 (AA)    |
+| `text-label`    | Group headings / fieldset legends (Admin only)        | 4.5:1 (AA)    |
+| `text-tertiary` | Captions, metadata, hints                             | 4.5:1 (AA)    |
+| `text-muted`    | Decorative or placeholder text only                   | 4.5:1 (AA)    |
+| `text-disabled` | Inactive controls (WCAG exempt, no floor)             | none          |
+| `text-inverse`  | Text on saturated/dark fills                          | 4.5:1 (AA)    |
+
+Rules:
+
+- Minimums are measured against the **darkest surface the role actually rests
+  on**, not the page background. A caption inside a muted chip is not a page-level
+  caption.
+- Small type does not get a lower bar. `text-tertiary` at 11px still needs 4.5:1.
+- `text-muted` may only be used when the information is also available elsewhere
+  (adjacent label, `aria-label`, or an icon with an accessible name). It is not a
+  licence to render unreadable text.
+- Rungs must be monotonically lighter and visually distinct. Adding a rung that
+  lands within 0.95x luminance of its neighbor is rejected — it reads as a bug,
+  not a hierarchy.
+- Each ramp declares its binding (darkest resting) surface. The contract test
+  walks the full role × surface matrix, compositing alpha values the way the
+  browser does.
+
+Enforcement: `src/features/admin/shared/lib/textRampContrast.contract.spec.ts`.
+A token edit that drops any role below its floor, collapses two rungs, breaks an
+alias, or desynchronizes `adminThemeTokenFallbacks` from `style.css` fails the
+web test lane.
+
+Current ramps, measured on each ramp's binding surface:
+
+| Ramp    | primary | secondary | label  | tertiary | muted  | Binding surface              |
+| ------- | ------- | --------- | ------ | -------- | ------ | ---------------------------- |
+| Admin   | 13.0:1  | 5.6:1     | 6.8:1  | 4.8:1    | —      | `--color-admin-surface-hover` |
+| Canvas  | 11.7:1  | 5.4:1     | —      | —        | 4.7:1  | `--color-canvas-workspace-bg` |
+| Boards  | 14.8:1  | 5.4:1     | —      | —        | 4.9:1  | `--color-board-page`          |
+
+`--color-canvas-text-control` and `--color-canvas-text-option` alias the Canvas
+ramp rather than declaring standalone greys; Canvas previously carried five greys
+of which two were the same value. `--color-ib-text*` aliases the Admin ramp and
+`--text-ib-*` aliases `--text-admin-*`. Do not redeclare either.
+
 ## Style Ownership
 
 Keep style ownership explicit. A selector should live at the narrowest layer that can own it without leaking implementation details.
@@ -75,7 +126,7 @@ Rules:
 ## UI Primitives And Tailwind
 
 - User shell primitives live in `src/components/ui/*` (`Button`, `Dialog`,
-  `Input`, `Popover`, `DropdownMenu`, `Card`, `Badge`, `Avatar`, `Skeleton`, `Spinner`),
+  `Input`, `Popover`, `DropdownMenu`, `Select`, `Card`, `Badge`, `Avatar`, `Skeleton`, `Spinner`),
   built on official `shadcn-vue` standards (`reka-ui` + `cva` + `@/lib/utils` `cn`). No PrimeVue dependency remains.
 - Use Tailwind utilities for layout, spacing, typography, and simple states.
 - Use micro primitives (`DialogRoot`/`DialogContent`/…) composed explicitly per caller
@@ -89,6 +140,122 @@ Rules:
 - Dialog widths are keyed by stable `data-size` (`slim/compact/form/medium/wide`) in
   `src/app/style.css` for `AdminDialogShell`; user-shell dialogs set their own
   widths via `cn(dialogContentBaseClass, …)` + style.
+
+## Select: One Primitive, Per-Surface Skin
+
+Every value picker on both surfaces mounts `@/components/ui/select`. That module owns
+structure and the keyboard model — arrow keys, typeahead, Home/End, Escape, and a
+correct `role="combobox"` / `aria-expanded` pair. It must stay neutral: it carries only
+the shadcn default geometry in `selectVariants.ts` and may not reference a surface
+token. `npm run lint:admin-dropdown` fails the build if it does.
+
+Surfaces own their skin and adapt on top:
+
+| Surface | Adapter | Skin source |
+| --- | --- | --- |
+| Admin | `AdminSelect.vue` | `admin/shared/lib/adminSelectSkin.ts` |
+| User shell | call `Select` directly | caller's class props |
+
+**Command menu vs value picker.** An icon trigger that immediately runs an action
+(`UserLocaleSelect`) is a command menu and belongs on `DropdownMenu`. A control that
+holds a chosen value (Boards sorting, Admin status filters) is a value picker and
+belongs on `Select`. Never declare `aria-haspopup="menu"` on a value picker, and never
+hand-roll `role="listbox"` over a `Popover` — that advertised a composite widget with no
+keyboard navigation.
+
+**Wrappers must forward a live binding.** `Select.vue` uses
+`useForwardPropsEmits` plus a `computed` wrapper, matching `Popover.vue` and
+`DropdownMenu.vue`. A plain `v-bind="cleanProps(props)"` freezes `modelValue` at mount
+and the option list silently never opens. Local variant props (`size` on the trigger,
+`inset` on the item) must be stripped before forwarding, or they render as stray
+attributes on the underlying element.
+
+**Readonly viewModels need commands.** Pages destructure `controller.viewModel`, whose
+fields are all `readonly(readonly(ref))`. `v-model` on one compiles, renders, and
+silently drops the write — the page looks right until a setting stops responding.
+Bind `:model-value` and forward through the command instead, the same shape
+`searchKeyword` uses on `BoardsPage`. `pageChrome.contract.spec.ts` fails if a
+`v-model` reappears there.
+
+## Touch Targets: 32px Floor, 24px For Drag Handles
+
+WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA) asks for 24x24 CSS px. This repo holds a
+stricter 32px floor, declared once as `--spacing-ib-touch-target-min` in
+`src/app/style.css` and enforced by `npm run lint:touch-target`
+(`scripts/checkTouchTargetContract.ts`).
+
+Controls that are visually small by design do not inflate to 32px. Instead the *hit
+area* grows past the visual box through `src/shared/theme/touch-target.css`:
+
+| Class | Grows to | Use for |
+| --- | --- | --- |
+| `.ib-hit-target-32` | 32px both axes | switch tracks, canvas zoom buttons, compact toolbar buttons |
+| `.ib-hit-target-32-inline` | 32px vertical only | chip rails, chart range segments, node action buttons — rows keep their rhythm |
+| `.ib-hit-target-drag` | 24px (AA floor) | drag handles only — see below |
+
+The pseudo-element belongs to the control itself, so pointer and keyboard
+activation still route to the real element and the accessible name, role, and
+focus ring are untouched. Prefer a real 32px box (`min-h-8`, `!size-8`) when the
+visual can afford it; use the overlay only where the small size is the design.
+
+**Drag handles stop at 24px.** Curve points and histogram markers must stay
+visually small (editing precision), their handles can sit pixels apart (a 32px
+overlay would steal neighbouring grabs), and both are fully keyboard-operable
+(arrow keys move, Delete removes). When even the pseudo-element is taken — the
+histogram marker paints its dot on `::after` and its stem on `::before` — grow
+the transparent button box itself instead.
+
+## Listbox: Declare It Only If You Implement It
+
+A `role="listbox"` promises the APG composite model: one Tab stop, arrow keys
+between options, Home/End to jump. Two places in this repo declared the role
+without the model:
+
+- `AdminOptionFilter` hand-rolled `role="listbox"` over a `Popover` with no arrow
+  keys at all — replaced with the shared `Select` primitive.
+- Retouch `LayersPanel` gave every `role="option"` its own `tabindex="0"` with
+  only Enter/Space bound — now roving tabindex (`LayersPanel.component.spec.ts`
+  pins single-tab-stop, arrows, Home/End, no-wrap, and Enter/Space).
+
+If a list cannot offer arrow-key navigation, do not give it `listbox` semantics.
+Render plain buttons and let Tab do the work.
+
+## Form Inputs: One Contract, Two Skins
+
+User-side inputs (everything except the search bar) and Admin inputs share one
+contract and differ only in tokens and density. The structure is identical on
+both sides: a neutral primitive, a surface skin, a field shell with persistent
+error text, and an invalid state that survives hover and focus.
+
+| Layer | User | Admin |
+| --- | --- | --- |
+| Primitive | `@/components/ui/input` (`Input`, `PasswordInput`) | same primitive |
+| Skin | `ibFormInputClass` (h-10) + `ibFormInputErrorClass` | `adminInputChromeClass` + `!border-admin-danger` |
+| Field shell | `IbFormField` | `AdminFormField` |
+| Error text | persistent `<p role="alert">` below | persistent `<p>` below |
+
+Three rules keep the two sides from diverging again (`formControls.contract.spec.ts`
+enforces them):
+
+1. **The primitive stays neutral.** It must not set a focus border or an invalid
+   border — every skin owns those. The primitive once shipped
+   `focus-visible:border-ring`, which tied at (0,2,0) with the skins' solid
+   accent border; stylesheet order then decided whether focus showed a stroke or
+   just a faint glow.
+2. **Border and glow share one modality.** Both ride `focus-visible`, so mouse
+   and keyboard focus look identical.
+3. **Error beats hover.** The base chrome's hover border (0,2,0) otherwise beats
+   a plain error border (0,1,0) and resting the mouse on an invalid field hides
+   the error. Both skins declare the error border `!`-important for this reason.
+
+Supporting rule: `cn()` (`src/lib/utils.ts`) registers the `ib-*`/`admin-*`
+namespaces in tailwind-merge's `border-color` group, so `cn()` keeps the last
+border class deterministically instead of leaving base and error tied for
+stylesheet order to decide.
+
+Errors never render as placeholder text: a placeholder vanishes on first
+keystroke and is not exposed as the accessible error. `IbFormField` shows every
+error — including required-field errors — as persistent text below the control.
 
 ## Component Placement
 

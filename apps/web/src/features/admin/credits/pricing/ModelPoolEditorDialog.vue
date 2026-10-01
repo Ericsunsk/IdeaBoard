@@ -75,7 +75,7 @@
       <div class="flex items-center gap-2">
         <select
           v-model="selectedCatalogId"
-          class="h-8 min-w-0 flex-1 rounded-lg border border-admin-border-soft bg-white px-2 text-xs text-admin-text-1"
+          :class="cn(adminSelectTriggerClass, adminSelectTriggerCompactClass, 'flex-1')"
           :aria-label="BILLING_PRICING_MESSAGES.poolAddPlaceholder"
           :disabled="pending || availableCatalogModels.length === 0"
         >
@@ -155,6 +155,11 @@ import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import {
+  adminSelectTriggerClass,
+  adminSelectTriggerCompactClass,
+} from '../../shared/lib/adminSelectSkin'
+import { cn } from '../../../../lib/utils'
 import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import type {
   AdminBillableItemCard,

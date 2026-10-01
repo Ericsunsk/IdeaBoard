@@ -14,11 +14,11 @@
 
     <slot v-bind="slotProps" />
 
-    <span v-if="inlineError || !showMessage" :id="errorId" class="sr-only">
+    <span v-if="!showMessage" :id="errorId" class="sr-only">
       {{ errorMessage }}
     </span>
 
-    <div v-else-if="shouldShowMessage" :id="errorId">
+    <div v-else-if="invalid" :id="errorId">
       <p
         class="m-0 mt-1.5 border-0 bg-transparent p-0 text-xs font-semibold text-ib-danger"
         role="alert"
@@ -32,20 +32,17 @@
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import { displayErrorMessage, isRequiredErrorMessage } from '../utils/formValidation'
+import { displayErrorMessage } from '../utils/formValidation'
 import type { FormFieldContractProps, FormFieldContractSlotProps } from './formFieldContract'
 
 export type IbFormFieldSlotProps = FormFieldContractSlotProps & {
   ariaInvalid: true | undefined
-  inlineError: boolean
-  inlineErrorText: string
 }
 
 const props = withDefaults(
   defineProps<
     FormFieldContractProps & {
     required?: boolean
-    inlineRequired?: boolean
     showMessage?: boolean
     fieldClass?: string
     labelClass?: string
@@ -55,7 +52,6 @@ const props = withDefaults(
     error: '',
     fieldId: undefined,
     required: false,
-    inlineRequired: false,
     showMessage: true,
     fieldClass: '',
     labelClass: '',
@@ -71,8 +67,9 @@ const generatedId = useId()
 const resolvedFieldId = computed(() => props.fieldId || `ib-form-field-${generatedId}`)
 const errorId = computed(() => `${resolvedFieldId.value}-error`)
 const invalid = computed(() => Boolean(props.error))
-const inlineError = computed(() => props.inlineRequired && isRequiredErrorMessage(props.error))
-const shouldShowMessage = computed(() => props.showMessage && invalid.value && !inlineError.value)
+// Errors always render as persistent text below the control, the same contract
+// AdminFormField keeps. The old inline-required path swapped the error into the
+// input's placeholder, where it vanished the moment the user typed.
 const describedbyId = computed(() => (invalid.value ? errorId.value : undefined))
 const errorMessage = computed(() => displayErrorMessage(props.error))
 const slotProps = computed<IbFormFieldSlotProps>(() => ({
@@ -80,8 +77,6 @@ const slotProps = computed<IbFormFieldSlotProps>(() => ({
   describedbyId: describedbyId.value,
   errorId: invalid.value ? errorId.value : undefined,
   fieldId: resolvedFieldId.value,
-  inlineError: inlineError.value,
-  inlineErrorText: inlineError.value ? errorMessage.value : '',
   invalid: invalid.value,
   required: props.required,
 }))

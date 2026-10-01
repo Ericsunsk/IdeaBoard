@@ -19,7 +19,7 @@
           <div class="text-admin-title-sm font-bold text-admin-title-color truncate">
             {{ t('admin.wallet.userAssetsTitle', { name: user.displayName }) }}
           </div>
-          <div class="text-admin-caption font-mono text-admin-subtitle-color truncate">
+          <div class="text-admin-caption font-mono text-admin-text-2 truncate">
             UID: {{ user.publicId }}
           </div>
         </div>

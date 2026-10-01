@@ -1,5 +1,13 @@
 <template>
-  <SelectRoot
+  <!--
+    The trigger's accessible name is supplied per call site: `ariaLabel` for
+    filter-style selects, or a visible <label for> bound to `id` for form
+    selects. `vuejs-accessibility/form-control-has-label` cannot follow either
+    across a component boundary, so the association is pinned by
+    adminSelectSkin / AdminOptionFilter specs and the a11y smoke lane instead.
+  -->
+  <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+  <Select
     :model-value="modelValue != null ? String(modelValue) : ''"
     :disabled="disabled"
     @update:model-value="handleUpdate"
@@ -7,10 +15,12 @@
     <SelectTrigger
       :id="id"
       v-bind="$attrs"
+      :aria-label="props.ariaLabel ?? ($attrs['aria-label'] as string | undefined)"
       :class="
         cn(
-          'flex h-9 w-full items-center justify-between rounded-lg border border-admin-border bg-white px-3 py-2 text-admin-body text-admin-text-1 ring-offset-background placeholder:text-admin-text-3 focus:outline-none focus:ring-2 focus:ring-admin-accent/20 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 cursor-pointer',
-          size === 'small' && 'h-8 px-2.5 text-admin-meta',
+          adminSelectTriggerClass,
+          size === 'small' && adminSelectTriggerCompactClass,
+          active && adminSelectTriggerActiveClass,
           props.class,
         )
       "
@@ -18,67 +28,79 @@
       <SelectValue :placeholder="placeholder">
         {{ selectedLabel || placeholder }}
       </SelectValue>
-      <SelectIcon as-child>
-        <NavArrowDown class="size-4 text-admin-text-3 opacity-70" />
+      <SelectIcon>
+        <NavArrowDown :class="adminSelectTriggerIconClass" />
       </SelectIcon>
     </SelectTrigger>
 
-    <SelectPortal>
-      <SelectContent
-        :class="
-          cn(
-            'relative z-50 max-h-96 min-w-32 overflow-hidden rounded-xl border border-admin-border bg-admin-card-strong text-admin-text-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
-          )
-        "
-        position="popper"
-        :side-offset="4"
-      >
-        <SelectViewport
-          class="p-1.5 h-[var(--reka-select-trigger-height)] w-full min-w-[var(--reka-select-trigger-width)]"
-        >
-          <slot>
-            <SelectItem
-              v-for="opt in normalizedOptions"
-              :key="String(opt.value)"
-              :value="String(opt.value)"
-              :class="
-                cn(
-                  'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pr-8 pl-2 text-admin-body outline-none transition-colors focus:bg-admin-surface-muted focus:text-admin-text-1 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-                  size === 'small' && 'text-admin-meta py-1 pl-2 pr-7',
-                )
-              "
-            >
-              <span class="absolute right-2 flex size-3.5 items-center justify-center">
-                <SelectItemIndicator>
-                  <Check class="size-4 text-admin-accent" />
-                </SelectItemIndicator>
-              </span>
-              <SelectItemText>{{ opt.label }}</SelectItemText>
-            </SelectItem>
-          </slot>
-        </SelectViewport>
-      </SelectContent>
-    </SelectPortal>
-  </SelectRoot>
+    <SelectContent
+      :class="adminSelectContentClass"
+      position="popper"
+      :side-offset="ADMIN_SELECT_SIDE_OFFSET"
+    >
+      <SelectViewport :class="adminSelectViewportClass">
+        <slot>
+          <SelectItem
+            v-for="opt in normalizedOptions"
+            :key="String(opt.value)"
+            :value="String(opt.value)"
+            :class="
+              cn(
+                adminSelectItemClass,
+                size === 'small' && adminSelectItemCompactClass,
+              )
+            "
+          >
+            <span :class="adminSelectItemIndicatorClass">
+              <SelectItemIndicator>
+                <Check :class="adminSelectItemCheckClass" />
+              </SelectItemIndicator>
+            </span>
+            <SelectItemText>{{ opt.label }}</SelectItemText>
+          </SelectItem>
+        </slot>
+      </SelectViewport>
+    </SelectContent>
+  </Select>
 </template>
 
 <script setup lang="ts">
 import { computed, type HTMLAttributes } from 'vue'
 import {
+  Select,
   SelectContent,
   SelectIcon,
   SelectItem,
   SelectItemIndicator,
   SelectItemText,
-  SelectPortal,
-  SelectRoot,
   SelectTrigger,
   SelectValue,
   SelectViewport,
-} from 'reka-ui'
+} from '@/components/ui/select'
 import { Check, NavArrowDown } from '@iconoir/vue'
 import { cn } from '@/lib/utils'
+import {
+  ADMIN_SELECT_SIDE_OFFSET,
+  adminSelectContentClass,
+  adminSelectItemCheckClass,
+  adminSelectItemClass,
+  adminSelectItemCompactClass,
+  adminSelectItemIndicatorClass,
+  adminSelectTriggerActiveClass,
+  adminSelectTriggerClass,
+  adminSelectTriggerCompactClass,
+  adminSelectTriggerIconClass,
+  adminSelectViewportClass,
+} from '../lib/adminSelectSkin'
 
+/**
+ * Admin skin adapter for the neutral shared Select primitive.
+ *
+ * Structure and the keyboard model (arrow keys, typeahead, Home/End, Escape)
+ * come from `@/components/ui/select`; this file only supplies Admin tokens, per
+ * the same split `Popover` and `DropdownMenu` callers rely on. Route pages never
+ * import `components/ui/select` directly.
+ */
 export type SelectOptionItem = {
   label: string
   value: string | number
@@ -87,6 +109,12 @@ export type SelectOptionItem = {
 const props = withDefaults(
   defineProps<{
     id?: string | undefined
+    /**
+     * Accessible name for the trigger. Select's trigger is a real form control,
+     * so it needs a programmatic label; callers that render a visible <label>
+     * pass its `for` via `id` instead and can leave this unset.
+     */
+    ariaLabel?: string | undefined
     modelValue?: string | number | null | undefined
     options?: readonly (SelectOptionItem | Record<string, unknown>)[]
     optionLabel?: string
@@ -95,9 +123,12 @@ const props = withDefaults(
     class?: HTMLAttributes['class']
     disabled?: boolean
     size?: 'small' | 'default'
+    /** Marks the trigger as carrying a non-default filter value. */
+    active?: boolean
   }>(),
   {
     id: undefined,
+    ariaLabel: undefined,
     modelValue: '',
     options: () => [],
     optionLabel: 'label',
@@ -106,6 +137,7 @@ const props = withDefaults(
     class: undefined,
     disabled: false,
     size: 'default',
+    active: false,
   },
 )
 

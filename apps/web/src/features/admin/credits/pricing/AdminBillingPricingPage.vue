@@ -56,7 +56,7 @@
       <div class="text-admin-title font-semibold text-admin-title-color">
         {{ BILLING_PRICING_MESSAGES.loadFailedTitle }}
       </div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">{{ errorMessage }}</div>
+      <div class="mt-2 text-admin-meta text-admin-text-2">{{ errorMessage }}</div>
       <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadCatalog">
         <Refresh class="size-4" />
         {{ BILLING_PRICING_MESSAGES.reload }}

@@ -29,11 +29,30 @@ describe('Cross-feature page chrome surface contract', () => {
     })
   })
 
-  it('uses a command menu instead of a form select for Boards sorting', () => {
+  it('never binds a controller viewModel field with v-model', () => {
+    // BoardsPage destructures `controller.viewModel`, and every field in it is
+    // readonly(readonly(ref)). `v-model` on such a field compiles and renders
+    // but silently drops the write, so the page looks correct until someone
+    // changes a setting and nothing happens. Selection must go through commands.
+    const boardsPage = readSource('features/board/presentation/catalog/BoardsPage.vue')
+    const vModelBindings = [...boardsPage.matchAll(/v-model(?:\.[\w-]+)?="([^"]+)"/g)].map(
+      (match) => match[1],
+    )
+
+    expect(vModelBindings).toEqual([])
+  })
+
+  it('uses the shared Select primitive for Boards sorting, never a command menu', () => {
     const boardsPage = readSource('features/board/presentation/catalog/BoardsPage.vue')
 
-    expect(boardsPage).toContain(':class="catalogClasses.sortMenuTrigger"')
-    expect(boardsPage).toContain('<DropdownMenu')
+    // Sorting picks a value and holds it, so it is a Select, not a menu of
+    // commands. It used to be a DropdownMenu with `aria-haspopup="menu"`, which
+    // mis-declared the widget and gave up the keyboard model. This assertion
+    // originally existed to keep PrimeVue's Select out; PrimeVue is gone, and
+    // `@/components/ui/select` is the neutral replacement.
+    expect(boardsPage).toContain(':class="catalogClasses.sortSelectTrigger"')
+    expect(boardsPage).toContain("from '@/components/ui/select'")
+    expect(boardsPage).not.toContain('<DropdownMenu')
     expect(boardsPage).not.toContain("from 'primevue/select'")
   })
 

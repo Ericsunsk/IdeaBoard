@@ -28,15 +28,13 @@ describe('Standard shadcn-vue primitives', () => {
     expect(wrapper.attributes('disabled')).toBeDefined()
   })
 
-  it('renders standard Input component with model value, compact size and invalid', async () => {
+  it('renders standard Input component with model value, compact size and invalid aria state', async () => {
     const wrapper = mount(Input, {
       props: { modelValue: 'hello', size: 'compact', invalid: true },
     })
     const input = wrapper.find('input')
     expect(input.element.value).toBe('hello')
     expect(input.classes()).toContain('h-8')
-    expect(input.classes()).toContain('border-destructive')
-    expect(input.classes()).toContain('focus-visible:border-destructive')
     expect(input.attributes('aria-invalid')).toBe('true')
   })
 

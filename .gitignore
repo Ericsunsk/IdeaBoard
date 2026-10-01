@@ -20,6 +20,7 @@ apps/api/*.exe
 apps/api/ideaboard-server*
 apps/api/uploads/*
 !apps/api/uploads/.placeholder
+apps/api/ws-uploads/*
 apps/api/test_upload.png
 apps/api/bin/
 apps/api/web/dist/*

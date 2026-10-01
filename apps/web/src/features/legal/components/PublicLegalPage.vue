@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="rounded-ib-control text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-ib-control text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="rounded-ib-control px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-ib-control px-2 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           Back to home
         </RouterLink>
@@ -46,7 +46,7 @@
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="rounded-ib-control no-underline transition-colors hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-ib-control px-2 no-underline transition-colors hover:text-ib-text focus-visible:outline-none focus-visible:shadow-ib-focus"
         >
           {{ link.label }}
         </RouterLink>
@@ -89,5 +89,10 @@ const legalLinks = PUBLIC_LEGAL_LINKS
 .legal-copy :slotted(a) {
   color: var(--color-ib-creative-accent-pressed);
   font-weight: 600;
+  /* Slotted legal copy is prose; inline links must still clear a 32px tap target
+     without loosening the surrounding line rhythm. */
+  display: inline-block;
+  min-height: 32px;
+  padding-block: 0.25rem;
 }
 </style>

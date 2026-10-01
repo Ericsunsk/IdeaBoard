@@ -65,12 +65,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
-  'src/features/admin/shared/styles/admin-user-avatar-button.css': {
-    counts: {
-      'raw-color': 1,
-    },
-    reason: 'Avatar CSS contract keeps a fallback color for the cross-feature avatar bridge.',
-  },
   'src/features/admin/monitor/domain/status.ts': {
     counts: {
       'raw-color': 10,
@@ -80,17 +74,17 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/lib/adminThemeTokens.ts': {
     counts: {
-      'raw-color': 56,
+      'raw-color': 54,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
   },
   'src/features/admin/shared/lib/taskMetricTokens.ts': {
     counts: {
-      'raw-color': 5,
+      'raw-color': 0,
     },
     reason:
-      'Task metric pill/chart palette is a domain visual contract shared by monitor pills and charts.',
+      'Task metric chart colors resolve from adminThemeTokenFallbacks; the allowance stays registered so reintroducing inline hex is caught as an overage rather than silently allowed.',
   },
   'src/features/admin/app/AdminSidebar.vue': {
     counts: {
@@ -204,12 +198,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Account usage chart palette is a domain visual contract for chart series colors.',
   },
-  'src/features/admin/shared/styles/admin-user-avatar-button.css': {
-    counts: {
-      'hex-color': 1,
-    },
-    reason: 'Avatar CSS contract keeps a fallback color for the cross-feature avatar bridge.',
-  },
   'src/features/board/infrastructure/preview/boardPreviewSerializer.ts': {
     counts: {
       'hex-color': 16,
@@ -248,7 +236,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/canvas/presentation/nodes/styles/node-input-thumbnails.css': {
     counts: {
-      'hex-color': 4,
+      'hex-color': 3,
     },
     reason: 'Canvas node thumbnail chrome uses canvas drawing constants.',
   },

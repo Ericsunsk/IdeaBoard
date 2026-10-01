@@ -2,6 +2,7 @@
   <RangedLineChartCard
     v-bind="forwarded"
     v-model="selectedRange"
+    :elevated="false"
     header-class="p-6 pb-4"
     title-class="text-base font-bold text-admin-text-1"
     range-group-class="inline-flex h-8 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-1 text-xs text-admin-text-3"

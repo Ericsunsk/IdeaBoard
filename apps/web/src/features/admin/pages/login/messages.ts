@@ -6,6 +6,7 @@
 
 export const ADMIN_LOGIN_MESSAGES = {
   title: '管理员登录',
+  emailLabel: '邮箱',
   passwordLabel: '密码',
   hidePassword: '隐藏密码',
   showPassword: '显示密码',

@@ -24,8 +24,8 @@ export const catalogClasses = {
   searchIcon: 'size-3.5 shrink-0 text-board-control-icon',
   searchInput:
     'min-w-0 flex-1 bg-transparent text-ib-body text-board-control-input-text outline-none',
-  sortMenuTrigger:
-    'ib-page-chrome-surface inline-flex h-[42px] w-[108px] min-w-[108px] cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-ib-body font-semibold text-board-control-text transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] w-full md:w-[108px]',
+  sortSelectTrigger:
+    'ib-page-chrome-surface inline-flex h-[42px] w-[108px] min-w-[108px] cursor-pointer items-center justify-between gap-2 rounded-full px-3 text-ib-body font-semibold text-board-control-text transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] w-full md:w-[108px]',
   loadingState:
     'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-board-card-border bg-board-loading-bg',
   loadingSpinner: '!h-9 !w-9 text-board-primary',
@@ -50,7 +50,7 @@ export const catalogClasses = {
     'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-board-danger px-3.5 text-sm font-bold text-ib-text-inverse transition-colors hover:bg-board-danger-hover disabled:cursor-not-allowed disabled:opacity-70',
 } as const
 
-// UiDialog 以 content-class 拥有造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
+// UiDialog 以 :class/cn() 组合造型：mask 沿用 UiDialog 内置 ibDialogMaskClass。
 export const catalogDeleteDialogContentClass =
   'overflow-hidden rounded-[var(--radius-board-dialog)] border border-board-card-border bg-board-surface-strong shadow-[var(--shadow-board-dialog)]'
 

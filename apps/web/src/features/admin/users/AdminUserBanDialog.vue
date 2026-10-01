@@ -14,7 +14,7 @@
           <AdminBadge severity="danger">{{ USERS_MESSAGES.banForceBadge }}</AdminBadge>
         </div>
         <h2 :class="adminDialogTitleClass">{{ USERS_MESSAGES.banTitle }}</h2>
-        <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
+        <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-text-2">
           {{ description }}
         </p>
       </div>

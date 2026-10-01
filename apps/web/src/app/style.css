@@ -1,11 +1,11 @@
 @import 'tailwindcss';
 @import '../shared/theme/interactive-control-state.css';
+@import '../shared/theme/touch-target.css';
 @import '../shared/theme/brand-mark.css';
 @import '../shared/theme/board-page-background.css';
 @import '../shared/theme/round-control.css';
 @import '../shared/theme/page-chrome.css';
 @import '../shared/theme/user-avatar-button.css';
-@import '../features/admin/shared/styles/admin-user-avatar-button.css';
 
 @theme {
   --font-admin:
@@ -19,55 +19,56 @@
   --color-admin-border-soft: #ececec;
   --color-admin-border-hover: #d4d4d4;
   --color-admin-border-pressed: #bfbfbf;
-  --color-admin-border-strong: #d4d4d4;
   --color-admin-text-1: #313131;
-  --color-admin-text-2: #71717a;
-  --color-admin-text-2-strong: #52525b;
-  --color-admin-text-3: #a3a3a3;
+  --color-admin-text-2: #62626a;
+  /* `label` is the "group heading / fieldset legend" level: heavier than
+     `text-2` but lighter than `text-1`. Formerly named `text-2-strong`, which
+     read as "stronger than text-2" while actually sitting *between* the two. */
+  --color-admin-text-label: #52525b;
+  --color-admin-text-2-strong: var(--color-admin-text-label);
+  --color-admin-text-3: #696971;
   --color-admin-text-disabled: #d4d4d4;
   --color-admin-text-inverse: #ffffff;
   --color-admin-title-color: #171717;
-  --color-admin-subtitle-color: #737373;
-  --color-admin-accent: #9278e6;
-  --color-admin-accent-hover: #725fd0;
-  --color-admin-accent-pressed: #614ec2;
+  --color-admin-subtitle-color: var(--color-admin-text-2);
+  --color-admin-accent: var(--color-ib-creative-accent);
+  --color-admin-accent-hover: var(--color-ib-creative-accent-hover);
+  --color-admin-accent-pressed: var(--color-ib-creative-accent-pressed);
   --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
   --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
   --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
   --color-admin-surface-muted: #f5f5f5;
   --color-admin-surface-hover: #f0f0f0;
   --color-admin-surface-pressed: #e5e5e5;
-  --color-admin-surface-disabled: #f5f5f5;
+  --color-admin-surface-disabled: var(--color-admin-surface-muted);
   --color-admin-control-bg: #fafafa;
-  --color-admin-control-bg-hover: #f0f0f0;
-  --color-admin-control-border: #e5e7eb;
-  --color-admin-control-border-hover: #d4d4d4;
-  --color-admin-control-border-pressed: #bfbfbf;
+  --color-admin-control-bg-hover: var(--color-admin-surface-hover);
+  --color-admin-control-border: var(--color-admin-border);
+  --color-admin-control-border-hover: var(--color-admin-border-hover);
+  --color-admin-control-border-pressed: var(--color-admin-border-pressed);
   --color-admin-nav-active-bg: #22304a;
   --color-admin-nav-active-bg-hover: #19243a;
-  --color-admin-preview-bg: #f5f5f5;
+  --color-admin-preview-bg: var(--color-admin-surface-muted);
   --color-admin-divider: rgba(0, 0, 0, 0.08);
-  --color-admin-success: #2f9e73;
+  --color-admin-success: #288661;
   --color-admin-success-strong: #176b4a;
-  --color-admin-success-soft: rgba(47, 158, 115, 0.12);
-  --color-admin-warning: #d48830;
-  --color-admin-warning-soft: rgba(212, 136, 48, 0.12);
-  --color-admin-warning-strong: #e79a38;
-  --color-admin-warning-hover: #eba84e;
-  --color-admin-danger: #d14d5a;
-  --color-admin-danger-soft: rgba(209, 77, 90, 0.12);
+  --color-admin-success-soft: rgba(40, 134, 97, 0.12);
+  --color-admin-warning: #a46925;
+  --color-admin-warning-soft: rgba(164, 105, 37, 0.12);
+  --color-admin-danger: #c94a56;
+  --color-admin-danger-soft: rgba(201, 74, 86, 0.12);
   --color-admin-danger-hover: #df6370;
   --color-admin-danger-pressed: #b23a45;
   --color-admin-info: #4775a8;
   --color-admin-info-soft: rgba(71, 117, 168, 0.12);
   --color-admin-model-indigo: #4f6f9f;
-  --color-admin-model-purple: #9278e6;
+  --color-admin-model-purple: var(--color-ib-creative-accent);
   --color-admin-model-cyan: #3d8b9a;
-  --color-admin-chart-tooltip-border: #e5e7eb;
+  --color-admin-chart-tooltip-border: var(--color-admin-border);
   --color-admin-chart-tooltip-text: #262626;
-  --color-admin-chart-axis-line: #e5e7eb;
-  --color-admin-chart-split-line: #f0f0f0;
-  --color-admin-chart-legend-text: #737373;
+  --color-admin-chart-axis-line: var(--color-admin-border);
+  --color-admin-chart-split-line: var(--color-admin-surface-hover);
+  --color-admin-chart-legend-text: var(--color-admin-text-2);
   --color-admin-chart-mist: #8f8f8f;
   --color-admin-chart-olive: #6f8b71;
 
@@ -84,9 +85,6 @@
   --text-admin-modal-title: 26px;
   --text-admin-modal-title-mobile: 22px;
 
-  --leading-admin-tight: 1.2;
-  --leading-admin-body: 1.5;
-
   --radius-admin-dialog: 14px;
 
   /* ── Canvas / node tokens ─────────────────────────────── */
@@ -96,28 +94,23 @@
   --color-canvas-edge: rgba(0, 0, 0, 0.2);
   --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
   --color-canvas-edge-running: var(--color-canvas-edge-selected);
-  --color-canvas-edge-width: 2;
-  --color-canvas-accent: #9278e6;
+  --color-canvas-accent: var(--color-ib-creative-accent);
   --color-canvas-accent-hover: #7a6bd5;
   --color-canvas-accent-pressed: #6d5fd0;
-  --color-canvas-accent-secondary: #c084fc;
-  --color-canvas-accent-soft: #f5f2ff;
+  --color-canvas-accent-soft: var(--color-ib-creative-accent-soft);
   --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
   --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
   --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
   --color-canvas-accent-shadow: rgba(146, 120, 230, 0.25);
   --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
   --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
-  --color-canvas-accent-ring: rgba(146, 120, 230, 0.1);
-  --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
-  --color-canvas-accent-clear: rgba(122, 107, 213, 0);
   --color-canvas-node-bg: var(--color-canvas-surface-bg);
   --color-canvas-node-border: #e8ecf4;
   --color-canvas-text-primary: #272932;
-  --color-canvas-text-secondary: #64748b;
-  --color-canvas-text-muted: #7b8798;
-  --color-canvas-text-control: #505766;
-  --color-canvas-text-option: #5f6878;
+  --color-canvas-text-secondary: #555d6d;
+  --color-canvas-text-muted: #5d6577;
+  --color-canvas-text-control: var(--color-canvas-text-secondary);
+  --color-canvas-text-option: var(--color-canvas-text-muted);
   --color-canvas-tooltip-bg: rgba(24, 24, 27, 0.94);
   --color-canvas-tooltip-text: #f4f4f5;
   --color-canvas-running-from: #9278e6;
@@ -148,6 +141,10 @@
   --shadow-ib-overlay-menu: none;
   --spacing-ib-page-dot: 12px;
   --spacing-ib-page-chrome-inset: 16px;
+  /* Touch-target floor. WCAG 2.2 AA asks 24px; this repo holds 32px. */
+  --spacing-ib-touch-target-min: 32px;
+  /* AA floor, drag handles only (see touch-target.css). */
+  --spacing-ib-touch-target-aa: 24px;
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
   --ib-glass-blur: 12px;
@@ -155,7 +152,7 @@
   /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: #f8f9fd;
   --color-board-page-text: #1f2430;
-  --color-board-page-text-muted: #6e7487;
+  --color-board-page-text-muted: #616677;
   --color-board-page-glow: rgba(150, 120, 230, 0.24);
   --color-board-page-glow-clear: rgba(150, 120, 230, 0);
   --color-board-primary: var(--color-ib-creative-accent-hover);
@@ -163,11 +160,10 @@
   --color-board-focus-ring: rgba(122, 107, 213, 0.16);
   --color-board-focus-ring-strong: rgba(122, 107, 213, 0.18);
   --color-board-surface: rgba(255, 255, 255, 0.9);
-  --color-board-surface-soft: rgba(255, 255, 255, 0.6);
   --color-board-surface-strong: var(--color-ib-surface);
   --color-board-control-bg: rgba(255, 255, 255, 0.85);
-  --color-board-control-text: #3e4457;
-  --color-board-control-input-text: #2f3446;
+  --color-board-control-text: var(--color-board-card-title);
+  --color-board-control-input-text: var(--color-board-card-title);
   --color-board-control-icon: #8a90a3;
   --color-board-card-border: #d9dfec;
   --color-board-card-border-hover: #cdd4e6;
@@ -180,11 +176,11 @@
   --color-board-card-input-border: rgba(224, 230, 245, 0.75);
   --color-board-card-input-bg: rgba(255, 255, 255, 0.8);
   --color-board-card-title: #293042;
-  --color-board-card-text: #7b8297;
+  --color-board-card-text: #676d7f;
   --color-board-card-action: #4e556b;
   --color-board-card-action-hover: #2b3142;
   --color-board-create-icon: #cfd7ea;
-  --color-board-create-title: #394054;
+  --color-board-create-title: var(--color-board-card-title);
   --color-board-loading-bg: rgba(220, 227, 238, 0.45);
   --color-board-danger: var(--color-ib-danger);
   --color-board-danger-hover: var(--color-ib-danger-pressed);
@@ -211,7 +207,6 @@
   --color-ib-border-soft: var(--color-admin-border-soft);
   --color-ib-border-hover: var(--color-admin-border-hover);
   --color-ib-border-pressed: var(--color-admin-border-pressed);
-  --color-ib-border-strong: var(--color-admin-border-strong);
   --color-ib-text: var(--color-admin-text-1);
   --color-ib-text-muted: var(--color-admin-text-2);
   --color-ib-text-subtle: var(--color-admin-text-3);
@@ -227,8 +222,6 @@
   --color-ib-creative-accent-secondary: #c084fc;
   --color-ib-creative-accent-soft: #f5f2ff;
   --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);
-  --color-ib-creative-accent-wash: rgba(122, 107, 213, 0.08);
-  --color-ib-creative-accent-clear: rgba(122, 107, 213, 0);
   --color-ib-focus-ring: var(--color-admin-focus-ring);
   --color-ib-focus-accent: var(--color-ib-creative-accent);
   --color-ib-success: var(--color-admin-success);
@@ -288,8 +281,8 @@
     var(--color-ib-creative-accent) 35%,
     transparent
   );
-  --color-ib-auth-link: var(--color-ib-creative-accent);
-  --color-ib-auth-link-hover: var(--color-ib-creative-accent-hover);
+  --color-ib-auth-link: var(--color-ib-creative-accent-hover);
+  --color-ib-auth-link-hover: var(--color-ib-creative-accent-pressed);
   --color-ib-auth-close: var(--color-ib-text-muted);
   --color-ib-auth-close-hover: var(--color-ib-text);
 
@@ -326,7 +319,6 @@
   --color-ib-scrollbar-thumb-hover: color-mix(in srgb, var(--color-ib-text) 72%, transparent);
 
   --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
-  --shadow-ib-panel: none;
   --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
   --shadow-ib-focus: 0 0 0 3px var(--color-ib-focus-ring);
   --shadow-ib-auth-shell:
@@ -346,17 +338,19 @@
   --motion-feedback-duration: 160ms;
   --motion-feedback-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  --text-ib-micro: 10px;
-  --text-ib-caption: 11px;
-  --text-ib-meta: 12px;
-  --text-ib-body: 13px;
-  --text-ib-content: 14px;
-  --text-ib-title-sm: 15px;
-  --text-ib-heading: 18px;
-  --text-ib-icon: 20px;
-  --text-ib-modal-title-mobile: 22px;
-  --text-ib-modal-title: 26px;
-  --text-ib-summary-value: 28px;
+  /* Cross-surface type scale. Admin and the user shell share one ladder, so
+     `ib` aliases the `admin` tokens instead of redeclaring the same pixels. */
+  --text-ib-micro: var(--text-admin-micro);
+  --text-ib-caption: var(--text-admin-caption);
+  --text-ib-meta: var(--text-admin-meta);
+  --text-ib-body: var(--text-admin-body);
+  --text-ib-content: var(--text-admin-content);
+  --text-ib-title-sm: var(--text-admin-title-sm);
+  --text-ib-heading: var(--text-admin-heading);
+  --text-ib-icon: var(--text-admin-icon);
+  --text-ib-modal-title-mobile: var(--text-admin-modal-title-mobile);
+  --text-ib-modal-title: var(--text-admin-modal-title);
+  --text-ib-summary-value: var(--text-admin-summary-value);
 
   --font-ib-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
   --font-ib-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
@@ -369,24 +363,6 @@
     --motion-exit-duration: 0ms;
     --motion-feedback-duration: 0ms;
   }
-}
-
-@utility ib-motion-control {
-  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
-  transition-duration: var(--motion-control-duration);
-  transition-timing-function: var(--motion-control-easing);
-}
-
-@utility ib-motion-control-colors {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-  transition-duration: var(--motion-control-duration);
-  transition-timing-function: var(--motion-control-easing);
-}
-
-@utility ib-motion-enter {
-  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
-  transition-duration: var(--motion-enter-duration);
-  transition-timing-function: var(--motion-enter-easing);
 }
 
 @utility ib-page-dot-bg {
@@ -406,7 +382,7 @@
   body {
     height: 100%;
     background: var(--color-ib-page);
-    color: #262626;
+    color: var(--color-ib-text);
     font-family:
       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -419,9 +395,9 @@
   }
 
   :root {
-    --ib-control-icon: #5f6368;
-    --ib-control-icon-hover: #2563eb;
-    --ib-control-bg-hover: #e8eaed;
+    --ib-control-icon: var(--color-ib-text-muted);
+    --ib-control-icon-hover: var(--color-ib-focus-accent);
+    --ib-control-bg-hover: var(--color-ib-surface-hover);
     --ib-focus-outline-width: 2px;
     --ib-focus-outline-offset: 2px;
     --ib-focus-outline-color: var(--color-ib-focus-accent);
@@ -457,23 +433,24 @@
 
   /* 选中文字颜色 */
   ::selection {
-    background: rgba(37, 99, 235, 0.16);
-    color: #262626;
+    background: color-mix(in srgb, var(--color-ib-creative-accent) 16%, transparent);
+    color: var(--color-ib-text);
   }
 }
 
-/* App-owned global: Sonner renders outside feature components and only exposes data selectors. */
+/* App-owned global: Sonner renders outside feature components and only exposes data selectors.
+   Palette values resolve from app tokens so toasts cannot drift from the surfaces. */
 [data-sonner-toaster].ideaboard-toaster {
   --ideaboard-toast-bg: rgba(255, 255, 255, 0.9);
-  --ideaboard-toast-border: #e5e7eb;
-  --ideaboard-toast-text: #333333;
-  --ideaboard-toast-muted: #737373;
+  --ideaboard-toast-border: var(--color-ib-border);
+  --ideaboard-toast-text: var(--color-ib-text);
+  --ideaboard-toast-muted: var(--color-ib-text-muted);
   --ideaboard-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
-  --ideaboard-toast-accent: #2563eb;
-  --ideaboard-toast-success: #2f9a64;
-  --ideaboard-toast-warning: #c9892b;
-  --ideaboard-toast-error: #cb4a5c;
-  --ideaboard-toast-info: #2563eb;
+  --ideaboard-toast-accent: var(--color-ib-accent);
+  --ideaboard-toast-success: var(--color-ib-success);
+  --ideaboard-toast-warning: var(--color-ib-warning);
+  --ideaboard-toast-error: var(--color-ib-danger);
+  --ideaboard-toast-info: var(--color-ib-info);
   width: min(300px, calc(100vw - 28px));
 }
 

@@ -13,7 +13,7 @@
         adminInputChromeClass,
         size === 'small' ? 'text-admin-meta' : 'text-admin-body',
         invalid &&
-          'border-admin-danger focus-visible:border-admin-danger focus-visible:ring-admin-danger/20',
+          '!border-admin-danger focus-visible:ring-admin-danger/20',
         props.class,
       )
     "

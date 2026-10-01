@@ -85,7 +85,7 @@
           <template #header-extra>
             <button
               type="button"
-              class="border-0 bg-transparent p-0 text-ib-caption font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
+              class="-my-1 inline-flex min-h-8 items-center border-0 bg-transparent px-1 text-ib-caption font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
               :disabled="loading"
               @click="resetMode = true"
             >

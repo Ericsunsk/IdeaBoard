@@ -48,22 +48,11 @@
     --ib-brand-mark-shadow: 0 10px 22px rgba(45, 64, 89, 0.08);
   }
 
-  .ib-brand-mark--fill {
-    --ib-brand-mark-size: 100%;
-    width: 100%;
-    min-width: 0;
-    height: 100%;
-  }
-
   .ib-brand-mark--image {
     --ib-brand-mark-border: transparent;
   }
 
   .ib-brand-mark--fallback-strong {
     --ib-brand-mark-border: var(--color-ib-accent-pressed);
-  }
-
-  .ib-brand-mark--fallback-soft {
-    --ib-brand-mark-border: var(--color-ib-border-soft);
   }
 }
