@@ -1022,8 +1022,8 @@ BEGIN
   JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
     AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
     AND holds.status = settlements.state
-  LEFT JOIN tasks ON tasks.task_id = snapshots.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.task_id IS NULL
+  LEFT JOIN tasks ON tasks.public_id = snapshots.task_id
+  WHERE snapshots.total_credits > 0 AND tasks.public_id IS NULL
     AND settlements.state IN ('held', 'captured', 'released')
     AND (settlements.state = 'held' OR EXISTS (
       SELECT 1 FROM credit_transactions terminal
@@ -1088,44 +1088,44 @@ BEGIN
   INSERT INTO reconciliation_scan
   SELECT CASE
       WHEN tasks.status IN ('pending', 'running') THEN 'active_task_not_held'
-      WHEN tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN 'terminal_task_settlement_mismatch'
+      WHEN tasks.status IN ('completed', 'failed', 'cancelled') THEN 'terminal_task_settlement_mismatch'
     END,
-    'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+    'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
       jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
       'capture_transaction_id', settlements.capture_transaction_id, 'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   WHERE snapshots.total_credits > 0 AND (
     (tasks.status IN ('pending', 'running') AND (settlements.state IS DISTINCT FROM 'held' OR holds.status IS DISTINCT FROM 'held'))
-    OR (tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') AND (
-      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id)
+    OR (tasks.status IN ('completed', 'failed', 'cancelled') AND (
+      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id)
       OR settlements.state IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
       OR holds.status IS DISTINCT FROM CASE
-        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.internal_id) THEN 'captured'
         ELSE 'released'
       END
     )));
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
+  SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.public_id,
     jsonb_build_object('task_status', tasks.status, 'expected_count',
       (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
       (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END),
       'actual_count', COUNT(terminals.transaction_id))
   FROM task_billing_snapshots snapshots
-  JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN tasks ON tasks.public_id = snapshots.task_id
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = snapshots.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release')
     AND terminals.wallet_user_id = snapshots.user_id
-    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
-  GROUP BY snapshots.user_id, tasks.task_id, tasks.status, settlements.captured_credits, settlements.released_credits
+    AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.public_id
+  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled')
+  GROUP BY snapshots.user_id, tasks.public_id, tasks.status, settlements.captured_credits, settlements.released_credits
   HAVING COUNT(terminals.transaction_id) <>
     (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
     (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END);
@@ -2291,7 +2291,7 @@ CREATE TABLE tasks (
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   submitter_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   billing_account_id BIGINT NOT NULL REFERENCES billing_accounts(internal_id) ON DELETE RESTRICT,
-  workflow_type TEXT NOT NULL,
+  service TEXT NOT NULL,
   workflow_input JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   priority INT NOT NULL DEFAULT 2,
@@ -2309,7 +2309,7 @@ CREATE TABLE tasks (
   CONSTRAINT chk_tasks_status CHECK (status IN ('pending','running','completed','failed','cancelled')),
   CONSTRAINT chk_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT chk_tasks_retry_count CHECK (retry_count >= 0),
-  CONSTRAINT chk_tasks_workflow_type CHECK (length(btrim(workflow_type)) BETWEEN 1 AND 64),
+  CONSTRAINT chk_tasks_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
   CONSTRAINT chk_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT chk_tasks_terminal_consistency CHECK (
     (status IN ('pending','running') AND completed_at IS NULL AND cancelled_at IS NULL)
@@ -2324,6 +2324,39 @@ CREATE INDEX idx_tasks_workspace ON tasks (workspace_id, created_at DESC);
 CREATE INDEX idx_tasks_status ON tasks (status, created_at) WHERE status IN ('pending','running');
 CREATE INDEX idx_tasks_submitter ON tasks (submitter_user_id, created_at DESC);
 CREATE INDEX idx_tasks_billing ON tasks (billing_account_id, created_at DESC);
+
+-- Durable submit idempotency fact for task:create. Written inside the
+-- settlement transaction alongside Quote + Credit Hold + task insert + River
+-- enqueue, so a committed claim always has its task row and a rolled-back
+-- settlement leaves no claim behind.
+--
+-- Scope is (workspace_id, operation, idempotency_key): tasks are
+-- workspace-scoped, and operation keeps "task:create" separable from future
+-- submit-shaped operations sharing the client key namespace. Claims never
+-- expire, matching the sibling durable facts
+-- (uq_payment_order_idempotency, uq_reward_codes_creator_idempotency).
+--
+-- Not a revival of task_submission_claims (dropped in
+-- 20260924000002): that table was user-scoped, carried no operation, and its
+-- guard function JOINed tasks ON tasks.task_id, a column that does not exist
+-- here, so every insert raised IB209. The deferrable FK below is the correct
+-- form of that guard: the claim is written before the task row it names within
+-- the same transaction, so the check must run at COMMIT.
+CREATE TABLE task_submission_idempotency (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  operation TEXT NOT NULL,
+  idempotency_key VARCHAR(128) NOT NULL,
+  request_hash VARCHAR(64) NOT NULL,
+  task_public_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT task_submission_idempotency_pkey PRIMARY KEY (workspace_id, operation, idempotency_key),
+  CONSTRAINT fk_task_submission_idempotency_task FOREIGN KEY (task_public_id)
+    REFERENCES tasks(public_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT ck_task_submission_idempotency_operation CHECK (char_length(btrim(operation)) BETWEEN 1 AND 64),
+  CONSTRAINT ck_task_submission_idempotency_key CHECK (char_length(btrim(idempotency_key)) BETWEEN 1 AND 128),
+  CONSTRAINT ck_task_submission_idempotency_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT ck_task_submission_idempotency_task_public_id CHECK (char_length(btrim(task_public_id)) BETWEEN 1 AND 64)
+);
 
 -- Task outputs reference Media Assets or remote URLs without exposing storage keys.
 CREATE TABLE task_outputs (
@@ -2406,7 +2439,7 @@ CREATE TABLE task_execution_attempts (
   river_job_id BIGINT NOT NULL DEFAULT 0,
   attempt_no INTEGER NOT NULL,
   execution_token VARCHAR(128) NOT NULL,
-  feature_slug VARCHAR(64) NOT NULL DEFAULT '',
+  service VARCHAR(64) NOT NULL DEFAULT '',
   requested_model VARCHAR(128) NOT NULL DEFAULT '',
   resolved_model VARCHAR(128) NOT NULL DEFAULT '',
   provider VARCHAR(64) NOT NULL DEFAULT '',
@@ -2479,6 +2512,7 @@ CREATE TABLE library_assets (
   source_url TEXT NOT NULL,
   preview_url TEXT NOT NULL,
   original_url TEXT NOT NULL,
+  media_asset_id BIGINT NULL REFERENCES media_assets(internal_id) ON DELETE RESTRICT,
   width INT NOT NULL DEFAULT 0,
   height INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2486,13 +2520,19 @@ CREATE TABLE library_assets (
   CONSTRAINT uq_library_assets_public_id UNIQUE (public_id),
   CONSTRAINT uq_library_assets_workspace_source UNIQUE (workspace_id, provider, source_id),
   CONSTRAINT chk_library_assets_public_id CHECK (public_id LIKE 'lasset\_%'),
-  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels')),
+  CONSTRAINT chk_library_assets_provider CHECK (provider IN ('unsplash','pexels','workspace_media')),
   CONSTRAINT chk_library_assets_source_id CHECK (length(btrim(source_id)) > 0),
-  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0)
+  CONSTRAINT chk_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
+  CONSTRAINT chk_library_assets_reference_shape CHECK (
+    (provider = 'workspace_media' AND media_asset_id IS NOT NULL AND source_url = '' AND preview_url = '' AND original_url = '')
+    OR (provider IN ('unsplash','pexels') AND media_asset_id IS NULL AND source_url <> '' AND preview_url <> '' AND original_url <> '')
+  )
 );
 
 CREATE INDEX idx_library_assets_workspace ON library_assets (workspace_id, created_at DESC);
 CREATE INDEX idx_library_assets_folder ON library_assets (folder_id, created_at DESC);
+CREATE INDEX idx_library_assets_media_asset ON library_assets (media_asset_id)
+  WHERE media_asset_id IS NOT NULL;
 
 -- Materialization creates a durable job that eventually produces a Media Asset.
 CREATE TABLE library_materializations (
@@ -2560,12 +2600,19 @@ CREATE INDEX idx_workspace_events_type ON workspace_events (event_type, occurred
 CREATE INDEX idx_workspace_events_resource ON workspace_events (resource_type, resource_id, occurred_at DESC);
 
 -- Webhook subscriptions with filtered event types and endpoint signing secrets.
+-- signing_secret is encrypted at rest (AES-256-GCM via APP_SECRETS_ENCRYPTION_KEY):
+-- material_kind='encrypted' rows hold ciphertext over the whsec_ transport string;
+-- material_kind='plaintext' rows predate the encryption cutover and are accepted on
+-- read only (converged to 'encrypted' by best-effort re-encrypt-on-read).
+-- key_version fingerprints the encrypting master key generation for rotation detection.
 CREATE TABLE event_subscriptions (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
   workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
   endpoint_url TEXT NOT NULL,
   signing_secret TEXT NOT NULL,
+  signing_secret_material_kind TEXT NOT NULL DEFAULT 'plaintext',
+  signing_secret_key_version TEXT NOT NULL DEFAULT '',
   event_types TEXT[] NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -2573,7 +2620,12 @@ CREATE TABLE event_subscriptions (
   CONSTRAINT uq_event_subscriptions_public_id UNIQUE (public_id),
   CONSTRAINT chk_event_subscriptions_public_id CHECK (public_id LIKE 'sub\_%'),
   CONSTRAINT chk_event_subscriptions_status CHECK (status IN ('active','paused','disabled')),
-  CONSTRAINT chk_event_subscriptions_event_types CHECK (array_length(event_types, 1) > 0)
+  CONSTRAINT chk_event_subscriptions_event_types CHECK (array_length(event_types, 1) > 0),
+  CONSTRAINT chk_event_subscriptions_secret_material CHECK (signing_secret_material_kind IN ('plaintext', 'encrypted')),
+  CONSTRAINT chk_event_subscriptions_secret_payload CHECK (
+    (signing_secret_material_kind = 'encrypted' AND btrim(signing_secret) <> '')
+    OR (signing_secret_material_kind = 'plaintext' AND signing_secret LIKE 'whsec\_%')
+  )
 );
 
 CREATE INDEX idx_event_subscriptions_workspace ON event_subscriptions (workspace_id, created_at DESC);
@@ -2603,6 +2655,27 @@ CREATE TABLE event_deliveries (
 CREATE INDEX idx_event_deliveries_subscription ON event_deliveries (subscription_id, created_at DESC);
 CREATE INDEX idx_event_deliveries_retry ON event_deliveries (next_retry_at) WHERE status = 'retrying' AND next_retry_at IS NOT NULL;
 CREATE INDEX idx_event_deliveries_status ON event_deliveries (status, created_at);
+
+-- A single event/subscription pair has one durable delivery aggregate.
+CREATE UNIQUE INDEX ux_event_deliveries_event_subscription
+  ON event_deliveries (event_id, subscription_id);
+
+-- Per-attempt history remains readable after River retries, restart, or discard.
+CREATE TABLE event_delivery_attempts (
+  internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  delivery_id BIGINT NOT NULL REFERENCES event_deliveries(internal_id) ON DELETE CASCADE,
+  attempt_number INT NOT NULL,
+  status_code INT NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL,
+  error_message TEXT NOT NULL DEFAULT '',
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_event_delivery_attempts_delivery_attempt UNIQUE (delivery_id, attempt_number),
+  CONSTRAINT chk_event_delivery_attempts_number CHECK (attempt_number > 0),
+  CONSTRAINT chk_event_delivery_attempts_outcome CHECK (outcome IN ('delivered', 'failed'))
+);
+
+CREATE INDEX idx_event_delivery_attempts_delivery
+  ON event_delivery_attempts (delivery_id, attempt_number DESC);
 CREATE TABLE ai_search_operations (
   operation_id UUID PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2720,6 +2793,78 @@ CREATE TABLE feature_prompts (
   CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('generation', 'inpaint', 'render', 'variations', 'cutout', 'fusion', 'upscale', 'outpaint')),
   CONSTRAINT fk_feature_prompts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
+-- Service Model Pool persistence (#848, ADR-0012).
+--
+-- A Service owns exactly one Model pool: an unordered set of entries
+-- { model, enabled, supported_resolutions }. One Model may appear in many
+-- Services' pools. Pool entries carry no priority/fallback/weight.
+--
+-- Canonical resolutions are exactly 1k/2k/4k. There is no default billing
+-- or routing variant; entry capabilities and requested resolutions use the
+-- same three canonical strings.
+--
+-- `service_model_pool_version` holds the per-Service monotonic uint64 pool
+-- version consumed as opaque by RoutingResolver snapshots. Version starts
+-- at 1 on first pool write and increments only when an effective pool
+-- entry, enabled state, or capability set changes (no-op saves do not
+-- bump; enforced in the catalog repository, not by trigger).
+--
+-- `tasks.routing_snapshot` is the immutable submit-time RoutingSnapshot
+-- JSONB pinned atomically with Credit Hold, task insert, and River
+-- enqueue. Later Admin pool edits never mutate it. Nullable so pre-pool
+-- tasks stay readable; wave 2 submit always writes it for new tasks.
+-- Exact JSON shape is documented in internal/generation/catalog
+-- (snapshot.go) and validated on persist/load there.
+--
+-- `task_execution_attempts.retry_layer` / `gateway_retry_count`
+-- distinguish the three retry layers (ADR-0012 rule 7): gateway request
+-- retry (same Model), Model fallback (next pinned candidate, at most
+-- once), River/task retry (whole-task requeue). Wave 2 owns the attempt
+-- write path; this fragment only provides the columns.
+
+CREATE TABLE service_model_pool_entry (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  service TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_service_model_pool_entry_service_model UNIQUE (service, model_id),
+  CONSTRAINT ck_service_model_pool_entry_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
+  CONSTRAINT ck_service_model_pool_entry_model_id CHECK (length(btrim(model_id)) BETWEEN 1 AND 128)
+);
+
+CREATE INDEX idx_service_model_pool_entry_service ON service_model_pool_entry (service);
+
+CREATE TABLE service_model_pool_resolution (
+  pool_entry_id BIGINT NOT NULL REFERENCES service_model_pool_entry(id) ON DELETE CASCADE,
+  resolution TEXT NOT NULL,
+  CONSTRAINT pk_service_model_pool_resolution PRIMARY KEY (pool_entry_id, resolution),
+  CONSTRAINT ck_service_model_pool_resolution_value CHECK (resolution IN ('1k', '2k', '4k'))
+);
+
+CREATE INDEX idx_service_model_pool_resolution_resolution ON service_model_pool_resolution (resolution);
+
+CREATE TABLE service_model_pool_version (
+  service TEXT PRIMARY KEY,
+  version BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT ck_service_model_pool_version_service CHECK (length(btrim(service)) BETWEEN 1 AND 64),
+  CONSTRAINT ck_service_model_pool_version_value CHECK (version >= 1)
+);
+
+ALTER TABLE tasks
+  ADD COLUMN routing_snapshot JSONB NULL,
+  ADD CONSTRAINT chk_tasks_routing_snapshot CHECK (routing_snapshot IS NULL OR jsonb_typeof(routing_snapshot) = 'object');
+
+ALTER TABLE task_execution_attempts
+  ADD COLUMN retry_layer TEXT NOT NULL DEFAULT '',
+  ADD COLUMN gateway_retry_count INTEGER NOT NULL DEFAULT 0,
+  ADD CONSTRAINT ck_task_execution_attempts_retry_layer CHECK (retry_layer IN ('', 'gateway', 'model_fallback', 'river_task')),
+  ADD CONSTRAINT ck_task_execution_attempts_gateway_retry_count CHECK (gateway_retry_count >= 0);
+
+CREATE INDEX idx_task_execution_attempts_retry_layer ON task_execution_attempts (retry_layer) WHERE retry_layer <> '';
 -- Boards and collaboration (#802). Boards are workspace-scoped with separate
 -- ACL from workspace membership. Document snapshots use optimistic concurrency
 -- (ETag/If-Match). Revisions are immutable. Share tokens enable public join.
@@ -2731,6 +2876,12 @@ CREATE TABLE boards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at TIMESTAMPTZ NULL,
+  -- Implicit board owner (creator). Nullable so the additive migration
+  -- applies where boards rows already exist; the WorkspaceBoardStore
+  -- postgres implementation always sets it on insert and reads owner-less
+  -- rows as not found (fail-closed). The creator never needs a
+  -- board_memberships row (see v1_workspace.go).
+  owner_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT uq_boards_public_id UNIQUE (public_id),
   CONSTRAINT chk_boards_public_id CHECK (public_id LIKE 'board\_%'),
   CONSTRAINT chk_boards_title CHECK (length(btrim(title)) BETWEEN 1 AND 200)
@@ -2779,6 +2930,7 @@ CREATE TABLE board_memberships (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (board_id, user_id)
 );
 
@@ -2794,12 +2946,25 @@ CREATE TABLE board_share_tokens (
   granted_role TEXT NOT NULL CHECK (granted_role IN ('editor','viewer')),
   created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   revoked_at TIMESTAMPTZ NULL,
   revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- Opaque sht_ bearer id exposed in {token_id} URL segments. Nullable so
+  -- the additive migration applies where token rows already exist; the
+  -- store always sets it on insert. Only the bearer hash is kept in
+  -- token_secret (never the bearer), so share secrets need no reversible
+  -- encryption at rest.
+  token_id TEXT NULL,
+  token_prefix TEXT NOT NULL DEFAULT '',
+  -- Join counter. The durable audit trail itself is a #808 follow-up.
+  usage_count BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT uq_board_share_tokens_public_id UNIQUE (public_id),
   CONSTRAINT uq_board_share_tokens_secret UNIQUE (token_secret),
+  CONSTRAINT uq_board_share_tokens_token_id UNIQUE (token_id),
   CONSTRAINT chk_board_share_tokens_public_id CHECK (public_id LIKE 'bst\_%'),
   CONSTRAINT chk_board_share_tokens_secret CHECK (length(token_secret) >= 32),
+  CONSTRAINT chk_board_share_tokens_token_id CHECK (token_id IS NULL OR token_id LIKE 'sht\_%'),
+  CONSTRAINT chk_board_share_tokens_usage_count CHECK (usage_count >= 0),
   CONSTRAINT chk_board_share_tokens_revocation CHECK (
     (revoked_at IS NULL AND revoked_by_user_id IS NULL)
     OR (revoked_at IS NOT NULL AND revoked_by_user_id IS NOT NULL)
@@ -3303,36 +3468,6 @@ $$;
 
 
 --
--- Name: guard_task_submission_claim(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION guard_task_submission_claim() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  valid_claim BOOLEAN;
-BEGIN
-  IF TG_OP <> 'INSERT' THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB208', MESSAGE = 'task submission claims are immutable';
-  END IF;
-  SELECT EXISTS (
-    SELECT 1
-    FROM task_billing_snapshots snapshots
-    JOIN tasks ON tasks.task_id = snapshots.task_id
-    WHERE snapshots.task_id = NEW.task_id
-      AND snapshots.user_id = NEW.user_id
-      AND tasks.user_id = NEW.user_id
-      AND tasks.client_action_id = NEW.client_action_id
-  ) INTO valid_claim;
-  IF NOT valid_claim THEN
-    RAISE EXCEPTION USING ERRCODE = 'IB209', MESSAGE = 'task submission claim does not match Task Billing facts';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: prevent_billing_admin_action_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3629,7 +3764,8 @@ CREATE TABLE billing_admin_actions (
     CONSTRAINT ck_billing_admin_actions_metadata CHECK ((jsonb_typeof(metadata) = 'object'::text)),
     CONSTRAINT ck_billing_admin_actions_price_scope CHECK (((((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('delete_archived'::character varying)::text])) AND (price_version_id IS NULL)) OR (((action_type)::text = ANY (ARRAY[('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text])) AND (price_version_id IS NOT NULL)))),
     CONSTRAINT ck_billing_admin_actions_reason CHECK ((((reason)::text = btrim((reason)::text, '
-'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
+
+'::text)) AND ((char_length((reason)::text) >= 1) AND (char_length((reason)::text) <= 1000)))),
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
 
@@ -3671,7 +3807,7 @@ CREATE TABLE billing_price_versions (
     created_by bigint NOT NULL,
     created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT billing_price_versions_created_by_check CHECK ((created_by > 0)),
-    CONSTRAINT billing_price_versions_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text]))),
+    CONSTRAINT billing_price_versions_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text]))),
     CONSTRAINT billing_price_versions_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
     CONSTRAINT billing_price_versions_version_check CHECK ((version > 0))
 );
@@ -3717,7 +3853,7 @@ CREATE TABLE billing_current_prices (
     price_version_id bigint NOT NULL,
     updated_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT billing_current_prices_pkey PRIMARY KEY (sku, output_resolution),
-    CONSTRAINT billing_current_prices_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text])))
+    CONSTRAINT billing_current_prices_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text])))
 );
 
 
@@ -3748,7 +3884,7 @@ CREATE TABLE task_billing_settlements (
 CREATE TABLE task_billing_snapshots (
     task_id character varying(64) NOT NULL,
     user_id bigint NOT NULL,
-    feature_slug character varying(64) NOT NULL,
+    service character varying(64) NOT NULL,
     sku character varying(128) NOT NULL,
     price_version_id bigint NOT NULL,
     price_version bigint NOT NULL,
@@ -3764,27 +3900,11 @@ CREATE TABLE task_billing_snapshots (
     CONSTRAINT task_billing_snapshot_hold_check CHECK ((((total_credits = 0) AND (hold_transaction_id IS NULL)) OR ((total_credits > 0) AND (hold_transaction_id IS NOT NULL) AND (btrim(hold_transaction_id) <> ''::text)))),
     CONSTRAINT task_billing_snapshot_total_check CHECK ((total_credits = (unit_credits * quantity))),
     CONSTRAINT task_billing_snapshots_price_version_check CHECK ((price_version > 0)),
-    CONSTRAINT task_billing_snapshots_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['default'::text, '1k'::text, '2k'::text, '4k'::text]))),
+    CONSTRAINT task_billing_snapshots_output_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text]))),
     CONSTRAINT task_billing_snapshots_quantity_check CHECK ((quantity > 0)),
     CONSTRAINT task_billing_snapshots_total_credits_check CHECK (((total_credits >= 0) AND (total_credits <= '9000000000000000'::bigint))),
     CONSTRAINT task_billing_snapshots_unit_credits_check CHECK (((unit_credits >= 0) AND (unit_credits <= '9000000000000000'::bigint))),
     CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0))
-);
-
-
---
--- Name: task_submission_claims; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE task_submission_claims (
-    user_id bigint NOT NULL,
-    client_action_id character varying(128) NOT NULL,
-    task_id character varying(64) NOT NULL,
-    request_hash character varying(64) NOT NULL,
-    created_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT task_submission_claims_client_action_id_check CHECK ((btrim((client_action_id)::text) <> ''::text)),
-    CONSTRAINT task_submission_claims_request_hash_check CHECK (((request_hash)::text ~ '^[0-9a-f]{64}$'::text)),
-    CONSTRAINT task_submission_claims_user_id_check CHECK ((user_id > 0))
 );
 
 
@@ -3862,22 +3982,6 @@ ALTER TABLE ONLY task_billing_snapshots
 
 
 --
--- Name: task_submission_claims task_submission_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_pkey PRIMARY KEY (user_id, client_action_id);
-
-
---
--- Name: task_submission_claims task_submission_claims_task_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_task_id_key UNIQUE (task_id);
-
-
---
 -- Name: idx_billing_admin_actions_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3943,13 +4047,6 @@ CREATE TRIGGER task_billing_snapshots_validate_insert BEFORE INSERT ON task_bill
 
 
 --
--- Name: task_submission_claims task_submission_claims_guard; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_submission_claims_guard BEFORE INSERT OR DELETE OR UPDATE ON task_submission_claims FOR EACH ROW EXECUTE FUNCTION guard_task_submission_claim();
-
-
---
 -- Name: billing_price_versions billing_price_versions_sku_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4009,14 +4106,6 @@ ALTER TABLE ONLY task_billing_snapshots
 
 
 --
--- Name: task_submission_claims task_submission_claims_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY task_submission_claims
-    ADD CONSTRAINT task_submission_claims_task_id_fkey FOREIGN KEY (task_id) REFERENCES task_billing_snapshots(task_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
-
-
---
 --
 CREATE OR REPLACE FUNCTION publish_billing_prices(
   p_sku text,
@@ -4050,13 +4139,13 @@ BEGIN
      OR char_length(p_display_name) NOT BETWEEN 1 AND 120
      OR char_length(p_description) > 1000 OR p_prices IS NULL
      OR jsonb_typeof(p_prices) <> 'object' OR p_actor_id IS NULL OR p_actor_id <= 0
-     OR NOT (p_prices ? '1k' OR p_prices ? 'default') THEN
+     OR NOT (p_prices ? '1k') THEN
     RAISE EXCEPTION USING ERRCODE = 'IB101', MESSAGE = 'invalid billing prices publish command';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM jsonb_object_keys(p_prices) AS keys(key)
-    WHERE key NOT IN ('default', '1k', '2k', '4k')
+    WHERE key NOT IN ('1k', '2k', '4k')
   ) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB101', MESSAGE = 'invalid billing prices resolution';
   END IF;
@@ -4073,12 +4162,12 @@ BEGIN
       enabled = CASE WHEN NOT EXISTS (
         SELECT 1 FROM billing_current_prices AS current_prices
         WHERE current_prices.sku = p_sku
-          AND current_prices.output_resolution IN ('default', '1k')
+          AND current_prices.output_resolution IN ('1k')
       ) THEN TRUE ELSE enabled END,
       updated_by = p_actor_id, updated_at = clock_timestamp()
   WHERE sku = p_sku;
 
-  FOREACH v_resolution IN ARRAY ARRAY['default', '1k', '2k', '4k'] LOOP
+  FOREACH v_resolution IN ARRAY ARRAY['1k', '2k', '4k'] LOOP
     v_value := p_prices -> v_resolution;
     IF v_value IS NULL THEN
       DELETE FROM billing_current_prices
@@ -4112,7 +4201,7 @@ BEGIN
     VALUES (p_sku, v_resolution, v_new_id)
     ON CONFLICT ON CONSTRAINT billing_current_prices_pkey DO UPDATE
       SET price_version_id = EXCLUDED.price_version_id, updated_at = clock_timestamp();
-    IF v_resolution IN ('default', '1k') THEN
+    IF v_resolution IN ('1k') THEN
       UPDATE billing_skus SET current_price_version_id = v_new_id WHERE sku = p_sku;
     END IF;
     INSERT INTO billing_admin_actions (action_type, sku, price_version_id, actor_id, reason, metadata)

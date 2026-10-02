@@ -16,8 +16,10 @@ package worker
 //	           the TaskAssets adapter (deterministic Fail), resolve the
 //	           pinned RoutingSnapshot (missing/corrupt fails closed
 //	           deterministically: hold released, no retry burn, the live
-//	           pool is never consulted), then ClaimTask with the lease
-//	           token (pending -> running).
+//	           pool is never consulted), settle the send's model + retry
+//	           layer, then ClaimTaskWithAttempt: pending -> running WITH
+//	           the send's attempt fact, in ONE statement (the lease token
+//	           IS the attempt's execution token).
 //	execution  (workspace_task_execution.go) — Generate through the provider
 //	           seam against the snapshot's current model (injected;
 //	           production bridges the EXISTING gateway executor, never
@@ -34,7 +36,8 @@ package worker
 //	           terminal-fails.
 //
 // Every send opens/closes a durable attempt fact (retry_layer +
-// gateway_retry_count); gateway request retries stay inside the gateway
+// gateway_retry_count); the primary send's row is written by the claim
+// statement itself, and gateway request retries stay inside the gateway
 // and never look like model fallback.
 //
 // Settlement note: the worker shares ONE workspaceTaskHolder with the HTTP
@@ -82,6 +85,23 @@ import (
 type WorkspaceTaskWorkerStore interface {
 	GetTask(ctx context.Context, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error)
 	workspacetasks.TaskClaimStore
+}
+
+// WorkspaceTaskAttemptClaimStore is the merged claim seam (DESIGN.md
+// contract 4): the pending -> running lease flip and the durable
+// task_execution_attempts row for the send that follows commit in ONE
+// statement, so no running lease can exist without the attempt fact that
+// explains it.
+//
+// The attempt row's execution_token is the lease token the claim fences with,
+// which is why start.ExecutionToken is ignored: one token per execution, not
+// the two the split claim/StartAttempt pair used to mint.
+//
+// started is false when a River redelivery re-acquires a lease that already
+// owns an attempt row; that is the SAME send resuming, not a second attempt,
+// and the caller keeps the existing attempt fact.
+type WorkspaceTaskAttemptClaimStore interface {
+	ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error)
 }
 
 // WorkspaceTaskWorkerSettler is the terminal settlement seam. The worker
@@ -158,12 +178,17 @@ type WorkspaceTaskWorker struct {
 	materializer taskruntime.WorkspaceTaskAutoMaterializer
 	attempts     workspacetasks.AttemptRecorder
 	metrics      ModelFallbackObserver
+	claims       WorkspaceTaskAttemptClaimStore
 }
 
 var _ river.Worker[workspacetasks.WorkspaceTaskArgs] = (*WorkspaceTaskWorker)(nil)
 
 // NewWorkspaceTaskWorker builds the consumer. Nil store/settler fail fast:
-// a worker that cannot settle must never claim.
+// a worker that cannot settle must never claim. A store that cannot claim
+// through the MERGED statement fails fast too: falling back to the split
+// claim-then-record path would reintroduce the "token without an attempt row"
+// intermediate state the contract forbids, so a partial store is a
+// configuration error, not a degraded mode.
 func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker, error) {
 	if deps.Store == nil {
 		return nil, errors.New("workspace task worker: store is required")
@@ -171,11 +196,15 @@ func NewWorkspaceTaskWorker(deps WorkspaceTaskWorkerDeps) (*WorkspaceTaskWorker,
 	if deps.Settler == nil {
 		return nil, errors.New("workspace task worker: settler is required")
 	}
+	claims, ok := deps.Store.(WorkspaceTaskAttemptClaimStore)
+	if !ok {
+		return nil, errors.New("workspace task worker: store cannot claim with an attempt")
+	}
 	return &WorkspaceTaskWorker{
 		store: deps.Store, settler: deps.Settler,
 		assets: deps.Assets, provider: deps.Provider, renderer: deps.Renderer,
 		materializer: deps.Materializer, attempts: deps.Attempts,
-		metrics: deps.Metrics,
+		metrics: deps.Metrics, claims: claims,
 	}, nil
 }
 
@@ -236,22 +265,21 @@ func (w *WorkspaceTaskWorker) Work(ctx context.Context, job *river.Job[workspace
 		return w.failTerminal(ctx, task, err.Error())
 	}
 
-	claimed, err := w.claim(ctx, args, task)
+	// The attempt fact is written BY the claim statement, so the send's
+	// model and retry layer must be settled BEFORE claiming. Both only
+	// need the task id, which loadDispatchableTask already resolved. The
+	// execution's gateway target comes from the verified snapshot alone: a
+	// redelivery that already consumed the fallback runs the retry
+	// candidate directly and never falls back again.
+	tracker := newWorkspaceSendTracker(w.attempts, task.ID, workspaceRiverJobID(job), snap.Service)
+	model, allowFallback := selectExecutionModel(snap, tracker.fallbackConsumed(ctx))
+	layer := workspaceAttemptLayer(int32(task.RetryCount), attemptNumber)
+
+	claimed, send, err := w.claim(ctx, args, task, tracker, model, layer)
 	if err != nil || claimed == nil {
 		return err
 	}
 
-	// The execution's gateway target comes from the verified snapshot
-	// alone. A redelivery that already consumed the fallback runs the
-	// retry candidate directly and never falls back again.
-	tracker := newWorkspaceSendTracker(w.attempts, claimed.ID, workspaceRiverJobID(job), snap.Service)
-	layer := workspacetasks.AttemptRetryLayerGateway
-	if claimed.RetryCount > 0 {
-		layer = workspacetasks.AttemptRetryLayerRiverTask
-	}
-	model, allowFallback := selectExecutionModel(snap, tracker.fallbackConsumed(ctx))
-
-	send := tracker.startSend(ctx, model, layer)
 	// Stamp the snapshot-derived target onto the transient claimed copy
 	// (never persisted): the provider bridge consumes only this field,
 	// so stamping is what keeps execution snapshot-only. The legacy

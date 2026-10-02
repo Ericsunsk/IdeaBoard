@@ -1,26 +1,62 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 
+/** The control client module every generated-query fixture points at. */
+const CONTROL_PLATFORM_MODULE =
+  'src/shared/api/generated-query/control/control-platform/control-platform'
+
+/**
+ * One module a fixture imports.
+ *
+ * `stubModule` is workspace-relative and is materialized as an empty module so
+ * the import resolves into a real dependency edge — dependency-cruiser needs
+ * the dependency to exist before it can judge the rule against it.
+ */
+type FixtureFile = {
+  /** Workspace-relative, POSIX-separated path of the fixture module. */
+  filePath: string
+  /**
+   * Fixture source. `{target:<stubModule>}` expands to a relative specifier
+   * that resolves to a generated stub module.
+   */
+  content: string
+}
+
 type BoundaryFixtureCase = {
   name: string
   expectedRule: string
-  fixtureFilePath: string
-  content: string
-  additionalFiles?: Array<{ filePath: string; content: string }>
+  /**
+   * Files to materialize in the fixture workspace. The first entry is the
+   * module dependency-cruiser is pointed at; the rest are its imports.
+   */
+  files: FixtureFile[]
+  /**
+   * Exercise this check's own Board deep-import scanner (which resolves `@/`
+   * aliases itself) instead of a dependency-cruiser rule.
+   */
   scannerOnly?: boolean
 }
 
-function resolveSourceModule(sourcePath: string, specifier: string): string | null {
+function toPosix(value: string): string {
+  return value.split(path.sep).join('/')
+}
+
+/**
+ * Resolve a module specifier the way the Board scanner does, honouring the
+ * `@/` and `src/` aliases that `tsconfig.app.json` declares.
+ */
+function resolveSourceModule(root: string, sourcePath: string, specifier: string): string | null {
   if (!specifier.startsWith('.') && !specifier.startsWith('@/') && !specifier.startsWith('src/'))
     return null
   const candidate = specifier.startsWith('@/')
-    ? path.join(webRoot, 'src', specifier.slice(2))
+    ? path.join(root, 'src', specifier.slice(2))
     : specifier.startsWith('src/')
-      ? path.join(webRoot, specifier)
+      ? path.join(root, specifier)
       : path.resolve(path.dirname(sourcePath), specifier)
   const candidates = [
     candidate,
@@ -30,12 +66,22 @@ function resolveSourceModule(sourcePath: string, specifier: string): string | nu
     path.join(candidate, 'index.ts'),
   ]
   const resolved = candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile())
-  return resolved ? path.relative(webRoot, resolved).split(path.sep).join('/') : null
+  return resolved ? path.relative(root, resolved).split(path.sep).join('/') : null
 }
 
-function scanBoardDeepImports(includeFixtures = false): Set<string> {
+/**
+ * The Board deep-import scanner.
+ *
+ * `root` is the directory that `src/` hangs off and the cwd dependency-cruiser
+ * runs in, so the same function scans the real checkout (production pass) and
+ * the disposable fixture workspace (self-test pass).
+ */
+function scanBoardDeepImports(
+  root: string,
+  options: { includeFixtures?: boolean } = {},
+): Set<string> {
   const edges = new Set<string>()
-  const sourceFiles = runDepcruise([
+  const sourceFiles = runDepcruise(root, [
     '--config',
     '.dependency-cruiser.cjs',
     '--output-type',
@@ -47,16 +93,16 @@ function scanBoardDeepImports(includeFixtures = false): Set<string> {
     if (
       !/\.(?:ts|tsx|vue)$/.test(module.source) ||
       module.source.startsWith('src/features/board/') ||
-      (!includeFixtures && module.source.includes('.fixture.'))
+      (options.includeFixtures !== true && module.source.includes('.fixture.'))
     )
       continue
-    const absoluteSource = path.join(webRoot, module.source)
+    const absoluteSource = path.join(root, module.source)
     const content = fs.readFileSync(absoluteSource, 'utf8')
     const importPattern = /(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g
     for (const match of content.matchAll(importPattern)) {
       const specifier = match[1]
       if (!specifier) continue
-      const target = resolveSourceModule(absoluteSource, specifier)
+      const target = resolveSourceModule(root, absoluteSource, specifier)
       if (
         !target ||
         !/^src\/features\/board\/(?:domain|application|infrastructure|presentation|testing)(?:\/|$)/.test(
@@ -70,102 +116,299 @@ function scanBoardDeepImports(includeFixtures = false): Set<string> {
   return edges
 }
 
+/**
+ * `route-pages-no-direct-generated-query` used to be anchored on
+ * `features/<feature>/(components|presentation|pages|app)`, which only matched
+ * 13 of the 31 route pages because `[^/]+` cannot cross a `/`. Each fixture
+ * below therefore sits in a *different* real layout shape; one directory would
+ * have kept the rule green while it was blind.
+ */
+const routePageFixtureDirs = [
+  'src/features/admin/pages',
+  'src/features/admin/users',
+  'src/features/admin/settings/pages',
+  'src/features/admin/credits/health',
+  'src/features/workspace/layout',
+] as const
+
 const fixtureCases: BoundaryFixtureCase[] = [
   {
     name: 'prohibits admin features from importing the public generated client',
     expectedRule: 'features-admin-no-public-client',
-    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-admin-public.fixture.ts'),
-    content: `import { getUser } from '../../shared/api/generated-query/public/user/user'; console.log(getUser);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-admin-public.fixture.ts',
+        content: `import { getUser } from '{target:src/shared/api/generated-query/public/user/user}'; console.log(getUser);`,
+      },
+    ],
   },
   {
     name: 'prohibits non-admin features from importing the control generated client',
     expectedRule: 'non-admin-no-control-client',
-    fixtureFilePath: path.join(
-      webRoot,
-      'src/features/board/.boundary-non-admin-control.fixture.ts',
-    ),
-    content: `import { listControlUsers } from '../../shared/api/generated-query/control/control-users/control-users'; console.log(listControlUsers);`,
+    files: [
+      {
+        filePath: 'src/features/board/boundary-non-admin-control.fixture.ts',
+        content: `import { listControlUsers } from '{target:src/shared/api/generated-query/control/control-users/control-users}'; console.log(listControlUsers);`,
+      },
+    ],
   },
   {
     name: 'detects circular dependencies',
     expectedRule: 'no-circular',
-    fixtureFilePath: path.join(webRoot, 'src/shared/.circular-a.fixture.ts'),
-    content: `import { circularB } from './.circular-b.fixture'; export const circularA = () => circularB();`,
-    additionalFiles: [
+    files: [
       {
-        filePath: path.join(webRoot, 'src/shared/.circular-b.fixture.ts'),
-        content: `import { circularA } from './.circular-a.fixture'; export const circularB = () => circularA();`,
+        filePath: 'src/shared/circular-a.fixture.ts',
+        content: `import { circularB } from './circular-b.fixture'; export const circularA = () => circularB();`,
+      },
+      {
+        filePath: 'src/shared/circular-b.fixture.ts',
+        content: `import { circularA } from './circular-a.fixture'; export const circularB = () => circularA();`,
       },
     ],
   },
   {
     name: 'prohibits shared modules from importing concrete feature modules',
     expectedRule: 'shared-not-to-features',
-    fixtureFilePath: path.join(webRoot, 'src/shared/.boundary-shared-to-feature.fixture.ts'),
-    content: `import { adminRoutes } from '../features/admin/app/routes'; console.log(adminRoutes);`,
+    files: [
+      {
+        filePath: 'src/shared/boundary-shared-to-feature.fixture.ts',
+        content: `import { adminRoutes } from '{target:src/features/admin/app/routes}'; console.log(adminRoutes);`,
+      },
+    ],
   },
-  {
-    name: 'prohibits route pages from importing generated-query directly',
+  // Multi-point: one fixture per real admin/workspace layout shape. These
+  // fixtures are named `*.fixture.Page.vue` / `*.fixture.Layout.vue` on purpose —
+  // the rule now matches route surfaces by that filename, so a `.ts` fixture
+  // would no longer prove anything.
+  ...routePageFixtureDirs.map<BoundaryFixtureCase>((dir, index) => ({
+    name: `prohibits route pages in ${dir} from importing generated-query directly`,
     expectedRule: 'route-pages-no-direct-generated-query',
-    fixtureFilePath: path.join(
-      webRoot,
-      'src/features/admin/pages/.boundary-page-to-query.fixture.ts',
-    ),
-    content: `import { getGetControlMonitorUrl } from '../../../shared/api/generated-query/control/control-platform/control-platform'; console.log(getGetControlMonitorUrl);`,
-  },
+    files: [
+      {
+        filePath: `${dir}/boundary-page-to-query-${index}.fixture.Page.vue`,
+        content: [
+          '<script setup lang="ts">',
+          `import { getGetControlMonitorUrl } from '{target:${CONTROL_PLATFORM_MODULE}}'`,
+          'console.log(getGetControlMonitorUrl)',
+          '</script>',
+        ].join('\n'),
+      },
+    ],
+  })),
   {
     name: 'prohibits cross-feature deep imports into internal directories',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(
-      webRoot,
-      'src/features/admin/.boundary-cross-feature-deep.fixture.ts',
-    ),
-    content: `import { createEmptyBoardSnapshot } from '../board/domain'; console.log(createEmptyBoardSnapshot);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-cross-feature-deep.fixture.ts',
+        content: `import { createEmptyBoardSnapshot } from '{target:src/features/board/domain/index}'; console.log(createEmptyBoardSnapshot);`,
+      },
+    ],
   },
   {
     name: 'prohibits aliased imports into Board internals',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-board-alias.fixture.ts'),
-    content: `import { createEmptyBoardSnapshot } from '@/features/board/domain'; console.log(createEmptyBoardSnapshot);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-board-alias.fixture.ts',
+        content: `import { createEmptyBoardSnapshot } from '@/features/board/domain'; console.log(createEmptyBoardSnapshot);`,
+      },
+    ],
     scannerOnly: true,
   },
   {
     name: 'prohibits cross-feature deep imports into auth session internals',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-auth-deep.fixture.ts'),
-    content: `import { useUserStore } from '../auth/session/userSession'; console.log(useUserStore);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-auth-deep.fixture.ts',
+        content: `import { useUserStore } from '{target:src/features/auth/session/userSession}'; console.log(useUserStore);`,
+      },
+    ],
   },
   {
     name: 'prohibits cross-feature deep imports into workspace infrastructure',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-workspace-deep.fixture.ts'),
-    content: `import { getWorkspaceSelectionStore } from '../workspace/infrastructure/workspaceContext'; console.log(getWorkspaceSelectionStore);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-workspace-deep.fixture.ts',
+        content: `import { getWorkspaceSelectionStore } from '{target:src/features/workspace/infrastructure/workspaceContext}'; console.log(getWorkspaceSelectionStore);`,
+      },
+    ],
   },
   {
     name: 'prohibits cross-feature deep imports into library components',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(webRoot, 'src/features/search/.boundary-library-deep.fixture.ts'),
-    content: `import LibraryFloatingIsland from '../library/components/LibraryFloatingIsland.vue'; console.log(LibraryFloatingIsland);`,
+    files: [
+      {
+        filePath: 'src/features/search/boundary-library-deep.fixture.ts',
+        content: `import LibraryFloatingIsland from '{target:src/features/library/components/LibraryFloatingIsland.vue}'; console.log(LibraryFloatingIsland);`,
+      },
+    ],
   },
   {
     name: 'prohibits cross-feature deep imports into search presentation',
     expectedRule: 'no-cross-feature-deep-imports',
-    fixtureFilePath: path.join(webRoot, 'src/features/admin/.boundary-search-deep.fixture.ts'),
-    content: `import { useSearchScreenRuntime } from '../search/presentation/useSearchScreenRuntime'; console.log(useSearchScreenRuntime);`,
+    files: [
+      {
+        filePath: 'src/features/admin/boundary-search-deep.fixture.ts',
+        content: `import { useSearchScreenRuntime } from '{target:src/features/search/presentation/useSearchScreenRuntime}'; console.log(useSearchScreenRuntime);`,
+      },
+    ],
   },
 ]
 
-function runDepcruise(args: string[]) {
+function runDepcruise(cwd: string, args: string[]) {
   const result = spawnSync('npx', ['depcruise', ...args], {
-    cwd: webRoot,
+    cwd,
     encoding: 'utf8',
     maxBuffer: 50 * 1024 * 1024,
   })
   return result
 }
 
+/**
+ * Build the disposable workspace the fixture phase runs in.
+ *
+ * Fixtures used to be written straight into the real `src/` tree and removed in
+ * a `finally` block. `finally` does not run on SIGINT/SIGTERM, so Ctrl-C mid-run
+ * left `.boundary-*.fixture.*` files inside `src/`. They are dotfiles, not in
+ * `.gitignore`, so they showed up in `git status` *and* dependency-cruiser read
+ * them on the next run — turning this check into a source of phantom violations
+ * that only reproduced after an interrupted run.
+ *
+ * The fixture phase now runs under `mkdtemp` with `node_modules` symlinked in,
+ * mirroring `checkApiGeneratedDrift.ts`. Nothing is written inside the checkout
+ * at all, so an interrupted run cannot leave residue in the working tree.
+ */
+function createFixtureWorkspace(): string {
+  // realpath matters: on macOS `os.tmpdir()` is `/var/folders/...` while
+  // `process.cwd()` inside the child resolves to `/private/var/folders/...`.
+  // dependency-cruiser relativizes rule paths against its baseDir, so a
+  // non-realpathed temp path silently stops every rule from matching.
+  const tempRoot = fs.realpathSync(fs.mkdtempSync(path.join(tmpdir(), 'ideaboard-boundaries-')))
+  const workspace = path.join(tempRoot, 'web')
+  fs.mkdirSync(workspace, { recursive: true })
+
+  // dependency-cruiser resolves `from`/`to` paths relative to cwd, so the temp
+  // workspace needs the real rule set and the tsconfig the config points at.
+  fs.copyFileSync(
+    path.join(webRoot, '.dependency-cruiser.cjs'),
+    path.join(workspace, '.dependency-cruiser.cjs'),
+  )
+  fs.copyFileSync(
+    path.join(webRoot, 'tsconfig.app.json'),
+    path.join(workspace, 'tsconfig.app.json'),
+  )
+  // `tsconfig.app.json` extends `@vue/tsconfig/tsconfig.dom.json` and resolves
+  // `@/*`, both of which live in node_modules.
+  fs.symlinkSync(path.join(webRoot, 'node_modules'), path.join(workspace, 'node_modules'), 'dir')
+  return workspace
+}
+
+/**
+ * Tear the fixture workspace down on an interrupt.
+ *
+ * `finally` never runs for SIGINT/SIGTERM, which is exactly how the old
+ * in-`src/` fixtures survived a Ctrl-C. The checkout is now safe either way;
+ * this only stops an aborted run from leaving a symlinked `node_modules` tree
+ * in the temp directory.
+ */
+function registerInterruptCleanup(workspace: string): void {
+  const tempRoot = path.dirname(workspace)
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.on(signal, () => {
+      fs.rmSync(tempRoot, { recursive: true, force: true })
+      process.exit(signal === 'SIGINT' ? 130 : 143)
+    })
+  }
+}
+
+/**
+ * Minimal module body so an imported fixture target actually resolves.
+ *
+ * The stub re-exports whatever names the fixture imports, otherwise the
+ * fixture workspace would not type-check and `tsPreCompilationDeps` would be
+ * operating on a broken program.
+ */
+function stubModuleSource(filePath: string, exportedNames: readonly string[]): string {
+  if (filePath.endsWith('.vue')) {
+    return [
+      '<script lang="ts">',
+      "export default { name: 'BoundaryFixtureStub' }",
+      `const { ${exportedNames.join(', ')} } = {} as Record<string, unknown>`,
+      `export { ${exportedNames.join(', ')} }`,
+      '</script>',
+    ].join('\n')
+  }
+  const declarations = exportedNames.map(
+    (name) => `export const ${name} = undefined as unknown as (() => void) & Record<string, never>`,
+  )
+  return [
+    '// Generated by checkDependencyBoundaries: exists only so the fixture import',
+    '// resolves into a real dependency edge for dependency-cruiser to judge.',
+    'export default undefined as never',
+    ...declarations,
+  ].join('\n')
+}
+
+/** Names bound by `import { a, b as c } from '…'` in a fixture module. */
+function importedNames(source: string, specifier: string): string[] {
+  const names: string[] = []
+  const pattern = new RegExp(
+    `import\\s+(?:type\\s+)?\\{([^}]*)\\}\\s+from\\s*['"]${specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`,
+    'g',
+  )
+  for (const match of source.matchAll(pattern)) {
+    for (const raw of (match[1] ?? '').split(',')) {
+      const bound = raw
+        .trim()
+        .replace(/^type\s+/, '')
+        .split(/\s+as\s+/)
+        .at(-1)
+        ?.trim()
+      if (bound && /^[A-Za-z_$][\w$]*$/.test(bound)) names.push(bound)
+    }
+  }
+  return names
+}
+
+function materializeFixture(workspace: string, file: FixtureFile): string {
+  const fixtureAbsolute = path.join(workspace, file.filePath)
+  fs.mkdirSync(path.dirname(fixtureAbsolute), { recursive: true })
+
+  const targets = new Map<string, { specifier: string; absolute: string }>()
+  const content = file.content.replace(/\{target:([^}]+)\}/g, (_match, targetModule: string) => {
+    const existing = targets.get(targetModule)
+    if (existing) return existing.specifier
+
+    const targetWithExtension = /\.[a-z]+$/.test(targetModule) ? targetModule : `${targetModule}.ts`
+    const targetAbsolute = path.join(workspace, targetWithExtension)
+
+    // Extensionless specifiers match how the real modules are imported; the stub
+    // keeps its extension so the file name stays readable in the workspace.
+    const specifier = toPosix(path.relative(path.dirname(fixtureAbsolute), targetAbsolute))
+    const withoutExtension = targetWithExtension.endsWith('.vue')
+      ? specifier
+      : specifier.replace(/\.ts$/, '')
+    targets.set(targetModule, { specifier: withoutExtension, absolute: targetAbsolute })
+    return withoutExtension
+  })
+
+  for (const { absolute, specifier } of targets.values()) {
+    fs.mkdirSync(path.dirname(absolute), { recursive: true })
+    fs.writeFileSync(
+      absolute,
+      stubModuleSource(path.relative(workspace, absolute), importedNames(content, specifier)),
+    )
+  }
+
+  fs.writeFileSync(fixtureAbsolute, content)
+  return toPosix(path.relative(workspace, fixtureAbsolute))
+}
+
 console.log('--- 1. Running dependency-cruiser on production codebase ---')
-const prodResult = runDepcruise([
+const prodResult = runDepcruise(webRoot, [
   '--config',
   '.dependency-cruiser.cjs',
   '--output-type',
@@ -176,40 +419,60 @@ const prodOutput = JSON.parse(prodResult.stdout || '{}') as {
   summary?: { violations?: Array<{ from: string; to: string; rule?: { name?: string } }> }
 }
 const cruiseViolations = prodOutput.summary?.violations ?? []
-const scannedBoardEdges = scanBoardDeepImports()
+const scannedBoardEdges = scanBoardDeepImports(webRoot)
 if (prodResult.status !== 0 || cruiseViolations.length > 0 || scannedBoardEdges.size > 0) {
   console.error('Production dependency boundaries check failed!')
   console.error('Dependency-cruiser violations:', cruiseViolations)
   console.error('Board deep imports:', [...scannedBoardEdges])
   process.exit(1)
 }
-console.log('✓ Production codebase satisfies all dependency boundary rules.\n')
+
+/**
+ * Coverage report for the rule that had the widest blind spot.
+ *
+ * `route-pages-no-direct-generated-query` silently covered 13 of 31 route pages
+ * while reading like a total ban, so the count is printed every run: a drop here
+ * means the rule narrowed again.
+ */
+const ROUTE_PAGE_PATTERN = /^src\/app\/|src\/.*(?:Page|Layout)\.vue$/
+function listRouteSurfaces(root: string): string[] {
+  const found: string[] = []
+  const visit = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'generated-query') continue
+      const absolute = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        visit(absolute)
+        continue
+      }
+      if (!/\.(?:vue|ts)$/.test(entry.name)) continue
+      const relative = toPosix(path.relative(root, absolute))
+      if (ROUTE_PAGE_PATTERN.test(relative)) found.push(relative)
+    }
+  }
+  visit(path.join(root, 'src'))
+  return found.sort()
+}
+
+const routeSurfaces = listRouteSurfaces(webRoot)
+const namedRoutePages = routeSurfaces.filter((file) => /(?:Page|Layout)\.vue$/.test(file))
+if (namedRoutePages.length === 0) {
+  console.error('Production dependency boundaries check failed!')
+  console.error('No *Page.vue / *Layout.vue found; the route-page rule regex is probably wrong.')
+  process.exit(1)
+}
+console.log('✓ Production codebase satisfies all dependency boundary rules.')
+console.log(
+  `  route-pages-no-direct-generated-query covers ${namedRoutePages.length} route page(s) + ${routeSurfaces.length - namedRoutePages.length} app-layer module(s).`,
+)
+console.log('')
 
 console.log('--- 2. Validating Positive & Negative Fixtures ---')
 let hasError = false
-const createdFiles: string[] = []
 
+const workspace = createFixtureWorkspace()
+registerInterruptCleanup(workspace)
 try {
-  // 2.1 Positive Fixture: Vue SFC + dynamic import resolution
-  const posVuePath = path.join(webRoot, 'src/shared/.pos-vue.fixture.vue')
-  const posDepPath = path.join(webRoot, 'src/shared/.pos-dep.fixture.ts')
-  createdFiles.push(posVuePath, posDepPath)
-
-  fs.writeFileSync(posDepPath, `export const lazyValue = 'ok';\n`)
-  fs.writeFileSync(
-    posVuePath,
-    `<script setup lang="ts">\nconst load = () => import('./.pos-dep.fixture');\n</script>`,
-  )
-
-  const posResult = runDepcruise([
-    '--config',
-    '.dependency-cruiser.cjs',
-    '--max-depth',
-    '2',
-    '--output-type',
-    'json',
-    posVuePath,
-  ])
   type CruiseModule = {
     source: string
     dependencies?: Array<{
@@ -225,9 +488,32 @@ try {
     }
   }
 
+  // 2.1 Positive Fixture: Vue SFC + dynamic import resolution
+  // Fixture files are NOT dot-prefixed: TypeScript's `include` globs skip
+  // dot-files, so a workspace containing only dot-files makes `tsPreCompilationDeps`
+  // fail with TS18003 and dependency-cruiser silently degrades to zero violations.
+  const posDepPath = path.join(workspace, 'src/shared/pos-dep.fixture.ts')
+  const posVuePath = path.join(workspace, 'src/shared/pos-vue.fixture.vue')
+  fs.mkdirSync(path.dirname(posDepPath), { recursive: true })
+  fs.writeFileSync(posDepPath, `export const lazyValue = 'ok';\n`)
+  fs.writeFileSync(
+    posVuePath,
+    `<script setup lang="ts">\nconst load = () => import('./pos-dep.fixture');\n</script>`,
+  )
+
+  const posResult = runDepcruise(workspace, [
+    '--config',
+    '.dependency-cruiser.cjs',
+    '--max-depth',
+    '2',
+    '--output-type',
+    'json',
+    toPosix(path.relative(workspace, posVuePath)),
+  ])
+
   const posOutput = JSON.parse(posResult.stdout || '{}') as { modules?: CruiseModule[] }
-  const posModule = posOutput.modules?.find((m) => m.source.includes('.pos-vue.fixture.vue'))
-  const posDep = posModule?.dependencies?.find((d) => d.module.includes('.pos-dep.fixture'))
+  const posModule = posOutput.modules?.find((m) => m.source.includes('pos-vue.fixture.vue'))
+  const posDep = posModule?.dependencies?.find((d) => d.module.includes('pos-dep.fixture'))
 
   if (!posDep || posDep.couldNotResolve) {
     console.error('✗ Positive fixture failed: Vue SFC / dynamic import failed to resolve.')
@@ -238,24 +524,24 @@ try {
 
   // 2.2 Negative Fixtures: Rule violation detection
   for (const testCase of fixtureCases) {
-    createdFiles.push(testCase.fixtureFilePath)
-    fs.writeFileSync(testCase.fixtureFilePath, testCase.content)
-
-    if (testCase.additionalFiles) {
-      for (const extra of testCase.additionalFiles) {
-        createdFiles.push(extra.filePath)
-        fs.writeFileSync(extra.filePath, extra.content)
-      }
+    const entry = testCase.files[0]
+    const rest = testCase.files.slice(1)
+    if (!entry) {
+      console.error(`✗ Negative fixture "${testCase.name}" declares no files.`)
+      hasError = true
+      continue
     }
+    for (const file of rest) materializeFixture(workspace, file)
+    const fixtureModule = materializeFixture(workspace, entry)
 
-    const negResult = runDepcruise([
+    const negResult = runDepcruise(workspace, [
       '--config',
       '.dependency-cruiser.cjs',
       '--max-depth',
       '2',
       '--output-type',
       'json',
-      testCase.fixtureFilePath,
+      fixtureModule,
     ])
     const negOutput = JSON.parse(negResult.stdout || '{}') as {
       summary?: { violations?: CruiseViolation[] }
@@ -264,14 +550,14 @@ try {
       (v) => v.rule?.name === testCase.expectedRule,
     )
     const scannerTriggered = testCase.scannerOnly
-      ? scanBoardDeepImports(true).has(
-          `${path.relative(webRoot, testCase.fixtureFilePath).split(path.sep).join('/')}|src/features/board/domain/index.ts`,
+      ? scanBoardDeepImports(workspace, { includeFixtures: true }).has(
+          `${fixtureModule}|src/features/board/domain/index.ts`,
         )
       : false
 
     if (!triggered && !scannerTriggered) {
       console.error(
-        `✗ Negative fixture failed: "${testCase.name}" expected to violate "${testCase.expectedRule}", but did not.`,
+        `✗ Negative fixture failed: "${testCase.name}" (${fixtureModule}) expected to violate "${testCase.expectedRule}", but did not.`,
       )
       console.error('Actual violations:', negOutput.summary?.violations)
       hasError = true
@@ -282,18 +568,7 @@ try {
     }
   }
 } finally {
-  for (const file of createdFiles) {
-    if (fs.existsSync(file)) {
-      try {
-        fs.unlinkSync(file)
-      } catch (error) {
-        console.warn(
-          `⚠ Could not remove temporary dependency-boundary fixture ${path.relative(webRoot, file)}:`,
-          error,
-        )
-      }
-    }
-  }
+  fs.rmSync(path.dirname(workspace), { recursive: true, force: true })
 }
 
 if (hasError) {

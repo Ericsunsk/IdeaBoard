@@ -38,6 +38,39 @@ CREATE INDEX idx_tasks_status ON tasks (status, created_at) WHERE status IN ('pe
 CREATE INDEX idx_tasks_submitter ON tasks (submitter_user_id, created_at DESC);
 CREATE INDEX idx_tasks_billing ON tasks (billing_account_id, created_at DESC);
 
+-- Durable submit idempotency fact for task:create. Written inside the
+-- settlement transaction alongside Quote + Credit Hold + task insert + River
+-- enqueue, so a committed claim always has its task row and a rolled-back
+-- settlement leaves no claim behind.
+--
+-- Scope is (workspace_id, operation, idempotency_key): tasks are
+-- workspace-scoped, and operation keeps "task:create" separable from future
+-- submit-shaped operations sharing the client key namespace. Claims never
+-- expire, matching the sibling durable facts
+-- (uq_payment_order_idempotency, uq_reward_codes_creator_idempotency).
+--
+-- Not a revival of task_submission_claims (dropped in
+-- 20260924000002): that table was user-scoped, carried no operation, and its
+-- guard function JOINed tasks ON tasks.task_id, a column that does not exist
+-- here, so every insert raised IB209. The deferrable FK below is the correct
+-- form of that guard: the claim is written before the task row it names within
+-- the same transaction, so the check must run at COMMIT.
+CREATE TABLE task_submission_idempotency (
+  workspace_id BIGINT NOT NULL REFERENCES workspaces(internal_id) ON DELETE CASCADE,
+  operation TEXT NOT NULL,
+  idempotency_key VARCHAR(128) NOT NULL,
+  request_hash VARCHAR(64) NOT NULL,
+  task_public_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT task_submission_idempotency_pkey PRIMARY KEY (workspace_id, operation, idempotency_key),
+  CONSTRAINT fk_task_submission_idempotency_task FOREIGN KEY (task_public_id)
+    REFERENCES tasks(public_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT ck_task_submission_idempotency_operation CHECK (char_length(btrim(operation)) BETWEEN 1 AND 64),
+  CONSTRAINT ck_task_submission_idempotency_key CHECK (char_length(btrim(idempotency_key)) BETWEEN 1 AND 128),
+  CONSTRAINT ck_task_submission_idempotency_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT ck_task_submission_idempotency_task_public_id CHECK (char_length(btrim(task_public_id)) BETWEEN 1 AND 64)
+);
+
 -- Task outputs reference Media Assets or remote URLs without exposing storage keys.
 CREATE TABLE task_outputs (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

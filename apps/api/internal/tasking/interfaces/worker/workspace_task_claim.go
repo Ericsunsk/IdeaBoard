@@ -1,7 +1,9 @@
 package worker
 
 // Claim phase (#860): load the task, drop dirty work, validate inputs,
-// resolve media refs, and fence pending -> running with the lease token.
+// resolve media refs, settle the send's routing facts, and fence
+// pending -> running with the lease token IN THE SAME STATEMENT that opens
+// the send's durable attempt fact.
 //
 // Dirty-work drops (all return (nil, nil): no error, no provider call):
 //
@@ -10,7 +12,9 @@ package worker
 // Validation and media resolution run BEFORE claiming so malformed tasks
 // fail from pending without lease churn; both converge deterministically
 // through the retry+settlement phase (failTerminal: hold released, no
-// retry burn).
+// retry burn). Routing resolves before the claim for the same reason: the
+// claim statement writes the attempt row, so the send's model and retry
+// layer have to be known up front.
 
 import (
 	"context"
@@ -18,6 +22,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/tasking/workspacetasks"
 )
@@ -121,38 +126,72 @@ func hasWorkspaceMaskParam(task *workspacetasks.WorkspaceTask) bool {
 	return ok
 }
 
-// claim fences pending -> running with the lease token and lets a River
-// redelivery reacquire the same interrupted running lease. Lease-guarded
-// conflicts reconverge: terminal/cancelled rows drop the job, anything else
-// is transient and rides River backoff.
-func (w *WorkspaceTaskWorker) claim(ctx context.Context, args workspacetasks.WorkspaceTaskArgs, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
+// claim fences pending -> running with the lease token AND opens the send's
+// durable attempt fact, in one statement. The ordering is what removes the
+// intermediate state: the attempt row is written by the SAME statement that
+// takes the lease, so there is no window in which the lease token is
+// committed without its attempt row (a crash, a rejected connection, or a
+// failed attempt insert now rolls the lease flip back with it).
+//
+// Because that row is the send's own fact, it is also keyed by the lease
+// token: one token, one attempt row, one attempt_no. The returned send closes
+// that same row, so a send can never be recorded against a token the claim
+// never took.
+//
+// A River redelivery reacquires the same interrupted running lease because it
+// carries the same token. That resume reuses the attempt row the earlier
+// attempt opened (started=false) instead of colliding on the token, so the
+// send keeps one fact. Lease-guarded conflicts reconverge: terminal/cancelled
+// rows drop the job, anything else is transient and rides River backoff.
+func (w *WorkspaceTaskWorker) claim(
+	ctx context.Context,
+	args workspacetasks.WorkspaceTaskArgs,
+	task *workspacetasks.WorkspaceTask,
+	tracker *workspaceSendTracker,
+	model, layer string,
+) (*workspacetasks.WorkspaceTask, *workspaceSend, error) {
 	lease := strings.TrimSpace(args.ExecutionToken)
 	if lease == "" {
 		fresh, err := workspacetasks.NewExecutionToken()
 		if err != nil {
-			return nil, fmt.Errorf("workspace task mint lease: %w", err)
+			return nil, nil, fmt.Errorf("workspace task mint lease: %w", err)
 		}
 		lease = fresh
 	}
-	claimed, err := w.store.ClaimTask(ctx, task.WorkspaceID, task.ID, lease)
+	claimed, started, err := w.claims.ClaimTaskWithAttempt(ctx, task.WorkspaceID, task.ID, lease, workspacetasks.AttemptStart{
+		TaskID:         task.ID,
+		RiverJobID:     tracker.riverJobID,
+		Service:        tracker.service,
+		RequestedModel: model,
+		ResolvedModel:  model,
+		Provider:       workspaceAttemptProvider(model),
+		RetryLayer:     layer,
+		StartedAt:      time.Now(),
+	})
 	if err != nil {
 		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
 			current, getErr := w.store.GetTask(ctx, task.WorkspaceID, task.ID)
 			if getErr != nil {
 				if errors.Is(getErr, workspacetasks.ErrNotFound) {
-					return nil, nil
+					return nil, nil, nil
 				}
-				return nil, fmt.Errorf("workspace task reload after claim conflict: %w", getErr)
+				return nil, nil, fmt.Errorf("workspace task reload after claim conflict: %w", getErr)
 			}
 			if current.IsTerminal() || current.Status == workspacetasks.StatusCancelled {
 				slog.Info("workspace task converged before claim; dropping", "task_id", task.ID, "status", current.Status)
-				return nil, nil
+				return nil, nil, nil
 			}
-			return nil, fmt.Errorf("workspace task claim conflict: %w", err)
+			return nil, nil, fmt.Errorf("workspace task claim conflict: %w", err)
 		}
-		return nil, fmt.Errorf("workspace task claim: %w", err)
+		return nil, nil, fmt.Errorf("workspace task claim: %w", err)
 	}
-	return claimed, nil
+	if !started {
+		// Same lease, same send: the attempt row already exists, so the
+		// resumed execution closes that row instead of opening a new one.
+		slog.Info("workspace task claim resumed an existing attempt fact",
+			"task_id", claimed.ID, "retry_layer", layer, "retry_count", claimed.RetryCount)
+	}
+	return claimed, tracker.claimedSend(lease, model, layer), nil
 }
 
 func redactToken(token string) string {

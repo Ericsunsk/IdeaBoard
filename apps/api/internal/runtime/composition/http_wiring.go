@@ -140,6 +140,14 @@ func newAppRouter(
 			// worker (built in task_wiring.go where the client exists),
 			// so HTTP views and the worker observe one registry.
 			Webhooks: taskServices.webhooks,
+			// The workspace envelope hot log is built in task_wiring.go and
+			// shared with the Control Plane admin-cancel adapter below: one
+			// instance, so an operator cancel reaches the same SSE replay
+			// window and live subscribers a user cancel does.
+			Events: taskServices.workspaceEvents,
+			// Use the same workspace-envelope bus for user and worker events;
+			// control-plane wiring below shares this instance as well.
+			EventBus: taskServices.workspaceEventBus,
 		},
 		// Workspace billing surface (issue #804). Reads compose the
 		// Credits ledger, billing records, and usage through their owning
@@ -192,14 +200,24 @@ func newAppRouter(
 		// over the workspace tasks table) plus the River queue monitor,
 		// so the monitor / statistics / stream proxies are live.
 		ContractControl: httpapi.ContractControlDeps{
-			Users:             services.userService,
-			Identity:          administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
-			Impersonator:      services.authServiceClient,
-			Credits:           services.creditService,
-			CreditUsers:       creditUserResolver,
-			CreditReads:       services.creditService,
-			Reconciliation:    services.creditService,
-			Tasks:             httpapi.NewWorkspaceControlTasks(services.dbPool, taskServices.workspaceTaskStore, taskServices.workspaceTaskHolder, creditUserResolver),
+			Users:          services.userService,
+			Identity:       administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+			Impersonator:   services.authServiceClient,
+			Credits:        services.creditService,
+			CreditUsers:    creditUserResolver,
+			CreditReads:    services.creditService,
+			Reconciliation: services.creditService,
+			Tasks: httpapi.NewWorkspaceControlTasks(services.dbPool, taskServices.workspaceTaskStore, taskServices.workspaceTaskHolder, creditUserResolver,
+				// Admin-cancel announcements (admin cancel dead-channel fix).
+				// The Control Plane declares a neutral port and this adapter is
+				// the only place the two are joined. It reuses the SAME task
+				// status publisher the River worker bridge publishes through
+				// (a second publisher would re-open the double-send bug), the
+				// SAME workspace hot log the SSE endpoints read, the SAME
+				// webhook store the worker delivers from, and the SAME NATS
+				// workspace bus for cross-instance envelope fanout. No second
+				// NATS connection is opened by this wiring.
+				newControlTaskEventAdapter(taskServices.taskStatusPublisher, taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
 			Tenancy:           tenancypg.NewStore(repos.db),
 			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),

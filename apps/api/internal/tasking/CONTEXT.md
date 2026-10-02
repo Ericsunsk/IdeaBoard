@@ -28,8 +28,15 @@ transport details.
   statuses only): each purge freezes statistics into task_daily_stats first,
   then deletes tasks in one transaction. Billing snapshots/settlements/claims,
   the credit ledger, and statistics aggregates are never purged.
-- Lease identity is fenced by task, account, provider endpoint, credential, and
-  lease token; stale workers cannot overwrite a newer lease.
+- Lease identity is fenced by task plus the execution token, and nothing
+  else: `tasks.lease_token` gates the pending -> running claim (a running row
+  is only reclaimable by the same token), the River job carries the token so
+  a stale delivery drops before claiming, and `task_execution_attempts` is
+  keyed `UNIQUE (execution_token)` so the claim and the attempt fact can
+  never disagree about which execution they describe. A retry mints a fresh
+  token, which is how stale workers lose the race. There is no account,
+  provider endpoint, or credential dimension in the fence — ADR-0009
+  retired that quadruple; do not reintroduce it.
 - Application packages depend on interfaces/contracts, never on concrete
   infrastructure adapters.
 

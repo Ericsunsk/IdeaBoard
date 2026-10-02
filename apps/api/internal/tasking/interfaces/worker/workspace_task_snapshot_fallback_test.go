@@ -52,8 +52,14 @@ func workerTestSnapshot(t *testing.T, service string, eligible []string) routing
 }
 
 // pinWorkerSnapshot persists snapshot bytes on an in-memory task
-// (delete + recreate, mirroring pinLiveDispatchModel).
-func pinWorkerSnapshot(t *testing.T, store *workspacetasks.InMemoryStore, task *workspacetasks.WorkspaceTask, snap routing.RoutingSnapshot) *workspacetasks.WorkspaceTask {
+// (delete + recreate, mirroring pinLiveDispatchModel). The seam is the
+// snapshot-writing pair, so the merged claim wrapper satisfies it unchanged.
+type workerSnapshotPinner interface {
+	DeleteTask(ctx context.Context, workspaceID, taskID string) error
+	CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error)
+}
+
+func pinWorkerSnapshot(t *testing.T, store workerSnapshotPinner, task *workspacetasks.WorkspaceTask, snap routing.RoutingSnapshot) *workspacetasks.WorkspaceTask {
 	t.Helper()
 	raw, err := json.Marshal(snap)
 	if err != nil {

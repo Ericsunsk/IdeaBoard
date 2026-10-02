@@ -50,6 +50,15 @@ import { fileURLToPath } from 'node:url'
  * therefore how the modules behind it stay private, and this check will not
  * flag additions inside those sealed modules (they never reach the surface).
  *
+ * ## Aliased re-exports count
+ *
+ * `resolveModule` used to bail out on any specifier that was not relative, so
+ * `export * from '@/features/x/internal'` resolved to nothing and its symbols
+ * never entered the baseline — the exact leak the ratchet is for. `@/` and
+ * `src/` now resolve against `src/` as `knip.jsonc` and `tsconfig.app.json`
+ * declare them. An `export *` that still cannot be resolved is reported rather
+ * than skipped, because a silently dropped re-export is an invisible surface.
+ *
  * Run `npm run api:surface:update` to regenerate the baseline after an
  * intentional change.
  */
@@ -90,14 +99,40 @@ function readEntrypoints(): string[] {
   return [...(parsed.entry ?? [])].sort()
 }
 
+/**
+ * Resolve an `export ... from` specifier.
+ *
+ * `@/` (and `src/`) were previously rejected outright, so a barrel that
+ * re-exported through the alias contributed **nothing** to the baseline — which
+ * is precisely the `export *` leak this ratchet exists to catch: widening
+ * `export * from '@/features/x/internal'` silently added public symbols and the
+ * check reported no drift. `knip.jsonc`/`tsconfig.app.json` both map `@/*` to
+ * `./src/*`, so the alias is resolved here too.
+ */
 function resolveModule(fromFile: string, specifier: string): string | null {
-  if (!specifier.startsWith('.')) return null
-  const base = path.resolve(path.dirname(fromFile), specifier)
-  const candidates = [base, `${base}.ts`, `${base}.vue`, path.join(base, 'index.ts')]
-  return candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile()) ?? null
+  const candidates = specifier.startsWith('@/')
+    ? [path.join(webRoot, 'src', specifier.slice(2))]
+    : specifier.startsWith('src/')
+      ? [path.join(webRoot, specifier)]
+      : specifier.startsWith('.')
+        ? [path.resolve(path.dirname(fromFile), specifier)]
+        : []
+  if (candidates.length === 0) return null
+  const base = candidates[0] as string
+  const resolved = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}.vue`,
+    path.join(base, 'index.ts'),
+  ].find((file) => fs.existsSync(file) && fs.statSync(file).isFile())
+  return resolved ?? null
 }
 
 type SurfaceScan = { symbols: Set<string>; files: Set<string> }
+
+/** `export *` targets that could not be resolved to a file. */
+const unresolvedStarExports: string[] = []
 
 /** Expand an entrypoint to every symbol it exposes, following `export *`. */
 function scanEntrypoint(file: string, seen = new Set<string>()): SurfaceScan {
@@ -133,7 +168,10 @@ function scanEntrypoint(file: string, seen = new Set<string>()): SurfaceScan {
       continue
     }
     const target = resolveModule(file, match[2] ?? '')
-    if (!target) continue
+    if (!target) {
+      unresolvedStarExports.push(`${path.relative(webRoot, file)} -> ${match[2] ?? ''}`)
+      continue
+    }
     const nested = scanEntrypoint(target, seen)
     nested.symbols.forEach((name) => symbols.add(name))
     nested.files.forEach((entry) => files.add(entry))
@@ -258,6 +296,12 @@ for (const [entrypoint, names] of Object.entries(current)) {
 }
 
 problems.push(...collectFeatureBarrelProblems())
+
+for (const unresolved of unresolvedStarExports) {
+  problems.push(
+    `Unresolved \`export *\` (${unresolved}). Its symbols are missing from the surface; fix the specifier or seal the barrel with an explicit export list.`,
+  )
+}
 
 if (problems.length > 0) {
   console.error('✗ Public API surface drift detected:')

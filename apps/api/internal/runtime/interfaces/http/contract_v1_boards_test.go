@@ -443,6 +443,92 @@ func TestV1BoardsShareReplayAndJoin(t *testing.T) {
 	}
 }
 
+// TestV1BoardsJoinRejectedBearerGrantsNoMembership pins the authorization
+// order on the join path: a bearer that fails to redeem (unknown or revoked)
+// must leave no membership row behind. Membership is not board-scoped — it
+// reaches billing, credits, tasks, media and library — so granting before the
+// token is validated would hand a caller who only guessed a workspace id a
+// far wider surface than the bearer was ever scoped to.
+//
+// The joiners below are deliberately never seeded with SeedWorkspaceMember, so
+// the negative assertions are not masked by a pre-existing membership (the
+// shares test seeds its joiner up front and so cannot observe this).
+func TestV1BoardsJoinRejectedBearerGrantsNoMembership(t *testing.T) {
+	f := newV1BoardsFixture(t)
+	ctx := context.Background()
+	sharesPath := f.boardPath("/shares")
+
+	isMember := func(userID int64) bool {
+		t.Helper()
+		_, member, err := f.store.GetWorkspaceRole(ctx, f.workspace.PublicID, userID)
+		if err != nil {
+			t.Fatalf("workspace role for %d = %v", userID, err)
+		}
+		return member
+	}
+	join := func(userID int64, key, token string) (int, map[string]any) {
+		return boardIDEMKey(t, f.engine, http.MethodPost, f.boardsPath("/join"), userID, key,
+			fmt.Sprintf(`{"data":{"token":%q}}`, token))
+	}
+	mintShare := func(key, role string) (string, string) {
+		t.Helper()
+		status, created := boardIDEMKey(t, f.engine, http.MethodPost, sharesPath, f.owner, key,
+			fmt.Sprintf(`{"data":{"role":%q}}`, role))
+		if status != 201 {
+			t.Fatalf("share create = %d %v, want 201", status, created)
+		}
+		data := v1Data(t, created).(map[string]any)
+		tokenID, _ := data["token_id"].(string)
+		bearer, _ := data["token"].(string)
+		if tokenID == "" || bearer == "" {
+			t.Fatalf("share = %v, want token_id and bearer", data)
+		}
+		return tokenID, bearer
+	}
+
+	const unknownJoiner, revokedJoiner, validJoiner = 106, 107, 108
+	for _, id := range []int64{unknownJoiner, revokedJoiner, validJoiner} {
+		if isMember(id) {
+			t.Fatalf("user %d must start as a workspace non-member", id)
+		}
+	}
+
+	// An unknown bearer converges to 404 and grants nothing.
+	status, unknown := join(unknownJoiner, "leak-unknown", "sht_unknownbearer")
+	if status != 404 || v1ErrorCode(t, unknown) != string(contract.CodeBoardShareTokenNotFound) {
+		t.Fatalf("unknown join = %d %v, want 404 board_share_token_not_found", status, unknown)
+	}
+	if isMember(unknownJoiner) {
+		t.Fatal("rejected join granted workspace membership: a failed bearer must leave no trace")
+	}
+
+	// A revoked bearer likewise converges to 404 and grants nothing.
+	revokedTokenID, revokedBearer := mintShare("leak-share-revoked", "viewer")
+	if status, _ := boardIDEMKey(t, f.engine, http.MethodDelete, sharesPath+"/"+revokedTokenID, f.owner, "leak-revoke", ""); status != 200 {
+		t.Fatalf("revoke = %d, want 200", status)
+	}
+	status, revoked := join(revokedJoiner, "leak-revoked", revokedBearer)
+	if status != 404 || v1ErrorCode(t, revoked) != string(contract.CodeBoardShareTokenNotFound) {
+		t.Fatalf("revoked join = %d %v, want 404 board_share_token_not_found", status, revoked)
+	}
+	if isMember(revokedJoiner) {
+		t.Fatal("revoked join granted workspace membership: a failed bearer must leave no trace")
+	}
+
+	// Positive control, so the two assertions above cannot pass vacuously by
+	// the grant having been dropped outright: a live bearer still grants
+	// membership, which is what lets the collaborator reach workspace-rooted
+	// surfaces after joining.
+	_, validBearer := mintShare("leak-share-valid", "editor")
+	status, joined := join(validJoiner, "leak-valid", validBearer)
+	if status != 200 {
+		t.Fatalf("valid join = %d %v, want 200", status, joined)
+	}
+	if !isMember(validJoiner) {
+		t.Fatal("successful join must grant workspace membership alongside the board grant")
+	}
+}
+
 func TestV1BoardsMembers(t *testing.T) {
 	f := newV1BoardsFixture(t)
 	f.dir.ensure(106)

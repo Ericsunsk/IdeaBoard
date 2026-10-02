@@ -122,6 +122,12 @@ func (phaseStubStore) ClaimTask(_ context.Context, _, _, _ string) (*workspaceta
 	return nil, workspacetasks.ErrStateConflict
 }
 
+// ClaimTaskWithAttempt satisfies the merged claim seam the constructor
+// requires; this stub never claims, so it never opens an attempt fact.
+func (phaseStubStore) ClaimTaskWithAttempt(_ context.Context, _, _, _ string, _ workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error) {
+	return nil, false, workspacetasks.ErrStateConflict
+}
+
 // convergeSendFailure routes purely on (retryable, budget): retryable with
 // budget requeues through Retry, exhausted budget or deterministic failures
 // converge through Fail. No store, no provider, no River involved.

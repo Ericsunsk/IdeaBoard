@@ -67,7 +67,7 @@ ATLAS_DEV_URL='postgres://user:password@127.0.0.1:5432/ideaboard_atlas_validate?
 bash scripts/atlas-migration-check.sh
 ```
 
-如确需 destructive migration，SQL 文件必须包含 `-- destructive: approved`，并且只在经过 review 的环境中显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`；CI 默认始终拒绝。
+如确需 destructive migration，SQL 文件必须包含 `-- destructive: approved`，并且只在经过 review 的环境中显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`；CI 默认始终拒绝。被拦截的 DDL 包括 `DROP TABLE` / `DROP COLUMN` / `DROP CONSTRAINT` / `DROP SCHEMA` / `DROP INDEX` / `DROP VIEW` / `DROP FUNCTION` / `DROP TRIGGER` / `TRUNCATE`，bare `DROP <object>` 与 `ALTER TABLE ... DROP <object>` 两种写法都会命中。
 
 然后分别启动 Auth 与 API：
 
@@ -132,14 +132,40 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | API tests                        | `cd apps/api && go test ./...`                                                                                                |
 | Test infrastructure modules      | `cd apps/api/internal/testdb && go test ./...` and `cd apps/api/internal/testsupport && go test ./...`                        |
 | API build                        | `cd apps/api && go build ./...`                                                                                               |
-| Production dead-code scan        | `cd apps/api && deadcode ./...`                                                                                               |
-| Test reachability dead-code scan | `cd apps/api && deadcode -test ./...`                                                                                         |
+| Production dead-code scan        | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode ./...`                            |
+| Test reachability dead-code scan | `cd apps/api && GOTOOLCHAIN="go$(awk '/^go [0-9]/ {print $2; exit}' go.mod)" deadcode -test ./...`                      |
 | Schema snapshot generation       | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' BASE_SHA=HEAD go run ./cmd/schemarelease --write-artifact`                |
 | Schema Release check             | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schemarelease` |
 | sqlc regeneration                | `cd apps/api && go tool sqlc generate`                                                                                        |
 | Auth build                       | `cd apps/auth && npm run build`                                                                                               |
-| Credits million dataset          | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v`      |
-| Usage million dataset            | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`         |
+| Credits million dataset          | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/credits/application/commands -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
+| Usage million dataset            | `cd apps/api && API_TEST_DATABASE_DSN='<test-dsn>' CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v`               |
+
+### 显式负载 harness
+
+两条百万流水命令都是 `CREDITS_LOAD_TEST=1` 门控的显式 harness，不在默认 suite 内：
+
+- 必须显式传 `API_TEST_DATABASE_DSN`。未设置时两个 harness 都只打印
+  `set API_TEST_DATABASE_DSN to run PostgreSQL integration tests` 然后 `SKIP`，
+  `go test` 仍然报 `PASS`——静默跳过，不是通过。
+- Credits harness 在子包 `./internal/credits/application/commands`（不是
+  `./internal/credits`）；Usage harness 就在 `./internal/usage` 根下。写错包路径
+  会得到 `[no tests to run]` 而没有任何失败信号。
+
+`deadcode` 是外部工具（`golang.org/x/tools/cmd/deadcode`），**不在**
+`apps/api/go.mod` 的 `tool` block 里，因此没有 `go tool deadcode`。它也不在任何
+CI lane 中跑——API Quality 用 `golangci-lint`（其中 `unused` 与它是不同算法）。
+首次使用先安装，版本跟随项目依赖的 `golang.org/x/tools`：
+
+```bash
+cd apps/api
+go install "golang.org/x/tools/cmd/deadcode@$(go list -m -f '{{.Version}}' golang.org/x/tools)"
+```
+
+上表命令里的 `GOTOOLCHAIN` 是必需的：`deadcode` 的 source-processing 包必须与运行
+`go list` 的 Go toolchain 同版本。用本机更高版本的 toolchain 会解析 stdlib 失败或
+在 RTA 阶段直接 panic。版本从 `apps/api/go.mod` 的 `go` directive 推导，不要在本文档
+里硬编码版本字面量。
 
 ### CI parity gate
 
@@ -301,6 +327,7 @@ sqlc:
 - API schema 由独立 `api-migrate` image 执行 Atlas versioned migrations，再执行 `finalize-migrate` 完成 River 与 runtime privilege setup。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 Atlas revisions 表。
 - Schema source 的唯一 lifecycle 是 `schema-release`：修改 domain fragment 或 manifest 后先用 `--write-artifact` 生成 `schema.sql`，再运行默认 check；CI 和 release gate 只运行默认 check。
 - clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
+- `api-migrate` 在 `atlas migrate apply` 之前会比对数据库记录的 Atlas revisions 与镜像内 `internal/db/migrations/` 的版本集合。出现缺失版本（错误的 image digest、回滚到旧 image、migration 文件被改名或删除、CI 变量错配）时 migrator **不会**自动清库，而是以 `clean break reset is not allowed` 失败，并列出缺失的 version。确认是预期的 pre-launch clean break、且已导出需要保留的数据后，才在 migration 容器上设置 `ATLAS_CLEAN_BREAK_ALLOW_RESET=true` 重跑：这是唯一的 opt-in 开关，值非法时按 `false` 处理并计入 `Config.InvalidEnv`。drop 前会把 `current_database()`、缺失 version 与 public schema 行数摘要写入结构化日志。
 
 ## 环境变量要点
 
@@ -337,7 +364,9 @@ API 在独立 `METRICS_ADDR` listener 暴露 Prometheus `/metrics`，默认 `127
 
 ### 改 task submission/runtime
 
-1. 保持 task insert 和 River enqueue 在同一个 PostgreSQL transaction。
+1. 不破坏 submit 的 transaction 边界。canonical 规则只写在 [DESIGN.md](./DESIGN.md) §3
+   （Quote snapshot、Credit Hold、task insert、River enqueue 同一 transaction；终态与
+   Capture/Release 原子提交；event 只能在 commit 后发布），本文不复述细则。
 2. 保持 River 是任务队列，NATS 只做事件层。
 3. 检查 cancel、terminal state、retry 和 no-capacity 分支。
 4. 跑 API tests；跨层状态变化同时跑 Web task event 相关测试。

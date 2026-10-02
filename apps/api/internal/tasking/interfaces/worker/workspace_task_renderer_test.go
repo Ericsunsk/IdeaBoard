@@ -296,7 +296,9 @@ func TestNewWorkspaceTaskRendererRequiresSeams(t *testing.T) {
 func TestWorkspaceTaskWorkerRendersBeforeComplete(t *testing.T) {
 	ctx := context.Background()
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
-	store := workspacetasks.NewInMemoryStoreForTests()
+	// Wrapped in the merged claim+attempt seam the worker constructor
+	// requires (production writes both in one statement).
+	store := newAttemptClaimStore(workspacetasks.NewInMemoryStoreForTests(), workspacetasks.NewInMemoryAttemptRecorderForTests())
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{

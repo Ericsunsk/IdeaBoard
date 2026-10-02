@@ -1,6 +1,7 @@
 package config
 
 import (
+	"slices"
 	"sync"
 	"testing"
 )
@@ -47,6 +48,7 @@ var configEnvKeys = []string{
 	"INIT_ADMIN_DISPLAY_NAME",
 	"ATLAS_BINARY",
 	"ATLAS_MIGRATIONS_DIR",
+	"ATLAS_CLEAN_BREAK_ALLOW_RESET",
 	"APP_SECRETS_ENCRYPTION_KEY",
 }
 
@@ -494,6 +496,44 @@ func TestLoadAdminSeedAndMigrationTooling(t *testing.T) {
 	}
 	if got.Secrets.EncryptionKey != "test-secrets-encryption-key" {
 		t.Fatalf("secrets encryption key = %q, want trimmed value", got.Secrets.EncryptionKey)
+	}
+}
+
+// TestLoadCleanBreakAllowReset covers the opt-in that gates
+// DROP SCHEMA public CASCADE in composition.reconcileCleanBreakDatabase. It
+// must stay false unless an operator asks for it explicitly, and an
+// unparseable value must fail closed rather than enabling the reset.
+func TestLoadCleanBreakAllowReset(t *testing.T) {
+	resetConfigEnv(t)
+	if Load().Migration.CleanBreakAllowReset {
+		t.Fatal("CleanBreakAllowReset = true with ATLAS_CLEAN_BREAK_ALLOW_RESET unset, want fail-closed default")
+	}
+
+	for _, value := range []string{"1", "true", "TRUE", "yes", "on"} {
+		resetConfigEnv(t)
+		t.Setenv("ATLAS_CLEAN_BREAK_ALLOW_RESET", value)
+		if !Load().Migration.CleanBreakAllowReset {
+			t.Fatalf("CleanBreakAllowReset = false for %q, want true", value)
+		}
+	}
+
+	for _, value := range []string{"0", "false", "no", "off"} {
+		resetConfigEnv(t)
+		t.Setenv("ATLAS_CLEAN_BREAK_ALLOW_RESET", value)
+		if Load().Migration.CleanBreakAllowReset {
+			t.Fatalf("CleanBreakAllowReset = true for %q, want false", value)
+		}
+	}
+
+	// A typo must not silently enable a destructive deploy-time branch.
+	resetConfigEnv(t)
+	t.Setenv("ATLAS_CLEAN_BREAK_ALLOW_RESET", "ture")
+	got := Load()
+	if got.Migration.CleanBreakAllowReset {
+		t.Fatal("CleanBreakAllowReset = true for a malformed value, want false")
+	}
+	if !slices.Contains(got.InvalidEnv, "ATLAS_CLEAN_BREAK_ALLOW_RESET") {
+		t.Fatalf("InvalidEnv = %v, want ATLAS_CLEAN_BREAK_ALLOW_RESET", got.InvalidEnv)
 	}
 }
 

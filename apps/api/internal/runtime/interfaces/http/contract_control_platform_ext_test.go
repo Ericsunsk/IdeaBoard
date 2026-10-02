@@ -710,7 +710,10 @@ func TestControlBrandingUploadGuards(t *testing.T) {
 }
 
 func TestWorkspaceControlTaskAdapterFailClosed(t *testing.T) {
-	adapter := NewWorkspaceControlTasks(nil, nil, nil, nil)
+	// The event port is nil here on purpose: cancel must fail closed on the
+	// missing db/store exactly as before, and a nil port must never turn a
+	// settlement error into anything else.
+	adapter := NewWorkspaceControlTasks(nil, nil, nil, nil, nil)
 	if adapter == nil {
 		t.Fatal("nil db must still return an adapter")
 	}

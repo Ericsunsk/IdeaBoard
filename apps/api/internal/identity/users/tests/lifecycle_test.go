@@ -7,8 +7,10 @@ import (
 	"ideaboard/api/internal/credits/ports"
 	"sync"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/identity/autherrors"
 	identitycreditsadapter "ideaboard/api/internal/identity/users/infrastructure/credits"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/secrets"
@@ -603,6 +605,106 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 	}
 	if authUserID != nil || retainedAuthUserID != nil || retainedStorageUID != nil || displayName != "已注销用户" || !IsValidStorageUID(tombstoneStorageUID) || tombstoneStorageUID == provisioned.User.StorageUID || taskCount != 1 || claimCount != 1 {
 		t.Fatalf("tombstone auth=%v request_auth=%v request_storage=%v display_name=%q storage_uid=%q tasks=%d claims=%d", authUserID, retainedAuthUserID, retainedStorageUID, displayName, tombstoneStorageUID, taskCount, claimCount)
+	}
+}
+
+// TestUserDeletionConvergesWhenAuthIdentityAlreadyGoneAfterLostPhaseAdvance
+// pins the pending_auth convergence contract. The first attempt deletes the
+// Auth identity successfully but loses the phase advance, leaving phase
+// pending_auth with the account frozen. Every retry then sees Auth answer
+// not_found; that must be treated as "already converged" so Storage cleanup
+// and the PII tombstone still run instead of stranding the user forever.
+func TestUserDeletionConvergesWhenAuthIdentityAlreadyGoneAfterLostPhaseAdvance(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	ctx := context.Background()
+	lifecycle := newLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
+		AuthUserID: "auth-delete-lost-advance", DisplayName: "delete-lost-advance",
+		ClaimIdentity: "delete-lost-advance@example.com", ClaimIdentityKind: "canonical_email",
+		ClaimIdentityVerified: true, Role: "user",
+	})
+	if err != nil {
+		t.Fatalf("provision deletion user: %v", err)
+	}
+	authUserID := *provisioned.User.AuthUserID
+	originalStorageUID := provisioned.User.StorageUID
+
+	// Simulate the flap: Auth delete commits, then the standalone
+	// pending_auth -> pending_storage UPDATE is lost.
+	if _, err := pool.Exec(ctx, `
+CREATE FUNCTION fail_auth_phase_advance_once() RETURNS trigger AS $$
+BEGIN
+  IF NEW.phase = 'pending_storage' THEN RAISE EXCEPTION 'injected phase advance failure'; END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql`); err != nil {
+		t.Fatalf("install phase advance failure function: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `CREATE TRIGGER fail_auth_phase_advance_once BEFORE UPDATE ON user_deletion_requests
+FOR EACH ROW EXECUTE FUNCTION fail_auth_phase_advance_once()`); err != nil {
+		t.Fatalf("install phase advance failure trigger: %v", err)
+	}
+
+	authDeleter := &recordingAuthUserDeleter{}
+	cleaner := &recordingUserUploadCleaner{}
+	service := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
+	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err == nil {
+		t.Fatal("lost Auth phase advance should surface an error on the first attempt")
+	}
+	if len(authDeleter.authUserIDs) != 1 || authDeleter.authUserIDs[0] != authUserID {
+		t.Fatalf("Auth delete calls = %v, want one call for %q", authDeleter.authUserIDs, authUserID)
+	}
+	if len(cleaner.calls) != 0 {
+		t.Fatalf("storage cleanup ran before the Auth phase advanced: %v", cleaner.calls)
+	}
+	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingAuth, 0, "frozen")
+
+	if _, err := pool.Exec(ctx, `DROP TRIGGER fail_auth_phase_advance_once ON user_deletion_requests`); err != nil {
+		t.Fatalf("remove phase advance failure trigger: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `DROP FUNCTION fail_auth_phase_advance_once()`); err != nil {
+		t.Fatalf("remove phase advance failure function: %v", err)
+	}
+
+	// Retry: Auth no longer holds the identity, so it answers not_found.
+	authDeleter.err = autherrors.ErrAuthUserNotFound
+	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err != nil {
+		t.Fatalf("retry after lost Auth phase advance: %v", err)
+	}
+	assertDeletionState(t, pool, provisioned.User.ID, DeletionCompleted, 0, "frozen")
+	if len(authDeleter.authUserIDs) != 2 {
+		t.Fatalf("Auth delete calls = %v, want the initial attempt plus one retry", authDeleter.authUserIDs)
+	}
+	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != provisioned.User.ID || cleaner.calls[0].storageUID != originalStorageUID {
+		t.Fatalf("storage cleanup calls = %+v, want one call for user %d storage %q", cleaner.calls, provisioned.User.ID, originalStorageUID)
+	}
+	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err != nil {
+		t.Fatalf("completed deletion idempotency retry: %v", err)
+	}
+	if len(authDeleter.authUserIDs) != 2 || len(cleaner.calls) != 1 {
+		t.Fatalf("idempotent rerun touched Auth or storage again: auth=%v storage=%v", authDeleter.authUserIDs, cleaner.calls)
+	}
+
+	var displayName, avatar, tombstoneStorageUID string
+	var remainingAuthUserID *string
+	if err := pool.QueryRow(ctx, `SELECT display_name, avatar, storage_uid, auth_user_id FROM users WHERE id = $1`, provisioned.User.ID).Scan(
+		&displayName, &avatar, &tombstoneStorageUID, &remainingAuthUserID,
+	); err != nil {
+		t.Fatalf("read converged tombstone: %v", err)
+	}
+	var retainedAuthUserID, retainedStorageUID *string
+	var completedAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT auth_user_id, storage_uid, completed_at FROM user_deletion_requests WHERE user_id = $1`, provisioned.User.ID).Scan(
+		&retainedAuthUserID, &retainedStorageUID, &completedAt,
+	); err != nil {
+		t.Fatalf("read completed deletion request: %v", err)
+	}
+	if displayName != "已注销用户" || avatar != "" || remainingAuthUserID != nil ||
+		retainedAuthUserID != nil || retainedStorageUID != nil || completedAt == nil {
+		t.Fatalf("tombstone display_name=%q avatar=%q auth=%v request_auth=%v request_storage=%v completed_at=%v",
+			displayName, avatar, remainingAuthUserID, retainedAuthUserID, retainedStorageUID, completedAt)
+	}
+	if !IsValidStorageUID(tombstoneStorageUID) || tombstoneStorageUID == originalStorageUID {
+		t.Fatalf("tombstone storage_uid = %q, want a fresh uid replacing %q", tombstoneStorageUID, originalStorageUID)
 	}
 }
 

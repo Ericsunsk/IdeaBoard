@@ -210,6 +210,25 @@ type workspaceSendTracker struct {
 	service    string
 }
 
+// workspaceAttemptLayer classifies the retry layer of the send that a claim
+// is about to open.
+//
+// gateway is only the INITIAL schedule. Every later send is a river_task
+// send: either Service.Retry rotated the token after a transient provider
+// failure (retryCount > 0), or River redelivered the same job
+// (jobAttempt > 0). Deriving this from retryCount ALONE mis-attributed
+// redeliveries: the claim's same-token branch lets a redelivery re-acquire the
+// lease without any retry_count increment, so those sends were recorded as
+// fresh gateway sends and the layer histogram under-counted whole-task
+// retries. jobAttempt is River's own durable signal for the redelivery case,
+// so the two together cover every non-initial send.
+func workspaceAttemptLayer(retryCount int32, jobAttempt int) string {
+	if retryCount > 0 || jobAttempt > 0 {
+		return workspacetasks.AttemptRetryLayerRiverTask
+	}
+	return workspacetasks.AttemptRetryLayerGateway
+}
+
 // workspaceSend is one started gateway send's open fact. A zero token
 // means the fact was never recorded (nil or degraded recorder): every
 // finish is a no-op and execution continues.
@@ -223,6 +242,18 @@ type workspaceSend struct {
 
 func newWorkspaceSendTracker(recorder workspacetasks.AttemptRecorder, taskID string, riverJobID int64, service string) *workspaceSendTracker {
 	return &workspaceSendTracker{recorder: recorder, taskID: taskID, riverJobID: riverJobID, service: service}
+}
+
+// claimedSend binds the send to the attempt fact its claim already wrote.
+// token IS the lease token, so finish() closes exactly the row the claim
+// opened: the split claim-then-StartAttempt pair used to mint a second,
+// unrelated token here, which is what let a lease and an attempt fact drift
+// apart.
+func (t *workspaceSendTracker) claimedSend(token, model, layer string) *workspaceSend {
+	return &workspaceSend{
+		tracker: t, token: strings.TrimSpace(token),
+		model: strings.TrimSpace(model), layer: strings.TrimSpace(layer),
+	}
 }
 
 // fallbackConsumed reports whether a model_fallback row already exists
@@ -241,9 +272,14 @@ func (t *workspaceSendTracker) fallbackConsumed(ctx context.Context) bool {
 	return consumed
 }
 
-// startSend opens one attempt fact, best-effort: a failing recorder
-// warns and the send proceeds without facts (telemetry failure never
-// changes task or billing state).
+// startSend opens the attempt fact for a SECOND send inside an already
+// claimed execution (today: the model_fallback send). It is best-effort: a
+// failing recorder warns and the send proceeds without facts.
+//
+// The primary send does NOT come through here. Its fact is written by the
+// claim statement, keyed by the lease token (claimedSend); only a send that
+// happens after the claim needs a freshly minted token, because
+// uq_task_execution_attempts_token gives one row per send.
 func (t *workspaceSendTracker) startSend(ctx context.Context, model, layer string) *workspaceSend {
 	send := &workspaceSend{tracker: t, model: strings.TrimSpace(model), layer: strings.TrimSpace(layer)}
 	if t == nil || t.recorder == nil {

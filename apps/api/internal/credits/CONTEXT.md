@@ -50,9 +50,9 @@ product identity, versioned pricing, and Quotes belong to the `billing` context.
   all other commands go through `execute_credit_command_v2`.
 - `Service.InTx(pgx.Tx)` / `CommandsInTx(pgx.Tx)`: caller-owned transaction
   adapters over the same `Commands` contract.
-  Task/River submission and task terminal `settleTerminal` both use pgx;
+  Task/River submission and task terminal convergence both use pgx;
   there is no `database/sql` Credit Command path.
-  Callers own commit/rollback; Task Repository holds no
+  Callers own commit/rollback; the Tasking Task Store holds no
   application-lifetime Credits/Billing dependency.
 - `WalletReader`: Wallet balance plus keyset-paginated Ledger queries.
 - `WalletRestrictionCommands`: idempotent create and precise release of

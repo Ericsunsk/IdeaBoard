@@ -26,6 +26,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -60,16 +61,22 @@ type workspaceControlTaskAdapter struct {
 	store  WorkspaceControlTaskStores
 	holder workspacetasks.Holder
 	users  ControlCreditDirectory
+	// events is the neutral ControlTaskEventPort the adapter announces
+	// settled transitions through (see contract_control_tasks_events.go for
+	// why the port is declared here instead of importing the event layer).
+	// Nil keeps cancel working with announcements disabled, never the
+	// reverse: a missing port can never fail a settlement.
+	events ControlTaskEventPort
 }
 
 // NewWorkspaceControlTasks builds the control task read model. A nil db
 // keeps every method fail-closed (the handlers converge to 503), matching
 // the nil-dep convention of the other control seams.
-func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.Holder, users ControlCreditDirectory) *workspaceControlTaskAdapter {
+func NewWorkspaceControlTasks(db *pgxpool.Pool, store WorkspaceControlTaskStores, holder workspacetasks.Holder, users ControlCreditDirectory, events ControlTaskEventPort) *workspaceControlTaskAdapter {
 	if db == nil {
-		return &workspaceControlTaskAdapter{store: store, holder: holder, users: users}
+		return &workspaceControlTaskAdapter{store: store, holder: holder, users: users, events: events}
 	}
-	return &workspaceControlTaskAdapter{db: db, q: dbsqlc.New(db), store: store, holder: holder, users: users}
+	return &workspaceControlTaskAdapter{db: db, q: dbsqlc.New(db), store: store, holder: holder, users: users, events: events}
 }
 
 // Compile-time conformance with the control seam.
@@ -396,6 +403,25 @@ func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context
 	return identity.ID, nil
 }
 
+// CancelAdminTask settles the operator cancel and then announces the
+// resulting transition. The staged-event drain lives HERE, inside this
+// function, and not at the handler: this method builds its OWN
+// workspacetasks.Service (it must not share the worker's instance, whose
+// staged buffer is drained under the worker's mutex), so the staged
+// events are unreachable from anywhere else and this is the only place
+// they can be drained.
+//
+// WHY THE FLUSH IS AFTER THE SETTLEMENT CALL RETURNS
+// workspacetasks.Service STAGES a status event only on its post-commit
+// line, so a rolled-back settlement stages nothing and this flush
+// publishes nothing. That is the same contract the River worker settler
+// bridge relies on; it is why the drain can never announce a state a
+// rollback still has the power to erase.
+//
+// The drain always runs (a failed settlement staged nothing, and
+// draining anyway keeps the buffer from leaking into a later call), but
+// publication is gated on a nil error. A terminal replay (already=true)
+// stages nothing, so an idempotent re-cancel announces nothing.
 func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskID string, adminID int64, reason string) error {
 	q := a.queries()
 	if q == nil || a.store == nil {
@@ -414,8 +440,73 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 		TaskRead: a.store, TaskLifecycle: a.store,
 		TaskBilling: a.store, Holder: a.holder,
 	})
-	_, _, err = settler.Cancel(ctx, row.WorkspacePublicID, taskID, adminID, reason)
+	cancelled, _, err := settler.Cancel(ctx, row.WorkspacePublicID, taskID, adminID, reason)
+	var settlementState, holdTransactionID string
+	if cancelled != nil {
+		settlementState = cancelled.BillingSnapshot.SettlementState
+		holdTransactionID = cancelled.BillingSnapshot.HoldTransactionID
+	}
+	a.announceCancelTransitions(ctx, settler, row.WorkspacePublicID, reason, adminID, settlementState, holdTransactionID, err)
 	return err
+}
+
+// announceCancelTransitions drains the settler staged on the cancel above
+// and publishes each transition through the neutral ControlTaskEventPort.
+//
+// Ordering guarantees:
+//   - The drain always runs, so a staged event can never leak into the
+//     NEXT cancel's announcements (this Service instance is discarded
+//     after the call, but the drain-always rule keeps the invariant local
+//     and matches the worker bridge).
+//   - Publication is skipped entirely when the settlement failed: a
+//     rollback must leave no trace on either delivery channel.
+//   - A terminal replay stages nothing, so an idempotent re-cancel is
+//     silent (exactly-once per real flip).
+//
+// Announcement failures are warn-logged and never returned: the domain
+// fact is already committed, and failing the HTTP response here would
+// report a settlement failure for a settlement that actually landed.
+func (a *workspaceControlTaskAdapter) announceCancelTransitions(ctx context.Context, settler *workspacetasks.Service, workspaceID, reason string, adminID int64, settlementState, holdTransactionID string, settleErr error) {
+	if settler == nil {
+		return
+	}
+	staged := settler.StagedEvents()
+	if len(staged) == 0 || settleErr != nil || a.events == nil {
+		return
+	}
+	// The operator is the actor on the workspace envelope. Resolve once per
+	// transition batch; an unresolvable operator leaves ActorUserID empty so
+	// the adapter records the Control Plane itself rather than inventing a
+	// user identity (best-effort: an announcement must never fail the cancel).
+	actorUserID := ""
+	if a.users != nil && adminID > 0 {
+		if identity, resolveErr := a.users.ResolveID(ctx, adminID); resolveErr == nil && identity.ID > 0 {
+			actorUserID = tenancy.FormatUserPublicID(identity.PublicID)
+		}
+	}
+	for _, event := range staged {
+		published := ControlTaskStatusEvent{
+			WorkspaceID:       strings.TrimSpace(workspaceID),
+			TaskID:            strings.TrimSpace(event.TaskID),
+			Status:            string(event.Status),
+			Reason:            reason,
+			ActorUserID:       actorUserID,
+			SettlementState:   settlementState,
+			HoldTransactionID: holdTransactionID,
+			OccurredAt:        event.OccurredAt,
+		}
+		if published.WorkspaceID == "" || published.TaskID == "" {
+			continue
+		}
+		if err := a.events.PublishTaskStatus(ctx, published); err != nil {
+			slog.Warn("publish control task status event failed",
+				"task_id", published.TaskID, "status", published.Status, "err", err)
+		}
+		if err := a.events.EmitWorkspaceTaskEvent(ctx, published); err != nil {
+			slog.Warn("emit control workspace task event failed",
+				"task_id", published.TaskID, "status", published.Status, "err", err)
+		}
+	}
 }
 
 // controlTaskOutputMeta is the task_outputs.metadata shape (asset refs

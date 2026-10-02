@@ -2,6 +2,7 @@ package workspacetasks
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,8 +44,12 @@ type Service struct {
 	// allowNonTransactional is set only by NewTestServiceForTests. Production
 	// settlement must always use the atomic PostgreSQL seams below.
 	allowNonTransactional bool
-	events                []TaskEvent
-	now                   func() time.Time
+	// submissionClaims is the durable submit idempotency fact store. See
+	// ServiceDeps.SubmissionClaims: production settlement fails closed
+	// without it.
+	submissionClaims TxSubmissionClaimStore
+	events           []TaskEvent
+	now              func() time.Time
 }
 
 // ServiceDeps wires the settlement seams. TaskRead and TaskLifecycle are
@@ -67,6 +72,13 @@ type ServiceDeps struct {
 	Resolver *routing.RoutingResolver
 	// SnapshotSaver pins the Resolve snapshot in the settlement transaction.
 	SnapshotSaver RoutingSnapshotSaver
+	// SubmissionClaims is the durable submit idempotency fact store. It is
+	// REQUIRED for production settlement: without it a retried submit cannot
+	// be fenced and would mint a second task, take a second Hold, and
+	// enqueue a second River job. NewService refuses to settle without it
+	// (ErrSettlementUnavailable), so a missing wiring fails closed instead
+	// of degrading into an unfenced create.
+	SubmissionClaims TxSubmissionClaimStore
 }
 
 // NewService builds the settlement orchestrator.
@@ -77,6 +89,7 @@ func NewService(deps ServiceDeps) *Service {
 		quoter:      deps.Quoter, holder: deps.Holder,
 		queue: deps.Queue, assets: deps.Assets,
 		resolver: deps.Resolver, saveSnapshot: deps.SnapshotSaver, now: time.Now,
+		submissionClaims: deps.SubmissionClaims,
 	}
 }
 
@@ -183,17 +196,40 @@ type CreateInput struct {
 	Quantity        int64
 	Resolution      string
 	CanonicalParams string
+	// RequestHash fingerprints the request body for the durable submit
+	// claim. Callers that already canonicalize the body (the v1 HTTP edge)
+	// pass TaskSubmitRequestHash; when empty, Create derives an equivalent
+	// hash from the settlement-shaping fields so the claim is never stored
+	// with an empty fingerprint.
+	RequestHash string
+	// Prompt is the caller prompt. It feeds the request hash (a different
+	// prompt with the same key is a conflict, not a replay) but is not
+	// itself persisted here; the canonical compiler owns prompt storage.
+	Prompt string
 }
 
-// Create settles one task atomically: Quote -> Hold -> Insert -> Enqueue.
-// Any failure compensates all prior steps. On success it stages a
-// pending status event (flushed by the caller after commit).
+// Create settles one task atomically: Quote -> Hold -> Insert -> Enqueue,
+// fenced by a durable submit idempotency claim written in the same
+// transaction. Any failure compensates all prior steps and rolls the claim
+// back with them. On success it stages a pending status event (flushed by
+// the caller after commit).
+//
+// idempotencyKey is REQUIRED and load-bearing: it scopes the durable claim
+// (workspace + operation + key) and derives the Credit Hold ledger key. A
+// repeated key returns the ORIGINAL task and stages NO event (the original
+// submit already emitted it); a repeated key with a different request body
+// returns ErrIdempotencyConflict. An empty key is a validation error, never
+// an unfenced create.
 func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey string) (*WorkspaceTask, error) {
 	ctx, span := telemetry.Start(ctx, "generation.submit.settlement",
 		attribute.String("service", input.Service), attribute.String("resolution", input.Resolution))
 	defer telemetry.End(span, nil)
 	if s.taskLifecycle == nil {
 		return nil, fmt.Errorf("workspacetasks: store unavailable: %w", ErrNotFound)
+	}
+	key, err := NormalizeSubmitIdempotencyKey(idempotencyKey)
+	if err != nil {
+		return nil, err
 	}
 	kind, err := ValidateCreate(input.Service, input.MediaAssetIDs, input.Params)
 	if err != nil {
@@ -217,6 +253,9 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	// atomically with the settlement transaction. The worker fails closed on a
 	// missing snapshot, and credits.Commands stays the sole ledger writer.
 	var snapshot BillingSnapshot
+	workspaceID := strings.TrimSpace(input.WorkspaceID)
+	// Mint the task id up front so the claim can name it. A replay returns
+	// this same id instead of minting a second one.
 	taskID, err := NewTaskPublicID()
 	if err != nil {
 		return nil, err
@@ -225,16 +264,20 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	if err != nil {
 		return nil, err
 	}
-	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token); handled {
+	claim := SubmissionClaim{
+		WorkspaceID: workspaceID, Operation: TaskSubmitOperation,
+		IdempotencyKey: key, TaskPublicID: taskID,
+		RequestHash: s.submitRequestHash(input, kind, resolution, quantity),
+	}
+	if created, handled, err := s.createInTx(ctx, input, kind, resolution, quantity, taskID, token, claim); handled {
 		return created, err
 	}
 	if !s.allowNonTransactional {
 		return nil, ErrSettlementUnavailable
 	}
-	var routingSnap routing.RoutingSnapshot
 	// Test-only fixtures without transaction seams resolve before Quote/Hold so
 	// an empty pool reserves nothing. Production cannot enter this branch.
-	routingSnap, err = s.resolveSnapshot(ctx, kind, resolution)
+	routingSnap, err := s.resolveSnapshot(ctx, kind, resolution)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +287,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
-		holdTxID, err = s.holder.Hold(ctx, input.OwnerUserID, snapshot.TotalCredits, "task-hold:"+taskID, taskID)
+		holdTxID, err = s.holder.Hold(ctx, input.OwnerUserID, snapshot.TotalCredits, TaskSubmitHoldKey(workspaceID, key), taskID)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +297,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		snapshot.SettlementState = "free"
 	}
 	task := &WorkspaceTask{
-		ID: taskID, WorkspaceID: strings.TrimSpace(input.WorkspaceID), OwnerUserID: input.OwnerUserID,
+		ID: taskID, WorkspaceID: workspaceID, OwnerUserID: input.OwnerUserID,
 		Service: kind, MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
 		Params: cloneParams(input.Params), CanonicalParams: input.CanonicalParams,
 		Status:     StatusPending,
@@ -285,6 +328,23 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 	}
 	s.stage(created.ID, created.WorkspaceID, StatusPending)
 	return created, nil
+}
+
+// submitRequestHash resolves the fingerprint persisted with the durable
+// claim. Callers that canonicalize the body themselves (the v1 HTTP edge)
+// supply it; otherwise an equivalent hash is derived from the fields that
+// shape settlement and rendering, so the claim is never stored blank.
+func (s *Service) submitRequestHash(input CreateInput, kind, resolution string, quantity int64) string {
+	if supplied := strings.TrimSpace(input.RequestHash); supplied != "" {
+		return supplied
+	}
+	paramsJSON := ""
+	if len(input.Params) > 0 {
+		if encoded, err := json.Marshal(input.Params); err == nil {
+			paramsJSON = string(encoded)
+		}
+	}
+	return TaskSubmitRequestHash(input.WorkspaceID, kind, input.MediaAssetIDs, input.Prompt, paramsJSON, quantity, resolution)
 }
 
 func cloneParams(in map[string]any) map[string]any {

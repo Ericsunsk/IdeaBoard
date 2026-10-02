@@ -11,7 +11,7 @@ task scheduling, or billing ledger facts.
   definitions, object key canonicalization, and upload validation rules.
   Free of external SDKs, SQL, and HTTP libraries.
 - `ports`: inbound/outbound contracts including `StorageDriver`,
-  `StorageProfileRepository`, `ObjectStore`, `UploadAuthorizer`,
+  `ProfileRepository`, `ObjectStore`, `ReadableUploadAccess`,
   and transfer models.
 - `infrastructure`: technical adapters: `local` (filesystem driver with safety
   boundary checks); `s3` (MinIO/AWS S3 compatible driver and capability probe,
@@ -32,9 +32,9 @@ task scheduling, or billing ledger facts.
 ## Public Seams
 
 - `StorageDriver`: file/object storage driver contract.
-- `StorageProfileRepository`: storage profile persistence contract.
+- `ProfileRepository`: storage profile persistence contract.
 - `ObjectStore`: object-store access contract.
-- `UploadAuthorizer`: upload authorization contract.
+- `ReadableUploadAccess`: upload read authorization contract.
 - `runtime`: upload, fetch, presign, and object lifecycle orchestration.
 - `profiles`: profile management, activation, and credential testing.
 - `authorization`: path and resource read/write authorization.

@@ -41,6 +41,7 @@ func TestRiverTimeoutMatrixIsSelfConsistent(t *testing.T) {
 		"task_retention",
 		"vision_billing",
 		"media_reclamation",
+		RiverQueueTaskSettlementSweep,
 	} {
 		if _, ok := seenQueues[want]; !ok {
 			t.Fatalf("matrix is missing queue %q", want)
@@ -51,6 +52,7 @@ func TestRiverTimeoutMatrixIsSelfConsistent(t *testing.T) {
 		"FinalFailureWorker (drawing_final_failure, settlement-only)",
 		"CreditReconciliationWorker",
 		"CreditReconciliationScheduleWorker",
+		"TaskSettlementSweepWorker (task_settlement_sweep, settlement-only)",
 		"PaymentReconciliationWorker",
 		"PaymentCheckoutShutdownWorker",
 		"PaymentCheckoutShutdownScheduleWorker",
@@ -77,17 +79,18 @@ func TestRiverTimeoutMatrixMatchesWorkerConstants(t *testing.T) {
 		budgets[policy.Worker] = policy.Timeout
 	}
 	want := map[string]time.Duration{
-		"TaskWorker (drawing_generate)":                               RiverJobTimeoutDrawing,
-		"FinalFailureWorker (drawing_final_failure, settlement-only)": RiverJobTimeoutFinalFailure,
-		"CreditReconciliationWorker":                                  RiverJobTimeoutCreditReconciliation,
-		"CreditReconciliationScheduleWorker":                          RiverJobTimeoutCreditSchedule,
-		"PaymentReconciliationWorker":                                 RiverJobTimeoutPaymentReconciliation,
-		"PaymentCheckoutShutdownWorker":                               RiverJobTimeoutPaymentCheckoutShutdown,
-		"PaymentCheckoutShutdownScheduleWorker":                       RiverJobTimeoutPaymentCheckoutShutdown,
-		"TaskRetentionWorker (serial single-worker queue)":            RiverJobTimeoutTaskRetention,
-		"VisionBillingReconciliationWorker":                           RiverJobTimeoutVisionBilling,
-		"ReclaimWorker":                                               RiverJobTimeoutMediaReclamation,
-		"ScheduleWorker":                                              RiverJobTimeoutMediaReclamationSchedule,
+		"TaskWorker (drawing_generate)":                                      RiverJobTimeoutDrawing,
+		"FinalFailureWorker (drawing_final_failure, settlement-only)":        RiverJobTimeoutFinalFailure,
+		"CreditReconciliationWorker":                                         RiverJobTimeoutCreditReconciliation,
+		"CreditReconciliationScheduleWorker":                                 RiverJobTimeoutCreditSchedule,
+		"TaskSettlementSweepWorker (task_settlement_sweep, settlement-only)": RiverJobTimeoutTaskSettlementSweep,
+		"PaymentReconciliationWorker":                                        RiverJobTimeoutPaymentReconciliation,
+		"PaymentCheckoutShutdownWorker":                                      RiverJobTimeoutPaymentCheckoutShutdown,
+		"PaymentCheckoutShutdownScheduleWorker":                              RiverJobTimeoutPaymentCheckoutShutdown,
+		"TaskRetentionWorker (serial single-worker queue)":                   RiverJobTimeoutTaskRetention,
+		"VisionBillingReconciliationWorker":                                  RiverJobTimeoutVisionBilling,
+		"ReclaimWorker":                                                      RiverJobTimeoutMediaReclamation,
+		"ScheduleWorker":                                                     RiverJobTimeoutMediaReclamationSchedule,
 	}
 	for worker, timeout := range want {
 		if budgets[worker] != timeout {

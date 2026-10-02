@@ -279,15 +279,16 @@ func (q *atomicQueue) failOnce(err error) {
 }
 
 type atomicEnv struct {
-	pool     *pgxpool.Pool
-	store    *taskpostgres.Store
-	credits  *credits.Service
-	holder   *atomicHolder
-	queue    *atomicQueue
-	service  *workspacetasks.Service
-	ws       string
-	userID   int64
-	unitCost int64
+	pool        *pgxpool.Pool
+	store       *taskpostgres.Store
+	credits     *credits.Service
+	holder      *atomicHolder
+	queue       *atomicQueue
+	service     *workspacetasks.Service
+	serviceDeps workspacetasks.ServiceDeps
+	ws          string
+	userID      int64
+	unitCost    int64
 }
 
 func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
@@ -365,10 +366,11 @@ func openAtomicEnv(t *testing.T, unitCost int64) *atomicEnv {
 		}
 		return catalog.SaveRoutingSnapshot(ctx, dbsqlc.New(tx), taskID, snap)
 	}
-	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
+	deps := workspacetasks.ServiceDeps{
 		TaskRead: store, TaskLifecycle: store, TaskBilling: store, Quoter: &atomicQuoter{catalog: billingCatalog}, Holder: holder, Queue: queue, Resolver: allowTestPoolResolver(), SnapshotSaver: snapshotSaver,
-	})
-	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, ws: ws, userID: userID, unitCost: unitCost}
+	}
+	service := workspacetasks.NewTestServiceForTests(deps)
+	return &atomicEnv{pool: pool, store: store, credits: creditService, holder: holder, queue: queue, service: service, serviceDeps: deps, ws: ws, userID: userID, unitCost: unitCost}
 }
 
 func (e *atomicEnv) wallet(t *testing.T) (available, reserved int64) {
@@ -398,17 +400,24 @@ func (e *atomicEnv) probeCount(t *testing.T, taskID string) int {
 	return count
 }
 
-func (e *atomicEnv) createPaidTask(t *testing.T, quantity int64) *workspacetasks.WorkspaceTask {
+// createPaidTaskKeyed creates a task with a caller-chosen idempotency key and
+// returns both, so tests can assert the durable key's effects.
+func (e *atomicEnv) createPaidTaskKeyed(t *testing.T, quantity int64, key string) *workspacetasks.WorkspaceTask {
 	t.Helper()
 	created, err := e.service.Create(context.Background(), workspacetasks.CreateInput{
 		WorkspaceID: e.ws, OwnerUserID: e.userID,
 		Service: "render", Quantity: quantity, Resolution: "1k",
-	}, "atomic-key-"+randomAtomicHex(t, 4))
+	}, key)
 	if err != nil {
 		t.Fatalf("atomic Create: %v", err)
 	}
 	_ = e.service.StagedEvents()
 	return created
+}
+
+func (e *atomicEnv) createPaidTask(t *testing.T, quantity int64) *workspacetasks.WorkspaceTask {
+	t.Helper()
+	return e.createPaidTaskKeyed(t, quantity, "atomic-key-"+randomAtomicHex(t, 4))
 }
 
 func (e *atomicEnv) claimTask(t *testing.T, taskID, token string) {
@@ -429,7 +438,8 @@ func atomicRemoteOutput() []workspacetasks.OutputRef {
 // hold ledger row, the reserved balance, and the enqueue probe all exist.
 func TestAtomicCreateSettlesHoldInsertEnqueue(t *testing.T) {
 	env := openAtomicEnv(t, 10)
-	created := env.createPaidTask(t, 1)
+	key := "atomic-key-" + randomAtomicHex(t, 4)
+	created := env.createPaidTaskKeyed(t, 1, key)
 
 	stored, err := env.store.GetTask(context.Background(), env.ws, created.ID)
 	if err != nil {
@@ -441,7 +451,10 @@ func TestAtomicCreateSettlesHoldInsertEnqueue(t *testing.T) {
 	if stored.BillingSnapshot.HoldTransactionID == "" || stored.BillingSnapshot.SettlementState != "held" {
 		t.Fatalf("snapshot = %+v, want held with hold id", stored.BillingSnapshot)
 	}
-	if env.ledgerCount(t, `idempotency_key = $1`, "task-hold:"+created.ID) != 1 {
+	// The hold key is derived from the DURABLE submit identity
+	// (workspace + operation + key), never from the freshly minted task id:
+	// a task-id-derived key differs on every retry and cannot fence anything.
+	if env.ledgerCount(t, `idempotency_key = $1`, workspacetasks.TaskSubmitHoldKey(env.ws, key)) != 1 {
 		t.Fatal("hold ledger row missing after atomic Create")
 	}
 	if available, reserved := env.wallet(t); available != 990 || reserved != 10 {

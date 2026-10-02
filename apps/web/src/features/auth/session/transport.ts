@@ -269,11 +269,20 @@ export const authTransport = {
   },
 
   async stopImpersonating(): Promise<void> {
-    const { error } = await authClient.admin.stopImpersonating()
-    if (error) {
-      throw new Error(
-        resolveBetterAuthErrorMessage(error, i18n.global.t('auth.errors.stopImpersonatingFailed')),
-      )
-    }
+    // Called directly instead of through the admin client plugin, which is
+    // intentionally not registered in the browser bundle (see
+    // shared/auth/client.ts). This endpoint needs no admin permission: the Auth
+    // Service only requires a session carrying `impersonatedBy` plus the signed
+    // admin_session cookie, and the reverse proxy is the single location that
+    // still allows it. Callers already refetch the user and session afterwards,
+    // so the admin client's session-signal listener is not needed here.
+    await requestAuthEndpoint(
+      '/api/auth/admin/stop-impersonating',
+      {
+        method: 'POST',
+        credentials: 'include',
+      },
+      i18n.global.t('auth.errors.stopImpersonatingFailed'),
+    )
   },
 }

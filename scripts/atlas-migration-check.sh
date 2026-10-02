@@ -35,7 +35,13 @@ resolve_added_migrations() {
     "${migration_prefix#/}"'/*.sql' || true
 }
 
-destructive_pattern='^[[:space:]]*(DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$)|TRUNCATE([[:space:]]|;|$)|ALTER[[:space:]]+TABLE[[:space:]].*[[:space:]]DROP[[:space:]]+(TABLE|COLUMN|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$))'
+# Destructive DDL that must be reviewed before it reaches a database. The
+# object-type list is shared by the bare `DROP <object>` form and the
+# `ALTER TABLE ... DROP <object>` form so both spellings of the same change are
+# caught. CONSTRAINT is included because dropping a foreign key or a CHECK
+# silently removes referential integrity or a validation rule, which a reviewer
+# scanning for DROP TABLE would not notice.
+destructive_pattern='^[[:space:]]*(DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$)|TRUNCATE([[:space:]]|;|$)|ALTER[[:space:]]+TABLE[[:space:]].*[[:space:]]DROP[[:space:]]+(TABLE|COLUMN|CONSTRAINT|SCHEMA|INDEX|TYPE|VIEW|MATERIALIZED[[:space:]]+VIEW|SEQUENCE|FUNCTION|TRIGGER)([[:space:]]|;|$))'
 
 check_destructive_changes() {
   local relative_path path

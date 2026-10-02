@@ -155,6 +155,11 @@ func renderTaskError(c *gin.Context, err error) {
 		contract.RenderError(c, http.StatusNotFound, contract.CodeTaskNotFound, msgControlNotFound8)
 	case errors.Is(err, workspacetasks.ErrForbidden):
 		contract.RenderError(c, http.StatusForbidden, contract.CodeTaskForbidden, msgForbidden)
+	case errors.Is(err, workspacetasks.ErrIdempotencyConflict):
+		// The durable submit claim already holds this (workspace, operation,
+		// key) for a different request body. Reusing a key across different
+		// bodies is a client bug, never a replay.
+		contract.RenderError(c, http.StatusConflict, contract.CodeTaskIdempotencyConflict, msgWorkspaceIdempotencyConflict)
 	case errors.Is(err, workspacetasks.ErrStateConflict):
 		contract.RenderError(c, http.StatusConflict, contract.CodeTaskStateConflict, msgTaskStateConflict)
 	case errors.Is(err, workspacetasks.ErrInsufficientCredits):
@@ -413,13 +418,20 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 			strings.Join(assetIDs, ","), prompt, string(paramsJSON),
 			strconv.FormatInt(quantity, 10), resolution)
 		externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
-		scope := contract.IdempotencyScope(externalUser, "task:create")
+		// The durable task claim is workspace-scoped. Include the workspace in
+		// the process-local fast-path scope as well, otherwise the same user
+		// reusing a key in another workspace can be rejected by this cache even
+		// though the durable claims are independent.
+		scope := contract.IdempotencyScope(externalUser+":"+workspace.PublicID, "task:create")
 		service := h.taskService()
 		result, _, doErr := h.deps.Idempotency.Do(c.Request.Context(), scope, identityPrincipal.UserID(), key, hash, func() (any, error) {
 			created, err := service.Create(c.Request.Context(), workspacetasks.CreateInput{
 				WorkspaceID: workspace.PublicID, OwnerUserID: identityPrincipal.UserID(),
 				Service: kind, MediaAssetIDs: assetIDs, Params: params,
 				Quantity: quantity, Resolution: resolution, CanonicalParams: canonicalParams,
+				// The durable claim stores this digest so a repeated key with a
+				// different body is a 409 rather than a replay of the wrong task.
+				RequestHash: hash, Prompt: prompt,
 			}, key)
 			if err != nil {
 				return nil, err

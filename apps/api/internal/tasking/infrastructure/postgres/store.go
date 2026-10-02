@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -68,6 +69,9 @@ func (s *Store) BeginSettlementTx(ctx context.Context) (pgx.Tx, error) {
 
 // Compile-time convergence with the settlement tx seam.
 var _ workspacetasks.TxTaskLifecycleStore = (*Store)(nil)
+
+// Compile-time convergence with the durable submit idempotency claim seam.
+var _ workspacetasks.TxSubmissionClaimStore = (*Store)(nil)
 
 // workflowInputEnvelope is the tasks.workflow_input JSONB shape. Billing
 // snapshots are quote-time facts (the credits ledger owns settlement
@@ -425,6 +429,74 @@ func (s *Store) GetTask(ctx context.Context, workspaceID, taskID string) (*works
 	return s.getTaskWithQueries(ctx, s.dbWithContext(ctx).q, workspaceID, taskID)
 }
 
+// GetTaskInTx resolves a workspace-scoped task inside the caller's
+// transaction. The idempotent replay path uses it so the task a durable claim
+// names is read from the same snapshot that observed the claim.
+func (s *Store) GetTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string) (*workspacetasks.WorkspaceTask, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	return s.getTaskWithQueries(ctx, s.q.WithTx(tx), workspaceID, taskID)
+}
+
+// ClaimSubmissionInTx records the durable submit idempotency claim inside the
+// caller's settlement transaction, or reports the claim that already holds
+// the key.
+//
+// Concurrency: the INSERT ... ON CONFLICT DO NOTHING serializes on the
+// primary key (workspace_id, operation, idempotency_key). A concurrent submit
+// of the same key blocks until the first transaction commits or rolls back,
+// then reads the winner. Exactly one submit settles.
+//
+// The workspace is resolved by public id inside the same statement, so a
+// caller that cannot see the workspace inserts nothing and reads no claim:
+// it fails closed instead of settling outside its workspace.
+func (s *Store) ClaimSubmissionInTx(ctx context.Context, tx pgx.Tx, claim workspacetasks.SubmissionClaim) (*workspacetasks.SubmissionClaim, bool, error) {
+	if tx == nil {
+		return nil, false, fmt.Errorf("tasking postgres: settlement transaction is nil")
+	}
+	workspaceID := strings.TrimSpace(claim.WorkspaceID)
+	operation := strings.TrimSpace(claim.Operation)
+	key := strings.TrimSpace(claim.IdempotencyKey)
+	taskPublicID := strings.TrimSpace(claim.TaskPublicID)
+	requestHash := strings.TrimSpace(claim.RequestHash)
+	if !contract.IsValidPublicID(contract.PrefixWorkspace, workspaceID) {
+		return nil, false, fmt.Errorf("tasking postgres: claim workspace invalid: %w", workspacetasks.ErrValidation)
+	}
+	if operation == "" || key == "" || taskPublicID == "" || requestHash == "" {
+		return nil, false, fmt.Errorf("tasking postgres: claim fields required: %w", workspacetasks.ErrValidation)
+	}
+	if !contract.IsTaskID(taskPublicID) {
+		return nil, false, fmt.Errorf("tasking postgres: claim task identity invalid: %w", workspacetasks.ErrValidation)
+	}
+	// ON CONFLICT DO NOTHING: pgx.ErrNoRows means the key is already claimed.
+	// The RETURNING clause only fires for the row this transaction inserted.
+	if _, err := s.q.WithTx(tx).ClaimTaskSubmissionIdempotency(ctx, dbsqlc.ClaimTaskSubmissionIdempotencyParams{
+		WorkspacePublicID: workspaceID, Operation: operation,
+		IdempotencyKey: key, RequestHash: requestHash, TaskPublicID: taskPublicID,
+	}); err == nil {
+		return nil, true, nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, fmt.Errorf("tasking postgres: claim submission: %w", err)
+	}
+	// Either the key is already claimed, or the workspace does not exist.
+	// Distinguish them: a missing workspace must fail closed, never look like
+	// a replay of a claim nobody can see.
+	existing, readErr := s.q.WithTx(tx).GetTaskSubmissionIdempotency(ctx, dbsqlc.GetTaskSubmissionIdempotencyParams{
+		WorkspacePublicID: workspaceID, Operation: operation, IdempotencyKey: key,
+	})
+	if readErr != nil {
+		if errors.Is(readErr, pgx.ErrNoRows) {
+			return nil, false, fmt.Errorf("tasking postgres: claim workspace not resolvable: %w", workspacetasks.ErrNotFound)
+		}
+		return nil, false, fmt.Errorf("tasking postgres: read submission claim: %w", readErr)
+	}
+	return &workspacetasks.SubmissionClaim{
+		WorkspaceID: workspaceID, Operation: operation, IdempotencyKey: key,
+		RequestHash: existing.RequestHash, TaskPublicID: existing.TaskPublicID,
+	}, false, nil
+}
+
 // ListTasks pages workspace tasks newest-first with limit/offset (the v1
 // layer converts cursor to offset). Outputs batch in one query.
 func (s *Store) ListTasks(ctx context.Context, workspaceID string, limit, offset int) ([]*workspacetasks.WorkspaceTask, error) {
@@ -487,6 +559,53 @@ func (s *Store) CountTasks(ctx context.Context, workspaceID string) (int, error)
 		return 0, err
 	}
 	return int(count), nil
+}
+
+// Compile-time convergence with the final-timeout sweep discovery seam.
+var _ workspacetasks.StalledSettlementScanner = (*Store)(nil)
+
+// ListStalledHeldSettlements names workspace-scoped tasks whose Credit Hold
+// was abandoned: the task is still live, still owes a hold, its settlement has
+// not reached captured/released, and no worker has touched its row since
+// stalledBefore (see the query comment for why tasks.updated_at is the
+// liveness clock).
+//
+// It is READ-ONLY discovery: convergence happens through the workspace-scoped
+// Fail seam, never here. That is what keeps the sweep's cross-workspace scan
+// safe — the scan may see every workspace, but the write it triggers is fenced
+// by workspace public id exactly like every other terminal settlement.
+//
+// Oldest-first with a caller-supplied bound; a non-positive limit fails closed
+// rather than scanning the whole table.
+func (s *Store) ListStalledHeldSettlements(ctx context.Context, stalledBefore time.Time, limit int) ([]workspacetasks.StalledSettlement, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("tasking postgres: database pool not configured")
+	}
+	if stalledBefore.IsZero() {
+		return nil, fmt.Errorf("tasking postgres: stalled settlement cutoff required: %w", workspacetasks.ErrValidation)
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("tasking postgres: stalled settlement limit must be positive: %w", workspacetasks.ErrValidation)
+	}
+	rows, err := s.dbWithContext(ctx).q.ListStalledHeldWorkspaceTasks(ctx, dbsqlc.ListStalledHeldWorkspaceTasksParams{
+		StalledBefore: pgtype.Timestamptz{Time: stalledBefore.UTC(), Valid: true},
+		RowLimit:      int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+	stalled := make([]workspacetasks.StalledSettlement, 0, len(rows))
+	for _, row := range rows {
+		workspaceID := strings.TrimSpace(row.WorkspacePublicID)
+		taskID := strings.TrimSpace(row.PublicID)
+		// A row the store cannot address is not a candidate: dropping it here
+		// keeps a malformed pair from ever reaching the settle transaction.
+		if !validTaskRef(workspaceID, taskID) {
+			continue
+		}
+		stalled = append(stalled, workspacetasks.StalledSettlement{WorkspaceID: workspaceID, TaskID: taskID})
+	}
+	return stalled, nil
 }
 
 // DeleteTask removes a task row (settlement compensation rollback).
@@ -552,6 +671,99 @@ func (s *Store) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken s
 		return nil, err
 	}
 	return s.mapRowWithOutputs(ctx, workspaceID, row)
+}
+
+// claimRowToTask narrows the merged claim row back to the task projection the
+// shared row mappers consume. The merged statement appends attempt_no and
+// attempt_started to the task columns, so the projection has to be rebuilt
+// field by field; TestClaimRowToTaskPreservesEveryTaskColumn fails the build
+// when tasks grows a column this narrowing drops.
+func claimRowToTask(row dbsqlc.ClaimWorkspaceTaskWithAttemptRow) dbsqlc.Task {
+	return dbsqlc.Task{
+		InternalID:        row.InternalID,
+		PublicID:          row.PublicID,
+		WorkspaceID:       row.WorkspaceID,
+		SubmitterUserID:   row.SubmitterUserID,
+		BillingAccountID:  row.BillingAccountID,
+		Service:           row.Service,
+		WorkflowInput:     row.WorkflowInput,
+		Status:            row.Status,
+		Priority:          row.Priority,
+		RetryCount:        row.RetryCount,
+		LeaseToken:        row.LeaseToken,
+		ErrorMessage:      row.ErrorMessage,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
+		StartedAt:         row.StartedAt,
+		CompletedAt:       row.CompletedAt,
+		CancelledAt:       row.CancelledAt,
+		CancelledByUserID: row.CancelledByUserID,
+		RoutingSnapshot:   row.RoutingSnapshot,
+	}
+}
+
+// ClaimTaskWithAttempt fences one execution and opens its durable attempt
+// fact in ONE statement (ClaimWorkspaceTaskWithAttempt), satisfying the
+// DESIGN.md contract 4 invariant: the lease flip and the attempt row commit
+// atomically, so no running lease can exist without the attempt fact that
+// explains it.
+//
+// The attempt row's execution_token IS leaseToken. Passing a second token
+// through start would recreate the two-token split the single statement
+// removes, so the field is deliberately ignored: this method is the only
+// writer of that token.
+//
+// started is false when the lease was re-acquired by a River redelivery that
+// already owns an attempt row: the same-token branch of the lease fence lets
+// the earlier attempt resume, and ON CONFLICT DO NOTHING keeps exactly one
+// attempt row (and one attempt_no) per lease token. Callers treat a resume as
+// the same send continuing, never as a second attempt fact.
+//
+// ErrStateConflict on a fenced-out claim keeps ClaimTask's convergence
+// contract: terminal/cancelled rows read back through the same reload path.
+func (s *Store) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, leaseToken string, start workspacetasks.AttemptStart) (*workspacetasks.WorkspaceTask, bool, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	taskID = strings.TrimSpace(taskID)
+	leaseToken = strings.TrimSpace(leaseToken)
+	if !validTaskRef(workspaceID, taskID) {
+		return nil, false, workspacetasks.ErrNotFound
+	}
+	if leaseToken == "" {
+		return nil, false, fmt.Errorf("tasking postgres: lease token required: %w", workspacetasks.ErrValidation)
+	}
+	layer := strings.TrimSpace(start.RetryLayer)
+	if layer == "" {
+		return nil, false, fmt.Errorf("tasking postgres: attempt retry layer required")
+	}
+	if start.GatewayRetryCount < 0 {
+		return nil, false, fmt.Errorf("tasking postgres: attempt gateway retry count is negative")
+	}
+	if start.RiverJobID < 0 {
+		return nil, false, fmt.Errorf("tasking postgres: attempt river job id is negative")
+	}
+	row, err := s.dbWithContext(ctx).q.ClaimWorkspaceTaskWithAttempt(ctx, dbsqlc.ClaimWorkspaceTaskWithAttemptParams{
+		LeaseToken:        leaseToken,
+		PublicID:          taskID,
+		WorkspacePublicID: workspaceID,
+		RiverJobID:        start.RiverJobID,
+		Service:           strings.TrimSpace(start.Service),
+		RequestedModel:    strings.TrimSpace(start.RequestedModel),
+		ResolvedModel:     strings.TrimSpace(start.ResolvedModel),
+		Provider:          strings.TrimSpace(start.Provider),
+		RetryLayer:        layer,
+		GatewayRetryCount: int32(start.GatewayRetryCount),
+	})
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, false, s.convergeFailedUpdate(ctx, workspaceID, taskID)
+		}
+		return nil, false, err
+	}
+	claimed, err := s.mapRowWithOutputs(ctx, workspaceID, claimRowToTask(row))
+	if err != nil {
+		return nil, false, err
+	}
+	return claimed, row.AttemptStarted, nil
 }
 
 // CancelTask flips pending/running to cancelled, records actor + reason,

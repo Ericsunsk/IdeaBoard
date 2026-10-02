@@ -22,6 +22,12 @@ const (
 	// owns the budget constants so RiverRetryMatrix stays the single
 	// source of truth for per-queue MaxAttempts.
 	RiverQueueWebhookDeliver = "webhook_deliver"
+	// RiverQueueTaskSettlementSweep carries the final-timeout convergence
+	// sweep (abandoned Credit Holds). Same ownership split as the webhook
+	// queue: the tasking worker package owns the worker, this package owns
+	// the queue name and its budget constants so the matrices stay the single
+	// source of truth.
+	RiverQueueTaskSettlementSweep = "task_settlement_sweep"
 )
 
 type riverClient interface {

@@ -32,6 +32,21 @@ type Querier interface {
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
+	// Durable submit idempotency fact (task_submission_idempotency), written
+	// inside the settlement transaction so a committed claim always has its task
+	// row and a rolled-back settlement leaves no claim behind.
+	//
+	// The workspace is resolved by public id inside the statement, so the scope
+	// predicate rides on the same query as the insert and the workspace scope
+	// guard covers it. A caller that cannot see the workspace inserts nothing and
+	// reads no claim, so it fails closed rather than settling outside its
+	// workspace.
+	//
+	// ON CONFLICT DO NOTHING is the concurrency fence: a concurrent submit of the
+	// same key blocks on the primary key until the first transaction commits or
+	// rolls back, then observes the winner. The claim must be written BEFORE the
+	// Hold so a replay never reaches the ledger at all.
+	ClaimTaskSubmissionIdempotency(ctx context.Context, arg ClaimTaskSubmissionIdempotencyParams) (ClaimTaskSubmissionIdempotencyRow, error)
 	// ClaimTask fences one task execution with the lease token. A pending task is
 	// claimed normally; a River redelivery of the same job may reacquire its
 	// interrupted running lease because it carries the same execution token.
@@ -39,6 +54,32 @@ type Querier interface {
 	// fence. The caller distinguishes already-converged/invisible rows via
 	// GetWorkspaceTaskByPublicID.
 	ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTaskParams) (Task, error)
+	// ClaimWorkspaceTaskWithAttempt fences one execution AND opens its durable
+	// attempt fact in ONE statement (DESIGN.md contract 4: "claim 与 attempt 行在
+	// 同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态").
+	//
+	// Both writes are data-modifying CTEs, so PostgreSQL runs them in a single
+	// implicit transaction: the lease flip and the attempt row commit together or
+	// not at all. A worker crash, a rejected pool connection, or a failed attempt
+	// insert can therefore no longer leave a running lease with zero attempt rows
+	// (which stranded Admin monitor / ListExecutionBottleneckStats buckets with no
+	// attributable send).
+	//
+	// execution_token IS the lease token (one token per execution, not two): the
+	// row that fences FinishAttempt is exactly the row the claim wrote, so the
+	// claim and the attempt fact can never disagree about which execution they
+	// describe.
+	//
+	// ON CONFLICT (execution_token) DO NOTHING keeps the same-token redelivery
+	// branch of the lease fence legal: a River redelivery of an interrupted lease
+	// resumes the attempt row the earlier attempt opened instead of colliding on
+	// uq_task_execution_attempts_token. attempt_no is only consumed when a new
+	// row is inserted, so one lease token owns at most one attempt number.
+	//
+	// Zero rows means the lease fence rejected the claim exactly as
+	// ClaimWorkspaceTask does, so the caller converges through the same
+	// GetWorkspaceTaskByPublicID path.
+	ClaimWorkspaceTaskWithAttempt(ctx context.Context, arg ClaimWorkspaceTaskWithAttemptParams) (ClaimWorkspaceTaskWithAttemptRow, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
@@ -267,6 +308,7 @@ type Querier interface {
 	GetServiceModelPoolVersion(ctx context.Context, service string) (int64, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
 	GetTaskRoutingSnapshot(ctx context.Context, publicID string) ([]byte, error)
+	GetTaskSubmissionIdempotency(ctx context.Context, arg GetTaskSubmissionIdempotencyParams) (GetTaskSubmissionIdempotencyRow, error)
 	GetUploadSessionByPublicID(ctx context.Context, arg GetUploadSessionByPublicIDParams) (UploadSession, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Text) (User, error)
@@ -350,6 +392,46 @@ type Querier interface {
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
 	ListServiceModelPoolEntries(ctx context.Context, service string) ([]ServiceModelPoolEntry, error)
 	ListServiceModelPoolResolutions(ctx context.Context, service string) ([]ServiceModelPoolResolution, error)
+	// ListStalledHeldWorkspaceTasks is the DISCOVERY half of the final-timeout
+	// convergence (stalled settlement sweep). It names workspace-scoped tasks
+	// that are still live, still owe a Credit Hold (snapshot total > 0 with a hold
+	// transaction), and whose settlement projection has not reached
+	// captured/released — AND whose row no worker has touched since stalled_before.
+	//
+	// Both live statuses are candidates, and both leak. A 'running' row is the
+	// claim-committed-then-worker-died shape (SIGKILL, then River discards the job
+	// after MaxAttempts). A 'pending' row with an open hold is the same leak one
+	// phase earlier: submit committed Hold + task + job atomically, and every
+	// attempt died before the claim. 24h with no progress means neither will
+	// converge on its own.
+	//
+	// stalled_before is measured from tasks.updated_at, which is the liveness
+	// clock, not the submission clock. The set_tasks_updated_at BEFORE UPDATE
+	// trigger stamps now() on every write, so no writer can forge a fresh stamp
+	// for an abandoned lease; and every reclaim path does write it (a River
+	// redelivery of the SAME execution token hits the running+same-token branch
+	// of ClaimWorkspaceTask; Retry re-arms pending with a fresh write). So a row
+	// older than the threshold is not "slow", it is "no worker has held this
+	// lease in a full day".
+	//
+	// Ordering is oldest-first with a bound: the sweep converges the longest
+	// abandoned holds first and never scans the whole table in one run.
+	//
+	// Scope: the sweep is cross-workspace BY DESIGN (an abandoned hold is money
+	// locked in SOME workspace, and leaving any workspace out would leave its
+	// users' credits locked forever), so it cannot carry the per-workspace
+	// predicate. It still INNER JOINs workspaces: only rows whose workspace
+	// resolves are visible, and each returned pair is converged through the
+	// workspace-scoped FailWorkspaceTask (see ListStalledHeldWorkspaceTasks in
+	// scripts/sql-workspace-scope-check.sh). A mismatched pair fails closed there
+	// instead of settling cross-workspace.
+	//
+	// The settlement projection is the task-side convergence fact, never the
+	// ledger: credit_holds is the Credits context's table and Tasking does not
+	// read it (CONTEXT.md). The Release itself still passes the ledger's own
+	// held-status CAS plus the task-release:<task_id> idempotency key, so a
+	// double sweep cannot double-release.
+	ListStalledHeldWorkspaceTasks(ctx context.Context, arg ListStalledHeldWorkspaceTasksParams) ([]ListStalledHeldWorkspaceTasksRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error)
 	ListStorageProfileSecretVersions(ctx context.Context, arg ListStorageProfileSecretVersionsParams) ([]StorageProfileSecretVersion, error)

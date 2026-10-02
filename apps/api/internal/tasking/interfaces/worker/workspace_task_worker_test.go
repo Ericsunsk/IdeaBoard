@@ -127,7 +127,7 @@ func (a *workerTestAssets) GetAsset(ctx context.Context, workspaceID, assetID st
 }
 
 type workerTestEnv struct {
-	store    *workspacetasks.InMemoryStore
+	store    *attemptClaimStore
 	holder   *workerTestHolder
 	queue    *workerTestQueue
 	service  *workspacetasks.Service
@@ -135,7 +135,12 @@ type workerTestEnv struct {
 }
 
 func newWorkerTestEnv() *workerTestEnv {
-	store := workspacetasks.NewInMemoryStoreForTests()
+	// The store is wrapped in the merged claim+attempt adapter: production
+	// fences the lease and opens the send fact in ONE statement, so unit
+	// paths must not keep the split claim-then-record shape alive.
+	memory := workspacetasks.NewInMemoryStoreForTests()
+	attempts := workspacetasks.NewInMemoryAttemptRecorderForTests()
+	store := newAttemptClaimStore(memory, attempts)
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{
@@ -143,7 +148,7 @@ func newWorkerTestEnv() *workerTestEnv {
 		Assets:   &workerTestAssets{ready: map[string]bool{}, archived: map[string]bool{}},
 		Resolver: allowTestPoolResolver(),
 	})
-	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service, attempts: workspacetasks.NewInMemoryAttemptRecorderForTests()}
+	return &workerTestEnv{store: store, holder: holder, queue: queue, service: service, attempts: attempts}
 }
 
 func (e *workerTestEnv) newWorker(provider WorkspaceTaskProvider, assets workspacetasks.AssetReader) *WorkspaceTaskWorker {

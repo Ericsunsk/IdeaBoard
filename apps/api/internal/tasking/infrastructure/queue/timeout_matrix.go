@@ -30,6 +30,12 @@ const (
 	// RiverJobTimeoutCreditReconciliation covers one scheduled reconciliation
 	// run (bounded per-run batch); same class as the payment sweep budget.
 	RiverJobTimeoutCreditReconciliation = 4 * time.Minute
+	// RiverJobTimeoutTaskSettlementSweep covers one bounded final-timeout
+	// sweep: a capped discovery query plus a capped batch of per-task settle
+	// transactions, none of which calls a provider. It stays well under the
+	// sweep's periodic interval so a stuck run times out instead of piling up
+	// behind the next one.
+	RiverJobTimeoutTaskSettlementSweep = 4 * time.Minute
 	// RiverJobTimeoutCreditSchedule covers a single idempotent schedule write.
 	RiverJobTimeoutCreditSchedule = time.Minute
 	// RiverJobTimeoutPaymentReconciliation covers the Stripe/DB sweep window.
@@ -91,6 +97,12 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 			Timeout: RiverJobTimeoutCreditReconciliation,
 			Worker:  "CreditReconciliationWorker",
 			Notes:   "one scheduled reconciliation run; same sweep class as payment reconciliation",
+		},
+		{
+			Queue:   RiverQueueTaskSettlementSweep,
+			Timeout: RiverJobTimeoutTaskSettlementSweep,
+			Worker:  "TaskSettlementSweepWorker (task_settlement_sweep, settlement-only)",
+			Notes:   "final-timeout convergence of abandoned Credit Holds; bounded batch, never calls a provider; stays below the sweep interval",
 		},
 		{
 			Queue:   "credit_reconciliation",

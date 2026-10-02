@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/ports"
 	"ideaboard/api/internal/platform/database"
@@ -86,7 +87,7 @@ func (s *Service) DeleteUser(
 			if authDeleter == nil {
 				return domain.ErrUserDeletionAuthUnavailable
 			}
-			if err := authDeleter.DeleteUser(ctx, progress.AuthUserID); err != nil {
+			if err := authDeleter.DeleteUser(ctx, progress.AuthUserID); err != nil && !isAuthIdentityAlreadyGone(err) {
 				return fmt.Errorf("delete Auth user: %w", err)
 			}
 			progress.Phase, err = s.advanceDeletion(ctx, progress.UserID, ports.DeletionPendingAuth, ports.DeletionPendingStorage)
@@ -114,6 +115,20 @@ func (s *Service) DeleteUser(
 		}
 	}
 	return nil
+}
+
+// isAuthIdentityAlreadyGone reports whether an Auth delete failure means
+// the identity is already absent from the Auth service. Auth answers a
+// missing user with a 404 not_found envelope, which the client maps to
+// ErrAuthUserNotFound; for the pending_auth phase that is a converged
+// state, not a failure. Deletion must keep converging idempotently
+// (Auth -> Media Storage -> business tombstone): a prior attempt can
+// succeed on the Auth side and still lose the phase advance, so a retry
+// only ever sees 404. Treating it as done is what lets Storage cleanup
+// and the PII tombstone run instead of stranding a frozen account with
+// its media and personal data retained.
+func isAuthIdentityAlreadyGone(err error) bool {
+	return errors.Is(err, autherrors.ErrAuthUserNotFound)
 }
 
 func (s *Service) beginUserDeletion(ctx context.Context, userID int64) (*ports.DeletionProgress, error) {

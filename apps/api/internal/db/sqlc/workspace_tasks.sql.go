@@ -67,6 +67,55 @@ func (q *Queries) CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTa
 	return i, err
 }
 
+const claimTaskSubmissionIdempotency = `-- name: ClaimTaskSubmissionIdempotency :one
+INSERT INTO task_submission_idempotency (workspace_id, operation, idempotency_key, request_hash, task_public_id)
+SELECT w.internal_id, $1, $2, $3, $4
+FROM workspaces AS w
+WHERE w.public_id = $5
+ON CONFLICT (workspace_id, operation, idempotency_key) DO NOTHING
+RETURNING task_public_id, request_hash
+`
+
+type ClaimTaskSubmissionIdempotencyParams struct {
+	Operation         string `json:"operation"`
+	IdempotencyKey    string `json:"idempotency_key"`
+	RequestHash       string `json:"request_hash"`
+	TaskPublicID      string `json:"task_public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+}
+
+type ClaimTaskSubmissionIdempotencyRow struct {
+	TaskPublicID string `json:"task_public_id"`
+	RequestHash  string `json:"request_hash"`
+}
+
+// Durable submit idempotency fact (task_submission_idempotency), written
+// inside the settlement transaction so a committed claim always has its task
+// row and a rolled-back settlement leaves no claim behind.
+//
+// The workspace is resolved by public id inside the statement, so the scope
+// predicate rides on the same query as the insert and the workspace scope
+// guard covers it. A caller that cannot see the workspace inserts nothing and
+// reads no claim, so it fails closed rather than settling outside its
+// workspace.
+//
+// ON CONFLICT DO NOTHING is the concurrency fence: a concurrent submit of the
+// same key blocks on the primary key until the first transaction commits or
+// rolls back, then observes the winner. The claim must be written BEFORE the
+// Hold so a replay never reaches the ledger at all.
+func (q *Queries) ClaimTaskSubmissionIdempotency(ctx context.Context, arg ClaimTaskSubmissionIdempotencyParams) (ClaimTaskSubmissionIdempotencyRow, error) {
+	row := q.db.QueryRow(ctx, claimTaskSubmissionIdempotency,
+		arg.Operation,
+		arg.IdempotencyKey,
+		arg.RequestHash,
+		arg.TaskPublicID,
+		arg.WorkspacePublicID,
+	)
+	var i ClaimTaskSubmissionIdempotencyRow
+	err := row.Scan(&i.TaskPublicID, &i.RequestHash)
+	return i, err
+}
+
 const claimWorkspaceTask = `-- name: ClaimWorkspaceTask :one
 UPDATE tasks AS t
 SET status = 'running', lease_token = $1, started_at = now(), updated_at = now()
@@ -116,6 +165,151 @@ func (q *Queries) ClaimWorkspaceTask(ctx context.Context, arg ClaimWorkspaceTask
 		&i.CancelledAt,
 		&i.CancelledByUserID,
 		&i.RoutingSnapshot,
+	)
+	return i, err
+}
+
+const claimWorkspaceTaskWithAttempt = `-- name: ClaimWorkspaceTaskWithAttempt :one
+WITH claimed AS (
+  UPDATE tasks AS t
+  SET status = 'running', lease_token = $1, started_at = now(), updated_at = now()
+  FROM workspaces AS w
+  WHERE t.workspace_id = w.internal_id
+  AND t.public_id = $2
+  AND w.public_id = $3
+  AND (
+    (t.status = 'pending' AND t.lease_token = '')
+    OR (t.status = 'running' AND t.lease_token = $1)
+  )
+  RETURNING t.internal_id, t.public_id, t.workspace_id, t.submitter_user_id, t.billing_account_id, t.service, t.workflow_input, t.status, t.priority, t.retry_count, t.lease_token, t.error_message, t.created_at, t.updated_at, t.started_at, t.completed_at, t.cancelled_at, t.cancelled_by_user_id, t.routing_snapshot
+),
+attempt AS (
+  INSERT INTO task_execution_attempts (
+    task_id, river_job_id, attempt_no, execution_token, service,
+    requested_model, resolved_model, provider, retry_layer,
+    gateway_retry_count, status
+  )
+  SELECT c.public_id,
+    $4::bigint,
+    COALESCE((SELECT MAX(a.attempt_no) FROM task_execution_attempts AS a WHERE a.task_id = c.public_id), 0) + 1,
+    c.lease_token,
+    $5::varchar(64),
+    $6::varchar(128),
+    $7::varchar(128),
+    $8::varchar(64),
+    $9::text,
+    $10::integer,
+    'running'
+  FROM claimed AS c
+  ON CONFLICT (execution_token) DO NOTHING
+  RETURNING attempt_no
+)
+SELECT c.internal_id, c.public_id, c.workspace_id, c.submitter_user_id, c.billing_account_id, c.service, c.workflow_input, c.status, c.priority, c.retry_count, c.lease_token, c.error_message, c.created_at, c.updated_at, c.started_at, c.completed_at, c.cancelled_at, c.cancelled_by_user_id, c.routing_snapshot,
+  -- attempt_no is 0 on the resume path (the insert conflicted), where the
+  -- caller keeps the attempt_no the earlier attempt already owns.
+  COALESCE((SELECT attempt_no FROM attempt), 0) AS attempt_no,
+  EXISTS (SELECT 1 FROM attempt) AS attempt_started
+FROM claimed AS c
+`
+
+type ClaimWorkspaceTaskWithAttemptParams struct {
+	LeaseToken        string `json:"lease_token"`
+	PublicID          string `json:"public_id"`
+	WorkspacePublicID string `json:"workspace_public_id"`
+	RiverJobID        int64  `json:"river_job_id"`
+	Service           string `json:"service"`
+	RequestedModel    string `json:"requested_model"`
+	ResolvedModel     string `json:"resolved_model"`
+	Provider          string `json:"provider"`
+	RetryLayer        string `json:"retry_layer"`
+	GatewayRetryCount int32  `json:"gateway_retry_count"`
+}
+
+type ClaimWorkspaceTaskWithAttemptRow struct {
+	InternalID        int64              `json:"internal_id"`
+	PublicID          string             `json:"public_id"`
+	WorkspaceID       int64              `json:"workspace_id"`
+	SubmitterUserID   int64              `json:"submitter_user_id"`
+	BillingAccountID  int64              `json:"billing_account_id"`
+	Service           string             `json:"service"`
+	WorkflowInput     []byte             `json:"workflow_input"`
+	Status            string             `json:"status"`
+	Priority          int32              `json:"priority"`
+	RetryCount        int32              `json:"retry_count"`
+	LeaseToken        string             `json:"lease_token"`
+	ErrorMessage      string             `json:"error_message"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	CompletedAt       pgtype.Timestamptz `json:"completed_at"`
+	CancelledAt       pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledByUserID pgtype.Int8        `json:"cancelled_by_user_id"`
+	RoutingSnapshot   []byte             `json:"routing_snapshot"`
+	AttemptNo         interface{}        `json:"attempt_no"`
+	AttemptStarted    bool               `json:"attempt_started"`
+}
+
+// ClaimWorkspaceTaskWithAttempt fences one execution AND opens its durable
+// attempt fact in ONE statement (DESIGN.md contract 4: "claim 与 attempt 行在
+// 同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态").
+//
+// Both writes are data-modifying CTEs, so PostgreSQL runs them in a single
+// implicit transaction: the lease flip and the attempt row commit together or
+// not at all. A worker crash, a rejected pool connection, or a failed attempt
+// insert can therefore no longer leave a running lease with zero attempt rows
+// (which stranded Admin monitor / ListExecutionBottleneckStats buckets with no
+// attributable send).
+//
+// execution_token IS the lease token (one token per execution, not two): the
+// row that fences FinishAttempt is exactly the row the claim wrote, so the
+// claim and the attempt fact can never disagree about which execution they
+// describe.
+//
+// ON CONFLICT (execution_token) DO NOTHING keeps the same-token redelivery
+// branch of the lease fence legal: a River redelivery of an interrupted lease
+// resumes the attempt row the earlier attempt opened instead of colliding on
+// uq_task_execution_attempts_token. attempt_no is only consumed when a new
+// row is inserted, so one lease token owns at most one attempt number.
+//
+// Zero rows means the lease fence rejected the claim exactly as
+// ClaimWorkspaceTask does, so the caller converges through the same
+// GetWorkspaceTaskByPublicID path.
+func (q *Queries) ClaimWorkspaceTaskWithAttempt(ctx context.Context, arg ClaimWorkspaceTaskWithAttemptParams) (ClaimWorkspaceTaskWithAttemptRow, error) {
+	row := q.db.QueryRow(ctx, claimWorkspaceTaskWithAttempt,
+		arg.LeaseToken,
+		arg.PublicID,
+		arg.WorkspacePublicID,
+		arg.RiverJobID,
+		arg.Service,
+		arg.RequestedModel,
+		arg.ResolvedModel,
+		arg.Provider,
+		arg.RetryLayer,
+		arg.GatewayRetryCount,
+	)
+	var i ClaimWorkspaceTaskWithAttemptRow
+	err := row.Scan(
+		&i.InternalID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.SubmitterUserID,
+		&i.BillingAccountID,
+		&i.Service,
+		&i.WorkflowInput,
+		&i.Status,
+		&i.Priority,
+		&i.RetryCount,
+		&i.LeaseToken,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CancelledAt,
+		&i.CancelledByUserID,
+		&i.RoutingSnapshot,
+		&i.AttemptNo,
+		&i.AttemptStarted,
 	)
 	return i, err
 }
@@ -468,6 +662,34 @@ func (q *Queries) GetControlTaskByPublicID(ctx context.Context, publicID string)
 	return i, err
 }
 
+const getTaskSubmissionIdempotency = `-- name: GetTaskSubmissionIdempotency :one
+SELECT c.task_public_id, c.request_hash
+FROM task_submission_idempotency AS c
+INNER JOIN workspaces AS w ON w.internal_id = c.workspace_id
+WHERE w.public_id = $1
+  AND c.operation = $2
+  AND c.idempotency_key = $3
+LIMIT 1
+`
+
+type GetTaskSubmissionIdempotencyParams struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	Operation         string `json:"operation"`
+	IdempotencyKey    string `json:"idempotency_key"`
+}
+
+type GetTaskSubmissionIdempotencyRow struct {
+	TaskPublicID string `json:"task_public_id"`
+	RequestHash  string `json:"request_hash"`
+}
+
+func (q *Queries) GetTaskSubmissionIdempotency(ctx context.Context, arg GetTaskSubmissionIdempotencyParams) (GetTaskSubmissionIdempotencyRow, error) {
+	row := q.db.QueryRow(ctx, getTaskSubmissionIdempotency, arg.WorkspacePublicID, arg.Operation, arg.IdempotencyKey)
+	var i GetTaskSubmissionIdempotencyRow
+	err := row.Scan(&i.TaskPublicID, &i.RequestHash)
+	return i, err
+}
+
 const getWorkspaceMediaAssetID = `-- name: GetWorkspaceMediaAssetID :one
 SELECT m.internal_id
 FROM media_assets AS m
@@ -671,6 +893,90 @@ func (q *Queries) ListControlTasks(ctx context.Context, arg ListControlTasksPara
 			&i.SettlementState,
 			&i.SettlementCapturedCredits,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStalledHeldWorkspaceTasks = `-- name: ListStalledHeldWorkspaceTasks :many
+SELECT w.public_id AS workspace_public_id, t.public_id
+FROM tasks AS t
+INNER JOIN workspaces AS w ON w.internal_id = t.workspace_id
+INNER JOIN task_billing_snapshots AS s ON s.task_id = t.public_id
+LEFT JOIN task_billing_settlements AS st ON st.task_id = t.public_id
+WHERE t.status IN ('pending', 'running')
+  AND t.updated_at < $1::TIMESTAMPTZ
+  AND s.total_credits > 0
+  AND s.hold_transaction_id IS NOT NULL
+  AND (st.state IS NULL OR st.state NOT IN ('captured', 'released'))
+ORDER BY t.updated_at ASC, t.internal_id ASC
+LIMIT $2
+`
+
+type ListStalledHeldWorkspaceTasksParams struct {
+	StalledBefore pgtype.Timestamptz `json:"stalled_before"`
+	RowLimit      int32              `json:"row_limit"`
+}
+
+type ListStalledHeldWorkspaceTasksRow struct {
+	WorkspacePublicID string `json:"workspace_public_id"`
+	PublicID          string `json:"public_id"`
+}
+
+// ListStalledHeldWorkspaceTasks is the DISCOVERY half of the final-timeout
+// convergence (stalled settlement sweep). It names workspace-scoped tasks
+// that are still live, still owe a Credit Hold (snapshot total > 0 with a hold
+// transaction), and whose settlement projection has not reached
+// captured/released — AND whose row no worker has touched since stalled_before.
+//
+// Both live statuses are candidates, and both leak. A 'running' row is the
+// claim-committed-then-worker-died shape (SIGKILL, then River discards the job
+// after MaxAttempts). A 'pending' row with an open hold is the same leak one
+// phase earlier: submit committed Hold + task + job atomically, and every
+// attempt died before the claim. 24h with no progress means neither will
+// converge on its own.
+//
+// stalled_before is measured from tasks.updated_at, which is the liveness
+// clock, not the submission clock. The set_tasks_updated_at BEFORE UPDATE
+// trigger stamps now() on every write, so no writer can forge a fresh stamp
+// for an abandoned lease; and every reclaim path does write it (a River
+// redelivery of the SAME execution token hits the running+same-token branch
+// of ClaimWorkspaceTask; Retry re-arms pending with a fresh write). So a row
+// older than the threshold is not "slow", it is "no worker has held this
+// lease in a full day".
+//
+// Ordering is oldest-first with a bound: the sweep converges the longest
+// abandoned holds first and never scans the whole table in one run.
+//
+// Scope: the sweep is cross-workspace BY DESIGN (an abandoned hold is money
+// locked in SOME workspace, and leaving any workspace out would leave its
+// users' credits locked forever), so it cannot carry the per-workspace
+// predicate. It still INNER JOINs workspaces: only rows whose workspace
+// resolves are visible, and each returned pair is converged through the
+// workspace-scoped FailWorkspaceTask (see ListStalledHeldWorkspaceTasks in
+// scripts/sql-workspace-scope-check.sh). A mismatched pair fails closed there
+// instead of settling cross-workspace.
+//
+// The settlement projection is the task-side convergence fact, never the
+// ledger: credit_holds is the Credits context's table and Tasking does not
+// read it (CONTEXT.md). The Release itself still passes the ledger's own
+// held-status CAS plus the task-release:<task_id> idempotency key, so a
+// double sweep cannot double-release.
+func (q *Queries) ListStalledHeldWorkspaceTasks(ctx context.Context, arg ListStalledHeldWorkspaceTasksParams) ([]ListStalledHeldWorkspaceTasksRow, error) {
+	rows, err := q.db.Query(ctx, listStalledHeldWorkspaceTasks, arg.StalledBefore, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStalledHeldWorkspaceTasksRow
+	for rows.Next() {
+		var i ListStalledHeldWorkspaceTasksRow
+		if err := rows.Scan(&i.WorkspacePublicID, &i.PublicID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

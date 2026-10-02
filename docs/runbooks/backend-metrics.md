@@ -38,8 +38,9 @@ histogram_quantile(0.95,
 ideaboard_river_queue_depth{queue="drawing_default"}
 ideaboard_river_queue_lag_seconds{queue="drawing_default"}
 # 维护队列逐个看（credit_reconciliation / payment_reconciliation /
-# payment_checkout_shutdown / task_retention / vision_billing / media_reclamation）：
-ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|task_retention|vision_billing|media_reclamation"}
+# payment_checkout_shutdown / task_retention / vision_billing / media_reclamation /
+# task_settlement_sweep）：
+ideaboard_river_queue_depth{queue=~"credit_reconciliation|payment_.*|task_retention|vision_billing|media_reclamation|task_settlement_sweep"}
 
 # 4. 网关失败与 worker 重投速率
 sum by (feature) (rate(ideaboard_gateway_requests_total{outcome="error"}[5m]))
@@ -103,12 +104,13 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `vision_billing` | 5 | 快照对账失败看 searchcatalog 计费链路 |
 | `media_reclamation` | 10 | 存储抖动自愈空间最大；持续失败看 storage profile 与对象可达性 |
 | `webhook_deliver` | 8 | 单 delivery 8 次耗尽即进 River `discarded`（即 durable DLQ），`discarded` 行即投递终态；attempt 间隔为 30s 起 doubling + jitter（1h cap） |
+| `task_settlement_sweep` | 5 | 「最终 timeout」收敛 sweep：把 24h 无 worker 触碰、仍持 Credit Hold 的 running/pending 任务收敛为 failed 并 Release。job 失败只可能是 sweep 级故障（DB 不可用/wiring 缺失）；单任务 Release 失败会打 `stalled task settlement convergence failed` 并被隔离，不消耗 job 的 attempt 预算 |
 
 `ideaboard_gateway_retries_total` 只统计 `drawing_default` 的 worker 层重投（网关 5 次内部重试耗尽后的整任务重投），维护队列不计入该指标。
 
 ## River 超时矩阵（#783）
 
-超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：12 个生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
+超时 policy 由 Worker 代码持有（`internal/tasking/infrastructure/queue.RiverTimeoutMatrix` 为事实源，每个 worker 的 `Timeout()` 引用同包常量）。未显式声明 `Timeout()` 的 worker 会继承 client 级 `JobTimeout`（即 drawing 17min 全局预算）——当前无此情况：13 个生产 worker 全部显式 pin，下表即名单证明。client 级 `JobTimeout` 仅作为未注册/test worker 的 fallback。
 
 | Queue | Worker | Timeout | 排障含义 |
 |-------|--------|---------|----------|
@@ -123,6 +125,7 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 | `media_reclamation` | ReclaimWorker | 2min | 低于 5min claim lease；超时看 storage profile 与对象可达性 |
 | `media_reclamation` | ScheduleWorker | 2min | scan（上限 100）+ 入队扇出；超时看 DB 慢查询 |
 | `webhook_deliver` | WebhookDeliverWorker | 1min | 单次签名 POST 投递；超时看目标端点可达性 |
+| `task_settlement_sweep` | TaskSettlementSweepWorker | 4min | 单次有界 sweep（发现上限 100 + 逐任务 settle 事务），无 provider 调用；低于 15min 调度周期，超时看 DB 慢查询与 settle 事务锁等待 |
 
 ## 告警建议阈值（初始值，按线上观察调优）
 

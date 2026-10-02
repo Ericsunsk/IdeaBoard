@@ -1,66 +1,35 @@
 <template>
-  <AdminPopover v-model:open="isOpen">
-    <AdminPopoverTrigger as-child>
-      <button
-        type="button"
-        class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
-        :class="modelValue ? 'border-admin-accent text-admin-accent bg-admin-accent/5' : ''"
-        :aria-label="ariaLabel ?? `筛选${label}`"
-      >
-        <span>{{ modelValue || label }}</span>
-        <NavArrowDown
-          class="size-3.5 text-admin-text-3 transition-transform"
-          :class="isOpen ? 'rotate-180' : ''"
-        />
-      </button>
-    </AdminPopoverTrigger>
-    <AdminPopoverContent align="start" :side-offset="4">
-      <div class="flex flex-col gap-0.5 min-w-[140px]" role="listbox">
-        <button
-          type="button"
-          role="option"
-          :aria-selected="modelValue === ''"
-          :class="[
-            'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-            modelValue === ''
-              ? 'bg-admin-accent/10 text-admin-accent font-semibold'
-              : 'text-admin-text-2 hover:bg-admin-surface-muted hover:text-admin-text-1',
-          ]"
-          @click="select('')"
-        >
-          <span>{{ allLabel }}</span>
-          <Check v-if="modelValue === ''" class="size-3.5 text-admin-accent shrink-0" />
-        </button>
-        <button
-          v-for="item in options"
-          :key="item"
-          type="button"
-          role="option"
-          :aria-selected="modelValue === item"
-          :class="[
-            'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-            modelValue === item
-              ? 'bg-admin-accent/10 text-admin-accent font-semibold'
-              : 'text-admin-text-2 hover:bg-admin-surface-muted hover:text-admin-text-1',
-          ]"
-          @click="select(item)"
-        >
-          <span>{{ item }}</span>
-          <Check v-if="modelValue === item" class="size-3.5 text-admin-accent shrink-0" />
-        </button>
-      </div>
-    </AdminPopoverContent>
-  </AdminPopover>
+  <!--
+    One model-dimension filter (mode / provider / hosting). Builds on
+    AdminSelect (reka `Select`) rather than a hand-rolled Popover: the previous
+    implementation put `role="listbox"` on a plain `AdminPopoverContent` over
+    bare `<button role="option">` children, which promises the APG composite
+    model — one Tab stop, arrow keys between options, Home/End, typeahead — that
+    it never implemented. reka's Select supplies the whole keyboard model, and
+    AdminSelect supplies the one Admin skin every other dropdown uses.
+
+    `placeholder` is only a fallback: while the "all" sentinel is selected the
+    trigger states the current value (`全部类型`), exactly like every other Admin
+    filter, and it falls back to `label` when the workspace filter points at a
+    value the catalog no longer lists. `active` paints the accent border once a
+    real filter is applied.
+  -->
+  <AdminSelect
+    :model-value="selectValue"
+    :options="normalizedOptions"
+    :aria-label="ariaLabel ?? `筛选${label}`"
+    :placeholder="label"
+    :active="modelValue !== ''"
+    class="w-auto"
+    @update:model-value="handleUpdate"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Check, NavArrowDown } from '@iconoir/vue'
-import AdminPopover from '../../../shared/components/AdminPopover.vue'
-import AdminPopoverContent from '../../../shared/components/AdminPopoverContent.vue'
-import AdminPopoverTrigger from '../../../shared/components/AdminPopoverTrigger.vue'
+import { computed } from 'vue'
+import AdminSelect from '../../../shared/components/AdminSelect.vue'
 
-defineProps<{
+const props = defineProps<{
   label: string
   allLabel: string
   options: readonly string[]
@@ -68,10 +37,29 @@ defineProps<{
 }>()
 
 const modelValue = defineModel<string>({ required: true })
-const isOpen = ref(false)
 
-function select(value: string) {
-  modelValue.value = value
-  isOpen.value = false
+/**
+ * reka `Select` reserves the empty string for "show the placeholder" and
+ * rejects a `<SelectItem value="">`. This page models "no filter" as `''` (see
+ * `useAdminModelCatalogWorkspace`), and the filter must stay reachable once a
+ * value is picked, so `''` is mapped to a sentinel at this boundary and
+ * translated back on the way out. `AdminOptionFilter` applies the same mapping
+ * for `{ label, value }` filter lists; it cannot be reused here because it also
+ * owns the trigger's `size` and idle text, which this page pins to `h-9` and to
+ * the dimension label.
+ */
+const ALL_SENTINEL = '__all__'
+
+/** `{ allLabel }` first, then one item per option, in the page's order. */
+const normalizedOptions = computed(() => [
+  { label: props.allLabel, value: ALL_SENTINEL },
+  ...props.options.map((option) => ({ label: option, value: option })),
+])
+
+/** Current value in reka's value space (empty string → sentinel). */
+const selectValue = computed(() => (modelValue.value === '' ? ALL_SENTINEL : modelValue.value))
+
+function handleUpdate(value: string | number) {
+  modelValue.value = value === ALL_SENTINEL ? '' : String(value)
 }
 </script>

@@ -43,6 +43,14 @@ predicate_allowlist=(
   "ListControlTasks"
   "CountControlTasks"
   "GetControlTaskBilling"
+  # Final-timeout settlement sweep DISCOVERY: cross-workspace by design — an
+  # abandoned Credit Hold locks a specific user's credits, so scoping the scan
+  # to one workspace would leave every other workspace's users locked
+  # forever. It is read-only and INNER JOINs workspaces (only rows whose
+  # workspace resolves are visible); every row it returns is converged through
+  # the workspace-scoped FailWorkspaceTask, so a mismatched pair fails closed
+  # instead of settling cross-workspace.
+  "ListStalledHeldWorkspaceTasks"
   # Inserts taking the caller-resolved workspace internal id: the store
   # resolves the workspace once at the entry seam, so there is no public_id
   # join left to scope.

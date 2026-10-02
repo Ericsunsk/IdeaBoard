@@ -10,8 +10,11 @@ package adapters
 // records hold_transaction_id -> userID at Hold time (process-local,
 // deleted on Capture/Release) so settlement converges without an
 // interface change. A process restart between Hold and terminal settle
-// leaves the hold to the 24h stale-hold reconciler (credits ownership),
-// never to a second Hold.
+// loses that map, but never the hold's owner: the terminal path reads the
+// userID from the settled task row (the TxHolder variants below), and if
+// no worker ever reaches the terminal path the final-timeout settlement
+// sweep releases the hold the same way (see workspacetasks.StalledSettlementThreshold).
+// It is never released by a second Hold.
 //
 // The TxHolder variants (HoldInTx/CaptureInTx/ReleaseInTx) take the userID
 // explicitly from the settled task row and run through

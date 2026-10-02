@@ -7,9 +7,12 @@ package worker
 // converge to failed, never strand). completeExecution renders (when
 // configured) and terminally completes one successful send through the
 // retry+settlement phase; renderer failures are deterministic finalize
-// failures (failed, hold released, no retry burn). The post-commit
-// auto-materialize trigger (#828) is best-effort: the task is complete
-// regardless of its outcome.
+// failures (failed, hold released, no retry burn). A settlement failure
+// AFTER the provider returned is NOT retryable (defect 2): that send is
+// already billed, so it converges terminally on a detached context and
+// never returns the error whose River redelivery would re-enter the
+// provider. The post-commit auto-materialize trigger (#828) is best-effort:
+// the task is complete regardless of its outcome.
 //
 // The gateway bridge below consumes the canonical execution plan and calls
 // the EXISTING provider gateway seam. It never shapes provider bodies and
@@ -24,6 +27,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/platform/telemetry"
 	taskruntime "ideaboard/api/internal/tasking/application/runtime"
@@ -88,7 +92,19 @@ func (w *WorkspaceTaskWorker) completeExecution(
 			slog.Info("workspace task converged during completion; dropping", "task_id", taskID, "err", err)
 			return nil
 		}
-		return fmt.Errorf("workspace task complete: %w", err)
+		// The provider already returned, so this send is billed, but the
+		// settlement transaction did not commit. Returning the error would
+		// hand River a retryable outcome, and its redelivery re-opens the
+		// SAME lease through the claim's same-token branch and calls the
+		// provider again: one submission could produce up to
+		// RiverMaxAttemptsDefault (25) billed sends. The send is therefore
+		// terminal here (defect 2): it converges through the terminal
+		// settlement path instead of re-entering the provider, and it does
+		// NOT spend the whole-task retry budget, because ADR-0010 rule 5
+		// scopes tasks.retry_count to transient PROVIDER failures only.
+		slog.Warn("workspace task settlement failed after a billed send; converging terminally",
+			"task_id", taskID, "model", model, "retry_layer", send.layer, "err", err)
+		return w.convergeUnsettledSend(claimed, workspaceFailureMessage(fmt.Errorf("settlement failed after provider send: %w", err)))
 	}
 	// #828: auto-materialize AFTER the atomic Complete commit. The
 	// task is complete regardless of the outcome; trigger failures
@@ -96,6 +112,70 @@ func (w *WorkspaceTaskWorker) completeExecution(
 	w.materializeCompletedTask(ctx, completed)
 	slog.Info("workspace task completed", "task_id", taskID, "outputs", len(outputs),
 		"model", model, "retry_layer", send.layer)
+	return nil
+}
+
+// workspaceSettlementCleanupTimeout bounds the detached convergence attempt
+// for a billed-but-unsettled send. It is deliberately short: this write only
+// has to beat a brief infrastructure blip, and the execution context it
+// replaces is frequently already cancelled.
+const workspaceSettlementCleanupTimeout = 5 * time.Second
+
+// convergeUnsettledSend terminally converges a task whose provider send
+// already succeeded but whose settlement could not commit.
+//
+// It runs on a DETACHED bounded context because the dominant cause is the
+// River execution context being cancelled at its timeout (or a pool blip), and
+// reusing that dead context would throw away the only chance to release the
+// hold. It retries the terminal write a few times inside that budget.
+//
+// It never returns a retryable error. After a billed send the only recovery a
+// River retry can offer is a redelivery that calls the provider again, which
+// is strictly worse than a task that stays running: the running row keeps its
+// claim token, its durable attempt fact, and its Credit hold, so the state is
+// fully attributable and an operator can settle it. Returning nil here is
+// what caps one submission at ONE billed send.
+func (w *WorkspaceTaskWorker) convergeUnsettledSend(task *workspacetasks.WorkspaceTask, reason string) error {
+	if task == nil {
+		return nil
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), workspaceSettlementCleanupTimeout)
+	defer cancel()
+	const attempts = 3
+	var err error
+	tried := 0
+	for i := 1; i <= attempts; i++ {
+		if i > 1 {
+			// Bounded backoff inside the detached budget: a short
+			// infrastructure blip often clears on the next try, and a
+			// dead context must stop the loop instead of spinning.
+			select {
+			case <-cleanupCtx.Done():
+				i = attempts
+				continue
+			case <-time.After(time.Duration(i-1) * 200 * time.Millisecond):
+			}
+		}
+		tried = i
+		if _, err = w.settler.Fail(cleanupCtx, task.WorkspaceID, task.ID, reason); err == nil {
+			slog.Warn("workspace task terminally failed after an unsettled billed send",
+				"task_id", task.ID, "reason", reason, "attempts", tried)
+			return nil
+		}
+		if errors.Is(err, workspacetasks.ErrStateConflict) || errors.Is(err, workspacetasks.ErrNotFound) {
+			slog.Info("workspace task converged while settling an unsettled send; dropping",
+				"task_id", task.ID, "err", err)
+			return nil
+		}
+		slog.Warn("workspace task terminal convergence after an unsettled billed send failed",
+			"task_id", task.ID, "attempt", tried, "of", attempts, "err", err)
+	}
+	// The task stays running with its claim token, its attempt fact, and its
+	// hold. No retry_count is spent: the whole-task retry budget belongs to
+	// transient provider failures (ADR-0010 rule 5), and requeueing here
+	// would only re-enter the provider.
+	slog.Error("workspace task stays running: provider send succeeded but neither settlement nor terminal convergence committed",
+		"task_id", task.ID, "reason", reason, "attempts", tried, "err", err)
 	return nil
 }
 

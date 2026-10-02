@@ -15,9 +15,9 @@ import { join } from 'node:path'
  *   canvas catalog recovery         62x22    2 instances   canvas header
  *   admin range segments            32x24    6 instances   chart card header
  *   admin tabs triggers             ~x28      8 instances   sub-navigation rail
- *   node action buttons             ~x26     4 instances   canvas node overlay
+ *   node action buttons             ~x26      4 instances   canvas node overlay
  *   admin pager / chart collapse    28x28    5 instances   toolbar
- *   admin header scroll-to-top      ~x24     6 instances   sticky page title
+ *   admin header scroll-to-top      ~x24      6 instances   sticky page title
  *   canvas board icon buttons       29x29    4 instances   canvas header
  *
  * The floor is `--spacing-ib-touch-target-min` (32px). Controls that are
@@ -47,75 +47,181 @@ function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
+/**
+ * The region a match belongs to: the control that owns it.
+ *
+ * ## Why this exists
+ *
+ * The opt-in used to be tested against the **whole file**:
+ *
+ *     if (OPT_IN.test(source)) continue
+ *
+ * One `ib-hit-target-32` anywhere in a file therefore exempted every control in
+ * it. That is the wrong granularity for `lib/uiClasses.ts`, a module that
+ * exports dozens of independent class tokens — opting in on the switch track
+ * silently exempted every future icon button added to it, which is precisely
+ * how a guard ends up green over a violation.
+ *
+ * The exemption now has to appear in the *same* class list as the too-small
+ * token: the enclosing string literal (the overwhelmingly common case), else the
+ * enclosing markup tag, else the enclosing CSS block, else the line.
+ */
+function enclosingLiteral(source: string, start: number, end: number): string | null {
+  for (const quote of ["'", '"', '`'] as const) {
+    let open = -1
+    for (let index = start - 1; index >= 0; index -= 1) {
+      if (source[index] !== quote) continue
+      if (source[index - 1] === '\\') continue
+      open = index
+      break
+    }
+    if (open === -1) continue
+    const close = source.indexOf(quote, end)
+    if (close === -1) continue
+    const literal = source.slice(open, close + 1)
+    // A single/double-quoted JS string cannot span a raw newline, so a match
+    // spanning lines means we paired the wrong quote. Fall through instead of
+    // widening the exemption to two unrelated literals.
+    if (quote !== '`' && literal.includes('\n')) continue
+    return literal
+  }
+  return null
+}
+
+export function controlRegion(source: string, start: number, end: number): string {
+  const literal = enclosingLiteral(source, start, end)
+  if (literal) return literal
+
+  // CSS rule block.
+  const openBrace = source.lastIndexOf('{', start)
+  const closeBrace = source.indexOf('}', end)
+  if (openBrace !== -1 && closeBrace !== -1 && !source.slice(openBrace, start).includes('}')) {
+    return source.slice(openBrace, closeBrace + 1)
+  }
+
+  // Markup tag.
+  const openTag = source.lastIndexOf('<', start)
+  const closeTag = source.indexOf('>', end)
+  if (openTag !== -1 && closeTag !== -1 && !source.slice(openTag, start).includes('>')) {
+    return source.slice(openTag, closeTag + 1)
+  }
+
+  // Last resort: the line. Never the file.
+  const lineStart = source.lastIndexOf('\n', start) + 1
+  const lineEnd = source.indexOf('\n', end)
+  return source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd)
+}
+
 type Rule = {
   /** Human label for the failure message. */
   label: string
   /** File relative to src/. */
   rel: string
-  /**
-   * Matches a class string that is too small on its own. Callers that also
-   * match OPT_IN are exempt.
-   */
-  pattern: RegExp
   /** What to do instead. */
   fix: string
-}
+} & (
+  | {
+      /**
+       * The control is still visually small by design: every occurrence of
+       * `pattern` must carry an opt-in class in its own class list.
+       */
+      kind: 'opt-in'
+      pattern: RegExp
+    }
+  | {
+      /**
+       * The control was remediated to a real 32px box, so the rule flipped from
+       * "forbid the small token" to "require the sized one". Keeping it in this
+       * shape is what preserves the regression guard; deleting it (as a naive
+       * stale sweep would) would leave the fix unprotected.
+       *
+       * `forbidden` keeps the *old* guard alive alongside the new one: the
+       * remediated token can still be reintroduced, and each occurrence still
+       * has to carry a local opt-in.
+       */
+      kind: 'required'
+      pattern: RegExp
+      forbidden?: RegExp[]
+    }
+)
 
 const RULES: Rule[] = [
   {
+    kind: 'opt-in',
     label: 'AdminSwitch track',
     rel: 'features/admin/shared/components/AdminSwitch.vue',
     pattern: /\bh-5\b/,
     fix: 'keep the 20px track but carry `ib-hit-target-32`, or grow the track to `h-8`',
   },
   {
+    // Was `opt-in` on `py-1`; the trigger now declares `min-h-8` outright.
+    kind: 'required',
     label: 'admin tab trigger',
     rel: 'features/admin/shared/components/AdminTabsTrigger.vue',
-    pattern: /\bpy-1\b(?![^\n]*\bmin-h-8\b)/,
-    fix: 'declare `min-h-8` (the AdminTabsList rail is h-9 and has room)',
+    pattern: /\bmin-h-8\b/,
+    fix: 'keep `min-h-8` on the trigger (the AdminTabsList rail is h-9 and has room)',
   },
   {
+    kind: 'opt-in',
     label: 'chart range segment',
     rel: 'shared/components/RangedLineChartCard.vue',
     pattern: /\bpy-1\b/,
-    fix: 'carry `ib-hit-target-32-inline` so the segment row keeps its rhythm',
+    fix: 'carry `ib-hit-target-32-inline` on the segment button so the row keeps its rhythm',
   },
   {
+    kind: 'opt-in',
     label: 'node action button',
     rel: 'features/canvas/presentation/nodes/primitives/NodeActionButton.vue',
     pattern: /\bmin-h-7\b/,
     fix: 'carry `ib-hit-target-32-inline` so node chrome keeps its compact height',
   },
   {
+    kind: 'opt-in',
     label: 'task filter pill',
     rel: 'features/admin/monitor/presentation/components/TaskEventsCard.vue',
     pattern: /\bpy-0\.5\b/,
-    fix: 'carry `ib-hit-target-32-inline` so the dense chip rail keeps its density',
+    fix: 'carry `ib-hit-target-32-inline` on the pill so the dense chip rail keeps its density',
   },
   {
+    // Was `opt-in` on `!size-7`; the compact icon button is now `!size-8`.
+    kind: 'required',
     label: 'compact admin icon button',
     rel: 'features/admin/shared/lib/uiClasses.ts',
-    pattern: /!size-7\b/,
-    fix: 'use `!size-8`',
+    // Pinned to the compact-button token, not a bare `!size-8` occurrence, so the
+    // rule still says something if a *different* token in this large module
+    // happens to be 8x8.
+    pattern: /flex !size-8 shrink-0 items-center justify-center !rounded-lg/,
+    // The 28px box the original rule forbade. Still enforced, still opt-in based,
+    // so a *new* compact button added to this module cannot quietly ship at 28px
+    // just because the existing one is compliant.
+    forbidden: [/!size-7\b/],
+    fix: 'keep `!size-8` on the compact admin icon button token',
   },
   {
+    // Was `opt-in` on `"hidden min-w-0 items-center`; the control grew to `min-h-8`.
+    kind: 'required',
     label: 'admin header scroll-to-top',
     rel: 'features/admin/app/AdminHeaderBar.vue',
-    pattern: /"hidden min-w-0 items-center/,
-    fix: 'declare `min-h-8` alongside `min-w-0`',
+    pattern: /hidden min-h-8 min-w-0 items-center/,
+    fix: 'keep `min-h-8` alongside `min-w-0` on the sticky-header control',
   },
   {
+    kind: 'opt-in',
     label: 'retouch curve drag point',
     rel: 'features/canvas/tools/retouch/components/CurveGraph.vue',
     pattern: /retouch-curves__point/,
     fix: 'carry `ib-hit-target-drag` (11px dot, keyboard-operable; a full 32px overlay would steal neighbouring grabs)',
   },
   {
+    // Was `opt-in` on the 11px marker width; the transparent button box grew to
+    // the AA floor instead, because both pseudos already paint the marker.
+    kind: 'required',
     label: 'retouch histogram marker',
     rel: 'features/canvas/tools/retouch/components/styles/retouch-histogram-plot.css',
     // Only the transparent button box counts: the 11px painted dot further down
     // the file is the visual, not the target.
-    pattern: /\.retouch-histogram-plot__marker \{\s*[^}]*?width: var\(--retouch-histogram-marker-size/,
+    pattern:
+      /\.retouch-histogram-plot__marker \{[\s\S]{0,600}?width: var\(--spacing-ib-touch-target-aa\)/,
     fix: 'grow the transparent button box to `var(--spacing-ib-touch-target-aa)`; both pseudos already paint the marker',
   },
 ]
@@ -125,7 +231,12 @@ const RULES: Rule[] = [
  * so they carry the shared hit-area utilities directly. These rules assert the
  * class is present where the visual box is under the floor.
  */
-const CANVAS_CHROME_RULES: Array<{ file: string; selector: string; hitClass: string; fix: string }> = [
+const CANVAS_CHROME_RULES: Array<{
+  file: string
+  selector: string
+  hitClass: string
+  fix: string
+}> = [
   {
     file: 'features/canvas/presentation/chrome/components/CanvasChrome.vue',
     selector: '.canvas-chrome-status-button',
@@ -146,6 +257,81 @@ const CANVAS_CHROME_RULES: Array<{ file: string; selector: string; hitClass: str
   },
 ]
 
+function matchCount(source: string, pattern: RegExp): number {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`
+  return [...source.matchAll(new RegExp(pattern.source, flags))].length
+}
+
+/**
+ * A rule whose pattern no longer appears at all is dead weight: it can never
+ * fail, and it teaches the next reader that the list is complete. This mirrors
+ * `checkStyleGovernance.checkStaleAllowances` — the guard reports it instead of
+ * spinning forever.
+ */
+function collectStaleRules(sources: Map<string, string>, missingFiles: string[]): string[] {
+  const stale: string[] = []
+  for (const rule of RULES) {
+    const source = sources.get(rule.rel)
+    if (source === undefined) {
+      if (missingFiles.includes(rule.rel)) {
+        stale.push(`${rule.rel}: rule "${rule.label}" points at a file that no longer exists.`)
+      }
+      continue
+    }
+    if (matchCount(source, rule.pattern) > 0) continue
+    stale.push(
+      `${rule.rel}: stale rule "${rule.label}" — \`${rule.pattern}\` no longer matches. The control was fixed or renamed; update the rule or delete it.`,
+    )
+  }
+  return stale
+}
+
+function collectControlViolations(sources: Map<string, string>): string[] {
+  const violations: string[] = []
+
+  const flagUnopted = (rule: Rule, pattern: RegExp, source: string): void => {
+    const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`
+    for (const match of source.matchAll(new RegExp(pattern.source, flags))) {
+      const index = match.index ?? 0
+      const region = controlRegion(source, index, index + match[0].length)
+      // The exemption must live in the control's own class list, not anywhere
+      // in the file.
+      if (OPT_IN.test(region)) continue
+      violations.push(
+        `${rule.rel}: ${rule.label} is under the ${FLOOR_PX}px floor without opting in — ${rule.fix}.`,
+      )
+    }
+  }
+
+  for (const rule of RULES) {
+    const source = sources.get(rule.rel)
+    if (source === undefined) continue
+
+    if (rule.kind === 'opt-in') {
+      flagUnopted(rule, rule.pattern, source)
+      continue
+    }
+    for (const pattern of rule.forbidden ?? []) flagUnopted(rule, pattern, source)
+  }
+
+  return violations
+}
+
+/**
+ * Read a rule's target, or record why it could not be read.
+ *
+ * A missing/renamed control must surface as a stale rule, not as an ENOENT
+ * stack trace — the stack trace tells the reader nothing about which rule broke.
+ */
+function readRuleSource(rel: string, sources: Map<string, string>, missing: string[]): void {
+  if (sources.has(rel)) return
+  try {
+    sources.set(rel, stripComments(readFileSync(join(SRC_ROOT, rel), 'utf8')))
+  } catch {
+    missing.push(rel)
+  }
+}
+
 function main(): void {
   const violations: string[] = []
 
@@ -165,19 +351,32 @@ function main(): void {
   // 2. The hit-area utility must be imported, or no control can opt in.
   if (!styles.includes("@import '../shared/theme/touch-target.css'")) {
     violations.push(
-      "app/style.css: `touch-target.css` is not imported, so `.ib-hit-target-32` does nothing.",
+      'app/style.css: `touch-target.css` is not imported, so `.ib-hit-target-32` does nothing.',
     )
   }
 
+  const sources = new Map<string, string>()
+  const missingFiles: string[] = []
+  for (const rule of RULES) readRuleSource(rule.rel, sources, missingFiles)
+
   // 3. Per-control rules.
+  violations.push(...collectControlViolations(sources))
+
+  // 4. Every `required` rule: the remediated control must still carry its fix.
   for (const rule of RULES) {
-    const source = stripComments(readFileSync(join(SRC_ROOT, rule.rel), 'utf8'))
-    if (!rule.pattern.test(source)) continue
-    if (OPT_IN.test(source)) continue
-    violations.push(`${rule.rel}: ${rule.label} is under the ${FLOOR_PX}px floor without opting in — ${rule.fix}.`)
+    if (rule.kind !== 'required') continue
+    const source = sources.get(rule.rel)
+    if (source === undefined) continue
+    if (matchCount(source, rule.pattern) > 0) continue
+    violations.push(
+      `${rule.rel}: ${rule.label} lost its touch-target fix — ${rule.fix}. This control is now under the ${FLOOR_PX}px floor.`,
+    )
   }
 
-  // 4. Canvas chrome buttons carry the shared hit-area class.
+  // 5. Stale rules: patterns that can no longer match anything.
+  violations.push(...collectStaleRules(sources, missingFiles))
+
+  // 6. Canvas chrome buttons carry the shared hit-area class.
   for (const { file, selector, hitClass, fix } of CANVAS_CHROME_RULES) {
     const source = stripComments(readFileSync(join(SRC_ROOT, file), 'utf8'))
     const className = selector.slice(1)
@@ -197,7 +396,8 @@ function main(): void {
   }
 
   console.log(
-    `Touch-target contract passed: ${RULES.length + CANVAS_CHROME_RULES.length} controls at or above the ${FLOOR_PX}px floor.`,
+    `Touch-target contract passed: ${RULES.length + CANVAS_CHROME_RULES.length} controls at or above the ${FLOOR_PX}px floor ` +
+      `(${RULES.filter((rule) => rule.kind === 'opt-in').length} opt-in, ${RULES.filter((rule) => rule.kind === 'required').length} remediated, ${CANVAS_CHROME_RULES.length} canvas chrome).`,
   )
 }
 

@@ -35,14 +35,25 @@
 > [!NOTE]
 > 暂不在内嵌 UI 暴露：后台改密。未开放的高风险动作应走受控身份运维流程，并在明确审计要求后再扩展 UI。
 
+### Browser-reachable admin surface（当前机制，非约定）
+
+`/api/auth/admin/*` 由三道机制收窄，而非仅靠开发约定：
+
+1. **Auth Service 权限收窄。** `apps/auth/src/application/auth.ts` 用 better-auth 的 `roles` 覆盖 admin plugin 默认角色，`admin` 角色只保留 `user:["impersonate"]`，其余 `user`/`session` 权限全部拒绝（`impersonate-admins` 也不授予，因此伪装管理员仍被拒）。回归测试见 `authConfig.test.ts` 的 `admin plugin permissions are narrowed to the one endpoint Go needs`。
+2. **反代兜底。** `deploy/templates/nginx/ideaboard.conf.template` 中 `location ~ ^/api/auth/admin/(?!stop-impersonating$)` 直接 `return 403`，浏览器只能访问 `stop-impersonating`。Go API 走内网 `AUTH_SERVICE_BASE_URL`（`http://auth:6001`）直连 Auth Service，不经过该反代，因此服务端口编排不受影响。
+3. **前端不注册 admin client。** `apps/web/src/shared/auth/client.ts` 不再注册 `adminClient()`，因此不存在 `authClient.admin.removeUser` 这类可编译的调用入口。退出伪装改为直接 `POST /api/auth/admin/stop-impersonating`。
+
+> [!IMPORTANT]
+> `impersonate` 是唯一保留的权限，因为 Go Control Plane 通过 `POST /api/auth/admin/impersonate-user` 发起伪装（`apps/api/internal/identity/auth/service_client.go`，转发浏览器 Cookie）。若日后要收紧该权限，必须先给 Go 侧补一条 internal-key 认证的发起通道，否则会破坏伪装登录。其余高危动作在 Auth Service 已有 internal-key 认证的 `/internal/users/*`（`ensure`、`emails`、`{id}`、`{id}/role`、`ban`、`unban`、`revoke-sessions`），因此收窄权限不影响服务端编排。
+
 ## 操作准则
 
 > [!TIP]
 > 默认先封禁，再评估是否需要进一步身份侧处理。封禁可立即阻断业务访问且保留业务数据链路，便于审计与恢复。
 
-1. **彻底注销只能走后台 `用户管理` 页的受控操作。** 前端不得直接调用 `authClient.admin.removeUser`；删除必须经由 Go Admin API 完成管理员自删保护、管理员账号保护、`auth_user_id` 校验与 Auth Service internal key 校验，避免本地业务库与 auth 库状态漂移。
+1. **彻底注销只能走后台 `用户管理` 页的受控操作。** 前端不得直接调用 `authClient.admin.removeUser`；删除必须经由 Go Admin API 完成管理员自删保护、管理员账号保护、`auth_user_id` 校验与 Auth Service internal key 校验，避免本地业务库与 auth 库状态漂移。（现状：`/api/auth/admin/remove-user` 在 Auth Service 侧无权限、反代侧 403、前端无调用入口，三重拦截。）
 
-2. **角色升降级只能走后台 `用户管理` 页的受控操作。** 前端不得直接调用 `authClient.admin.setRole`；角色变更必须同步 Better Auth 与 Go 业务库，且不允许修改当前登录管理员自己的角色。
+2. **角色升降级只能走后台 `用户管理` 页的受控操作。** 前端不得直接调用 `authClient.admin.setRole`；角色变更必须同步 Better Auth 与 Go 业务库，且不允许修改当前登录管理员自己的角色。（现状：`/api/auth/admin/set-role` 同样被上述三重拦截拦截。）
 
 3. **生产环境默认建议关闭公开注册。** 可在管理后台 `用户管理` 页的"开放注册"开关控制，仅在明确运营窗口内开启。
 

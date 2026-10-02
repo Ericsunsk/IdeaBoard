@@ -1251,18 +1251,22 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 	// converge to 404 board_share_token_not_found: existence is not leaked.
 	externalUser := tenancy.FormatUserPublicID(identityPrincipal.PublicID())
 	hash := contract.HashIdempotencyRequest("board:join", workspace.PublicID, bearer)
-	// Grant workspace membership first: without it the new collaborator
-	// could not reach the workspace-rooted surface. On join failure the
-	// grant only confers the workspace viewer default (owners get owner).
-	if _, memberErr := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), tenancy.RoleMember); memberErr != nil {
-		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailable46)
-		c.Abort()
-		return
-	}
 	result, fnErr, ok := h.boardDo(c, externalUser, identityPrincipal.UserID(), "join", key, hash, func() (any, error) {
 		board, _, joinErr := h.deps.Boards.JoinByToken(c.Request.Context(), workspace.PublicID, bearer, identityPrincipal.UserID())
 		if joinErr != nil {
 			return nil, joinErr
+		}
+		// Membership is granted only once the bearer has redeemed, never
+		// before: JoinByToken cannot be gated on it because the board store
+		// never reads workspace membership (it resolves the joiner's role
+		// from the board row it just wrote), so an up-front grant authorizes
+		// nothing and only leaves a member row behind on rejected joins.
+		// A member row is not board-scoped — it reaches billing, credits,
+		// tasks, media and library — so a rejected bearer must leave no
+		// trace at all. Keeping the grant inside the idempotency scope also
+		// means a replayed success can never outlive its own grant.
+		if _, memberErr := h.deps.Store.AddWorkspaceMember(c.Request.Context(), workspace.PublicID, identityPrincipal.UserID(), tenancy.RoleMember); memberErr != nil {
+			return nil, memberErr
 		}
 		dto := toBoardDTO(board)
 		return &dto, nil

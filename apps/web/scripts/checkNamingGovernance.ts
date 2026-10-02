@@ -414,6 +414,74 @@ function checkStaleWorkspacePrefix(relativePath: string, fileName: string): Viol
   return null
 }
 
+/**
+ * Statement forms that belong in a barrel and carry no implementation.
+ *
+ * The repo formats without semicolons (`prettier.config.js` `semi: false`), so
+ * none of these can lean on `;` as a terminator.
+ *
+ * The re-export pattern deliberately requires `*` or `{` right after `export`.
+ * The previous `export\s+[^;]*?\sfrom` form could start at an `export const`
+ * and run all the way to a *later* `from`, silently deleting the declaration it
+ * was supposed to judge.
+ */
+const BARREL_SHAPED_LINES: RegExp[] = [
+  // `export {…} from`, `export type {…} from`, `export * from`, `export * as ns from`
+  /^export\s*(?:type\s*)?(?:\*(?:\s+as\s+[A-Za-z0-9_$]+)?|\{[^}]*\})\s*from\s*['"][^'"]+['"]\s*;?/gm,
+  // `import {…} from`, `import x from`, `import 'side-effect'`
+  /^\s*import\s[\s\S]*?from\s*['"][^'"]+['"]\s*;?/gm,
+  /^\s*import\s*['"][^'"]+['"]\s*;?/gm,
+  // `export type Foo = …` written inline (no `from`)
+  /^export\s+type\s+[A-Za-z0-9_$]+(?:<[^=<>]*>)?\s*=[^;\n]*(?:\n\s+[^;\n]*)*/gm,
+  // pure export lists of local bindings
+  /^export\s*(?:type\s*)?\{[^}]*\}\s*;?/gm,
+  // `export declare const/function …` has no runtime body but is still a
+  // declaration, not a seam.
+]
+
+/** The single lazy wrapper a barrel may declare: `export const loadX = () => import('./x')`. */
+const LAZY_IMPORT_WRAPPER =
+  /export\s+const\s+[A-Za-z0-9_]+\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>\s*import\s*\([^)]*\)\s*;?/g
+
+/**
+ * Rule 14. `index.ts` is a barrel or a documented module boundary only.
+ *
+ * The old check missed every `export const/let/var` binding that survived the
+ * lazy-wrapper strip, because the residual test only looked for a bare
+ * `const|let|var|function` at the start of a line — `export const x = (a) => …`
+ * starts with `export`, so a whole barrel's worth of business logic passed as
+ * long as it was declared with `export`.
+ */
+function checkIndexBarrelBody(relativePath: string, source: string): Violation | null {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const stripped = BARREL_SHAPED_LINES.reduce(
+    (accumulated, pattern) => accumulated.replace(pattern, ''),
+    withoutComments,
+  ).replace(LAZY_IMPORT_WRAPPER, '')
+
+  const barrelImpl = (): Violation => ({
+    kind: 'index-impl',
+    path: relativePath,
+    detail: `'index.ts' hides business implementation; keep barrels re-export-only`,
+  })
+
+  if (/:\s*(Vue|Component)\b/.test(stripped)) return barrelImpl()
+
+  // Any surviving `export`ed declaration is implementation, whether it is a
+  // function, a class, an enum, or a `const`/`let`/`var` binding — including
+  // arrow-function consts, which the previous residual test could not see.
+  if (
+    /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|class|const|let|var|enum)\b/m.test(
+      stripped,
+    )
+  )
+    return barrelImpl()
+
+  if (/(^|\n)\s*(const|let|var|function)\s+[A-Za-z0-9_]/.test(stripped.trim())) return barrelImpl()
+
+  return null
+}
+
 function checkIndexBarrel(
   relativePath: string,
   absolutePath: string,
@@ -421,34 +489,28 @@ function checkIndexBarrel(
 ): Violation | null {
   if (fileName !== 'index.ts') return null
   if (Object.hasOwn(keptBarrelBoundaries, relativePath)) return null
-  let source: string
   try {
-    source = readFileSync(absolutePath, 'utf8')
+    return checkIndexBarrelBody(relativePath, readFileSync(absolutePath, 'utf8'))
   } catch {
     return null
   }
-  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  const stripped = withoutComments
-    .replace(/export\s+[^;]*?\sfrom\s*['"][^'"]+['"]\s*;?/gs, '')
-    .replace(/^\s*import\s+[^;]+;\s*$/gm, '')
-    .replace(/export\s+type\s+[^;]+;/g, '')
-    .replace(/export\s+const\s+[A-Za-z0-9_]+\s*=\s*\([^)]*\)\s*=>\s*import\s*\([^)]*\)\s*;?/g, '')
-  if (/export\s+(function|class|enum|abstract|declare)|:\s*(Vue|Component)/.test(stripped)) {
-    return {
-      kind: 'index-impl',
-      path: relativePath,
-      detail: `'index.ts' hides business implementation; keep barrels re-export-only`,
-    }
-  }
-  const leftover = stripped.replace(/export\s*\{\s*[^}]*\s*\}\s*;?/g, '').trim()
-  if (/(^|\n)\s*(const|let|var|function)\s+[A-Za-z0-9_]/.test(leftover)) {
-    return {
-      kind: 'index-impl',
-      path: relativePath,
-      detail: `'index.ts' hides business implementation; keep barrels re-export-only`,
-    }
-  }
-  return null
+}
+
+/**
+ * Rule 12. Collect the symbols a `useX.ts` module actually exports.
+ *
+ * The old pattern was `/^export\s+(?:function|const|type|interface|class)\s+(\w+)/`,
+ * so `export async function useFoo` and `export default function useFoo` matched
+ * nothing at all: `detected` came back empty and the guard reported the file
+ * as if it had no exports, which reads as "aligned" rather than "unknown".
+ */
+const EXPORTED_SYMBOL =
+  /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\*?|const|let|var|type|interface|class|enum)\s+([A-Za-z0-9_$]+)/gm
+
+function collectExportedSymbols(source: string): Set<string> {
+  const exported = new Set<string>()
+  for (const match of source.matchAll(EXPORTED_SYMBOL)) exported.add(match[1] ?? '')
+  return exported
 }
 
 function checkSymbolAlignment(
@@ -456,29 +518,41 @@ function checkSymbolAlignment(
   absolutePath: string,
   fileName: string,
 ): Violation | null {
-  if (!/^use[A-Z]/.test(fileName) || fileName.endsWith('.spec.ts')) return null
-  if (Object.hasOwn(keptComposableFamilies, relativePath)) return null
-  const stem = fileName.split('.')[0] ?? ''
   let source: string
   try {
     source = readFileSync(absolutePath, 'utf8')
   } catch {
     return null
   }
-  const exported = new Set<string>()
-  for (const match of source.matchAll(
-    /^export\s+(?:function|const|type|interface|class)\s+([A-Za-z0-9_]+)/gm,
-  )) {
-    exported.add(match[1] ?? '')
+  return checkSymbolAlignmentSource(relativePath, fileName, source)
+}
+
+/** Pure half of rule 12, so the self-test can pin the bypass shapes. */
+function checkSymbolAlignmentSource(
+  relativePath: string,
+  fileName: string,
+  source: string,
+): Violation | null {
+  if (!/^use[A-Z]/.test(fileName) || fileName.endsWith('.spec.ts')) return null
+  if (Object.hasOwn(keptComposableFamilies, relativePath)) return null
+  const stem = fileName.split('.')[0] ?? ''
+  if (collectExportedSymbols(source).has(stem)) return null
+  return {
+    kind: 'symbol-alignment',
+    path: relativePath,
+    detail: `'${fileName}' must export '${stem}' or a documented composable family`,
   }
-  if (!exported.has(stem)) {
-    return {
-      kind: 'symbol-alignment',
-      path: relativePath,
-      detail: `'${fileName}' must export '${stem}' or a documented composable family`,
-    }
-  }
-  return null
+}
+
+/** Rule 14 on an in-memory source, so the self-test can pin the bypass shapes. */
+function checkIndexBarrelSource(
+  relativePath: string,
+  fileName: string,
+  source: string,
+): Violation | null {
+  if (fileName !== 'index.ts') return null
+  if (Object.hasOwn(keptBarrelBoundaries, relativePath)) return null
+  return checkIndexBarrelBody(relativePath, source)
 }
 
 function collectViolations(): Violation[] {
@@ -676,6 +750,152 @@ function runSelfTest(): void {
         'export type ResolvedTaskImageResult = { url: string }',
       )?.kind,
       'types-placement',
+    ],
+    // --- rule 12: symbol-alignment -----------------------------------
+    // The old export regex was `/^export\s+(?:function|const|type|interface|class)\s+(\w+)/`,
+    // so `export async function useThing` and `export default function useThing`
+    // contributed *nothing* to `exported` — the file looked like it had no
+    // exports at all, i.e. a correctly aligned composable was reported as
+    // misaligned for the wrong reason.
+    [
+      'symbol-alignment-async-function',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export async function useThing() {\n  return 1\n}\n',
+      ),
+      null,
+    ],
+    [
+      'symbol-alignment-default-function',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export default function useThing() {\n  return 1\n}\n',
+      ),
+      null,
+    ],
+    [
+      'symbol-alignment-plain-function',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export function useThing() {\n  return 1\n}\n',
+      ),
+      null,
+    ],
+    [
+      'symbol-alignment-async-mismatch',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export async function useOther() {\n  return 1\n}\n',
+      )?.kind,
+      'symbol-alignment',
+    ],
+    [
+      'symbol-alignment-default-mismatch',
+      checkSymbolAlignmentSource(
+        'features/example/useThing.ts',
+        'useThing.ts',
+        'export default function useOther() {\n  return 1\n}\n',
+      )?.kind,
+      'symbol-alignment',
+    ],
+    [
+      'symbol-alignment-detects-async-and-default',
+      [
+        ...collectExportedSymbols('export async function useThing() {}'),
+        ...collectExportedSymbols('export default function useThing() {}'),
+      ],
+      ['useThing', 'useThing'],
+    ],
+    // --- rule 14: index-impl -----------------------------------------
+    // The old residual test only looked for a bare `const|let|var|function`
+    // at the start of a line, so `export const x = (a) => …` — the exact shape
+    // the rule exists to forbid — sailed through.
+    [
+      'index-impl-arrow-const',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        'export const total = (a, b) => a + b\n',
+      )?.kind,
+      'index-impl',
+    ],
+    [
+      'index-impl-plain-const',
+      checkIndexBarrelSource('features/example/index.ts', 'index.ts', 'export const LIMIT = 3\n')
+        ?.kind,
+      'index-impl',
+    ],
+    [
+      'index-impl-async-function',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        'export async function loadThing() {\n  return 1\n}\n',
+      )?.kind,
+      'index-impl',
+    ],
+    [
+      'index-impl-default-export',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        'export default function loadThing() {\n  return 1\n}\n',
+      )?.kind,
+      'index-impl',
+    ],
+    [
+      'index-impl-not-swallowed-by-a-later-from',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        "export const total = (a, b) => a + b\n\nexport { other } from './other'\n",
+      )?.kind,
+      'index-impl',
+    ],
+    [
+      'index-impl-local-const',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        'const total = (a, b) => a + b\n',
+      )?.kind,
+      'index-impl',
+    ],
+    [
+      'index-barrel-reexports-ok',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        "export { a, type B } from './a'\n\nexport * from './b'\n\nexport {\n  c,\n  type D,\n} from './c'\n",
+      ),
+      null,
+    ],
+    [
+      'index-barrel-lazy-wrapper-ok',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        "export const loadThing = () => import('./thing')\n",
+      ),
+      null,
+    ],
+    [
+      'index-barrel-type-only-ok',
+      checkIndexBarrelSource(
+        'features/example/index.ts',
+        'index.ts',
+        'export type Thing = {\n  id: string\n}\n',
+      ),
+      null,
+    ],
+    [
+      'index-barrel-kept-boundary',
+      checkIndexBarrelSource('app/router/index.ts', 'index.ts', 'export const routes = build()\n'),
+      null,
     ],
   ]
   let failed = 0

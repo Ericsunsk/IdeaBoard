@@ -274,7 +274,16 @@ Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中
 
 Atlas migration integrity 由 `atlas.sum` 与 `atlas_schema_revisions` 共同保证；API migration image 在部署前应用 versioned migrations，随后由 `finalize-migrate` 完成 River schema 与 runtime privilege setup。Better Auth 的认证表可以先存在，不计入 API baseline 冲突；不过标准部署顺序仍是 API baseline first、Better Auth migration second。Clean-break 后禁止只回滚 API/Auth image；需要同时恢复数据库 backup 或重新初始化 Fresh Database。
 
-Migration workflow 使用 Atlas Community Edition 的 `atlas migrate validate` 完成 `atlas.sum` integrity、Fresh replay 和 PostgreSQL semantic validation；`atlas migrate lint` 需要 Atlas Pro 登录，不是部署或 CI 前置条件。新增 migration 由 `atlas migrate diff` 生成，必须与 `atlas.sum` 一起提交。`scripts/atlas-migration-check.sh` 只检查本次新增 SQL，并默认阻止 `DROP TABLE`、`DROP COLUMN`、`TRUNCATE` 等 destructive DDL；若业务确实需要 destructive change，必须在 SQL 中写入 `-- destructive: approved`，并在受控 review 环境显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`。CI 使用隔离的 Fresh database 运行该 gate，然后对集成 database 执行两轮 Atlas apply，覆盖 Fresh 与 incremental idempotency 路径。
+> [!WARNING]
+> `api-migrate` 会在 `atlas migrate apply` 之前比对数据库记录的 Atlas revisions 与镜像内 migration 目录。若数据库记录了镜像里不存在的 version（错误的 image digest、回滚到旧 image、migration 文件被改名或删除、CI 变量错配），migration 会以 `clean break reset is not allowed` **失败**，并在日志中列出缺失的 version；**不会**自动清库。按顺序处理：
+>
+> 1. 先按上一节的 image rollback 流程确认部署的 digest 与 commit 是否与数据库的 migration history 匹配。绝大多数情况这是真正的故障，用匹配该 history 的 image 重跑即可，不要走清库路径。
+> 2. 确认是需要保留数据的 clean break 时，先完成 PostgreSQL backup，并导出需要保留的数据。
+> 3. 只有在确认要放弃当前全部数据后，才在 **一次性 migration 容器**上设置 `ATLAS_CLEAN_BREAK_ALLOW_RESET=true` 重跑 `api-migrate`。该值只在 migration 容器注入，绝不能进入长期运行的 API/Auth runtime。
+> 4. drop 前 migrator 会记录 `current_database()`、缺失的 version 与 public schema 全部表的行数摘要；请保留这段日志。drop 完成后会立即执行 `atlas migrate apply` 重建当前 baseline，若该步失败，数据库处于空且无数据状态，需要按 backup 流程恢复。
+> 5. 不要长期保留 `ATLAS_CLEAN_BREAK_ALLOW_RESET=true`：它会让后续任何一次 image/migration 错配都变成静默清库。clean break 完成后应立即移除该变量。
+
+Migration workflow 使用 Atlas Community Edition 的 `atlas migrate validate` 完成 `atlas.sum` integrity、Fresh replay 和 PostgreSQL semantic validation；`atlas migrate lint` 需要 Atlas Pro 登录，不是部署或 CI 前置条件。新增 migration 由 `atlas migrate diff` 生成，必须与 `atlas.sum` 一起提交。`scripts/atlas-migration-check.sh` 只检查本次新增 SQL，并默认阻止 `DROP TABLE`、`DROP COLUMN`、`DROP CONSTRAINT`、`TRUNCATE` 等 destructive DDL（bare `DROP <object>` 与 `ALTER TABLE ... DROP <object>` 两种写法都命中）；若业务确实需要 destructive change，必须在 SQL 中写入 `-- destructive: approved`，并在受控 review 环境显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`。CI 使用隔离的 Fresh database 运行该 gate，然后对集成 database 执行两轮 Atlas apply，覆盖 Fresh 与 incremental idempotency 路径。
 
 PostgreSQL init script 只在空 volume 创建 API/Auth runtime roles。项目尚未上线时若本地 volume 早于该角色分离方案，直接删除并重建开发 volume；不要把 owner credential 配回任何长期运行的应用 runtime。
 

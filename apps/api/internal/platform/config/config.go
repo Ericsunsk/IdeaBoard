@@ -308,10 +308,16 @@ type AdminSeedConfig struct {
 }
 
 // MigrationToolingConfig carries the Atlas tooling knobs read from
-// ATLAS_BINARY and ATLAS_MIGRATIONS_DIR.
+// ATLAS_BINARY, ATLAS_MIGRATIONS_DIR and ATLAS_CLEAN_BREAK_ALLOW_RESET.
 type MigrationToolingConfig struct {
 	AtlasBinary   string
 	MigrationsDir string
+	// CleanBreakAllowReset is the explicit opt-in for the destructive clean
+	// break path that drops and recreates the public schema. It defaults to
+	// false: a database whose Atlas revisions are absent from the shipped
+	// migration directory must fail the deploy, never silently reset itself.
+	// See composition.reconcileCleanBreakDatabase.
+	CleanBreakAllowReset bool
 }
 
 // SecretsConfig carries the raw at-rest encryption key material read from
@@ -372,7 +378,11 @@ type envConfig struct {
 	InitAdminDisplayName string `env:"INIT_ADMIN_DISPLAY_NAME"`
 	AtlasBinary          string `env:"ATLAS_BINARY"`
 	AtlasMigrationsDir   string `env:"ATLAS_MIGRATIONS_DIR"`
-	SecretsEncryptionKey string `env:"APP_SECRETS_ENCRYPTION_KEY"`
+	// AtlasCleanBreakAllowReset gates DROP SCHEMA public CASCADE. It is a
+	// deliberate, self-describing opt-in rather than a bare boolean so the
+	// blast radius is obvious to whoever sets it in a deploy environment.
+	AtlasCleanBreakAllowReset string `env:"ATLAS_CLEAN_BREAK_ALLOW_RESET"`
+	SecretsEncryptionKey      string `env:"APP_SECRETS_ENCRYPTION_KEY"`
 }
 
 var loadEnvOnce sync.Once
@@ -460,6 +470,14 @@ func Load() *Config {
 		invalidEnv = append(invalidEnv, "RIVER_POOL_MIN_CONNS")
 		slog.Warn("invalid integer env; fallback to default", "key", "RIVER_POOL_MIN_CONNS", "value", strings.TrimSpace(raw.RiverPoolMinConns), "default", DefaultRiverPoolMinConns)
 	}
+	// ATLAS_CLEAN_BREAK_ALLOW_RESET gates DROP SCHEMA public CASCADE. An
+	// unparseable value must fail closed (false) and be reported, never
+	// silently enable the destructive path.
+	cleanBreakAllowReset, cleanBreakValid := parseBoolEnv(raw.AtlasCleanBreakAllowReset, false)
+	if !cleanBreakValid {
+		invalidEnv = append(invalidEnv, "ATLAS_CLEAN_BREAK_ALLOW_RESET")
+		slog.Warn("invalid boolean env; fallback to default", "key", "ATLAS_CLEAN_BREAK_ALLOW_RESET", "value", strings.TrimSpace(raw.AtlasCleanBreakAllowReset), "default", false)
+	}
 
 	return &Config{
 		Database: DatabaseConfig{
@@ -516,8 +534,9 @@ func Load() *Config {
 			DisplayName: strings.TrimSpace(raw.InitAdminDisplayName),
 		},
 		Migration: MigrationToolingConfig{
-			AtlasBinary:   stringEnvDefault(raw.AtlasBinary, DefaultAtlasBinary),
-			MigrationsDir: stringEnvDefault(raw.AtlasMigrationsDir, DefaultMigrationDirectory),
+			AtlasBinary:          stringEnvDefault(raw.AtlasBinary, DefaultAtlasBinary),
+			MigrationsDir:        stringEnvDefault(raw.AtlasMigrationsDir, DefaultMigrationDirectory),
+			CleanBreakAllowReset: cleanBreakAllowReset,
 		},
 		Secrets: SecretsConfig{
 			EncryptionKey: strings.TrimSpace(raw.SecretsEncryptionKey),

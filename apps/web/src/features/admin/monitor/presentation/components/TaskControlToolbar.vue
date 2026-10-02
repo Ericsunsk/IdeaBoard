@@ -58,53 +58,23 @@
         <span>{{ t('admin.monitor.autoRefresh') }}</span>
       </button>
 
-      <!-- 时间范围下拉按钮与弹出层 (shadcn-vue 原生原子组件) -->
-      <AdminPopover
-        :open="timeRangePopoverOpen"
-        @update:open="emit('update:timeRangePopoverOpen', $event)"
-      >
-        <AdminPopoverTrigger as-child>
-          <button
-            type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-admin-card-strong px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
-            :aria-expanded="timeRangePopoverOpen"
-            aria-haspopup="listbox"
-            :aria-label="MONITOR_MESSAGES.timeRangeAria"
-          >
-            <Calendar class="size-3.5 text-admin-text-2" />
-            <span>{{ selectedPreset.label }}</span>
-            <NavArrowDown
-              class="size-3.5 text-admin-text-3 transition-transform"
-              :class="timeRangePopoverOpen ? 'rotate-180' : ''"
-            />
-          </button>
-        </AdminPopoverTrigger>
-
-        <AdminPopoverContent align="end" :side-offset="4">
-          <div class="flex flex-col gap-0.5" role="listbox">
-            <button
-              v-for="preset in timeRangePresets"
-              :key="preset.key"
-              type="button"
-              role="option"
-              :aria-selected="selectedTimeRangeKey === preset.key"
-              :class="[
-                'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-                selectedTimeRangeKey === preset.key
-                  ? 'bg-admin-info-soft text-admin-info font-semibold'
-                  : 'text-admin-text-2 hover:bg-admin-surface-muted hover:text-admin-text-1',
-              ]"
-              @click="emit('selectTimeRange', preset.key)"
-            >
-              <span>{{ preset.label }}</span>
-              <Check
-                v-if="selectedTimeRangeKey === preset.key"
-                class="size-3.5 text-admin-info shrink-0"
-              />
-            </button>
-          </div>
-        </AdminPopoverContent>
-      </AdminPopover>
+      <!--
+        Time-range picker. Builds on AdminSelect (reka `Select`): the previous
+        implementation was an `AdminPopover` with `aria-haspopup="listbox"` over a
+        hand-rolled `role="listbox"`, which advertised arrow keys, Home/End and
+        typeahead without implementing one of them. The keyboard model and the
+        Admin skin now come from the shared primitive, so the trigger is a single
+        Tab stop. `placeholder` keeps the resolved `selectedPreset.label` visible
+        when the current key is not among the presets, as the old trigger did.
+      -->
+      <AdminSelect
+        :model-value="selectedTimeRangeKey"
+        :options="timeRangeOptions"
+        :placeholder="selectedPreset.label"
+        :aria-label="MONITOR_MESSAGES.timeRangeAria"
+        class="w-auto"
+        @update:model-value="handleTimeRangeUpdate"
+      />
 
       <!-- 更多按钮 (样式占位，后续接功能) -->
       <AdminButton
@@ -120,16 +90,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  AdminPopover,
-  AdminPopoverContent,
-  AdminPopoverTrigger,
-} from '../../../shared/components/adminPopoverAtoms'
 import AdminButton from '../../../shared/components/AdminButton.vue'
+import AdminSelect from '../../../shared/components/AdminSelect.vue'
 import {
-  Calendar,
-  Check,
   HelpCircle,
   MoreHoriz,
   NavArrowDown,
@@ -141,8 +106,14 @@ import {
 import type { TimeRangePreset, TimeRangePresetKey } from '../../domain/timeRange'
 import { MONITOR_MESSAGES } from '../pages/messages'
 
-defineProps<{
+const props = defineProps<{
   searchKeyword: string
+  /**
+   * @deprecated reka `Select` owns its own open state. `AdminMonitorPage` still
+   * binds `v-model:time-range-popover-open` to this pair; dropping it means
+   * touching `useMonitorTimeline` and the page as well, which is out of scope
+   * here, so the contract is kept inert rather than deleted mid-refactor.
+   */
   timeRangePopoverOpen: boolean
   selectedPreset: TimeRangePreset
   selectedTimeRangeKey: TimeRangePresetKey
@@ -151,11 +122,20 @@ defineProps<{
 
 const emit = defineEmits<{
   'update:searchKeyword': [value: string]
+  /** @deprecated See `timeRangePopoverOpen`; the dropdown no longer reports open state. */
   'update:timeRangePopoverOpen': [value: boolean]
   search: []
   liveRefresh: []
   selectTimeRange: [key: TimeRangePresetKey]
 }>()
+
+const timeRangeOptions = computed(() =>
+  props.timeRangePresets.map((preset) => ({ label: preset.label, value: preset.key })),
+)
+
+function handleTimeRangeUpdate(value: string | number) {
+  emit('selectTimeRange', String(value) as TimeRangePresetKey)
+}
 
 const { t } = useI18n()
 </script>

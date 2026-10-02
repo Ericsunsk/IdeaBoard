@@ -114,9 +114,9 @@ describe('AdminModelsPage', () => {
     renderModelsPage()
 
     expect(screen.getByRole('textbox', { name: '搜索模型' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '筛选模型类型' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '筛选提供商' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '筛选托管方式' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '筛选模型类型' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '筛选提供商' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '筛选托管方式' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '刷新模型' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '新增网关' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加模型' })).toBeInTheDocument()

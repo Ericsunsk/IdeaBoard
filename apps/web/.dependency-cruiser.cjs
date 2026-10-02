@@ -40,7 +40,24 @@ module.exports = {
       comment:
         'Route pages and app layers must use feature/resource/shared API adapters instead of generated-query directly.',
       from: {
-        path: '^src/(app|features/[^/]+/(components|presentation|pages|app))',
+        // Matched by FILENAME, not by directory depth.
+        //
+        // The previous pattern was `features/[^/]+/(components|presentation|pages|app)`,
+        // which assumes the second path segment is a layer name. `[^/]+` cannot
+        // cross a `/`, so only `features/<x>/<layer>/…` matched — 13 of the 31
+        // route pages. Every real admin vertical (`admin/users/`,
+        // `admin/settings/pages/`, `admin/credits/health/`, …) and the workspace
+        // layout have a *vertical* name in that second segment, so all of them
+        // fell through the rule unnoticed.
+        //
+        // `*Page.vue` / `*Layout.vue` is the definition that router wiring
+        // actually uses: every `component:` / route-table entry in
+        // `features/*/app/routes.ts` and `features/workspace/routes/` points at
+        // one of those two suffixes. The negative fixtures in
+        // `scripts/checkDependencyBoundaries.ts` assert this pattern against
+        // three separate admin directories so the rule cannot silently shrink
+        // back to one directory again.
+        path: '^src/app/|src/.*(?:Page|Layout)\\.vue$',
       },
       to: {
         path: '^src/shared/api/generated-query',

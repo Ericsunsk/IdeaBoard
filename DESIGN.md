@@ -64,6 +64,7 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 
 | Feature      | 语义     |
 | ------------ | -------- |
+| `generation` | Prompt 生图（纯文本指令 + 最多 4 张参考图） |
 | `render`     | 草图成图 |
 | `variations` | 风格延展 |
 | `inpaint`    | 局部重绘 |
@@ -74,9 +75,10 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 
 Contract rules:
 
-- `feature` 是顶层任务字段，由后端统一校验。
-- `image_urls` 是顶层媒体输入字段。
-- `params` 只承载 feature-specific structured parameters。
+- 顶层判别字段是 `service`（不是 `feature`），由后端 `workflow.ValidateWorkflowFeatureSlug` 统一校验；`params.service` 是同义来源。
+- 媒体输入走 `inputs.media_asset_ids`（有序 `AssetID + role` 引用）与 `inputs.prompt`；持久化 Task Params 不保存任何 storage URL。
+- `params` 只承载 service-specific structured parameters，未知 key 直接 422。
+- `vision` 是永久保留 slug（Vision Search 专用映射），永远不能注册为 workflow feature。
 - `use_mask`、`mask_image_url`、`mask_image_urls` 属于 `inpaint` 的运行时边界参数，不是 prompt 模板变量。
 - 产品文案、模板变量和展示分组只能描述当前可执行能力。
 
@@ -92,25 +94,26 @@ Contract rules:
 River + PostgreSQL 负责：
 
 - 任务入队、重试和 worker 执行
-- 账号容量调度和无容量延迟重试
 - 任务状态、取消标记和运行态事实源
 - 队列监控的聚合来源
 
-全部 canonical AI Image Workflow 都使用 Idea 计费；纯本地裁剪、调色、图层和蒙版绘制不进入 Task Billing。用户展示名使用 `Idea/Ideas`，内部 domain unit、代码、API 与 schema 继续使用 `Credit/credits`。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
+全部 canonical AI Image Workflow 都使用 Idea 计费；纯本地裁剪、调色、图层和蒙版绘制不进入 Task Billing。用户展示名使用 `Idea/Ideas`，内部 domain unit、代码、API 与 schema 继续使用 `Credit/credits`。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、`RoutingSnapshot` 固化、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
 
 NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前核心事件是 `task.status_changed`，由 API 实例 bridge 到本地 SSE hub。禁止把 NATS JetStream 恢复成任务执行队列，也不保留 Redis/Asynq/Dragonfly/Garnet 等生产兼容路径。
 
 ### 4. Worker 是 runtime adapter
 
-`internal/runtime/worker` 消费 Tasking、Workflow、Prompts 和 Media 的接口，经 Cloudflare AI Gateway 做 provider calls，并拥有 River worker execution 与运行时错误收敛。网关内部重试（上限 5 次）耗尽后，transient 失败（429/5xx/超时/网络错误）允许最多 2 次 worker 层整任务重投（reset + River backoff，新 execution token，以 `tasks.retry_count` 为界），确定性失败直接终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md) 与 [ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md)。
+workspace task 的执行适配器是 `internal/tasking/interfaces/worker`：它消费 Tasking、Workflow、Prompts 和 Media 的接口，经 `internal/runtime/interfaces/worker/providers` 做 Cloudflare AI Gateway provider calls，并收敛运行时错误。River worker execution 与周期性后台 job（credit reconciliation、payment、retention、vision billing）由 `internal/runtime/interfaces/worker` 的 `river`/`billing`/`retention`/`visionbilling` 子包拥有。
 
-不要把 worker implementation 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义；worker 拥有执行适配。
+重试分三层，各自有独立事实（`ExecutionAttempt.retry_layer` 与 `gateway_retry_count`）：网关内部重试（同 Model，有界 HTTP policy，归 gateway adapter）、Model fallback（最多一次，只用快照里的 `retry_candidate`，归 worker）、River 整任务重投（transient 失败后按 `MaxProviderRequeues` 整任务 requeue，reset + River backoff + 新 execution token，以 `tasks.retry_count` 为界，归 task lifecycle）。确定性失败（参数非法、额度不足、内容安全拒绝、鉴权失败、not-found、成功但 payload 不可用）直接终态，绝不消耗 fallback 预算；无标记的未知结果同样 fail closed 到终态，见 [ADR-0008](./docs/adr/0008-cloudflare-ai-gateway-sole-egress.md)、[ADR-0010](./docs/adr/0010-gateway-cache-billing-timeout.md) 与 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。
+
+不要把 provider execution 和后台 job adapter 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义，其 `interfaces/worker` 拥有 workspace task 的执行编排（快照消费、attempt 事实、重试分层）；provider 方言与网关调用、River worker execution 和后台 job 仍属 Runtime。
 
 模型图片请求的 vendor 方言收敛在 `internal/runtime/interfaces/worker/providers/dialects`：按 `(provider, model, customParams)` 一次分发（chat 判定优先、Fal 专表、其余 generic），shaping 与解析纯函数无网络。路径推断仍归 `workflow.ResolveRoute`（execution 与 preview 共用单 seam），membership 与别名归 `workflow.ResolveProvider`，custom 参数由 worker 在 Encode 后合并一次，重试/缓存/超时归网关（ADR-0008/0010）。claim 与 attempt 行在同一 SQL 语句原子提交，不存在有 token 无 attempt 行的中间态。
 
 ### 5. Feature Prompt 只保存当前模板
 
-`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格与 Service Model Pool 路由都必须在 Hold 前通过校验；Readiness 与 Submit 共用 Prompt、typed params 和 Billing request 规划。#847 完成字段改名后，生产环境的 Quote 与 Submit 暂以 `service_resolution_unavailable` 拒绝缺失路由的任务；#848 将在提交事务中固化 `RoutingSnapshot`，worker 只使用该快照，不读取实时 Model 映射。价格不受模型影响，见 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
+`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格与 Service Model Pool 路由都必须在 Hold 前通过校验；Readiness 与 Submit 共用 Prompt、typed params 和 Billing request 规划。#847 完成字段改名后，Readiness、Quote 与 Submit 共用同一个 `RoutingResolver` 判定，缺失或空的 Service Model Pool 路由在任何 Hold 之前就以 `service_resolution_unavailable` fail closed。#848 已落地：Submit 在同一 settlement transaction（Credit Hold + task insert + River enqueue）里固化不可变 `RoutingSnapshot`，worker 只消费该快照，绝不读取实时 Model 映射，也不从 live pool 回落；快照缺失或无法 replay 时同样 fail closed（释放 Hold、不烧重试预算）。价格不受模型影响，见 [ADR-0012](./docs/adr/0012-service-model-pool-routing-contract.md)。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 
@@ -124,7 +127,7 @@ Better Auth Service 负责登录、注册、session、身份侧字段和凭据�
 
 - 角色升降级需要同时同步 Auth Service 与业务侧 `users.role`。
 - 彻底注销必须先在 Go API 的 PostgreSQL transaction 中停用业务用户、冻结 Credit Wallet lifecycle status 并记录 durable deletion phase，再按 Auth identity → Media Storage → business tombstone 顺序幂等收敛；跨服务失败期间 Wallet 不得恢复 active，Identity lifecycle 不得清除 Credits 拥有的原因化 Restriction。
-- 前端不得直接调用 Better Auth admin client 执行跨库高风险动作。
+- 前端不得直接调用 Better Auth admin client 执行跨库高风险动作。该边界由机制强制，而非仅靠约定：Auth Service 用 better-auth `roles` 把 admin 角色收窄到 `user:["impersonate"]`（`stop-impersonating` 端点本身不需要权限），反代对 `/api/auth/admin/` 下除该端点外的路径返回 403，且前端 bundle 不注册 `adminClient()`。Go Control Plane 通过 internal-key 认证的 `/internal/users/*` 执行其余高危动作，走内网直连 Auth Service。
 
 运行规则见 [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)。
 
@@ -136,17 +139,19 @@ Media context 拥有 object storage provider/profile、upload serving、upload a
 
 ### 8. Admin 是 vertical contexts
 
-Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。
+Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。垂直划分以 [navigationMeta.ts](./apps/web/src/features/admin/app/navigationMeta.ts) 的 navigation key 为准；`storage` 与 `payments` 作为独立 context 存在，分别内嵌在 `settings` 与 `credits` 布局下。
 
-| Frontend context                 | Backend context                                                                 | Ownership                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `features/admin/users`           | `internal/identity/users`                                                       | 用户列表、角色/status、会话、伪装登录、受控注销                                                          |
-| `features/admin/provider-config`（已退役，见 ADR-0009，随 PR-2 删除） | `internal/accountpool`（已退役） | ~~channel/account/provider payload、模型检测、调度可见性~~ |
-| `features/admin/prompts`   | `internal/prompts`, `internal/workflow`                                         | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护                                 |
-| `features/admin/storage`         | `internal/media/storage`                                                        | storage provider/profile、secret masking、bucket test/apply                                              |
-| `features/admin/monitor`    | `internal/tasking`                                                              | task list/detail、runtime monitor、stream/poll fallback                                                  |
-| `features/admin/statistics`      | `internal/tasking/taskstats`                                                    | statistics aggregation、backfill status、range contract                                                  |
-| `features/admin/credits` | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/payments` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health、RewardCode 运营与 Stripe 配置 |
+| Frontend context            | Backend context                                                          | Ownership                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `features/admin/users`      | `internal/identity/users`                                                | 用户列表、角色/status、会话、伪装登录、受控注销                                                        |
+| `features/admin/models`     | `internal/aigateway`                                                     | 网关连接、模型目录、映射规则、route preview 与连通性探测（Service Model Pool 归 Generation）          |
+| `features/admin/prompts`    | `internal/prompts`, `internal/workflow`                                  | 当前 workflow feature 的 prompt template；变量和 merge policy 由代码维护                              |
+| `features/admin/storage`    | `internal/media/storage`                                                 | storage provider/profile、secret masking、bucket test/apply                                           |
+| `features/admin/monitor`    | `internal/tasking`                                                       | task list/detail/cancel、runtime monitor、stream/poll fallback                                          |
+| `features/admin/statistics` | `internal/tasking/application/statistics`                                 | statistics aggregation、backfill status、range contract                                                 |
+| `features/admin/credits`    | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/generation` | Registry-backed 功能定价 Catalog、Service Model Pool 版本与 Admin 写入、Wallet/Ledger operations、Credit Health、RewardCode 运营 |
+| `features/admin/payments`   | `internal/payments`                                                      | 支付订单查询/退款/争议、Stripe 配置                                                                    |
+| `features/admin/settings`   | `internal/platform/settings`, `internal/searchcatalog`                   | 网站 branding/access/mediaUpload、限流、typed Outbound Policy、搜索 provider key；邮件配置经 Go Control Plane 转发到 Auth Service |
 
 ### 9. Generated code 是边界，不是业务模型
 
@@ -171,15 +176,19 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 
 | Context                                             | Directories                                           | Responsibility                                                                                                                             |
 | --------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Runtime                                             | `internal/runtime`, `cmd`                             | 进程启动、HTTP route wiring、worker adapters、embedded frontend dist                                                                       |
-| Platform                                            | `internal/platform`, `internal/db`, `internal/events` | config、database、response helpers、safe HTTP、event bus、sqlc                                                                             |
-| Tasking                                             | `internal/tasking`                                    | task model、submission、queueing、runtime state、statistics                                                                                |
+| Runtime                                             | `internal/runtime`, `cmd`                             | 进程启动生命周期、`internal/runtime/composition` 唯一装配根、HTTP/Worker interface adapters、后台 job adapters、embedded frontend dist             |
+| Platform                                            | `internal/platform`, `internal/db`, `internal/events` | config、system settings、database、response helpers、safe HTTP、event bus、sqlc                                                             |
+| Tasking                                             | `internal/tasking`                                    | task model、submission、queueing、runtime state、task billing、statistics                                                                  |
 | Identity                                            | `internal/identity`                                   | auth middleware/client、user persistence、user/admin management                                                                            |
+| Tenancy                                             | `internal/tenancy`                                    | Workspace、Organization、membership 生命周期与 role 约束、workspace billing account 绑定；不拥有账务写入                                      |
 | AccountPool（已退役，见 ADR-0009）                   | —                                                     | Account/endpoint rows remain for historical references; credential material is purged. AI egress belongs to Cloudflare AI Gateway          |
+| [AI Gateway](./apps/api/internal/aigateway/CONTEXT.md) | `internal/aigateway`                                | 唯一 AI 出口的配置面：gateway connection、model catalog、Vision mapping、route preview 与探测；不拥有 Wallet、Ledger、价格或 Service Model Pool   |
 | Boards                                              | `internal/boards`                                     | board ownership、access checks、board management API                                                                                       |
-| Media                                               | `internal/media`                                      | storage、assets、media refs、image format validation                                                                                       |
+| Media                                               | `internal/media`                                      | storage、assets、derivatives、media refs、image format validation                                                                         |
 | Library                                             | `internal/library`                                    | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata                                                   |
-| Workflow/Prompts                                    | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly                                                                |
+| [SearchCatalog](./apps/api/internal/searchcatalog/CONTEXT.md) | `internal/searchcatalog`                  | 图片搜索：Unsplash/Pexels provider key 生命周期与 Vision Search（独立计费）；Vision 模型只来自 AI Gateway vision mapping                   |
+| Workflow/Prompts                                    | `internal/workflow`, `internal/prompts`               | executable feature contract、task params、prompt templates、prompt assembly；只做 feature 编译与参数 shaping，从不选 Model                          |
+| Generation                                          | `internal/generation`                                 | Service Model Pool 的 `routing`（纯领域：eligibility、确定性选型、retry candidate、`RoutingSnapshot`）与 `catalog`（pool 持久化、快照 save/load）    |
 | Billing                                             | `internal/billing`                                    | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot                                                          |
 | Billing Records                                     | `internal/billingrecords`                             | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入                                    |
 | Credits                                             | `internal/credits`                                    | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands                                          |
@@ -189,15 +198,17 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 
 Dependency direction:
 
-- `cmd` stays lightweight and calls `internal/runtime/bootstrap`.
-- `internal/runtime` composes platform modules and business contexts.
+- `cmd` stays lightweight and delegates process wiring to `internal/runtime/composition`.
+- `internal/runtime` composes platform modules and business contexts; `composition` is the sole assembly root.
 - Business contexts may depend on `internal/platform` and `internal/db/sqlc` through local repositories/adapters.
 - `internal/platform` must not import business contexts.
+- Business contexts must never depend on `internal/runtime`; runtime interfaces and adapters stay isolated.
 - Cross-context collaboration should use small service/repository interfaces at the caller boundary.
 - Products consume Credits through the `credits.Commands` seam; only Credits owns Ledger writes and balance projections.
 - Rewards owns RewardCode/Redemption but must grant Ideas through transaction-bound `credits.Commands`; Code plaintext is never persisted.
-- Products ask Billing for an immutable `PriceSnapshot`; Provider Account routing must not influence SKU price. Billing does not write the Credits Ledger.
-- Tasking 通过 `internal/tasking/taskbilling` 编排 Billing Quote 与 Credits Commands，并持久化不可变 Task Billing snapshot；Billing/Credits 仍分别拥有价格事实和 Ledger 写入。
+- Products ask Billing for an immutable `PriceSnapshot`; Service Model Pool routing must not influence SKU price. Billing does not write the Credits Ledger.
+- Tasking 通过 `internal/tasking/application/billing` 编排 Billing Quote 与 Credits Commands，并持久化不可变 Task Billing snapshot；Billing/Credits 仍分别拥有价格事实和 Ledger 写入。
+- Service Model Pool 的选型只由 `internal/generation` 拥有：Tasking 的 Quote/Submit 调用它拿 `RoutingSnapshot` 并在 settlement transaction 中固化，worker 只读快照；Business contexts 不得自行查 live pool。
 
 ## Frontend Context Map & Architecture Contract
 
@@ -210,13 +221,14 @@ Dependency direction:
 | Canvas Workspace    | `features/canvas`             | AI 画布交互面、节点运行时、工具链（Retouch/Inpaint/Brush/Select）、命令编排与任务生命周期                         | Canvas Node/Edge runtime, Tool State Machine, Execution Plan, Task Runner |
 | Board               | `features/board`              | 看板全生命周期事实源：持久化文档模型、快照 Schema、媒体引用提取、看板 CRUD 与画廊列表、协作加入、revision/乐观锁同步、持久化与预览适配器 | `BoardState`, Valibot `stateSchema`, `boardRepository`, `boardSync`, `previewSerializer` |
 | Account             | `features/account`            | 用户额度（Idea/Credits）查看与刷新、Stripe 充值收银台、兑换码兑换、账单记录与用量统计明细                         | Wallet balance, Recharge session state machine, Redemption, Usage trend   |
-| Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户运营、模型/通道配置、提示词模板管理、存储配置、任务调度监控、统计分析、额度计费 Catalog） | Vertical context view models, Admin resources, Policy inspection          |
+| Admin Verticals     | `features/admin`              | 管理端独立垂直子域（用户管理、积分运营、数据仪表盘、任务监控、模型管理、系统提示词、系统设置）             | Vertical context view models, Admin resources, Policy inspection          |
 | Auth & Identity     | `features/auth`               | 认证与会话状态（Better Auth 集成、登录/注册弹窗与路由拦截、凭据校验、Auth Bridge）                                | Session state, Auth token lifecycle, Login/Register workflows             |
 | Library             | `features/library`            | 外部灵感素材收藏、分类文件夹、媒体引用与拖拽入画布交互                                                            | Library item model, Folder taxonomy, cursor pagination                    |
 | Workspace           | `features/workspace`          | 工作区外壳与路由承载：应用全局外壳布局、顶栏导航、工作区路由与协作加入（保留外部 /user/* URL 契约）              | Shell layout state, navigation triggers, workspace routes, share-join      |
 | Search              | `features/search`             | 灵感素材搜索、Vision Search、素材引用与搜索结果持久化                                                             | Search query state, vision reference state                                |
-| Public Site         | `features/public-site`        | 匿名公开落地页、产品介绍、展示案例与静态 HTML 生成（不负责登录后工作区渲染）                                      | Public Fact Registry, Editorial Content, SSR/SSG models                   |
 | Legal               | `features/legal`              | 服务条款、隐私政策协议与合规展示                                                                                  | Terms, Privacy Policy documents                                           |
+
+匿名公开落地页不是独立 context：`/` 路由直接渲染 `features/canvas/presentation/pages/CanvasLandingPage.vue`，公开访问与 SEO 由 router meta 表达（见 [router/index.ts](./apps/web/src/app/router/index.ts)）。新增公开页面属于 Canvas presentation 层，不要为此新建 `public-site` 之类的平行 vertical。
 
 ### 2. Complex Feature Layering Contract (Architecture Contract)
 
@@ -283,7 +295,7 @@ Vue UI -> application use case -> resource/adapter -> generated API
 
 1. **分级架构范式 (Tiered DDD Architecture)**：
    - **重度核心子域**（如 `board`, `canvas`, `search`, `account`, `admin`）：必须严格落地标准 4 层或职责清晰分层（`domain/`, `application/`, `infrastructure/`, `presentation/` 或 `ui/`）。
-   - **轻量特性模块**（如 `legal`, `public-site`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
+   - **轻量特性模块**（如 `legal`, `auth`）：保持轻量扁平结构（`components/`, `useXxx.ts`, `types.ts` 等），严禁为了套用模板引入空目录或无意义的空抽象。
 
 2. **文件与目录命名规范 (Naming Conventions)**：
    - **目录命名**：全小写短横线 `kebab-case`（如 `board/`, `image-tools/`, `workspace-runtime/`）。

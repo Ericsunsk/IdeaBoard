@@ -20,6 +20,12 @@ const (
 	RiverMaxAttemptsVisionBilling           = 5
 	RiverMaxAttemptsMediaReclamation        = 10
 	RiverMaxAttemptsWebhookDeliver          = 8
+	// RiverMaxAttemptsTaskSettlementSweep budgets the final-timeout
+	// convergence sweep. A poisoned sweep (a task whose ledger row is
+	// un-releasable, a database blip) must surface as a failed River job an
+	// operator can see instead of churning for 25 attempts: the sweep is
+	// idempotent, so the next scheduled run converges the same batch anyway.
+	RiverMaxAttemptsTaskSettlementSweep = 5
 )
 
 // QueueRetryPolicy pins the retry budget of one River queue.
@@ -59,6 +65,12 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			MaxAttempts: RiverMaxAttemptsCreditReconciliation,
 			Worker:      "CreditReconciliationWorker",
 			Notes:       "daily scheduled run; small budget so a stuck run pages instead of churning",
+		},
+		{
+			Queue:       RiverQueueTaskSettlementSweep,
+			MaxAttempts: RiverMaxAttemptsTaskSettlementSweep,
+			Worker:      "TaskSettlementSweepWorker (task_settlement_sweep)",
+			Notes:       "settlement-only convergence of abandoned Credit Holds; per-task failures are isolated, so the job only fails on a sweep-level fault",
 		},
 		{
 			Queue:       "payment_reconciliation",

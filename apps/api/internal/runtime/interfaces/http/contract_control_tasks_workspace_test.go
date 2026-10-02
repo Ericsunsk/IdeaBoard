@@ -145,7 +145,7 @@ func seedControlObservabilityFixture(t *testing.T, db *pgxpool.Pool) {
 func TestControlTaskDetailSuccessfulRouting(t *testing.T) {
 	db := openControlTaskTestDB(t)
 	seedControlObservabilityFixture(t, db)
-	adapter := NewWorkspaceControlTasks(db, nil, nil, nil)
+	adapter := NewWorkspaceControlTasks(db, nil, nil, nil, nil)
 
 	detail, err := adapter.GetTask(context.Background(), "task_obs_ok")
 	if err != nil {
@@ -188,7 +188,7 @@ func TestControlTaskDetailSuccessfulRouting(t *testing.T) {
 func TestControlTaskDetailModelFallbackRetry(t *testing.T) {
 	db := openControlTaskTestDB(t)
 	seedControlObservabilityFixture(t, db)
-	adapter := NewWorkspaceControlTasks(db, nil, nil, nil)
+	adapter := NewWorkspaceControlTasks(db, nil, nil, nil, nil)
 
 	detail, err := adapter.GetTask(context.Background(), "task_obs_retry")
 	if err != nil {
@@ -219,7 +219,7 @@ func TestControlTaskDetailModelFallbackRetry(t *testing.T) {
 func TestControlTaskDetailFinalFailure(t *testing.T) {
 	db := openControlTaskTestDB(t)
 	seedControlObservabilityFixture(t, db)
-	adapter := NewWorkspaceControlTasks(db, nil, nil, nil)
+	adapter := NewWorkspaceControlTasks(db, nil, nil, nil, nil)
 
 	detail, err := adapter.GetTask(context.Background(), "task_obs_fail")
 	if err != nil {
@@ -246,7 +246,7 @@ func TestControlTaskDetailFinalFailure(t *testing.T) {
 func TestControlTaskDetailMissingModelData(t *testing.T) {
 	db := openControlTaskTestDB(t)
 	seedControlObservabilityFixture(t, db)
-	adapter := NewWorkspaceControlTasks(db, nil, nil, nil)
+	adapter := NewWorkspaceControlTasks(db, nil, nil, nil, nil)
 
 	detail, err := adapter.GetTask(context.Background(), "task_obs_bare")
 	if err != nil {
@@ -269,7 +269,7 @@ func TestControlTaskDetailMissingModelData(t *testing.T) {
 func TestControlTaskListExposesRoutingAndFinalModel(t *testing.T) {
 	db := openControlTaskTestDB(t)
 	seedControlObservabilityFixture(t, db)
-	adapter := NewWorkspaceControlTasks(db, nil, nil, nil)
+	adapter := NewWorkspaceControlTasks(db, nil, nil, nil, nil)
 
 	items, counts, err := adapter.ListTasks(context.Background(), nil)
 	if err != nil {

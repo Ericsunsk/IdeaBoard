@@ -50,6 +50,20 @@ server {
         add_header Pragma "no-cache" always;
     }
 
+    # Better Auth admin plugin surface. Auth Service is also directly reachable
+    # by the Go API on the internal network (AUTH_SERVICE_BASE_URL), which is
+    # how impersonation starts; the browser must never reach these endpoints
+    # directly. Every high-risk action here (remove-user, set-role, ban,
+    # set-user-password, revoke-session, ...) already has an internal-key
+    # authenticated route under /internal/users/* on the Auth Service, and
+    # the only browser-needed endpoint is ending an impersonation, which is
+    # the single exception below. A plain `return 403` keeps this location
+    # free of add_header directives, so it inherits the server-level security
+    # headers instead of replacing them.
+    location ~ ^/api/auth/admin/(?!stop-impersonating$) {
+        return 403;
+    }
+
     location /api/auth/ {
         proxy_pass ${NGINX_AUTH_UPSTREAM};
         proxy_http_version 1.1;

@@ -1,6 +1,7 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
 import { admin, emailOTP } from 'better-auth/plugins'
+import { defaultAc } from 'better-auth/plugins/admin/access'
 import { Pool, type PoolConfig } from 'pg'
 import type { AuthAdmissionPolicy } from '../admission/authAdmissionPolicy.js'
 import { createAuthAdmissionPolicy } from '../admission/authAdmissionPolicy.js'
@@ -43,6 +44,41 @@ const CANONICAL_EMAIL_PATHS = new Set([
   '/email-otp/send-verification-otp',
   '/email-otp/verify-email',
 ])
+
+// Better Auth's admin plugin ships a default `admin` role holding every user
+// and session permission, which makes all `/api/auth/admin/*` endpoints
+// reachable from any browser session whose Auth role is `admin`. Those
+// endpoints mutate Auth state directly, so reaching them from the browser
+// bypasses the Go Control Plane orchestration that DESIGN.md requires for
+// cross-database high-risk identity actions (no operator reason, no
+// Idempotency-Key, no control audit, no local cleanup).
+//
+// `impersonate` is the single permission that must survive, because the Go
+// Control Plane starts impersonation through this plugin's public endpoint
+// (POST /api/auth/admin/impersonate-user, see
+// apps/api/internal/identity/auth/service_client.go). Every other high-risk
+// admin action -- role change, ban/unban, delete, set-email, set-password,
+// session revoke, list -- already has an internal-key authenticated route
+// under /internal/users/* that writes the repository directly, so narrowing
+// this role cannot break Go orchestration.
+//
+// `impersonate-admins` stays ungranted, preserving the existing refusal to
+// impersonate admin accounts.
+//
+// Ending impersonation needs no permission at all: POST
+// /admin/stop-impersonating only requires a session carrying
+// `impersonatedBy` plus the signed admin_session cookie, so the frontend
+// exit flow keeps working unchanged.
+const AUTH_ADMIN_ROLES = {
+  admin: defaultAc.newRole({
+    user: ['impersonate'],
+    session: [],
+  }),
+  user: defaultAc.newRole({
+    user: [],
+    session: [],
+  }),
+} satisfies NonNullable<Parameters<typeof admin>[0]>['roles']
 
 export type AuthDatabase = Pool
 
@@ -217,6 +253,7 @@ export function createBetterAuthOptions(input: {
         defaultRole: 'user',
         adminRoles: ['admin'],
         impersonationSessionDuration: 60 * 60,
+        roles: AUTH_ADMIN_ROLES,
       }),
     ],
     databaseHooks: {

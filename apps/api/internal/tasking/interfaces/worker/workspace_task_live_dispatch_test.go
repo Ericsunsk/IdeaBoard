@@ -74,7 +74,7 @@ func liveDispatchGatewayFactory(serverURL string) runtimeports.GatewayClientFact
 type liveDispatchEnv struct {
 	media   *workspacemedia.InMemoryWorkspaceMediaStore
 	objects *fakeRendererObjects
-	store   *workspacetasks.InMemoryStore
+	store   *attemptClaimStore
 	holder  *workerTestHolder
 	queue   *workerTestQueue
 	service *workspacetasks.Service
@@ -82,7 +82,9 @@ type liveDispatchEnv struct {
 
 func newLiveDispatchEnv() *liveDispatchEnv {
 	media := workspacemedia.NewInMemoryWorkspaceMediaStoreForTests()
-	store := workspacetasks.NewInMemoryStoreForTests()
+	// Wrapped in the merged claim+attempt seam the worker constructor
+	// requires (production writes both in one statement).
+	store := newAttemptClaimStore(workspacetasks.NewInMemoryStoreForTests(), workspacetasks.NewInMemoryAttemptRecorderForTests())
 	holder := newWorkerTestHolder()
 	queue := &workerTestQueue{}
 	service := workspacetasks.NewTestServiceForTests(workspacetasks.ServiceDeps{

@@ -22,7 +22,14 @@ package worker
 // gateway client, the model fallback is the single same-claim second send
 // above, and River/task retries are fresh-token requeues bounded by
 // tasks.retry_count. Attempt facts record which layer each send used
-// (gateway / model_fallback / river_task).
+// (gateway / model_fallback / river_task); the primary send's row is
+// written by the claim statement, keyed by the lease token.
+//
+// Budget scope (ADR-0010 rule 5): tasks.retry_count is spent ONLY here,
+// on a transient PROVIDER failure that requeues. A settlement fault
+// after a billed send never reaches this file's paths: it converges
+// terminally instead (workspace_task_execution.go), because the only
+// recovery a River retry could offer would be another billed call.
 
 import (
 	"context"

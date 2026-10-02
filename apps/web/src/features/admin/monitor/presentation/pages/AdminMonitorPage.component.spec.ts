@@ -189,7 +189,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
@@ -221,7 +220,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
@@ -272,7 +270,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
@@ -285,8 +282,8 @@ describe('AdminMonitorPage', () => {
     expect(screen.getByLabelText('展开图表')).toBeInTheDocument()
   })
 
-  it('renders time range picker and updates selection', async () => {
-    const view = renderWithUser(AdminMonitorPage, {
+  it('renders the resolved time range on the picker trigger', () => {
+    renderWithUser(AdminMonitorPage, {
       global: {
         stubs: {
           AdminChartCard: SlotStub,
@@ -305,21 +302,18 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
     })
 
-    const trigger = screen.getByLabelText('选择时间范围')
+    // The picker is a real reka `Select`, whose option list renders into a portal
+    // that only opens on real pointer input. jsdom therefore sees the trigger and
+    // nothing else, so open-state and keyboard behaviour live in
+    // TaskControlToolbar.browser.spec.ts; what the page owns is that the
+    // resolved preset reaches the trigger as its value.
+    const trigger = screen.getByRole('combobox', { name: '选择时间范围' })
     expect(trigger).toHaveTextContent('过去 1 小时')
-
-    await view.user.click(trigger)
-    const option24h = screen.getByRole('option', { name: /过去 24 小时/ })
-    expect(option24h).toBeInTheDocument()
-
-    await view.user.click(option24h)
-    expect(trigger).toHaveTextContent('过去 24 小时')
   })
 
   it('renders table columns directly as the header without redundant Activity Log title', () => {
@@ -342,7 +336,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
@@ -384,7 +377,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },
@@ -417,7 +409,6 @@ describe('AdminMonitorPage', () => {
           InputNumber: SlotStub,
           Message: SlotStub,
           Refresh: SlotStub,
-          Select: SlotStub,
           Tag: SlotStub,
         },
       },

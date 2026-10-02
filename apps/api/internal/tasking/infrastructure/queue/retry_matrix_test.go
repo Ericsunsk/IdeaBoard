@@ -34,6 +34,7 @@ func TestRiverRetryMatrixIsSelfConsistent(t *testing.T) {
 		"task_retention",
 		"vision_billing",
 		"media_reclamation",
+		RiverQueueTaskSettlementSweep,
 	} {
 		if seen[want] == 0 {
 			t.Fatalf("matrix is missing queue %q", want)
@@ -53,13 +54,14 @@ func TestRiverRetryMatrixMatchesInsertSiteConstants(t *testing.T) {
 		budgets[policy.Queue] = policy.MaxAttempts
 	}
 	want := map[string]int{
-		RiverQueueDefault:           RiverMaxAttemptsDefault,
-		"credit_reconciliation":     RiverMaxAttemptsCreditReconciliation,
-		"payment_reconciliation":    RiverMaxAttemptsPaymentReconciliation,
-		"payment_checkout_shutdown": RiverMaxAttemptsPaymentCheckoutShutdown,
-		"task_retention":            RiverMaxAttemptsTaskRetention,
-		"vision_billing":            RiverMaxAttemptsVisionBilling,
-		"media_reclamation":         RiverMaxAttemptsMediaReclamation,
+		RiverQueueDefault:             RiverMaxAttemptsDefault,
+		"credit_reconciliation":       RiverMaxAttemptsCreditReconciliation,
+		"payment_reconciliation":      RiverMaxAttemptsPaymentReconciliation,
+		"payment_checkout_shutdown":   RiverMaxAttemptsPaymentCheckoutShutdown,
+		"task_retention":              RiverMaxAttemptsTaskRetention,
+		"vision_billing":              RiverMaxAttemptsVisionBilling,
+		"media_reclamation":           RiverMaxAttemptsMediaReclamation,
+		RiverQueueTaskSettlementSweep: RiverMaxAttemptsTaskSettlementSweep,
 	}
 	for queue, attempts := range want {
 		if budgets[queue] != attempts {

@@ -62,6 +62,11 @@ type TxTaskLifecycleStore interface {
 	FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, errorMsg string) (*WorkspaceTask, error)
 	CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string, actorUserID int64, reason string) (*WorkspaceTask, bool, error)
 	TransitionForRetryInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID, newToken string) (*WorkspaceTask, error)
+	// GetTaskInTx reads a workspace-scoped task inside the settlement
+	// transaction. It exists so an idempotent replay resolves the task its
+	// durable claim named from the same consistent snapshot that observed
+	// the claim, never from a second connection.
+	GetTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID string) (*WorkspaceTask, error)
 }
 
 // TaskBillingStore persists immutable billing facts and the settlement read
@@ -83,31 +88,55 @@ func (s *Service) billingFacts() TxBillingFacts {
 	return facts
 }
 
-func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskLifecycleStore, TxEnqueuer, bool) {
+func (s *Service) settlementSeams() (SettlementTransactor, TxQuoter, TxHolder, TxTaskLifecycleStore, TxEnqueuer, TxSubmissionClaimStore, bool) {
 	if s == nil || s.taskLifecycle == nil {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	transactor, ok := s.taskLifecycle.(SettlementTransactor)
 	if !ok {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	txQuoter, ok := s.quoter.(TxQuoter)
 	if !ok {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	txHolder, ok := s.holder.(TxHolder)
 	if !ok {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	txStore, ok := s.taskLifecycle.(TxTaskLifecycleStore)
 	if !ok {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	txQueue, ok := s.queue.(TxEnqueuer)
 	if !ok {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
-	return transactor, txQuoter, txHolder, txStore, txQueue, true
+	// The durable submit claim is discovered from the same lifecycle store
+	// that owns the settlement transaction, for the same reason every other
+	// seam above is: the claim must be written in THAT transaction, so it
+	// cannot come from an independently wired component. A store that cannot
+	// claim fails closed (no seam -> ErrSettlementUnavailable) rather than
+	// settling an unfenced submit.
+	txClaims := s.claimStore(txStore)
+	if txClaims == nil {
+		return nil, nil, nil, nil, nil, nil, false
+	}
+	return transactor, txQuoter, txHolder, txStore, txQueue, txClaims, true
+}
+
+// claimStore resolves the durable submit claim store: the explicit
+// ServiceDeps override when set (tests inject a fake), otherwise the
+// lifecycle store itself when it implements the seam (production: the
+// postgres Store does, so no extra wiring is required).
+func (s *Service) claimStore(txStore TxTaskLifecycleStore) TxSubmissionClaimStore {
+	if s != nil && s.submissionClaims != nil {
+		return s.submissionClaims
+	}
+	if claims, ok := txStore.(TxSubmissionClaimStore); ok {
+		return claims
+	}
+	return nil
 }
 
 func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskLifecycleStore, bool) {
@@ -185,13 +214,18 @@ func (s *Service) holderSettles(holdID string, total int64) bool {
 	return s.holder != nil && strings.TrimSpace(holdID) != "" && total > 0
 }
 
-// createInTx settles Quote -> Hold -> Insert -> Enqueue in ONE PostgreSQL
-// transaction. Any failure rolls the whole transaction back: no task row
-// without its Hold, no Hold without its task, no River job without task
-// facts. It reports handled=false for test-only service fixtures that do not
-// expose PostgreSQL transaction seams.
-func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, taskID, token string) (*WorkspaceTask, bool, error) {
-	transactor, txQuoter, txHolder, txStore, txQueue, ok := s.settlementSeams()
+// createInTx settles Claim -> Quote -> Hold -> Insert -> Enqueue in ONE
+// PostgreSQL transaction. Any failure rolls the whole transaction back: no
+// task row without its Hold, no Hold without its task, no River job without
+// task facts, and no durable idempotency claim without all of them.
+//
+// The claim is written FIRST, before Quote and before the Hold. That
+// ordering is the fix: a retried submit now collides on the claim's unique
+// constraint and returns the original task, so it never reaches the ledger,
+// the task table, or River. It reports handled=false for test-only service
+// fixtures that do not expose PostgreSQL transaction seams.
+func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resolution string, quantity int64, taskID, token string, claim SubmissionClaim) (*WorkspaceTask, bool, error) {
+	transactor, txQuoter, txHolder, txStore, txQueue, txClaims, ok := s.settlementSeams()
 	if !ok {
 		return nil, false, nil
 	}
@@ -208,6 +242,29 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
+	// Claim the client key inside the settlement transaction. This is the
+	// concurrency fence: a concurrent submit of the same key blocks on the
+	// unique constraint until this transaction commits or rolls back, then
+	// observes the winner and replays it.
+	existing, claimed, err := txClaims.ClaimSubmissionInTx(ctx, tx, claim)
+	if err != nil {
+		return nil, true, fmt.Errorf("workspacetasks: claim submission: %w", err)
+	}
+	if !claimed {
+		replayed, err := s.replayClaimedSubmission(ctx, tx, txStore, existing, claim)
+		if err != nil {
+			return nil, true, err
+		}
+		// Read-only transaction: commit so the replayed task is read from a
+		// consistent snapshot and no write is left open.
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, true, err
+		}
+		committed = true
+		// No event is staged on replay: the winning submit already emitted
+		// task.created for this exact task.
+		return replayed, true, nil
+	}
 	// Resolve inside the settlement transaction before Quote/Hold so
 	// an empty pool fails before any ledger, task, or queue write (the
 	// rollback below then removes nothing because nothing was written).
@@ -227,7 +284,12 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	snapshot.SettlementState = "quoted"
 	var holdTxID string
 	if snapshot.TotalCredits > 0 {
-		holdTxID, err = txHolder.HoldInTx(ctx, tx, input.OwnerUserID, snapshot.TotalCredits, "task-hold:"+taskID, taskID)
+		// The ledger key is derived from the DURABLE claim scope, never from
+		// the freshly minted task id. A retried submit therefore asks the
+		// ledger for the same key, so the ledger's own replay path fences a
+		// duplicate hold even if the claim were somehow bypassed.
+		holdTxID, err = txHolder.HoldInTx(ctx, tx, input.OwnerUserID, snapshot.TotalCredits,
+			TaskSubmitHoldKey(claim.WorkspaceID, claim.IdempotencyKey), taskID)
 		if err != nil {
 			return nil, true, err
 		}
@@ -268,6 +330,42 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	committed = true
 	s.stage(created.ID, created.WorkspaceID, StatusPending)
 	return created, true, nil
+}
+
+// replayClaimedSubmission resolves an existing durable claim into the task it
+// settled, or fails closed.
+//
+// Two outcomes, both terminal for this request:
+//   - Same request hash: replay. The ORIGINAL task is returned. It is read
+//     inside the caller's transaction so the read is consistent with the
+//     claim that named it.
+//   - Different request hash: ErrIdempotencyConflict (409). The caller must
+//     NOT receive a task built from a different body.
+//
+// A claim that names a task which cannot be read is a torn durable fact; it
+// fails closed with an error rather than settling a second task.
+func (s *Service) replayClaimedSubmission(ctx context.Context, tx pgx.Tx, txStore TxTaskLifecycleStore, existing *SubmissionClaim, attempted SubmissionClaim) (*WorkspaceTask, error) {
+	if existing == nil {
+		return nil, fmt.Errorf("workspacetasks: claim store reported a conflict without a claim: %w", ErrSettlementUnavailable)
+	}
+	if existing.WorkspaceID != attempted.WorkspaceID || existing.Operation != attempted.Operation ||
+		existing.IdempotencyKey != attempted.IdempotencyKey {
+		return nil, fmt.Errorf("workspacetasks: claim scope mismatch: %w", ErrSettlementUnavailable)
+	}
+	if existing.RequestHash != attempted.RequestHash {
+		return nil, ErrIdempotencyConflict
+	}
+	// The claim and the task commit in the same transaction, so a readable
+	// claim always names a committed task. Anything else is fail-closed.
+	taskID := strings.TrimSpace(existing.TaskPublicID)
+	if taskID == "" {
+		return nil, fmt.Errorf("workspacetasks: claim names no task: %w", ErrSettlementUnavailable)
+	}
+	replayed, err := txStore.GetTaskInTx(ctx, tx, existing.WorkspaceID, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("workspacetasks: replay claimed task %s: %w", taskID, err)
+	}
+	return replayed, nil
 }
 
 // completeInTx flips running -> completed (persisting outputs) atomically
@@ -454,5 +552,13 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 		return nil, true, err
 	}
 	committed = true
+	// running -> pending is a real status transition, so it needs an event
+	// like every other flip (this was the one settlement that staged
+	// nothing: a requeued task went dark on the event channel because the
+	// UI had no pending signal to re-render against). Staged AFTER the
+	// commit, for the same reason as the terminal settlements above: a
+	// staged event means a committed fact, and publishing it is the
+	// caller's post-commit job (never inside this transaction).
+	s.stage(taskID, workspaceID, StatusPending)
 	return retried, true, nil
 }

@@ -1008,6 +1008,15 @@ type TaskStatEvent struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TaskSubmissionIdempotency struct {
+	WorkspaceID    int64              `json:"workspace_id"`
+	Operation      string             `json:"operation"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	RequestHash    string             `json:"request_hash"`
+	TaskPublicID   string             `json:"task_public_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type UploadSession struct {
 	InternalID        int64              `json:"internal_id"`
 	PublicID          string             `json:"public_id"`

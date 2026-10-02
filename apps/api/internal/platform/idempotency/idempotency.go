@@ -13,8 +13,14 @@
 //     Reward-create replays through its durable uniqueness facts
 //     (reward_codes.created_by+idempotency_key, reward_redemptions
 //     natural user+code dedup); board POSTs replay through the
-//     process-local Store below. Task submit stays fail-closed until its
-//     workspace-scoped store lands, so it never reaches this store.
+//     process-local Store below.
+//   - Task submit does NOT depend on this store. It has its own durable,
+//     transactional idempotency fact (task_submission_idempotency, written
+//     in the same transaction as the Credit Hold + task insert + River
+//     enqueue), so a retried submit replays the original task even after a
+//     crash or a cache eviction. The Store is still consulted by the v1
+//     task edge as a cheap in-process fast path / same-request coalescer,
+//     but it is not the authority: correctness no longer depends on it.
 package idempotency
 
 import (
@@ -129,9 +135,16 @@ func HashRequest(parts ...string) string {
 // Store is a process-local first-result replay cache for POST writes whose
 // service layer has no durable idempotency fact (board share/member paths).
 // Reward create/redeem replay through their durable facts and never use
-// this store; task submit stays fail-closed until its workspace-scoped
-// store lands. Entries expire after TTL; methods are nil-safe
-// so handlers constructed without a store still enforce keys and skip replay.
+// this store. Task submit has its own durable, transactional claim
+// (task_submission_idempotency); the v1 task edge may still pass through
+// here as an in-process fast path, but a Store miss or eviction no longer
+// permits a duplicate settlement. Entries expire after TTL; methods are
+// nil-safe so handlers constructed without a store still enforce keys and
+// skip replay.
+//
+// This store is deliberately NOT durable: it is shared by every control
+// plane POST, and making it transactional is a separate, larger change. The
+// money path (task submit) no longer relies on it.
 type Store struct {
 	mu         sync.Mutex
 	items      map[string]storedResult
