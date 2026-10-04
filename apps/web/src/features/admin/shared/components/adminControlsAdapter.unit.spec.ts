@@ -63,7 +63,7 @@ describe('Admin base control adapters', () => {
         props: { invalid: true, size: 'small' },
       })
       const input = wrapper.find('input')
-      expect(input.classes()).toContain('!border-admin-danger')
+      expect(input.classes()).toContain('!border-destructive')
       expect(input.classes()).toContain('text-admin-meta')
       expect(input.attributes('aria-invalid')).toBe('true')
     })
@@ -83,7 +83,7 @@ describe('Admin base control adapters', () => {
       })
       expect(wrapper.text()).toBe('Active')
       expect(wrapper.classes()).toContain('rounded-full')
-      expect(wrapper.classes()).toContain('text-admin-success-strong')
+      expect(wrapper.classes()).toContain('text-success')
     })
 
     it('supports rounded false for rounded-md', () => {

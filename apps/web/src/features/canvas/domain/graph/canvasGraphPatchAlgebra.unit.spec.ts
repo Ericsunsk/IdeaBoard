@@ -27,10 +27,7 @@ import {
   stageSelectNode,
   stageUpdateNode,
 } from './canvasGraphMutation'
-import type {
-  CanvasGraphStoreState,
-  CanvasGraphTransactionDraft,
-} from './canvasGraphStoreTypes'
+import type { CanvasGraphStoreState, CanvasGraphTransactionDraft } from './canvasGraphStoreTypes'
 
 function createImageNode(id: number, x: number, y: number): ImageNodeItem {
   return {
@@ -196,11 +193,7 @@ describe('canvasGraphPatchAlgebra', () => {
     expect(unchanged.size).toBe(0)
 
     const added = new Map()
-    recordAppliedOrderPatch(
-      before,
-      [...before, toCanvasGraphNodeId('prompt', 9)],
-      added,
-    )
+    recordAppliedOrderPatch(before, [...before, toCanvasGraphNodeId('prompt', 9)], added)
     // Appending shifts the previous tail's placement, so both the new id and
     // its predecessor carry order patches (needed to restore order on undo).
     expect([...added.keys()]).toEqual([

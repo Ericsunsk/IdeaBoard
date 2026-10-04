@@ -64,11 +64,7 @@ body.canvas-overscroll-guard {
     color-mix(in srgb, var(--canvas-minimap-viewport) 26%, transparent)
   );
   --canvas-panel-content-gap: 10px;
-  --canvas-panel-border: color-mix(
-    in srgb,
-    var(--color-canvas-neutral-line) 55%,
-    transparent
-  );
+  --canvas-panel-border: color-mix(in srgb, var(--color-canvas-neutral-line) 55%, transparent);
   --canvas-text-strong: var(--color-canvas-text-primary);
   --canvas-text-body: var(--color-canvas-text-secondary);
   --canvas-text-muted: var(--color-canvas-text-secondary);

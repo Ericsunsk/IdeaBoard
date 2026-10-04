@@ -63,7 +63,9 @@
                   </button>
                 </div>
 
-                <p class="text-admin-caption text-muted-foreground">{{ SETTINGS_MESSAGES.logoHint }}</p>
+                <p class="text-admin-caption text-muted-foreground">
+                  {{ SETTINGS_MESSAGES.logoHint }}
+                </p>
 
                 <input
                   id="admin-branding-logo-file"

@@ -23,10 +23,12 @@ describe('Theme Token Parity Contract', () => {
   })
 
   it('keeps dark token declarations unique within the dark scope', () => {
-    const tokens = [...darkCss.matchAll(/(--color-(?:admin|board|canvas|home|ib)-[a-z0-9-]+):/g)].map(
-      (match) => match[1],
-    )
-    const duplicates = [...new Set(tokens.filter((token, index) => tokens.indexOf(token) !== index))]
+    const tokens = [
+      ...darkCss.matchAll(/(--color-(?:admin|board|canvas|home|ib)-[a-z0-9-]+):/g),
+    ].map((match) => match[1])
+    const duplicates = [
+      ...new Set(tokens.filter((token, index) => tokens.indexOf(token) !== index)),
+    ]
     expect(duplicates, 'dark.css must not redeclare the same token').toEqual([])
   })
 
@@ -114,12 +116,10 @@ describe('Theme Token Parity Contract', () => {
     const semLightCss = readFileSync(join(import.meta.dirname, '../semantic-light.css'), 'utf8')
     const semDarkCss = readFileSync(join(import.meta.dirname, '../semantic-dark.css'), 'utf8')
 
-    const lightTokens = [
-      ...semLightCss.matchAll(/(--(?:color|blur)-[a-z0-9-]+):/g),
-    ].map((m) => m[1])
-    const darkTokens = [
-      ...semDarkCss.matchAll(/(--(?:color|blur)-[a-z0-9-]+):/g),
-    ].map((m) => m[1])
+    const lightTokens = [...semLightCss.matchAll(/(--(?:color|blur)-[a-z0-9-]+):/g)].map(
+      (m) => m[1],
+    )
+    const darkTokens = [...semDarkCss.matchAll(/(--(?:color|blur)-[a-z0-9-]+):/g)].map((m) => m[1])
 
     expect(lightTokens.length).toBeGreaterThan(0)
     expect(darkTokens.length).toBeGreaterThan(0)
@@ -199,10 +199,9 @@ describe('Theme Token Parity Contract', () => {
     ]
 
     for (const token of requiredPrimitives) {
-      expect(
-        primitivesCss,
-        `Primitive scale ${token} must be defined in primitives.css`,
-      ).toContain(token)
+      expect(primitivesCss, `Primitive scale ${token} must be defined in primitives.css`).toContain(
+        token,
+      )
     }
   })
 })

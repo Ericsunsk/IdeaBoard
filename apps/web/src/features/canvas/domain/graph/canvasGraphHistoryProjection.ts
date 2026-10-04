@@ -1,8 +1,4 @@
-import {
-  cloneEdgeRecord,
-  cloneGroupRecord,
-  cloneNodeRecord,
-} from './canvasGraphStoreState'
+import { cloneEdgeRecord, cloneGroupRecord, cloneNodeRecord } from './canvasGraphStoreState'
 import { createCommitPatch, hasVisibleChanges } from './canvasGraphPatchAlgebra'
 import type {
   CanvasGraphEdgeRecord,

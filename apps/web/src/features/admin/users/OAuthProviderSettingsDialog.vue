@@ -73,9 +73,7 @@
       </AdminFormField>
 
       <!-- 2. 当前选中 Provider 的凭据与回调配置区 -->
-      <div
-        class="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 shadow-2xs"
-      >
+      <div class="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 shadow-2xs">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <button

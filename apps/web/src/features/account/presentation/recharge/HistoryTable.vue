@@ -58,7 +58,7 @@
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-semibold"
-            :class="data.status === 'credited' ? 'text-ib-success' : 'text-muted-foreground'"
+            :class="data.status === 'credited' ? 'text-success' : 'text-muted-foreground'"
             >{{ rechargeStatusLabel(data) }}</span
           ></template
         >
@@ -94,7 +94,9 @@
           class="flex min-h-40 items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-foreground">{{ t('account.topUp.historyEmptyTitle') }}</span>
+          <span class="font-semibold text-foreground">{{
+            t('account.topUp.historyEmptyTitle')
+          }}</span>
         </div>
       </template>
 
@@ -117,10 +119,7 @@
             t('account.topUp.retryLoad')
           }}</Button>
         </div>
-        <div
-          v-else-if="hasNextPage"
-          class="flex justify-center border-t border-border px-4 py-3"
-        >
+        <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
           <Button
             variant="outline"
             size="sm"

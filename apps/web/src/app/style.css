@@ -10,23 +10,23 @@
 
 @theme {
   /* ── Primitive Light Elevation Palette Scale (Linear/Vercel standard) ── */
-  --palette-light-0: #fbfbfb;            /* Level 0: Global canvas & workspace base */
-  --palette-light-1: #ffffff;            /* Level 1: Elevated card strong, dialog shell */
-  --palette-light-2: #f5f5f5;            /* Level 2: Surface muted, secondary container */
-  --palette-light-3: #fafafa;            /* Level 3: Inputs, controls, interactive elements */
-  --palette-light-hover: #f0f0f0;        /* Level 3.5: Control hover state */
-  --palette-light-surface-pressed: #e5e5e5;/* Level 3.6: Control pressed state */
-  --palette-light-border: #e5e7eb;       /* Base structural borders & dividers */
-  --palette-light-border-soft: #ececec;  /* Softer structural borders */
+  --palette-light-0: #fbfbfb; /* Level 0: Global canvas & workspace base */
+  --palette-light-1: #ffffff; /* Level 1: Elevated card strong, dialog shell */
+  --palette-light-2: #f5f5f5; /* Level 2: Surface muted, secondary container */
+  --palette-light-3: #fafafa; /* Level 3: Inputs, controls, interactive elements */
+  --palette-light-hover: #f0f0f0; /* Level 3.5: Control hover state */
+  --palette-light-surface-pressed: #e5e5e5; /* Level 3.6: Control pressed state */
+  --palette-light-border: #e5e7eb; /* Base structural borders & dividers */
+  --palette-light-border-soft: #ececec; /* Softer structural borders */
   --palette-light-border-hover: #d4d4d4; /* Interactive border hover state */
-  --palette-light-border-pressed: #bfbfbf;/* Border pressed state */
+  --palette-light-border-pressed: #bfbfbf; /* Border pressed state */
 
   /* ── Primitive Light Typography Scale (WCAG AAA/AA monotonic ramp) ── */
-  --palette-light-title: #171717;        /* High-emphasis titles */
-  --palette-light-text-1: #313131;       /* Primary body text (AAA >= 7.0:1) */
-  --palette-light-text-label: #52525b;   /* Section labels / legends */
-  --palette-light-text-2: #62626a;       /* Secondary / muted text (AA >= 4.5:1) */
-  --palette-light-text-3: #696971;       /* Tertiary / captions / icons */
+  --palette-light-title: #171717; /* High-emphasis titles */
+  --palette-light-text-1: #313131; /* Primary body text (AAA >= 7.0:1) */
+  --palette-light-text-label: #52525b; /* Section labels / legends */
+  --palette-light-text-2: #62626a; /* Secondary / muted text (AA >= 4.5:1) */
+  --palette-light-text-3: #696971; /* Tertiary / captions / icons */
 
   --font-admin:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -42,10 +42,8 @@
   --color-admin-text-1: var(--palette-light-text-1);
   --color-admin-text-2: var(--palette-light-text-2);
   /* `label` is the "group heading / fieldset legend" level: heavier than
-     `text-2` but lighter than `text-1`. Formerly named `text-2-strong`, which
-     read as "stronger than text-2" while actually sitting *between* the two. */
+     `text-2` but lighter than `text-1`. */
   --color-admin-text-label: var(--palette-light-text-label);
-  --color-admin-text-2-strong: var(--color-admin-text-label);
   --color-admin-text-3: var(--palette-light-text-3);
   --color-admin-text-disabled: var(--palette-light-border-hover);
   --color-admin-text-inverse: var(--palette-light-1);
@@ -70,17 +68,6 @@
   --color-admin-nav-active-bg-hover: #19243a;
   --color-admin-preview-bg: var(--color-admin-surface-muted);
   --color-admin-divider: rgba(0, 0, 0, 0.08);
-  --color-admin-success: #288661;
-  --color-admin-success-strong: #176b4a;
-  --color-admin-success-soft: rgba(40, 134, 97, 0.12);
-  --color-admin-warning: #a46925;
-  --color-admin-warning-soft: rgba(164, 105, 37, 0.12);
-  --color-admin-danger: #c94a56;
-  --color-admin-danger-soft: rgba(201, 74, 86, 0.12);
-  --color-admin-danger-hover: #df6370;
-  --color-admin-danger-pressed: #b23a45;
-  --color-admin-info: #4775a8;
-  --color-admin-info-soft: rgba(71, 117, 168, 0.12);
   --color-admin-model-indigo: #4f6f9f;
   --color-admin-model-purple: var(--color-ib-creative-accent);
   --color-admin-model-cyan: #3d8b9a;
@@ -158,7 +145,7 @@
   --color-ib-overlay-border: #d8ddea;
   --color-ib-overlay-item: #4b5565;
   --color-ib-overlay-item-hover-bg: var(--color-ib-creative-accent-ring);
-  --color-ib-overlay-danger: var(--color-ib-danger);
+  --color-ib-overlay-danger: var(--color-destructive);
   --color-ib-overlay-danger-hover-bg: color-mix(
     in srgb,
     var(--color-ib-overlay-danger) 10%,
@@ -215,8 +202,8 @@
   --color-board-create-icon: #cfd7ea;
   --color-board-create-title: var(--color-board-card-title);
   --color-board-loading-bg: rgba(220, 227, 238, 0.45);
-  --color-board-danger: var(--color-ib-danger);
-  --color-board-danger-hover: var(--color-ib-danger-pressed);
+  --color-board-danger: var(--color-destructive);
+  --color-board-danger-hover: var(--color-destructive-hover);
   --color-board-dialog-title: var(--color-board-control-input-text);
   --color-board-dialog-description: var(--color-board-page-text-muted);
   --radius-board-dialog: 20px;
@@ -257,12 +244,6 @@
   --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);
   --color-ib-focus-ring: var(--color-admin-focus-ring);
   --color-ib-focus-accent: var(--color-ib-creative-accent);
-  --color-ib-success: var(--color-admin-success);
-  --color-ib-warning: var(--color-admin-warning);
-  --color-ib-danger: var(--color-admin-danger);
-  --color-ib-danger-hover: var(--color-admin-danger-hover);
-  --color-ib-danger-pressed: var(--color-admin-danger-pressed);
-  --color-ib-info: var(--color-admin-info);
   --color-ib-dialog-mask: color-mix(in srgb, var(--color-ib-text) 38%, transparent);
   /*
    * Auth modal aliases.
@@ -288,19 +269,19 @@
   --color-ib-auth-input-icon: var(--color-ib-text-subtle);
   --color-ib-auth-focus: var(--color-ib-creative-accent);
   --color-ib-auth-focus-ring: color-mix(in srgb, var(--color-ib-creative-accent) 10%, transparent);
-  --color-ib-auth-error: var(--color-ib-danger);
+  --color-ib-auth-error: var(--color-destructive);
   --color-ib-auth-error-border: color-mix(
     in srgb,
-    var(--color-ib-danger) 38%,
+    var(--color-destructive) 38%,
     var(--color-ib-surface)
   );
-  --color-ib-auth-error-bg: color-mix(in srgb, var(--color-ib-danger) 8%, transparent);
+  --color-ib-auth-error-bg: color-mix(in srgb, var(--color-destructive) 8%, transparent);
   --color-ib-auth-error-placeholder: color-mix(
     in srgb,
-    var(--color-ib-danger) 75%,
+    var(--color-destructive) 75%,
     var(--color-ib-text-subtle)
   );
-  --color-ib-auth-error-ring: color-mix(in srgb, var(--color-ib-danger) 10%, transparent);
+  --color-ib-auth-error-ring: color-mix(in srgb, var(--color-destructive) 10%, transparent);
   --color-ib-auth-primary-from: var(--color-ib-creative-accent);
   --color-ib-auth-primary-to: var(--color-ib-creative-accent-hover);
   --color-ib-auth-primary-text: var(--color-ib-text-inverse);
@@ -343,8 +324,21 @@
   --color-muted-foreground: var(--color-ib-text-muted);
   --color-accent: var(--color-ib-surface-hover);
   --color-accent-foreground: var(--color-ib-text);
-  --color-destructive: var(--color-ib-danger);
+  --color-destructive: var(--primitive-red-500);
+  --color-destructive-hover: var(--primitive-red-600);
   --color-destructive-foreground: var(--color-ib-text-inverse);
+  --color-success: #16a34a;
+  --color-success-hover: #15803d;
+  --color-success-foreground: var(--palette-light-1);
+  --color-success-soft: rgb(22 163 74 / 15%);
+  --color-warning: #d97706;
+  --color-warning-hover: #b45309;
+  --color-warning-foreground: var(--palette-light-1);
+  --color-warning-soft: rgb(217 119 6 / 15%);
+  --color-info: #0284c7;
+  --color-info-hover: #0369a1;
+  --color-info-foreground: var(--palette-light-1);
+  --color-info-soft: rgb(2 132 199 / 15%);
   --color-border: var(--color-ib-border-soft);
   --color-input: var(--color-ib-border);
   --color-ring: var(--color-ib-focus-ring);
@@ -491,10 +485,10 @@
   --ideaboard-toast-highlight: var(--color-ib-toast-highlight);
   --ideaboard-toast-button: var(--color-ib-toast-button);
   --ideaboard-toast-accent: var(--color-ib-accent);
-  --ideaboard-toast-success: var(--color-admin-success);
-  --ideaboard-toast-warning: var(--color-admin-warning);
-  --ideaboard-toast-error: var(--color-admin-danger);
-  --ideaboard-toast-info: var(--color-admin-info);
+  --ideaboard-toast-success: var(--color-success);
+  --ideaboard-toast-warning: var(--color-warning);
+  --ideaboard-toast-error: var(--color-destructive);
+  --ideaboard-toast-info: var(--color-info);
   width: min(300px, calc(100vw - 28px));
 }
 

@@ -14,8 +14,7 @@
         adminInputChromeClass,
         'h-9 px-3 py-1.5 text-admin-body',
         size === 'small' && 'h-8 px-2.5 text-admin-meta',
-        invalid &&
-          '!border-admin-danger focus-visible:ring-admin-danger/20',
+        invalid && '!border-destructive focus-visible:ring-destructive/20',
         props.class,
       )
     "

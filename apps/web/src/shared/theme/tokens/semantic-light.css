@@ -38,6 +38,19 @@
     --color-destructive-hover: var(--primitive-red-600);
     --color-destructive-foreground: #ffffff;
 
+    --color-success: #16a34a;
+    --color-success-hover: #15803d;
+    --color-success-foreground: #ffffff;
+    --color-success-soft: rgb(22 163 74 / 15%);
+    --color-warning: #d97706;
+    --color-warning-hover: #b45309;
+    --color-warning-foreground: #ffffff;
+    --color-warning-soft: rgb(217 119 6 / 15%);
+    --color-info: #0284c7;
+    --color-info-hover: #0369a1;
+    --color-info-foreground: #ffffff;
+    --color-info-soft: rgb(2 132 199 / 15%);
+
     /* ── Structural Borders & Interactive Focus ── */
     --color-border: #e4e4e7;
     --color-border-hover: #d4d4d8;

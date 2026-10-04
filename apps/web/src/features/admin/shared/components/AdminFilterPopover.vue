@@ -3,11 +3,7 @@
     <PopoverTrigger as-child>
       <button
         type="button"
-        :class="[
-          adminFramedIconButtonClass,
-          active ? '!border-foreground' : '',
-          'cursor-pointer',
-        ]"
+        :class="[adminFramedIconButtonClass, active ? '!border-foreground' : '', 'cursor-pointer']"
         :aria-label="filterLabel"
         :aria-pressed="active"
       >

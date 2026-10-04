@@ -9,9 +9,7 @@
   >
     <div class="flex flex-col gap-4">
       <!-- 顶部操作栏：供应商过滤 + 关键词搜索 + 重新探测 -->
-      <div
-        class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5"
-      >
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5">
         <div class="flex flex-1 flex-wrap items-center gap-2.5">
           <!-- 供应商筛选 -->
           <div class="w-40 sm:w-44">
@@ -59,7 +57,10 @@
       </AdminAlert>
 
       <!-- 探测加载中：单行文案，避免与副标题重复造成“两个状态”观感 -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-16 text-muted-foreground">
+      <div
+        v-if="loading"
+        class="flex flex-col items-center justify-center py-16 text-muted-foreground"
+      >
         <Refresh class="size-6 animate-spin text-primary mb-2.5" />
         <p class="text-xs font-medium text-muted-foreground">{{ MODELS_MESSAGES.addDetecting }}</p>
       </div>
@@ -113,9 +114,7 @@
                 class="transition-colors hover:bg-muted/40 cursor-pointer"
                 :class="{
                   'bg-primary/[0.03]': selectedModelIds.has(model.id),
-                  'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(
-                    model.id,
-                  ),
+                  'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(model.id),
                 }"
                 @click="toggleRowSelection(model.id)"
               >

@@ -166,41 +166,15 @@
   </Transition>
 
   <!-- 用户 Folder 的右键操作菜单 -->
-  <div
-    v-if="contextMenu"
-    ref="folderMenuRef"
-    :class="[
-      appOverlayMenuSurfaceClass,
-      'fixed z-[80] min-w-40 rounded-xl p-1.5 backdrop-blur-md',
-    ]"
-    :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
-    role="menu"
-    tabindex="-1"
-    :aria-label="contextMenu.folder.name"
-    @click.stop
-    @keydown="handleFolderMenuKeydown"
-  >
-    <button
-      type="button"
-      :class="[appOverlayMenuItemClass, '!h-8 !py-0 !text-xs cursor-pointer']"
-      role="menuitem"
-      @click="openRenameFolder(contextMenu.folder)"
-    >
-      <span>{{ t('library.actions.rename') }}</span>
-    </button>
-    <button
-      type="button"
-      :class="[
-        appOverlayMenuItemClass,
-        appOverlayMenuDangerItemClass,
-        '!h-8 !py-0 !text-xs cursor-pointer',
-      ]"
-      role="menuitem"
-      @click="deleteFolder(contextMenu.folder)"
-    >
-      <span>{{ t('library.actions.delete') }}</span>
-    </button>
-  </div>
+  <LibraryFolderContextMenu
+    :context-menu="contextMenu"
+    :surface-class="appOverlayMenuSurfaceClass"
+    :item-class="appOverlayMenuItemClass"
+    :danger-item-class="appOverlayMenuDangerItemClass"
+    @rename="openRenameFolder"
+    @delete="deleteFolder"
+    @escape="closeFolderMenu(true)"
+  />
 
   <!-- 新建与重命名文件夹弹窗 -->
   <LibraryFolderDialogs
@@ -232,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Bookmark,
@@ -260,6 +234,7 @@ import { deleteFolderConfirmation, removeAssetConfirmation } from './confirmatio
 import LibraryAssetGallery from './LibraryAssetGallery.vue'
 import LibraryAssetLightbox from './LibraryAssetLightbox.vue'
 import LibraryFolderDialogs from './LibraryFolderDialogs.vue'
+import LibraryFolderContextMenu from './LibraryFolderContextMenu.vue'
 import { useLibraryIslandDnD } from './useLibraryIslandDnD'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
@@ -317,7 +292,6 @@ const initialized = ref(false)
 const isHeaderCollapsed = ref(false)
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const galleryRef = ref<InstanceType<typeof LibraryAssetGallery> | null>(null)
-const folderMenuRef = ref<HTMLElement | null>(null)
 const contextMenu = ref<{
   folder: LibraryFolderTab
   x: number
@@ -372,7 +346,6 @@ function openFolderMenu(event: MouseEvent, folder: LibraryFolderTab) {
     y: Math.min(Math.max(event.clientY, edge), maxY),
     trigger,
   }
-  void nextTick(() => folderMenuRef.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus())
 }
 
 function openRenameFolder(folder: LibraryFolderTab) {
@@ -427,7 +400,7 @@ async function requestRemove(asset: LibraryAssetView) {
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (folderMenuRef.value?.contains(event.target as Node)) return
+  if ((event.target as HTMLElement | null)?.closest('[data-library-folder-menu]')) return
   closeFolderMenu(false)
 }
 
@@ -438,22 +411,6 @@ function handleDocumentKeydown(event: KeyboardEvent) {
     event.stopPropagation()
     closeFolderMenu(true)
   }
-}
-
-function handleFolderMenuKeydown(event: KeyboardEvent) {
-  const items = Array.from(
-    folderMenuRef.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
-  )
-  if (!items.length) return
-  const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLElement))
-  let nextIndex: number | null = null
-  if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
-  if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = items.length - 1
-  if (nextIndex === null) return
-  event.preventDefault()
-  items[nextIndex]?.focus()
 }
 
 function handleWindowResize() {

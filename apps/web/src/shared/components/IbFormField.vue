@@ -42,10 +42,10 @@ export type IbFormFieldSlotProps = FormFieldContractSlotProps & {
 const props = withDefaults(
   defineProps<
     FormFieldContractProps & {
-    required?: boolean
-    showMessage?: boolean
-    fieldClass?: string
-    labelClass?: string
+      required?: boolean
+      showMessage?: boolean
+      fieldClass?: string
+      labelClass?: string
     }
   >(),
   {

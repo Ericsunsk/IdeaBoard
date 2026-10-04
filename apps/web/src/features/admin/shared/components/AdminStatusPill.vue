@@ -49,13 +49,13 @@ const sizeClasses = computed(() => {
 const pillClasses = computed(() => {
   switch (props.variant) {
     case 'success':
-      return 'bg-emerald-500/15 text-admin-success border-emerald-500/20 shadow-xs'
+      return 'bg-success-soft text-success border-success/20 shadow-xs'
     case 'danger':
       return 'bg-destructive/15 text-destructive border-destructive/20 shadow-xs'
     case 'warning':
-      return 'bg-amber-500/15 text-admin-warning border-amber-500/20 shadow-xs'
+      return 'bg-warning-soft text-warning border-warning/20 shadow-xs'
     case 'info':
-      return 'bg-sky-500/15 text-admin-info border-sky-500/20 shadow-xs'
+      return 'bg-info-soft text-info border-info/20 shadow-xs'
     case 'neutral':
     default:
       return 'bg-muted text-muted-foreground border-border'
@@ -65,13 +65,13 @@ const pillClasses = computed(() => {
 const dotColorClass = computed(() => {
   switch (props.variant) {
     case 'success':
-      return 'bg-emerald-500'
+      return 'bg-success'
     case 'danger':
       return 'bg-destructive'
     case 'warning':
-      return 'bg-amber-500'
+      return 'bg-warning'
     case 'info':
-      return 'bg-sky-500'
+      return 'bg-info'
     case 'neutral':
     default:
       return 'bg-muted-foreground'

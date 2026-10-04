@@ -11,11 +11,7 @@ import {
   normalizeTransactionChanges,
 } from './canvasGraphPatchAlgebra'
 import { createSummary } from './canvasGraphHistoryProjection'
-import {
-  stageAddNode,
-  stageSelectNode,
-  stageUpdateNode,
-} from './canvasGraphMutation'
+import { stageAddNode, stageSelectNode, stageUpdateNode } from './canvasGraphMutation'
 import { createStateFromSnapshot } from './canvasGraphStoreState'
 import { toCanvasGraphNodeId } from './canvasGraphStoreIds'
 import type {
@@ -178,7 +174,13 @@ describe('canvasGraphHistoryProjection', () => {
     expect(materialized.shouldRecordHistory).toBe(false)
     expect(materialized.shouldMarkDirty).toBe(true)
 
-    const silent = createSummary('node-update', { recordHistory: false, markDirty: false }, base, changes, draft)
+    const silent = createSummary(
+      'node-update',
+      { recordHistory: false, markDirty: false },
+      base,
+      changes,
+      draft,
+    )
     expect(silent.shouldRecordHistory).toBe(false)
     expect(silent.shouldMarkDirty).toBe(false)
     expect(silent.changedNodeIds).toEqual([added])

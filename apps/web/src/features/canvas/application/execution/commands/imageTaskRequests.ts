@@ -260,7 +260,9 @@ export function buildDirectActionTaskRequest(input: {
   })
 }
 
-export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): CanvasTaskRequestData {
+export function buildImageInpaintTaskRequest(
+  input: ImageInpaintTaskRequestInput,
+): CanvasTaskRequestData {
   const originalOpaqueId = opaqueAssetId({ assetId: input.originalImageMediaAssetId })
   const maskAssetId = `${input.maskAssetId ?? ''}`.trim()
   return buildExecutionTaskRequest({

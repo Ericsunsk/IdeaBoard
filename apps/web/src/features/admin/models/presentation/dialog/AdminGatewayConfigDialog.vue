@@ -43,15 +43,12 @@
       <!-- API 密钥 -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label
-            class="text-admin-caption font-semibold text-foreground"
-            for="gateway-token-input"
-          >
+          <label class="text-admin-caption font-semibold text-foreground" for="gateway-token-input">
             {{ MODELS_MESSAGES.gatewayTokenLabel }}
           </label>
           <span
             v-if="isTokenConfigured"
-            class="inline-flex items-center gap-1 text-admin-caption text-admin-success font-medium"
+            class="inline-flex items-center gap-1 text-admin-caption text-success font-medium"
           >
             <ShieldCheck class="size-3.5" />
             {{ MODELS_MESSAGES.gatewayTokenConfigured }}

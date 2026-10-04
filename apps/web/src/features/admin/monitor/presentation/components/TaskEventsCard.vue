@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card"
-  >
+  <div class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card">
     <!-- 表头：带外层边框，底色同页面背景 (bg-transparent) -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <!-- 标题 Events + ℹ 提示图标 -->

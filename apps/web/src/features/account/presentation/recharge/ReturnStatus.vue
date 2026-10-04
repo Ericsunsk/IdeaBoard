@@ -8,7 +8,7 @@
     aria-live="polite"
   >
     <template v-if="status?.status === 'credited'">
-      <p class="m-0 font-semibold text-ib-success">
+      <p class="m-0 font-semibold text-success">
         {{
           t('account.returnStatus.creditedTitle', {
             amount: formatIdeaAmount(status.idea_quantity),
@@ -26,7 +26,9 @@
       </p>
     </template>
     <template v-else-if="pending">
-      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.confirmingTitle') }}</p>
+      <p class="m-0 font-semibold text-foreground">
+        {{ t('account.returnStatus.confirmingTitle') }}
+      </p>
       <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.confirmingDetail') }}
       </p>
@@ -52,7 +54,9 @@
       </p>
     </template>
     <template v-else>
-      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.confirmingTitle') }}</p>
+      <p class="m-0 font-semibold text-foreground">
+        {{ t('account.returnStatus.confirmingTitle') }}
+      </p>
       <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.confirmingDetail') }}
       </p>

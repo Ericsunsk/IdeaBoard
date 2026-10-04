@@ -34,7 +34,9 @@
             <div class="font-mono text-admin-content font-bold text-foreground">
               {{ detail.publicOrderNumber }}
             </div>
-            <div class="mt-1 text-admin-meta text-muted-foreground">{{ detail.user.displayName }}</div>
+            <div class="mt-1 text-admin-meta text-muted-foreground">
+              {{ detail.user.displayName }}
+            </div>
           </div>
           <AdminBadge :severity="getPaymentOrderStatusPresentation(detail.status).severity">
             {{ getPaymentOrderStatusPresentation(detail.status).label }}
@@ -110,9 +112,7 @@
         </div>
 
         <div aria-labelledby="payment-disputes">
-          <h3 id="payment-disputes" class="text-admin-body font-bold text-foreground">
-            Dispute
-          </h3>
+          <h3 id="payment-disputes" class="text-admin-body font-bold text-foreground">Dispute</h3>
           <p v-if="detail.disputes.length === 0" class="mt-2 text-admin-meta text-muted-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.disputesEmpty }}
           </p>

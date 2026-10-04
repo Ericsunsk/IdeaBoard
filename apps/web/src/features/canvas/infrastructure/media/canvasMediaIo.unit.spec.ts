@@ -63,21 +63,33 @@ describe('canvas upload URL stability', () => {
   })
 
   it('treats board-owned task uploads as stable without re-upload', () => {
-    expect(isStableBoardUploadUrl('/uploads/tasks/user-uid/board-a/content/a.png', 'user-uid', 'board-a')).toBe(
-      true,
-    )
-    expect(isStableBoardUploadUrl('  ', 'user-uid', 'board-a')).toBe(true)
-    expect(isStableBoardUploadUrl('https://provider.example/image.png', 'user-uid', 'board-a')).toBe(
-      false,
-    )
     expect(
-      isStableBoardUploadUrl('/uploads/tasks/other-user/board-a/content/a.png', 'user-uid', 'board-a'),
+      isStableBoardUploadUrl(
+        '/uploads/tasks/user-uid/board-a/content/a.png',
+        'user-uid',
+        'board-a',
+      ),
+    ).toBe(true)
+    expect(isStableBoardUploadUrl('  ', 'user-uid', 'board-a')).toBe(true)
+    expect(
+      isStableBoardUploadUrl('https://provider.example/image.png', 'user-uid', 'board-a'),
+    ).toBe(false)
+    expect(
+      isStableBoardUploadUrl(
+        '/uploads/tasks/other-user/board-a/content/a.png',
+        'user-uid',
+        'board-a',
+      ),
     ).toBe(false)
   })
 
   it('matches encoded user and board segments in stable paths', () => {
     expect(
-      isStableBoardUploadUrl('/uploads/tasks/user%20uid/board%20a/content/a.png', 'user uid', 'board a'),
+      isStableBoardUploadUrl(
+        '/uploads/tasks/user%20uid/board%20a/content/a.png',
+        'user uid',
+        'board a',
+      ),
     ).toBe(true)
   })
 })
@@ -102,7 +114,10 @@ describe('shared image blob fetch', () => {
   })
 
   it('throws a status-carrying error for non-ok responses', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 404 })),
+    )
 
     const error = await fetchImageBlobFromUrl('https://cdn.example.com/a.png').catch(
       (reason: unknown) => reason,

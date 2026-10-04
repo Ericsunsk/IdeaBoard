@@ -2,7 +2,9 @@
   <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
     <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
       <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.specsTitle }}</h4>
-      <span class="text-admin-caption text-muted-foreground">{{ MODELS_MESSAGES.specsSubtitle }}</span>
+      <span class="text-admin-caption text-muted-foreground">{{
+        MODELS_MESSAGES.specsSubtitle
+      }}</span>
     </div>
 
     <div class="flex flex-col gap-3.5">
@@ -40,9 +42,7 @@
           <label class="text-admin-caption font-semibold text-foreground">{{
             MODELS_MESSAGES.specsHostingLabel
           }}</label>
-          <div
-            class="flex h-9 items-center rounded-lg border border-border bg-muted/40 p-1"
-          >
+          <div class="flex h-9 items-center rounded-lg border border-border bg-muted/40 p-1">
             <button
               type="button"
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"

@@ -11,14 +11,12 @@
             {{ t('admin.wallet.accountBalance') }}
           </span>
           <div class="flex items-baseline gap-2">
-            <span
-              class="text-2xl font-black tracking-tight text-foreground font-mono tabular-nums"
-            >
+            <span class="text-2xl font-black tracking-tight text-foreground font-mono tabular-nums">
               {{ formatIdeaAmount(availableCredits) }}
             </span>
             <span
               v-if="reservedCredits && reservedCredits > 0"
-              class="rounded-md bg-amber-500/15 px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-admin-warning"
+              class="rounded-md bg-warning-soft px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-warning"
             >
               {{ t('admin.wallet.reservedAmount', { amount: formatIdeaAmount(reservedCredits) }) }}
             </span>
@@ -69,13 +67,11 @@
     <!-- 限制与冻结状态提示条 -->
     <div
       v-if="activeRestrictions.length"
-      class="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 p-3 text-xs"
+      class="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft p-3 text-xs"
     >
-      <WarningTriangle class="size-4 shrink-0 text-admin-warning mt-0.5" />
+      <WarningTriangle class="size-4 shrink-0 text-warning mt-0.5" />
       <div class="flex flex-col gap-1">
-        <span class="font-bold text-admin-warning">{{
-          t('admin.wallet.activeRestrictionsNotice')
-        }}</span>
+        <span class="font-bold text-warning">{{ t('admin.wallet.activeRestrictionsNotice') }}</span>
         <ul class="space-y-0.5 pl-4 text-muted-foreground list-disc">
           <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
             <span class="font-semibold text-foreground"

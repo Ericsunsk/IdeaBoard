@@ -16,8 +16,7 @@
 export const adminSelectTriggerClass =
   'h-9 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-3 text-admin-body text-foreground transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50'
 
-export const adminSelectTriggerCompactClass =
-  'h-8 px-2.5 text-admin-meta'
+export const adminSelectTriggerCompactClass = 'h-8 px-2.5 text-admin-meta'
 
 /** Active/filtered state for a dropdown trigger, used by filter-style selects. */
 export const adminSelectTriggerActiveClass = 'border-primary bg-primary/5 text-primary'
@@ -31,8 +30,7 @@ export const adminSelectContentClass =
 /** Every dropdown overlay detaches from its trigger by the same distance. */
 export const ADMIN_SELECT_SIDE_OFFSET = 4
 
-export const adminSelectViewportClass =
-  'w-full min-w-[var(--reka-select-trigger-width)] p-1.5'
+export const adminSelectViewportClass = 'w-full min-w-[var(--reka-select-trigger-width)] p-1.5'
 
 export const adminSelectItemClass =
   'relative flex w-full cursor-pointer select-none items-center rounded-lg py-1.5 pr-8 pl-2 text-admin-body text-foreground outline-none transition-colors focus:bg-muted focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50'

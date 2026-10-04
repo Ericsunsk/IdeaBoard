@@ -73,6 +73,7 @@ import {
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
 import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
+import { useAdminStickyTitle } from './useAdminStickyTitle'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -81,8 +82,7 @@ const drawerOpen = ref(false)
 const sidebarRef = ref<InstanceType<typeof AdminSidebar> | null>(null)
 const headerBarRef = ref<InstanceType<typeof AdminHeaderBar> | null>(null)
 
-const showStickyTitle = ref(false)
-const dynamicTitle = ref('')
+const { showStickyTitle, dynamicTitle, reset: resetStickyTitle } = useAdminStickyTitle()
 
 // 积分运营与系统设置等二级导航聚合页常驻顶栏标题（不随滚动显隐，其它页保持滚动行为）。
 const pinStickyTitle = computed(
@@ -118,42 +118,16 @@ function scrollToTop() {
   }
 }
 
-function updateStickyTitle() {
-  if (typeof window === 'undefined') return
-  if (window.scrollY <= 10) {
-    showStickyTitle.value = false
-    return
-  }
-  showStickyTitle.value = true
-  if (typeof document === 'undefined') return
-  const heading = document.querySelector('main h1')
-  const text = heading?.textContent?.replace(/\s+/g, ' ').trim()
-  dynamicTitle.value = text || ''
-}
-
 function handleKeyDown(event: KeyboardEvent) {
   if (event.key === 'Escape' && drawerOpen.value) {
     drawerOpen.value = false
   }
 }
 
-let scrollTicking = false
-function handleScroll() {
-  if (scrollTicking) return
-  scrollTicking = true
-  requestAnimationFrame(() => {
-    updateStickyTitle()
-    scrollTicking = false
-  })
-}
-
 onMounted(() => {
   if (typeof window !== 'undefined') {
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('resize', handleScroll, { passive: true })
     window.addEventListener('keydown', handleKeyDown)
   }
-  updateStickyTitle()
   if (!userStore.email && import.meta.env.MODE !== 'test') {
     void authTransport
       .getSessionUser()
@@ -168,8 +142,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
-    window.removeEventListener('scroll', handleScroll)
-    window.removeEventListener('resize', handleScroll)
     window.removeEventListener('keydown', handleKeyDown)
   }
 })
@@ -180,8 +152,7 @@ watch(
     sidebarRef.value?.resetHoverState?.()
     headerBarRef.value?.closeUserMenu?.()
     drawerOpen.value = false
-    showStickyTitle.value = false
-    dynamicTitle.value = ''
+    resetStickyTitle()
   },
 )
 </script>

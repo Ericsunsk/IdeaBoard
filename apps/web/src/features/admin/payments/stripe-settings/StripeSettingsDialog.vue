@@ -16,13 +16,17 @@
       class="grid grid-cols-1 gap-2 rounded-xl border border-border bg-muted p-3 sm:grid-cols-2"
     >
       <div class="min-w-0">
-        <div class="text-admin-caption text-muted-foreground">{{ PAYMENTS_MESSAGES.accountLabel }}</div>
+        <div class="text-admin-caption text-muted-foreground">
+          {{ PAYMENTS_MESSAGES.accountLabel }}
+        </div>
         <div class="truncate text-admin-body font-semibold text-foreground">
           {{ summary.accountId || PAYMENTS_MESSAGES.accountUnset }}
         </div>
       </div>
       <div class="min-w-0">
-        <div class="text-admin-caption text-muted-foreground">{{ PAYMENTS_MESSAGES.modeLabel }}</div>
+        <div class="text-admin-caption text-muted-foreground">
+          {{ PAYMENTS_MESSAGES.modeLabel }}
+        </div>
         <div class="text-admin-body font-semibold text-foreground">
           {{ modeLabel }}
         </div>
@@ -30,14 +34,14 @@
       <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
         <span
           class="size-1.5 rounded-full"
-          :class="summary.productReady ? 'bg-emerald-500' : 'bg-amber-500'"
+          :class="summary.productReady ? 'bg-success' : 'bg-warning'"
         />
         {{ PAYMENTS_MESSAGES.productReadyState(summary.productReady) }}
       </div>
       <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
         <span
           class="size-1.5 rounded-full"
-          :class="summary.webhookReady ? 'bg-emerald-500' : 'bg-amber-500'"
+          :class="summary.webhookReady ? 'bg-success' : 'bg-warning'"
         />
         {{ PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady) }}
       </div>
@@ -59,7 +63,7 @@
           maxlength="255"
           aria-label="Payment Method Configuration ID"
           :disabled="isBusy"
-          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('paymentMethodConfigurationId')"
         />
@@ -82,7 +86,7 @@
           aria-label="Stripe API Key"
           :placeholder="apiKeyPlaceholder"
           :disabled="isBusy"
-          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('apiKey')"
         />
@@ -102,7 +106,7 @@
           :placeholder="PAYMENTS_MESSAGES.taxCodePlaceholder"
           aria-label="Product Tax Code"
           :disabled="isBusy"
-          :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+          :class="invalid ? '!border-destructive focus-visible:ring-destructive/20' : undefined"
           :aria-describedby="describedbyId"
           @update:model-value="clearError('productTaxCode')"
         />

@@ -118,7 +118,9 @@ export async function fetchImageBlobFromUrl(
   try {
     response = await fetch(
       fetchUrl,
-      options?.signal ? { credentials: 'include', signal: options.signal } : { credentials: 'include' },
+      options?.signal
+        ? { credentials: 'include', signal: options.signal }
+        : { credentials: 'include' },
     )
   } catch (error) {
     throw new ImageBlobFetchError(null, { cause: error })

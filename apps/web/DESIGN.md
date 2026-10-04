@@ -68,8 +68,6 @@ Deliberately kept, not omissions:
   `RegisterAuthPanel.vue`), canvas chrome identity (`canvas-chrome.css`,
   pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
   (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
-- Form invalid borders (`!border-admin-danger`), pinned by
-  `formControls.contract.spec.ts` (see Form Inputs below).
 - Private resolution infrastructure: `--color-*` declarations in
   `src/app/style.css` / `src/shared/theme/tokens/dark.css` and the
   `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
@@ -104,15 +102,15 @@ Every surface names its text ramp by **role**, never by ordinal. Ordinal names
 invite the mistake of reading a higher number as "more important". Role names
 stay meaningful as the ramp grows.
 
-| Role            | Use for                                              | Minimum ratio |
-| --------------- | ---------------------------------------------------- | ------------- |
-| `text-primary`  | Headings, body copy, the main reading color           | 7:1 (AAA)     |
-| `text-secondary`| Labels, supporting copy, field values                 | 4.5:1 (AA)    |
-| `text-label`    | Group headings / fieldset legends (Admin only)        | 4.5:1 (AA)    |
-| `text-tertiary` | Captions, metadata, hints                             | 4.5:1 (AA)    |
-| `text-muted`    | Decorative or placeholder text only                   | 4.5:1 (AA)    |
-| `text-disabled` | Inactive controls (WCAG exempt, no floor)             | none          |
-| `text-inverse`  | Text on saturated/dark fills                          | 4.5:1 (AA)    |
+| Role             | Use for                                        | Minimum ratio |
+| ---------------- | ---------------------------------------------- | ------------- |
+| `text-primary`   | Headings, body copy, the main reading color    | 7:1 (AAA)     |
+| `text-secondary` | Labels, supporting copy, field values          | 4.5:1 (AA)    |
+| `text-label`     | Group headings / fieldset legends (Admin only) | 4.5:1 (AA)    |
+| `text-tertiary`  | Captions, metadata, hints                      | 4.5:1 (AA)    |
+| `text-muted`     | Decorative or placeholder text only            | 4.5:1 (AA)    |
+| `text-disabled`  | Inactive controls (WCAG exempt, no floor)      | none          |
+| `text-inverse`   | Text on saturated/dark fills                   | 4.5:1 (AA)    |
 
 Rules:
 
@@ -137,11 +135,11 @@ web test lane.
 
 Current ramps, measured on each ramp's binding surface:
 
-| Ramp    | primary | secondary | label  | tertiary | muted  | Binding surface              |
-| ------- | ------- | --------- | ------ | -------- | ------ | ---------------------------- |
-| Admin   | 13.0:1  | 5.6:1     | 6.8:1  | 4.8:1    | —      | `--color-admin-surface-hover` |
-| Canvas  | 11.7:1  | 5.4:1     | —      | —        | 4.7:1  | `--color-canvas-workspace-bg` |
-| Boards  | 14.8:1  | 5.4:1     | —      | —        | 4.9:1  | `--color-board-page`          |
+| Ramp   | primary | secondary | label | tertiary | muted | Binding surface               |
+| ------ | ------- | --------- | ----- | -------- | ----- | ----------------------------- |
+| Admin  | 13.0:1  | 5.6:1     | 6.8:1 | 4.8:1    | —     | `--color-admin-surface-hover` |
+| Canvas | 11.7:1  | 5.4:1     | —     | —        | 4.7:1 | `--color-canvas-workspace-bg` |
+| Boards | 14.8:1  | 5.4:1     | —     | —        | 4.9:1 | `--color-board-page`          |
 
 `--color-canvas-text-control` and `--color-canvas-text-option` alias the Canvas
 ramp rather than declaring standalone greys; Canvas previously carried five greys
@@ -196,10 +194,10 @@ token. `npm run lint:admin-dropdown` fails the build if it does.
 
 Surfaces own their skin and adapt on top:
 
-| Surface | Adapter | Skin source |
-| --- | --- | --- |
-| Admin | `AdminSelect.vue` | `admin/shared/lib/adminSelectSkin.ts` |
-| User shell | call `Select` directly | caller's class props |
+| Surface    | Adapter                | Skin source                           |
+| ---------- | ---------------------- | ------------------------------------- |
+| Admin      | `AdminSelect.vue`      | `admin/shared/lib/adminSelectSkin.ts` |
+| User shell | call `Select` directly | caller's class props                  |
 
 **Command menu vs value picker.** An icon trigger that immediately runs an action
 (`UserLocaleSelect`) is a command menu and belongs on `DropdownMenu`. A control that
@@ -229,14 +227,14 @@ stricter 32px floor, declared once as `--spacing-ib-touch-target-min` in
 `src/app/style.css` and enforced by `npm run lint:touch-target`
 (`scripts/checkTouchTargetContract.ts`).
 
-Controls that are visually small by design do not inflate to 32px. Instead the *hit
-area* grows past the visual box through `src/shared/theme/atoms/touch-target.css`:
+Controls that are visually small by design do not inflate to 32px. Instead the _hit
+area_ grows past the visual box through `src/shared/theme/atoms/touch-target.css`:
 
-| Class | Grows to | Use for |
-| --- | --- | --- |
-| `.ib-hit-target-32` | 32px both axes | switch tracks, canvas zoom buttons, compact toolbar buttons |
+| Class                      | Grows to           | Use for                                                                        |
+| -------------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `.ib-hit-target-32`        | 32px both axes     | switch tracks, canvas zoom buttons, compact toolbar buttons                    |
 | `.ib-hit-target-32-inline` | 32px vertical only | chip rails, chart range segments, node action buttons — rows keep their rhythm |
-| `.ib-hit-target-drag` | 24px (AA floor) | drag handles only — see below |
+| `.ib-hit-target-drag`      | 24px (AA floor)    | drag handles only — see below                                                  |
 
 The pseudo-element belongs to the control itself, so pointer and keyboard
 activation still route to the real element and the accessible name, role, and
@@ -272,12 +270,12 @@ contract and differ only in tokens and density. The structure is identical on
 both sides: a neutral primitive, a surface skin, a field shell with persistent
 error text, and an invalid state that survives hover and focus.
 
-| Layer | User | Admin |
-| --- | --- | --- |
-| Primitive | `@/components/ui/input` (`Input`, `PasswordInput`) | same primitive |
-| Skin | `ibFormInputClass` (h-10) + `ibFormInputErrorClass` | `adminInputChromeClass` + `!border-admin-danger` |
-| Field shell | `IbFormField` | `AdminFormField` |
-| Error text | persistent `<p role="alert">` below | persistent `<p>` below |
+| Layer       | User                                                | Admin                                           |
+| ----------- | --------------------------------------------------- | ----------------------------------------------- |
+| Primitive   | `@/components/ui/input` (`Input`, `PasswordInput`)  | same primitive                                  |
+| Skin        | `ibFormInputClass` (h-10) + `ibFormInputErrorClass` | `adminInputChromeClass` + `!border-destructive` |
+| Field shell | `IbFormField`                                       | `AdminFormField`                                |
+| Error text  | persistent `<p role="alert">` below                 | persistent `<p>` below                          |
 
 Three rules keep the two sides from diverging again (`formControls.contract.spec.ts`
 enforces them):

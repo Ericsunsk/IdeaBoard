@@ -27,7 +27,9 @@
         :filter-label="REWARD_CODES_MESSAGES.filterLabel"
         @reset="resetStatusFilter"
       >
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
+        <label
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+        >
           <span>{{ REWARD_CODES_MESSAGES.activeStateLabel }}</span>
           <AdminSelect v-model="statusFilter" :options="statusOptions" size="small" />
         </label>

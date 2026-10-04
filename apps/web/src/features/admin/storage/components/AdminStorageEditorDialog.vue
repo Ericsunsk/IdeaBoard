@@ -121,13 +121,13 @@
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
               :class="
                 form.enabled
-                  ? 'bg-emerald-500/15 text-admin-success'
+                  ? 'bg-success-soft text-success'
                   : 'bg-muted text-muted-foreground border border-border'
               "
             >
               <span
                 class="size-1.5 rounded-full"
-                :class="form.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'"
+                :class="form.enabled ? 'bg-success animate-pulse' : 'bg-muted-foreground'"
               />
               {{ STORAGE_MESSAGES.editorEnableState(form.enabled) }}
             </span>

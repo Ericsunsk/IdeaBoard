@@ -1,7 +1,4 @@
-import type {
-  CanvasGraphGroupGeometry,
-  CanvasGraphGroupRecord,
-} from './canvasGraphStoreTypes'
+import type { CanvasGraphGroupGeometry, CanvasGraphGroupRecord } from './canvasGraphStoreTypes'
 
 /** Pure value comparisons shared by graph mutation and patch algebra. */
 export function isSameGroupGeometry(

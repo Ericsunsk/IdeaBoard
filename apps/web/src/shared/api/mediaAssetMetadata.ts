@@ -173,7 +173,10 @@ function releaseWorkspaceMediaInvalidation(workspaceId: string): void {
  * component lifecycle; the workspace stream notifies through
  * `notifyAssetInvalidated` above.
  */
-export function subscribeAssetInvalidation(assetId: MediaAssetId, listener: () => void): () => void {
+export function subscribeAssetInvalidation(
+  assetId: MediaAssetId,
+  listener: () => void,
+): () => void {
   const key = normalizeMediaAssetId(assetId) ?? ''
   let listeners = invalidationListeners.get(key)
   if (!listeners) {

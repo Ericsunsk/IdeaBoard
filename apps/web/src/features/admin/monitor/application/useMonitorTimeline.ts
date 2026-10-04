@@ -8,10 +8,7 @@ import {
   withAlpha,
 } from '../../../../shared/lib/chartPrimitives'
 import { adminTaskStatuses } from '../domain/status'
-import {
-  taskMetricDefinitions,
-  monitorChartSpecs,
-} from '../../shared/lib/taskMetricTokens'
+import { taskMetricDefinitions, monitorChartSpecs } from '../../shared/lib/taskMetricTokens'
 import { timeRangePresets, type TimeRangePresetKey } from '../domain/timeRange'
 import type { AdminTaskRow } from './useAdminTaskList'
 import type { TaskStatus } from '../../shared/lib/taskMetricTokens'

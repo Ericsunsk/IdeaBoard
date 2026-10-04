@@ -49,14 +49,8 @@
           follow across the Select primitive.
         -->
         <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <Select
-          :model-value="sortMode"
-          @update:model-value="onSortModeChange"
-        >
-          <SelectTrigger
-            :id="sortSelectId"
-            :class="catalogClasses.sortSelectTrigger"
-          >
+        <Select :model-value="sortMode" @update:model-value="onSortModeChange">
+          <SelectTrigger :id="sortSelectId" :class="catalogClasses.sortSelectTrigger">
             <SelectValue />
             <SelectIcon>
               <NavArrowDown
@@ -71,11 +65,7 @@
             class="w-[140px]"
           >
             <SelectViewport>
-              <SelectItem
-                v-for="item in sortOptions"
-                :key="item.value"
-                :value="item.value"
-              >
+              <SelectItem v-for="item in sortOptions" :key="item.value" :value="item.value">
                 <SelectItemText>{{ item.label }}</SelectItemText>
               </SelectItem>
             </SelectViewport>

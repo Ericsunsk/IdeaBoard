@@ -43,11 +43,7 @@
       <div class="flex items-center gap-2.5">
         <div
           class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-          :class="
-            brandLogo
-              ? 'border border-border/60 bg-muted/60'
-              : 'bg-primary/10 text-primary'
-          "
+          :class="brandLogo ? 'border border-border/60 bg-muted/60' : 'bg-primary/10 text-primary'"
         >
           <img
             v-if="brandLogo && !logoLoadFailed"
@@ -80,27 +76,21 @@
       </p>
 
       <div v-else class="flex flex-col gap-2 text-xs">
-        <div
-          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
-        >
+        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referencePricingLabel }}</span>
           <span class="font-medium text-foreground">
             {{ pricingText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
-        <div
-          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
-        >
+        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceContextLabel }}</span>
           <span class="font-medium text-foreground">
             {{ contextText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
-        <div
-          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
-        >
+        <div class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
           <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceUpdatedLabel }}</span>
           <span class="font-mono text-admin-caption text-foreground">
             {{ snapshot.lastUpdated || MODELS_MESSAGES.referenceUnknown }}
@@ -170,7 +160,9 @@
           class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceFamilyTitle"
         >
-          <span class="shrink-0 text-muted-foreground">{{ MODELS_MESSAGES.referenceFamilyLabel }}</span>
+          <span class="shrink-0 text-muted-foreground">{{
+            MODELS_MESSAGES.referenceFamilyLabel
+          }}</span>
           <span class="font-medium text-foreground">
             {{ snapshot.family || MODELS_MESSAGES.referenceNoData }}
           </span>
@@ -181,7 +173,9 @@
           class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceStatusTitle"
         >
-          <span class="shrink-0 text-muted-foreground">{{ MODELS_MESSAGES.referenceStatusLabel }}</span>
+          <span class="shrink-0 text-muted-foreground">{{
+            MODELS_MESSAGES.referenceStatusLabel
+          }}</span>
           <span v-if="statusKind === 'unknown'" class="font-medium text-muted-foreground">{{
             MODELS_MESSAGES.referenceNoData
           }}</span>

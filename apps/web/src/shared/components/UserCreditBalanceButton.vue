@@ -48,7 +48,7 @@ defineProps<{
   flex: none;
   overflow: hidden;
   border-radius: 9999px;
-  color: var(--color-ib-text);
+  color: var(--color-foreground);
   cursor: pointer;
   appearance: none;
   transition:
@@ -63,13 +63,13 @@ defineProps<{
 }
 
 .user-credit-pill:hover {
-  border-color: var(--color-ib-page-chrome-border-hover);
-  background: var(--color-ib-page-chrome-bg-hover);
+  border-color: var(--color-border-hover);
+  background: var(--color-muted);
 }
 
 .user-credit-pill:active {
-  border-color: var(--color-ib-page-chrome-border-hover);
-  background: var(--color-ib-surface-pressed);
+  border-color: var(--color-border-hover);
+  background: var(--color-secondary-hover);
 }
 
 .user-credit-pill:focus-visible {
@@ -81,7 +81,7 @@ defineProps<{
   width: 17px;
   height: 17px;
   flex: none;
-  color: var(--color-ib-warning);
+  color: var(--color-warning);
   stroke-width: 1.8;
 }
 
@@ -98,11 +98,11 @@ defineProps<{
 }
 
 .user-credit-pill.is-loading .user-credit-pill__balance {
-  color: var(--color-ib-text-subtle);
+  color: var(--color-muted-foreground);
 }
 
 .user-credit-pill.is-error .user-credit-pill__balance {
-  color: var(--color-ib-danger);
+  color: var(--color-destructive);
 }
 
 @media (max-width: 640px) {

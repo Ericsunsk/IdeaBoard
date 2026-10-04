@@ -1,4 +1,8 @@
-import type { CanvasConnection, CanvasConnectionEndpoint, CanvasPoint } from '../../../board/ports/canvas'
+import type {
+  CanvasConnection,
+  CanvasConnectionEndpoint,
+  CanvasPoint,
+} from '../../../board/ports/canvas'
 import {
   type CanvasGraphEdgeId,
   type CanvasGraphGroupId,

@@ -7,10 +7,7 @@ import {
   resolveWorkspaceMediaAssetDerivativeURL,
   resolveWorkspaceMediaAssetOriginalURL,
 } from './mediaAssetUrls'
-import {
-  resetMediaWorkspaceIdResolver,
-  setMediaWorkspaceIdResolver,
-} from './mediaWorkspaceScope'
+import { resetMediaWorkspaceIdResolver, setMediaWorkspaceIdResolver } from './mediaWorkspaceScope'
 
 const WORKSPACE_ID = 'ws_test123'
 const ASSET_ID = 'asset_uid42'

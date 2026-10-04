@@ -1,8 +1,5 @@
 <template>
-  <SelectViewport
-    v-bind="cleanProps(props)"
-    :class="cn(selectViewportVariants, props.class)"
-  >
+  <SelectViewport v-bind="cleanProps(props)" :class="cn(selectViewportVariants, props.class)">
     <slot />
   </SelectViewport>
 </template>

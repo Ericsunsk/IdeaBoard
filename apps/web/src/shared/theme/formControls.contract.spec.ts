@@ -94,7 +94,7 @@ describe('User form input contract', () => {
       ['features/admin/shared/components', 'AdminNumberInput.vue'],
       ['features/admin/payments/stripe-settings', 'StripeSettingsDialog.vue'],
     ]) {
-      expect(src(...file)).toContain('!border-admin-danger')
+      expect(src(...file)).toContain('!border-destructive')
     }
   })
 })

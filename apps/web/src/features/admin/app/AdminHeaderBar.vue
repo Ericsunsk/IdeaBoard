@@ -109,9 +109,7 @@
 
                 <div v-else class="px-5 py-8 text-center">
                   <div class="text-admin-content font-bold text-foreground">运行正常</div>
-                  <div class="mt-1.5 text-admin-meta text-muted-foreground">
-                    当前没有活跃异常
-                  </div>
+                  <div class="mt-1.5 text-admin-meta text-muted-foreground">当前没有活跃异常</div>
                 </div>
               </div>
             </PopoverContent>
@@ -144,7 +142,9 @@
                 <span class="truncate text-xs font-semibold text-foreground">
                   {{ userEmail }}
                 </span>
-                <span class="truncate text-admin-caption text-muted-foreground font-mono"> admin </span>
+                <span class="truncate text-admin-caption text-muted-foreground font-mono">
+                  admin
+                </span>
               </div>
             </DropdownMenuLabel>
 
@@ -238,7 +238,8 @@ const notificationButtonClass =
 const userAvatarButtonClass =
   'relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted cursor-pointer'
 const userAvatarImageClass = 'size-6 rounded-full object-cover'
-const userAvatarPlaceholderClass = 'flex size-full items-center justify-center text-muted-foreground'
+const userAvatarPlaceholderClass =
+  'flex size-full items-center justify-center text-muted-foreground'
 const userAvatarIconClass = 'size-4'
 
 function handleAnomalySelect(item: AdminAnomalyItem) {

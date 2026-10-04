@@ -33,11 +33,7 @@ import RangedLineChartCard, {
 // Admin skin is pinned here.
 type AdminRangedLineChartProps<TRange extends string> = Omit<
   RangedLineChartProps<TRange>,
-  | 'headerClass'
-  | 'titleClass'
-  | 'rangeGroupClass'
-  | 'rangeSelectedClass'
-  | 'rangeUnselectedClass'
+  'headerClass' | 'titleClass' | 'rangeGroupClass' | 'rangeSelectedClass' | 'rangeUnselectedClass'
 > & {
   class?: string | undefined
 }

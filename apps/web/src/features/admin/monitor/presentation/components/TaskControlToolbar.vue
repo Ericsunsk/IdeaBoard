@@ -10,7 +10,7 @@
         :title="MONITOR_MESSAGES.sidebarToggleTitle"
       >
         <SidebarCollapse class="size-4" />
-        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-sky-500"></span>
+        <span class="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-info"></span>
       </button>
 
       <!-- 数据集选择器 (样式占位，后续接功能) -->

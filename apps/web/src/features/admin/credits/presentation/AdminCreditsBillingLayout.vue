@@ -93,7 +93,7 @@ const healthBadge = computed(() => {
         presentation.tone === 'danger'
           ? 'border-destructive text-destructive'
           : presentation.tone === 'warning'
-            ? 'border-admin-warning text-admin-warning'
+            ? 'border-warning text-warning'
             : 'border-border text-muted-foreground',
     }
   }

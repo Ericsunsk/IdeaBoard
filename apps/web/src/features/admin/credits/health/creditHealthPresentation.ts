@@ -25,7 +25,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '最近检查可信，当前没有待处理异常。',
     badgeLabel: null,
     tone: 'success',
-    iconClass: 'text-admin-success',
+    iconClass: 'text-success',
     iconKey: 'healthy',
   },
   attention: {
@@ -33,7 +33,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '存在待处理异常，但当前没有高风险隔离。',
     badgeLabel: '关注',
     tone: 'warning',
-    iconClass: 'text-admin-warning',
+    iconClass: 'text-warning',
     iconKey: 'warning',
   },
   critical: {
@@ -41,7 +41,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '存在高风险异常或 Ledger Integrity Restriction。',
     badgeLabel: '异常',
     tone: 'danger',
-    iconClass: 'text-admin-danger',
+    iconClass: 'text-destructive',
     iconKey: 'warning',
   },
   stale: {
@@ -49,7 +49,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '最近成功检查已超过 48 小时。',
     badgeLabel: '过期',
     tone: 'warning',
-    iconClass: 'text-admin-warning',
+    iconClass: 'text-warning',
     iconKey: 'time',
   },
   failed: {
@@ -57,7 +57,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '最近一次检查失败，上次成功结果不再代表当前状态。',
     badgeLabel: '失败',
     tone: 'danger',
-    iconClass: 'text-admin-danger',
+    iconClass: 'text-destructive',
     iconKey: 'failed',
   },
 }

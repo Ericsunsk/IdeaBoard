@@ -12,10 +12,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  taskMetricDefinitions,
-  type TaskMetricKey,
-} from '../../shared/lib/taskMetricTokens'
+import { taskMetricDefinitions, type TaskMetricKey } from '../../shared/lib/taskMetricTokens'
 import type { AdminBillableItemStatus } from './billableCatalogTypes'
 
 const props = defineProps<{

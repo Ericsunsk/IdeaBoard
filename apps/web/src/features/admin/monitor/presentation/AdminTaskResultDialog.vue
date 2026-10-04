@@ -91,59 +91,13 @@
     <!-- 主信息单页极简流 -->
     <div v-else class="flex flex-col gap-3">
       <!-- 状态与耗时横幅 / 错误提示 -->
-      <div
-        v-if="detailTask.status === adminTaskStatuses.failed"
-        class="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive"
-        role="alert"
-      >
-        <WarningTriangle class="mt-0.5 size-3.5 shrink-0" />
-        <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <div class="flex items-center justify-between">
-            <span class="font-semibold">{{ MONITOR_MESSAGES.detailFailedTitle }}</span>
-            <button
-              type="button"
-              class="h-5 cursor-pointer rounded border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors hover:bg-destructive/10"
-              @click="emit('retry')"
-            >
-              {{ MONITOR_MESSAGES.retry }}
-            </button>
-          </div>
-          <span class="text-destructive/90">
-            {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailUnknownError }}
-          </span>
-        </div>
-      </div>
-
-      <div
-        v-else-if="detailTask.status === adminTaskStatuses.cancelled"
-        class="flex items-start gap-2 rounded-xl border border-border bg-muted p-3 text-xs leading-relaxed text-muted-foreground"
-      >
-        <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-        <div class="flex min-w-0 flex-1 flex-col">
-          <span class="font-semibold">{{ MONITOR_MESSAGES.detailStoppedTitle }}</span>
-          <span class="text-muted-foreground">
-            {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailStoppedFallback }}
-          </span>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3.5 py-2 text-xs"
-      >
-        <div class="flex items-center gap-1.5">
-          <span class="text-muted-foreground">{{ MONITOR_MESSAGES.detailDurationLabel }}</span>
-          <span class="font-mono font-medium text-foreground">{{
-            calcDuration(detailTask)
-          }}</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-muted-foreground">{{ MONITOR_MESSAGES.detailCreatedLabel }}</span>
-          <span class="font-mono font-medium text-foreground">
-            {{ formatDateTime(detailTask.created_at) }}
-          </span>
-        </div>
-      </div>
+      <TaskResultStatusBanner
+        :task="detailTask"
+        :get-error-reason="getErrorReason"
+        :format-date-time="formatDateTime"
+        :calc-duration="calcDuration"
+        @retry="emit('retry')"
+      />
 
       <!-- 1. 身份与归属 (Card) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-identity">
@@ -172,9 +126,7 @@
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.priorityLabel }}</span>
-            <span class="font-medium text-foreground">{{
-              getTaskPriorityLabel(detailTask)
-            }}</span>
+            <span class="font-medium text-foreground">{{ getTaskPriorityLabel(detailTask) }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
             <span class="text-muted-foreground">{{ MONITOR_MESSAGES.providerLabel }}</span>
@@ -251,7 +203,9 @@
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingPoolVersionLabel }}</span>
+            <span class="text-muted-foreground">{{
+              MONITOR_MESSAGES.routingPoolVersionLabel
+            }}</span>
             <span class="font-mono text-foreground">v{{ detailTask.routing.pool_version }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
@@ -270,10 +224,10 @@
             v-if="detailTask.routing.retry_candidate"
             class="flex items-center justify-between py-1.5"
           >
-            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingRetryCandidateLabel }}</span>
-            <span class="font-mono text-foreground">{{
-              detailTask.routing.retry_candidate
+            <span class="text-muted-foreground">{{
+              MONITOR_MESSAGES.routingRetryCandidateLabel
             }}</span>
+            <span class="font-mono text-foreground">{{ detailTask.routing.retry_candidate }}</span>
           </div>
           <div class="flex items-center justify-between gap-3 py-1.5">
             <span class="shrink-0 text-muted-foreground">{{
@@ -373,7 +327,9 @@
                 <span>{{ getAttemptStageLabel(attempt.stage) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">{{ MONITOR_MESSAGES.attemptFailureLabel }}</span>
+                <span class="text-muted-foreground">{{
+                  MONITOR_MESSAGES.attemptFailureLabel
+                }}</span>
                 <span>{{ getAttemptFailureLabel(attempt.failure_category) }}</span>
               </div>
               <div class="flex items-center justify-between">
@@ -552,13 +508,13 @@ import {
   MediaImage,
   NavArrowDown,
   Terminal,
-  WarningTriangle,
   XmarkCircle,
 } from '@iconoir/vue'
 import { DialogTitle } from 'reka-ui'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import TaskResultStatusBanner from './TaskResultStatusBanner.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { getTaskPriorityLabel } from './columns'

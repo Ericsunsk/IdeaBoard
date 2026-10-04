@@ -73,7 +73,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SendDiagonalSolid } from '@iconoir/vue'
-import { IMAGE_OUTPUT_COUNT_PRESET_OPTIONS, type PromptAspectRatio } from '../../../../board/ports/canvas'
+import {
+  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
+  type PromptAspectRatio,
+} from '../../../../board/ports/canvas'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   type OutputResolution,

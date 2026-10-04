@@ -1,8 +1,5 @@
 <template>
-  <SelectRoot
-    v-bind="forwardedProps"
-    @update:model-value="emits('update:modelValue', $event)"
-  >
+  <SelectRoot v-bind="forwardedProps" @update:model-value="emits('update:modelValue', $event)">
     <slot />
   </SelectRoot>
 </template>

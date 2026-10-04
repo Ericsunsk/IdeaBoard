@@ -239,9 +239,7 @@
               />
             </section>
 
-            <section
-              class="grid gap-x-5 gap-y-4 border-y border-border py-5 sm:grid-cols-2"
-            >
+            <section class="grid gap-x-5 gap-y-4 border-y border-border py-5 sm:grid-cols-2">
               <div>
                 <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}
@@ -304,7 +302,9 @@
                   :key="entry.key"
                   class="min-w-0 rounded-lg border border-border bg-muted/50 px-3 py-2.5"
                 >
-                  <dt class="text-admin-caption font-[700] text-muted-foreground">{{ entry.key }}</dt>
+                  <dt class="text-admin-caption font-[700] text-muted-foreground">
+                    {{ entry.key }}
+                  </dt>
                   <dd
                     class="mt-1 mb-0 whitespace-pre-wrap break-all font-mono text-admin-caption leading-5 text-foreground"
                   >

@@ -103,10 +103,7 @@
                   </AdminTableCell>
                 </AdminTableRow>
                 <AdminTableRow v-if="isExpanded(row, rowIndex) && hasExpansionSlot">
-                  <AdminTableCell
-                    :colspan="columnCount"
-                    class="border-b border-border px-0 py-0"
-                  >
+                  <AdminTableCell :colspan="columnCount" class="border-b border-border px-0 py-0">
                     <slot name="expansion" :data="row" :index="rowIndex" />
                   </AdminTableCell>
                 </AdminTableRow>

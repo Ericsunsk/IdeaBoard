@@ -27,8 +27,7 @@ export const accountLogoutButtonClass =
 export const accountCardPanelClass =
   'rounded-ib-panel border border-border bg-card p-4 shadow-sm sm:p-5'
 
-export const accountDataTableFrameClass =
-  'rounded-ib-panel border border-border bg-card shadow-sm'
+export const accountDataTableFrameClass = 'rounded-ib-panel border border-border bg-card shadow-sm'
 
 export const accountPrimaryActionButtonClass =
   'inline-flex h-11 w-full items-center justify-center rounded-ib-control border border-transparent bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-ib-control transition-[background-color,color,box-shadow] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:bg-primary/90 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none'

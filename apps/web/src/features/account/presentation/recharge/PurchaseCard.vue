@@ -45,7 +45,9 @@
           <h3 id="recharge-purchase-heading" class="m-0 text-base font-bold text-foreground">
             {{ t('account.topUp.chooseQuantity') }}
           </h3>
-          <span class="text-ib-meta font-semibold text-muted-foreground">$1.00 USD = 100 Ideas</span>
+          <span class="text-ib-meta font-semibold text-muted-foreground"
+            >$1.00 USD = 100 Ideas</span
+          >
         </div>
         <div
           class="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5"

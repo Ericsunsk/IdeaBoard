@@ -1,6 +1,4 @@
-import type {
-  CanvasTaskRequestData,
-} from '../../../domain/execution-contracts/canvasTaskRequest'
+import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { submitTaskRequest } from '../task-runner/imageDirectActionExecutor'
 import { assertTaskSubmitReady } from '../task-runner/taskReadiness'
 

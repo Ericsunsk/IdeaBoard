@@ -43,14 +43,14 @@ const variantClasses = computed(() => {
     return 'border-destructive/20 bg-destructive/15 text-destructive font-medium'
   }
   if (sev === 'warn' || sev === 'warning' || v === 'warning') {
-    return 'border-amber-500/20 bg-amber-500/15 text-admin-warning font-medium'
+    return 'border-warning/20 bg-warning-soft text-warning font-medium'
   }
   if (sev === 'success' || v === 'success') {
-    return 'border-emerald-500/20 bg-emerald-500/15 text-admin-success font-medium'
+    return 'border-success/20 bg-success-soft text-success font-medium'
   }
   if (sev === 'secondary') {
     return 'border-border bg-muted text-muted-foreground'
   }
-  return 'border-sky-500/20 bg-sky-500/15 text-admin-info'
+  return 'border-info/20 bg-info-soft text-info'
 })
 </script>

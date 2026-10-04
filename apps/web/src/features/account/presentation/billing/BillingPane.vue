@@ -115,10 +115,7 @@
             t('account.billingRecords.retryLoad')
           }}</Button>
         </div>
-        <div
-          v-else-if="hasNextPage"
-          class="flex justify-center border-t border-border px-4 py-3"
-        >
+        <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
           <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
             t('account.billingRecords.loadMore')
           }}</Button>
@@ -179,7 +176,7 @@ function formatSignedAmount(value: number): string {
 }
 
 function amountTone(record: BillingRecordItem): string {
-  if (record.credit_delta > 0) return 'text-ib-success'
+  if (record.credit_delta > 0) return 'text-success'
   if (record.kind === 'system_adjustment' && record.credit_delta < 0) {
     return 'text-destructive'
   }

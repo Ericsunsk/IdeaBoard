@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, readonly, ref, type Ref } from 'vue'
 import { render, screen, userEvent, waitFor } from '../../../test/render'
-import { Select, SelectContent, SelectItem, SelectItemText, SelectTrigger, SelectValue, SelectViewport } from './index'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectItemText,
+  SelectTrigger,
+  SelectValue,
+  SelectViewport,
+} from './index'
 
 describe('select primitive', () => {
   it('exposes a combobox trigger', () => {
@@ -10,9 +18,11 @@ describe('select primitive', () => {
       slots: {
         default: () => [
           h(SelectTrigger, { 'aria-label': '测试选择' }, () => h(SelectValue, {}, () => '')),
-          h(SelectContent, {}, () => h(SelectViewport, {}, () => [
-            h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
-          ])),
+          h(SelectContent, {}, () =>
+            h(SelectViewport, {}, () => [
+              h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
+            ]),
+          ),
         ],
       },
     })
@@ -26,10 +36,12 @@ describe('select primitive', () => {
       slots: {
         default: () => [
           h(SelectTrigger, { 'aria-label': '测试选择' }, () => h(SelectValue, {}, () => '')),
-          h(SelectContent, {}, () => h(SelectViewport, {}, () => [
-            h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
-            h(SelectItem, { value: 'b' }, () => h(SelectItemText, {}, () => '乙')),
-          ])),
+          h(SelectContent, {}, () =>
+            h(SelectViewport, {}, () => [
+              h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
+              h(SelectItem, { value: 'b' }, () => h(SelectItemText, {}, () => '乙')),
+            ]),
+          ),
         ],
       },
     })
@@ -51,10 +63,12 @@ describe('select primitive', () => {
       slots: {
         default: () => [
           h(SelectTrigger, { 'aria-label': '测试选择' }, () => h(SelectValue)),
-          h(SelectContent, {}, () => h(SelectViewport, {}, () => [
-            h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
-            h(SelectItem, { value: 'b' }, () => h(SelectItemText, {}, () => '乙')),
-          ])),
+          h(SelectContent, {}, () =>
+            h(SelectViewport, {}, () => [
+              h(SelectItem, { value: 'a' }, () => h(SelectItemText, {}, () => '甲')),
+              h(SelectItem, { value: 'b' }, () => h(SelectItemText, {}, () => '乙')),
+            ]),
+          ),
         ],
       },
     })

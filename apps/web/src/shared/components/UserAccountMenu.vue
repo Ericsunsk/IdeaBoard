@@ -57,10 +57,7 @@
             v-for="item in nonDangerItems"
             :key="item.key ?? item.label"
             :data-control-tone="item.tone ?? 'default'"
-            :class="[
-              appOverlayMenuItemClass,
-              props.menuItemClass,
-            ]"
+            :class="[appOverlayMenuItemClass, props.menuItemClass]"
             @select="item.command?.()"
           >
             <span class="flex min-w-0 flex-1 items-center justify-between gap-4">

@@ -77,7 +77,9 @@
           class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ib-control border border-destructive/25 bg-muted px-3 py-2"
           role="alert"
         >
-          <span class="text-sm font-semibold text-destructive">{{ errorMessage(actionError) }}</span>
+          <span class="text-sm font-semibold text-destructive">{{
+            errorMessage(actionError)
+          }}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -166,7 +168,7 @@ function statusText(item: PendingPaymentOrder) {
 }
 
 function statusTone(status: PendingPaymentOrder['status']) {
-  if (status === 'credited') return 'text-ib-success'
+  if (status === 'credited') return 'text-success'
   if (status === 'expired' || status === 'cancelled' || status === 'payment_failed') {
     return 'text-muted-foreground'
   }

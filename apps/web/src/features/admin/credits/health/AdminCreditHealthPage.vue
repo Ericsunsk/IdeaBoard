@@ -1,8 +1,6 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <div
-      class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card"
-    >
+    <div class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card">
       <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
         <AdminSpinner
           class="size-9 text-primary"

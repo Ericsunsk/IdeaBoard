@@ -43,10 +43,7 @@ import { workspaceTaskIdempotencyKey } from '../../../../../shared/api/idempoten
 import { notifyUserCreditsInvalidation } from '../../../../../shared/query/userCreditsInvalidation'
 import type { CanvasTaskRequestData } from '../../../domain/execution-contracts/canvasTaskRequest'
 import { toWorkspaceCreateInput } from './canvasTaskContractMapping'
-import {
-  registerCanvasWorkspaceTask,
-  requireCanvasWorkspaceId,
-} from './canvasTaskCancellation'
+import { registerCanvasWorkspaceTask, requireCanvasWorkspaceId } from './canvasTaskCancellation'
 
 export {
   CanvasWorkspaceTaskUnmappableError,

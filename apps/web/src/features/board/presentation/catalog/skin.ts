@@ -41,8 +41,7 @@ export const catalogClasses = {
   createDate: 'mt-[3px] text-xs text-muted-foreground',
   emptyTip: 'mt-[18px] text-ib-body text-muted-foreground',
   deleteDialogShell: 'p-5',
-  deleteDialogTitle:
-    'm-0 text-ib-heading leading-[1.2] font-bold tracking-normal text-foreground',
+  deleteDialogTitle: 'm-0 text-ib-heading leading-[1.2] font-bold tracking-normal text-foreground',
   deleteDialogDescription: 'mt-3 mb-0 text-ib-body leading-6 text-muted-foreground',
   deleteDialogFooter: 'mt-6 flex justify-end gap-2',
   deleteCancelButton:

@@ -1,8 +1,4 @@
-import {
-  cloneEdgeRecord,
-  cloneGroupRecord,
-  cloneNodeRecord,
-} from './canvasGraphStoreState'
+import { cloneEdgeRecord, cloneGroupRecord, cloneNodeRecord } from './canvasGraphStoreState'
 import { hasSameGroupRecord } from './canvasGraphRecordEquality'
 import { isSameJsonValue } from './canvasGraphValueEquality'
 import type {
@@ -51,9 +47,7 @@ export { isSameJsonValue }
 /** A commit is visible when it carries domain changes or selection changes. */
 export function hasVisibleChanges(changes: TransactionChangeSet): boolean {
   return (
-    changes.hasDomainChanges ||
-    changes.selectedNodeIds.size > 0 ||
-    changes.selectedEdgeIds.size > 0
+    changes.hasDomainChanges || changes.selectedNodeIds.size > 0 || changes.selectedEdgeIds.size > 0
   )
 }
 

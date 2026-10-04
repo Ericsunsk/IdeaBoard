@@ -84,7 +84,7 @@ describe('BillingPane', () => {
     )
     expect(screen.getAllByText('07/14/2026, 09:08:07')).toHaveLength(3)
     expect(screen.getByText('-20')).toHaveClass('text-foreground')
-    expect(screen.getByText('+50')).toHaveClass('text-ib-success')
+    expect(screen.getByText('+50')).toHaveClass('text-success')
     expect(screen.getByText('-5')).toHaveClass('text-destructive')
     expect(screen.getByText('1,030')).toBeVisible()
   })

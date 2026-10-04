@@ -9,9 +9,7 @@
     <p class="m-0 text-admin-body text-muted-foreground">
       {{ REWARD_CODES_MESSAGES.plaintextWarning }}
     </p>
-    <div
-      class="flex items-center gap-2 rounded-lg border border-border bg-muted p-3"
-    >
+    <div class="flex items-center gap-2 rounded-lg border border-border bg-muted p-3">
       <code
         class="min-w-0 flex-1 select-all break-all text-admin-content font-semibold text-foreground"
       >

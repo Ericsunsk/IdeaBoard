@@ -60,10 +60,7 @@
 
       <!-- 提供商 -->
       <div class="flex flex-col gap-1.5">
-        <label
-          class="text-admin-caption font-semibold text-foreground"
-          for="model-provider-input"
-        >
+        <label class="text-admin-caption font-semibold text-foreground" for="model-provider-input">
           {{ MODELS_MESSAGES.identityProviderLabel }} <span class="text-destructive">*</span>
         </label>
         <AdminInput

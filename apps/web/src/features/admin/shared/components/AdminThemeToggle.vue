@@ -12,26 +12,17 @@
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" :side-offset="8" class="w-36">
-      <DropdownMenuItem
-        class="cursor-pointer gap-2"
-        @select="setTheme('light')"
-      >
+      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('light')">
         <SunLight class="size-4 text-muted-foreground" />
         <span class="flex-1">明亮</span>
         <Check v-if="mode === 'light'" class="size-4 text-primary" />
       </DropdownMenuItem>
-      <DropdownMenuItem
-        class="cursor-pointer gap-2"
-        @select="setTheme('dark')"
-      >
+      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('dark')">
         <HalfMoon class="size-4 text-muted-foreground" />
         <span class="flex-1">暗黑</span>
         <Check v-if="mode === 'dark'" class="size-4 text-primary" />
       </DropdownMenuItem>
-      <DropdownMenuItem
-        class="cursor-pointer gap-2"
-        @select="setTheme('auto')"
-      >
+      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('auto')">
         <Laptop class="size-4 text-muted-foreground" />
         <span class="flex-1">跟随系统</span>
         <Check v-if="mode === 'auto'" class="size-4 text-primary" />

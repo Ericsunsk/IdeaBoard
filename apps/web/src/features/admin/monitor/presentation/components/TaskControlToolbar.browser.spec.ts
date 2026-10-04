@@ -30,7 +30,7 @@ describe('TaskControlToolbar browser contract', () => {
         selectedTimeRangeKey: key.value,
         selectedPreset: timeRangePresets.find((preset) => preset.key === key.value)!,
         timeRangePresets,
-        'onSelectTimeRange': (next: (typeof timeRangePresets)[number]['key']) => {
+        onSelectTimeRange: (next: (typeof timeRangePresets)[number]['key']) => {
           key.value = next
           void view.rerender({
             selectedTimeRangeKey: key.value,

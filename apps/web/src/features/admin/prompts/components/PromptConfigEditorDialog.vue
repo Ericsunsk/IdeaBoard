@@ -52,7 +52,9 @@
       </div>
 
       <!-- 字符统计与校验提示信息 -->
-      <div class="flex items-center justify-between text-admin-meta text-muted-foreground font-mono">
+      <div
+        class="flex items-center justify-between text-admin-meta text-muted-foreground font-mono"
+      >
         <span>{{ PROMPTS_MESSAGES.editorCharCount(draft.length) }}</span>
         <span
           v-if="validation?.severity === 'error' && validation?.message"
@@ -62,7 +64,7 @@
         </span>
         <span
           v-else-if="validation?.severity === 'warning' && validation?.message"
-          class="text-admin-warning font-sans text-xs"
+          class="text-warning font-sans text-xs"
         >
           {{ validation?.message }}
         </span>

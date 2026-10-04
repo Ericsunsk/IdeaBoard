@@ -147,14 +147,14 @@
               v-if="data.isCurrent"
               class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
             >
-              <span class="size-1.5 rounded-full bg-emerald-500" />
+              <span class="size-1.5 rounded-full bg-success" />
               <span>{{ STORAGE_MESSAGES.current }}</span>
             </span>
             <span
               v-else-if="data.statusType === 'configured'"
               class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-sky-50 text-sky-700 ring-1 ring-sky-200"
             >
-              <span class="size-1.5 rounded-full bg-sky-500" />
+              <span class="size-1.5 rounded-full bg-info" />
               <span>{{ STORAGE_MESSAGES.configured }}</span>
             </span>
             <span
@@ -190,10 +190,7 @@
           :style="{ width: '220px' }"
         >
           <template #body="{ data }">
-            <span
-              class="truncate font-mono text-xs text-muted-foreground"
-              :title="data.endpoint"
-            >
+            <span class="truncate font-mono text-xs text-muted-foreground" :title="data.endpoint">
               {{ data.endpoint }}
             </span>
           </template>
@@ -208,7 +205,7 @@
           <template #body="{ data }">
             <span
               v-if="data.isCurrent"
-              class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-admin-success"
+              class="inline-flex items-center gap-1 font-mono text-xs font-semibold text-success"
             >
               <Check class="size-3.5" />
               {{ STORAGE_MESSAGES.currentEffective }}

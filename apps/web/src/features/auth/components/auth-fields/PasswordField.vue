@@ -31,11 +31,7 @@
           :aria-invalid="ariaInvalid"
           :aria-describedby="describedbyId"
           :invalid="invalid"
-          :input-class="[
-            inputClass,
-            $slots.prefix ? 'pl-10' : '',
-            invalid ? inputErrorClass : '',
-          ]"
+          :input-class="[inputClass, $slots.prefix ? 'pl-10' : '', invalid ? inputErrorClass : '']"
           :placeholder="placeholder"
           @blur="emit('blur')"
         />

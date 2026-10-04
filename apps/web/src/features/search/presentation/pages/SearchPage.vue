@@ -4,7 +4,9 @@
     class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-background px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-foreground"
   >
     <div class="ib-board-page-background ib-page-dot-bg"></div>
-    <header class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2">
+    <header
+      class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2"
+    >
       <StudioName class="pointer-events-auto" />
       <WorkspaceNavigation class="pointer-events-auto" />
       <UserAccountMenu
@@ -68,9 +70,7 @@
                   <div
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-50 w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
-                    <div
-                      class="size-14 shrink-0 overflow-hidden rounded-md bg-card shadow-md"
-                    >
+                    <div class="size-14 shrink-0 overflow-hidden rounded-md bg-card shadow-md">
                       <img
                         :src="reference.previewUrl"
                         :alt="t('search.reference.previewAlt')"

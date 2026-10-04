@@ -30,10 +30,7 @@ import {
   toCanvasGraphGroupId,
   toCanvasGraphNodeId,
 } from './canvasGraphStoreIds'
-import type {
-  CanvasGraphStoreState,
-  CanvasGraphTransactionDraft,
-} from './canvasGraphStoreTypes'
+import type { CanvasGraphStoreState, CanvasGraphTransactionDraft } from './canvasGraphStoreTypes'
 
 const GROUP_GEOMETRY = { x: 20, y: 20, width: 700, height: 360 }
 
@@ -117,11 +114,7 @@ describe('canvasGraphMutation', () => {
     const draft = createDraft(base)
     const promptId = toCanvasGraphNodeId('prompt', 1)
     expect(() =>
-      stageUpdateNode(
-        draft,
-        promptId,
-        ((node: PromptNodeItem) => ({ ...node, id: 99 })) as never,
-      ),
+      stageUpdateNode(draft, promptId, ((node: PromptNodeItem) => ({ ...node, id: 99 })) as never),
     ).toThrow('cannot change node identity')
   })
 
@@ -154,9 +147,7 @@ describe('canvasGraphMutation', () => {
     ).toThrow('group node does not exist')
 
     const tooFew = createDraft(base)
-    expect(() => stageCreateGroup(tooFew, [imageId], GROUP_GEOMETRY)).toThrow(
-      'at least two nodes',
-    )
+    expect(() => stageCreateGroup(tooFew, [imageId], GROUP_GEOMETRY)).toThrow('at least two nodes')
 
     const grouped = createDraft(base)
     stageCreateGroup(grouped, [imageId, promptId], GROUP_GEOMETRY, toCanvasGraphGroupId(1))
@@ -176,9 +167,7 @@ describe('canvasGraphMutation', () => {
     const groupId = toCanvasGraphGroupId(1)
     const imageId = toCanvasGraphNodeId('image', 1)
     const promptId = toCanvasGraphNodeId('prompt', 1)
-    snapshot.groups = [
-      { id: groupId, nodeIds: [imageId, promptId], ...GROUP_GEOMETRY },
-    ]
+    snapshot.groups = [{ id: groupId, nodeIds: [imageId, promptId], ...GROUP_GEOMETRY }]
     const base = createStateFromSnapshot(snapshot)
     const draft = createDraft(base)
 
@@ -238,12 +227,7 @@ describe('canvasGraphMutation', () => {
 
     commitEdgeWrites(
       state,
-      new Map([
-        [
-          edgeId,
-          { id: edgeId, connection: createConnection(2, 1, 2), selected: false },
-        ],
-      ]),
+      new Map([[edgeId, { id: edgeId, connection: createConnection(2, 1, 2), selected: false }]]),
     )
     expect(state.indexes.outgoingEdgesByNodeId.get(imageId)).toContain(edgeId)
     expect(state.indexes.incomingEdgesByNodeId.get(promptId)).toContain(edgeId)
@@ -254,9 +238,7 @@ describe('canvasGraphMutation', () => {
     const groupId = toCanvasGraphGroupId(1)
     commitGroupWrites(
       state,
-      new Map([
-        [groupId, { id: groupId, nodeIds: [imageId], ...GROUP_GEOMETRY }],
-      ]),
+      new Map([[groupId, { id: groupId, nodeIds: [imageId], ...GROUP_GEOMETRY }]]),
     )
     expect(state.indexes.groupIdByNodeId.get(imageId)).toBe(groupId)
     commitGroupWrites(state, new Map([[groupId, null]]))

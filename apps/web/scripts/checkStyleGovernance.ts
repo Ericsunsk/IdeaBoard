@@ -74,7 +74,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/lib/adminThemeTokens.ts': {
     counts: {
-      'raw-color': 65,
+      'raw-color': 58,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
@@ -371,53 +371,12 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
 // tokens resolve through the ib-* alias tier, so the decommission stops at
 // the component layer (see apps/web/DESIGN.md Tokens).
 const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
-  'src/features/admin/credits/health/creditHealthPresentation.ts': {
-    counts: {
-      'legacy-token': 5,
-    },
-    reason:
-      'Credit health status semantics (ok/warn/critical) are a domain visual contract, like task status.',
-  },
-  'src/features/admin/credits/shared/AdminActionReasonField.vue': {
-    counts: {
-      'legacy-token': 2,
-    },
-    reason:
-      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
-  },
-  'src/features/admin/monitor/domain/status.ts': {
-    counts: {
-      'legacy-token': 15,
-    },
-    reason: 'Task status palette is a domain visual contract shared by table and detail views.',
-  },
   'src/features/admin/monitor/presentation/AdminTaskResultDialog.vue': {
     counts: {
       'legacy-token': 0,
     },
     reason:
       'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
-  },
-  'src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue': {
-    counts: {
-      'legacy-token': 6,
-    },
-    reason:
-      'Form invalid borders (!border-admin-danger + ring on three fields) are pinned by formControls.contract.spec.ts.',
-  },
-  'src/features/admin/shared/components/AdminInput.vue': {
-    counts: {
-      'legacy-token': 2,
-    },
-    reason:
-      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
-  },
-  'src/features/admin/shared/components/AdminNumberInput.vue': {
-    counts: {
-      'legacy-token': 2,
-    },
-    reason:
-      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
   },
   'src/features/auth/components/RegisterAuthPanel.vue': {
     counts: {
@@ -473,105 +432,6 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
       'legacy-token': 5,
     },
     reason: 'Avatar auth-gradient and page-chrome hover states are shell identity tokens.',
-  },
-  'src/shared/components/UserCreditBalanceButton.vue': {
-    counts: {
-      'legacy-token': 8,
-    },
-    reason: 'Balance pill shares the boards page-chrome hover language and ib text/warning tokens.',
-  },
-  'src/features/admin/shared/components/AdminAlert.vue': {
-    counts: {
-      'legacy-token': 3,
-    },
-    reason:
-      'Alert severity text uses theme-adaptive admin status tokens (dark-mode readable, unlike fixed emerald/amber/sky-700).',
-  },
-  'src/features/admin/shared/components/AdminBadge.vue': {
-    counts: {
-      'legacy-token': 4,
-    },
-    reason:
-      'Badge severity text uses theme-adaptive admin status tokens (dark-mode readable).',
-  },
-  'src/features/admin/shared/components/AdminStatusPill.vue': {
-    counts: {
-      'legacy-token': 3,
-    },
-    reason:
-      'Status pill text uses theme-adaptive admin status tokens (dark-mode readable).',
-  },
-  'src/features/account/presentation/billing/BillingPane.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Credit-delta success text uses the adaptive ib-success token (dark-mode readable).',
-  },
-  'src/features/account/presentation/recharge/HistoryTable.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Credited-state text uses the adaptive ib-success token (dark-mode readable).',
-  },
-  'src/features/account/presentation/recharge/PendingOrders.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Credited-state text uses the adaptive ib-success token (dark-mode readable).',
-  },
-  'src/features/account/presentation/recharge/ReturnStatus.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Success notice uses the adaptive ib-success token (dark-mode readable).',
-  },
-  'src/features/account/presentation/rewards/RewardsPane.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Reward amount text uses the adaptive ib-success token (dark-mode readable).',
-  },
-  'src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue': {
-    counts: {
-      'legacy-token': 2,
-    },
-    reason: 'Billing badge warning state uses adaptive admin-warning tokens.',
-  },
-  'src/features/admin/credits/wallets/components/WalletLedgerTable.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Grant/refund amount text uses the adaptive admin-success token.',
-  },
-  'src/features/admin/credits/wallets/components/WalletOverviewCard.vue': {
-    counts: {
-      'legacy-token': 3,
-    },
-    reason: 'Restriction notice uses adaptive admin-warning tokens (dark-mode readable).',
-  },
-  'src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Gateway configured indicator uses the adaptive admin-success token.',
-  },
-  'src/features/admin/prompts/components/PromptConfigEditorDialog.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Warning hint uses the adaptive admin-warning token.',
-  },
-  'src/features/admin/storage/components/AdminStorageEditorDialog.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Enabled-state text uses the adaptive admin-success token.',
-  },
-  'src/features/admin/storage/components/AdminStorageTable.vue': {
-    counts: {
-      'legacy-token': 1,
-    },
-    reason: 'Current-profile indicator uses the adaptive admin-success token.',
   },
 }
 

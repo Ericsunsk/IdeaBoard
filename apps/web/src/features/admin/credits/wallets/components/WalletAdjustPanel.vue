@@ -1,7 +1,5 @@
 <template>
-  <section
-    class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-2xs"
-  >
+  <section class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-2xs">
     <div class="flex items-center justify-between border-b border-border pb-3">
       <div class="flex items-center gap-2">
         <span

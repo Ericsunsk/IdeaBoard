@@ -84,27 +84,23 @@ import ChartRenderer from './ChartRenderer.vue'
 // explicit class props with user-surface defaults. Admin pages use the
 // `features/admin/shared` `AdminRangedLineChartCard` wrapper to supply
 // the Admin skin instead of a feature-specific `variant` flag.
-withDefaults(
-  defineProps<RangedLineChartProps<TRange>>(),
-  {
-    titleTag: 'span',
-    headerClass: undefined,
-    titleClass: undefined,
-    cardClass: undefined,
-    elevated: undefined,
-    rangeGroupClass:
-      'inline-flex items-center rounded-lg border border-border bg-muted p-0.5 text-xs',
-    rangeSelectedClass:
-      'bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring',
-    rangeUnselectedClass: 'text-muted-foreground hover:text-foreground focus-visible:ring-ring',
-    rangeAriaLabel: undefined,
-    plugins: () => [],
-    canvasProps: undefined,
-    size: 'standard',
-    height: '',
-    showChart: true,
-  },
-)
+withDefaults(defineProps<RangedLineChartProps<TRange>>(), {
+  titleTag: 'span',
+  headerClass: undefined,
+  titleClass: undefined,
+  cardClass: undefined,
+  elevated: undefined,
+  rangeGroupClass:
+    'inline-flex items-center rounded-lg border border-border bg-muted p-0.5 text-xs',
+  rangeSelectedClass: 'bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring',
+  rangeUnselectedClass: 'text-muted-foreground hover:text-foreground focus-visible:ring-ring',
+  rangeAriaLabel: undefined,
+  plugins: () => [],
+  canvasProps: undefined,
+  size: 'standard',
+  height: '',
+  showChart: true,
+})
 
 const { t } = useI18n()
 

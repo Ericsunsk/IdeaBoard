@@ -43,8 +43,7 @@ function readToken(name: string): string {
 
 /**
  * Reads a token's raw declaration, so alias chains can be asserted. `readToken`
- * only matches literals, which would throw on `--color-admin-text-2-strong:
- * var(--color-admin-text-label)`.
+ * only matches literals, which would throw on alias declarations.
  */
 function readDeclaration(name: string): string {
   const match = styleSheet.match(new RegExp(`${name}:\\s*([^;]+);`))
@@ -55,7 +54,9 @@ function readDeclaration(name: string): string {
 /** Reads a translucent token as [rgb, alpha] so the test can composite it like a browser does. */
 function readRgbaToken(name: string): { rgb: Rgb; alpha: number } {
   const match = styleSheet.match(
-    new RegExp(`${name}:\\s*rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)`),
+    new RegExp(
+      `${name}:\\s*rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([\\d.]+)\\s*\\)`,
+    ),
   )
   if (!match) throw new Error(`Translucent token ${name} not found in app/style.css`)
   return {
@@ -148,8 +149,14 @@ const ADMIN_RAMP = [
 const ADMIN_SURFACES = [
   { id: 'bg', value: bg },
   { id: 'card-strong', value: cardStrong },
-  { id: 'card (alpha over bg)', value: toHex(compositeOver(cardLayer.rgb, cardLayer.alpha, bgRgb)) },
-  { id: 'shell (alpha over bg)', value: toHex(compositeOver(shellLayer.rgb, shellLayer.alpha, bgRgb)) },
+  {
+    id: 'card (alpha over bg)',
+    value: toHex(compositeOver(cardLayer.rgb, cardLayer.alpha, bgRgb)),
+  },
+  {
+    id: 'shell (alpha over bg)',
+    value: toHex(compositeOver(shellLayer.rgb, shellLayer.alpha, bgRgb)),
+  },
   { id: 'control-bg', value: controlBg },
   { id: 'surface-muted', value: surfaceMuted },
   ...[0.8, 0.6, 0.5, 0.4, 0.3, 0.2].map((alpha) =>
@@ -310,24 +317,13 @@ describe('text ramp contrast contract', () => {
     expect(adminThemeTokenFallbacks.textTertiary).toBe(readToken('--color-admin-text-3'))
   })
 
-  it('keeps the retired text-2-strong name aliased to text-label', () => {
-    expect(readDeclaration('--color-admin-text-2-strong')).toBe(
-      'var(--color-admin-text-label)',
-    )
-    expect(adminThemeTokenFallbacks.textSecondaryStrong).toBe(
-      adminThemeTokenFallbacks.textLabel,
-    )
-  })
-
   it('resolves canvas control and option text through the ramp instead of standalone greys', () => {
     // Canvas previously carried five greys where two of them were the same value.
     // The control/option roles now alias the ramp so they cannot drift apart.
     expect(readDeclaration('--color-canvas-text-control')).toBe(
       'var(--color-canvas-text-secondary)',
     )
-    expect(readDeclaration('--color-canvas-text-option')).toBe(
-      'var(--color-canvas-text-muted)',
-    )
+    expect(readDeclaration('--color-canvas-text-option')).toBe('var(--color-canvas-text-muted)')
   })
 
   it('keeps deduplicated surfaces linked to their canonical token', () => {

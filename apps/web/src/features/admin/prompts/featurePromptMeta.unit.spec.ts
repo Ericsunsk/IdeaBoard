@@ -16,7 +16,13 @@ describe('featurePromptMeta', () => {
         key: 'image',
         title: 'Image',
         order: 10,
-        slugs: [SERVICE.render, SERVICE.variations, SERVICE.inpaint, SERVICE.outpaint, SERVICE.upscale],
+        slugs: [
+          SERVICE.render,
+          SERVICE.variations,
+          SERVICE.inpaint,
+          SERVICE.outpaint,
+          SERVICE.upscale,
+        ],
       },
       {
         key: 'prompt',

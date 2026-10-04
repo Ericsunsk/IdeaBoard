@@ -95,7 +95,7 @@
         >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
-            <span v-else class="whitespace-nowrap font-mono font-bold text-ib-success">
+            <span v-else class="whitespace-nowrap font-mono font-bold text-success">
               {{ formatCreditedAmount(data.credited_amount) }}
             </span>
           </template>
@@ -160,10 +160,7 @@
               t('account.rewards.retryLoad')
             }}</Button>
           </div>
-          <div
-            v-else-if="hasNextPage"
-            class="flex justify-center border-t border-border px-4 py-3"
-          >
+          <div v-else-if="hasNextPage" class="flex justify-center border-t border-border px-4 py-3">
             <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
               t('account.rewards.loadMore')
             }}</Button>

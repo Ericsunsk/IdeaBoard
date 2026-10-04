@@ -40,14 +40,13 @@ const props = withDefaults(
 
 const adminBadgeColorOverrides: Record<string, string> = {
   default: 'bg-primary text-primary-foreground border-transparent',
-  success: 'bg-emerald-500/15 text-admin-success-strong border-emerald-500/20 font-bold',
+  success: 'bg-success-soft text-success border-success/20 font-bold',
   destructive: 'bg-destructive/15 text-destructive border-destructive/20 font-bold',
   danger: 'bg-destructive/15 text-destructive border-destructive/20 font-bold',
-  warning: 'bg-amber-500/15 text-admin-warning border-amber-500/20 font-bold',
-  warn: 'bg-amber-500/15 text-admin-warning border-amber-500/20 font-bold',
-  info: 'bg-sky-500/15 text-admin-info border-sky-500/20 font-bold',
-  secondary:
-    'bg-secondary text-secondary-foreground border-border font-semibold',
+  warning: 'bg-warning-soft text-warning border-warning/20 font-bold',
+  warn: 'bg-warning-soft text-warning border-warning/20 font-bold',
+  info: 'bg-info-soft text-info border-info/20 font-bold',
+  secondary: 'bg-secondary text-secondary-foreground border-border font-semibold',
   outline: 'border-border text-foreground bg-card font-medium',
 }
 

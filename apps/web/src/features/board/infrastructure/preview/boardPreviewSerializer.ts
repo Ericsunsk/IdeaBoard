@@ -837,8 +837,12 @@ export async function renderBoardPreviewDataUrl(
   const imageAssets = await buildPreviewImageMap(frames)
 
   drawDotBackground(ctx, isDark)
-  connections.forEach((connection) => drawConnection(ctx, connection, scale, offsetX, offsetY, isDark))
-  frames.forEach((frame) => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images, isDark))
+  connections.forEach((connection) =>
+    drawConnection(ctx, connection, scale, offsetX, offsetY, isDark),
+  )
+  frames.forEach((frame) =>
+    drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images, isDark),
+  )
 
   try {
     return encodePreviewCanvas(canvas, frames.length > 12)

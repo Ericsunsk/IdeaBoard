@@ -36,7 +36,9 @@
         :filter-label="USERS_MESSAGES.filterUsers"
         @reset="resetUserFilters"
       >
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
+        <label
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+        >
           <span>{{ USERS_MESSAGES.role }}</span>
           <AdminSelect
             v-model="userRoleFilter"
@@ -47,7 +49,9 @@
           />
         </label>
 
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
+        <label
+          class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
+        >
           <span>{{ USERS_MESSAGES.status }}</span>
           <AdminSelect
             v-model="userStatusFilter"

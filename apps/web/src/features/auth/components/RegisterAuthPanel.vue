@@ -16,13 +16,7 @@
         @submit.prevent="handleRegister"
       >
         <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            invalid,
-            required,
-          }"
+          v-slot="{ ariaInvalid, describedbyId, fieldId, invalid, required }"
           :label="t('auth.fields.username')"
           :error="errors.displayName"
           field-id="register-display-name"

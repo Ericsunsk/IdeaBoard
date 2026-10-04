@@ -20,7 +20,9 @@
             <span class="font-semibold text-muted-foreground text-xs">{{
               MONITOR_MESSAGES.timestampColumn
             }}</span>
-            <span class="font-mono text-admin-caption text-muted-foreground font-normal">GMT+8</span>
+            <span class="font-mono text-admin-caption text-muted-foreground font-normal"
+              >GMT+8</span
+            >
           </div>
         </template>
         <template #body="{ data }">
@@ -157,9 +159,7 @@
     </AdminTable>
 
     <!-- 表格底栏 (Card Footer)：灰底带上边框，左侧记录总数，右侧分页控制器 -->
-    <div
-      :class="adminTableFooterClass"
-    >
+    <div :class="adminTableFooterClass">
       <span class="text-xs font-normal text-muted-foreground">
         {{ MONITOR_MESSAGES.totalRecords(totalCount) }}
       </span>

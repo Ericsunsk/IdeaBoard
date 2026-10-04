@@ -44,12 +44,7 @@
             v-for="opt in normalizedOptions"
             :key="String(opt.value)"
             :value="String(opt.value)"
-            :class="
-              cn(
-                adminSelectItemClass,
-                size === 'small' && adminSelectItemCompactClass,
-              )
-            "
+            :class="cn(adminSelectItemClass, size === 'small' && adminSelectItemCompactClass)"
           >
             <span :class="adminSelectItemIndicatorClass">
               <SelectItemIndicator>

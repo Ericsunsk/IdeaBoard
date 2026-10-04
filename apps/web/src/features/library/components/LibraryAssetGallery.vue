@@ -11,11 +11,7 @@
       class="grid h-full min-h-40 grid-cols-2 gap-2 overflow-hidden"
       aria-busy="true"
     >
-      <div
-        v-for="n in 6"
-        :key="n"
-        class="h-28 animate-pulse rounded-xl bg-muted"
-      ></div>
+      <div v-for="n in 6" :key="n" class="h-28 animate-pulse rounded-xl bg-muted"></div>
     </div>
 
     <!-- 空状态提示 -->

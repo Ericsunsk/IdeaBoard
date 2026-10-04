@@ -3,24 +3,24 @@
     color-scheme: dark;
 
     /* ── Primitive Dark Elevation Palette Scale (100% Pure Neutral True Black) ── */
-    --palette-dark-0: #0f0f0f;            /* Level 0: Global canvas & workspace base (R=15 G=15 B=15) */
-    --palette-dark-1: #141414;            /* Level 1: Deep card strong, dialog shell (R=20 G=20 B=20) */
-    --palette-dark-2: #181818;            /* Level 2: Surface muted, secondary container (R=24 G=24 B=24) */
-    --palette-dark-3: #1d1d1d;            /* Level 3: Inputs, controls, cards, canvas nodes (R=29 G=29 B=29) */
-    --palette-dark-hover: #262626;        /* Level 3.5: Interactive control hover state (R=38 G=38 B=38) */
-    --palette-dark-surface-hover: #282828;/* Level 3.5b: Surface hover state (R=40 G=40 B=40) */
-    --palette-dark-surface-pressed: #333333;/* Level 3.6: Surface pressed state (R=51 G=51 B=51) */
-    --palette-dark-border: #282828;       /* Base structural borders & canvas dots (R=40 G=40 B=40) */
-    --palette-dark-border-soft: #1f1f1f;  /* Softer structural borders (R=31 G=31 B=31) */
+    --palette-dark-0: #0f0f0f; /* Level 0: Global canvas & workspace base (R=15 G=15 B=15) */
+    --palette-dark-1: #141414; /* Level 1: Deep card strong, dialog shell (R=20 G=20 B=20) */
+    --palette-dark-2: #181818; /* Level 2: Surface muted, secondary container (R=24 G=24 B=24) */
+    --palette-dark-3: #1d1d1d; /* Level 3: Inputs, controls, cards, canvas nodes (R=29 G=29 B=29) */
+    --palette-dark-hover: #262626; /* Level 3.5: Interactive control hover state (R=38 G=38 B=38) */
+    --palette-dark-surface-hover: #282828; /* Level 3.5b: Surface hover state (R=40 G=40 B=40) */
+    --palette-dark-surface-pressed: #333333; /* Level 3.6: Surface pressed state (R=51 G=51 B=51) */
+    --palette-dark-border: #282828; /* Base structural borders & canvas dots (R=40 G=40 B=40) */
+    --palette-dark-border-soft: #1f1f1f; /* Softer structural borders (R=31 G=31 B=31) */
     --palette-dark-border-hover: #3d3d3d; /* Interactive border hover, chart axis (R=61 G=61 B=61) */
-    --palette-dark-border-pressed: #525252;/* Border pressed state (R=82 G=82 B=82) */
+    --palette-dark-border-pressed: #525252; /* Border pressed state (R=82 G=82 B=82) */
 
     /* ── Primitive Dark Typography Scale (100% Pure Neutral Grays, WCAG AAA/AA) ── */
-    --palette-dark-title: #fafafa;         /* High-emphasis titles */
-    --palette-dark-text-1: #f5f5f5;        /* Primary body text (AAA >= 7.0:1) */
-    --palette-dark-text-label: #d4d4d4;    /* Section labels / legends */
-    --palette-dark-text-2: #a3a3a3;        /* Secondary / muted text (AA >= 4.5:1) */
-    --palette-dark-text-3: #737373;        /* Tertiary / captions / icons */
+    --palette-dark-title: #fafafa; /* High-emphasis titles */
+    --palette-dark-text-1: #f5f5f5; /* Primary body text (AAA >= 7.0:1) */
+    --palette-dark-text-label: #d4d4d4; /* Section labels / legends */
+    --palette-dark-text-2: #a3a3a3; /* Secondary / muted text (AA >= 4.5:1) */
+    --palette-dark-text-3: #737373; /* Tertiary / captions / icons */
     --palette-dark-text-disabled: #525252; /* Disabled states */
 
     /* ── Admin dark surface tokens (shadcn zinc standard) ─── */
@@ -58,18 +58,6 @@
     --color-admin-accent-softer: rgba(255, 255, 255, 0.06);
     --color-admin-focus-ring: rgba(255, 255, 255, 0.25);
     --color-admin-text-inverse: var(--palette-dark-0);
-
-    --color-admin-success: #34d399;
-    --color-admin-success-strong: #10b981;
-    --color-admin-success-soft: rgba(52, 211, 153, 0.15);
-    --color-admin-warning: #fbbf24;
-    --color-admin-warning-soft: rgba(251, 191, 36, 0.15);
-    --color-admin-danger: #f87171;
-    --color-admin-danger-soft: rgba(248, 113, 113, 0.15);
-    --color-admin-danger-hover: #ef4444;
-    --color-admin-danger-pressed: #dc2626;
-    --color-admin-info: #60a5fa;
-    --color-admin-info-soft: rgba(96, 165, 250, 0.15);
 
     --color-admin-model-indigo: #818cf8;
     --color-admin-model-purple: #a78bfa;
@@ -129,8 +117,8 @@
     --color-board-create-icon: var(--palette-dark-border-hover);
     --color-board-create-title: var(--palette-dark-title);
     --color-board-loading-bg: rgba(24, 24, 24, 0.45);
-    --color-board-danger: #f87171;
-    --color-board-danger-hover: #ef4444;
+    --color-board-danger: var(--color-destructive);
+    --color-board-danger-hover: var(--color-destructive-hover);
     --color-board-dialog-title: var(--palette-dark-title);
     --color-board-dialog-description: var(--palette-dark-text-2);
     --shadow-board-dialog: 0 22px 58px rgba(0, 0, 0, 0.65);

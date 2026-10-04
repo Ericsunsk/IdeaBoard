@@ -63,9 +63,7 @@
             :key="margin.sku"
             class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-admin-caption font-medium"
             :class="
-              margin.onSale
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-muted text-muted-foreground'
+              margin.onSale ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'
             "
             :title="margin.service"
           >

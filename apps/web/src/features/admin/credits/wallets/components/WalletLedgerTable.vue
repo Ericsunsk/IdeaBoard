@@ -33,7 +33,7 @@
               class="font-bold tabular-nums font-mono text-admin-body"
               :class="
                 data.command_type === 'grant' || data.command_type === 'refund'
-                  ? 'text-admin-success'
+                  ? 'text-success'
                   : 'text-foreground'
               "
             >
@@ -57,13 +57,13 @@
 
         <AdminColumn :header="t('admin.wallet.reasonAndReference')" style="min-width: 220px">
           <template #body="{ data }">
-            <div
-              class="max-w-72 truncate text-admin-body-sm text-foreground"
-              :title="data.reason"
-            >
+            <div class="max-w-72 truncate text-admin-body-sm text-foreground" :title="data.reason">
               {{ data.reason || '-' }}
             </div>
-            <div v-if="data.charge" class="mt-0.5 text-admin-caption text-muted-foreground font-mono">
+            <div
+              v-if="data.charge"
+              class="mt-0.5 text-admin-caption text-muted-foreground font-mono"
+            >
               {{
                 t('admin.wallet.refundableAmount', {
                   amount: formatIdeaAmount(data.charge.remaining_refundable_credits),

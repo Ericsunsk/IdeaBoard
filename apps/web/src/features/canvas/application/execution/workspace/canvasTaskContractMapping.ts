@@ -213,7 +213,9 @@ function toWorkspaceMaskAssetId(value: unknown): string | undefined {
   return maskId
 }
 
-function toWorkspaceParams(params: CanvasTaskRequestData['params']): Record<string, unknown> | undefined {
+function toWorkspaceParams(
+  params: CanvasTaskRequestData['params'],
+): Record<string, unknown> | undefined {
   if (params == null) return undefined
   const next: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(params)) {

@@ -66,7 +66,7 @@ const selectValue = computed(() => {
   const value = props.modelValue === props.allValue ? ALL_SENTINEL : props.modelValue
   return normalizedOptions.value.some((option) => option.value === value)
     ? value
-    : normalizedOptions.value[0]?.value ?? ''
+    : (normalizedOptions.value[0]?.value ?? '')
 })
 
 function handleUpdate(value: string | number) {

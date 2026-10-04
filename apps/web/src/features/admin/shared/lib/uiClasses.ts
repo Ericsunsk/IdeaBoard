@@ -89,8 +89,7 @@ export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center
 export const adminDialogChromeClass =
   'rounded-[var(--radius-admin-dialog)] border border-border bg-card text-card-foreground shadow-xl'
 
-export const adminDialogChromeHeaderClass =
-  '!py-4.5 border-b border-border bg-card'
+export const adminDialogChromeHeaderClass = '!py-4.5 border-b border-border bg-card'
 
 export const adminDialogChromeHeaderSplitClass =
   '!flex-row !items-center !justify-between !gap-2 !pr-0'
@@ -98,10 +97,10 @@ export const adminDialogChromeHeaderSplitClass =
 export const adminDialogChromeTitleClass =
   '!text-admin-title !font-bold text-foreground tracking-tight'
 
-export const adminDialogChromeContentClass = '!overflow-hidden !px-6 !py-6 bg-card text-card-foreground'
+export const adminDialogChromeContentClass =
+  '!overflow-hidden !px-6 !py-6 bg-card text-card-foreground'
 
-export const adminDialogChromeFooterClass =
-  '!px-6 !py-4 border-t border-border bg-card'
+export const adminDialogChromeFooterClass = '!px-6 !py-4 border-t border-border bg-card'
 
 export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-foreground'
 

@@ -4,11 +4,7 @@
     <div class="flex items-center min-w-0">
       <div
         class="flex size-7 shrink-0 items-center justify-center rounded-lg mr-2.5 overflow-hidden transition-colors"
-        :class="
-          brandLogo
-            ? 'bg-muted/60 border border-border/60'
-            : 'bg-primary/10 text-primary'
-        "
+        :class="brandLogo ? 'bg-muted/60 border border-border/60' : 'bg-primary/10 text-primary'"
       >
         <img
           v-if="brandLogo && !logoLoadFailed"

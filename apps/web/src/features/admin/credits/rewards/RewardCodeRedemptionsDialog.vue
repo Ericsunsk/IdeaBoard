@@ -94,7 +94,9 @@
         >
           <template #body="{ data }">
             <span class="font-semibold text-foreground">{{ data.displayName }}</span>
-            <span class="block text-admin-caption text-muted-foreground">{{ data.userPublicId }}</span>
+            <span class="block text-admin-caption text-muted-foreground">{{
+              data.userPublicId
+            }}</span>
           </template>
         </AdminColumn>
         <AdminColumn
@@ -165,7 +167,9 @@
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-muted-foreground">masked Code hint</dt>
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
+                  masked Code hint
+                </dt>
                 <dd
                   class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >

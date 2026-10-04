@@ -303,7 +303,6 @@ async function loadModelPools() {
   })
 }
 
-
 async function loadPoolCatalog() {
   if (poolCatalogLoading.value) return
   poolCatalogLoading.value = true

@@ -410,10 +410,7 @@ export function stageUpdateGroupGeometry(
   })
 }
 
-function removeGroupWrite(
-  draft: CanvasGraphTransactionDraft,
-  groupId: CanvasGraphGroupId,
-): void {
+function removeGroupWrite(draft: CanvasGraphTransactionDraft, groupId: CanvasGraphGroupId): void {
   draft.groupWrites.set(groupId, null)
   removeFromOrder(ensureGroupOrder(draft), groupId, draft.groupOrderPatches)
 }
