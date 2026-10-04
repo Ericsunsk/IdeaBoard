@@ -316,9 +316,10 @@ func newAppTaskRuntime(
 	// AutoRemediate stays false (fail-closed); opening automatic repair
 	// needs a dedicated opt-in switch plus repair-path tests.
 	identityAdminReconciler := identityreconciliation.NewReconciler(identityreconciliation.ReconcilerDeps{
-		DB:    dbs.db,
-		Users: repos.userRepo,
-		Auth:  services.authServiceClient,
+		DB:      dbs.db,
+		Users:   repos.userRepo,
+		Auth:    services.authServiceClient,
+		Manager: services.authServiceClient,
 	})
 	identityAdminDispatcher, err := identityreconciliation.NewRunDispatcher(services.riverProducer)
 	if err != nil {

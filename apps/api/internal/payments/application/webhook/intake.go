@@ -17,6 +17,7 @@ import (
 	paymentcontracts "ideaboard/api/internal/payments/application/contracts"
 	"ideaboard/api/internal/payments/application/credentials"
 	paymentports "ideaboard/api/internal/payments/ports"
+	"ideaboard/api/internal/platform/database"
 )
 
 // ReceiveStripeWebhook verifies the raw-body signature against every retained
@@ -45,6 +46,15 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 	if err := paymentports.ValidateStripeWebhookEvent(event); err != nil {
 		return paymentports.StripeWebhookReceipt{}, err
 	}
+	existing := ""
+	if current, err := s.inbox.GetStripeWebhookEvent(ctx, event.ID); err == nil {
+		existing = current
+		if existing == string(WebhookProcessingProcessed) || existing == string(WebhookProcessingIgnored) {
+			return paymentports.StripeWebhookReceipt{EventID: event.ID, Duplicate: true, Ignored: existing == string(WebhookProcessingIgnored)}, nil
+		}
+	} else if !database.IsNotFound(err) {
+		return paymentports.StripeWebhookReceipt{}, fmt.Errorf("load Stripe webhook inbox state: %w", err)
+	}
 	if event.Livemode != (stored.Mode == paymentports.StripeModeLive) {
 		return paymentports.StripeWebhookReceipt{}, paymentports.ErrMalformedWebhookPayload
 	}
@@ -61,6 +71,13 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 	receipt := paymentports.StripeWebhookReceipt{EventID: event.ID, Duplicate: duplicate, Ignored: !recognized}
 	if !recognized {
 		return receipt, nil
+	}
+	claimed, err := s.inbox.ClaimStripeWebhookEvent(ctx, event.ID)
+	if err != nil {
+		return paymentports.StripeWebhookReceipt{}, fmt.Errorf("claim Stripe webhook event: %w", err)
+	}
+	if !claimed {
+		return paymentports.StripeWebhookReceipt{EventID: event.ID, Duplicate: true}, nil
 	}
 	if err := s.processEvent(ctx, event, stored, now); err != nil {
 		return paymentports.StripeWebhookReceipt{}, err

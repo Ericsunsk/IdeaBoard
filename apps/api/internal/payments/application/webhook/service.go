@@ -15,6 +15,8 @@ import (
 )
 
 type InboxStore interface {
+	GetStripeWebhookEvent(context.Context, string) (string, error)
+	ClaimStripeWebhookEvent(context.Context, string) (bool, error)
 	InsertStripeWebhookEvent(context.Context, paymentports.StripeWebhookEvent, string, *time.Time) (bool, error)
 	MarkStripeWebhookEventProcessed(context.Context, string, string, string, time.Time) error
 }

@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"strings"
 
+	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -301,10 +304,6 @@ func (p *PostgresWebhookPersistence) RecordAttempt(ctx context.Context, subscrip
 	if err := p.valid(); err != nil {
 		return err
 	}
-	deliveryID, err := p.deliveryID(ctx, subscriptionID, envelope)
-	if err != nil {
-		return err
-	}
 	status := DeliveryStatusRetrying
 	completedAt := any(nil)
 	if attempt.Outcome == AttemptOutcomeDelivered {
@@ -314,14 +313,21 @@ func (p *PostgresWebhookPersistence) RecordAttempt(ctx context.Context, subscrip
 		status = DeliveryStatusDeadLetter
 		completedAt = attempt.At
 	}
-	_, err = p.db.Exec(ctx, `
+	return dbutil.WithTxDBTX(ctx, p.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		var deliveryID int64
+		if err := tx.QueryRow(ctx, `SELECT d.internal_id `+deliveryLookupSQL, subscriptionID, envelope.ID).Scan(&deliveryID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `
 INSERT INTO event_delivery_attempts (delivery_id, attempt_number, status_code, outcome, error_message, attempted_at)
-VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (delivery_id, attempt_number) DO UPDATE SET status_code=EXCLUDED.status_code, outcome=EXCLUDED.outcome, error_message=EXCLUDED.error_message, attempted_at=EXCLUDED.attempted_at`, deliveryID, attempt.Attempt, attempt.StatusCode, string(attempt.Outcome), attempt.Error, attempt.At)
-	if err != nil {
-		return err
-	}
-	_, err = p.db.Exec(ctx, `UPDATE event_deliveries SET attempt_count=GREATEST(attempt_count,$2), status=$3, last_attempted_at=$4, response_status=$5, response_body=$6, completed_at=$7 WHERE internal_id=$1`, deliveryID, attempt.Attempt, string(status), attempt.At, attempt.StatusCode, attempt.Error, completedAt)
-	return err
+VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (delivery_id, attempt_number) DO UPDATE SET status_code=EXCLUDED.status_code, outcome=EXCLUDED.outcome, error_message=EXCLUDED.error_message, attempted_at=EXCLUDED.attempted_at`, deliveryID, attempt.Attempt, attempt.StatusCode, string(attempt.Outcome), attempt.Error, attempt.At); err != nil {
+			return fmt.Errorf("events: record webhook attempt: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE event_deliveries SET attempt_count=GREATEST(attempt_count,$2), status=$3, last_attempted_at=$4, response_status=$5, response_body=$6, completed_at=$7 WHERE internal_id=$1`, deliveryID, attempt.Attempt, string(status), attempt.At, attempt.StatusCode, attempt.Error, completedAt); err != nil {
+			return fmt.Errorf("events: update webhook delivery: %w", err)
+		}
+		return nil
+	})
 }
 
 func (p *PostgresWebhookPersistence) MarkDelivered(ctx context.Context, subscriptionID string, envelope V1Envelope) error {

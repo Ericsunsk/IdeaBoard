@@ -29,6 +29,28 @@ func (r *Repository) InsertStripeWebhookEvent(ctx context.Context, event payment
 	return rows == 0, nil
 }
 
+func (r *Repository) GetStripeWebhookEvent(ctx context.Context, eventID string) (string, error) {
+	if r == nil || r.db == nil {
+		return "", fmt.Errorf("payments repository: database unavailable")
+	}
+	event, err := r.dbWithContext(ctx).queries().GetPaymentWebhookEvent(ctx, eventID)
+	if err != nil {
+		return "", fmt.Errorf("get Stripe webhook event: %w", err)
+	}
+	return event.ProcessingResult, nil
+}
+
+func (r *Repository) ClaimStripeWebhookEvent(ctx context.Context, eventID string) (bool, error) {
+	if r == nil || r.db == nil {
+		return false, fmt.Errorf("payments repository: database unavailable")
+	}
+	rows, err := r.dbWithContext(ctx).queries().ClaimPaymentWebhookEvent(ctx, eventID)
+	if err != nil {
+		return false, fmt.Errorf("claim Stripe webhook event: %w", err)
+	}
+	return rows == 1, nil
+}
+
 func (r *Repository) MarkStripeWebhookEventProcessed(ctx context.Context, eventID, result, errorSummary string, processedAt time.Time) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("payments repository: database unavailable")

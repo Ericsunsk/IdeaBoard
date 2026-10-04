@@ -92,24 +92,27 @@ type userScanner interface {
 	List(ctx context.Context, keyword, role string, status int16, hasStatus bool, page, pageSize int) ([]*domain.User, ports.UserListCounts, error)
 }
 
-// Reconciler executes Identity admin reconciliation runs. Findings are
-// recorded, alerts are emitted, nothing is repaired.
+// Reconciler executes Identity admin reconciliation runs. The scan remains
+// read-only; the worker may separately repair only the low-privilege side of
+// a role mismatch (local user versus Auth admin).
 type Reconciler struct {
 	store         *Store
 	users         userScanner
 	auth          ports.AuthUserStateReader
+	manager       ports.AuthUserManager
 	autoRemediate bool
 	now           func() time.Time
 }
 
 // ReconcilerDeps wires the reconciler without importing concrete
 // infrastructure: the composition root passes the users repository (which
-// satisfies userScanner) and the Auth service client (which satisfies
-// ports.AuthUserStateReader).
+// satisfies userScanner) and the Auth service client (which satisfies both
+// the Auth state reader and the narrow role manager used by the worker).
 type ReconcilerDeps struct {
-	DB    *pgxpool.Pool
-	Users userScanner
-	Auth  ports.AuthUserStateReader
+	DB      *pgxpool.Pool
+	Users   userScanner
+	Auth    ports.AuthUserStateReader
+	Manager ports.AuthUserManager
 	// AutoRemediate is the future opt-in switch. It must stay false: when
 	// true, ExecuteReconciliation fails closed with
 	// ErrAutoRemediationNotSupported instead of repairing anything.
@@ -122,9 +125,47 @@ func NewReconciler(deps ReconcilerDeps) *Reconciler {
 		store:         NewStore(deps.DB),
 		users:         deps.Users,
 		auth:          deps.Auth,
+		manager:       deps.Manager,
 		autoRemediate: deps.AutoRemediate,
 		now:           time.Now,
 	}
+}
+
+// RepairRoleDemotions applies only demotion findings from a completed scan.
+// SetUserRole is idempotent, and each finding is resolved only after Auth
+// acknowledges the desired local user role. Promotion drift remains manual so
+// a stale Auth read can never grant admin privileges automatically.
+func (r *Reconciler) RepairRoleDemotions(ctx context.Context, runID int64) error {
+	if r == nil || r.store == nil || r.manager == nil || runID <= 0 {
+		return errInvalidReconciliationCommand
+	}
+	findings, err := r.store.ListRunFindings(ctx, runID)
+	if err != nil {
+		return err
+	}
+	for _, finding := range findings {
+		if finding.Status != "open" || finding.FindingType != FindingRoleMismatch {
+			continue
+		}
+		authID, _ := finding.Details["auth_user_id"].(string)
+		role, _ := finding.Details["local_role"].(string)
+		if strings.TrimSpace(authID) == "" {
+			return fmt.Errorf("identity admin reconciliation: invalid role finding %d", finding.ID)
+		}
+		if role == domain.RoleAdmin {
+			continue
+		}
+		if role != domain.RoleUser {
+			return fmt.Errorf("identity admin reconciliation: invalid role finding %d", finding.ID)
+		}
+		if err := r.manager.SetUserRole(ctx, authID, role); err != nil {
+			return fmt.Errorf("identity admin reconciliation: repair role finding %d: %w", finding.ID, err)
+		}
+		if err := r.store.resolveFinding(ctx, finding.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetClock overrides the clock (tests only).
@@ -393,14 +434,15 @@ func classifyUserDrift(user *domain.User, state *authidentity.AuthUserState, has
 			SubjectType: "user",
 			SubjectID:   subjectID,
 			Details: map[string]any{
-				"local_role":  user.Role,
-				"auth_role":   state.Role,
-				"auth_found":  true,
-				"winner":      "local",
-				"remediation": "push_to_auth",
-				"applied":     false,
-				"dry_run":     true,
-				"note":        "role drifted; local wins and a future repair would push the local role to Auth (demote drift leaves a residual Auth admin)",
+				"local_role":   user.Role,
+				"auth_role":    state.Role,
+				"auth_user_id": strings.TrimSpace(derefAuthUserID(user.AuthUserID)),
+				"auth_found":   true,
+				"winner":       "local",
+				"remediation":  "push_to_auth",
+				"applied":      false,
+				"dry_run":      true,
+				"note":         "role drifted; local wins and a future repair would push the local role to Auth (demote drift leaves a residual Auth admin)",
 			},
 		})
 	}

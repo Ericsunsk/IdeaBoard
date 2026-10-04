@@ -76,7 +76,7 @@ CREATE TABLE payment_webhook_events (
   payment_order_id UUID,
   CONSTRAINT ck_payment_webhook_event_id CHECK (char_length(stripe_event_id) BETWEEN 1 AND 255),
   CONSTRAINT ck_payment_webhook_event_type CHECK (char_length(event_type) BETWEEN 1 AND 255),
-  CONSTRAINT ck_payment_webhook_processing_result CHECK (processing_result IN ('received', 'ignored', 'processed', 'failed')),
+  CONSTRAINT ck_payment_webhook_processing_result CHECK (processing_result IN ('received', 'processing', 'ignored', 'processed', 'failed')),
   CONSTRAINT ck_payment_webhook_error_summary_length CHECK (char_length(error_summary) <= 500)
 );
 

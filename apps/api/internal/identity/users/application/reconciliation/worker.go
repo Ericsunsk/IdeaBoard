@@ -59,11 +59,13 @@ func (d *riverDispatcher) DispatchReconciliationRun(ctx context.Context, tx pgx.
 
 type executeService interface {
 	ExecuteReconciliation(context.Context, int64) error
+	RepairRoleDemotions(context.Context, int64) error
 	FailReconciliation(context.Context, int64, error) error
 	GetReconciliationRun(context.Context, int64) (Run, error)
 }
 
-// ExecuteWorker runs one dry-run scan for a scheduled run.
+// ExecuteWorker runs one scan and then repairs only local-user/Auth-admin
+// role drift. All other findings remain dry-run and require review.
 type ExecuteWorker struct {
 	river.WorkerDefaults[executeArgs]
 	service executeService
@@ -87,14 +89,21 @@ func (w *ExecuteWorker) Work(ctx context.Context, job *river.Job[executeArgs]) e
 		return errInvalidReconciliationCommand
 	}
 	err := w.service.ExecuteReconciliation(ctx, job.Args.RunID)
-	if err == nil {
-		return nil
+	if err != nil {
+		w.logFailure(ctx, job, err)
+		if job.Attempt < job.MaxAttempts {
+			return err
+		}
+		return w.failRun(ctx, job, err)
 	}
-	w.logFailure(ctx, job, err)
-	if job.Attempt < job.MaxAttempts {
-		return err
+	if err := w.service.RepairRoleDemotions(ctx, job.Args.RunID); err != nil {
+		w.logFailure(ctx, job, err)
+		if job.Attempt < job.MaxAttempts {
+			return err
+		}
+		return w.failRun(ctx, job, err)
 	}
-	return w.failRun(ctx, job, err)
+	return nil
 }
 
 func (w *ExecuteWorker) logFailure(ctx context.Context, job *river.Job[executeArgs], err error) {

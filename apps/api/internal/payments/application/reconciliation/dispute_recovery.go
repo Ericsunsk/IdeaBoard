@@ -34,13 +34,17 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, now time.Time
 			retryErr = errors.Join(retryErr, err)
 			continue
 		}
-		if changed && s.publish != nil {
-			s.publish(updated.UserID, paymentports.PaymentEventDisputeUpdated)
-		}
 		if s.disputeExpiry != nil {
 			if err := s.disputeExpiry.ExpireDisputeCheckoutSessions(ctx, updated); err != nil {
 				retryErr = errors.Join(retryErr, err)
+				continue
 			}
+		}
+		// The dispute fact and dependent checkout expiry are durable before
+		// this hint. Re-emitting on a later due pass repairs a dropped
+		// in-memory notification without changing the ledger fact.
+		if (changed || updated.UserID > 0) && s.publish != nil {
+			s.publish(updated.UserID, paymentports.PaymentEventDisputeUpdated)
 		}
 	}
 	return retryErr

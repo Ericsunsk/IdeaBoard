@@ -45,6 +45,26 @@ func TestDispatchRecoversExternalRefundWithoutLocalReservation(t *testing.T) {
 	}
 }
 
+func TestDispatchPublishesExternalRefundOnlyAfterConvergence(t *testing.T) {
+	now := time.Now().UTC()
+	event := paymentports.StripeWebhookEvent{
+		ID: "evt_refund_order", Type: "refund.updated",
+		ObjectID: "re_order", ChargeID: "ch_order", CreatedAt: now,
+	}
+	fx := newTestFixtures(t, event, nil)
+	fx.refundGw.refund = paymentports.StripeRefund{ID: "re_order", ChargeID: "ch_order", AmountMinor: 100, Currency: "usd", Status: "succeeded"}
+	publishedAfterConvergence := false
+	fx.service.events = countingPublisher{fn: func(int64, paymentports.PaymentEvent) {
+		publishedAfterConvergence = fx.convergence.refundConverged
+	}}
+	if _, err := fx.service.ReceiveStripeWebhook(context.Background(), []byte("{}"), "sig"); err != nil {
+		t.Fatalf("ReceiveStripeWebhook: %v", err)
+	}
+	if !publishedAfterConvergence {
+		t.Fatal("refund event published before durable convergence")
+	}
+}
+
 // TestDispatchConvergesDisputeThroughCanonicalRetrieve pins the dispute
 // dispatch branch: the canonical dispute is retrieved and converged, and the
 // user event fires exactly once.

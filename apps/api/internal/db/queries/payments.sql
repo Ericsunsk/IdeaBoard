@@ -137,6 +137,22 @@ VALUES (
 )
 ON CONFLICT (stripe_event_id) DO NOTHING;
 
+-- name: GetPaymentWebhookEvent :one
+SELECT *
+FROM payment_webhook_events
+WHERE stripe_event_id = $1;
+
+-- name: ClaimPaymentWebhookEvent :execrows
+UPDATE payment_webhook_events
+SET processing_result = 'processing',
+    processed_at = clock_timestamp(),
+    error_summary = ''
+WHERE stripe_event_id = $1
+  AND (
+    processing_result IN ('received', 'failed')
+    OR (processing_result = 'processing' AND processed_at < clock_timestamp() - INTERVAL '5 minutes')
+  );
+
 -- name: GetPaymentOrderByIdempotency :one
 SELECT *
 FROM payment_orders

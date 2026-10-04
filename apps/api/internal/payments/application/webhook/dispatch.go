@@ -33,19 +33,24 @@ func (s *Service) processEvent(ctx context.Context, event paymentports.StripeWeb
 	if !checkoutEvent {
 		if strings.HasPrefix(event.Type, "refund.") {
 			if err := s.processRefund(ctx, event, stored.CredentialID); err != nil {
-				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingFailed), paymentreconciliation.OperationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
-				return err
+				return errors.Join(err, s.markWebhookFailure(ctx, event.ID, paymentreconciliation.OperationalErrorSummary(err, "Stripe refund webhook processing failed"), now))
 			}
 		}
 		if strings.HasPrefix(event.Type, "charge.dispute.") {
 			if err := s.processDispute(ctx, event, stored.CredentialID); err != nil {
-				_ = s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingFailed), paymentreconciliation.OperationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
-				return err
+				return errors.Join(err, s.markWebhookFailure(ctx, event.ID, paymentreconciliation.OperationalErrorSummary(err, "Stripe dispute webhook processing failed"), now))
 			}
 		}
 		return s.inbox.MarkStripeWebhookEventProcessed(ctx, event.ID, string(WebhookProcessingProcessed), "", now)
 	}
-	return s.processCheckout(ctx, event, stored, signal, now)
+	if err := s.processCheckout(ctx, event, stored, signal, now); err != nil {
+		return errors.Join(err, s.markWebhookFailure(ctx, event.ID, paymentreconciliation.OperationalErrorSummary(err, "Stripe checkout webhook processing failed"), now))
+	}
+	return nil
+}
+
+func (s *Service) markWebhookFailure(ctx context.Context, eventID, summary string, now time.Time) error {
+	return s.inbox.MarkStripeWebhookEventProcessed(ctx, eventID, string(WebhookProcessingFailed), summary, now)
 }
 
 // processCheckout re-reads the canonical Checkout Session from Stripe and
@@ -98,10 +103,13 @@ func (s *Service) processDispute(ctx context.Context, event paymentports.StripeW
 	if err != nil {
 		return err
 	}
+	if err := s.dispute.ExpireDisputeCheckoutSessions(ctx, dispute); err != nil {
+		return err
+	}
 	if changed && s.events != nil {
 		s.events.Publish(dispute.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventDisputeUpdated})
 	}
-	return s.dispute.ExpireDisputeCheckoutSessions(ctx, dispute)
+	return nil
 }
 
 // processRefund converges a refund event for a known local refund, or falls
@@ -162,11 +170,11 @@ func (s *Service) processExternalRefund(ctx context.Context, refundID, credentia
 	if err != nil {
 		return err
 	}
-	if s.events != nil {
-		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
-	}
 	providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
 	_, err = s.refund.Converge(ctx, refund, providerRefund)
+	if err == nil && s.events != nil {
+		s.events.Publish(refund.UserID, paymentports.PaymentEvent{Status: paymentports.PaymentEventRefundUpdated})
+	}
 	return err
 }
 

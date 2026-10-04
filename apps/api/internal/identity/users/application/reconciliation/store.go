@@ -289,6 +289,21 @@ func (s *Store) CountFindings(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
+func (s *Store) resolveFinding(ctx context.Context, findingID int64) error {
+	pool := s.dbWithContext(ctx)
+	if pool == nil || findingID <= 0 {
+		return errInvalidReconciliationCommand
+	}
+	_, err := pool.Exec(ctx, `
+UPDATE identity_admin_reconciliation_findings
+SET status = 'resolved', resolved_at = clock_timestamp()
+WHERE id = $1 AND status = 'open'`, findingID)
+	if err != nil {
+		return fmt.Errorf("identity admin reconciliation: resolve finding: %w", err)
+	}
+	return nil
+}
+
 type findingRows interface {
 	Next() bool
 	Scan(...any) error

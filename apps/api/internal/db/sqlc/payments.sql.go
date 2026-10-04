@@ -184,6 +184,26 @@ func (q *Queries) ClaimDuePaymentOrderReconciliations(ctx context.Context, arg C
 	return items, nil
 }
 
+const claimPaymentWebhookEvent = `-- name: ClaimPaymentWebhookEvent :execrows
+UPDATE payment_webhook_events
+SET processing_result = 'processing',
+    processed_at = clock_timestamp(),
+    error_summary = ''
+WHERE stripe_event_id = $1
+  AND (
+    processing_result IN ('received', 'failed')
+    OR (processing_result = 'processing' AND processed_at < clock_timestamp() - INTERVAL '5 minutes')
+  )
+`
+
+func (q *Queries) ClaimPaymentWebhookEvent(ctx context.Context, stripeEventID string) (int64, error) {
+	result, err := q.db.Exec(ctx, claimPaymentWebhookEvent, stripeEventID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const completePaymentCheckoutShutdown = `-- name: CompletePaymentCheckoutShutdown :execrows
 UPDATE payment_checkout_shutdowns
 SET completed_at = $2
@@ -854,6 +874,30 @@ func (q *Queries) GetPaymentStripeCredentialForOrderNumber(ctx context.Context, 
 		&i.SecretMaterialKind,
 		&i.CreatedBy,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPaymentWebhookEvent = `-- name: GetPaymentWebhookEvent :one
+SELECT stripe_event_id, event_type, stripe_object_id, livemode, stripe_created_at, processing_result, error_summary, received_at, processed_at, payment_order_id
+FROM payment_webhook_events
+WHERE stripe_event_id = $1
+`
+
+func (q *Queries) GetPaymentWebhookEvent(ctx context.Context, stripeEventID string) (PaymentWebhookEvent, error) {
+	row := q.db.QueryRow(ctx, getPaymentWebhookEvent, stripeEventID)
+	var i PaymentWebhookEvent
+	err := row.Scan(
+		&i.StripeEventID,
+		&i.EventType,
+		&i.StripeObjectID,
+		&i.Livemode,
+		&i.StripeCreatedAt,
+		&i.ProcessingResult,
+		&i.ErrorSummary,
+		&i.ReceivedAt,
+		&i.ProcessedAt,
+		&i.PaymentOrderID,
 	)
 	return i, err
 }

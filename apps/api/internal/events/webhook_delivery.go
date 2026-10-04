@@ -15,7 +15,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 )
 
@@ -80,7 +79,9 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	body, err := json.Marshal(envelope)
 	s.mu.Unlock()
 	if err != nil {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, err.Error())
+		if recordErr := s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, err.Error()); recordErr != nil {
+			return recordErr
+		}
 		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, err.Error())
 	}
 	s.mu.Lock()
@@ -90,14 +91,18 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	headers := SignWebhook(secret, body, envelope.ID, s.clock())
 	sender := s.sender
 	if sender == nil {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, "no sender configured")
+		if recordErr := s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, 0, AttemptOutcomeFailed, "no sender configured"); recordErr != nil {
+			return recordErr
+		}
 		return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, "no sender configured")
 	}
 	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	status, sendErr := sender.Send(sendCtx, destination, headers, body)
 	cancel()
 	if sendErr == nil && status >= 200 && status < 300 {
-		s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeDelivered, "")
+		if err := s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeDelivered, ""); err != nil {
+			return err
+		}
 		if persistence != nil {
 			if err := persistence.MarkDelivered(ctx, subscriptionID, envelope); err != nil {
 				return fmt.Errorf("events: persist delivered webhook: %w", err)
@@ -120,7 +125,9 @@ func (s *WebhookStore) executeDeliveryAttempt(ctx context.Context, subscriptionI
 	} else {
 		detail = fmt.Sprintf("unexpected status %d", status)
 	}
-	s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeFailed, detail)
+	if err := s.recordAttempt(ctx, subscriptionID, envelope, attempt, maxAttempts, status, AttemptOutcomeFailed, detail); err != nil {
+		return err
+	}
 	return s.deliveryFailure(subscriptionID, envelope, attempt, maxAttempts, detail)
 }
 
@@ -163,12 +170,12 @@ func (s *WebhookStore) parkDeadLetterOnce(subscriptionID string, envelope V1Enve
 	sub.UpdatedAt = s.clock()
 }
 
-func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts, status int, outcome AttemptOutcome, detail string) {
+func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string, envelope V1Envelope, attempt, maxAttempts, status int, outcome AttemptOutcome, detail string) error {
 	s.mu.Lock()
 	sub, ok := s.subs[subscriptionID]
 	if !ok {
 		s.mu.Unlock()
-		return
+		return nil
 	}
 	fact := WebhookAttempt{
 		DeliveryID: envelope.ID, Attempt: attempt, StatusCode: status,
@@ -187,7 +194,8 @@ func (s *WebhookStore) recordAttempt(ctx context.Context, subscriptionID string,
 	s.mu.Unlock()
 	if persistence != nil {
 		if err := persistence.RecordAttempt(ctx, subscriptionID, envelope, fact, exhausted); err != nil {
-			slog.Warn("webhook durable attempt record failed", "subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+			return fmt.Errorf("events: persist webhook attempt: %w", err)
 		}
 	}
+	return nil
 }

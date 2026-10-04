@@ -132,6 +132,22 @@ func TestIntakeRecordsIgnoredEventsWithoutDispatch(t *testing.T) {
 	}
 }
 
+func TestIntakeShortCircuitsProcessedDuplicate(t *testing.T) {
+	now := time.Now().UTC()
+	fx := newTestFixtures(t, paymentports.StripeWebhookEvent{
+		ID: "evt_processed", Type: "checkout.session.completed", ObjectID: "cs_processed", CreatedAt: now,
+	}, nil)
+	fx.inbox.existing = string(WebhookProcessingProcessed)
+	if receipt, err := fx.service.ReceiveStripeWebhook(context.Background(), []byte("{}"), "sig"); err != nil {
+		t.Fatalf("ReceiveStripeWebhook: %v", err)
+	} else if !receipt.Duplicate || receipt.Ignored {
+		t.Fatalf("receipt = %+v, want processed duplicate", receipt)
+	}
+	if fx.inbox.inserts != 0 || fx.inbox.claims != 0 || fx.checkout.converges != 0 {
+		t.Fatalf("duplicate reached processing: inserts=%d claims=%d converges=%d", fx.inbox.inserts, fx.inbox.claims, fx.checkout.converges)
+	}
+}
+
 // TestDispatchConvergesCheckoutThroughOrderLifecycle pins the checkout
 // dispatch path: a recognized session event re-reads the canonical session
 // and converges it without intake bearing settlement details.
@@ -183,7 +199,21 @@ func (f *fakeConfiguration) GetStripeCredentialForOrder(context.Context, string)
 
 type fakeInbox struct {
 	inserts    int
+	claims     int
+	existing   string
 	lastResult string
+}
+
+func (f *fakeInbox) GetStripeWebhookEvent(context.Context, string) (string, error) {
+	if f.existing != "" {
+		return f.existing, nil
+	}
+	return "", errFakeNotFound
+}
+
+func (f *fakeInbox) ClaimStripeWebhookEvent(context.Context, string) (bool, error) {
+	f.claims++
+	return true, nil
 }
 
 func (f *fakeInbox) InsertStripeWebhookEvent(_ context.Context, _ paymentports.StripeWebhookEvent, result string, _ *time.Time) (bool, error) {
@@ -198,8 +228,9 @@ func (f *fakeInbox) MarkStripeWebhookEventProcessed(_ context.Context, _ string,
 }
 
 type fakeConvergence struct {
-	order    paymentsdomain.PaymentOrder
-	external paymentsdomain.PaymentRefund
+	order           paymentsdomain.PaymentOrder
+	external        paymentsdomain.PaymentRefund
+	refundConverged bool
 }
 
 func (f *fakeConvergence) GetPaymentRefundByStripeID(context.Context, string) (paymentsdomain.PaymentRefund, error) {
@@ -270,6 +301,7 @@ func (f *fakeConvergence) MarkPaymentRefundFailed(_ context.Context, _ string, _
 }
 
 func (f *fakeConvergence) MarkPaymentRefundProviderResult(_ context.Context, _ string, _ string, _ string, _ time.Time) (paymentsdomain.PaymentRefund, error) {
+	f.refundConverged = true
 	return paymentsdomain.PaymentRefund{}, nil
 }
 

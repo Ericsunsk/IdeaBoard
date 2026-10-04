@@ -49,6 +49,13 @@ func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, now time.Time)
 		}
 		if err := s.convergeRefund(ctx, refund, provider, now); err != nil {
 			retryErr = errors.Join(retryErr, err)
+			continue
+		}
+		// The durable refund fact is committed before this post-commit hint.
+		// Re-emitting during a later recovery pass lets connected clients
+		// refresh after a process crash dropped the original in-memory event.
+		if s.publish != nil {
+			s.publish(refund.UserID, paymentports.PaymentEventRefundUpdated)
 		}
 	}
 	return retryErr

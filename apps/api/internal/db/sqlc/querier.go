@@ -32,6 +32,7 @@ type Querier interface {
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
+	ClaimPaymentWebhookEvent(ctx context.Context, stripeEventID string) (int64, error)
 	// Durable submit idempotency fact (task_submission_idempotency), written
 	// inside the settlement transaction so a committed claim always has its task
 	// row and a rolled-back settlement leaves no claim behind.
@@ -303,6 +304,7 @@ type Querier interface {
 	GetPaymentStripeCredential(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id pgtype.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
+	GetPaymentWebhookEvent(ctx context.Context, stripeEventID string) (PaymentWebhookEvent, error)
 	GetPersonalWorkspaceByOwner(ctx context.Context, ownerUserID pgtype.Int8) (Workspace, error)
 	GetQuickSavesFolder(ctx context.Context, workspaceID int64) (LibraryFolder, error)
 	GetServiceModelPoolVersion(ctx context.Context, service string) (int64, error)
