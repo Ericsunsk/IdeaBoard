@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/db/dbutil"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	rewardsports "ideaboard/api/internal/rewards/ports"
 	"strings"
@@ -71,12 +72,25 @@ func (s *Service) currentTime() time.Time {
 	return time.Now().UTC()
 }
 
-// begin starts a new transaction.
-func (s *Service) begin(ctx context.Context) (pgx.Tx, error) {
-	if s == nil || s.pool == nil {
-		return nil, fmt.Errorf("reward codes service unavailable")
+// begin opens the write transaction for one admin mutation, or reuses
+// the ambient guard transaction staged in the context (control audit
+// atomicity, step 3). The bool reports ownership: true means the caller
+// opened the transaction and must commit or roll it back; false means
+// the transaction is BORROWED from the guard, which alone commits or
+// rolls it back, so the caller must do neither. With no carrier the
+// pool path below runs unchanged.
+func (s *Service) begin(ctx context.Context) (pgx.Tx, bool, error) {
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return ambient, false, nil
 	}
-	return s.pool.Begin(ctx)
+	if s == nil || s.pool == nil {
+		return nil, false, fmt.Errorf("reward codes service unavailable")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	return tx, true, nil
 }
 
 func (s *Service) beginReadSnapshot(ctx context.Context) (pgx.Tx, error) {
@@ -99,11 +113,15 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 		return CreatedRewardCode{}, err
 	}
 
-	tx, err := s.begin(ctx)
+	tx, owned, err := s.begin(ctx)
 	if err != nil {
 		return CreatedRewardCode{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	if err := s.lockRewardCodeIdentity(ctx, tx, input.normalized); err != nil {
 		return CreatedRewardCode{}, err
@@ -112,7 +130,7 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 	if replay, ok, err := s.loadRewardCodeReplay(ctx, tx, input, command.ActorUserID); err != nil {
 		return CreatedRewardCode{}, err
 	} else if ok {
-		return finishRewardCodeReplay(ctx, tx, replay)
+		return finishRewardCodeReplay(ctx, tx, replay, owned)
 	}
 
 	if err := ensureRewardCodeCodeAvailable(ctx, tx, input.current, input.previous); err != nil {
@@ -128,7 +146,7 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 		if !ok {
 			return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
 		}
-		return finishRewardCodeReplay(ctx, tx, replay)
+		return finishRewardCodeReplay(ctx, tx, replay, owned)
 	}
 	if err != nil {
 		return CreatedRewardCode{}, err
@@ -140,8 +158,10 @@ func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCode
 	if err := recordRewardCodeCreation(ctx, tx, rewardCode, input.displayName, input.creditAmount, input.maxRedemptions, input.expiresAt, command.ActorUserID); err != nil {
 		return CreatedRewardCode{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("commit reward Code creation: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return CreatedRewardCode{}, fmt.Errorf("commit reward Code creation: %w", err)
+		}
 	}
 	return CreatedRewardCode{RewardCode: rewardCode, Plaintext: input.normalized}, nil
 }
@@ -217,9 +237,11 @@ WHERE created_by = $1 AND idempotency_key = $2`, actorUserID, input.idempotencyK
 	return rewardCode, true, nil
 }
 
-func finishRewardCodeReplay(ctx context.Context, tx pgx.Tx, rewardCode RewardCode) (CreatedRewardCode, error) {
-	if err := tx.Rollback(ctx); err != nil {
-		return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
+func finishRewardCodeReplay(ctx context.Context, tx pgx.Tx, rewardCode RewardCode, owned bool) (CreatedRewardCode, error) {
+	if owned {
+		if err := tx.Rollback(ctx); err != nil {
+			return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
+		}
 	}
 	return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
 }

@@ -215,6 +215,15 @@ func withManagedRestrictionTransaction(
 	if service == nil || service.pool == nil {
 		return ports.WalletRestrictionChange{}, fmt.Errorf("credits restrictions: database pool not configured")
 	}
+	// Ambient guard transaction (control audit atomicity, step 3): same
+	// borrower contract as the commands path above. The restriction
+	// writes join the guard-owned transaction; the guard alone commits
+	// or rolls it back, so this path never begins, commits, or rolls
+	// back. With no carrier the legacy owned-transaction path below
+	// runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return run(&transactionLifecycle{tx: ambient, backend: service.backend})
+	}
 	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return ports.WalletRestrictionChange{}, fmt.Errorf("credits restrictions: begin transaction: %w", err)

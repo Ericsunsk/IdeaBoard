@@ -59,6 +59,12 @@ const (
 	// RiverJobTimeoutWebhookDeliver covers one signed delivery attempt
 	// (one outbound POST under a 5s send budget plus store bookkeeping).
 	RiverJobTimeoutWebhookDeliver = time.Minute
+	// RiverJobTimeoutIdentityAdminReconciliation covers one bounded dry-run
+	// scan and its finding persistence.
+	RiverJobTimeoutIdentityAdminReconciliation = 4 * time.Minute
+	// RiverJobTimeoutIdentityAdminReconciliationSchedule covers one idempotent
+	// schedule/catch-up write and transactional enqueue.
+	RiverJobTimeoutIdentityAdminReconciliationSchedule = time.Minute
 )
 
 // QueueTimeoutPolicy pins the River Timeout of one worker.
@@ -157,6 +163,18 @@ func RiverTimeoutMatrix() []QueueTimeoutPolicy {
 			Timeout: RiverJobTimeoutWebhookDeliver,
 			Worker:  "WebhookDeliverWorker (webhook_deliver)",
 			Notes:   "single signed POST attempt; short budget keeps slow endpoints from head-blocking the delivery queue",
+		},
+		{
+			Queue:   "identity_admin_reconciliation",
+			Timeout: RiverJobTimeoutIdentityAdminReconciliation,
+			Worker:  "IdentityReconciliationExecuteWorker",
+			Notes:   "bounded dry-run scan and finding persistence",
+		},
+		{
+			Queue:   "identity_admin_reconciliation",
+			Timeout: RiverJobTimeoutIdentityAdminReconciliationSchedule,
+			Worker:  "IdentityReconciliationScheduleWorker",
+			Notes:   "idempotent schedule/catch-up write and transactional enqueue",
 		},
 	}
 }

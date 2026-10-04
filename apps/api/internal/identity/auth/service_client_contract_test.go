@@ -767,6 +767,86 @@ func TestServiceClientImpersonationBridgeRejectsSuccessWithoutSessionCookie(t *t
 	}
 }
 
+func TestServiceClientGetUserStatesUsesStableContract(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		assertContractRequest(t, r, http.MethodPost, "/internal/users/states")
+		assertJSONContentType(t, r)
+		body := decodeContractBody(t, r)
+		ids, ok := body["user_ids"].([]any)
+		if !ok || len(ids) != 3 {
+			t.Fatalf("body[user_ids] = %#v, want 3 requested ids", body["user_ids"])
+		}
+		writeContractJSON(w, http.StatusOK, map[string]any{
+			"code": 0,
+			"msg":  "success",
+			"data": map[string]any{
+				"users": []any{
+					map[string]any{
+						"auth_user_id": "auth-admin",
+						"role":         "admin",
+						"banned":       false,
+						"ban_reason":   nil,
+						"ban_expires":  nil,
+					},
+					map[string]any{
+						"auth_user_id": "auth-banned",
+						"role":         "user",
+						"banned":       true,
+						"ban_reason":   "spam",
+						"ban_expires":  "2026-10-11T03:00:00Z",
+					},
+				},
+			},
+		})
+	})
+	defer server.Close()
+
+	// Unknown Auth IDs are omitted by the read-only contract, never fabricated.
+	states, err := newContractClient(server).GetUserStates(context.Background(), []string{" auth-admin ", "auth-banned", "auth-admin", "auth-missing", " "})
+	if err != nil {
+		t.Fatalf("GetUserStates returned error: %v", err)
+	}
+	if len(states) != 2 {
+		t.Fatalf("states = %#v, want 2 known identities (missing omitted)", states)
+	}
+	admin := states["auth-admin"]
+	if admin.Role != "admin" || admin.Banned || admin.BanReason != nil || admin.BanExpiresAt != nil {
+		t.Fatalf("admin state = %+v, want unbanned admin without ban metadata", admin)
+	}
+	banned := states["auth-banned"]
+	if banned.Role != "user" || !banned.Banned {
+		t.Fatalf("banned state = %+v, want banned user", banned)
+	}
+	if banned.BanReason == nil || *banned.BanReason != "spam" {
+		t.Fatalf("banned ban reason = %+v, want spam", banned.BanReason)
+	}
+	if banned.BanExpiresAt == nil || banned.BanExpiresAt.UTC().Format("2006-01-02") != "2026-10-11" {
+		t.Fatalf("banned ban expiry = %+v, want 2026-10-11", banned.BanExpiresAt)
+	}
+	if _, ok := states["auth-missing"]; ok {
+		t.Fatalf("states contains auth-missing = %#v, unknown IDs must be omitted", states)
+	}
+}
+
+func TestServiceClientGetUserStatesRejectsInvalidEnvelope(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeContractJSON(w, http.StatusOK, map[string]any{
+			"code": 0,
+			"msg":  "success",
+			"data": map[string]any{
+				"users": []any{
+					map[string]any{"auth_user_id": "", "role": "user", "banned": false},
+				},
+			},
+		})
+	})
+	defer server.Close()
+
+	if _, err := newContractClient(server).GetUserStates(context.Background(), []string{"auth-user"}); err == nil {
+		t.Fatal("GetUserStates with empty auth_user_id succeeded, want invalid envelope error")
+	}
+}
+
 func newContractServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(handler))

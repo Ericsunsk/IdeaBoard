@@ -158,18 +158,34 @@ func (s *Service) terminalSeams() (SettlementTransactor, TxHolder, TxTaskLifecyc
 	return transactor, txHolder, txStore, true
 }
 
-func beginSettlementTx(ctx context.Context, transactor SettlementTransactor) (pgx.Tx, error) {
+func beginSettlementTx(ctx context.Context, transactor SettlementTransactor) (pgx.Tx, bool, error) {
+	// Ambient guard transaction (control audit atomicity, step 3): when
+	// the guard staged its mutation transaction in the context, the
+	// whole settlement unit (claim/quote/hold/task/enqueue, or the
+	// terminal capture/release flips) joins it INSTEAD of opening the
+	// store's own settlement transaction. The bool reports ownership:
+	// true means the caller opened the transaction and must commit or
+	// roll it back; false means the transaction is BORROWED from the
+	// guard, which alone commits or rolls it back, so the caller must do
+	// neither. Nesting depth is 1: a staged carrier is reused as-is
+	// (pgx has no true nested transactions and savepoints are not
+	// needed, because settlement and audit share one flat unit of
+	// commit). With no carrier the settlement transactor path below
+	// runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return ambient, false, nil
+	}
 	if transactor == nil {
-		return nil, errors.New("workspacetasks: settlement transactor is nil")
+		return nil, false, errors.New("workspacetasks: settlement transactor is nil")
 	}
 	tx, err := transactor.BeginSettlementTx(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("workspacetasks: begin settlement tx: %w", err)
+		return nil, false, fmt.Errorf("workspacetasks: begin settlement tx: %w", err)
 	}
 	if tx == nil {
-		return nil, errors.New("workspacetasks: begin settlement tx returned nil")
+		return nil, false, errors.New("workspacetasks: begin settlement tx returned nil")
 	}
-	return tx, nil
+	return tx, true, nil
 }
 
 func rollbackSettlementTx(ctx context.Context, tx pgx.Tx) {
@@ -232,13 +248,13 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	if s.saveSnapshot == nil {
 		return nil, true, errors.New("workspacetasks: routing snapshot saver is required for atomic settlement")
 	}
-	tx, err := beginSettlementTx(ctx, transactor)
+	tx, owned, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && owned {
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
@@ -255,12 +271,15 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		if err != nil {
 			return nil, true, err
 		}
-		// Read-only transaction: commit so the replayed task is read from a
-		// consistent snapshot and no write is left open.
-		if err := commitSettlementTx(ctx, tx); err != nil {
-			return nil, true, err
+		// Owned read-only transaction: commit so the replayed task is
+		// read from a consistent snapshot and no write is left open. A
+		// borrowed guard transaction stays open for the guard to commit.
+		if owned {
+			if err := commitSettlementTx(ctx, tx); err != nil {
+				return nil, true, err
+			}
+			committed = true
 		}
-		committed = true
 		// No event is staged on replay: the winning submit already emitted
 		// task.created for this exact task.
 		return replayed, true, nil
@@ -324,10 +343,16 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 	if err := txQueue.EnqueueInTx(ctx, tx, created); err != nil {
 		return nil, true, fmt.Errorf("workspacetasks: enqueue: %w", err)
 	}
-	if err := commitSettlementTx(ctx, tx); err != nil {
-		return nil, true, err
+	// The settlement unit is durable once the owned transaction commits;
+	// a borrowed guard transaction commits later at the guard. The event
+	// stages after the successful unit either way (never inside a failed
+	// one), and the caller flushes it only after the commit it can see.
+	if owned {
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, true, err
+		}
+		committed = true
 	}
-	committed = true
 	s.stage(created.ID, created.WorkspaceID, StatusPending)
 	return created, true, nil
 }
@@ -377,13 +402,13 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 	if !ok {
 		return nil, false, nil
 	}
-	tx, err := beginSettlementTx(ctx, transactor)
+	tx, owned, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && owned {
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
@@ -419,10 +444,12 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 			}
 		}
 	}
-	if err := commitSettlementTx(ctx, tx); err != nil {
-		return nil, true, err
+	if owned {
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, true, err
+		}
+		committed = true
 	}
-	committed = true
 	s.stage(taskID, workspaceID, StatusCompleted)
 	return completed, true, nil
 }
@@ -433,13 +460,13 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 	if !ok {
 		return nil, false, nil
 	}
-	tx, err := beginSettlementTx(ctx, transactor)
+	tx, owned, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && owned {
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
@@ -459,10 +486,12 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 			}
 		}
 	}
-	if err := commitSettlementTx(ctx, tx); err != nil {
-		return nil, true, err
+	if owned {
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, true, err
+		}
+		committed = true
 	}
-	committed = true
 	s.stage(taskID, workspaceID, StatusFailed)
 	return failed, true, nil
 }
@@ -475,13 +504,13 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 	if !ok {
 		return nil, false, false, nil
 	}
-	tx, err := beginSettlementTx(ctx, transactor)
+	tx, owned, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, false, true, err
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && owned {
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
@@ -504,10 +533,12 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 			}
 		}
 	}
-	if err := commitSettlementTx(ctx, tx); err != nil {
-		return nil, false, true, err
+	if owned {
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, false, true, err
+		}
+		committed = true
 	}
-	committed = true
 	s.stage(taskID, workspaceID, StatusCancelled)
 	return flipped, false, true, nil
 }
@@ -531,13 +562,13 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	if !ok {
 		return nil, false, nil
 	}
-	tx, err := beginSettlementTx(ctx, transactor)
+	tx, owned, err := beginSettlementTx(ctx, transactor)
 	if err != nil {
 		return nil, true, err
 	}
 	committed := false
 	defer func() {
-		if !committed {
+		if !committed && owned {
 			rollbackSettlementTx(ctx, tx)
 		}
 	}()
@@ -548,10 +579,12 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	if err := txQueue.EnqueueInTx(ctx, tx, retried); err != nil {
 		return nil, true, fmt.Errorf("workspacetasks: requeue: %w", err)
 	}
-	if err := commitSettlementTx(ctx, tx); err != nil {
-		return nil, true, err
+	if owned {
+		if err := commitSettlementTx(ctx, tx); err != nil {
+			return nil, true, err
+		}
+		committed = true
 	}
-	committed = true
 	// running -> pending is a real status transition, so it needs an event
 	// like every other flip (this was the one settlement that staged
 	// nothing: a requeued task went dark on the event channel because the

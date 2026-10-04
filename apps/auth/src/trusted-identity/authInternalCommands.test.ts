@@ -136,6 +136,114 @@ describe('AuthInternalCommands', () => {
     if (result.ok) assert.equal(result.data.user.existing, true)
   })
 
+  it('reads auth user states in one batch for reconciliation', async () => {
+    const seen: string[][] = []
+    const commands = createTestCommands({
+      repository: {
+        findUserStatesByIDs: async (authUserIDs) => {
+          seen.push(authUserIDs)
+          return [
+            {
+              auth_user_id: 'auth-admin',
+              role: 'admin',
+              banned: false,
+              ban_reason: null,
+              ban_expires: null,
+            },
+            {
+              auth_user_id: 'auth-banned',
+              role: 'user',
+              banned: true,
+              ban_reason: 'spam',
+              ban_expires: '2026-10-11T03:00:00.000Z',
+            },
+          ]
+        },
+      },
+    })
+
+    assert.deepEqual(
+      await commands.getUserStates({ userIDs: [' auth-admin ', 'auth-banned', 'auth-admin'] }),
+      {
+        ok: true,
+        data: {
+          users: [
+            {
+              auth_user_id: 'auth-admin',
+              role: 'admin',
+              banned: false,
+              ban_reason: null,
+              ban_expires: null,
+            },
+            {
+              auth_user_id: 'auth-banned',
+              role: 'user',
+              banned: true,
+              ban_reason: 'spam',
+              ban_expires: '2026-10-11T03:00:00.000Z',
+            },
+          ],
+        },
+      },
+    )
+    assert.deepEqual(seen, [['auth-admin', 'auth-banned']])
+  })
+
+  it('rejects invalid user state reads before calling dependencies', async () => {
+    let called = false
+    const commands = createTestCommands({
+      repository: {
+        findUserStatesByIDs: async () => {
+          called = true
+          return []
+        },
+      },
+    })
+
+    assert.deepEqual(await commands.getUserStates({ userIDs: [] }), {
+      ok: false,
+      kind: 'invalid_input',
+      message: 'user_ids must contain 1 to 100 valid user ids',
+    })
+    assert.deepEqual(
+      await commands.getUserStates({ userIDs: Array.from({ length: 101 }, (_, i) => `auth-${i}`) }),
+      {
+        ok: false,
+        kind: 'invalid_input',
+        message: 'user_ids must contain 1 to 100 valid user ids',
+      },
+    )
+    assert.deepEqual(await commands.getUserStates({ userIDs: ['x'.repeat(192)] }), {
+      ok: false,
+      kind: 'invalid_input',
+      message: 'user_ids must contain 1 to 100 valid user ids',
+    })
+    assert.equal(called, false)
+  })
+
+  it('classifies an unconfigured user state reader and reader throws as repository failures', async (t) => {
+    t.mock.method(console, 'error', () => {})
+    const unconfigured = createTestCommands()
+    assert.deepEqual(await unconfigured.getUserStates({ userIDs: ['auth-user'] }), {
+      ok: false,
+      kind: 'repository_failure',
+      message: 'auth user state reader is not configured',
+    })
+
+    const throwing = createTestCommands({
+      repository: {
+        findUserStatesByIDs: async () => {
+          throw new Error('state store unavailable')
+        },
+      },
+    })
+    assert.deepEqual(await throwing.getUserStates({ userIDs: ['auth-user'] }), {
+      ok: false,
+      kind: 'repository_failure',
+      message: 'failed to read auth user states',
+    })
+  })
+
   it('classifies duplicate and mismatched trusted identities as conflicts', async () => {
     const duplicate = () => {
       throw new Error('user already exists')

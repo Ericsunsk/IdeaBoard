@@ -146,6 +146,16 @@ func withManagedTransactionResult[T any](
 	if service == nil || service.pool == nil {
 		return empty, fmt.Errorf("credits service: database pool not configured")
 	}
+	// Ambient guard transaction (control audit atomicity, step 3): when
+	// the guard staged its mutation transaction in the context, the
+	// business writes join it as participants. The transaction is
+	// BORROWED (the guard began it and the guard commits or rolls it
+	// back), so this path never begins, commits, or rolls back: it only
+	// runs the business statements on the carrier. With no carrier the
+	// legacy owned-transaction path below runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return run(&transactionCommands{tx: ambient, backend: service.backend})
+	}
 	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return empty, fmt.Errorf("credits service: begin transaction: %w", err)

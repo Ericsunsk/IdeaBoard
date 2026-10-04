@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/db/dbutil"
+
 	"github.com/google/uuid"
 )
 
@@ -105,5 +107,76 @@ func TestListUsersFiltersRoleAndStatusAcrossTotal(t *testing.T) {
 	}
 	if list[0].Role != "user" || list[0].Status != 0 || !strings.Contains(list[0].DisplayName, "filter_full") {
 		t.Fatalf("unexpected filtered user: %+v", list[0])
+	}
+}
+
+func TestAmbientTransactionCarriesAdminUserMutation(t *testing.T) {
+	ctx := context.Background()
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	observer, err := db.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire observer connection: %v", err)
+	}
+	defer observer.Release()
+
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	ambient := dbutil.ContextWithAmbientTx(ctx, tx)
+	if err := repo.UpdateRoleByID(ambient, 42, "admin"); err != nil {
+		t.Fatalf("update role in ambient transaction: %v", err)
+	}
+
+	var role string
+	if err := observer.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, 42).Scan(&role); err != nil {
+		t.Fatalf("read role before commit: %v", err)
+	}
+	if role == "admin" {
+		t.Fatal("ambient role update became visible before commit")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit ambient transaction: %v", err)
+	}
+	if err := observer.QueryRow(ctx, `SELECT role FROM users WHERE id = $1`, 42).Scan(&role); err != nil {
+		t.Fatalf("read role after commit: %v", err)
+	}
+	if role != "admin" {
+		t.Fatalf("role after commit = %q, want admin", role)
+	}
+}
+
+func TestAmbientTransactionRollbackDiscardsAdminUserMutation(t *testing.T) {
+	ctx := context.Background()
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	observer, err := db.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire observer connection: %v", err)
+	}
+	defer observer.Release()
+
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin transaction: %v", err)
+	}
+	ambient := dbutil.ContextWithAmbientTx(ctx, tx)
+	if err := repo.UpdateStatus(ambient, 42, StatusBanned); err != nil {
+		t.Fatalf("update status in ambient transaction: %v", err)
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatalf("rollback ambient transaction: %v", err)
+	}
+
+	var status int16
+	if err := observer.QueryRow(ctx, `SELECT status FROM users WHERE id = $1`, 42).Scan(&status); err != nil {
+		t.Fatalf("read status after rollback: %v", err)
+	}
+	if status == StatusBanned {
+		t.Fatal("ambient status update survived rollback")
 	}
 }

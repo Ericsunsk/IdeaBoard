@@ -42,6 +42,7 @@ func TestRiverTimeoutMatrixIsSelfConsistent(t *testing.T) {
 		"vision_billing",
 		"media_reclamation",
 		RiverQueueTaskSettlementSweep,
+		"identity_admin_reconciliation",
 	} {
 		if _, ok := seenQueues[want]; !ok {
 			t.Fatalf("matrix is missing queue %q", want)
@@ -91,6 +92,8 @@ func TestRiverTimeoutMatrixMatchesWorkerConstants(t *testing.T) {
 		"VisionBillingReconciliationWorker":                                  RiverJobTimeoutVisionBilling,
 		"ReclaimWorker":                                                      RiverJobTimeoutMediaReclamation,
 		"ScheduleWorker":                                                     RiverJobTimeoutMediaReclamationSchedule,
+		"IdentityReconciliationExecuteWorker":                                RiverJobTimeoutIdentityAdminReconciliation,
+		"IdentityReconciliationScheduleWorker":                               RiverJobTimeoutIdentityAdminReconciliationSchedule,
 	}
 	for worker, timeout := range want {
 		if budgets[worker] != timeout {

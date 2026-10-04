@@ -31,6 +31,61 @@ describe('AuthIdentityStore', () => {
     ])
   })
 
+  it('reads role and ban state for a batch of identities', async () => {
+    const queries: Array<{ text: string; values?: unknown[] }> = []
+    const store = createAuthIdentityStore({
+      async query(text: string, values?: unknown[]) {
+        queries.push({ text, values })
+        return {
+          rows: [
+            {
+              id: 'auth-user-1',
+              role: 'user',
+              banned: false,
+              banReason: null,
+              banExpires: null,
+            },
+            {
+              id: 'auth-user-2',
+              role: 'admin',
+              banned: true,
+              banReason: 'spam',
+              banExpires: new Date('2026-10-11T03:00:00.000Z'),
+            },
+            // Rows without a usable identity are dropped, never fabricated.
+            { id: '', role: 'user', banned: false, banReason: null, banExpires: null },
+            { id: 'auth-user-3', role: '', banned: false, banReason: null, banExpires: null },
+          ],
+          rowCount: 4,
+        }
+      },
+      async connect() {
+        throw new Error('not used')
+      },
+    })
+
+    assert.deepEqual(await store.findUserStatesByIDs(['auth-user-1', 'auth-user-2']), [
+      {
+        auth_user_id: 'auth-user-1',
+        role: 'user',
+        banned: false,
+        ban_reason: null,
+        ban_expires: null,
+      },
+      {
+        auth_user_id: 'auth-user-2',
+        role: 'admin',
+        banned: true,
+        ban_reason: 'spam',
+        ban_expires: '2026-10-11T03:00:00.000Z',
+      },
+    ])
+    assert.equal(queries.length, 1)
+    assert.match(queries[0]?.text ?? '', /FROM "user" users/)
+    assert.match(queries[0]?.text ?? '', /WHERE users\.id = ANY\(\$1::text\[\]\)/)
+    assert.deepEqual(queries[0]?.values, [['auth-user-1', 'auth-user-2']])
+  })
+
   it('reads identities through the injected database', async () => {
     const queries: Array<{ text: string; values?: unknown[] }> = []
     const store = createAuthIdentityStore({

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/platform/validation"
 )
 
@@ -156,7 +157,7 @@ func (s *RuntimeSettingsService) UpdateRateLimit(ctx context.Context, setting Ra
 	}); err != nil {
 		return RateLimitSetting{}, err
 	}
-	s.writeCachedRateLimit(setting)
+	s.publishRateLimit(ctx, setting)
 	return setting, nil
 }
 
@@ -250,6 +251,34 @@ func (s *RuntimeSettingsService) writeCachedRateLimit(setting RateLimitSetting) 
 		setting:   setting,
 		expiresAt: time.Now().Add(runtimeSettingsCacheTTL),
 	}
+}
+
+// publishRateLimit refreshes the in-memory entry only when the database
+// write already committed. Inside an ambient (guard-owned) transaction
+// the rows are still uncommitted when SetMany returns, so caching the
+// new value there would serve rolled-back data until the TTL expires;
+// invalidate instead and let the next read reload committed state from
+// the database. With no carrier SetMany committed before returning, so
+// the write-through below is already post-commit and stays.
+func (s *RuntimeSettingsService) publishRateLimit(ctx context.Context, setting RateLimitSetting) {
+	if _, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		s.invalidateCachedRateLimit()
+		return
+	}
+	s.writeCachedRateLimit(setting)
+}
+
+// invalidateCachedRateLimit drops the entry so the next read falls
+// through to the database. Invalidation (unlike a value write) is safe
+// before commit: on rollback the reload sees the old rows, on commit it
+// sees the new rows, and on crash the empty cache reloads from disk.
+func (s *RuntimeSettingsService) invalidateCachedRateLimit() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rateLimitCache = nil
 }
 
 func NormalizeMediaUploadSetting(setting MediaUploadSetting) (MediaUploadSetting, error) {

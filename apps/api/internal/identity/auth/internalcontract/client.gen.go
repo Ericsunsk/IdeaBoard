@@ -129,6 +129,21 @@ func (e GetUserEmailsEnvelopeCode) Valid() bool {
 	}
 }
 
+// Defines values for GetUserStatesEnvelopeCode.
+const (
+	GetUserStatesEnvelopeCodeN0 GetUserStatesEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the GetUserStatesEnvelopeCode enum.
+func (e GetUserStatesEnvelopeCode) Valid() bool {
+	switch e {
+	case GetUserStatesEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MailConfigEnvelopeCode.
 const (
 	MailConfigEnvelopeCodeN0 MailConfigEnvelopeCode = 0
@@ -353,13 +368,13 @@ func (e UnbanUserDataBanned) Valid() bool {
 
 // Defines values for UnbanUserEnvelopeCode.
 const (
-	UnbanUserEnvelopeCodeN0 UnbanUserEnvelopeCode = 0
+	N0 UnbanUserEnvelopeCode = 0
 )
 
 // Valid indicates whether the value is a known member of the UnbanUserEnvelopeCode enum.
 func (e UnbanUserEnvelopeCode) Valid() bool {
 	switch e {
-	case UnbanUserEnvelopeCodeN0:
+	case N0:
 		return true
 	default:
 		return false
@@ -384,6 +399,15 @@ type AuthUserEmail struct {
 // AuthUserRequest defines model for AuthUserRequest.
 type AuthUserRequest struct {
 	UserID string `json:"userId"`
+}
+
+// AuthUserState defines model for AuthUserState.
+type AuthUserState struct {
+	AuthUserID string     `json:"auth_user_id"`
+	BanExpires *time.Time `json:"ban_expires,omitempty"`
+	BanReason  *string    `json:"ban_reason,omitempty"`
+	Banned     bool       `json:"banned"`
+	Role       AuthRole   `json:"role"`
 }
 
 // BanUserData defines model for BanUserData.
@@ -478,6 +502,26 @@ type GetUserEmailsEnvelopeCode int
 
 // GetUserEmailsRequest defines model for GetUserEmailsRequest.
 type GetUserEmailsRequest struct {
+	UserIds []string `json:"user_ids"`
+}
+
+// GetUserStatesData defines model for GetUserStatesData.
+type GetUserStatesData struct {
+	Users []AuthUserState `json:"users"`
+}
+
+// GetUserStatesEnvelope defines model for GetUserStatesEnvelope.
+type GetUserStatesEnvelope struct {
+	Code GetUserStatesEnvelopeCode `json:"code"`
+	Data GetUserStatesData         `json:"data"`
+	Msg  string                    `json:"msg"`
+}
+
+// GetUserStatesEnvelopeCode defines model for GetUserStatesEnvelope.Code.
+type GetUserStatesEnvelopeCode int
+
+// GetUserStatesRequest defines model for GetUserStatesRequest.
+type GetUserStatesRequest struct {
 	UserIds []string `json:"user_ids"`
 }
 
@@ -758,6 +802,9 @@ type EnsureUserJSONRequestBody = EnsureUserRequest
 // RevokeUserSessionsJSONRequestBody defines body for RevokeUserSessions for application/json ContentType.
 type RevokeUserSessionsJSONRequestBody = AuthUserRequest
 
+// GetUserStatesJSONRequestBody defines body for GetUserStates for application/json ContentType.
+type GetUserStatesJSONRequestBody = GetUserStatesRequest
+
 // UnbanUserJSONRequestBody defines body for UnbanUser for application/json ContentType.
 type UnbanUserJSONRequestBody = AuthUserRequest
 
@@ -888,6 +935,11 @@ type ClientInterface interface {
 	RevokeUserSessionsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RevokeUserSessions(ctx context.Context, body RevokeUserSessionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUserStatesWithBody request with any body
+	GetUserStatesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	GetUserStates(ctx context.Context, body GetUserStatesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnbanUserWithBody request with any body
 	UnbanUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1133,6 +1185,30 @@ func (c *Client) RevokeUserSessionsWithBody(ctx context.Context, contentType str
 
 func (c *Client) RevokeUserSessions(ctx context.Context, body RevokeUserSessionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRevokeUserSessionsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetUserStatesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserStatesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetUserStates(ctx context.Context, body GetUserStatesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserStatesRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1645,6 +1721,46 @@ func NewRevokeUserSessionsRequestWithBody(server string, contentType string, bod
 	return req, nil
 }
 
+// NewGetUserStatesRequest calls the generic GetUserStates builder with application/json body
+func NewGetUserStatesRequest(server string, body GetUserStatesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewGetUserStatesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewGetUserStatesRequestWithBody generates requests for GetUserStates with any type of body
+func NewGetUserStatesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/users/states")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUnbanUserRequest calls the generic UnbanUser builder with application/json body
 func NewUnbanUserRequest(server string, body UnbanUserJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1860,6 +1976,11 @@ type ClientWithResponsesInterface interface {
 	RevokeUserSessionsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeUserSessionsResponse, error)
 
 	RevokeUserSessionsWithResponse(ctx context.Context, body RevokeUserSessionsJSONRequestBody, reqEditors ...RequestEditorFn) (*RevokeUserSessionsResponse, error)
+
+	// GetUserStatesWithBodyWithResponse request with any body
+	GetUserStatesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetUserStatesResponse, error)
+
+	GetUserStatesWithResponse(ctx context.Context, body GetUserStatesJSONRequestBody, reqEditors ...RequestEditorFn) (*GetUserStatesResponse, error)
 
 	// UnbanUserWithBodyWithResponse request with any body
 	UnbanUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnbanUserResponse, error)
@@ -2284,6 +2405,39 @@ func (r RevokeUserSessionsResponse) ContentType() string {
 	return ""
 }
 
+type GetUserStatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetUserStatesEnvelope
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUserStatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUserStatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUserStatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type UnbanUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2559,6 +2713,23 @@ func (c *ClientWithResponses) RevokeUserSessionsWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseRevokeUserSessionsResponse(rsp)
+}
+
+// GetUserStatesWithBodyWithResponse request with arbitrary body returning *GetUserStatesResponse
+func (c *ClientWithResponses) GetUserStatesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetUserStatesResponse, error) {
+	rsp, err := c.GetUserStatesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserStatesResponse(rsp)
+}
+
+func (c *ClientWithResponses) GetUserStatesWithResponse(ctx context.Context, body GetUserStatesJSONRequestBody, reqEditors ...RequestEditorFn) (*GetUserStatesResponse, error) {
+	rsp, err := c.GetUserStates(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserStatesResponse(rsp)
 }
 
 // UnbanUserWithBodyWithResponse request with arbitrary body returning *UnbanUserResponse
@@ -3246,6 +3417,53 @@ func ParseRevokeUserSessionsResponse(rsp *http.Response) (*RevokeUserSessionsRes
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetUserStatesResponse parses an HTTP response from a GetUserStatesWithResponse call
+func ParseGetUserStatesResponse(rsp *http.Response) (*GetUserStatesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUserStatesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetUserStatesEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

@@ -508,6 +508,63 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, displayName, pass
 	return &user, nil
 }
 
+// GetUserStates resolves a bounded batch of Auth-owned role/ban states.
+//
+// Read-only: unknown IDs are omitted from the result (never fabricated),
+// so a missing entry means the Auth identity does not exist. Callers must
+// treat absence as drift to report, never as a delete signal.
+func (c *ServiceClient) GetUserStates(ctx context.Context, authUserIDs []string) (map[string]authidentity.AuthUserState, error) {
+	client, err := c.contractClient()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(authUserIDs))
+	seen := make(map[string]struct{}, len(authUserIDs))
+	for _, rawID := range authUserIDs {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return map[string]authidentity.AuthUserState{}, nil
+	}
+	response, err := client.GetUserStatesWithResponse(ctx, internalcontract.GetUserStatesJSONRequestBody{UserIds: ids})
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK {
+		return nil, contractFailure("get user states", response.StatusCode(), response.Body)
+	}
+	if response.JSON200 == nil || response.JSON200.Code != internalcontract.GetUserStatesEnvelopeCodeN0 {
+		return nil, fmt.Errorf("auth service get user states returned an invalid success envelope")
+	}
+	states := make(map[string]authidentity.AuthUserState, len(response.JSON200.Data.Users))
+	for _, user := range response.JSON200.Data.Users {
+		id := strings.TrimSpace(user.AuthUserID)
+		role := strings.TrimSpace(string(user.Role))
+		if id == "" || role == "" {
+			return nil, fmt.Errorf("auth service get user states returned an invalid user state")
+		}
+		state := authidentity.AuthUserState{AuthUserID: id, Role: role, Banned: user.Banned}
+		if user.BanReason != nil {
+			reason := strings.TrimSpace(*user.BanReason)
+			state.BanReason = &reason
+		}
+		if user.BanExpires != nil {
+			expires := *user.BanExpires
+			state.BanExpiresAt = &expires
+		}
+		states[id] = state
+	}
+	return states, nil
+}
+
 // GetUserEmails resolves a bounded batch of Auth-owned email identities.
 func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string) (map[string]authidentity.UserIdentity, error) {
 	client, err := c.contractClient()

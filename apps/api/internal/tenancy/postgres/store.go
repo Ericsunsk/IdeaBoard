@@ -55,6 +55,15 @@ func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
 }
 
 func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {
+	// Ambient guard transaction (control audit atomicity, step 3): when
+	// the guard staged its mutation transaction in the context, the
+	// tenancy writes join it as participants. The transaction is
+	// BORROWED (the guard began it and the guard commits or rolls it
+	// back), so this path never begins, commits, or rolls back. With no
+	// carrier the legacy owned-transaction path below runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
+		return run(dbsqlc.New(ambient))
+	}
 	return dbutil.WithTx(db.ctx, db.db, run)
 }
 

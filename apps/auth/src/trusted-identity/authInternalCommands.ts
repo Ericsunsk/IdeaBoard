@@ -1,6 +1,7 @@
 import type {
   AuthRole,
   GetUserEmailsData,
+  GetUserStatesData,
   BanUserData,
   DeleteUserData,
   EnsureUserEnvelope,
@@ -27,6 +28,15 @@ export type AuthIdentityMutationStore = {
   findUserEmailsByIDs?: (
     authUserIDs: string[],
   ) => Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>
+  findUserStatesByIDs?: (authUserIDs: string[]) => Promise<
+    Array<{
+      auth_user_id: string
+      role: string
+      banned: boolean
+      ban_reason: string | null
+      ban_expires: string | null
+    }>
+  >
   removeAuthUserCascade(authUserID: string): Promise<boolean>
   updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>
   updateAuthUserBanState(
@@ -68,6 +78,10 @@ export type GetUserEmailsCommandInput = {
   userIDs?: unknown
 }
 
+export type GetUserStatesCommandInput = {
+  userIDs?: unknown
+}
+
 export type BanIdentityCommandInput = AuthUserIDCommandInput & {
   banReason?: unknown
   banExpiresIn?: unknown
@@ -83,6 +97,9 @@ export type AuthInternalCommands = {
   getUserEmails(
     input: GetUserEmailsCommandInput,
   ): Promise<AuthInternalCommandResult<GetUserEmailsData>>
+  getUserStates(
+    input: GetUserStatesCommandInput,
+  ): Promise<AuthInternalCommandResult<GetUserStatesData>>
   ensureIdentity(
     input: EnsureIdentityCommandInput,
   ): Promise<AuthInternalCommandResult<TrustedIdentityData>>
@@ -101,6 +118,7 @@ export function createAuthInternalCommands(
 ): AuthInternalCommands {
   return {
     getUserEmails: (input) => getUserEmails(input, mutationStore),
+    getUserStates: (input) => getUserStates(input, mutationStore),
     ensureIdentity: (input) => ensureIdentity(input, provisioner),
     deleteIdentity: (input) => deleteIdentity(input, mutationStore),
     banIdentity: (input) => banIdentity(input, mutationStore),
@@ -128,6 +146,31 @@ async function getUserEmails(
     })
   } catch (error) {
     return repositoryFailure(error, 'failed to read auth user emails')
+  }
+}
+
+async function getUserStates(
+  input: GetUserStatesCommandInput,
+  repository: AuthIdentityMutationStore,
+): Promise<AuthInternalCommandResult<GetUserStatesData>> {
+  const rawIDs = Array.isArray(input.userIDs) ? input.userIDs : []
+  const userIDs = [...new Set(rawIDs.map((value) => String(value ?? '').trim()).filter(Boolean))]
+  if (userIDs.length === 0 || userIDs.length > 100 || userIDs.some((id) => id.length > 191)) {
+    return commandFailure('invalid_input', 'user_ids must contain 1 to 100 valid user ids')
+  }
+  if (!repository.findUserStatesByIDs) {
+    return commandFailure('repository_failure', 'auth user state reader is not configured')
+  }
+  try {
+    const states = await repository.findUserStatesByIDs(userIDs)
+    return commandSuccess({
+      // The stored role passes through verbatim (cast): an unexpected
+      // Auth-side role is drift the Go reconciler reports as a role
+      // mismatch, not as a missing identity.
+      users: states.map((state) => ({ ...state, role: state.role as AuthRole })),
+    })
+  } catch (error) {
+    return repositoryFailure(error, 'failed to read auth user states')
   }
 }
 

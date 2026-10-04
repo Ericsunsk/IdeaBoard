@@ -43,11 +43,11 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if r == nil || r.db == nil || provider.ID == "" || provider.ChargeID == "" || provider.AmountMinor <= 0 {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
 	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.beginDirectTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { rollbackDirectIfOwned(ctx, tx, owned) }()
 	order, err := r.paymentRefundOrderForCharge(ctx, tx, provider.ChargeID)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -56,7 +56,7 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if existing, found, err := r.findExistingExternalRefund(ctx, tx, order.ID, provider.ID, key); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	} else if found {
-		return existing, tx.Commit(ctx)
+		return existing, commitDirectIfOwned(ctx, tx, owned)
 	}
 	if err := validateExternalRefund(order, provider); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -65,7 +65,7 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 		if err := r.attachExternalProviderRefund(ctx, tx, pending, provider, now); err != nil {
 			return paymentsdomain.PaymentRefund{}, err
 		}
-		if err := tx.Commit(ctx); err != nil {
+		if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 			return paymentsdomain.PaymentRefund{}, err
 		}
 		pending.StripeRefundID, pending.StripeStatus, pending.UpdatedAt, pending.PublicOrderNumber = provider.ID, provider.Status, now, order.PublicNumber
@@ -77,7 +77,7 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider p
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil
@@ -142,11 +142,11 @@ func (r *Repository) createExternalRefundFact(ctx context.Context, tx pgx.Tx, or
 }
 
 func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider paymentports.StripeRefund, reason string, now time.Time) (int64, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.beginDirectTx(ctx)
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { rollbackDirectIfOwned(ctx, tx, owned) }()
 	order, err := r.paymentRefundOrderForCharge(ctx, tx, provider.ChargeID)
 	if err != nil {
 		return 0, err
@@ -162,7 +162,7 @@ func (r *Repository) RecordPaymentRefundAnomaly(ctx context.Context, provider pa
 	if err != nil {
 		return 0, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 		return 0, err
 	}
 	return order.UserID, nil
@@ -177,11 +177,11 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if strings.TrimSpace(input.Reason) == "" {
 		input.Reason = "Admin refund of unused Ideas"
 	}
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.beginDirectTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("begin refund transaction: %w", err)
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { rollbackDirectIfOwned(ctx, tx, owned) }()
 	order, paidSubtotal, paidTotal, paidCurrency, paidAt, err := r.loadPendingRefundOrder(ctx, tx, input.OrderNumber)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
@@ -189,7 +189,7 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if existing, replayed, err := findPendingRefundReplay(ctx, tx, order, input); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	} else if replayed {
-		return commitPendingRefundReplay(ctx, tx, existing, order)
+		return commitPendingRefundReplay(ctx, tx, owned, existing, order)
 	}
 	if err := validatePendingRefundEligibility(order, paidSubtotal, paidTotal, paidAt, input.Now); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
@@ -210,8 +210,10 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit payment refund: %w", err)
+		}
 	}
 	return refund, false, nil
 }
@@ -220,8 +222,8 @@ func validPendingRefundRequest(r *Repository, input paymentrefund.CreatePendingP
 	return r != nil && r.db != nil && input.ActorID > 0 && input.IdeaQuantity > 0
 }
 
-func commitPendingRefundReplay(ctx context.Context, tx pgx.Tx, existing paymentsdomain.PaymentRefund, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentRefund, bool, error) {
-	if err := tx.Commit(ctx); err != nil {
+func commitPendingRefundReplay(ctx context.Context, tx pgx.Tx, owned bool, existing paymentsdomain.PaymentRefund, order paymentsdomain.PaymentOrder) (paymentsdomain.PaymentRefund, bool, error) {
+	if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("commit refund replay: %w", err)
 	}
 	existing.PublicOrderNumber = order.PublicOrderNumber
@@ -269,17 +271,17 @@ func (r *Repository) MarkPaymentRefundProviderResult(ctx context.Context, refund
 }
 
 func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summary string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.beginDirectTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { rollbackDirectIfOwned(ctx, tx, owned) }()
 	var refund paymentsdomain.PaymentRefund
 	if err := scanPaymentRefund(tx.QueryRow(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundFailed || refund.Status == paymentsdomain.PaymentRefundAnomaly {
-		return refund, tx.Commit(ctx)
+		return refund, commitDirectIfOwned(ctx, tx, owned)
 	}
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
@@ -301,24 +303,24 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, error_code, error_summary, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'failed', 'provider_failed', $2, jsonb_build_object('phase', 'released') FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, boundedText(summary, 500)); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil
 }
 
 func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.beginDirectTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() { rollbackDirectIfOwned(ctx, tx, owned) }()
 	var refund paymentsdomain.PaymentRefund
 	if err := scanPaymentRefund(tx.QueryRow(ctx, paymentRefundSelect+` WHERE id = $1::uuid FOR UPDATE`, refundID), &refund); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	if refund.Status == paymentsdomain.PaymentRefundSucceeded || refund.Status == paymentsdomain.PaymentRefundAnomaly {
-		return refund, tx.Commit(ctx)
+		return refund, commitDirectIfOwned(ctx, tx, owned)
 	}
 	if refund.Status == paymentsdomain.PaymentRefundFailed {
 		return paymentsdomain.PaymentRefund{}, paymentcontracts.ErrRefundOrderNotEligible
@@ -342,7 +344,7 @@ func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID st
 	if _, err := tx.Exec(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'succeeded', jsonb_build_object('phase', 'settled', 'credit_transaction_id', $2::text) FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, creditResult.TransactionID); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitDirectIfOwned(ctx, tx, owned); err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	return refund, nil

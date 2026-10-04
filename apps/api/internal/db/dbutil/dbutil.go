@@ -21,6 +21,14 @@ import (
 // every site shares the same small budget.
 const RollbackTimeout = 5 * time.Second
 
+// WithTx runs fn inside a single transaction and commits it.
+//
+// Ambient guard transaction (control audit atomicity): when ctx carries
+// the guard-staged transaction (see AmbientTxFromContext), fn joins it
+// as a BORROWED participant instead of opening a new transaction. The
+// borrowed transaction is never committed or rolled back here; the
+// guard owns its lifecycle. With no carrier the legacy owned-transaction
+// path runs unchanged.
 func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) error) error {
 	if fn == nil {
 		return errors.New("dbutil: tx function is nil")
@@ -30,12 +38,28 @@ func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries) er
 	})
 }
 
+// WithTxDBTX runs fn inside a single transaction, exposing both the
+// transaction-bound Queries and the raw pgx.Tx, then commits.
+//
+// Ambient guard transaction (control audit atomicity): when ctx carries
+// the guard-staged transaction (see AmbientTxFromContext), fn joins it
+// as a BORROWED participant: fn runs on the carrier and its error
+// returns unchanged, with no begin, commit, or rollback here. On fn
+// error this branch deliberately does NOT roll back: the transaction
+// is not ours, and only the guard may decide its fate. With no carrier
+// the legacy owned-transaction path below runs byte for byte as before.
 func WithTxDBTX(ctx context.Context, pool *pgxpool.Pool, fn func(*dbsqlc.Queries, pgx.Tx) error) error {
-	if pool == nil {
-		return errors.New("dbutil: database is nil")
-	}
 	if fn == nil {
 		return errors.New("dbutil: tx function is nil")
+	}
+	if ambient, ok := AmbientTxFromContext(ctx); ok {
+		// dbsqlc.New(ambient) binds Queries to the carrier without
+		// touching pool, so this path needs no pool connection of its
+		// own (and never acquires one).
+		return fn(dbsqlc.New(ambient), ambient)
+	}
+	if pool == nil {
+		return errors.New("dbutil: database is nil")
 	}
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

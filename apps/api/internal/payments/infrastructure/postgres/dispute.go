@@ -25,18 +25,24 @@ func (r *Repository) ConvergePaymentDispute(ctx context.Context, provider paymen
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
-	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.dbWithContext(ctx).beginTx()
 	if err != nil {
-		return paymentsdomain.PaymentDispute{}, false, fmt.Errorf("begin Dispute transaction: %w", err)
+		return paymentsdomain.PaymentDispute{}, false, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	dispute, changed, err := r.convergePaymentDisputeTx(ctx, tx, provider, desiredStatus, now)
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, false, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return paymentsdomain.PaymentDispute{}, false, err
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return paymentsdomain.PaymentDispute{}, false, err
+		}
 	}
 	return dispute, changed, nil
 }
@@ -299,17 +305,23 @@ func (r *Repository) GetPaymentDisputeByStripeID(ctx context.Context, stripeDisp
 	if r == nil || r.db == nil {
 		return paymentsdomain.PaymentDispute{}, paymentcontracts.ErrDisputeUnavailable
 	}
-	tx, err := r.dbWithContext(ctx).transactionStarter.BeginTx(ctx, pgx.TxOptions{})
+	tx, owned, err := r.dbWithContext(ctx).beginTx()
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 	dispute, err := getPaymentDisputeInTx(ctx, tx, strings.TrimSpace(stripeDisputeID))
 	if err != nil {
 		return paymentsdomain.PaymentDispute{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return paymentsdomain.PaymentDispute{}, err
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return paymentsdomain.PaymentDispute{}, err
+		}
 	}
 	return dispute, nil
 }

@@ -108,6 +108,54 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 		Objects: []dbprivileges.ObjectRule{
 			{
 				Kind:  dbprivileges.KindTable,
+				Names: []string{"identity_admin_reconciliation_runs"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: []string{"identity_admin_reconciliation_findings"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: []string{"identity_admin_reconciliation_run_findings"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeUpdate,
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  dbprivileges.KindTable,
 				Names: apiOwnedTableNames,
 				Required: []dbprivileges.Privilege{
 					dbprivileges.PrivilegeSelect,
@@ -186,6 +234,24 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeUsage, dbprivileges.PrivilegeSelect},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeUpdate},
 				PublicForbidden: allSequencePrivileges,
+			},
+			{
+				Kind:     dbprivileges.KindSequence,
+				Names:    []string{"identity_admin_reconciliation_runs_id_seq", "identity_admin_reconciliation_findings_id_seq"},
+				Required: []dbprivileges.Privilege{dbprivileges.PrivilegeUsage, dbprivileges.PrivilegeSelect},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeUpdate,
+				},
+				PublicForbidden: allSequencePrivileges,
+			},
+			{
+				Kind: dbprivileges.KindFunction,
+				Names: []string{
+					"start_identity_admin_reconciliation(text, bigint, text, timestamptz, boolean)",
+					"fail_identity_admin_reconciliation(bigint, text)",
+				},
+				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
+				PublicForbidden: []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 			},
 			{
 				Kind:            dbprivileges.KindTable,

@@ -13,13 +13,14 @@ package queue
 // retries) requeue at most twice per task (tasks.retry_count bound) before
 // converging terminally. Deterministic failures never retry.
 const (
-	RiverMaxAttemptsCreditReconciliation    = 5
-	RiverMaxAttemptsPaymentReconciliation   = 8
-	RiverMaxAttemptsPaymentCheckoutShutdown = 8
-	RiverMaxAttemptsTaskRetention           = 3
-	RiverMaxAttemptsVisionBilling           = 5
-	RiverMaxAttemptsMediaReclamation        = 10
-	RiverMaxAttemptsWebhookDeliver          = 8
+	RiverMaxAttemptsCreditReconciliation        = 5
+	RiverMaxAttemptsPaymentReconciliation       = 8
+	RiverMaxAttemptsPaymentCheckoutShutdown     = 8
+	RiverMaxAttemptsTaskRetention               = 3
+	RiverMaxAttemptsVisionBilling               = 5
+	RiverMaxAttemptsMediaReclamation            = 10
+	RiverMaxAttemptsWebhookDeliver              = 8
+	RiverMaxAttemptsIdentityAdminReconciliation = 5
 	// RiverMaxAttemptsTaskSettlementSweep budgets the final-timeout
 	// convergence sweep. A poisoned sweep (a task whose ledger row is
 	// un-releasable, a database blip) must surface as a failed River job an
@@ -107,6 +108,18 @@ func RiverRetryMatrix() []QueueRetryPolicy {
 			MaxAttempts: RiverMaxAttemptsWebhookDeliver,
 			Worker:      "WebhookDeliverWorker (webhook_deliver)",
 			Notes:       "one job per delivery preserves the 8-attempt budget; discarded rows are the durable DLQ fact",
+		},
+		{
+			Queue:       "identity_admin_reconciliation",
+			MaxAttempts: RiverMaxAttemptsIdentityAdminReconciliation,
+			Worker:      "IdentityReconciliationExecuteWorker",
+			Notes:       "daily dry-run identity drift scan; bounded retries surface a poisoned run without indefinite churn",
+		},
+		{
+			Queue:       "identity_admin_reconciliation",
+			MaxAttempts: RiverMaxAttemptsIdentityAdminReconciliation,
+			Worker:      "IdentityReconciliationScheduleWorker",
+			Notes:       "schedule and catch-up writes are idempotent and share the reconciliation queue budget",
 		},
 	}
 }

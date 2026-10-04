@@ -61,6 +61,23 @@ function createContractCommands(): AuthInternalCommands {
         },
       }
     },
+    getUserStates: async (input) => {
+      assert.deepEqual(input, { userIDs: [authUserID] })
+      return {
+        ok: true,
+        data: {
+          users: [
+            {
+              auth_user_id: authUserID,
+              role: 'admin',
+              banned: false,
+              ban_reason: null,
+              ban_expires: null,
+            },
+          ],
+        },
+      }
+    },
     ensureIdentity: async (input) => {
       assert.deepEqual(input, {
         email: 'alice@example.com',

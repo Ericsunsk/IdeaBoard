@@ -32,7 +32,9 @@ import (
 	"ideaboard/api/internal/usage"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 )
 
 type appDomainServices struct {
@@ -50,6 +52,7 @@ type appDomainServices struct {
 	rewardService        *rewards.Service
 	paymentService       *payments.Service
 	userLifecycle        *identityLifecycle
+	riverProducer        *river.Client[pgx.Tx]
 }
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
@@ -149,6 +152,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		rewardService:        rewardService,
 		paymentService:       paymentService,
 		userLifecycle:        userLifecycle,
+		riverProducer:        riverProducer,
 	}, nil
 }
 

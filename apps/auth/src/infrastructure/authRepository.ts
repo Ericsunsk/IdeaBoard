@@ -29,6 +29,15 @@ export type AuthIdentityStore = {
   findUserEmailsByIDs(
     authUserIDs: string[],
   ): Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>
+  findUserStatesByIDs(authUserIDs: string[]): Promise<
+    Array<{
+      auth_user_id: string
+      role: string
+      banned: boolean
+      ban_reason: string | null
+      ban_expires: string | null
+    }>
+  >
   updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean>
   finalizeTrustedRegistrationIdentity(
     authUserID: string,
@@ -97,6 +106,48 @@ GROUP BY users.id, users.email`,
             auth_user_id: candidate.id,
             email: candidate.email,
             providers,
+          },
+        ]
+      })
+    },
+
+    async findUserStatesByIDs(authUserIDs) {
+      const result = await database.query(
+        `
+SELECT users.id,
+       users.role,
+       users.banned,
+       users."banReason" AS "banReason",
+       users."banExpires" AS "banExpires"
+FROM "user" users
+WHERE users.id = ANY($1::text[])`,
+        [authUserIDs],
+      )
+      return result.rows.flatMap((row) => {
+        const candidate = row as UserRow & {
+          banned?: unknown
+          banReason?: unknown
+          banExpires?: unknown
+        }
+        if (typeof candidate.id !== 'string' || candidate.id.length === 0) return []
+        // Pass the stored role through verbatim: an unexpected Auth-side
+        // role is itself drift the reconciler must report as a role
+        // mismatch, not as a missing identity.
+        const role = typeof candidate.role === 'string' ? candidate.role : ''
+        if (role.length === 0) return []
+        const banExpires =
+          candidate.banExpires instanceof Date
+            ? candidate.banExpires.toISOString()
+            : typeof candidate.banExpires === 'string' && candidate.banExpires.length > 0
+              ? candidate.banExpires
+              : null
+        return [
+          {
+            auth_user_id: candidate.id,
+            role,
+            banned: candidate.banned === true,
+            ban_reason: typeof candidate.banReason === 'string' ? candidate.banReason : null,
+            ban_expires: banExpires,
           },
         ]
       })

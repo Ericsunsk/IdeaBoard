@@ -39,7 +39,11 @@ func (r *Repository) Pool() *pgxpool.Pool {
 }
 
 func (r *Repository) dbWithContext(ctx context.Context) repositoryQueryer {
-	return repositoryQueryer{ctx: ctx, db: r.db, q: r.q}
+	queries := r.q
+	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		queries = dbsqlc.New(tx)
+	}
+	return repositoryQueryer{ctx: ctx, db: r.db, q: queries}
 }
 
 func (db repositoryQueryer) withTx(run func(*dbsqlc.Queries) error) error {

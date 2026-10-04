@@ -200,6 +200,13 @@ type UserEmailReader interface {
 	GetUserEmails(context.Context, []string) (map[string]authidentity.UserIdentity, error)
 }
 
+// AuthUserStateReader is the narrow Auth-side read seam for the Identity
+// admin reconciliation job (dry-run alerting only). Implementations must be
+// read-only: unknown IDs are omitted from the result, never fabricated.
+type AuthUserStateReader interface {
+	GetUserStates(context.Context, []string) (map[string]authidentity.AuthUserState, error)
+}
+
 type AdminUserImpersonator interface {
 	ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error)
 }

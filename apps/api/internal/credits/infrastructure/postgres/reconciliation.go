@@ -25,6 +25,15 @@ func CreateReconciliationRun(
 	scheduledFor *time.Time,
 	onlyIfOverdue bool,
 ) (*int64, bool, error) {
+	// Ambient guard transaction (control audit atomicity, step 3): the
+	// reconciliation-run creation (plus its dispatch enqueue) joins the
+	// borrowed guard transaction. The guard began it and the guard
+	// commits or rolls it back, so this path never commits or rolls
+	// back. With no carrier the legacy owned-transaction path below
+	// runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return createReconciliationRunTx(ctx, ambient, dispatcher, trigger, requestedBy, reason, scheduledFor, onlyIfOverdue)
+	}
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, false, fmt.Errorf("credits reconciliation: begin: %w", err)
@@ -36,6 +45,28 @@ func CreateReconciliationRun(
 			slog.Warn("failed to roll back Credits reconciliation transaction", "err", rollbackErr)
 		}
 	}()
+	runID, enqueueRequired, err := createReconciliationRunTx(ctx, tx, dispatcher, trigger, requestedBy, reason, scheduledFor, onlyIfOverdue)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, fmt.Errorf("credits reconciliation: commit: %w", err)
+	}
+	return runID, enqueueRequired, nil
+}
+
+// createReconciliationRunTx starts one reconciliation run (and enqueues
+// it when required) inside the caller's transaction (owned or borrowed).
+func createReconciliationRunTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	dispatcher ports.ReconciliationRunDispatcher,
+	trigger ports.ReconciliationTrigger,
+	requestedBy *int64,
+	reason *string,
+	scheduledFor *time.Time,
+	onlyIfOverdue bool,
+) (*int64, bool, error) {
 	var runID *int64
 	var enqueueRequired bool
 	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_credit_reconciliation($1, $2, $3, $4, $5)`,
@@ -53,9 +84,6 @@ func CreateReconciliationRun(
 		if err := dispatcher.DispatchReconciliationRun(ctx, tx, *runID); err != nil {
 			return nil, false, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
 		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, false, fmt.Errorf("credits reconciliation: commit: %w", err)
 	}
 	return runID, enqueueRequired, nil
 }

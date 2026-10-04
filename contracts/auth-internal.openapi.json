@@ -120,6 +120,44 @@
         }
       }
     },
+    "/internal/users/states": {
+      "post": {
+        "operationId": "getUserStates",
+        "summary": "Read Auth role and ban state for a bounded set of user IDs",
+        "description": "Read-only batch endpoint for the Identity admin reconciliation job (dry-run alerting). Returns role, banned flag, ban reason and ban expiry per Auth identity; unknown IDs are omitted, never fabricated.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetUserStatesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auth states resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetUserStatesEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/internal/users/{id}": {
       "parameters": [
         {
@@ -830,6 +868,79 @@
               "type": "string",
               "minLength": 1
             }
+          }
+        }
+      },
+      "GetUserStatesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["user_ids"],
+        "properties": {
+          "user_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 191
+            }
+          }
+        }
+      },
+      "GetUserStatesData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["users"],
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthUserState"
+            }
+          }
+        }
+      },
+      "AuthUserState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["auth_user_id", "role", "banned"],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          },
+          "banned": {
+            "type": "boolean"
+          },
+          "ban_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "ban_expires": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "GetUserStatesEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "msg", "data"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [0]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GetUserStatesData"
           }
         }
       },

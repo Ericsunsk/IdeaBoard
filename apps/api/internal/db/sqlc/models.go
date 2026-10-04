@@ -382,6 +382,53 @@ type FeaturePrompt struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type IdentityAdminReconciliationFinding struct {
+	ID              int64              `json:"id"`
+	Fingerprint     string             `json:"fingerprint"`
+	FindingType     string             `json:"finding_type"`
+	Severity        string             `json:"severity"`
+	Risk            string             `json:"risk"`
+	UserID          pgtype.Int8        `json:"user_id"`
+	SubjectType     string             `json:"subject_type"`
+	SubjectID       string             `json:"subject_id"`
+	Details         []byte             `json:"details"`
+	Status          string             `json:"status"`
+	FirstSeenRunID  int64              `json:"first_seen_run_id"`
+	LastSeenRunID   int64              `json:"last_seen_run_id"`
+	OccurrenceCount int64              `json:"occurrence_count"`
+	FirstSeenAt     pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
+	ResolvedAt      pgtype.Timestamptz `json:"resolved_at"`
+}
+
+type IdentityAdminReconciliationRun struct {
+	ID           int64              `json:"id"`
+	Status       string             `json:"status"`
+	TriggerType  string             `json:"trigger_type"`
+	RequestedBy  pgtype.Int8        `json:"requested_by"`
+	Reason       pgtype.Text        `json:"reason"`
+	ScheduledFor pgtype.Timestamptz `json:"scheduled_for"`
+	FindingCount int64              `json:"finding_count"`
+	AttemptCount int32              `json:"attempt_count"`
+	ErrorMessage string             `json:"error_message"`
+	RequestedAt  pgtype.Timestamptz `json:"requested_at"`
+	StartedAt    pgtype.Timestamptz `json:"started_at"`
+	CompletedAt  pgtype.Timestamptz `json:"completed_at"`
+}
+
+type IdentityAdminReconciliationRunFinding struct {
+	RunID                   int64              `json:"run_id"`
+	FindingID               int64              `json:"finding_id"`
+	ObservedSeverity        string             `json:"observed_severity"`
+	ObservedRisk            string             `json:"observed_risk"`
+	ObservedDetails         []byte             `json:"observed_details"`
+	ObservedStatus          string             `json:"observed_status"`
+	ObservedOccurrenceCount int64              `json:"observed_occurrence_count"`
+	ObservedFirstSeenAt     pgtype.Timestamptz `json:"observed_first_seen_at"`
+	ObservedLastSeenAt      pgtype.Timestamptz `json:"observed_last_seen_at"`
+	ObservedResolvedAt      pgtype.Timestamptz `json:"observed_resolved_at"`
+}
+
 type LibraryAsset struct {
 	InternalID   int64              `json:"internal_id"`
 	PublicID     string             `json:"public_id"`

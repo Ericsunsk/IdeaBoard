@@ -10,11 +10,13 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/contract"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -112,6 +114,39 @@ func (s *Store) AppendRecord(ctx context.Context, params RecordParams) error {
 	if params.OperatorUserID <= 0 {
 		return nil
 	}
+	query := s.dbWithContext(ctx)
+	return dbutil.WithTx(query.ctx, query.db, func(q *dbsqlc.Queries) error {
+		return insertControlAuditRow(query.ctx, q, params)
+	})
+}
+
+// AppendRecordTx persists one audit record as a PARTICIPANT of the
+// caller-owned transaction tx: it never begins or commits, so the audit
+// row commits or rolls back atomically with whatever else the caller
+// wrote in tx. A persistence failure is returned (never swallowed):
+// the caller must fail its own transaction with it, which is the
+// deliberate semantic inversion versus AppendRecord's best-effort
+// warn-and-continue. A nil store, a nil pool, or a non-positive operator
+// id still skips silently (service subjects keep the slog trail only);
+// a nil tx is a wiring error and fails the call.
+func (s *Store) AppendRecordTx(ctx context.Context, tx pgx.Tx, params RecordParams) error {
+	if s == nil || s.db == nil || s.q == nil {
+		return nil
+	}
+	if params.OperatorUserID <= 0 {
+		return nil
+	}
+	if tx == nil {
+		return errors.New("audit: participant write requires a transaction")
+	}
+	return insertControlAuditRow(ctx, s.q.WithTx(tx), params)
+}
+
+// insertControlAuditRow builds the wire-stable insert (public id,
+// outcome convergence, route/status metadata) and executes it on q, so
+// the detached best-effort path and the caller-owned atomic path share
+// one construction and satisfy the table CHECK constraints identically.
+func insertControlAuditRow(ctx context.Context, q *dbsqlc.Queries, params RecordParams) error {
 	publicID, err := contract.MintPublicID("audit_", 16)
 	if err != nil {
 		return err
@@ -125,22 +160,19 @@ func (s *Store) AppendRecord(ctx context.Context, params RecordParams) error {
 	if err != nil {
 		return err
 	}
-	query := s.dbWithContext(ctx)
-	return dbutil.WithTx(query.ctx, query.db, func(q *dbsqlc.Queries) error {
-		_, err := q.InsertControlAuditRecord(query.ctx, dbsqlc.InsertControlAuditRecordParams{
-			PublicID:             publicID,
-			OperatorUserID:       params.OperatorUserID,
-			OperationType:        params.Operation,
-			Capability:           params.Capability,
-			TargetType:           params.TargetType,
-			TargetID:             params.TargetID,
-			Reason:               params.Reason,
-			Outcome:              MapOutcome(params.Outcome),
-			ErrorMessage:         params.ErrorMessage,
-			RequestCorrelationID: params.RequestID,
-			IdempotencyKey:       params.IdempotencyKey,
-			Metadata:             metadata,
-		})
-		return err
+	_, err = q.InsertControlAuditRecord(ctx, dbsqlc.InsertControlAuditRecordParams{
+		PublicID:             publicID,
+		OperatorUserID:       params.OperatorUserID,
+		OperationType:        params.Operation,
+		Capability:           params.Capability,
+		TargetType:           params.TargetType,
+		TargetID:             params.TargetID,
+		Reason:               params.Reason,
+		Outcome:              MapOutcome(params.Outcome),
+		ErrorMessage:         params.ErrorMessage,
+		RequestCorrelationID: params.RequestID,
+		IdempotencyKey:       params.IdempotencyKey,
+		Metadata:             metadata,
 	})
+	return err
 }

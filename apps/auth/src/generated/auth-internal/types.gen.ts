@@ -146,6 +146,28 @@ export type AuthUserEmail = {
     providers: Array<string>;
 };
 
+export type GetUserStatesRequest = {
+    user_ids: Array<string>;
+};
+
+export type GetUserStatesData = {
+    users: Array<AuthUserState>;
+};
+
+export type AuthUserState = {
+    auth_user_id: string;
+    role: AuthRole;
+    banned: boolean;
+    ban_reason?: string | null;
+    ban_expires?: string | null;
+};
+
+export type GetUserStatesEnvelope = {
+    code: 0;
+    msg: string;
+    data: GetUserStatesData;
+};
+
 export type SetUserRoleRequest = {
     role: AuthRole;
 };
@@ -345,6 +367,39 @@ export type GetUserEmailsResponses = {
 };
 
 export type GetUserEmailsResponse = GetUserEmailsResponses[keyof GetUserEmailsResponses];
+
+export type GetUserStatesData2 = {
+    body: GetUserStatesRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/users/states';
+};
+
+export type GetUserStatesErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+};
+
+export type GetUserStatesError = GetUserStatesErrors[keyof GetUserStatesErrors];
+
+export type GetUserStatesResponses = {
+    /**
+     * Auth states resolved
+     */
+    200: GetUserStatesEnvelope;
+};
+
+export type GetUserStatesResponse = GetUserStatesResponses[keyof GetUserStatesResponses];
 
 export type DeleteUserData2 = {
     body?: never;

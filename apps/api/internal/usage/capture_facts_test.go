@@ -42,6 +42,8 @@ func SeedCaptureFacts(ctx context.Context, db *pgxpool.Pool, config CaptureFacts
 }
 
 func seedUsersAndAccounts(ctx context.Context, db *pgxpool.Pool, config CaptureFactsConfig) error {
+	// The user-insert trigger already provisions wallets and user accounts,
+	// so these seed inserts only ensure the required rows exist.
 	statements := []string{
 		`
 INSERT INTO users (id, display_name, storage_uid, role, status)
@@ -53,11 +55,13 @@ SELECT $1 + series,
 FROM generate_series(0, $2 - 1) AS series`,
 		`
 INSERT INTO credit_wallets (user_id)
-SELECT $1 + series FROM generate_series(0, $2 - 1) AS series`,
+SELECT $1 + series FROM generate_series(0, $2 - 1) AS series
+ON CONFLICT DO NOTHING`,
 		`
 INSERT INTO credit_accounts (wallet_user_id, account_role)
 SELECT $1 + series, 'user_reserved'
-FROM generate_series(0, $2 - 1) AS series`,
+FROM generate_series(0, $2 - 1) AS series
+ON CONFLICT DO NOTHING`,
 		`
 INSERT INTO credit_accounts (account_role, shard_key)
 SELECT 'system_revenue', 'usage-load-' || ($1 + series)::text

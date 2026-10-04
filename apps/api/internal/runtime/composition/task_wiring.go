@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/catalog"
 	"ideaboard/api/internal/generation/routing"
+	identityreconciliation "ideaboard/api/internal/identity/users/application/reconciliation"
 	"ideaboard/api/internal/identity/users/ports"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	"ideaboard/api/internal/media/workspacemedia"
@@ -308,6 +309,25 @@ func newAppTaskRuntime(
 	// building a second settler.
 	settlementSweepPeriodicJobs := taskworker.TaskSettlementSweepPeriodicJobs()
 	settlementSweepWorker := taskworker.NewTaskSettlementSweepWorker(workspaceStore, workspaceSettlerBridge)
+	// Identity admin reconciliation (dry-run alerting only): a daily scan
+	// pages the local users table and compares each row against the Auth
+	// read-only batch endpoint, persisting one finding per drift. The local
+	// row always wins future repairs; this phase never pushes anything.
+	// AutoRemediate stays false (fail-closed); opening automatic repair
+	// needs a dedicated opt-in switch plus repair-path tests.
+	identityAdminReconciler := identityreconciliation.NewReconciler(identityreconciliation.ReconcilerDeps{
+		DB:    dbs.db,
+		Users: repos.userRepo,
+		Auth:  services.authServiceClient,
+	})
+	identityAdminDispatcher, err := identityreconciliation.NewRunDispatcher(services.riverProducer)
+	if err != nil {
+		if eventBus != nil {
+			_ = eventBus.Close()
+		}
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize identity admin reconciliation dispatcher: %w", err)
+	}
+	identityPeriodicJobs := identityreconciliation.PeriodicJobs()
 	if err := eventinterfaces.ConfigureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
@@ -328,12 +348,13 @@ func newAppTaskRuntime(
 	// #809 hard cut: the legacy task-retention periodic jobs are dropped
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs))
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(identityPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
 	periodicJobs = append(periodicJobs, settlementSweepPeriodicJobs...)
+	periodicJobs = append(periodicJobs, identityPeriodicJobs...)
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
 	// fail loudly as unknown kinds; the workspace_task_execute consumer
@@ -357,6 +378,10 @@ func newAppTaskRuntime(
 			// runs would contend on the same per-task settle transactions for no
 			// throughput gain.
 			taskqueue.RiverQueueTaskSettlementSweep: {MaxWorkers: 1},
+			// Identity admin reconciliation: one serial maintenance worker.
+			// Serial is deliberate: overlapping scans would contend on the
+			// same finding fingerprints for no throughput gain.
+			identityreconciliation.IdentityReconciliationQueue: {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, workerbilling.NewCreditReconciliationWorker(services.creditService))
@@ -373,6 +398,10 @@ func newAppTaskRuntime(
 			// Final-timeout settlement sweep: converges abandoned Credit Holds
 			// through the worker's own settler bridge.
 			river.AddWorker(workers, settlementSweepWorker)
+			// Identity admin reconciliation: the dry-run scan worker and its
+			// schedule worker ride the same client (no new infra).
+			river.AddWorker(workers, identityreconciliation.NewExecuteWorker(identityAdminReconciler))
+			river.AddWorker(workers, identityreconciliation.NewScheduleWorker(identityAdminReconciler, identityAdminDispatcher))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -434,6 +463,7 @@ func riverQueueStatsByQueue(monitor *taskqueue.RiverQueue) map[string]redmetrics
 		visionbilling.VisionBillingQueue,
 		taskqueue.RiverQueueWebhookDeliver,
 		taskqueue.RiverQueueTaskSettlementSweep,
+		identityreconciliation.IdentityReconciliationQueue,
 	}
 	stats := make(map[string]redmetrics.RiverQueueStats, len(queues))
 	for _, name := range queues {

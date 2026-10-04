@@ -44,6 +44,14 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 		t.Fatalf("GetUserEmails response = %+v, want email identity", emails)
 	}
 
+	states, err := client.GetUserStates(ctx, []string{authUserID})
+	if err != nil {
+		t.Fatalf("GetUserStates against Fastify: %v", err)
+	}
+	if states[authUserID].Role != "admin" || states[authUserID].Banned || states[authUserID].BanReason != nil || states[authUserID].BanExpiresAt != nil {
+		t.Fatalf("GetUserStates response = %+v, want unbanned admin state", states)
+	}
+
 	assertFastifyMutationSuccess(t, "DeleteUser", func() error {
 		return client.DeleteUser(ctx, authUserID)
 	})

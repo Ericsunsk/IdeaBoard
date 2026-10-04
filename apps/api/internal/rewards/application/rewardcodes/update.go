@@ -20,11 +20,15 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 		return UpdatedRewardCode{}, err
 	}
 
-	tx, err := s.begin(ctx)
+	tx, owned, err := s.begin(ctx)
 	if err != nil {
 		return UpdatedRewardCode{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	rotationReplayed, err := s.lockRewardCodeUpdate(ctx, tx, input)
 	if err != nil {
@@ -40,8 +44,10 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 	if err != nil {
 		return UpdatedRewardCode{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return UpdatedRewardCode{}, fmt.Errorf("commit reward Code update: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return UpdatedRewardCode{}, fmt.Errorf("commit reward Code update: %w", err)
+		}
 	}
 	result := UpdatedRewardCode{RewardCode: updated}
 	if input.hasCode {
@@ -147,11 +153,15 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) {
 		return RewardCode{}, ErrInvalidCommand
 	}
-	tx, err := s.begin(ctx)
+	tx, owned, err := s.begin(ctx)
 	if err != nil {
 		return RewardCode{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 	if err := s.lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return RewardCode{}, err
 	}
@@ -168,8 +178,10 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 	if err != nil {
 		return RewardCode{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return RewardCode{}, fmt.Errorf("commit reward Code enabled intent: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return RewardCode{}, fmt.Errorf("commit reward Code enabled intent: %w", err)
+		}
 	}
 	return updated, nil
 }
@@ -179,11 +191,15 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 	if !s.validAdminMutation(command.RewardCodeID, command.ActorUserID) {
 		return DeletedRewardCode{}, ErrInvalidCommand
 	}
-	tx, err := s.begin(ctx)
+	tx, owned, err := s.begin(ctx)
 	if err != nil {
 		return DeletedRewardCode{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 	if err := s.lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return DeletedRewardCode{}, err
 	}
@@ -196,8 +212,10 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 	if !deleted {
 		return DeletedRewardCode{}, ErrRewardCodeNotFound
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return DeletedRewardCode{}, fmt.Errorf("commit reward Code deletion: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return DeletedRewardCode{}, fmt.Errorf("commit reward Code deletion: %w", err)
+		}
 	}
 	return DeletedRewardCode{RewardCodeID: command.RewardCodeID}, nil
 }

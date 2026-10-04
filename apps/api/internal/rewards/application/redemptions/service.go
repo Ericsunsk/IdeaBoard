@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/db/dbutil"
 	rewardsdomain "ideaboard/api/internal/rewards/domain"
 	"ideaboard/api/internal/rewards/ports"
 	"strconv"
@@ -68,15 +69,25 @@ func (s *Service) currentTime() time.Time {
 	return time.Now().UTC()
 }
 
-func (s *Service) begin(ctx context.Context) (pgx.Tx, error) {
+// begin opens the write transaction for one redemption, or reuses
+// the ambient guard transaction staged in the context. The bool
+// reports ownership: true means the caller opened the transaction
+// and must commit or roll it back; false means the transaction is
+// BORROWED from the guard, which alone commits or rolls it back,
+// so the caller must do neither. With no carrier the pool path
+// below runs unchanged.
+func (s *Service) begin(ctx context.Context) (pgx.Tx, bool, error) {
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return ambient, false, nil
+	}
 	if s == nil || s.pool == nil {
-		return nil, errors.New("rewards service unavailable")
+		return nil, false, errors.New("rewards service unavailable")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("begin rewards transaction: %w", err)
+		return nil, false, fmt.Errorf("begin rewards transaction: %w", err)
 	}
-	return tx, nil
+	return tx, true, nil
 }
 
 const (
@@ -120,11 +131,15 @@ func (s *Service) redeemRewardCode(
 	candidates []CodeDigest,
 ) (RedeemResult, bool, error) {
 	current, previous := splitCodeDigestCandidates(candidates)
-	tx, err := s.begin(ctx)
+	tx, owned, err := s.begin(ctx)
 	if err != nil {
 		return RedeemResult{}, false, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	defer func() {
+		if owned {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
 	rewardCodeID, found, err := lockRewardCodeForRedemption(ctx, tx, s.locker, current, previous)
 	if err != nil {
@@ -147,7 +162,7 @@ func (s *Service) redeemRewardCode(
 		return RedeemResult{}, true, err
 	}
 	if replayed {
-		return s.finishRewardRedemptionReplay(ctx, tx, command.UserID, redemption)
+		return s.finishRewardRedemptionReplay(ctx, tx, command.UserID, redemption, owned)
 	}
 
 	redemptionID, grant, err := s.grantRewardCodeCredits(ctx, tx, command.UserID, rewardCode)
@@ -158,8 +173,10 @@ func (s *Service) redeemRewardCode(
 	if err != nil {
 		return RedeemResult{}, true, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
+	if owned {
+		if err := tx.Commit(ctx); err != nil {
+			return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
+		}
 	}
 	return canonicalRedeemResult(redemption, grant.AvailableBalance, false), true, nil
 }
@@ -205,9 +222,11 @@ WHERE user_id = $1 AND reward_code_id = $2`, userID, rewardCodeID).Scan(
 	return redemption, true, nil
 }
 
-func (s *Service) finishRewardRedemptionReplay(ctx context.Context, tx pgx.Tx, userID int64, redemption Redemption) (RedeemResult, bool, error) {
-	if err := tx.Rollback(ctx); err != nil {
-		return RedeemResult{}, true, fmt.Errorf("release reward Code replay lock: %w", err)
+func (s *Service) finishRewardRedemptionReplay(ctx context.Context, tx pgx.Tx, userID int64, redemption Redemption, owned bool) (RedeemResult, bool, error) {
+	if owned {
+		if err := tx.Rollback(ctx); err != nil {
+			return RedeemResult{}, true, fmt.Errorf("release reward Code replay lock: %w", err)
+		}
 	}
 	wallet, err := s.credits.ReadWallet(ctx, userID)
 	if err != nil {

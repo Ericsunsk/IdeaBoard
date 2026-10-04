@@ -66,6 +66,14 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
         email: `${auth_user_id}@example.com`,
         providers: ['email'],
       })),
+    findUserStatesByIDs: async (authUserIDs) =>
+      authUserIDs.map((auth_user_id) => ({
+        auth_user_id,
+        role: 'user',
+        banned: false,
+        ban_reason: null,
+        ban_expires: null,
+      })),
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,
     updateAuthUserBanState: async () => true,
@@ -236,6 +244,7 @@ describe('createAuthApp', () => {
         },
       },
       getUserEmails: { payload: { user_ids: ['auth-user-1'] } },
+      getUserStates: { payload: { user_ids: ['auth-user-1'] } },
       deleteUser: {},
       setUserRole: { payload: { role: 'user' } },
       banUser: { payload: { userId: 'auth-user-1' } },

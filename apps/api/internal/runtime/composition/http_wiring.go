@@ -19,6 +19,7 @@ import (
 	storagehttp "ideaboard/api/internal/media/storage/interfaces/http"
 	paymenthttp "ideaboard/api/internal/payments/interfaces/http"
 	"ideaboard/api/internal/platform/adminbranding"
+	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
@@ -75,6 +76,22 @@ func newAppRouter(
 		aigateway.NewObservedRepository(repos.db),
 		newBillingSKUCatalogAdapter(services.billingCatalog),
 	))
+	// Control audit durability (step 2: atomic where the guard owns the
+	// transaction). The directory is the request-scoped public->internal
+	// resolver the control handlers already use; both sinks reuse that
+	// SAME instance for their per-audit operator lookup (no cache, no new
+	// global state). The observer sink persists into control_audit_records
+	// in its own detached transaction (reads and fail-fast denials have
+	// no business write to be atomic with; failures only slog.Warn).
+	// The participant sink joins the guard-owned mutation transaction
+	// instead, so the business fact and its audit row commit or roll back
+	// together; its failures roll the mutation back (semantic inversion
+	// versus step 1, by definition of atomic). Both sinks share one
+	// audit.Store over the pool.
+	controlUserDirectory := httpapi.NewUsersRepositoryDirectory(repos.userRepo)
+	controlAuditStore := audit.NewStore(repos.db)
+	controlAuditSink := newControlAuditDurableSink(controlAuditStore, controlUserDirectory)
+	controlAuditTxSink := newControlAuditAtomicSink(controlAuditStore, controlUserDirectory)
 
 	router := gin.New()
 	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
@@ -219,7 +236,7 @@ func newAppRouter(
 				// NATS connection is opened by this wiring.
 				newControlTaskEventAdapter(taskServices.taskStatusPublisher, taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
 			Tenancy:           tenancypg.NewStore(repos.db),
-			UserDirectory:     httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			UserDirectory:     controlUserDirectory,
 			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
 			Catalog:           services.billingCatalog,
 			ModelPools:        catalog.NewRepository(repos.db), // #849: Admin pool reads/replaces; no second model catalog.
@@ -237,6 +254,12 @@ func newAppRouter(
 			OAuth:             services.authServiceClient,
 			BrandLogos:        adminbranding.NewHandler(repos.adminBrandLogoRepo, controlRequireAdmin),
 			BrandingUpload:    services.storageService,
+			AuditSink:         controlAuditSink,
+			// Step 2 atomic scope: every guarded mutation runs inside
+			// one guard-owned transaction that the audit row joins
+			// before commit (nil in tests keeps the legacy path).
+			TxScope: newControlTxScope(repos.db),
+			TxAudit: controlAuditTxSink,
 		},
 		PublicSearchHandler: searchhttp.NewSearchHandler(searchapplication.NewSearchService(searchProviderConfig, []searchports.SearchProviderAdapter{searchinfra.NewUnsplashAdapter(), searchinfra.NewPexelsAdapter()})),
 		PaymentWebhook:      paymentWebhookHandler,

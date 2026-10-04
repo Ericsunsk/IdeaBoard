@@ -58,15 +58,93 @@ func (db paymentContextDB) queries() *dbsqlc.Queries {
 	return dbsqlc.New(db.executor)
 }
 
-func (db paymentContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resultErr error) {
+// beginTx opens the write transaction for one repository unit, or reuses
+// the ambient guard transaction staged in the context (control audit
+// atomicity, step 3). The bool reports ownership: true means the caller
+// opened the transaction and must commit or roll it back; false means
+// the transaction is BORROWED from the guard, which alone commits or
+// rolls it back, so the caller must do neither. With no carrier the
+// starter path below runs unchanged (including the advisory-lock session
+// starter when one is staged).
+func (db paymentContextDB) beginTx() (pgx.Tx, bool, error) {
+	if ambient, ok := dbutil.AmbientTxFromContext(db.ctx); ok {
+		return ambient, false, nil
+	}
 	if db.transactionStarter == nil {
-		return fmt.Errorf("payments repository: database unavailable")
+		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}
 	tx, err := db.transactionStarter.BeginTx(db.ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("begin payments transaction: %w", err)
+		return nil, false, fmt.Errorf("begin payments transaction: %w", err)
+	}
+	return tx, true, nil
+}
+
+// beginDirectTx opens a write transaction for the admin refund paths, or
+// reuses the ambient guard transaction staged in the context (control
+// audit atomicity, step 3). The bool reports ownership: true means the
+// caller opened the transaction and must commit or roll it back; false
+// means the transaction is BORROWED from the guard, which alone commits
+// or rolls it back, so the caller must do neither. These paths never run
+// under an advisory lock, so the fallback matches the previous
+// r.db.BeginTx exactly. With no carrier behavior is unchanged.
+func (r *Repository) beginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return ambient, false, nil
+	}
+	if r == nil || r.db == nil {
+		return nil, false, fmt.Errorf("payments repository: database unavailable")
+	}
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	return tx, true, nil
+}
+
+// commitIfOwned commits an owned transaction and is a no-op for a
+// borrowed guard transaction (the guard commits it with the audit row).
+func commitIfOwned(ctx context.Context, tx pgx.Tx, owned bool) error {
+	if !owned {
+		return nil
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit payments transaction: %w", err)
+	}
+	return nil
+}
+
+// commitDirectIfOwned commits an owned direct transaction and is a
+// no-op for a borrowed guard transaction (the guard commits it with the
+// audit row).
+func commitDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) error {
+	if !owned {
+		return nil
+	}
+	return tx.Commit(ctx)
+}
+
+// rollbackDirectIfOwned rolls back an owned direct transaction and is a
+// no-op for a borrowed guard transaction (the guard owns its fate).
+func rollbackDirectIfOwned(ctx context.Context, tx pgx.Tx, owned bool) {
+	if !owned {
+		return
+	}
+	_ = tx.Rollback(ctx)
+}
+
+func (db paymentContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resultErr error) {
+	tx, owned, err := db.beginTx()
+	if err != nil {
+		return err
 	}
 	defer func() {
+		// Only an owned transaction is cleaned up here: a borrowed
+		// guard transaction stays open for the guard, which rolls it
+		// back on error and commits it with the audit row on success.
+		if !owned {
+			return
+		}
 		if rollbackErr := tx.Rollback(db.ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) && resultErr != nil {
 			resultErr = errors.Join(resultErr, fmt.Errorf("rollback payments transaction: %w", rollbackErr))
 		}
@@ -74,10 +152,7 @@ func (db paymentContextDB) withTx(run func(*dbsqlc.Queries, pgx.Tx) error) (resu
 	if err := run(dbsqlc.New(tx), tx); err != nil {
 		return err
 	}
-	if err := tx.Commit(db.ctx); err != nil {
-		return fmt.Errorf("commit payments transaction: %w", err)
-	}
-	return nil
+	return commitIfOwned(db.ctx, tx, owned)
 }
 
 func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts paymentsdomain.PaidCheckoutFacts, creditedAt time.Time) (paymentsdomain.PaymentConvergenceResult, error) {

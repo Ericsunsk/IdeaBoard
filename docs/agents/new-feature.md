@@ -28,8 +28,8 @@ path), `issue-tracker.md` / `triage-labels.md` (process), `shared/CONTEXT.md`
 3. **Layer split for complex features, flat for light ones** —
    `domain/` (pure: no Vue, router, Query, DTOs) + `application/` (use-case
    orchestration) + `infrastructure/` (transport/storage adapters, DTO mapping)
-   + `ui/` or `presentation/`; or a documented flat exception (`legal`,
-   `public-site`: `components/`, `useXxx.ts`, `types.ts`, no empty dirs to fake
+   + `ui/` or `presentation/`; or a documented flat exception (`legal`:
+   `components/`, `useXxx.ts`, `types.ts`, no empty dirs to fake
    the template). Record the choice (layered vs flat + why) in the feature
    `CONTEXT.md` or the PR description.
 4. **Admin adapter boundary** — route pages and components never import

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/ports"
@@ -45,6 +46,17 @@ func (s *Service) VerifyWelcomeIdentityKey(ctx context.Context) error {
 	if s == nil || s.pool == nil || s.credits == nil || len(s.welcomeIdentityKey) != 32 {
 		return fmt.Errorf("identity lifecycle dependencies and a 32-byte Welcome Grant key are required")
 	}
+	// Ambient guard transaction (control audit atomicity, step 3): the
+	// verification write joins the borrowed guard transaction. The guard
+	// began it and the guard commits or rolls it back, so this path
+	// never commits or rolls back. With no carrier the legacy
+	// owned-transaction path below runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		if err := s.credits.LifecycleInTx(ambient).BindWelcomeIdentityKey(ctx, s.welcomeKeyFingerprint); err != nil {
+			return fmt.Errorf("verify permanently bound Welcome identity key: %w", err)
+		}
+		return nil
+	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin Welcome identity key verification: %w", err)
@@ -71,6 +83,23 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 		return nil, fmt.Errorf("identity lifecycle dependencies are not configured")
 	}
 
+	// Ambient guard transaction (control audit atomicity, step 3): the
+	// whole provisioning unit (identity row, wallet, welcome grant,
+	// freeze alignment) joins the borrowed guard transaction. The guard
+	// began it and the guard commits or rolls it back, so this path
+	// never commits or rolls back. With no carrier the legacy
+	// owned-transaction path below runs unchanged.
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		user, grant, granted, err := s.provisionIdentityTx(ctx, ambient, identity, fingerprint)
+		if err != nil {
+			return nil, err
+		}
+		if granted {
+			return &ports.ProvisionResult{User: *user, Wallet: grant, WelcomeGranted: true}, nil
+		}
+		return s.provisionResultWithoutGrant(ctx, user)
+	}
+
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("begin identity lifecycle transaction: %w", err)
@@ -92,13 +121,28 @@ func (s *Service) ProvisionIdentity(ctx context.Context, identity ports.Verified
 	}
 	wallet := grant
 	if !granted {
-		walletDetails, err := s.credits.GetWallet(ctx, user.ID)
+		result, err := s.provisionResultWithoutGrant(ctx, user)
 		if err != nil {
-			return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
+			return nil, err
 		}
-		wallet = walletDetails.WalletBalance
+		return result, nil
 	}
 	return &ports.ProvisionResult{User: *user, Wallet: wallet, WelcomeGranted: granted}, nil
+}
+
+// provisionResultWithoutGrant reads the already-settled wallet for a
+// replayed provisioning (the welcome fingerprint was claimed before, so
+// no new grant was minted). The read runs on the pool outside any
+// transaction, exactly as before: under a borrowed guard transaction the
+// wallet row pre-exists in every reachable replay shape (a fresh wallet
+// plus an already-claimed fingerprint would require a fingerprint
+// collision), so the pool read observes it.
+func (s *Service) provisionResultWithoutGrant(ctx context.Context, user *domain.User) (*ports.ProvisionResult, error) {
+	walletDetails, err := s.credits.GetWallet(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
+	}
+	return &ports.ProvisionResult{User: *user, Wallet: walletDetails.WalletBalance, WelcomeGranted: false}, nil
 }
 
 func (s *Service) provisionIdentityTx(ctx context.Context, tx pgx.Tx, identity ports.VerifiedIdentity, fingerprint string) (*domain.User, ports.WalletBalance, bool, error) {
