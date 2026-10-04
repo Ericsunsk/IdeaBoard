@@ -52,7 +52,7 @@ type ServiceClient struct {
 func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	if timeout <= 0 {
-		timeout = 5 * time.Second
+		timeout = time.Duration(config.DefaultAuthServiceTimeoutSeconds) * time.Second
 	}
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	authHost := ""
@@ -1001,7 +1001,7 @@ type authOutboundRoundTripper struct {
 }
 
 func (t *authOutboundRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	timeout := 5 * time.Second
+	timeout := time.Duration(config.DefaultAuthServiceTimeoutSeconds) * time.Second
 	if t != nil && t.timeout > 0 {
 		timeout = t.timeout
 	}

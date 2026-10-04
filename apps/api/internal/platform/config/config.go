@@ -284,6 +284,8 @@ type AuthServiceConfig struct {
 	TimeoutSeconds int
 }
 
+const DefaultAuthServiceTimeoutSeconds = 5
+
 type StorageConfig struct {
 	// LocalRoot is the canonical filesystem root for the builtin-local
 	// storage driver. Empty resolves to the process working directory,
@@ -517,7 +519,7 @@ func Load() *Config {
 		Auth: AuthServiceConfig{
 			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
-			TimeoutSeconds: 5,
+			TimeoutSeconds: DefaultAuthServiceTimeoutSeconds,
 		},
 		Worker:  WorkerConfig{Concurrency: workerConcurrency, TaskRetentionDays: retentionDays},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},

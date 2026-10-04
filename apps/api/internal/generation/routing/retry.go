@@ -1,5 +1,7 @@
 package routing
 
+import "ideaboard/api/internal/platform/retrypolicy"
+
 // AttemptFailure describes one failed execution attempt in
 // provider-neutral terms (ADR-0012 rule 6). The worker (later wave) maps
 // provider errors into this shape; routing classifies without importing
@@ -75,10 +77,5 @@ func (f AttemptFailure) Retryable() bool {
 // 429, 408, and 5xx are transient; every other status (including 0,
 // meaning "no HTTP status") is not retryable by status alone.
 func RetryableHTTPStatus(status int) bool {
-	switch status {
-	case 408, 429:
-		return true
-	default:
-		return status >= 500 && status <= 599
-	}
+	return retrypolicy.RetryableHTTPStatus(status)
 }

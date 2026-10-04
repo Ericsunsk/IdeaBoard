@@ -30,7 +30,6 @@ func (p TaskEventHubPublisher) PublishTaskStatus(ctx context.Context, event even
 	if p.Hub == nil {
 		return nil
 	}
-	event = events.NormalizeTaskStatusEvent(event)
 	taskEvent := taskservice.TaskEvent{TaskID: event.TaskID, Status: string(event.Status)}
 	if p.Resolver != nil {
 		if task, err := p.Resolver.GetByTaskID(ctx, event.TaskID); err == nil && task != nil {
@@ -58,7 +57,6 @@ type CompositeTaskStatusPublisher struct {
 
 // PublishTaskStatus sends event to both local and remote publishers sequentially.
 func (p CompositeTaskStatusPublisher) PublishTaskStatus(ctx context.Context, event events.TaskStatusEvent) error {
-	event = events.NormalizeTaskStatusEvent(event)
 	var firstErr error
 	if p.Local != nil {
 		if err := p.Local.PublishTaskStatus(ctx, event); err != nil {

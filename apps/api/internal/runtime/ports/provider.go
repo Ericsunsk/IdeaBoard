@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/retrypolicy"
 	tasks "ideaboard/api/internal/tasking/domain"
 )
 
@@ -98,20 +97,7 @@ func NewUpstreamHTTPErrorFromResponse(resp *http.Response, body string) error {
 }
 
 func ParseRetryAfter(raw string) time.Duration {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0
-	}
-	if seconds, err := strconv.ParseFloat(raw, 64); err == nil && seconds >= 0 {
-		return time.Duration(seconds * float64(time.Second))
-	}
-	if when, err := http.ParseTime(raw); err == nil {
-		delay := time.Until(when)
-		if delay > 0 {
-			return delay
-		}
-	}
-	return 0
+	return retrypolicy.ParseRetryAfter(raw)
 }
 
 type ProviderInvocationOutcomeUnknownError struct {

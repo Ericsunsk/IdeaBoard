@@ -31,13 +31,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *Repository) Pool() *pgxpool.Pool {
-	if r == nil {
-		return nil
-	}
-	return r.db
-}
-
 func (r *Repository) dbWithContext(ctx context.Context) repositoryQueryer {
 	queries := r.q
 	if tx, ok := dbutil.AmbientTxFromContext(ctx); ok {
