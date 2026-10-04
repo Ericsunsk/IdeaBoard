@@ -1,5 +1,5 @@
 <template>
-  <IbFormField
+  <AuthFieldShell
     :label="label"
     :error="error"
     :field-id="fieldId"
@@ -31,13 +31,13 @@
         @blur="emit('blur')"
       />
     </template>
-  </IbFormField>
+  </AuthFieldShell>
 </template>
 
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { Input } from '@/components/ui/input'
-import IbFormField from '../../../../shared/components/IbFormField.vue'
+import AuthFieldShell from './AuthFieldShell.vue'
 import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
 
 const props = withDefaults(

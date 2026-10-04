@@ -33,6 +33,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CanvasCreatableNodeKind } from '../../../board/ports/canvas'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
+import { handleMenuKeyboardNavigation } from '../../../../shared/interaction/menuKeyboardNavigation'
 
 const props = defineProps<{
   visible: boolean
@@ -133,19 +134,7 @@ onBeforeUnmount(stopPositionTracking)
 void props
 
 function handleMenuKeydown(event: KeyboardEvent) {
-  const items = Array.from(menuRef.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
-  if (!items.length) return
-  const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLElement))
-  let nextIndex: number | null = null
-
-  if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
-  if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = items.length - 1
-  if (nextIndex === null) return
-
-  event.preventDefault()
-  items[nextIndex]?.focus()
+  handleMenuKeyboardNavigation(event, menuRef.value)
 }
 
 function resolveFocusReturnTarget() {

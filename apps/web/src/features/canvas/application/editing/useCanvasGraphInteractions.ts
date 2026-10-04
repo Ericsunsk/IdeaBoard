@@ -21,6 +21,7 @@ import type { CanvasRendererMetricsPort } from '../../infrastructure/vue-flow-ad
 import { createCanvasNodeAt } from '../../domain/nodes/canvasNodeFactory.ts'
 import { resolveImageNodeDisplayPayload } from '../../infrastructure/vue-flow-adapter/flowImageNodeSelectors.ts'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
+import { resolveWritableCanvasGraphStore } from '../canvasGraphStoreWriter'
 import {
   renderImageRetouchRecipeFile,
   type ImageRetouchRenderSource,
@@ -196,7 +197,7 @@ function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages']
 
 export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOptions) {
   const writeGraphStore = () =>
-    options.writeCanvasGraphStore?.() ?? (options.readCanvasGraphStore() as CanvasGraphStore)
+    resolveWritableCanvasGraphStore(options.readCanvasGraphStore, options.writeCanvasGraphStore)
   const rendererMetrics: CanvasRendererMetricsPort = options.rendererMetrics ?? {
     readNodeMetrics: (nodeId) => {
       const node = options.nodes.value.find((candidate) => candidate.id === nodeId)

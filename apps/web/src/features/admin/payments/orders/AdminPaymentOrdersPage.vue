@@ -95,146 +95,13 @@
       </AdminAlert>
     </template>
 
-    <AdminTable
+    <AdminPaymentOrdersTable
       v-if="!initialError"
-      :value="orders"
+      :orders="orders"
       :loading="loading"
-      data-key="publicOrderNumber"
-      scrollable
-      :frame-class="adminTableFrameClass"
-      :table-aria-label="PAYMENT_ORDERS_MESSAGES.tableAria"
-      :scroll-aria-label="PAYMENT_ORDERS_MESSAGES.tableScrollAria"
-      :table-style="adminTableStyle"
-      :class="adminTableClass"
-    >
-      <template #empty>
-        <AdminEmptyState :title="emptyTitle" />
-      </template>
-
-      <!-- 订单时间列：等宽日期 -->
-      <AdminColumn
-        field="createdAt"
-        :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn"
-        :style="{ width: '160px' }"
-      >
-        <template #body="{ data }">
-          <time
-            :datetime="data.createdAt"
-            class="whitespace-nowrap font-mono text-xs text-muted-foreground"
-          >
-            {{ formatPaymentDateTime(data.createdAt) }}
-          </time>
-        </template>
-      </AdminColumn>
-
-      <!-- 公开订单号列：等宽可点击链接 -->
-      <AdminColumn
-        field="publicOrderNumber"
-        :header="PAYMENT_ORDERS_MESSAGES.orderNumberColumn"
-        :style="{ minWidth: '220px' }"
-      >
-        <template #body="{ data }">
-          <button
-            type="button"
-            class="font-mono text-xs font-semibold text-foreground hover:text-primary cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 rounded"
-            :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
-            @click="openDetail(data.publicOrderNumber)"
-          >
-            {{ data.publicOrderNumber }}
-          </button>
-        </template>
-      </AdminColumn>
-
-      <!-- 用户列：姓名 -->
-      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.userColumn" :style="{ width: '160px' }">
-        <template #body="{ data }">
-          <div class="truncate font-medium text-foreground">
-            {{ data.user.displayName }}
-          </div>
-        </template>
-      </AdminColumn>
-
-      <!-- Idea 数量列：等宽数字 -->
-      <AdminColumn
-        field="ideaQuantity"
-        :header="PAYMENT_ORDERS_MESSAGES.ideaColumn"
-        :style="{ width: '120px' }"
-      >
-        <template #body="{ data }">
-          <span class="font-mono text-xs font-semibold text-foreground">
-            {{ formatLocaleNumber(data.ideaQuantity) }}
-          </span>
-        </template>
-      </AdminColumn>
-
-      <!-- 原始实付列：等宽金额 -->
-      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.paidColumn" :style="{ width: '130px' }">
-        <template #body="{ data }">
-          <span class="font-mono text-xs font-semibold text-foreground">
-            {{ formatPaymentMoney(data.paidAmountMinor, data.paidCurrency) }}
-          </span>
-        </template>
-      </AdminColumn>
-
-      <!-- Stripe 状态列：圆角徽标 -->
-      <AdminColumn
-        field="stripeStatus"
-        :header="PAYMENT_ORDERS_MESSAGES.stripeColumn"
-        :style="{ width: '120px' }"
-      >
-        <template #body="{ data }">
-          <AdminBadge
-            :value="getStripeStatusLabel(data.stripeStatus)"
-            :severity="stripeStatusSeverity(data.stripeStatus)"
-            rounded
-          />
-        </template>
-      </AdminColumn>
-
-      <!-- 本地到账列：圆角徽标 -->
-      <AdminColumn
-        field="creditStatus"
-        :header="PAYMENT_ORDERS_MESSAGES.creditColumn"
-        :style="{ width: '120px' }"
-      >
-        <template #body="{ data }">
-          <AdminBadge
-            :value="getCreditStatusLabel(data.creditStatus)"
-            :severity="creditStatusSeverity(data.creditStatus)"
-            rounded
-          />
-        </template>
-      </AdminColumn>
-
-      <!-- 异常列：Badge 或横线 -->
-      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.anomalyColumn" :style="{ width: '110px' }">
-        <template #body="{ data }">
-          <AdminBadge
-            v-if="data.anomalousAt"
-            :value="PAYMENT_ORDERS_MESSAGES.anomalyBadge"
-            severity="danger"
-            rounded
-          />
-          <span v-else class="text-xs text-muted-foreground">—</span>
-        </template>
-      </AdminColumn>
-
-      <!-- 详情操作列 (1:1 对齐用户管理页操作列样式) -->
-      <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.detailColumn" :style="{ width: '64px' }">
-        <template #body="{ data }">
-          <div class="flex items-center justify-start">
-            <button
-              type="button"
-              :class="adminTableRowActionButtonClass"
-              :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
-              @click="openDetail(data.publicOrderNumber)"
-            >
-              <Eye class="size-4" />
-            </button>
-          </div>
-        </template>
-      </AdminColumn>
-    </AdminTable>
+      :empty-title="emptyTitle"
+      @open-detail="openDetail"
+    />
 
     <template #footer-label>{{ PAYMENT_ORDERS_MESSAGES.footerLabel(totalLabel) }}</template>
   </AdminCollectionPageShell>
@@ -254,38 +121,24 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAdminCursorCollection } from '../../shared/composables/useAdminCursorCollection'
-import { Eye, Refresh } from '@iconoir/vue'
+import { Refresh } from '@iconoir/vue'
 import AdminCollectionPageShell from '../../shared/components/AdminCollectionPageShell.vue'
-import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
-import AdminTable from '../../shared/components/AdminTable.vue'
-import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { usePaymentOrdersFeedback } from '../useStripeSettingsFeedback'
-import {
-  adminActionButtonClass,
-  adminFramedIconButtonClass,
-  adminTableClass,
-  adminTableFrameClass,
-  adminTableRowActionButtonClass,
-  adminTableStyle,
-} from '../../shared/lib/uiClasses'
+import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
 import { createUniqueId } from '../../../../shared/utils/ids'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
+import AdminPaymentOrdersTable from './AdminPaymentOrdersTable.vue'
 import {
-  formatPaymentDateTime,
-  formatPaymentMoney,
-  getCreditStatusLabel,
-  getStripeStatusLabel,
   ORDER_STATUS_FILTER_ALL,
   paymentOrderStatusOptions,
   type PaymentOrderStatusFilter,
@@ -510,18 +363,5 @@ async function loadDetail() {
   } finally {
     if (!controller.signal.aborted && epoch === detailRequestEpoch) detailLoading.value = false
   }
-}
-
-function stripeStatusSeverity(status: string) {
-  if (status === 'paid') return 'success'
-  if (status === 'payment_failed') return 'danger'
-  if (status === 'open' || status === 'async_payment_pending') return 'warn'
-  return 'secondary'
-}
-
-function creditStatusSeverity(status: string) {
-  if (status === 'credited') return 'success'
-  if (status === 'pending') return 'warn'
-  return 'secondary'
 }
 </script>

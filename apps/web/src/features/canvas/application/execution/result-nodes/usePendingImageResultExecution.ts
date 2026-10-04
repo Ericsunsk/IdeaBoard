@@ -18,6 +18,7 @@ import { flowConnectionToCanvasConnection } from '../../../infrastructure/vue-fl
 import { canvasNodeToFlowNode } from '../../../infrastructure/vue-flow-adapter/flowSnapshotAdapter.ts'
 import { createPrefixedId } from '../../../../../shared/utils/ids'
 import type { CanvasRendererMetricsPort } from '../../../infrastructure/vue-flow-adapter'
+import { resolveWritableCanvasGraphStore } from '../../canvasGraphStoreWriter'
 import {
   readOutputAnchorLayout,
   resolvePendingImageResultPosition,
@@ -93,7 +94,7 @@ export function usePendingImageResultExecution(
     },
   }
   const writeGraphStore = () =>
-    options.writeCanvasGraphStore?.() ?? (options.readCanvasGraphStore() as CanvasGraphStore)
+    resolveWritableCanvasGraphStore(options.readCanvasGraphStore, options.writeCanvasGraphStore)
   function buildPendingResultLookup(): PendingImageResultLookup {
     const nodeById = new Map<string, CanvasGraphNodeRecord>()
     const imageChildIdsBySource = new Map<string, string[]>()

@@ -34,6 +34,7 @@
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { LibraryFolderTab } from '../application/useLibraryWorkspace'
+import { handleMenuKeyboardNavigation } from '../../../shared/interaction/menuKeyboardNavigation'
 
 defineProps<{
   contextMenu: {
@@ -55,21 +56,6 @@ watch(menuRef, (menu) => {
 })
 
 function handleKeydown(event: KeyboardEvent) {
-  const items = Array.from(menuRef.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
-  if (!items.length) return
-  const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLElement))
-  let nextIndex: number | null = null
-  if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
-  if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = items.length - 1
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    emit('escape')
-    return
-  }
-  if (nextIndex === null) return
-  event.preventDefault()
-  items[nextIndex]?.focus()
+  handleMenuKeyboardNavigation(event, menuRef.value, { onEscape: () => emit('escape') })
 }
 </script>

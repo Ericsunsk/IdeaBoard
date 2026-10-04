@@ -191,14 +191,6 @@ function resolveNodeBodyHeight(
   return preview ? Math.max(112, Math.min(180, Math.round(width * 0.56))) : 132
 }
 
-function resolveNodeHeight(
-  nodeType: CanvasConnectionNodeType,
-  width: number,
-  node: NodeLike,
-): number {
-  return resolveNodeBodyHeight(nodeType, width, node)
-}
-
 function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds | null {
   if (!frames.length) return null
   const minX = Math.min(...frames.map((frame) => frame.x))
@@ -257,7 +249,7 @@ function collectNodeFrames(state: BoardSnapshot): BoardPreviewFrame[] {
         x: node.x,
         y: node.y,
         width,
-        height: resolveNodeHeight(nodeType, width, node),
+        height: resolveNodeBodyHeight(nodeType, width, node),
         bodyOffsetY: 0,
         bodyHeight: resolveNodeBodyHeight(nodeType, width, node),
         imageUrl: nodeType === 'fusion' ? undefined : preview?.url,
@@ -339,61 +331,56 @@ function roundedRectPath(
   ctx.closePath()
 }
 
-function drawDotBackground(ctx: CanvasRenderingContext2D, isDark = false) {
-  if (isDark) {
-    ctx.fillStyle = PREVIEW_BACKGROUND_DARK
-    ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
+interface PreviewDotBackgroundOptions {
+  background: string
+  dotColor: string
+  dotOffset: number
+  dotSpacing: number
+  dotRadius: number
+  gradient?: readonly [string, string]
+}
 
-    ctx.fillStyle = PREVIEW_DOT_COLOR_DARK
-    for (let x = 14; x < PREVIEW_VIEWPORT_WIDTH; x += 24) {
-      for (let y = 14; y < PREVIEW_VIEWPORT_HEIGHT; y += 24) {
-        ctx.beginPath()
-        ctx.arc(x, y, 1.25, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-    return
+function drawDottedBackground(ctx: CanvasRenderingContext2D, options: PreviewDotBackgroundOptions) {
+  ctx.fillStyle = options.background
+  ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
+
+  if (options.gradient) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, PREVIEW_VIEWPORT_HEIGHT)
+    gradient.addColorStop(0, options.gradient[0])
+    gradient.addColorStop(1, options.gradient[1])
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
   }
 
-  ctx.fillStyle = PREVIEW_BACKGROUND
-  ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
-
-  const gradient = ctx.createLinearGradient(0, 0, 0, PREVIEW_VIEWPORT_HEIGHT)
-  gradient.addColorStop(0, '#ffffff')
-  gradient.addColorStop(1, '#f8fafc')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
-
-  ctx.fillStyle = PREVIEW_DOT_COLOR
-  for (let x = 14; x < PREVIEW_VIEWPORT_WIDTH; x += 24) {
-    for (let y = 14; y < PREVIEW_VIEWPORT_HEIGHT; y += 24) {
+  ctx.fillStyle = options.dotColor
+  for (let x = options.dotOffset; x < PREVIEW_VIEWPORT_WIDTH; x += options.dotSpacing) {
+    for (let y = options.dotOffset; y < PREVIEW_VIEWPORT_HEIGHT; y += options.dotSpacing) {
       ctx.beginPath()
-      ctx.arc(x, y, 1.25, 0, Math.PI * 2)
+      ctx.arc(x, y, options.dotRadius, 0, Math.PI * 2)
       ctx.fill()
     }
   }
 }
 
-function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D, isDark = false) {
-  ctx.fillStyle = isDark ? BLANK_BOARD_PREVIEW_BACKGROUND_DARK : BLANK_BOARD_PREVIEW_BACKGROUND
-  ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
+function drawDotBackground(ctx: CanvasRenderingContext2D, isDark = false) {
+  drawDottedBackground(ctx, {
+    background: isDark ? PREVIEW_BACKGROUND_DARK : PREVIEW_BACKGROUND,
+    dotColor: isDark ? PREVIEW_DOT_COLOR_DARK : PREVIEW_DOT_COLOR,
+    dotOffset: 14,
+    dotSpacing: 24,
+    dotRadius: 1.25,
+    ...(!isDark ? { gradient: ['#ffffff', '#f8fafc'] as const } : {}),
+  })
+}
 
-  ctx.fillStyle = isDark ? BLANK_BOARD_PREVIEW_DOT_COLOR_DARK : BLANK_BOARD_PREVIEW_DOT_COLOR
-  for (
-    let x = BLANK_BOARD_PREVIEW_DOT_OFFSET;
-    x < PREVIEW_VIEWPORT_WIDTH;
-    x += BLANK_BOARD_PREVIEW_DOT_SPACING
-  ) {
-    for (
-      let y = BLANK_BOARD_PREVIEW_DOT_OFFSET;
-      y < PREVIEW_VIEWPORT_HEIGHT;
-      y += BLANK_BOARD_PREVIEW_DOT_SPACING
-    ) {
-      ctx.beginPath()
-      ctx.arc(x, y, BLANK_BOARD_PREVIEW_DOT_RADIUS, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
+function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D, isDark = false) {
+  drawDottedBackground(ctx, {
+    background: isDark ? BLANK_BOARD_PREVIEW_BACKGROUND_DARK : BLANK_BOARD_PREVIEW_BACKGROUND,
+    dotColor: isDark ? BLANK_BOARD_PREVIEW_DOT_COLOR_DARK : BLANK_BOARD_PREVIEW_DOT_COLOR,
+    dotOffset: BLANK_BOARD_PREVIEW_DOT_OFFSET,
+    dotSpacing: BLANK_BOARD_PREVIEW_DOT_SPACING,
+    dotRadius: BLANK_BOARD_PREVIEW_DOT_RADIUS,
+  })
 }
 
 async function loadPreviewImage(

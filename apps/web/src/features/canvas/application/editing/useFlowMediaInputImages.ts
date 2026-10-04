@@ -19,6 +19,7 @@ import {
 } from '../../domain/graph'
 import type { MediaRef } from '../../../../shared/media/mediaRef'
 import { createPrefixedId } from '../../../../shared/utils/ids'
+import { resolveWritableCanvasGraphStore } from '../canvasGraphStoreWriter'
 
 export type MediaInputImage = {
   id: string
@@ -165,7 +166,7 @@ function createSyncedMediaInputImages(
 
 export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions) {
   const writeGraphStore = () =>
-    options.writeCanvasGraphStore?.() ?? (options.readCanvasGraphStore() as CanvasGraphStore)
+    resolveWritableCanvasGraphStore(options.readCanvasGraphStore, options.writeCanvasGraphStore)
   watch(createProjectionFactSignature, syncLinkedMediaInputs)
 
   function createProjectionFactSignature() {
