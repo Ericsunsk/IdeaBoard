@@ -7,14 +7,14 @@ import { appOverlayMenuItemClass } from '../theme/appOverlayMenu'
 import { ibFormInputClass } from '../theme/formControls'
 
 const controlStateStyles = readFileSync(
-  resolve(process.cwd(), 'src/shared/theme/interactive-control-state.css'),
+  resolve(process.cwd(), 'src/shared/theme/atoms/interactive-control-state.css'),
   'utf8',
 )
 const appStyles = readFileSync(resolve(process.cwd(), 'src/app/style.css'), 'utf8')
 
 describe('Interactive Control State CSS contract', () => {
   it('is an app-level policy adapter driven by stable semantic attributes', () => {
-    expect(appStyles).toContain("@import '../shared/theme/interactive-control-state.css';")
+    expect(appStyles).toContain("@import '../shared/theme/atoms/interactive-control-state.css';")
     expect(controlStateStyles).toContain('.ib-control-state:hover')
     expect(controlStateStyles).toContain('.ib-control-state:focus-visible')
     expect(controlStateStyles).toContain('.ib-control-state:active')

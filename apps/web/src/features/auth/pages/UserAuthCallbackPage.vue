@@ -1,9 +1,9 @@
 <template>
-  <main class="grid min-h-[60vh] place-items-center px-6 py-12 text-ib-text">
+  <main class="grid min-h-[60vh] place-items-center px-6 py-12 text-foreground">
     <div class="flex max-w-md flex-col items-center gap-4 text-center" aria-live="polite">
       <Spinner v-if="status === 'loading'" class="size-8" />
       <h1 class="m-0 text-xl font-semibold">{{ title }}</h1>
-      <p class="m-0 text-sm leading-6 text-ib-text-muted">{{ message }}</p>
+      <p class="m-0 text-sm leading-6 text-muted-foreground">{{ message }}</p>
       <Button v-if="status === 'failed'" variant="outline" @click="returnToLogin">
         {{ t('auth.backToSignIn') }}
       </Button>

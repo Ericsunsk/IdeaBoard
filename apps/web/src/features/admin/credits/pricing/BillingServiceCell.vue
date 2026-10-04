@@ -1,9 +1,9 @@
 <template>
-  <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-admin-text-1">
-    <component :is="icon" v-if="icon" class="size-4 shrink-0 text-admin-text-2" />
+  <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
+    <component :is="icon" v-if="icon" class="size-4 shrink-0 text-muted-foreground" />
     <div class="flex min-w-0 flex-col">
-      <span class="truncate text-slate-700">{{ serviceSlug }}</span>
-      <span class="truncate text-admin-caption text-admin-text-3">{{ nodeTitle }}</span>
+      <span class="truncate text-foreground">{{ serviceSlug }}</span>
+      <span class="truncate text-admin-caption text-muted-foreground">{{ nodeTitle }}</span>
     </div>
   </div>
 </template>

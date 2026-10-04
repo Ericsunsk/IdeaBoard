@@ -31,11 +31,11 @@
 
       <!-- 次级统计提示条：共 X 个计费功能 -->
       <div v-if="!isLoading" class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1">{{
+        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">{{
             BILLING_PRICING_MESSAGES.billingCount(filteredItems.length)
           }}</span>
-          <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
+          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
             {{ BILLING_PRICING_MESSAGES.totalCount(sortedItems.length) }}
           </span>
         </div>
@@ -45,18 +45,18 @@
     <!-- 2. 加载中状态 (AdminSpinner 自带 role="progressbar") -->
     <div
       v-if="isLoading && items.length === 0"
-      class="flex min-h-[260px] items-center justify-center rounded-xl border border-admin-border-soft bg-white text-admin-text-3"
+      class="flex min-h-[260px] items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
       :aria-label="BILLING_PRICING_MESSAGES.loadingAria"
     >
-      <AdminSpinner class="size-9 text-admin-accent" />
+      <AdminSpinner class="size-9 text-primary" />
     </div>
 
     <!-- 3. 错误告警状态 -->
     <div v-else-if="errorMessage" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">
+      <div class="text-admin-title font-semibold text-foreground">
         {{ BILLING_PRICING_MESSAGES.loadFailedTitle }}
       </div>
-      <div class="mt-2 text-admin-meta text-admin-text-2">{{ errorMessage }}</div>
+      <div class="mt-2 text-admin-meta text-muted-foreground">{{ errorMessage }}</div>
       <AdminButton class="mt-4" variant="outline" :disabled="isLoading" @click="loadCatalog">
         <Refresh class="size-4" />
         {{ BILLING_PRICING_MESSAGES.reload }}
@@ -66,22 +66,22 @@
     <!-- 4. 空状态提示 (无数据或过滤未命中) -->
     <div
       v-else-if="filteredItems.length === 0"
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-admin-border-soft bg-white p-10 text-center"
+      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
     >
       <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3"
+        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
       >
         <Coins v-if="!hasActiveFilter" class="size-6" />
         <Search v-else class="size-6" />
       </div>
-      <h3 class="text-base font-semibold text-admin-title-color">
+      <h3 class="text-base font-semibold text-foreground">
         {{
           !hasActiveFilter
             ? BILLING_PRICING_MESSAGES.emptyNone
             : BILLING_PRICING_MESSAGES.emptyNoMatch
         }}
       </h3>
-      <p class="mt-1 max-w-sm text-xs text-admin-text-3">
+      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
         {{
           !hasActiveFilter
             ? BILLING_PRICING_MESSAGES.emptyNoneHint
@@ -91,7 +91,7 @@
       <button
         v-if="hasActiveFilter"
         type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />
@@ -114,35 +114,28 @@
         @availability="setAvailability"
         @publish="openPriceDialog"
         @delete="confirmArchivedDelete"
-        @pool="openPoolEditor"
       >
       </BillingPricingTable>
     </div>
 
-    <!-- 6. 价格发布调整弹窗 -->
+    <!-- 6. 统一服务设置弹窗（定价与模型池） -->
     <BillingPriceDialog
       v-model:visible="priceDialogVisible"
       :item="selectedItem"
       :pending="publishPending"
       :error-message="publishError"
+      :pool-version="poolEditVersion"
+      :pool-entries="poolEditEntries"
+      :pool-catalog-models="poolCatalogModels"
+      :pool-catalog-loading="poolCatalogLoading"
+      :pool-save-pending="poolSavePending"
+      :pool-save-error="poolSaveError"
+      :pool-save-stale="poolSaveStale"
+      :pool-save-disabled="!poolEditReady"
+      :pool-catalog-error="poolCatalogError"
       @submit="publishPrice"
-    />
-
-    <!-- 7. 服务模型池编辑弹窗 -->
-    <ModelPoolEditorDialog
-      v-model:visible="poolDialogVisible"
-      :item="poolEditItem"
-      :version="poolEditVersion"
-      :entries="poolEditEntries"
-      :catalog-models="poolCatalogModels"
-      :catalog-loading="poolCatalogLoading"
-      :catalog-error="poolCatalogError"
-      :save-disabled="!poolEditReady"
-      :pending="poolSavePending"
-      :error-message="poolSaveError"
-      :stale="poolSaveStale"
-      @submit="savePool"
-      @reload="reloadPool"
+      @submit-pool="savePool"
+      @reload-pool="reloadPool"
       @reload-catalog="loadPoolCatalog"
     />
   </div>
@@ -160,7 +153,6 @@ import { adminDashboardRootClass, adminEmptyStateClass } from '../../shared/lib/
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import BillingPricingTable from './BillingPricingTable.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
-import ModelPoolEditorDialog from './ModelPoolEditorDialog.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave, requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
@@ -190,7 +182,6 @@ const sortedItems = computed(() => [...items.value].sort(compareCatalogCards))
 // 加载失败按 SKU 标记，摘要列就地展示失败态，刷新按钮可整体重试。
 const poolBySku = ref<Record<string, AdminModelPool>>({})
 const poolFailed = reactive<Record<string, boolean>>({})
-const poolDialogVisible = ref(false)
 const poolEditItem = ref<AdminBillableItemCard | null>(null)
 const poolEditVersion = ref(0)
 const poolEditEntries = ref<AdminModelPoolEntry[]>([])
@@ -312,18 +303,6 @@ async function loadModelPools() {
   })
 }
 
-async function openPoolEditor(item: AdminBillableItemCard) {
-  if (!serviceOfSku(item.sku)) return
-  poolEditItem.value = item
-  poolEditReady.value = false
-  poolSaveError.value = ''
-  poolSaveStale.value = false
-  poolDialogVisible.value = true
-  await reloadPool()
-  if (poolCatalogModels.value.length === 0 && !poolCatalogLoading.value) {
-    await loadPoolCatalog()
-  }
-}
 
 async function loadPoolCatalog() {
   if (poolCatalogLoading.value) return
@@ -397,7 +376,7 @@ async function savePool(entries: AdminModelPoolEntry[]) {
       enabled: entry.enabled,
       resolutions: [...entry.resolutions],
     }))
-    poolDialogVisible.value = false
+    priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.poolSaved)
   } catch (error) {
     poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
@@ -410,10 +389,20 @@ async function savePool(entries: AdminModelPoolEntry[]) {
 
 onMounted(loadCatalog)
 
-function openPriceDialog(item: AdminBillableItemCard) {
+async function openPriceDialog(item: AdminBillableItemCard) {
   selectedItem.value = item
   publishError.value = ''
   priceDialogVisible.value = true
+  if (serviceOfSku(item.sku)) {
+    poolEditItem.value = item
+    poolEditReady.value = false
+    poolSaveError.value = ''
+    poolSaveStale.value = false
+    await reloadPool()
+    if (poolCatalogModels.value.length === 0 && !poolCatalogLoading.value) {
+      await loadPoolCatalog()
+    }
+  }
 }
 
 async function confirmArchivedDelete(item: AdminBillableItemCard) {

@@ -60,7 +60,7 @@
             <SelectValue />
             <SelectIcon>
               <NavArrowDown
-                class="size-3.5 shrink-0 text-board-control-icon transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+                class="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
                 aria-hidden="true"
               />
             </SelectIcon>

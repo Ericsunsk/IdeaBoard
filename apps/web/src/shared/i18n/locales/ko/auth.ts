@@ -56,6 +56,10 @@ export default {
     account: '계정',
     console: '콘솔',
     home: '홈',
+    appearance: '화면 테마',
+    themeLight: '라이트',
+    themeDark: '다크',
+    themeSystem: '시스템 설정',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

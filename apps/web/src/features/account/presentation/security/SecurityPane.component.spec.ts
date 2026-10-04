@@ -28,6 +28,6 @@ describe('SecurityPane', () => {
 
     const submitButton = screen.getByRole('button', { name: 'Update password' })
     expect(submitButton).not.toHaveClass('p-button')
-    expect(submitButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
+    expect(submitButton).toHaveClass('bg-primary', 'text-primary-foreground')
   })
 })

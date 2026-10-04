@@ -1,11 +1,11 @@
 <template>
   <div :class="adminDashboardRootClass">
     <div
-      class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-white"
+      class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card"
     >
       <div v-if="showLoading" class="flex min-h-72 items-center justify-center">
         <AdminSpinner
-          class="size-9 text-admin-accent"
+          class="size-9 text-primary"
           :aria-label="CREDIT_HEALTH_MESSAGES.loadingAria"
         />
       </div>
@@ -14,11 +14,11 @@
         v-else-if="loadError"
         class="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"
       >
-        <XmarkCircle class="size-8 text-admin-danger" aria-hidden="true" />
-        <h2 class="mt-4 text-admin-title font-bold text-admin-title-color">
+        <XmarkCircle class="size-8 text-destructive" aria-hidden="true" />
+        <h2 class="mt-4 text-admin-title font-bold text-foreground">
           {{ CREDIT_HEALTH_MESSAGES.unavailableTitle }}
         </h2>
-        <p class="mt-2 text-admin-body text-admin-text-2">
+        <p class="mt-2 text-admin-body text-muted-foreground">
           {{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}
         </p>
         <AdminButton
@@ -43,17 +43,17 @@
             </span>
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2.5">
-                <h2 class="m-0 text-admin-title font-bold text-admin-title-color">
+                <h2 class="m-0 text-admin-title font-bold text-foreground">
                   {{ presentation.label }}
                 </h2>
                 <span
                   v-if="health.active_run"
-                  class="rounded-full border border-admin-border-soft bg-admin-bg px-2.5 py-0.5 text-xs font-semibold text-admin-text-2"
+                  class="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
                 >
                   {{ CREDIT_HEALTH_MESSAGES.activeRunBadge(health.active_run.id) }}
                 </span>
               </div>
-              <p class="mt-1.5 text-admin-body leading-6 text-admin-text-2">
+              <p class="mt-1.5 text-admin-body leading-6 text-muted-foreground">
                 {{ presentation.summary }}
               </p>
             </div>
@@ -96,23 +96,23 @@
         </AdminAlert>
 
         <div
-          class="grid border-t border-admin-border-soft bg-admin-bg/30 sm:grid-cols-3 sm:divide-x sm:divide-admin-border-soft"
+          class="grid border-t border-border bg-muted/30 sm:grid-cols-3 sm:divide-x sm:divide-border"
         >
           <div
             v-for="fact in facts"
             :key="fact.label"
-            class="min-w-0 border-b border-admin-border-soft px-6 py-4.5 last:border-b-0 sm:border-b-0"
+            class="min-w-0 border-b border-border px-6 py-4.5 last:border-b-0 sm:border-b-0"
           >
-            <div class="text-xs font-semibold tracking-wide text-admin-text-3">
+            <div class="text-xs font-semibold tracking-wide text-muted-foreground">
               {{ fact.label }}
             </div>
             <div
-              class="mt-1.5 truncate font-mono text-base font-bold text-admin-text-1"
+              class="mt-1.5 truncate font-mono text-base font-bold text-foreground"
               :title="fact.value"
             >
               {{ fact.value }}
             </div>
-            <div v-if="fact.detail" class="mt-0.5 text-xs text-admin-text-3">
+            <div v-if="fact.detail" class="mt-0.5 text-xs text-muted-foreground">
               {{ fact.detail }}
             </div>
           </div>
@@ -120,12 +120,12 @@
 
         <section
           :aria-label="CREDIT_HEALTH_MESSAGES.recentSectionAria"
-          class="border-t border-admin-border-soft px-6 py-4"
+          class="border-t border-border px-6 py-4"
         >
-          <h3 class="text-sm font-bold text-admin-title-color">
+          <h3 class="text-sm font-bold text-foreground">
             {{ CREDIT_HEALTH_MESSAGES.recentSectionTitle }}
           </h3>
-          <ul v-if="recentRuns.length > 0" class="mt-2 divide-y divide-admin-border-soft">
+          <ul v-if="recentRuns.length > 0" class="mt-2 divide-y divide-border">
             <li
               v-for="{ kind, run } in recentRuns"
               :key="`${kind}-${run.id}`"
@@ -136,26 +136,26 @@
                 :severity="getRunStatusSeverity(run.status)"
                 rounded
               />
-              <span class="font-mono text-xs font-bold text-admin-text-1"> Run #{{ run.id }} </span>
-              <span class="text-xs text-admin-text-3">{{
+              <span class="font-mono text-xs font-bold text-foreground"> Run #{{ run.id }} </span>
+              <span class="text-xs text-muted-foreground">{{
                 getReconciliationTriggerLabel(run)
               }}</span>
-              <span class="min-w-0 flex-1 truncate text-xs text-admin-text-2">
+              <span class="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 {{ formatReconciliationRunResult(run) }}
               </span>
-              <span class="font-mono text-xs whitespace-nowrap text-admin-text-3">
+              <span class="font-mono text-xs whitespace-nowrap text-muted-foreground">
                 {{ formatRecentRunTime(run) }} · {{ formatReconciliationRunDuration(run) }}
               </span>
               <span
                 v-if="kind === 'failed' && run.error_message"
-                class="w-full truncate font-mono text-xs text-admin-danger"
+                class="w-full truncate font-mono text-xs text-destructive"
                 :title="formatReconciliationRunError(run.error_message)"
               >
                 {{ formatReconciliationRunError(run.error_message) }}
               </span>
             </li>
           </ul>
-          <p v-else class="mt-2 text-xs text-admin-text-3">
+          <p v-else class="mt-2 text-xs text-muted-foreground">
             {{ CREDIT_HEALTH_MESSAGES.emptyRuns }}
           </p>
         </section>

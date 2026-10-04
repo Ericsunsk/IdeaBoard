@@ -7,11 +7,11 @@
     :rows="settingRows"
   >
     <template #summary="{ data }">
-      <span class="font-mono text-admin-meta text-admin-text-2">{{ data.summary }}</span>
+      <span class="font-mono text-admin-meta text-muted-foreground">{{ data.summary }}</span>
     </template>
 
     <template #expansion="{ data }">
-      <div class="border-t border-admin-border-soft bg-admin-bg p-4 md:p-5">
+      <div class="border-t border-border bg-card p-4 md:p-5">
         <SettingEditorCard
           v-if="data.id === 'branding'"
           :title="SETTINGS_MESSAGES.brandingTitle"
@@ -24,7 +24,7 @@
           <div :class="settingCardBodyClass">
             <div class="grid gap-5 md:grid-cols-[140px_minmax(0,1fr)]">
               <div class="flex min-w-0 flex-col gap-2">
-                <span class="text-admin-meta font-[680] text-admin-text-2">{{
+                <span class="text-admin-meta font-[680] text-muted-foreground">{{
                   SETTINGS_MESSAGES.logoLabel
                 }}</span>
                 <div class="group/logo relative size-28">
@@ -45,7 +45,7 @@
 
                   <button
                     v-if="brandingForm.logo_url"
-                    class="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full border border-admin-border-soft bg-white text-admin-text-2 leading-none shadow-xs transition-colors hover:text-admin-danger focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
+                    class="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground leading-none shadow-xs transition-colors hover:text-destructive focus-visible:outline-none disabled:cursor-not-allowed cursor-pointer"
                     :class="
                       brandingLoading || brandingSaving || uploading
                         ? 'opacity-40'
@@ -63,7 +63,7 @@
                   </button>
                 </div>
 
-                <p class="text-admin-caption text-admin-text-3">{{ SETTINGS_MESSAGES.logoHint }}</p>
+                <p class="text-admin-caption text-muted-foreground">{{ SETTINGS_MESSAGES.logoHint }}</p>
 
                 <input
                   id="admin-branding-logo-file"

@@ -14,11 +14,14 @@ import {
 } from '../../../../shared/config/runtimeUrls'
 import {
   BLANK_BOARD_PREVIEW_BACKGROUND,
+  BLANK_BOARD_PREVIEW_BACKGROUND_DARK,
   BLANK_BOARD_PREVIEW_DOT_COLOR,
+  BLANK_BOARD_PREVIEW_DOT_COLOR_DARK,
   BLANK_BOARD_PREVIEW_DOT_OFFSET,
   BLANK_BOARD_PREVIEW_DOT_RADIUS,
   BLANK_BOARD_PREVIEW_DOT_SPACING,
 } from './boardPreviewStyle'
+import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
 import { clamp } from '../../../../shared/utils/number'
 import { withAlpha } from '../../../../shared/lib/chartPrimitives'
 
@@ -92,6 +95,12 @@ const PREVIEW_DOT_COLOR = 'rgba(226, 228, 232, 0.86)'
 const PREVIEW_NODE_BORDER = '#e2e8f0'
 const PREVIEW_NODE_TEXT = '#334155'
 const PREVIEW_EDGE_STROKE = '#9aa4b2'
+
+const PREVIEW_BACKGROUND_DARK = '#0f0f0f'
+const PREVIEW_DOT_COLOR_DARK = '#282828'
+const PREVIEW_NODE_BG_DARK = '#1d1d1d'
+const PREVIEW_NODE_BORDER_DARK = '#282828'
+const PREVIEW_EDGE_STROKE_DARK = 'rgba(255, 255, 255, 0.22)'
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -330,7 +339,22 @@ function roundedRectPath(
   ctx.closePath()
 }
 
-function drawDotBackground(ctx: CanvasRenderingContext2D) {
+function drawDotBackground(ctx: CanvasRenderingContext2D, isDark = false) {
+  if (isDark) {
+    ctx.fillStyle = PREVIEW_BACKGROUND_DARK
+    ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
+
+    ctx.fillStyle = PREVIEW_DOT_COLOR_DARK
+    for (let x = 14; x < PREVIEW_VIEWPORT_WIDTH; x += 24) {
+      for (let y = 14; y < PREVIEW_VIEWPORT_HEIGHT; y += 24) {
+        ctx.beginPath()
+        ctx.arc(x, y, 1.25, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    return
+  }
+
   ctx.fillStyle = PREVIEW_BACKGROUND
   ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
 
@@ -350,11 +374,11 @@ function drawDotBackground(ctx: CanvasRenderingContext2D) {
   }
 }
 
-function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = BLANK_BOARD_PREVIEW_BACKGROUND
+function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D, isDark = false) {
+  ctx.fillStyle = isDark ? BLANK_BOARD_PREVIEW_BACKGROUND_DARK : BLANK_BOARD_PREVIEW_BACKGROUND
   ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
 
-  ctx.fillStyle = BLANK_BOARD_PREVIEW_DOT_COLOR
+  ctx.fillStyle = isDark ? BLANK_BOARD_PREVIEW_DOT_COLOR_DARK : BLANK_BOARD_PREVIEW_DOT_COLOR
   for (
     let x = BLANK_BOARD_PREVIEW_DOT_OFFSET;
     x < PREVIEW_VIEWPORT_WIDTH;
@@ -479,12 +503,13 @@ function drawNodeImageStage(
   y: number,
   width: number,
   height: number,
+  isDark = false,
 ) {
   const stageRadius = Math.max(6, Math.min(12, Math.min(width, height) * 0.12))
-  ctx.fillStyle = '#f7f9ff'
+  ctx.fillStyle = isDark ? '#141414' : '#f7f9ff'
   roundedRectPath(ctx, x, y, width, height, stageRadius)
   ctx.fill()
-  ctx.strokeStyle = PREVIEW_NODE_BORDER
+  ctx.strokeStyle = isDark ? PREVIEW_NODE_BORDER_DARK : PREVIEW_NODE_BORDER
   ctx.lineWidth = 0.9
   roundedRectPath(ctx, x, y, width, height, stageRadius)
   ctx.stroke()
@@ -509,6 +534,7 @@ function drawConnection(
   scale: number,
   offsetX: number,
   offsetY: number,
+  isDark = false,
 ) {
   const startX = connection.startX * scale + offsetX
   const startY = connection.startY * scale + offsetY
@@ -518,18 +544,24 @@ function drawConnection(
   ctx.beginPath()
   ctx.moveTo(startX, startY)
   ctx.bezierCurveTo(startX + curve, startY, endX - curve, endY, endX, endY)
-  ctx.strokeStyle = withAlpha(PREVIEW_EDGE_STROKE, 0.5)
+  ctx.strokeStyle = isDark ? PREVIEW_EDGE_STROKE_DARK : withAlpha(PREVIEW_EDGE_STROKE, 0.5)
   ctx.lineWidth = 1.1
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.stroke()
 }
 
-function drawEmptyImageGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+function drawEmptyImageGlyph(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  isDark = false,
+) {
   const strokeWidth = Math.max(0.7, size * 0.011)
   const left = x - size / 2
   const top = y - size / 2
-  ctx.strokeStyle = '#a8b3be'
+  ctx.strokeStyle = isDark ? '#525252' : '#a8b3be'
   ctx.lineWidth = strokeWidth
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -554,11 +586,12 @@ function drawPromptPreviewLines(
   width: number,
   height: number,
   scale: number,
+  isDark = false,
 ) {
   const padding = Math.max(8, 12 * scale)
   const lineHeight = Math.max(8, 14 * scale)
   const lineCount = Math.max(3, Math.min(6, Math.floor((height - padding * 2) / lineHeight)))
-  ctx.fillStyle = withAlpha(PREVIEW_NODE_TEXT, 0.24)
+  ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.2)' : withAlpha(PREVIEW_NODE_TEXT, 0.24)
   for (let i = 0; i < lineCount; i += 1) {
     const lineWidth = width * (i === lineCount - 1 ? 0.42 : i % 2 === 0 ? 0.76 : 0.62)
     roundedRectPath(
@@ -580,10 +613,11 @@ function drawExecutionPreviewBody(
   width: number,
   height: number,
   scale: number,
+  isDark = false,
 ) {
   const padding = Math.max(7, 10 * scale)
   const cardHeight = Math.max(26, Math.min(height * 0.42, 54 * scale))
-  ctx.fillStyle = '#f8fafc'
+  ctx.fillStyle = isDark ? '#181818' : '#f8fafc'
   roundedRectPath(
     ctx,
     x + padding,
@@ -593,7 +627,7 @@ function drawExecutionPreviewBody(
     Math.max(8, 12 * scale),
   )
   ctx.fill()
-  ctx.strokeStyle = '#e8ebf3'
+  ctx.strokeStyle = isDark ? PREVIEW_NODE_BORDER_DARK : '#e8ebf3'
   ctx.lineWidth = Math.max(0.7, 1 * scale)
   roundedRectPath(
     ctx,
@@ -605,7 +639,7 @@ function drawExecutionPreviewBody(
   )
   ctx.stroke()
 
-  ctx.fillStyle = withAlpha(PREVIEW_NODE_TEXT, 0.22)
+  ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.18)' : withAlpha(PREVIEW_NODE_TEXT, 0.22)
   const rowY = y + padding + cardHeight + Math.max(10, 14 * scale)
   roundedRectPath(ctx, x + padding, rowY, width - padding * 2, Math.max(3, 5 * scale), 999)
   ctx.fill()
@@ -629,6 +663,7 @@ function drawFusionNodePreview(
   height: number,
   scale: number,
   imageMap: Map<string, HTMLImageElement>,
+  isDark = false,
 ) {
   const stageInset = Math.max(7, Math.min(14, Math.min(width, height) * 0.08))
   const stageX = x + stageInset
@@ -656,7 +691,7 @@ function drawFusionNodePreview(
     ctx.beginPath()
     ctx.moveTo(startX, startY)
     ctx.lineTo(endX, endY)
-    ctx.strokeStyle = withAlpha('#b9a8f7', 0.5)
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : withAlpha('#b9a8f7', 0.5)
     ctx.lineWidth = Math.max(1, scale * 1.2)
     ctx.setLineDash([Math.max(3, scale * 4), Math.max(3, scale * 3)])
     ctx.lineCap = 'round'
@@ -670,10 +705,10 @@ function drawFusionNodePreview(
     const slotX = slotCenterX - slotSize / 2
     const slotY = slotCenterY - slotSize / 2
     const inputImage = inputUrls[index] ? imageMap.get(inputUrls[index]!) : null
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = isDark ? '#181818' : '#ffffff'
     roundedRectPath(ctx, slotX, slotY, slotSize, slotSize, slotRadius)
     ctx.fill()
-    ctx.strokeStyle = '#e3e8f4'
+    ctx.strokeStyle = isDark ? PREVIEW_NODE_BORDER_DARK : '#e3e8f4'
     ctx.lineWidth = Math.max(0.8, scale)
     roundedRectPath(ctx, slotX, slotY, slotSize, slotSize, slotRadius)
     ctx.stroke()
@@ -699,17 +734,17 @@ function drawFusionNodePreview(
       ctx.restore()
       return
     }
-    drawEmptyImageGlyph(ctx, slotCenterX, slotCenterY, slotSize * 0.7)
+    drawEmptyImageGlyph(ctx, slotCenterX, slotCenterY, slotSize * 0.7, isDark)
   })
 
   const centerX = stageX + blendPoint.x * stageWidth
   const centerY = stageY + blendPoint.y * stageHeight
   const centerRadius = Math.max(3.5, Math.min(8, Math.min(stageWidth, stageHeight) * 0.045))
-  ctx.fillStyle = '#9278e6'
+  ctx.fillStyle = isDark ? '#fcfcfc' : '#9278e6'
   ctx.beginPath()
   ctx.arc(centerX, centerY, centerRadius, 0, Math.PI * 2)
   ctx.fill()
-  ctx.strokeStyle = '#ffffff'
+  ctx.strokeStyle = isDark ? '#0f0f0f' : '#ffffff'
   ctx.lineWidth = Math.max(0.9, scale)
   ctx.stroke()
 }
@@ -721,6 +756,7 @@ function drawFrame(
   offsetX: number,
   offsetY: number,
   imageMap: Map<string, HTMLImageElement>,
+  isDark = false,
 ) {
   const x = frame.x * scale + offsetX
   const y = frame.y * scale + offsetY
@@ -733,7 +769,7 @@ function drawFrame(
   ctx.save()
   roundedRectPath(ctx, x, bodyY, width, bodyHeight, radius)
   ctx.clip()
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = isDark ? PREVIEW_NODE_BG_DARK : '#ffffff'
   ctx.fillRect(x, bodyY, width, bodyHeight)
 
   if (frame.nodeType === 'image') {
@@ -745,12 +781,13 @@ function drawFrame(
         x + width / 2,
         bodyY + bodyHeight / 2,
         Math.min(width, bodyHeight) * 0.62,
+        isDark,
       )
     }
   } else if (frame.nodeType === 'prompt') {
-    drawPromptPreviewLines(ctx, x, bodyY, width, bodyHeight, scale)
+    drawPromptPreviewLines(ctx, x, bodyY, width, bodyHeight, scale, isDark)
   } else if (frame.nodeType === 'fusion') {
-    drawFusionNodePreview(ctx, frame, x, bodyY, width, bodyHeight, scale, imageMap)
+    drawFusionNodePreview(ctx, frame, x, bodyY, width, bodyHeight, scale, imageMap, isDark)
   } else if (image) {
     const inset = Math.max(7, Math.min(13, bodyHeight * 0.11))
     drawNodeImageStage(
@@ -760,21 +797,26 @@ function drawFrame(
       bodyY + inset,
       Math.max(0, width - inset * 2),
       Math.max(0, bodyHeight - inset * 2),
+      isDark,
     )
   } else {
-    drawExecutionPreviewBody(ctx, x, bodyY, width, bodyHeight, scale)
+    drawExecutionPreviewBody(ctx, x, bodyY, width, bodyHeight, scale, isDark)
   }
 
   ctx.restore()
 
-  ctx.strokeStyle = PREVIEW_NODE_BORDER
+  ctx.strokeStyle = isDark ? PREVIEW_NODE_BORDER_DARK : PREVIEW_NODE_BORDER
   ctx.lineWidth = 1.5
   roundedRectPath(ctx, x, bodyY, width, bodyHeight, radius)
   ctx.stroke()
 }
 
-export async function renderBoardPreviewDataUrl(state: BoardSnapshot | null): Promise<string> {
+export async function renderBoardPreviewDataUrl(
+  state: BoardSnapshot | null,
+  options?: { isDark?: boolean },
+): Promise<string> {
   if (!state) return ''
+  const isDark = options?.isDark ?? isDarkModeActive()
   const canvas = createPreviewCanvas()
   if (!canvas) return ''
 
@@ -786,7 +828,7 @@ export async function renderBoardPreviewDataUrl(state: BoardSnapshot | null): Pr
   const frames = collectBoardPreviewFrames(state)
   const bounds = resolveBounds(frames)
   if (!bounds) {
-    drawBlankBoardPreviewBackground(ctx)
+    drawBlankBoardPreviewBackground(ctx, isDark)
     return encodePreviewCanvas(canvas, false)
   }
 
@@ -794,9 +836,9 @@ export async function renderBoardPreviewDataUrl(state: BoardSnapshot | null): Pr
   const { scale, offsetX, offsetY } = scaleBounds(bounds)
   const imageAssets = await buildPreviewImageMap(frames)
 
-  drawDotBackground(ctx)
-  connections.forEach((connection) => drawConnection(ctx, connection, scale, offsetX, offsetY))
-  frames.forEach((frame) => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images))
+  drawDotBackground(ctx, isDark)
+  connections.forEach((connection) => drawConnection(ctx, connection, scale, offsetX, offsetY, isDark))
+  frames.forEach((frame) => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images, isDark))
 
   try {
     return encodePreviewCanvas(canvas, frames.length > 12)

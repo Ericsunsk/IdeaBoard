@@ -93,10 +93,10 @@ withDefaults(
     cardClass: undefined,
     elevated: undefined,
     rangeGroupClass:
-      'inline-flex items-center rounded-lg border border-ib-border-soft bg-ib-surface-muted p-0.5 text-xs',
+      'inline-flex items-center rounded-lg border border-border bg-muted p-0.5 text-xs',
     rangeSelectedClass:
-      'bg-ib-surface font-semibold text-ib-text shadow-xs focus-visible:ring-ib-focus',
-    rangeUnselectedClass: 'text-ib-text-muted hover:text-ib-text focus-visible:ring-ib-focus',
+      'bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring',
+    rangeUnselectedClass: 'text-muted-foreground hover:text-foreground focus-visible:ring-ring',
     rangeAriaLabel: undefined,
     plugins: () => [],
     canvasProps: undefined,

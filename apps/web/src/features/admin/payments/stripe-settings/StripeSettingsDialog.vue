@@ -13,31 +13,31 @@
   >
     <div
       v-if="summary"
-      class="grid grid-cols-1 gap-2 rounded-xl border border-admin-border bg-admin-surface-muted p-3 sm:grid-cols-2"
+      class="grid grid-cols-1 gap-2 rounded-xl border border-border bg-muted p-3 sm:grid-cols-2"
     >
       <div class="min-w-0">
-        <div class="text-admin-caption text-admin-text-3">{{ PAYMENTS_MESSAGES.accountLabel }}</div>
-        <div class="truncate text-admin-body font-semibold text-admin-title-color">
+        <div class="text-admin-caption text-muted-foreground">{{ PAYMENTS_MESSAGES.accountLabel }}</div>
+        <div class="truncate text-admin-body font-semibold text-foreground">
           {{ summary.accountId || PAYMENTS_MESSAGES.accountUnset }}
         </div>
       </div>
       <div class="min-w-0">
-        <div class="text-admin-caption text-admin-text-3">{{ PAYMENTS_MESSAGES.modeLabel }}</div>
-        <div class="text-admin-body font-semibold text-admin-title-color">
+        <div class="text-admin-caption text-muted-foreground">{{ PAYMENTS_MESSAGES.modeLabel }}</div>
+        <div class="text-admin-body font-semibold text-foreground">
           {{ modeLabel }}
         </div>
       </div>
-      <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+      <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
         <span
           class="size-1.5 rounded-full"
-          :class="summary.productReady ? 'bg-admin-success' : 'bg-admin-warning'"
+          :class="summary.productReady ? 'bg-emerald-500' : 'bg-amber-500'"
         />
         {{ PAYMENTS_MESSAGES.productReadyState(summary.productReady) }}
       </div>
-      <div class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+      <div class="flex items-center gap-1.5 text-admin-caption text-muted-foreground">
         <span
           class="size-1.5 rounded-full"
-          :class="summary.webhookReady ? 'bg-admin-success' : 'bg-admin-warning'"
+          :class="summary.webhookReady ? 'bg-emerald-500' : 'bg-amber-500'"
         />
         {{ PAYMENTS_MESSAGES.webhookReadyState(summary.webhookReady) }}
       </div>
@@ -113,9 +113,9 @@
         for="admin-stripe-purchases-enabled"
       >
         <div
-          class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
+          class="flex min-h-10 items-center justify-between rounded-xl border border-border bg-muted px-3"
         >
-          <span class="text-admin-body text-admin-text-2">
+          <span class="text-admin-body text-muted-foreground">
             {{ PAYMENTS_MESSAGES.purchasesState(form.values.purchasesEnabled) }}
           </span>
           <AdminSwitch

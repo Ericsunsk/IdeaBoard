@@ -10,7 +10,7 @@
     <div class="flex flex-col gap-4">
       <!-- 顶部操作栏：供应商过滤 + 关键词搜索 + 重新探测 -->
       <div
-        class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border-soft pb-3.5"
+        class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3.5"
       >
         <div class="flex flex-1 flex-wrap items-center gap-2.5">
           <!-- 供应商筛选 -->
@@ -35,7 +35,7 @@
         <!-- 重新探测按钮 -->
         <button
           type="button"
-          class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-2.5 text-xs font-medium text-admin-text-2 shadow-xs transition-colors hover:bg-admin-surface-muted hover:text-admin-text-1 cursor-pointer disabled:opacity-50"
+          class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-50"
           :disabled="loading"
           @click="loadDetectedModels"
         >
@@ -59,9 +59,9 @@
       </AdminAlert>
 
       <!-- 探测加载中：单行文案，避免与副标题重复造成“两个状态”观感 -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-16 text-admin-text-3">
-        <Refresh class="size-6 animate-spin text-admin-accent mb-2.5" />
-        <p class="text-xs font-medium text-admin-text-2">{{ MODELS_MESSAGES.addDetecting }}</p>
+      <div v-if="loading" class="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <Refresh class="size-6 animate-spin text-primary mb-2.5" />
+        <p class="text-xs font-medium text-muted-foreground">{{ MODELS_MESSAGES.addDetecting }}</p>
       </div>
 
       <!-- 结果区与 loading 互斥：必须包在 template v-else 里 -->
@@ -69,13 +69,13 @@
         <!-- 空结果提示：失败态只保留顶部 error alert（含重试），此处不再叠加 -->
         <div
           v-if="!error && filteredModels.length === 0"
-          class="flex flex-col items-center justify-center py-14 text-admin-text-3 text-center"
+          class="flex flex-col items-center justify-center py-14 text-muted-foreground text-center"
         >
-          <Cube class="size-8 text-admin-text-3/60 mb-2" />
-          <p class="text-xs font-medium text-admin-text-2">
+          <Cube class="size-8 text-muted-foreground/60 mb-2" />
+          <p class="text-xs font-medium text-muted-foreground">
             {{ emptyDetectionTitle }}
           </p>
-          <p class="text-admin-caption text-admin-text-3 mt-1 max-w-sm">
+          <p class="text-admin-caption text-muted-foreground mt-1 max-w-sm">
             {{ emptyDetectionHint }}
           </p>
         </div>
@@ -83,17 +83,17 @@
         <!-- 紧凑 Checkbox 列表表格 -->
         <div
           v-else-if="!error"
-          class="max-h-[380px] overflow-y-auto rounded-lg border border-admin-border-soft bg-white"
+          class="max-h-[380px] overflow-y-auto rounded-lg border border-border bg-card"
         >
           <table class="w-full text-left text-xs border-collapse">
             <thead
-              class="sticky top-0 z-10 bg-admin-surface-muted/80 backdrop-blur-xs border-b border-admin-border-soft text-admin-text-2 font-medium"
+              class="sticky top-0 z-10 bg-muted/80 backdrop-blur-xs border-b border-border text-muted-foreground font-medium"
             >
               <tr>
                 <th class="w-10 px-3 py-2.5 text-center">
                   <input
                     type="checkbox"
-                    class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer"
+                    class="size-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer"
                     :checked="isAllSelected"
                     :indeterminate="isIndeterminate"
                     :disabled="availableFilteredCount === 0"
@@ -106,14 +106,14 @@
                 <th class="px-3 py-2.5 w-24 text-right">{{ MODELS_MESSAGES.addColumnStatus }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-admin-border-soft/60">
+            <tbody class="divide-y divide-border/60">
               <tr
                 v-for="model in filteredModels"
                 :key="model.id"
-                class="transition-colors hover:bg-admin-surface-muted/40 cursor-pointer"
+                class="transition-colors hover:bg-muted/40 cursor-pointer"
                 :class="{
-                  'bg-admin-accent/[0.03]': selectedModelIds.has(model.id),
-                  'opacity-60 bg-admin-surface-muted/20 cursor-not-allowed': isModelExisting(
+                  'bg-primary/[0.03]': selectedModelIds.has(model.id),
+                  'opacity-60 bg-muted/20 cursor-not-allowed': isModelExisting(
                     model.id,
                   ),
                 }"
@@ -123,7 +123,7 @@
                 <td class="w-10 px-3 py-2.5 text-center" @click.stop>
                   <input
                     type="checkbox"
-                    class="size-3.5 rounded border-admin-border text-admin-accent focus:ring-admin-accent cursor-pointer disabled:cursor-not-allowed"
+                    class="size-3.5 rounded border-input text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
                     :checked="selectedModelIds.has(model.id)"
                     :disabled="isModelExisting(model.id)"
                     :aria-label="MODELS_MESSAGES.addSelectAria(model.name || model.id)"
@@ -138,8 +138,8 @@
                       class="flex size-6 shrink-0 items-center justify-center rounded-md overflow-hidden"
                       :class="
                         rowBrandLogo(model)
-                          ? 'bg-admin-surface-muted/60 border border-admin-border-soft/60'
-                          : 'bg-admin-accent/10 text-admin-accent'
+                          ? 'bg-muted/60 border border-border/60'
+                          : 'bg-primary/10 text-primary'
                       "
                     >
                       <img
@@ -153,10 +153,10 @@
                       <Cube v-else class="size-3.5" />
                     </div>
                     <div class="flex flex-col gap-0.5 min-w-0">
-                      <span class="font-medium text-admin-text-1 truncate">
+                      <span class="font-medium text-foreground truncate">
                         {{ model.name || model.id }}
                       </span>
-                      <span class="font-mono text-admin-caption text-admin-text-3 truncate">
+                      <span class="font-mono text-admin-caption text-muted-foreground truncate">
                         {{ model.id }}
                       </span>
                     </div>
@@ -177,20 +177,20 @@
                 <td class="px-3 py-2.5 text-right">
                   <span
                     v-if="isModelExisting(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-admin-surface-muted px-2 py-0.5 text-admin-micro font-medium text-admin-text-3"
+                    class="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ MODELS_MESSAGES.addExisting }}
                   </span>
                   <span
                     v-else-if="selectedModelIds.has(model.id)"
-                    class="inline-flex items-center gap-1 rounded-full bg-admin-accent/10 px-2 py-0.5 text-admin-micro font-medium text-admin-accent"
+                    class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-admin-micro font-medium text-primary"
                   >
                     <Check class="size-3" />
                     {{ MODELS_MESSAGES.addSelected }}
                   </span>
                   <span
                     v-else
-                    class="inline-flex items-center rounded-full bg-admin-border-soft/40 px-2 py-0.5 text-admin-micro font-medium text-admin-text-3"
+                    class="inline-flex items-center rounded-full bg-muted/40 px-2 py-0.5 text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ MODELS_MESSAGES.addNotAdded }}
                   </span>
@@ -205,7 +205,7 @@
     <!-- 底部操作与导航 -->
     <template #footer>
       <div class="flex w-full items-center justify-between">
-        <div class="text-xs text-admin-text-3">
+        <div class="text-xs text-muted-foreground">
           <span v-if="selectedCount > 0">{{ MODELS_MESSAGES.addPickedCount(selectedCount) }}</span>
         </div>
 

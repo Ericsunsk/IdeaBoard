@@ -14,7 +14,7 @@
           <AdminBadge severity="danger">{{ USERS_MESSAGES.banForceBadge }}</AdminBadge>
         </div>
         <h2 :class="adminDialogTitleClass">{{ USERS_MESSAGES.banTitle }}</h2>
-        <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-text-2">
+        <p class="mt-2.5 mb-0 text-admin-content leading-7 text-muted-foreground">
           {{ description }}
         </p>
       </div>
@@ -22,7 +22,7 @@
 
     <label
       for="admin-ban-duration-select"
-      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
     >
       <span>{{ USERS_MESSAGES.banDurationLabel }}</span>
       <AdminSelect
@@ -35,7 +35,7 @@
     </label>
     <label
       for="admin-ban-reason-textarea"
-      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
     >
       <span>{{ USERS_MESSAGES.banReasonLabel }}</span>
       <AdminTextarea
@@ -50,7 +50,7 @@
 
     <template #footer>
       <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div class="max-w-[480px] text-admin-meta leading-6 text-admin-text-3">
+        <div class="max-w-[480px] text-admin-meta leading-6 text-muted-foreground">
           {{ USERS_MESSAGES.banFooterNote }}
         </div>
         <div :class="adminDialogFooterActionsClass">

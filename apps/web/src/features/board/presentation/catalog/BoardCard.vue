@@ -1,6 +1,6 @@
 <template>
   <article
-    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover focus-visible:outline-none focus-visible:shadow-board-focus"
+    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     role="button"
     tabindex="0"
     :aria-label="board.name"
@@ -35,7 +35,7 @@
         :value="renameDraft"
         type="text"
         :aria-label="t('common.actions.rename')"
-        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-ib-body text-board-card-action-hover outline-none focus:border-board-primary"
+        class="pointer-events-auto h-[30px] w-full rounded-lg border border-input bg-background/90 px-2 text-ib-body text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
         maxlength="60"
         @click.stop
         @input="onRenameInput"
@@ -46,13 +46,13 @@
       <button
         v-else
         type="button"
-        class="pointer-events-auto block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-sm font-[650] text-board-card-title hover:underline focus-visible:outline-none focus-visible:underline"
+        class="pointer-events-auto block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 text-left text-sm font-[650] text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
         :aria-label="board.name"
         @click.stop="emit('click-board')"
       >
         {{ board.name }}
       </button>
-      <div class="mt-[3px] text-xs text-board-card-text">
+      <div class="mt-[3px] text-xs text-muted-foreground">
         {{ t('workspace.boards.edited', { date: displayDate }) }}
       </div>
     </div>
@@ -65,7 +65,7 @@
             size="icon"
             :title="t('workspace.boards.moreActions')"
             :aria-label="t('workspace.boards.moreActions')"
-            class="size-[34px] border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
+            class="size-[34px] border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/60"
             @click="emit('toggle-menu')"
           >
             <MoreHoriz class="size-[18px]" />

@@ -39,16 +39,16 @@ const props = withDefaults(
 )
 
 const adminBadgeColorOverrides: Record<string, string> = {
-  default: 'bg-admin-accent text-white border-transparent',
-  success: 'bg-admin-success-soft text-admin-success-strong border-admin-success/20 font-bold',
-  destructive: 'bg-admin-danger-soft text-admin-danger border-admin-danger/20 font-bold',
-  danger: 'bg-admin-danger-soft text-admin-danger border-admin-danger/20 font-bold',
-  warning: 'bg-admin-warning-soft text-admin-warning border-admin-warning/20 font-bold',
-  warn: 'bg-admin-warning-soft text-admin-warning border-admin-warning/20 font-bold',
-  info: 'bg-admin-info-soft text-admin-info border-admin-info/20 font-bold',
+  default: 'bg-primary text-primary-foreground border-transparent',
+  success: 'bg-emerald-500/15 text-admin-success-strong border-emerald-500/20 font-bold',
+  destructive: 'bg-destructive/15 text-destructive border-destructive/20 font-bold',
+  danger: 'bg-destructive/15 text-destructive border-destructive/20 font-bold',
+  warning: 'bg-amber-500/15 text-admin-warning border-amber-500/20 font-bold',
+  warn: 'bg-amber-500/15 text-admin-warning border-amber-500/20 font-bold',
+  info: 'bg-sky-500/15 text-admin-info border-sky-500/20 font-bold',
   secondary:
-    'bg-admin-surface-muted text-admin-text-label border-admin-border-soft font-semibold',
-  outline: 'border-admin-border text-admin-text-1 bg-white font-medium',
+    'bg-secondary text-secondary-foreground border-border font-semibold',
+  outline: 'border-border text-foreground bg-card font-medium',
 }
 
 const keyVariant = computed(() => {

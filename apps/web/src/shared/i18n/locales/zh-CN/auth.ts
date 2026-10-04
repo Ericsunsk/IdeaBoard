@@ -56,6 +56,10 @@ export default {
     account: '账户',
     console: '控制台',
     home: '首页',
+    appearance: '外观',
+    themeLight: '明亮',
+    themeDark: '暗黑',
+    themeSystem: '跟随系统',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

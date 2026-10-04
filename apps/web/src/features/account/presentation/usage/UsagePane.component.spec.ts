@@ -318,7 +318,7 @@ describe('UsagePane', () => {
     )
     const month = screen.getByRole('radio', { name: 'Month' })
     expect(month).toHaveAttribute('aria-checked', 'true')
-    expect(month).toHaveClass('bg-ib-surface', 'font-semibold')
+    expect(month).toHaveClass('bg-card', 'font-semibold')
 
     const year = screen.getByRole('radio', { name: 'Year' })
     year.focus()

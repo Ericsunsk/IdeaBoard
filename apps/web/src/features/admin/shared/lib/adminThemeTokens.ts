@@ -87,3 +87,17 @@ function mapAdminThemeTokenField<Field extends AdminThemeTokenField>(
 }
 
 export const adminThemeTokenFallbacks = mapAdminThemeTokenField('fallback')
+
+export const adminDarkThemeTokenFallbacks = {
+  tooltipBg: '#18181b',
+  tooltipBorder: '#27272a',
+  tooltipText: '#f4f4f5',
+  axisLine: '#3f3f46',
+  axisText: '#a1a1aa',
+  splitLine: '#27272a',
+  legendText: '#a1a1aa',
+  emptyText: '#71717a',
+  cardBg: '#1d1d1d',
+  segmentBorder: '#18181b',
+  mainText: '#f4f4f5',
+} as const

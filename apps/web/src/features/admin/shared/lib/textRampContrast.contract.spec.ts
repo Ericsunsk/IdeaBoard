@@ -30,9 +30,15 @@ const styleSheet = readFileSync(join(import.meta.dirname, '../../../../app/style
 
 /** Reads a solid hex token from the token source of truth. */
 function readToken(name: string): string {
-  const match = styleSheet.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))
+  const match = styleSheet.match(new RegExp(`${name}:\\s*([^;]+);`))
   if (!match?.[1]) throw new Error(`Token ${name} not found in app/style.css`)
-  return match[1]
+  const value = match[1].trim()
+  if (value.startsWith('#')) return value
+  const varMatch = value.match(/var\((--[a-z0-9-]+)\)/)
+  if (varMatch?.[1]) {
+    return readToken(varMatch[1])
+  }
+  return value
 }
 
 /**

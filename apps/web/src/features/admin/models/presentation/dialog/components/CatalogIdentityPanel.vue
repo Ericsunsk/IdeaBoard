@@ -1,8 +1,8 @@
 <template>
-  <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
-    <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
-      <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.identityTitle }}</h4>
-      <span class="text-admin-caption text-admin-text-3">{{
+  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
+      <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.identityTitle }}</h4>
+      <span class="text-admin-caption text-muted-foreground">{{
         MODELS_MESSAGES.identitySubtitle
       }}</span>
     </div>
@@ -11,10 +11,10 @@
       <!-- 模型标识 (ID) -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="model-id-input">
-            {{ MODELS_MESSAGES.identityIdLabel }} <span class="text-admin-danger">*</span>
+          <label class="text-admin-caption font-semibold text-foreground" for="model-id-input">
+            {{ MODELS_MESSAGES.identityIdLabel }} <span class="text-destructive">*</span>
           </label>
-          <span class="text-admin-caption text-admin-text-3">{{
+          <span class="text-admin-caption text-muted-foreground">{{
             MODELS_MESSAGES.identityIdHint
           }}</span>
         </div>
@@ -30,14 +30,14 @@
           v-if="!isEditing && idPrefixOptions.length > 0"
           class="flex flex-wrap items-center gap-1 pt-0.5"
         >
-          <span class="text-admin-caption text-admin-text-3">{{
+          <span class="text-admin-caption text-muted-foreground">{{
             MODELS_MESSAGES.identityPrefixLabel
           }}</span>
           <button
             v-for="prefix in idPrefixOptions"
             :key="prefix"
             type="button"
-            class="rounded-md border border-admin-border-soft bg-admin-surface-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2 transition-colors hover:border-admin-accent/40 hover:bg-admin-accent/5 hover:text-admin-accent cursor-pointer"
+            class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
             @click="applyPrefix(prefix)"
           >
             {{ prefix }}
@@ -47,8 +47,8 @@
 
       <!-- 模型显示名称 -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-admin-caption font-semibold text-admin-text-1" for="model-name-input">
-          {{ MODELS_MESSAGES.identityNameLabel }} <span class="text-admin-danger">*</span>
+        <label class="text-admin-caption font-semibold text-foreground" for="model-name-input">
+          {{ MODELS_MESSAGES.identityNameLabel }} <span class="text-destructive">*</span>
         </label>
         <AdminInput
           id="model-name-input"
@@ -61,10 +61,10 @@
       <!-- 提供商 -->
       <div class="flex flex-col gap-1.5">
         <label
-          class="text-admin-caption font-semibold text-admin-text-1"
+          class="text-admin-caption font-semibold text-foreground"
           for="model-provider-input"
         >
-          {{ MODELS_MESSAGES.identityProviderLabel }} <span class="text-admin-danger">*</span>
+          {{ MODELS_MESSAGES.identityProviderLabel }} <span class="text-destructive">*</span>
         </label>
         <AdminInput
           id="model-provider-input"
@@ -81,8 +81,8 @@
             class="rounded px-1.5 py-0.5 text-admin-micro font-medium transition-colors cursor-pointer"
             :class="
               modelProvider === p.display_name
-                ? 'bg-admin-accent text-white font-semibold'
-                : 'bg-admin-surface-muted text-admin-text-2 hover:bg-admin-surface-muted/80'
+                ? 'bg-primary text-primary-foreground font-semibold'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
             "
             @click="selectProvider(p)"
           >
@@ -93,7 +93,7 @@
 
       <!-- 功能描述 -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-admin-caption font-semibold text-admin-text-1" for="model-desc-input">
+        <label class="text-admin-caption font-semibold text-foreground" for="model-desc-input">
           {{ MODELS_MESSAGES.identityDescriptionLabel }}
         </label>
         <AdminInput

@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest'
 const sourceRoot = resolve(process.cwd(), 'src')
 const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, relativePath), 'utf8')
 
-const roundControl = readSource('shared/theme/round-control.css')
-const pageChrome = readSource('shared/theme/page-chrome.css')
+const roundControl = readSource('shared/theme/atoms/round-control.css')
+const pageChrome = readSource('shared/theme/atoms/page-chrome.css')
 const canvasChromeSkin = readSource('features/canvas/presentation/styles/canvas-chrome.css')
 
 describe('Round Control surface ownership contract', () => {

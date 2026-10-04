@@ -11,7 +11,7 @@
       <div class="flex w-full items-center justify-between gap-3 pr-6">
         <div class="flex min-w-0 items-center gap-2.5">
           <span
-            class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-admin-surface-muted"
+            class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-muted"
             :style="{ color: getTaskStatusDefinition(detailTask?.status || '').color }"
           >
             <CheckCircle
@@ -28,15 +28,15 @@
             <Clock v-else class="size-3.5" />
           </span>
           <div class="flex min-w-0 flex-col">
-            <DialogTitle class="text-sm font-semibold text-admin-text-1">
+            <DialogTitle class="text-sm font-semibold text-foreground">
               {{ MONITOR_MESSAGES.detailAria }}
             </DialogTitle>
-            <div class="flex items-center gap-1.5 font-mono text-xs text-admin-text-3">
+            <div class="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
               <span class="truncate">ID: {{ detailTask?.task_id || taskId || '-' }}</span>
               <button
                 v-if="detailTask?.task_id || taskId"
                 type="button"
-                class="flex size-5 cursor-pointer items-center justify-center rounded text-admin-text-3 transition-colors hover:bg-admin-surface-muted hover:text-admin-text-1"
+                class="flex size-5 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyTaskIdAria"
                 @click="copyToClipboard(detailTask?.task_id || taskId || '')"
               >
@@ -59,7 +59,7 @@
 
     <div
       v-if="loading"
-      class="flex min-h-40 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 text-xs text-admin-text-3"
+      class="flex min-h-40 items-center justify-center rounded-xl border border-border bg-muted/60 text-xs text-muted-foreground"
       role="status"
     >
       {{ MONITOR_MESSAGES.detailLoading }}
@@ -67,10 +67,10 @@
 
     <div
       v-else-if="errorMessage"
-      class="flex min-h-40 flex-col items-center justify-center gap-2.5 rounded-xl border border-admin-danger/20 bg-admin-danger/5 px-4 text-center"
+      class="flex min-h-40 flex-col items-center justify-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/5 px-4 text-center"
       role="alert"
     >
-      <span class="text-xs font-semibold text-admin-danger">{{ errorMessage }}</span>
+      <span class="text-xs font-semibold text-destructive">{{ errorMessage }}</span>
       <AdminButton
         :class="adminActionButtonClass"
         size="small"
@@ -83,7 +83,7 @@
 
     <div
       v-else-if="!detailTask"
-      class="flex min-h-40 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 text-xs text-admin-text-3"
+      class="flex min-h-40 items-center justify-center rounded-xl border border-border bg-muted/60 text-xs text-muted-foreground"
     >
       {{ MONITOR_MESSAGES.detailUnavailable }}
     </div>
@@ -93,7 +93,7 @@
       <!-- 状态与耗时横幅 / 错误提示 -->
       <div
         v-if="detailTask.status === adminTaskStatuses.failed"
-        class="flex items-start gap-2 rounded-xl border border-admin-danger/20 bg-admin-danger/5 p-3 text-xs leading-relaxed text-admin-danger"
+        class="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive"
         role="alert"
       >
         <WarningTriangle class="mt-0.5 size-3.5 shrink-0" />
@@ -102,13 +102,13 @@
             <span class="font-semibold">{{ MONITOR_MESSAGES.detailFailedTitle }}</span>
             <button
               type="button"
-              class="h-5 cursor-pointer rounded border border-admin-danger/30 px-1.5 text-admin-caption font-medium text-admin-danger transition-colors hover:bg-admin-danger/10"
+              class="h-5 cursor-pointer rounded border border-destructive/30 px-1.5 text-admin-caption font-medium text-destructive transition-colors hover:bg-destructive/10"
               @click="emit('retry')"
             >
               {{ MONITOR_MESSAGES.retry }}
             </button>
           </div>
-          <span class="text-admin-danger/90">
+          <span class="text-destructive/90">
             {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailUnknownError }}
           </span>
         </div>
@@ -116,12 +116,12 @@
 
       <div
         v-else-if="detailTask.status === adminTaskStatuses.cancelled"
-        class="flex items-start gap-2 rounded-xl border border-admin-border-soft bg-admin-surface-muted p-3 text-xs leading-relaxed text-admin-text-label"
+        class="flex items-start gap-2 rounded-xl border border-border bg-muted p-3 text-xs leading-relaxed text-muted-foreground"
       >
-        <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-admin-text-3" />
+        <WarningTriangle class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
         <div class="flex min-w-0 flex-1 flex-col">
           <span class="font-semibold">{{ MONITOR_MESSAGES.detailStoppedTitle }}</span>
-          <span class="text-admin-text-2">
+          <span class="text-muted-foreground">
             {{ getErrorReason(detailTask) || MONITOR_MESSAGES.detailStoppedFallback }}
           </span>
         </div>
@@ -129,17 +129,17 @@
 
       <div
         v-else
-        class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-3.5 py-2 text-xs"
+        class="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3.5 py-2 text-xs"
       >
         <div class="flex items-center gap-1.5">
-          <span class="text-admin-text-3">{{ MONITOR_MESSAGES.detailDurationLabel }}</span>
-          <span class="font-mono font-medium text-admin-text-1">{{
+          <span class="text-muted-foreground">{{ MONITOR_MESSAGES.detailDurationLabel }}</span>
+          <span class="font-mono font-medium text-foreground">{{
             calcDuration(detailTask)
           }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="text-admin-text-3">{{ MONITOR_MESSAGES.detailCreatedLabel }}</span>
-          <span class="font-mono font-medium text-admin-text-1">
+          <span class="text-muted-foreground">{{ MONITOR_MESSAGES.detailCreatedLabel }}</span>
+          <span class="font-mono font-medium text-foreground">
             {{ formatDateTime(detailTask.created_at) }}
           </span>
         </div>
@@ -147,22 +147,22 @@
 
       <!-- 1. 身份与归属 (Card) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-identity">
-        <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
-          <Fingerprint class="size-3.5 text-admin-text-2" />
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <Fingerprint class="size-3.5 text-muted-foreground" />
           <span id="task-detail-identity">{{ MONITOR_MESSAGES.identityTitle }}</span>
         </div>
         <div
-          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.userLabel }}</span>
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.userLabel }}</span>
             <div class="flex items-center gap-1">
-              <span class="font-mono text-admin-text-1">
+              <span class="font-mono text-foreground">
                 {{ detailTask.user_display_name || detailTask.user_public_id }}
               </span>
               <button
                 type="button"
-                class="flex size-4 cursor-pointer items-center justify-center rounded text-admin-text-3 transition-colors hover:text-admin-text-1"
+                class="flex size-4 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
                 :aria-label="MONITOR_MESSAGES.copyUserIdAria"
                 @click="copyToClipboard(String(detailTask.user_public_id))"
               >
@@ -171,32 +171,32 @@
             </div>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.priorityLabel }}</span>
-            <span class="font-medium text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.priorityLabel }}</span>
+            <span class="font-medium text-foreground">{{
               getTaskPriorityLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.providerLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.providerLabel }}</span>
+            <span class="font-mono text-foreground">{{
               getDetailExecutionProviderLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.modelLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.modelLabel }}</span>
+            <span class="font-mono text-foreground">{{
               getDetailExecutionModelLabel(detailTask)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.createdAtLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.createdAtLabel }}</span>
+            <span class="font-mono text-foreground">{{
               formatDateTime(detailTask.created_at)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.completedAtLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.completedAtLabel }}</span>
+            <span class="font-mono text-foreground">{{
               formatDateTime(detailTask.completed_at)
             }}</span>
           </div>
@@ -205,14 +205,14 @@
 
       <!-- 2. 任务指令 (Prompt) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-prompt">
-        <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
+        <div class="flex items-center justify-between text-xs font-semibold text-foreground">
           <div class="flex items-center gap-1.5">
-            <ChatBubble class="size-3.5 text-admin-text-2" />
+            <ChatBubble class="size-3.5 text-muted-foreground" />
             <span id="task-detail-prompt">{{ MONITOR_MESSAGES.promptTitle }}</span>
           </div>
           <button
             type="button"
-            class="cursor-pointer text-admin-caption font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
             :disabled="!detailTask.prompt"
             @click="copyToClipboard(detailTask.prompt || '')"
           >
@@ -220,10 +220,10 @@
           </button>
         </div>
         <div
-          class="max-h-[120px] overflow-y-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5"
+          class="max-h-[120px] overflow-y-auto rounded-xl border border-border bg-muted/60 p-2.5"
         >
           <div
-            class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-slate-800"
+            class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground"
           >
             {{ detailTask.prompt || MONITOR_MESSAGES.promptEmpty }}
           </div>
@@ -232,37 +232,37 @@
 
       <!-- 2. 路由快照 (Routing Snapshot, #852) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-routing">
-        <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
-          <FastArrowRight class="size-3.5 text-admin-text-2" />
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <FastArrowRight class="size-3.5 text-muted-foreground" />
           <span id="task-detail-routing">{{ MONITOR_MESSAGES.routingTitle }}</span>
         </div>
         <div
           v-if="detailTask.routing"
-          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingServiceLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{ detailTask.routing.service }}</span>
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingServiceLabel }}</span>
+            <span class="font-mono text-foreground">{{ detailTask.routing.service }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingResolutionLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingResolutionLabel }}</span>
+            <span class="font-mono text-foreground">{{
               detailTask.routing.requested_resolution || '-'
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingPoolVersionLabel }}</span>
-            <span class="font-mono text-admin-text-1">v{{ detailTask.routing.pool_version }}</span>
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingPoolVersionLabel }}</span>
+            <span class="font-mono text-foreground">v{{ detailTask.routing.pool_version }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingSelectedLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingSelectedLabel }}</span>
+            <span class="font-mono text-foreground">{{
               detailTask.routing.selected_model || '-'
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingFinalLabel }}</span>
-            <span class="font-mono font-medium text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingFinalLabel }}</span>
+            <span class="font-mono font-medium text-foreground">{{
               getDetailFinalModelLabel(detailTask)
             }}</span>
           </div>
@@ -270,23 +270,23 @@
             v-if="detailTask.routing.retry_candidate"
             class="flex items-center justify-between py-1.5"
           >
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.routingRetryCandidateLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.routingRetryCandidateLabel }}</span>
+            <span class="font-mono text-foreground">{{
               detailTask.routing.retry_candidate
             }}</span>
           </div>
           <div class="flex items-center justify-between gap-3 py-1.5">
-            <span class="shrink-0 text-admin-text-3">{{
+            <span class="shrink-0 text-muted-foreground">{{
               MONITOR_MESSAGES.routingEligibleLabel
             }}</span>
-            <span class="truncate font-mono text-admin-text-1" :title="eligibleModelsText">
+            <span class="truncate font-mono text-foreground" :title="eligibleModelsText">
               {{ eligibleModelsText }}
             </span>
           </div>
         </div>
         <div
           v-else
-          class="rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-3.5 py-2.5 text-xs text-admin-text-3"
+          class="rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
         >
           {{ MONITOR_MESSAGES.routingMissing }}
         </div>
@@ -294,13 +294,13 @@
 
       <!-- 3. 生成结果 (Result) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-result">
-        <div class="flex items-center gap-1.5 text-xs font-semibold text-admin-text-1">
-          <MediaImage class="size-3.5 text-admin-text-2" />
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <MediaImage class="size-3.5 text-muted-foreground" />
           <span id="task-detail-result">{{ MONITOR_MESSAGES.resultTitle }}</span>
         </div>
         <div
           v-if="resultImageUrl"
-          class="group relative overflow-hidden rounded-xl border border-admin-border-soft bg-admin-surface-muted/40 p-1.5 transition-colors hover:border-admin-border-hover"
+          class="group relative overflow-hidden rounded-xl border border-border bg-muted/40 p-1.5 transition-colors hover:border-border-hover"
         >
           <img
             :src="resultImageUrl"
@@ -318,7 +318,7 @@
         </div>
         <div
           v-else
-          class="rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-3.5 py-2.5 text-xs text-admin-text-3"
+          class="rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-xs text-muted-foreground"
         >
           {{
             isResultImageDeletedByUser
@@ -332,12 +332,12 @@
 
       <!-- 4. 执行轨迹 (Execution Attempts) -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-execution-trace">
-        <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
+        <div class="flex items-center justify-between text-xs font-semibold text-foreground">
           <div class="flex items-center gap-1.5">
-            <Clock class="size-3.5 text-admin-text-2" />
+            <Clock class="size-3.5 text-muted-foreground" />
             <span id="task-detail-execution-trace">{{ MONITOR_MESSAGES.attemptsTitle }}</span>
           </div>
-          <span class="text-admin-caption font-normal text-admin-text-3">
+          <span class="text-admin-caption font-normal text-muted-foreground">
             {{ MONITOR_MESSAGES.attemptsCount(detailTask.execution_attempts?.length || 0) }}
           </span>
         </div>
@@ -346,16 +346,16 @@
           <article
             v-for="attempt in detailTask.execution_attempts"
             :key="attempt.attempt_no"
-            class="flex flex-col gap-1.5 rounded-xl border border-admin-border-soft bg-white p-2.5 text-xs"
+            class="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-2.5 text-xs"
           >
             <div class="flex items-center justify-between gap-2">
               <div class="flex min-w-0 items-center gap-1.5">
-                <span class="font-mono text-admin-text-3">#{{ attempt.attempt_no }}</span>
-                <span class="font-semibold text-admin-text-1">{{
+                <span class="font-mono text-muted-foreground">#{{ attempt.attempt_no }}</span>
+                <span class="font-semibold text-foreground">{{
                   getAttemptProviderLabel(attempt)
                 }}</span>
-                <span class="text-admin-text-3">/</span>
-                <span class="truncate font-mono text-admin-caption text-admin-text-2">
+                <span class="text-muted-foreground">/</span>
+                <span class="truncate font-mono text-admin-caption text-muted-foreground">
                   {{ attempt.resolved_model || '-' }}
                 </span>
               </div>
@@ -366,31 +366,31 @@
               />
             </div>
             <div
-              class="grid grid-cols-2 gap-x-3 gap-y-1 text-admin-caption text-admin-text-2 pt-1 border-t border-admin-border-soft/50"
+              class="grid grid-cols-2 gap-x-3 gap-y-1 text-admin-caption text-muted-foreground pt-1 border-t border-border/50"
             >
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptStageLabel }}</span>
+                <span class="text-muted-foreground">{{ MONITOR_MESSAGES.attemptStageLabel }}</span>
                 <span>{{ getAttemptStageLabel(attempt.stage) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptFailureLabel }}</span>
+                <span class="text-muted-foreground">{{ MONITOR_MESSAGES.attemptFailureLabel }}</span>
                 <span>{{ getAttemptFailureLabel(attempt.failure_category) }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{ MONITOR_MESSAGES.attemptLayerLabel }}</span>
+                <span class="text-muted-foreground">{{ MONITOR_MESSAGES.attemptLayerLabel }}</span>
                 <span>{{ getAttemptRetryLayerLabel(attempt.retry_layer) }}</span>
               </div>
               <div
                 v-if="(attempt.gateway_retry_count ?? 0) > 0"
                 class="flex items-center justify-between"
               >
-                <span class="text-admin-text-3">{{
+                <span class="text-muted-foreground">{{
                   MONITOR_MESSAGES.attemptGatewayRetriesLabel
                 }}</span>
                 <span class="font-mono">{{ attempt.gateway_retry_count }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{
+                <span class="text-muted-foreground">{{
                   MONITOR_MESSAGES.attemptProviderLatencyLabel
                 }}</span>
                 <span class="font-mono">{{
@@ -398,7 +398,7 @@
                 }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-admin-text-3">{{
+                <span class="text-muted-foreground">{{
                   MONITOR_MESSAGES.attemptTotalLatencyLabel
                 }}</span>
                 <span class="font-mono">{{ formatAttemptLatency(attempt.total_latency_ms) }}</span>
@@ -408,7 +408,7 @@
         </div>
         <div
           v-else
-          class="rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 py-3 text-center text-xs text-admin-text-3"
+          class="rounded-xl border border-border bg-muted/50 py-3 text-center text-xs text-muted-foreground"
         >
           {{ MONITOR_MESSAGES.attemptsEmpty }}
         </div>
@@ -420,60 +420,60 @@
         class="flex flex-col gap-1.5"
         aria-labelledby="task-detail-billing"
       >
-        <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
+        <div class="flex items-center justify-between text-xs font-semibold text-foreground">
           <div class="flex items-center gap-1.5">
-            <LightBulb class="size-3.5 text-admin-text-2" />
+            <LightBulb class="size-3.5 text-muted-foreground" />
             <span id="task-detail-billing">{{ MONITOR_MESSAGES.billingTitle }}</span>
           </div>
           <span
             v-if="detailTask.billing.feature_exists === false"
-            class="text-admin-caption font-normal text-admin-text-3"
+            class="text-admin-caption font-normal text-muted-foreground"
           >
             {{ MONITOR_MESSAGES.billingFeatureGone }}
           </span>
         </div>
         <div
-          class="flex flex-col divide-y divide-admin-border-soft/60 rounded-xl border border-admin-border-soft bg-white px-3 py-1 text-xs"
+          class="flex flex-col divide-y divide-border/60 rounded-xl border border-border bg-card px-3 py-1 text-xs"
         >
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingFeatureLabel }}</span>
-            <span class="font-medium text-admin-text-1">{{ detailTask.billing.display_name }}</span>
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingFeatureLabel }}</span>
+            <span class="font-medium text-foreground">{{ detailTask.billing.display_name }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">SKU</span>
-            <span class="font-mono text-admin-text-1">{{ detailTask.billing.sku }}</span>
+            <span class="text-muted-foreground">SKU</span>
+            <span class="font-mono text-foreground">{{ detailTask.billing.sku }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingUnitLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingUnitLabel }}</span>
+            <span class="font-mono text-foreground">{{
               formatIdeaAmount(detailTask.billing.unit_credits)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingQuantityLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{ detailTask.billing.quantity }}</span>
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingQuantityLabel }}</span>
+            <span class="font-mono text-foreground">{{ detailTask.billing.quantity }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingTotalLabel }}</span>
-            <span class="font-mono font-semibold text-admin-text-1">
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingTotalLabel }}</span>
+            <span class="font-mono font-semibold text-foreground">
               {{ formatIdeaAmount(detailTask.billing.total_credits) }}
             </span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingSettlementLabel }}</span>
-            <span class="font-medium text-admin-text-1">
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingSettlementLabel }}</span>
+            <span class="font-medium text-foreground">
               {{ getBillingSettlementLabel(detailTask.billing.settlement_state) }}
             </span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingQuotedLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingQuotedLabel }}</span>
+            <span class="font-mono text-foreground">{{
               formatDateTime(detailTask.billing.quoted_at)
             }}</span>
           </div>
           <div class="flex items-center justify-between py-1.5">
-            <span class="text-admin-text-3">{{ MONITOR_MESSAGES.billingSettledLabel }}</span>
-            <span class="font-mono text-admin-text-1">{{
+            <span class="text-muted-foreground">{{ MONITOR_MESSAGES.billingSettledLabel }}</span>
+            <span class="font-mono text-foreground">{{
               formatDateTime(detailTask.billing.settled_at)
             }}</span>
           </div>
@@ -482,14 +482,14 @@
 
       <!-- 6. API 响应摘要 & 调试详情 -->
       <section class="flex flex-col gap-1.5" aria-labelledby="task-detail-api-result">
-        <div class="flex items-center justify-between text-xs font-semibold text-admin-text-1">
+        <div class="flex items-center justify-between text-xs font-semibold text-foreground">
           <div class="flex items-center gap-1.5">
-            <CodeBrackets class="size-3.5 text-admin-text-2" />
+            <CodeBrackets class="size-3.5 text-muted-foreground" />
             <span id="task-detail-api-result">{{ MONITOR_MESSAGES.apiResultTitle }}</span>
           </div>
           <button
             type="button"
-            class="cursor-pointer text-admin-caption font-medium text-admin-text-3 transition-colors hover:text-admin-text-1 disabled:pointer-events-none disabled:opacity-50"
+            class="cursor-pointer text-admin-caption font-medium text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
             :disabled="!hasResultPayload"
             @click="copyToClipboard(resultSummaryText)"
           >
@@ -497,9 +497,9 @@
           </button>
         </div>
         <div
-          class="max-h-[140px] overflow-x-auto rounded-xl border border-admin-border-soft bg-admin-surface-muted/60 p-2.5 font-mono text-xs"
+          class="max-h-[140px] overflow-x-auto rounded-xl border border-border bg-muted/60 p-2.5 font-mono text-xs"
         >
-          <pre class="m-0 leading-relaxed text-slate-800">{{
+          <pre class="m-0 leading-relaxed text-foreground">{{
             resultSummaryText || MONITOR_MESSAGES.apiResultEmpty
           }}</pre>
         </div>
@@ -507,28 +507,28 @@
         <!-- 原始调试详情 (脱敏) -->
         <div
           v-if="resultDebugText"
-          class="overflow-hidden rounded-xl border border-admin-border-soft bg-admin-surface-muted/40"
+          class="overflow-hidden rounded-xl border border-border bg-muted/40"
         >
           <button
             type="button"
-            class="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-medium text-admin-text-2 transition-colors hover:bg-admin-surface-muted"
+            class="flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
             :aria-expanded="showDebugResult"
             aria-controls="task-result-debug-details"
             @click="showDebugResult = !showDebugResult"
           >
             <div class="flex items-center gap-1.5">
-              <Terminal class="size-3.5 text-admin-text-3" />
+              <Terminal class="size-3.5 text-muted-foreground" />
               <span>{{ MONITOR_MESSAGES.debugToggle(showDebugResult) }}</span>
             </div>
             <NavArrowDown
-              class="size-3 text-admin-text-3 transition-transform"
+              class="size-3 text-muted-foreground transition-transform"
               :class="showDebugResult ? 'rotate-180' : ''"
             />
           </button>
           <div
             v-show="showDebugResult"
             id="task-result-debug-details"
-            class="overflow-x-auto border-t border-admin-border-soft bg-white p-2.5 font-mono text-xs text-admin-text-3"
+            class="overflow-x-auto border-t border-border bg-muted p-2.5 font-mono text-xs text-muted-foreground"
           >
             <pre class="m-0 leading-relaxed">{{ resultDebugText }}</pre>
           </div>

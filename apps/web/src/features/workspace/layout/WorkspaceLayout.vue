@@ -2,11 +2,11 @@
   <div class="flex h-screen w-full flex-col overflow-hidden">
     <div
       v-if="isImpersonating"
-      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-ib-panel border border-ib-creative-accent/25 bg-ib-creative-accent-soft/90 px-2.5 py-1.5 text-ib-text backdrop-blur-[10px] top-2 max-w-[calc(100vw-12px)] rounded-ib-control px-2 py-1 md:top-2.5 md:max-w-[calc(100vw-20px)] md:rounded-ib-panel md:px-2.5 md:py-1.5"
+      class="fixed top-2.5 left-1/2 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-ib-panel border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-foreground backdrop-blur-[10px] top-2 max-w-[calc(100vw-12px)] rounded-ib-control px-2 py-1 md:top-2.5 md:max-w-[calc(100vw-20px)] md:rounded-ib-panel md:px-2.5 md:py-1.5"
     >
       <div class="inline-flex min-w-0 items-center gap-2">
         <span
-          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-ib-control bg-ib-creative-accent/15 text-ib-creative-accent-pressed"
+          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-ib-control bg-primary/15 text-primary"
         >
           <Shield class="size-3.5" />
         </span>
@@ -18,7 +18,7 @@
         type="button"
         variant="ghost"
         size="icon"
-        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-ib-creative-accent/35 bg-ib-surface p-0 text-ib-creative-accent-pressed shadow-none hover:border-ib-creative-accent/50 hover:bg-ib-creative-accent-soft active:border-ib-creative-accent-pressed/55 active:bg-ib-creative-accent/15 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-wait disabled:opacity-70 size-6 min-w-6 md:size-[26px] md:min-w-[26px]"
+        class="size-[26px] min-w-[26px] shrink-0 rounded-full border border-primary/35 bg-card p-0 text-primary shadow-none hover:border-primary/50 hover:bg-primary/10 active:border-primary/55 active:bg-primary/15 focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-wait disabled:opacity-70 size-6 min-w-6 md:size-[26px] md:min-w-[26px]"
         :aria-label="t('common.impersonation.exit')"
         :aria-busy="stopImpersonatingLoading"
         :disabled="stopImpersonatingLoading"

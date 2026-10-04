@@ -2,8 +2,8 @@
   <div :class="adminDashboardRootClass">
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex items-center gap-2">
-        <h2 class="text-admin-title font-bold text-admin-title-color">{{ title }}</h2>
-        <span class="text-admin-meta text-admin-text-2">{{ subtitle }}</span>
+        <h2 class="text-admin-title font-bold text-foreground">{{ title }}</h2>
+        <span class="text-admin-meta text-muted-foreground">{{ subtitle }}</span>
       </div>
       <AdminButton
         variant="outline"
@@ -60,7 +60,7 @@
         >
           <template #body="{ data }">
             <slot name="summary" :data="data">
-              <span class="text-admin-body text-admin-text-2">{{ data.summary }}</span>
+              <span class="text-admin-body text-muted-foreground">{{ data.summary }}</span>
             </slot>
           </template>
         </AdminColumn>

@@ -17,10 +17,10 @@
       <AdminColumn :style="{ width: adminMonitorColumnWidths.timestamp }">
         <template #header>
           <div class="flex items-center gap-1.5 font-sans">
-            <span class="font-semibold text-admin-text-2 text-xs">{{
+            <span class="font-semibold text-muted-foreground text-xs">{{
               MONITOR_MESSAGES.timestampColumn
             }}</span>
-            <span class="font-mono text-admin-caption text-admin-text-3 font-normal">GMT+8</span>
+            <span class="font-mono text-admin-caption text-muted-foreground font-normal">GMT+8</span>
           </div>
         </template>
         <template #body="{ data }">
@@ -33,7 +33,7 @@
               ]"
             />
             <!-- 精确时间戳 2026-09-17 12:18:35 -->
-            <span class="font-medium text-admin-text-1">
+            <span class="font-medium text-foreground">
               {{ formatTaskExactTimestamp(data) }}
             </span>
           </div>
@@ -43,7 +43,7 @@
       <!-- 耗时列：完成时间 - 创建时间，未完成展示占位 -->
       <AdminColumn header="Duration" :style="{ width: adminMonitorColumnWidths.duration }">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-admin-text-1">
+          <span class="font-mono text-xs text-foreground">
             {{ formatTaskDuration(data) }}
           </span>
         </template>
@@ -59,19 +59,19 @@
       <!-- 第 3 列：Service (service 图标 + slug + 请求清晰度) -->
       <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
         <template #body="{ data }">
-          <div class="flex items-center gap-1.5 font-mono text-xs text-admin-text-1">
+          <div class="flex items-center gap-1.5 font-mono text-xs text-foreground">
             <component
               :is="getTaskRowView(data).serviceIcon"
               v-if="getTaskRowView(data).serviceIcon"
-              class="size-4 shrink-0 text-admin-text-2"
+              class="size-4 shrink-0 text-muted-foreground"
             />
             <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
-            <span class="truncate text-slate-700">{{
+            <span class="truncate text-foreground">{{
               getTaskRowView(data).serviceSlug || '-'
             }}</span>
             <span
               v-if="getTaskServiceResolution(data)"
-              class="shrink-0 rounded border border-admin-border-soft bg-admin-surface-muted px-1 font-mono text-admin-caption text-admin-text-2"
+              class="shrink-0 rounded border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
               :title="getTaskServiceResolution(data)"
             >
               {{ getTaskServiceResolution(data) }}
@@ -84,7 +84,7 @@
       <AdminColumn header="Model" :style="{ width: adminMonitorColumnWidths.model }">
         <template #body="{ data }">
           <span
-            class="truncate font-mono text-xs text-admin-text-1"
+            class="truncate font-mono text-xs text-foreground"
             :title="getTaskModelLabel(data) || '-'"
           >
             {{ getTaskModelLabel(data) || '-' }}
@@ -96,7 +96,7 @@
       <AdminColumn header="Message" :style="{ width: adminMonitorColumnWidths.message }">
         <template #body="{ data }">
           <div
-            class="max-w-[160px] truncate font-mono text-xs text-slate-800"
+            class="max-w-[160px] truncate font-mono text-xs text-foreground"
             :title="data.prompt || '-'"
           >
             {{ getTaskRowView(data).message || '-' }}
@@ -107,8 +107,8 @@
       <!-- 花费列：实际扣账 Idea 数 -->
       <AdminColumn header="Credits" :style="{ width: adminMonitorColumnWidths.credits }">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-admin-text-1">
-            {{ data.credits || 0 }} <span class="text-admin-text-3">Idea</span>
+          <span class="font-mono text-xs text-foreground">
+            {{ data.credits || 0 }} <span class="text-muted-foreground">Idea</span>
           </span>
         </template>
       </AdminColumn>
@@ -145,7 +145,7 @@
           <div class="flex items-center justify-start">
             <button
               type="button"
-              class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-admin-border-soft bg-white text-admin-text-2 transition-colors hover:bg-admin-surface-muted"
+              :class="adminTableRowActionButtonClass"
               :aria-label="MONITOR_MESSAGES.moreDetailAria"
               @click="emit('showDetail', data)"
             >
@@ -158,9 +158,9 @@
 
     <!-- 表格底栏 (Card Footer)：灰底带上边框，左侧记录总数，右侧分页控制器 -->
     <div
-      class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg px-4 py-2.5"
+      :class="adminTableFooterClass"
     >
-      <span class="text-xs font-normal text-admin-text-3">
+      <span class="text-xs font-normal text-muted-foreground">
         {{ MONITOR_MESSAGES.totalRecords(totalCount) }}
       </span>
 
@@ -188,7 +188,9 @@ import AdminTable from '../../../shared/components/AdminTable.vue'
 import {
   adminTableCardClass,
   adminTableClass,
+  adminTableFooterClass,
   adminTableFrameClass,
+  adminTableRowActionButtonClass,
   adminTableStyle,
   adminTextButtonClass,
 } from '../../../shared/lib/uiClasses'

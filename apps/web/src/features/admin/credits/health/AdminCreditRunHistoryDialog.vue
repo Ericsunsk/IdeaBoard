@@ -12,7 +12,7 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">
+              <div class="text-admin-title-sm font-[740] text-foreground">
                 {{ CREDIT_HEALTH_MESSAGES.runHistoryTitle }}
               </div>
             </div>
@@ -125,7 +125,7 @@
         </AdminColumn>
 
         <template #expansion="{ data }">
-          <div class="border-y border-admin-border-soft bg-ib-surface-muted px-5 py-4">
+          <div class="border-y border-border bg-muted px-5 py-4">
             <div
               v-if="runDetailLoading && selectedRunId === data.id"
               class="flex min-h-24 items-center justify-center"
@@ -153,34 +153,34 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryTechId }}
                 </dt>
-                <dd class="mt-1 mb-0 font-mono text-admin-body text-admin-text-1">
+                <dd class="mt-1 mb-0 font-mono text-admin-body text-foreground">
                   Run #{{ selectedRun.id }}
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryAttempts }}
                 </dt>
-                <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
+                <dd class="mt-1 mb-0 text-admin-body text-foreground">
                   {{ selectedRun.attempt_count }}
                 </dd>
               </div>
               <div class="sm:col-span-2">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryReason }}
                 </dt>
-                <dd class="mt-1 mb-0 break-words text-admin-body text-admin-text-1">
+                <dd class="mt-1 mb-0 break-words text-admin-body text-foreground">
                   {{ selectedRun.reason || CREDIT_HEALTH_MESSAGES.runHistoryDefaultReason }}
                 </dd>
               </div>
               <div v-if="selectedRun.error_message" class="sm:col-span-2 xl:col-span-4">
-                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.runHistoryError }}
                 </dt>
-                <dd class="mt-1 mb-0 break-words text-admin-body text-admin-danger">
+                <dd class="mt-1 mb-0 break-words text-admin-body text-destructive">
                   {{ formatReconciliationRunError(selectedRun.error_message) }}
                 </dd>
               </div>

@@ -263,13 +263,13 @@
 .canvas-chrome-icon-button.is-active {
   border-color: var(--canvas-accent);
   background: var(--canvas-accent);
-  color: #ffffff;
+  color: var(--canvas-text-inverse);
 }
 
 .canvas-chrome-icon-button.is-active:hover {
   border-color: var(--canvas-accent-hover);
   background: var(--canvas-accent-hover);
-  color: #ffffff;
+  color: var(--canvas-text-inverse);
 }
 
 .canvas-chrome-icon {

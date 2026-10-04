@@ -13,7 +13,7 @@
     </Button>
 
     <aside
-      class="flex min-h-0 max-h-[48dvh] flex-col overflow-y-auto bg-white px-4 py-4 [scrollbar-width:none] md:max-h-none md:py-5"
+      class="flex min-h-0 max-h-[48dvh] flex-col overflow-y-auto bg-card px-4 py-4 [scrollbar-width:none] md:max-h-none md:py-5"
     >
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
         <span :class="accountBrandMarkClass">
@@ -24,7 +24,7 @@
           />
         </span>
         <span
-          class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-ib-text"
+          class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-foreground"
         >
           {{ projectName }}
         </span>
@@ -42,7 +42,7 @@
         >
           <p
             :id="`account-nav-${group.key}`"
-            class="mb-2 px-2 text-ib-meta leading-5 font-semibold tracking-normal text-ib-text-muted"
+            class="mb-2 px-2 text-ib-meta leading-5 font-semibold tracking-normal text-muted-foreground"
           >
             {{ t(group.labelKey) }}
           </p>

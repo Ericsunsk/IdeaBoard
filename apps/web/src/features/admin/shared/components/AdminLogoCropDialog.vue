@@ -12,7 +12,7 @@
     </template>
 
     <div class="flex flex-col gap-3.5">
-      <div class="relative overflow-hidden rounded-xl bg-admin-surface-muted p-2">
+      <div class="relative overflow-hidden rounded-xl bg-muted p-2">
         <Cropper
           v-if="sourceURL"
           ref="cropperRef"
@@ -27,7 +27,7 @@
           @error="handleCropperError"
         />
         <div
-          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-md border border-admin-border/80 bg-white/90 p-1 backdrop-blur"
+          class="absolute bottom-3 left-3 flex items-center gap-1 rounded-md border border-border/80 bg-white/90 p-1 backdrop-blur"
         >
           <AdminButton
             variant="ghost"
@@ -84,7 +84,7 @@
         </div>
       </div>
 
-      <p v-if="cropError" class="min-w-0 text-admin-caption font-[650] text-admin-danger">
+      <p v-if="cropError" class="min-w-0 text-admin-caption font-[650] text-destructive">
         {{ cropError }}
       </p>
     </div>

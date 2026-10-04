@@ -3,17 +3,17 @@
     <PopoverAnchor v-if="anchorEl" :reference="anchorEl" />
     <PopoverPortal>
       <PopoverContent
-        class="z-50 w-[288px] max-w-[calc(100vw_-_48px)] rounded-xl border border-admin-border bg-admin-card-strong p-3 text-admin-text-1 shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+        class="z-50 w-[288px] max-w-[calc(100vw_-_48px)] rounded-xl border border-border bg-card p-3 text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
         :side-offset="6"
         align="start"
       >
         <div class="flex flex-col gap-2">
           <!-- 头部：标题与智能识别复位 -->
           <div class="flex items-center justify-between">
-            <span class="text-admin-caption font-bold text-admin-title-color"> 选择品牌 Logo </span>
+            <span class="text-admin-caption font-bold text-foreground"> 选择品牌 Logo </span>
             <button
               type="button"
-              class="cursor-pointer border-0 bg-transparent p-0 text-admin-caption font-semibold text-admin-accent hover:underline"
+              class="cursor-pointer border-0 bg-transparent p-0 text-admin-caption font-semibold text-primary hover:underline"
               :disabled="isSaving"
               @click="selectLogo('auto')"
             >
@@ -32,8 +32,8 @@
               class="shrink-0 cursor-pointer rounded-full px-2 py-0.5 text-admin-caption font-medium transition-colors"
               :class="
                 currentCategory === cat.key
-                  ? 'bg-admin-accent text-admin-text-inverse font-semibold shadow-xs'
-                  : 'bg-admin-surface-muted text-admin-text-2 hover:bg-admin-border-soft hover:text-admin-title-color'
+                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               "
               @click="currentCategory = cat.key"
             >
@@ -49,7 +49,7 @@
               v-for="item in filteredLogos"
               :key="item.key"
               type="button"
-              class="ib-control-state flex size-9 items-center justify-center rounded-lg border border-admin-border-soft bg-white p-1.5 cursor-pointer transition-colors hover:border-admin-accent hover:bg-white data-[control-state=selected]:border-admin-accent data-[control-state=selected]:bg-white"
+              class="ib-control-state flex size-9 items-center justify-center rounded-lg border border-border bg-card p-1.5 cursor-pointer transition-colors hover:border-primary hover:bg-card data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card"
               :data-control-state="selectedKey === item.key ? 'selected' : 'idle'"
               :aria-label="item.label"
               :title="item.label"
@@ -64,7 +64,7 @@
                 loading="lazy"
                 @error="markLogoFailed(item.key)"
               />
-              <Cube v-else class="size-5 text-admin-text-3" />
+              <Cube v-else class="size-5 text-muted-foreground" />
             </button>
           </div>
         </div>

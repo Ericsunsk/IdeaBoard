@@ -2,8 +2,8 @@
   <tr
     :class="
       cn(
-        'border-b border-admin-divider transition-colors data-[state=selected]:bg-admin-surface-muted',
-        props.hoverable && 'hover:bg-admin-surface-hover',
+        'border-b border-border transition-colors data-[state=selected]:bg-muted',
+        props.hoverable && 'hover:bg-muted/50',
         props.class,
       )
     "

@@ -1,20 +1,20 @@
 <template>
   <section
-    class="flex flex-col gap-4 rounded-2xl border border-admin-border-soft bg-white p-5 shadow-2xs"
+    class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-2xs"
   >
-    <div class="flex items-center justify-between border-b border-admin-border-soft pb-3">
+    <div class="flex items-center justify-between border-b border-border pb-3">
       <div class="flex items-center gap-2">
         <span
           class="size-2 rounded-full"
           :class="
             activeTab === 'grant'
-              ? 'bg-admin-success'
+              ? 'bg-emerald-500'
               : activeTab === 'deduction'
-                ? 'bg-admin-danger'
-                : 'bg-admin-warning'
+                ? 'bg-destructive'
+                : 'bg-amber-500'
           "
         />
-        <h3 class="m-0 text-admin-title-sm font-bold text-admin-title-color">
+        <h3 class="m-0 text-admin-title-sm font-bold text-foreground">
           {{
             activeTab === 'grant'
               ? t('admin.wallet.grantTitle')
@@ -24,7 +24,7 @@
           }}
         </h3>
       </div>
-      <span class="text-admin-caption text-admin-text-3">
+      <span class="text-admin-caption text-muted-foreground">
         {{
           activeTab === 'grant'
             ? t('admin.wallet.grantHint')
@@ -37,7 +37,7 @@
 
     <div
       v-if="activeTab === 'refund' && refundSource"
-      class="flex items-center gap-2 rounded-xl border border-admin-accent/20 bg-admin-accent-soft/40 px-3.5 py-2.5 text-xs text-admin-accent-strong font-mono"
+      class="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-xs text-primary font-mono"
     >
       <span>{{
         t('admin.wallet.originalChargeNotice', {

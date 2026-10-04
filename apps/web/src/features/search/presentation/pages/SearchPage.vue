@@ -1,7 +1,7 @@
 <template>
   <div
     ref="pageScrollRef"
-    class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text"
+    class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-background px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-foreground"
   >
     <div class="ib-board-page-background ib-page-dot-bg"></div>
     <header class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2">
@@ -39,7 +39,7 @@
             <div class="flex items-center gap-2">
               <Search
                 v-if="references.length === 0"
-                class="ml-2 size-3.5 shrink-0 text-board-control-icon"
+                class="ml-2 size-3.5 shrink-0 text-muted-foreground"
                 aria-hidden="true"
               />
 
@@ -51,7 +51,7 @@
                 >
                   <button
                     type="button"
-                    class="grid size-8 overflow-hidden rounded-full bg-board-card-bg cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
+                    class="grid size-8 overflow-hidden rounded-full bg-card cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :title="
                       t('search.tooltips.removeReferenceWithCount', { count: referenceSlotCount })
                     "
@@ -69,7 +69,7 @@
                     class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-50 w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
                   >
                     <div
-                      class="size-14 shrink-0 overflow-hidden rounded-md bg-board-card-bg shadow-md"
+                      class="size-14 shrink-0 overflow-hidden rounded-md bg-card shadow-md"
                     >
                       <img
                         :src="reference.previewUrl"
@@ -99,7 +99,7 @@
               <input
                 v-model="draftQuery"
                 type="text"
-                class="min-h-8 min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
+                class="min-h-8 min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-foreground outline-none"
                 :placeholder="
                   references.length > 0
                     ? t('search.placeholders.queryWithReferences')
@@ -129,7 +129,7 @@
                   :disabled="!canAddReference"
                   @click="openFilePicker"
                 >
-                  <Camera class="size-3.5 text-board-primary" aria-hidden="true" />
+                  <Camera class="size-3.5 text-primary" aria-hidden="true" />
                   <span class="hidden sm:inline">{{ t('search.fallbackImageTitle') }}</span>
                 </button>
                 <Button
@@ -137,7 +137,7 @@
                   :loading="visionState === 'extracting'"
                   :disabled="visionState === 'extracting'"
                   :title="searchButtonTitle"
-                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-board-primary !px-4 !text-xs !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
+                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-primary !px-4 !text-xs !font-bold !text-primary-foreground !shadow-none hover:!bg-primary/90 cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 >
                   {{ t('search.actions.search') }}
                 </Button>
@@ -148,7 +148,7 @@
           <button
             type="button"
             class="ib-page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-full transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-ib-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] cursor-pointer"
-            :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '']"
+            :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"
             :aria-expanded="libraryIslandOpen"
@@ -161,7 +161,7 @@
           >
             <BookmarkSolid
               v-if="libraryIslandOpen"
-              class="size-4 text-board-primary rotate-6 scale-110 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              class="size-4 text-primary rotate-6 scale-110 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               aria-hidden="true"
             />
             <Bookmark
@@ -184,7 +184,7 @@
 
         <p
           v-if="queryError"
-          class="mt-2 mb-0 text-sm font-semibold text-board-danger pointer-events-auto"
+          class="mt-2 mb-0 text-sm font-semibold text-destructive pointer-events-auto"
         >
           {{ queryError }}
         </p>
@@ -197,10 +197,10 @@
           </h2>
           <div
             v-if="hasError && results.length > 0"
-            class="mt-1 flex items-center gap-2 text-sm text-board-danger"
+            class="mt-1 flex items-center gap-2 text-sm text-destructive"
           >
             <span>{{ t('search.errors.unableToLoadResults') }}</span>
-            <button type="button" class="font-semibold text-board-primary" @click="reload">
+            <button type="button" class="font-semibold text-primary" @click="reload">
               {{ t('search.actions.retry') }}
             </button>
           </div>
@@ -219,7 +219,7 @@
         <div
           v-for="h in [260, 340, 200, 380, 280, 320, 240, 360, 300, 220]"
           :key="h"
-          class="break-inside-avoid overflow-hidden rounded-2xl bg-board-loading-bg/80 animate-pulse"
+          class="break-inside-avoid overflow-hidden rounded-2xl bg-muted/30 animate-pulse"
           :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           :style="{ height: `${h}px` }"
         ></div>
@@ -276,11 +276,11 @@
       </SearchResultViewport>
 
       <div v-if="loadingMore" class="flex justify-center py-5">
-        <Spinner class="!h-7 !w-7 text-board-primary" :label="t('search.loadingMore')" />
+        <Spinner class="!h-7 !w-7 text-primary" :label="t('search.loadingMore')" />
       </div>
       <p
         v-else-if="results.length > 0 && !hasMore"
-        class="py-4 text-center text-xs text-board-page-text-muted"
+        class="py-4 text-center text-xs text-muted-foreground"
       >
         {{ t('search.allLoaded') }}
       </p>

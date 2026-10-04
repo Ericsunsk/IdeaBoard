@@ -3,18 +3,18 @@
     :key="`${result.provider}:${result.id}`"
     :style="cardStyle"
     draggable="true"
-    class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 cursor-grab active:cursor-grabbing select-none"
+    class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-card/85 cursor-grab active:cursor-grabbing select-none"
     @dragstart="$emit('cardDragStart', $event)"
     @dragend="$emit('cardDragEnd')"
   >
     <button
       type="button"
-      class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
+      class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       :aria-label="t('search.viewResult', { title: result.title || t('search.fallbackTitle') })"
       @click="$emit('openLightbox')"
     >
       <div
-        class="relative overflow-hidden bg-board-loading-bg"
+        class="relative overflow-hidden bg-muted/30"
         :style="{ aspectRatio: `${result.width} / ${result.height}` }"
       >
         <img
@@ -40,10 +40,10 @@
       <div class="pointer-events-auto flex items-center justify-between">
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:shadow-board-focus"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="
             isSelected
-              ? '!bg-board-primary text-ib-text-inverse shadow-xs'
+              ? '!bg-primary text-primary-foreground shadow-xs'
               : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--ib-glass-blur)]'
           "
           :title="
@@ -59,9 +59,9 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           :class="{
-            '!bg-board-primary shadow-xs': isUsedAsReference,
+            '!bg-primary !text-primary-foreground shadow-xs': isUsedAsReference,
           }"
           :title="t('search.tooltips.useAsReference')"
           :aria-label="t('search.tooltips.useAsReference')"
@@ -89,11 +89,11 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full shadow-md transition focus-visible:outline-none focus-visible:shadow-board-focus disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           :class="
             isSaved
-              ? 'bg-ib-success text-ib-text-inverse hover:bg-ib-success/90'
-              : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30'
+              ? 'bg-emerald-700 text-white hover:bg-emerald-700/90'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/30'
           "
           :aria-label="
             isSaved ? t('search.tooltips.removeFromLibrary') : t('search.tooltips.saveToLibrary')
@@ -111,9 +111,9 @@
 
     <div
       v-if="hasImageError"
-      class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
+      class="grid place-items-center gap-2 bg-muted/30 px-4 py-5 text-center"
     >
-      <span class="text-xs font-semibold text-board-page-text-muted">{{
+      <span class="text-xs font-semibold text-muted-foreground">{{
         t('common.errors.imageLoadFailed')
       }}</span>
       <Button variant="outline" size="sm" class="!rounded-full" @click="$emit('retryImage')">

@@ -14,14 +14,14 @@
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label
-            class="text-admin-meta font-[680] text-admin-text-2"
+            class="text-admin-meta font-[680] text-muted-foreground"
             :for="`prompt-textarea-${item.slug}`"
           >
             {{ PROMPTS_MESSAGES.editorSystemLabel }}
           </label>
           <!-- 变量快捷填充标签 -->
           <div v-if="variables.length > 0" class="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span class="text-admin-caption font-medium text-admin-text-3">{{
+            <span class="text-admin-caption font-medium text-muted-foreground">{{
               PROMPTS_MESSAGES.editorInsertVariables
             }}</span>
             <button
@@ -29,7 +29,7 @@
               :key="variable.key"
               type="button"
               :disabled="saving"
-              class="rounded-md border border-admin-border-soft bg-admin-surface-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2 transition-colors hover:border-admin-accent/40 hover:bg-admin-accent/5 hover:text-admin-accent cursor-pointer disabled:opacity-50"
+              class="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-admin-caption font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer disabled:opacity-50"
               @click="insertVariable(variable.key)"
             >
               {{ variable.key }}
@@ -52,11 +52,11 @@
       </div>
 
       <!-- 字符统计与校验提示信息 -->
-      <div class="flex items-center justify-between text-admin-meta text-admin-text-3 font-mono">
+      <div class="flex items-center justify-between text-admin-meta text-muted-foreground font-mono">
         <span>{{ PROMPTS_MESSAGES.editorCharCount(draft.length) }}</span>
         <span
           v-if="validation?.severity === 'error' && validation?.message"
-          class="text-admin-danger font-sans text-xs"
+          class="text-destructive font-sans text-xs"
         >
           {{ validation?.message }}
         </span>

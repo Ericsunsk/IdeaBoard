@@ -11,7 +11,7 @@
     "src/features/canvas/presentation/styles/canvas-range-input.css",
     "src/features/canvas/tools/retouch/processing/engine.ts",
     "src/shared/components/UserCreditBalanceButton.vue",
-    "src/shared/theme/round-control.css",
+    "src/shared/theme/atoms/round-control.css",
     "src/shared/i18n/locales/en/index.ts",
     "src/shared/i18n/locales/es/index.ts",
     "src/shared/i18n/locales/ko/index.ts",

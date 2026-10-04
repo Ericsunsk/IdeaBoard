@@ -32,11 +32,11 @@
 
       <!-- 次级统计提示条：共 X 个工作流模块 -->
       <div class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1">
+        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">
             {{ PROMPTS_MESSAGES.moduleCount(filteredFeatureGroups.length) }}
           </span>
-          <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
+          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
             {{ PROMPTS_MESSAGES.totalCount(featureGroups.length) }}
           </span>
         </div>
@@ -45,10 +45,10 @@
 
     <!-- 2. 错误告警状态 -->
     <div v-if="loadFailed && prompts.length === 0" :class="adminEmptyStateClass" role="alert">
-      <div class="text-admin-title font-semibold text-admin-title-color">
+      <div class="text-admin-title font-semibold text-foreground">
         {{ PROMPTS_MESSAGES.loadFailedTitle }}
       </div>
-      <div class="mt-2 text-admin-meta text-admin-text-2">
+      <div class="mt-2 text-admin-meta text-muted-foreground">
         {{ PROMPTS_MESSAGES.loadFailedHint }}
       </div>
       <AdminButton class="mt-4" variant="outline" :disabled="loading" @click="loadPrompts()">
@@ -60,18 +60,18 @@
     <!-- 3. 空状态提示 (无数据或过滤未命中) -->
     <div
       v-else-if="filteredFeatureGroups.length === 0"
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-admin-border-soft bg-white p-10 text-center"
+      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
     >
       <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3"
+        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
       >
         <Spark v-if="!hasActiveFilter" class="size-6" />
         <Search v-else class="size-6" />
       </div>
-      <h3 class="text-base font-semibold text-admin-title-color">
+      <h3 class="text-base font-semibold text-foreground">
         {{ !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfig : PROMPTS_MESSAGES.emptyNoMatch }}
       </h3>
-      <p class="mt-1 max-w-sm text-xs text-admin-text-3">
+      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
         {{
           !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfigHint : PROMPTS_MESSAGES.emptyNoMatchHint
         }}
@@ -79,7 +79,7 @@
       <button
         v-if="hasActiveFilter"
         type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />
@@ -96,8 +96,8 @@
       >
         <!-- 分组标题栏 (1:1 对齐 BillingPricingTable section header) -->
         <div class="mb-2 flex items-center gap-2">
-          <h3 class="text-sm font-bold text-admin-title-color">{{ group.title }}</h3>
-          <span class="text-xs text-admin-text-3">{{
+          <h3 class="text-sm font-bold text-foreground">{{ group.title }}</h3>
+          <span class="text-xs text-muted-foreground">{{
             PROMPTS_MESSAGES.featureCount(group.items.length)
           }}</span>
         </div>
@@ -114,7 +114,7 @@
             :class="adminTableClass"
           >
             <template #empty>
-              <div class="p-6 text-center text-xs text-admin-text-3">
+              <div class="p-6 text-center text-xs text-muted-foreground">
                 {{ PROMPTS_MESSAGES.groupEmpty }}
               </div>
             </template>
@@ -122,14 +122,14 @@
             <!-- 1. Service (1:1 对齐功能定价页 Service 规范) -->
             <AdminColumn field="service" header="Service" :style="{ width: '200px' }">
               <template #body="{ data }">
-                <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-admin-text-1">
+                <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
                   <component
                     :is="getFeatureIcon(data.slug)"
-                    class="size-4 shrink-0 text-admin-text-2"
+                    class="size-4 shrink-0 text-muted-foreground"
                   />
                   <div class="flex min-w-0 flex-col">
-                    <span class="truncate text-slate-700">{{ data.slug }}</span>
-                    <span class="truncate text-admin-caption text-admin-text-3">{{
+                    <span class="truncate text-foreground">{{ data.slug }}</span>
+                    <span class="truncate text-admin-caption text-muted-foreground">{{
                       group.title
                     }}</span>
                   </div>
@@ -167,13 +167,13 @@
                   <span
                     v-for="variable in rowView(data.slug).vars"
                     :key="variable.key"
-                    class="inline-flex items-center rounded bg-admin-surface-muted/80 px-1.5 py-0.5 font-mono text-admin-micro font-medium text-admin-text-2"
+                    class="inline-flex items-center rounded bg-muted/80 px-1.5 py-0.5 font-mono text-admin-micro font-medium text-muted-foreground"
                   >
                     {{ variable.key }}
                   </span>
                   <span
                     v-if="rowView(data.slug).vars.length === 0"
-                    class="text-xs text-admin-text-3 font-mono"
+                    class="text-xs text-muted-foreground font-mono"
                   >
                     {{ PROMPTS_MESSAGES.noVariables }}
                   </span>
@@ -186,12 +186,12 @@
               <template #body="{ data }">
                 <div
                   v-if="rowView(data.slug).saved?.trim()"
-                  class="line-clamp-1 max-w-xl font-mono text-xs text-admin-text-2"
+                  class="line-clamp-1 max-w-xl font-mono text-xs text-muted-foreground"
                   :title="rowView(data.slug).saved"
                 >
                   {{ rowView(data.slug).saved }}
                 </div>
-                <span v-else class="text-xs text-admin-text-3 font-mono">{{
+                <span v-else class="text-xs text-muted-foreground font-mono">{{
                   PROMPTS_MESSAGES.unset
                 }}</span>
               </template>

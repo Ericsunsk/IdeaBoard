@@ -295,8 +295,8 @@ function submitOutpaint(prompt: string) {
   max-width: calc(100% - 16px);
   padding: 4px 6px 4px 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-board-danger) 18%);
-  color: var(--color-board-danger);
+  background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-destructive) 18%);
+  color: var(--color-destructive);
   font-size: 12px;
   font-weight: 600;
   text-align: center;

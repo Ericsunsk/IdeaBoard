@@ -34,12 +34,12 @@
         @reset="resetFilters"
       >
         <div class="flex min-w-0 flex-col gap-3.5">
-          <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+          <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
             <span>{{ PAYMENT_ORDERS_MESSAGES.statusLabel }}</span>
             <AdminSelect v-model="statusFilter" :options="paymentOrderStatusOptions" size="small" />
           </label>
           <label
-            class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
+            class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-muted-foreground"
           >
             <span>{{ PAYMENT_ORDERS_MESSAGES.anomalyOnly }}</span>
             <AdminSwitch
@@ -59,7 +59,7 @@
         :disabled="loading"
         @click="refreshOrders"
       >
-        <Refresh class="size-4 text-admin-text-2" />
+        <Refresh class="size-4 text-muted-foreground" />
       </AdminButton>
     </template>
 
@@ -120,7 +120,7 @@
         <template #body="{ data }">
           <time
             :datetime="data.createdAt"
-            class="whitespace-nowrap font-mono text-xs text-admin-text-3"
+            class="whitespace-nowrap font-mono text-xs text-muted-foreground"
           >
             {{ formatPaymentDateTime(data.createdAt) }}
           </time>
@@ -136,7 +136,7 @@
         <template #body="{ data }">
           <button
             type="button"
-            class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
+            class="font-mono text-xs font-semibold text-foreground hover:text-primary cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 rounded"
             :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
             @click="openDetail(data.publicOrderNumber)"
           >
@@ -148,7 +148,7 @@
       <!-- 用户列：姓名 -->
       <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.userColumn" :style="{ width: '160px' }">
         <template #body="{ data }">
-          <div class="truncate font-medium text-admin-text-1">
+          <div class="truncate font-medium text-foreground">
             {{ data.user.displayName }}
           </div>
         </template>
@@ -161,7 +161,7 @@
         :style="{ width: '120px' }"
       >
         <template #body="{ data }">
-          <span class="font-mono text-xs font-semibold text-admin-text-1">
+          <span class="font-mono text-xs font-semibold text-foreground">
             {{ formatLocaleNumber(data.ideaQuantity) }}
           </span>
         </template>
@@ -170,7 +170,7 @@
       <!-- 原始实付列：等宽金额 -->
       <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.paidColumn" :style="{ width: '130px' }">
         <template #body="{ data }">
-          <span class="font-mono text-xs font-semibold text-admin-text-1">
+          <span class="font-mono text-xs font-semibold text-foreground">
             {{ formatPaymentMoney(data.paidAmountMinor, data.paidCurrency) }}
           </span>
         </template>
@@ -215,7 +215,7 @@
             severity="danger"
             rounded
           />
-          <span v-else class="text-xs text-admin-text-3">—</span>
+          <span v-else class="text-xs text-muted-foreground">—</span>
         </template>
       </AdminColumn>
 

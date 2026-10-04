@@ -11,7 +11,8 @@ import {
   withAlpha,
 } from '../../../../shared/lib/chartPrimitives'
 import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
-import { adminThemeTokenFallbacks } from './adminThemeTokens'
+import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
+import { adminDarkThemeTokenFallbacks, adminThemeTokenFallbacks } from './adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
 const adminChartPointClipPadding = 6
@@ -24,18 +25,51 @@ const adminChartBubbleClipPadding = adminChartBubbleRadiusMax + adminChartBubble
 const adminChartFontFamily = chartFontFamilyStack
 
 // Chart.js paints canvas colors and helpers like withAlpha need concrete values.
+// Each themed key resolves lazily per access so a theme switch applies the next
+// time options are built (no watcher/remount needed beyond Chart.js updates).
+function themedChartToken(
+  lightKey: keyof typeof adminThemeTokenFallbacks,
+  darkKey: keyof typeof adminDarkThemeTokenFallbacks,
+): string {
+  return isDarkModeActive()
+    ? adminDarkThemeTokenFallbacks[darkKey]
+    : adminThemeTokenFallbacks[lightKey]
+}
+
 export const adminChartTheme = {
-  tooltipBg: adminThemeTokenFallbacks.controlBg,
-  tooltipBorder: adminThemeTokenFallbacks.chartTooltipBorder,
-  tooltipText: adminThemeTokenFallbacks.chartTooltipText,
-  axisLine: adminThemeTokenFallbacks.chartAxisLine,
-  axisText: adminThemeTokenFallbacks.textSecondary,
-  splitLine: adminThemeTokenFallbacks.chartSplitLine,
-  legendText: adminThemeTokenFallbacks.chartLegendText,
-  emptyText: adminThemeTokenFallbacks.textTertiary,
-  cardBg: adminThemeTokenFallbacks.controlBg,
-  segmentBorder: adminThemeTokenFallbacks.textInverse,
-  mainText: adminThemeTokenFallbacks.textPrimary,
+  get tooltipBg() {
+    return themedChartToken('controlBg', 'tooltipBg')
+  },
+  get tooltipBorder() {
+    return themedChartToken('chartTooltipBorder', 'tooltipBorder')
+  },
+  get tooltipText() {
+    return themedChartToken('chartTooltipText', 'tooltipText')
+  },
+  get axisLine() {
+    return themedChartToken('chartAxisLine', 'axisLine')
+  },
+  get axisText() {
+    return themedChartToken('textSecondary', 'axisText')
+  },
+  get splitLine() {
+    return themedChartToken('chartSplitLine', 'splitLine')
+  },
+  get legendText() {
+    return themedChartToken('chartLegendText', 'legendText')
+  },
+  get emptyText() {
+    return themedChartToken('textTertiary', 'emptyText')
+  },
+  get cardBg() {
+    return themedChartToken('controlBg', 'cardBg')
+  },
+  get segmentBorder() {
+    return themedChartToken('textInverse', 'segmentBorder')
+  },
+  get mainText() {
+    return themedChartToken('textPrimary', 'mainText')
+  },
   brand: adminThemeTokenFallbacks.accent,
   slate: adminThemeTokenFallbacks.modelIndigo,
   mist: adminThemeTokenFallbacks.chartMist,

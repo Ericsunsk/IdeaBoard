@@ -27,7 +27,7 @@ describe('adminSelectSkin', () => {
   it('gives every trigger one radius, one height, and one border token', () => {
     expect(adminSelectTriggerClass).toContain('rounded-lg')
     expect(adminSelectTriggerClass).toContain('h-9')
-    expect(adminSelectTriggerClass).toContain('border-admin-border')
+    expect(adminSelectTriggerClass).toContain('border-input')
   })
 
   it('exposes a visible focus indicator on every trigger', () => {
@@ -74,19 +74,19 @@ describe('adminSelectSkin', () => {
 
   it('reuses one item skin, and only the compact variant differs', () => {
     expect(adminSelectItemClass).toContain('rounded-lg')
-    expect(adminSelectItemClass).toContain('focus:bg-admin-surface-muted')
+    expect(adminSelectItemClass).toContain('focus:bg-muted')
     expect(adminSelectItemCompactClass).toContain('text-admin-meta')
     expect(adminSelectItemCompactClass).not.toContain('rounded-')
   })
 
   it('keeps the selected-state affordance in one place', () => {
     expect(adminSelectItemIndicatorClass).toContain('absolute')
-    expect(adminSelectItemCheckClass).toContain('text-admin-accent')
-    expect(adminSelectTriggerIconClass).toContain('text-admin-text-3')
+    expect(adminSelectItemCheckClass).toContain('text-primary')
+    expect(adminSelectTriggerIconClass).toContain('text-muted-foreground')
   })
 
   it('paints the active filter state with the accent, distinct from idle', () => {
-    expect(adminSelectTriggerActiveClass).toContain('border-admin-accent')
+    expect(adminSelectTriggerActiveClass).toContain('border-primary')
     expect(adminSelectTriggerActiveClass).not.toBe(adminSelectTriggerClass)
   })
 

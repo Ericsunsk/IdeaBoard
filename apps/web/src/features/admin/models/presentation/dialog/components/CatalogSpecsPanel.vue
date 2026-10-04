@@ -1,8 +1,8 @@
 <template>
-  <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
-    <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
-      <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.specsTitle }}</h4>
-      <span class="text-admin-caption text-admin-text-3">{{ MODELS_MESSAGES.specsSubtitle }}</span>
+  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
+      <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.specsTitle }}</h4>
+      <span class="text-admin-caption text-muted-foreground">{{ MODELS_MESSAGES.specsSubtitle }}</span>
     </div>
 
     <div class="flex flex-col gap-3.5">
@@ -11,7 +11,7 @@
         <!-- 分辨率 / 最大上下文 -->
         <div class="flex flex-col gap-1.5">
           <label
-            class="text-admin-caption font-semibold text-admin-text-1"
+            class="text-admin-caption font-semibold text-foreground"
             for="model-resolution-input"
           >
             {{ MODELS_MESSAGES.specsResolutionLabel }}
@@ -27,7 +27,7 @@
               v-for="res in ['1024×1024', '2048×2048', '4096×4096', '128K']"
               :key="res"
               type="button"
-              class="rounded bg-admin-surface-muted px-1.5 py-0.5 text-admin-micro text-admin-text-2 hover:bg-admin-surface-muted/80 cursor-pointer"
+              class="rounded bg-muted px-1.5 py-0.5 text-admin-micro text-muted-foreground hover:bg-muted/80 cursor-pointer"
               @click="emit('update:contextOrResolution', res)"
             >
               {{ res }}
@@ -37,19 +37,19 @@
 
         <!-- 托管类型 (Hosting) -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-admin-caption font-semibold text-admin-text-1">{{
+          <label class="text-admin-caption font-semibold text-foreground">{{
             MODELS_MESSAGES.specsHostingLabel
           }}</label>
           <div
-            class="flex h-9 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/40 p-1"
+            class="flex h-9 items-center rounded-lg border border-border bg-muted/40 p-1"
           >
             <button
               type="button"
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_CLOUDFLARE
-                  ? 'bg-white text-emerald-700 shadow-xs font-semibold'
-                  : 'text-admin-text-2 hover:text-admin-text-1'
+                  ? 'bg-card text-emerald-700 shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
               "
               @click="emit('update:hosting', MODEL_HOSTING_CLOUDFLARE)"
             >
@@ -60,8 +60,8 @@
               class="flex-1 rounded-md py-1 text-xs font-medium transition-colors cursor-pointer text-center"
               :class="
                 hosting === MODEL_HOSTING_THIRD_PARTY
-                  ? 'bg-white text-admin-text-1 shadow-xs font-semibold'
-                  : 'text-admin-text-2 hover:text-admin-text-1'
+                  ? 'bg-card text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
               "
               @click="emit('update:hosting', MODEL_HOSTING_THIRD_PARTY)"
             >
@@ -74,10 +74,10 @@
       <!-- 能力标签 -->
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label class="text-admin-caption font-semibold text-admin-text-1" for="model-caps-input">
+          <label class="text-admin-caption font-semibold text-foreground" for="model-caps-input">
             {{ MODELS_MESSAGES.specsCapabilitiesLabel }}
           </label>
-          <span class="text-admin-caption text-admin-text-3">{{
+          <span class="text-admin-caption text-muted-foreground">{{
             MODELS_MESSAGES.specsCapabilitiesHint
           }}</span>
         </div>
@@ -88,14 +88,14 @@
           @update:model-value="emit('update:capabilitiesDraft', String($event))"
         />
         <div class="flex flex-wrap items-center gap-1 pt-0.5">
-          <span class="text-admin-caption text-admin-text-3">{{
+          <span class="text-admin-caption text-muted-foreground">{{
             MODELS_MESSAGES.specsQuickAdd
           }}</span>
           <button
             v-for="tag in MODELS_MESSAGES.specsPopularCapabilities"
             :key="tag"
             type="button"
-            class="rounded-md border border-dashed border-admin-border-soft px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2 hover:border-admin-accent/40 hover:text-admin-accent cursor-pointer"
+            class="rounded-md border border-dashed border-border px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:border-primary/40 hover:text-primary cursor-pointer"
             @click="addCapabilityTag(tag)"
           >
             + {{ tag }}

@@ -1,5 +1,5 @@
 <template>
-  <main class="grid min-h-screen place-items-center bg-ib-page p-4 text-ib-text sm:p-6">
+  <main class="grid min-h-screen place-items-center bg-background p-4 text-foreground sm:p-6">
     <div :class="loginCardClass">
       <div class="flex justify-center px-6 pt-[26px] pb-2 sm:px-8 sm:pt-8">
         <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
@@ -13,18 +13,18 @@
 
       <div class="px-6 pt-0 pb-6 sm:px-8 sm:pb-7">
         <div class="p-0 text-center">
-          <h1 class="m-0 text-admin-modal-title leading-[1.2] font-bold text-admin-title-color">
+          <h1 class="m-0 text-admin-modal-title leading-[1.2] font-bold text-foreground">
             {{ ADMIN_LOGIN_MESSAGES.title }}
           </h1>
         </div>
 
         <div class="pt-6 pb-0">
           <form class="flex flex-col gap-4" novalidate @submit.prevent="handleLogin">
-            <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
+            <label class="flex flex-col gap-2 text-xs font-bold text-muted-foreground">
               <span>{{ ADMIN_LOGIN_MESSAGES.emailLabel }}</span>
               <div class="relative flex items-center">
                 <span
-                  class="pointer-events-none absolute left-3 flex items-center text-admin-text-3"
+                  class="pointer-events-none absolute left-3 flex items-center text-muted-foreground"
                 >
                   <User class="h-4 w-4" />
                 </span>
@@ -40,7 +40,7 @@
               </div>
             </label>
 
-            <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
+            <label class="flex flex-col gap-2 text-xs font-bold text-muted-foreground">
               <span>{{ ADMIN_LOGIN_MESSAGES.passwordLabel }}</span>
               <div class="relative flex items-center">
                 <AdminInput
@@ -53,7 +53,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-0 flex size-8 items-center justify-center text-admin-text-3 hover:text-admin-text-1 cursor-pointer transition-colors"
+                  class="absolute right-0 flex size-8 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                   :aria-label="
                     showPassword
                       ? ADMIN_LOGIN_MESSAGES.hidePassword
@@ -67,7 +67,7 @@
               </div>
             </label>
 
-            <p v-if="formError" class="m-0 text-admin-body font-semibold text-admin-danger">
+            <p v-if="formError" class="m-0 text-admin-body font-semibold text-destructive">
               {{ formError }}
             </p>
 
@@ -137,7 +137,7 @@ const brandMarkClass = computed(() =>
   ),
 )
 const loginCardClass =
-  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-ib-border bg-ib-surface shadow-[0_24px_70px_rgba(45,64,89,0.12)]'
+  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-border bg-card shadow-[0_24px_70px_rgba(45,64,89,0.12)]'
 
 const loading = ref(false)
 const showPassword = ref(false)

@@ -56,6 +56,10 @@ export default {
     account: 'Account',
     console: 'Console',
     home: 'Home',
+    appearance: 'Appearance',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

@@ -5,15 +5,15 @@
     role="status"
   >
     <div
-      class="flex shrink-0 items-center justify-center rounded-2xl border border-admin-border-soft bg-admin-surface-muted/60 text-admin-text-3"
+      class="flex shrink-0 items-center justify-center rounded-2xl border border-border bg-muted/60 text-muted-foreground"
       :class="compact ? 'size-10 mb-2' : 'size-12 mb-3'"
     >
       <component :is="icon || EmptyPage" :class="compact ? 'size-5' : 'size-6'" />
     </div>
-    <div class="text-admin-body font-semibold text-admin-text-2">
+    <div class="text-admin-body font-semibold text-muted-foreground">
       {{ title }}
     </div>
-    <div v-if="description" class="mt-1 max-w-sm text-admin-caption text-admin-text-3">
+    <div v-if="description" class="mt-1 max-w-sm text-admin-caption text-muted-foreground">
       {{ description }}
     </div>
     <div v-if="$slots.actions" class="mt-3 flex items-center gap-2">

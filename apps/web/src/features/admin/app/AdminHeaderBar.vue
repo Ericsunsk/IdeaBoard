@@ -1,13 +1,13 @@
 <template>
-  <div class="sticky top-0 z-30 flex shrink-0 flex-col bg-admin-bg">
+  <div class="sticky top-0 z-30 flex shrink-0 flex-col bg-background">
     <header
-      class="flex h-14 shrink-0 items-center justify-between border-b border-admin-border px-4 sm:px-6 lg:px-8"
+      class="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6 lg:px-8"
     >
       <div class="flex min-w-0 items-center gap-3">
         <button
           type="button"
           aria-label="切换导航菜单"
-          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-admin-border text-admin-text-1 transition-colors hover:bg-admin-surface-muted lg:hidden"
+          class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted lg:hidden"
           @click="drawerOpen = !drawerOpen"
         >
           <MenuIcon v-if="!drawerOpen" class="size-5" />
@@ -27,16 +27,18 @@
         >
           <component
             :is="activeItem.icon"
-            class="size-4 shrink-0 text-admin-text-2"
+            class="size-4 shrink-0 text-muted-foreground"
             aria-hidden="true"
           />
-          <span class="truncate text-base font-semibold text-admin-title-color">
+          <span class="truncate text-base font-semibold text-foreground">
             {{ dynamicTitle || currentMeta.title }}
           </span>
         </button>
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
+        <AdminThemeToggle />
+
         <PopoverRoot>
           <PopoverTrigger as-child>
             <button
@@ -49,23 +51,23 @@
               <BellIcon class="size-4" />
               <span
                 v-if="hasAnomalies"
-                class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-admin-danger ring-2 ring-white"
+                class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-destructive ring-2 ring-card"
                 aria-hidden="true"
               ></span>
             </button>
           </PopoverTrigger>
           <PopoverPortal>
             <PopoverContent
-              class="z-50 w-[340px] max-w-[calc(100vw_-_28px)] rounded-xl border border-admin-border bg-admin-card-strong p-0 text-admin-text-1 shadow-lg outline-none overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+              class="z-50 w-[340px] max-w-[calc(100vw_-_28px)] rounded-xl border border-border bg-card p-0 text-foreground shadow-lg outline-none overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
               :side-offset="8"
               align="end"
             >
               <div :class="adminAnomalyPopoverClass">
                 <div
-                  class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
+                  class="flex items-start justify-between gap-4 border-b border-border px-4 py-3.5"
                 >
                   <div class="min-w-0">
-                    <div class="text-admin-content font-bold text-admin-title-color">异常雷达</div>
+                    <div class="text-admin-content font-bold text-foreground">异常雷达</div>
                   </div>
                   <AdminBadge
                     :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
@@ -79,26 +81,26 @@
                     v-for="item in anomalies"
                     :key="item.id"
                     type="button"
-                    class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-admin-surface-muted"
+                    class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted"
                     @click="handleAnomalySelect(item)"
                   >
                     <span
-                      class="mt-[7px] size-2 shrink-0 rounded-full bg-admin-danger"
+                      class="mt-[7px] size-2 shrink-0 rounded-full bg-destructive"
                       aria-hidden="true"
                     ></span>
                     <span class="min-w-0 flex-1">
                       <span class="flex min-w-0 items-center justify-between gap-3">
-                        <span class="truncate text-admin-body font-bold text-admin-text-1">
+                        <span class="truncate text-admin-body font-bold text-foreground">
                           {{ item.title }}
                         </span>
-                        <span class="shrink-0 text-admin-caption font-bold text-admin-text-3">
+                        <span class="shrink-0 text-admin-caption font-bold text-muted-foreground">
                           {{ item.metric || item.actionLabel }}
                         </span>
                       </span>
-                      <span class="mt-1 block text-admin-meta leading-5 text-admin-text-2">
+                      <span class="mt-1 block text-admin-meta leading-5 text-muted-foreground">
                         {{ item.summary }}
                       </span>
-                      <span class="mt-1.5 block text-admin-caption font-bold text-admin-text-3">
+                      <span class="mt-1.5 block text-admin-caption font-bold text-muted-foreground">
                         {{ item.actionLabel }}
                       </span>
                     </span>
@@ -106,8 +108,8 @@
                 </div>
 
                 <div v-else class="px-5 py-8 text-center">
-                  <div class="text-admin-content font-bold text-admin-title-color">运行正常</div>
-                  <div class="mt-1.5 text-admin-meta text-admin-text-2">
+                  <div class="text-admin-content font-bold text-foreground">运行正常</div>
+                  <div class="mt-1.5 text-admin-meta text-muted-foreground">
                     当前没有活跃异常
                   </div>
                 </div>
@@ -139,24 +141,24 @@
             <!-- 极简用户信息：主标题为邮箱，副标题为 admin -->
             <DropdownMenuLabel class="px-2.5 py-1.5 font-normal">
               <div class="flex flex-col">
-                <span class="truncate text-xs font-semibold text-admin-title-color">
+                <span class="truncate text-xs font-semibold text-foreground">
                   {{ userEmail }}
                 </span>
-                <span class="truncate text-admin-caption text-admin-text-3 font-mono"> admin </span>
+                <span class="truncate text-admin-caption text-muted-foreground font-mono"> admin </span>
               </div>
             </DropdownMenuLabel>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuItem class="cursor-pointer gap-2" @select="handleUserAction('boards')">
-              <ViewGrid class="size-4 text-admin-text-3" />
+              <ViewGrid class="size-4 text-muted-foreground" />
               <span>返回画布</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              class="cursor-pointer gap-2 text-admin-danger focus:bg-admin-danger-soft focus:text-admin-danger"
+              class="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
               @select="handleUserAction('logout')"
             >
               <LogOut class="size-4" />
@@ -167,7 +169,7 @@
       </div>
     </header>
     <!-- 二级子导航栏（插槽/Teleport 挂载区：有子页面时挂载，无子页面时 empty:hidden 高度折叠） -->
-    <div id="admin-sub-header" class="border-b border-admin-border empty:hidden"></div>
+    <div id="admin-sub-header" class="border-b border-border empty:hidden"></div>
   </div>
 </template>
 
@@ -184,6 +186,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import AdminBadge from '../shared/components/AdminBadge.vue'
+import AdminThemeToggle from '../shared/components/AdminThemeToggle.vue'
 import {
   BellNotificationSolid as BellIcon,
   LogOut,
@@ -231,11 +234,11 @@ const { anomalies, anomalyCount, hasAnomalies } = useAnomalyRadar({
 })
 
 const notificationButtonClass =
-  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted'
+  'relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted'
 const userAvatarButtonClass =
-  'relative flex size-9 items-center justify-center rounded-lg text-admin-text-3 transition-colors hover:bg-admin-surface-muted cursor-pointer'
+  'relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted cursor-pointer'
 const userAvatarImageClass = 'size-6 rounded-full object-cover'
-const userAvatarPlaceholderClass = 'flex size-full items-center justify-center text-admin-text-3'
+const userAvatarPlaceholderClass = 'flex size-full items-center justify-center text-muted-foreground'
 const userAvatarIconClass = 'size-4'
 
 function handleAnomalySelect(item: AdminAnomalyItem) {

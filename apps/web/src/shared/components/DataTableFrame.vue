@@ -12,7 +12,7 @@
         :class="tableClass"
         :style="props.tableStyle"
       >
-        <thead class="bg-ib-surface-muted">
+        <thead class="bg-muted/40">
           <tr>
             <th
               v-for="col in columns"
@@ -31,7 +31,7 @@
             <td :colspan="Math.max(columns.length, 1)" :class="bodyCellClass">
               <slot name="loading">
                 <div class="flex items-center justify-center px-6 py-10" role="status">
-                  <Spinner class="size-6 text-ib-text-subtle" />
+                  <Spinner class="size-6 text-muted-foreground" />
                 </div>
               </slot>
             </td>
@@ -66,10 +66,10 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="status"
           >
-            <span class="font-semibold text-ib-text">{{
+            <span class="font-semibold text-foreground">{{
               props.emptyTitle || t('common.states.empty')
             }}</span>
-            <span v-if="props.emptyDescription" class="mt-1 text-sm text-ib-text-muted">
+            <span v-if="props.emptyDescription" class="mt-1 text-sm text-muted-foreground">
               {{ props.emptyDescription }}
             </span>
           </div>
@@ -273,17 +273,17 @@ const scrollContainerClass = computed(() =>
 // size 只有 small/large 显式档位，其余（含 undefined）走 default：新增档位只加表项。
 const headerCellClasses = {
   small:
-    'border-b border-ib-border-soft px-3 py-2 text-left align-middle text-ib-body font-semibold text-ib-text',
+    'border-b border-border px-3 py-2 text-left align-middle text-ib-body font-semibold text-foreground',
   large:
-    'border-b border-ib-border-soft px-5 py-4 text-left align-middle text-ib-title-sm font-semibold text-ib-text',
+    'border-b border-border px-5 py-4 text-left align-middle text-ib-title-sm font-semibold text-foreground',
   default:
-    'border-b border-ib-border-soft px-4 py-3 text-left align-middle text-ib-body font-semibold text-ib-text',
+    'border-b border-border px-4 py-3 text-left align-middle text-ib-body font-semibold text-foreground',
 } as const
 const headerCellClass = computed(() => headerCellClasses[props.size ?? 'default'])
 const bodyCellClasses = {
-  small: 'border-b border-ib-border-soft px-3 py-2 align-middle text-ib-body text-ib-text',
-  large: 'border-b border-ib-border-soft px-5 py-4 align-middle text-ib-title-sm text-ib-text',
-  default: 'border-b border-ib-border-soft px-4 py-3 align-middle text-sm text-ib-text',
+  small: 'border-b border-border px-3 py-2 align-middle text-ib-body text-foreground',
+  large: 'border-b border-border px-5 py-4 align-middle text-ib-title-sm text-foreground',
+  default: 'border-b border-border px-4 py-3 align-middle text-sm text-foreground',
 } as const
 const bodyCellClass = computed(() => bodyCellClasses[props.size ?? 'default'])
 </script>

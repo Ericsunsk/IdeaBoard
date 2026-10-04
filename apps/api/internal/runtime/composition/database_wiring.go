@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	billingpostgres "ideaboard/api/internal/billing/infrastructure/postgres"
+	generationcatalog "ideaboard/api/internal/generation/catalog"
 	identitypostgres "ideaboard/api/internal/identity/users/infrastructure/postgres"
 	storagepostgres "ideaboard/api/internal/media/storage/infrastructure/postgres"
 	paymentpostgres "ideaboard/api/internal/payments/infrastructure/postgres"
@@ -138,6 +139,7 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		rewards.RuntimePrivilegePolicy(),
 		paymentpostgres.RuntimePrivilegePolicy(),
 		searchinfra.RuntimePrivilegePolicy(),
+		generationcatalog.RuntimePrivilegePolicy(),
 	}
 }
 

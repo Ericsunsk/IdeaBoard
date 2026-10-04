@@ -230,4 +230,21 @@ describe('UserAccountMenu', () => {
     expect(localeTrigger.nextElementSibling).toBe(loginBtn)
     expect(loginBtn.nextElementSibling).toBe(registerBtn)
   })
+
+  it('renders appearance sub-menu allowing tri-state theme switching', async () => {
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
+    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
+
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
+    await user.click(trigger)
+
+    const appearanceSpan = await screen.findByText('Appearance')
+    expect(appearanceSpan).toBeVisible()
+
+    await user.click(appearanceSpan)
+
+    expect(await screen.findByRole('menuitem', { name: /Light/i })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /Dark/i })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /System/i })).toBeVisible()
+  })
 })

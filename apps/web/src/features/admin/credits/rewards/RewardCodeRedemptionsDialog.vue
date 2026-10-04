@@ -12,7 +12,7 @@
         <AdminResourceToolbar>
           <template #start>
             <div class="min-w-0">
-              <div class="text-admin-title-sm font-[740] text-admin-title-color">
+              <div class="text-admin-title-sm font-[740] text-foreground">
                 {{ REWARD_CODES_MESSAGES.redemptionsTitle }}
               </div>
             </div>
@@ -36,7 +36,7 @@
               :aria-label="REWARD_CODES_MESSAGES.redemptionsRefreshAria"
               @click="refreshRedemptions"
             >
-              <Refresh class="size-4 text-admin-text-2" />
+              <Refresh class="size-4 text-muted-foreground" />
             </AdminButton>
           </template>
         </AdminResourceToolbar>
@@ -93,8 +93,8 @@
           :style="{ minWidth: '240px' }"
         >
           <template #body="{ data }">
-            <span class="font-semibold text-admin-text-1">{{ data.displayName }}</span>
-            <span class="block text-admin-caption text-admin-text-3">{{ data.userPublicId }}</span>
+            <span class="font-semibold text-foreground">{{ data.displayName }}</span>
+            <span class="block text-admin-caption text-muted-foreground">{{ data.userPublicId }}</span>
           </template>
         </AdminColumn>
         <AdminColumn
@@ -115,7 +115,7 @@
         </AdminColumn>
 
         <template #expansion="{ data }">
-          <div class="border-y border-admin-border-soft bg-ib-surface-muted px-5 py-4">
+          <div class="border-y border-border bg-muted px-5 py-4">
             <div
               v-if="detailLoading && selectedRedemptionId === data.id"
               class="flex min-h-24 items-center justify-center"
@@ -147,27 +147,27 @@
               class="grid gap-x-6 gap-y-4 sm:grid-cols-3"
             >
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">Redemption ID</dt>
+                <dt class="text-admin-caption font-[700] text-muted-foreground">Redemption ID</dt>
                 <dd
-                  class="mt-1 mb-0 break-all font-mono text-admin-body text-admin-text-1 select-all"
+                  class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >
                   {{ selectedDetail?.id }}
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">
+                <dt class="text-admin-caption font-[700] text-muted-foreground">
                   Credits Transaction ID
                 </dt>
                 <dd
-                  class="mt-1 mb-0 break-all font-mono text-admin-body text-admin-text-1 select-all"
+                  class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >
                   {{ selectedDetail?.creditTransactionId }}
                 </dd>
               </div>
               <div>
-                <dt class="text-admin-caption font-[700] text-admin-text-3">masked Code hint</dt>
+                <dt class="text-admin-caption font-[700] text-muted-foreground">masked Code hint</dt>
                 <dd
-                  class="mt-1 mb-0 break-all font-mono text-admin-body text-admin-text-1 select-all"
+                  class="mt-1 mb-0 break-all font-mono text-admin-body text-foreground select-all"
                 >
                   {{ selectedDetail?.maskedCodeHint }}
                 </dd>

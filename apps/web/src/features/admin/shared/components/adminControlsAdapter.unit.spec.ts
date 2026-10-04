@@ -12,7 +12,7 @@ describe('Admin base control adapters', () => {
       })
       expect(wrapper.element.tagName).toBe('BUTTON')
       expect(wrapper.text()).toContain('Submit')
-      expect(wrapper.classes()).toContain('bg-admin-accent')
+      expect(wrapper.classes()).toContain('bg-primary')
     })
 
     it('renders as anchor when href is provided', () => {
@@ -30,7 +30,7 @@ describe('Admin base control adapters', () => {
       })
       expect(wrapper.attributes('aria-busy')).toBe('true')
       expect(wrapper.attributes('disabled')).toBeDefined()
-      expect(wrapper.classes()).toContain('bg-admin-danger')
+      expect(wrapper.classes()).toContain('bg-destructive')
     })
 
     it('maps small size to compact typography', () => {
@@ -83,7 +83,7 @@ describe('Admin base control adapters', () => {
       })
       expect(wrapper.text()).toBe('Active')
       expect(wrapper.classes()).toContain('rounded-full')
-      expect(wrapper.classes()).toContain('bg-admin-success-soft')
+      expect(wrapper.classes()).toContain('text-admin-success-strong')
     })
 
     it('supports rounded false for rounded-md', () => {
@@ -93,7 +93,7 @@ describe('Admin base control adapters', () => {
       })
       expect(wrapper.text()).toBe('Banned')
       expect(wrapper.classes()).toContain('rounded-md')
-      expect(wrapper.classes()).toContain('bg-admin-danger-soft')
+      expect(wrapper.classes()).toContain('bg-destructive/15')
     })
   })
 })

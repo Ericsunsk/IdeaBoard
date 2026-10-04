@@ -145,7 +145,7 @@
         novalidate
         @submit.prevent="handleVerifyOTP"
       >
-        <p class="text-xs text-slate-600">
+        <p class="text-xs text-[var(--color-ib-auth-subtle)]">
           {{ t('auth.otpSentTo', { email: formValue.email }) }}
         </p>
         <OtpField

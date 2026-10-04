@@ -15,24 +15,24 @@
           })
         }}
       </p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.creditedDetail') }}
       </p>
     </template>
     <template v-else-if="source === 'cancel'">
-      <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.returnedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.returnedTitle') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.returnedDetail') }}
       </p>
     </template>
     <template v-else-if="pending">
-      <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.confirmingTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.confirmingTitle') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.confirmingDetail') }}
       </p>
     </template>
     <template v-else-if="error">
-      <p class="m-0 font-semibold text-ib-danger">
+      <p class="m-0 font-semibold text-destructive">
         {{ t('account.errors.orderStatusLoadFailed') }}
       </p>
       <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
@@ -40,20 +40,20 @@
       }}</Button>
     </template>
     <template v-else-if="status?.status === 'failed'">
-      <p class="m-0 font-semibold text-ib-danger">{{ t('account.returnStatus.failedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="m-0 font-semibold text-destructive">{{ t('account.returnStatus.failedTitle') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.failedDetail') }}
       </p>
     </template>
     <template v-else-if="delayed">
-      <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.delayedTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.delayedTitle') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.delayedDetail') }}
       </p>
     </template>
     <template v-else>
-      <p class="m-0 font-semibold text-ib-text">{{ t('account.returnStatus.confirmingTitle') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+      <p class="m-0 font-semibold text-foreground">{{ t('account.returnStatus.confirmingTitle') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         {{ t('account.returnStatus.confirmingDetail') }}
       </p>
     </template>
@@ -92,15 +92,15 @@ const showError = computed(
 )
 const statusClass = computed(() => {
   if (props.status?.status === 'credited') {
-    return 'border-ib-success/25 bg-ib-surface text-ib-text'
+    return 'border-emerald-500/25 bg-card text-foreground'
   }
   if (props.source === 'cancel') {
-    return 'border-ib-border-soft bg-ib-surface text-ib-text'
+    return 'border-border bg-card text-foreground'
   }
   if (props.error || props.status?.status === 'failed') {
-    return 'border-ib-danger/25 bg-ib-surface text-ib-text'
+    return 'border-destructive/25 bg-card text-foreground'
   }
-  return 'border-ib-border-soft bg-ib-surface text-ib-text'
+  return 'border-border bg-card text-foreground'
 })
 
 onMounted(async () => {

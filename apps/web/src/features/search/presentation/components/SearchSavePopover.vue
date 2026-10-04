@@ -7,16 +7,16 @@
       side="bottom"
       :side-offset="4"
     >
-      <div class="w-48 select-none text-board-page-text" @click.stop>
+      <div class="w-48 select-none text-foreground" @click.stop>
         <div class="flex items-center gap-2 px-2 py-1.5">
-          <Search class="size-3.5 shrink-0 text-board-page-text-muted" aria-hidden="true" />
+          <Search class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
             ref="searchInputRef"
             v-model="searchQuery"
             type="text"
             :placeholder="t('search.savePopover.searchPlaceholder')"
             :aria-label="t('search.savePopover.searchAria')"
-            class="w-full bg-transparent text-xs font-normal text-board-page-text placeholder:text-board-page-text-muted outline-none"
+            class="w-full bg-transparent text-xs font-normal text-foreground placeholder:text-muted-foreground outline-none"
             @keydown.enter.prevent="handleEnterCreate"
           />
         </div>
@@ -24,14 +24,14 @@
         <div v-if="folderFactsReady && canCreateFromQuery" class="my-0.5 px-1">
           <button
             type="button"
-            class="flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-board-primary/10 px-2 py-1.5 text-xs font-medium text-board-primary transition hover:bg-board-primary/20"
+            class="flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
             :disabled="saving || !folderFactsReady"
             @click="handleEnterCreate"
           >
             <span class="truncate">{{
               t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
             }}</span>
-            <span class="font-mono text-ib-micro text-board-primary">↵</span>
+            <span class="font-mono text-ib-micro text-primary">↵</span>
           </button>
         </div>
 
@@ -43,7 +43,7 @@
               filteredFolders.length === 0 &&
               !canCreateFromQuery
             "
-            class="py-2.5 text-center text-xs text-board-page-text-muted"
+            class="py-2.5 text-center text-xs text-muted-foreground"
           >
             {{ t('search.savePopover.noMatchingFolders') }}
           </div>
@@ -51,12 +51,12 @@
           <button
             v-if="showQuickSaves"
             type="button"
-            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted hover:text-primary disabled:opacity-50"
             :disabled="saving || !folderFactsReady"
             @click="saveTo()"
           >
             <div class="flex min-w-0 items-center gap-2">
-              <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
+              <Bookmark class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
               <span class="truncate font-medium">{{ t('search.savePopover.quickSaves') }}</span>
             </div>
           </button>
@@ -65,13 +65,13 @@
             v-for="folder in filteredFolders"
             :key="folder.id"
             type="button"
-            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+            class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-foreground transition hover:bg-muted hover:text-primary disabled:opacity-50"
             :disabled="saving || !folderFactsReady"
             @click="saveTo(folder.id)"
           >
             <div class="flex min-w-0 items-center gap-2">
               <Folder
-                class="size-3.5 shrink-0 text-board-page-text-muted transition-colors group-hover/fitem:text-board-primary"
+                class="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/fitem:text-primary"
                 aria-hidden="true"
               />
               <span class="truncate font-medium">{{ folder.name }}</span>

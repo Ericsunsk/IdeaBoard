@@ -2,15 +2,15 @@
   <div
     :class="
       cn(
-        'break-inside-avoid overflow-hidden rounded-xl border border-admin-border-soft bg-admin-card-strong text-admin-text-1 transition-colors',
+        'break-inside-avoid overflow-hidden rounded-xl border border-border bg-card text-foreground transition-colors',
         props.class,
       )
     "
   >
     <div
-      class="flex min-w-0 items-center justify-between gap-3 border-b border-admin-border-soft bg-admin-surface-muted/30 px-5 py-3.5"
+      class="flex min-w-0 items-center justify-between gap-3 border-b border-border bg-muted/30 px-5 py-3.5"
     >
-      <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+      <span class="truncate text-admin-title-sm font-bold text-foreground">
         {{ title }}
       </span>
       <AdminBadge :value="status" class="shrink-0" :severity="statusSeverity" rounded />
@@ -20,7 +20,7 @@
       <slot />
       <div
         v-if="$slots.actions"
-        class="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-admin-border-soft pt-4"
+        class="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4"
       >
         <slot name="actions" />
       </div>

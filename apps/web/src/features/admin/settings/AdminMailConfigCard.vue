@@ -83,7 +83,7 @@
         </AdminAlert>
 
         <div
-          class="grid gap-3 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
+          class="grid gap-3 rounded-lg border border-border bg-muted/50 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
         >
           <AdminFormField
             :label="SETTINGS_MESSAGES.mailTestRecipientLabel"

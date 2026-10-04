@@ -2,7 +2,7 @@
   <th
     :class="
       cn(
-        'h-10 border-b border-admin-border px-3 py-2 text-left align-middle text-admin-caption font-bold text-admin-text-3 whitespace-nowrap [&:has([role=checkbox])]:pr-0',
+        'h-10 border-b border-border px-3 py-2 text-left align-middle text-admin-caption font-bold text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0',
         props.class,
       )
     "

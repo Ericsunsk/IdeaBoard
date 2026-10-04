@@ -7,9 +7,9 @@
 | Asset 类型 | 总量预算 | 单个最大 Asset 预算 |
 | ---------- | -------: | ------------------: |
 | JavaScript |   3.5 MB |              650 KB |
-| CSS        |   350 KB |              180 KB |
+| CSS        |   350 KB |              205 KB |
 
-2026-08-13 测得的 baseline 约为 3.04 MB JavaScript 和 268 KB CSS；最大的 Asset 分别为 565 KB 的 `CanvasPage` 和 144 KB 的 `index.css`。预算为常规 Feature 开发保留余量，同时让意外的大 Chunk 在 build 阶段可见。
+2026-10-05 测得的 baseline 约为 4.60 MB JavaScript 和 307 KB CSS；最大的 Asset 分别为 600 KB 的 `CanvasPage` 和 200.16 KB 的 `index.css`。CSS 单个 Asset 预算仅保留约 2.4% 余量，预算调整对应当前 token-layer split；意外的大 Chunk 仍会在 build 阶段失败。
 
 ## Canvas interaction benchmark
 

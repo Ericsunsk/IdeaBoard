@@ -1,0 +1,74 @@
+/*
+ * Tier 1: Primitives (Physical scales)
+ * Theme-agnostic raw scales: neutrals, brand violet, status palettes,
+ * elevation, radii, spacing, and motion curves.
+ */
+
+:root {
+  /* ── Neutral Gray Scale (0 = White, 1000 = Black) ── */
+  --primitive-neutral-0: #ffffff;
+  --primitive-neutral-50: #fbfbfb;
+  --primitive-neutral-100: #f5f5f5;
+  --primitive-neutral-150: #f0f0f0;
+  --primitive-neutral-200: #e5e5e5;
+  --primitive-neutral-300: #d4d4d4;
+  --primitive-neutral-400: #a3a3a3;
+  --primitive-neutral-500: #737373;
+  --primitive-neutral-600: #525252;
+  --primitive-neutral-700: #404040;
+  --primitive-neutral-800: #262626;
+  --primitive-neutral-850: #1d1d1d;
+  --primitive-neutral-900: #171717;
+  --primitive-neutral-950: #0d0d0d;
+  --primitive-neutral-1000: #000000;
+
+  /* ── Brand Violet Scale ── */
+  --primitive-violet-50: #f5f3ff;
+  --primitive-violet-100: #ede9fe;
+  --primitive-violet-200: #ddd6fe;
+  --primitive-violet-300: #c4b5fd;
+  --primitive-violet-400: #a78bfa;
+  --primitive-violet-500: #8b5cf6;
+  --primitive-violet-600: #7c3aed;
+  --primitive-violet-650: #7a6bd5; /* IdeaBoard Signature Violet */
+  --primitive-violet-700: #6d5fd0; /* IdeaBoard Violet Pressed */
+  --primitive-violet-800: #5b21b6;
+  --primitive-violet-900: #4c1d95;
+  --primitive-violet-950: #2e1065;
+
+  /* ── Feedback Status Palettes ── */
+  --primitive-green-400: #34d399;
+  --primitive-green-500: #10b981;
+  --primitive-green-600: #059669;
+
+  --primitive-amber-400: #fbbf24;
+  --primitive-amber-500: #f59e0b;
+  --primitive-amber-600: #d97706;
+
+  --primitive-red-400: #f87171;
+  --primitive-red-500: #ef4444;
+  --primitive-red-600: #dc2626;
+
+  --primitive-blue-400: #60a5fa;
+  --primitive-blue-500: #3b82f6;
+  --primitive-blue-600: #2563eb;
+
+  /* ── Radii Scale ── */
+  --primitive-radius-xs: 2px;
+  --primitive-radius-sm: 4px;
+  --primitive-radius-md: 6px;
+  --primitive-radius-lg: 8px;
+  --primitive-radius-xl: 12px;
+  --primitive-radius-2xl: 16px;
+  --primitive-radius-3xl: 20px;
+  --primitive-radius-pill: 9999px;
+
+  /* ── Elevation Shadows ── */
+  --primitive-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --primitive-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --primitive-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --primitive-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --primitive-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --primitive-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+

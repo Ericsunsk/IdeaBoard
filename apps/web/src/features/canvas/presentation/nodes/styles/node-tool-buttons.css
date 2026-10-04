@@ -31,10 +31,10 @@
   --node-tool-icon-button-hover-bg: var(--canvas-glass-bg);
   --node-tool-icon-button-hover-transform: scale(1.06);
   --node-tool-icon-button-primary-border: var(--node-tool-button-brand);
-  --node-tool-icon-button-primary-color: #ffffff;
+  --node-tool-icon-button-primary-color: var(--canvas-text-inverse);
   --node-tool-icon-button-primary-bg: var(--node-tool-button-brand);
   --node-tool-icon-button-primary-hover-border: var(--canvas-accent-strong);
-  --node-tool-icon-button-primary-hover-color: #ffffff;
+  --node-tool-icon-button-primary-hover-color: var(--canvas-text-inverse);
   --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-strong);
   --node-tool-icon-button-icon-size: var(--node-tool-icon-size);
 }
@@ -57,7 +57,7 @@
 .node-tool-icon-button--accent-hover {
   --node-tool-icon-button-primary-hover-border: var(--canvas-accent-hover);
   --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-hover);
-  --node-tool-icon-button-primary-hover-color: #ffffff;
+  --node-tool-icon-button-primary-hover-color: var(--canvas-text-inverse);
 }
 
 .node-tool-output-count-wrap {
@@ -105,7 +105,7 @@
 
 .node-tool-send {
   border: 0;
-  color: #ffffff;
+  color: var(--canvas-text-inverse);
   background: var(--node-tool-button-brand);
   transition:
     transform var(--motion-control-duration) var(--motion-control-easing),

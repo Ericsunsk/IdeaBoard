@@ -27,16 +27,16 @@
               id="island-folder-name"
               v-model="createDraft"
               type="text"
-              class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
+              class="mt-2 w-full rounded-xl border border-border bg-card/85 px-3 py-2.5 text-sm outline-none focus:border-primary"
               maxlength="100"
               autofocus
               :placeholder="t('library.dialogs.folderNamePlaceholder')"
             />
-            <p v-if="createError" class="mt-2 mb-0 text-sm text-board-danger">{{ createError }}</p>
+            <p v-if="createError" class="mt-2 mb-0 text-sm text-destructive">{{ createError }}</p>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
-                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover cursor-pointer"
+                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
                 @click="emit('update:createOpen', false)"
               >
                 {{ t('library.dialogs.cancel') }}
@@ -44,7 +44,7 @@
               <Button
                 type="submit"
                 :disabled="createSaving || !createDraft.trim()"
-                class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50 cursor-pointer"
+                class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.create') }}
               </Button>
@@ -83,16 +83,16 @@
               id="island-rename-folder-name"
               v-model="renameDraft"
               type="text"
-              class="mt-2 w-full rounded-xl border border-board-card-border bg-board-control-bg px-3 py-2.5 text-sm outline-none focus:border-board-primary"
+              class="mt-2 w-full rounded-xl border border-border bg-card/85 px-3 py-2.5 text-sm outline-none focus:border-primary"
               maxlength="100"
               autofocus
               :placeholder="t('library.dialogs.folderNamePlaceholder')"
             />
-            <p v-if="renameError" class="mt-2 mb-0 text-sm text-board-danger">{{ renameError }}</p>
+            <p v-if="renameError" class="mt-2 mb-0 text-sm text-destructive">{{ renameError }}</p>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
-                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover cursor-pointer"
+                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
                 @click="emit('update:renameOpen', false)"
               >
                 {{ t('library.dialogs.cancel') }}
@@ -100,7 +100,7 @@
               <Button
                 type="submit"
                 :disabled="renameSaving || !renameDraft.trim()"
-                class="rounded-full bg-board-primary px-4 py-2 text-sm font-semibold text-ib-text-inverse disabled:opacity-50 cursor-pointer"
+                class="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
               >
                 {{ t('library.dialogs.save') }}
               </Button>
@@ -145,7 +145,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const dialogContentClass =
-  'overflow-hidden rounded-2xl border border-board-card-border bg-board-surface-strong/80 backdrop-blur-md'
+  'overflow-hidden rounded-2xl border border-border bg-card/80 backdrop-blur-md'
 
 function blockDialogOutsideDismiss(event: Event) {
   event.preventDefault()

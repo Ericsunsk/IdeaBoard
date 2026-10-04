@@ -9,7 +9,7 @@
     <aside
       ref="siderRef"
       aria-label="后台导航"
-      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-admin-border bg-admin-bg transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
+      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-card transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
       :class="[
         effectiveCollapsed ? 'w-52 lg:w-14' : 'w-52',
         isCollapsed && isHovered ? 'lg:z-40' : '',
@@ -25,12 +25,12 @@
         @focusin="handleNavMouseEnter"
         @focusout="handleSiderFocusOut"
       >
-        <div class="flex h-14 shrink-0 items-center border-b border-admin-border px-2">
+        <div class="flex h-14 shrink-0 items-center border-b border-border px-2">
           <router-link
             :to="ADMIN_DEFAULT_PATH"
             :aria-label="brandAriaLabel"
             :title="effectiveCollapsed ? projectName || 'IdeaBoard' : undefined"
-            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-xl whitespace-nowrap transition-colors hover:bg-admin-surface-muted active:scale-[0.98]"
+            class="group flex h-10 w-full min-w-0 items-center overflow-hidden rounded-xl whitespace-nowrap transition-colors hover:bg-muted active:scale-[0.98]"
           >
             <span
               class="flex size-10 shrink-0 items-center justify-center transition-transform duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] group-hover:scale-105"
@@ -42,7 +42,7 @@
               />
             </span>
             <span
-              class="shrink-0 truncate pl-1.5 text-lg font-bold tracking-tight text-admin-title-color transition-[opacity,transform]"
+              class="shrink-0 truncate pl-1.5 text-lg font-bold tracking-tight text-foreground transition-[opacity,transform]"
               :class="[
                 effectiveCollapsed
                   ? 'pointer-events-none opacity-0 -translate-x-3 duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]'
@@ -74,7 +74,7 @@
               >
                 <div v-if="groupIndex > 0 && effectiveCollapsed" class="grid">
                   <div class="min-h-0 overflow-hidden">
-                    <div class="mx-2 my-1 h-px bg-admin-border-soft" aria-hidden="true" />
+                    <div class="mx-2 my-1 h-px bg-border" aria-hidden="true" />
                   </div>
                 </div>
               </Transition>
@@ -90,7 +90,7 @@
                 <div v-if="!effectiveCollapsed" class="grid origin-top-left">
                   <div class="min-h-0 overflow-hidden">
                     <div
-                      class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-admin-text-label select-none whitespace-nowrap"
+                      class="px-3 pt-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground select-none whitespace-nowrap"
                     >
                       {{ group.title }}
                     </div>
@@ -106,7 +106,7 @@
               :title="effectiveCollapsed ? `${group.title} · ${item.label}` : item.label"
               :aria-label="item.label"
               :aria-current="activeKey === item.key ? 'page' : undefined"
-              class="group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium whitespace-nowrap text-admin-title-color transition-colors hover:bg-admin-surface-muted active:scale-[0.98]"
+              class="group flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium whitespace-nowrap text-foreground transition-colors hover:bg-muted active:scale-[0.98]"
               @click="drawerOpen = false"
             >
               <span class="flex size-10 shrink-0 items-center justify-center">
@@ -114,8 +114,8 @@
                   :is="item.icon"
                   :class="[
                     navIconSizeClass,
-                    'text-admin-text-2 transition-transform group-hover:scale-110',
-                    activeKey === item.key && 'text-admin-accent scale-105 font-bold',
+                    'text-muted-foreground transition-transform group-hover:scale-110',
+                    activeKey === item.key && 'text-primary scale-105 font-bold',
                   ]"
                 />
               </span>
@@ -135,7 +135,7 @@
       </div>
 
       <div
-        class="hidden h-14 shrink-0 items-center border-t border-admin-border px-2 lg:flex"
+        class="hidden h-14 shrink-0 items-center border-t border-border px-2 lg:flex"
         @mouseenter="handleBottomMouseEnter"
         @focusin="handleBottomMouseEnter"
       >
@@ -143,7 +143,7 @@
           type="button"
           :aria-label="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
           :title="isCollapsed ? '展开并固定侧边栏' : '折叠侧边栏'"
-          class="group flex size-10 items-center justify-center rounded-xl text-admin-text-2 transition hover:bg-admin-surface-muted hover:text-admin-title-color active:scale-95 cursor-pointer"
+          class="group flex size-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
           @click="toggleCollapsed"
         >
           <SidebarCollapseIcon

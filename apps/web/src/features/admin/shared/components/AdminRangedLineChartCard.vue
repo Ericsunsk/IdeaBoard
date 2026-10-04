@@ -4,10 +4,10 @@
     v-model="selectedRange"
     :elevated="false"
     header-class="p-6 pb-4"
-    title-class="text-base font-bold text-admin-text-1"
-    range-group-class="inline-flex h-8 items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-1 text-xs text-admin-text-3"
-    range-selected-class="bg-white font-semibold text-admin-text-1 shadow-xs focus-visible:ring-admin-accent"
-    range-unselected-class="text-admin-text-2 hover:text-admin-text-1 focus-visible:ring-admin-accent"
+    title-class="text-base font-bold text-foreground"
+    range-group-class="inline-flex h-8 items-center rounded-lg border border-border bg-muted p-1 text-xs text-muted-foreground"
+    range-selected-class="bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring"
+    range-unselected-class="text-muted-foreground hover:text-foreground focus-visible:ring-ring"
   >
     <template #before-chart>
       <slot name="before-chart" />

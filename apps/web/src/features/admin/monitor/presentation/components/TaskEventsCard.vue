@@ -1,15 +1,15 @@
 <template>
   <div
-    class="flex w-full flex-col overflow-hidden rounded-xl border border-admin-border-soft bg-admin-bg"
+    class="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card"
   >
     <!-- 表头：带外层边框，底色同页面背景 (bg-transparent) -->
     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
       <!-- 标题 Events + ℹ 提示图标 -->
       <div class="flex items-center gap-1.5">
-        <span class="text-sm font-semibold text-admin-text-1">Events</span>
+        <span class="text-sm font-semibold text-foreground">Events</span>
         <span
           :title="MONITOR_MESSAGES.eventsInfoTitle"
-          class="flex size-4 cursor-pointer items-center justify-center rounded-full text-admin-text-3 hover:text-admin-text-1"
+          class="flex size-4 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
         >
           <InfoCircle class="size-3.5" />
         </span>
@@ -27,7 +27,7 @@
             'ib-hit-target-32-inline inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors px-2 py-0.5 rounded',
             filterStatus === metric.status
               ? metric.activePillClass
-              : 'text-admin-text-2 hover:text-admin-text-1',
+              : 'text-muted-foreground hover:text-foreground',
           ]"
           :title="metric.pillTitle"
           @click="emit('toggleFilterStatus', metric.status)"
@@ -53,7 +53,7 @@
     <!-- 表身：白色卡片 (bg-white)，撑满卡片下方，衔接处圆角与边框分界 -->
     <div
       v-show="!chartsCollapsed"
-      class="w-full rounded-t-xl border-t border-admin-border-soft bg-white px-4 py-3"
+      class="w-full rounded-t-xl border-t border-border bg-card px-4 py-3"
       :style="{ height: `${chartHeightPx}px` }"
     >
       <ChartRenderer

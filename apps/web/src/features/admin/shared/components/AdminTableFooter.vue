@@ -2,7 +2,7 @@
   <tfoot
     :class="
       cn(
-        'border-t border-admin-border bg-admin-surface-muted font-medium [&>tr]:last:border-b-0',
+        'border-t border-border bg-muted/50 font-medium [&>tr]:last:border-b-0',
         props.class,
       )
     "

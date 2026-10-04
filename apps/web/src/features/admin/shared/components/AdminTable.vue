@@ -29,7 +29,7 @@
                   :indeterminate="someSelected && !allSelected"
                   :disabled="rows.length === 0"
                   aria-label="选择全部行"
-                  class="size-4 accent-admin-accent"
+                  class="size-4 accent-primary"
                   @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                 />
                 <component :is="column.headerSlot" v-if="column.headerSlot" />
@@ -53,10 +53,10 @@
                     class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
                     role="status"
                   >
-                    <span class="font-semibold text-ib-text">{{
+                    <span class="font-semibold text-foreground">{{
                       emptyTitle || t('common.states.empty')
                     }}</span>
-                    <span v-if="emptyDescription" class="mt-1 text-sm text-ib-text-muted">{{
+                    <span v-if="emptyDescription" class="mt-1 text-sm text-muted-foreground">{{
                       emptyDescription
                     }}</span>
                   </div>
@@ -72,7 +72,7 @@
                       type="checkbox"
                       :checked="isSelected(row, rowIndex)"
                       :aria-label="selectionRowLabel(row, rowIndex)"
-                      class="size-4 accent-admin-accent"
+                      class="size-4 accent-primary"
                       @change="
                         toggleSelectRow(row, rowIndex, ($event.target as HTMLInputElement).checked)
                       "
@@ -105,7 +105,7 @@
                 <AdminTableRow v-if="isExpanded(row, rowIndex) && hasExpansionSlot">
                   <AdminTableCell
                     :colspan="columnCount"
-                    class="border-b border-admin-divider px-0 py-0"
+                    class="border-b border-border px-0 py-0"
                   >
                     <slot name="expansion" :data="row" :index="rowIndex" />
                   </AdminTableCell>

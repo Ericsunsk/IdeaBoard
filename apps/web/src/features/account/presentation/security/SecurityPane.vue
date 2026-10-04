@@ -56,7 +56,7 @@
       >
     </form>
 
-    <div class="my-8 border-t border-ib-border-soft" aria-hidden="true"></div>
+    <div class="my-8 border-t border-border" aria-hidden="true"></div>
 
     <form
       v-if="!emailOtpSent"
@@ -97,7 +97,7 @@
     </form>
 
     <form v-else class="grid gap-5" novalidate @submit.prevent="handleConfirmEmailChange">
-      <p class="text-sm text-ib-text-subtle">
+      <p class="text-sm text-muted-foreground">
         {{ t('account.security.otpSentTo', { email: emailForm.newEmail }) }}
       </p>
       <OtpField

@@ -94,7 +94,7 @@
   width: var(--node-input-thumbnail-size);
   height: var(--node-input-thumbnail-size);
   border-style: dashed;
-  color: var(--color-canvas-text-secondary);
+  color: var(--canvas-text-muted);
   cursor: copy;
 }
 
@@ -103,6 +103,6 @@
 .node-tool-output-count.node-input-thumbnail-add:active,
 .node-tool-output-count.node-input-thumbnail-add.is-drag-over {
   border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
+  background: var(--canvas-accent-wash);
   color: var(--node-tool-button-accent);
 }

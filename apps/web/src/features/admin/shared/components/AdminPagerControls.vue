@@ -9,7 +9,7 @@
       aria-label="上一页"
       @click="$emit('prev')"
     >
-      <NavArrowLeft class="size-4 text-admin-text-2" />
+      <NavArrowLeft class="size-4 text-muted-foreground" />
     </AdminButton>
     <AdminButton
       variant="ghost"
@@ -19,7 +19,7 @@
       aria-label="下一页"
       @click="$emit('next')"
     >
-      <NavArrowRight class="size-4 text-admin-text-2" />
+      <NavArrowRight class="size-4 text-muted-foreground" />
     </AdminButton>
   </div>
 </template>

@@ -6,8 +6,8 @@
         class="flex size-7 shrink-0 items-center justify-center rounded-lg mr-2.5 overflow-hidden transition-colors"
         :class="
           brandLogo
-            ? 'bg-admin-surface-muted/60 border border-admin-border-soft/60'
-            : 'bg-admin-accent/10 text-admin-accent'
+            ? 'bg-muted/60 border border-border/60'
+            : 'bg-primary/10 text-primary'
         "
       >
         <img
@@ -21,8 +21,8 @@
         <Cube v-else class="size-4" />
       </div>
       <div
-        class="text-base font-semibold text-admin-title-color line-clamp-1 flex-1 transition-colors"
-        :class="hoverable ? 'group-hover:text-admin-accent' : ''"
+        class="text-base font-semibold text-foreground line-clamp-1 flex-1 transition-colors"
+        :class="hoverable ? 'group-hover:text-primary' : ''"
       >
         {{ model.name }}
       </div>
@@ -30,17 +30,17 @@
 
     <!-- 第二行：提供商名 + mode 胶囊（社区原样，无站内分类） -->
     <div class="mt-2.5 flex items-center gap-2 text-xs">
-      <span class="font-semibold text-admin-text-1">{{ model.provider }}</span>
+      <span class="font-semibold text-foreground">{{ model.provider }}</span>
       <span
         v-if="model.mode"
-        class="inline-flex items-center rounded-full border border-admin-border-soft bg-admin-surface-muted/60 px-2.5 py-0.5 text-admin-caption font-medium text-admin-text-2"
+        class="inline-flex items-center rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ model.mode }}
       </span>
     </div>
 
     <!-- 第三行：模型功能描述 (两行截断) -->
-    <p class="mt-2 text-xs leading-relaxed text-admin-text-3 line-clamp-2">
+    <p class="mt-2 text-xs leading-relaxed text-muted-foreground line-clamp-2">
       {{ model.description }}
     </p>
 
@@ -49,7 +49,7 @@
       <!-- 上下文 / 分辨率胶囊 (有值才展示，避免空灰色长条) -->
       <span
         v-if="model.contextOrResolution"
-        class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-admin-caption font-medium text-slate-700"
+        class="inline-flex items-center rounded-md bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ model.contextOrResolution }}
       </span>
@@ -58,7 +58,7 @@
       <span
         v-for="cap in model.capabilities"
         :key="cap"
-        class="inline-flex items-center rounded-md bg-admin-surface-muted/80 px-2 py-0.5 text-admin-caption font-medium text-admin-text-2"
+        class="inline-flex items-center rounded-md bg-muted/80 px-2 py-0.5 text-admin-caption font-medium text-muted-foreground"
       >
         {{ cap }}
       </span>
@@ -78,7 +78,7 @@
         :class="
           model.hosting === MODEL_HOSTING_CLOUDFLARE
             ? 'bg-emerald-50 text-emerald-700'
-            : 'bg-slate-100 text-slate-600'
+            : 'bg-muted/80 text-muted-foreground'
         "
       >
         {{ model.hosting }}

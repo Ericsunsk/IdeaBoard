@@ -2,33 +2,33 @@
   <!-- 加载中状态 (AdminSpinner 自带 role="progressbar") -->
   <div
     v-if="loading && rows.length === 0"
-    class="flex min-h-[260px] items-center justify-center rounded-xl border border-admin-border-soft bg-white text-admin-text-3"
+    class="flex min-h-[260px] items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
     :aria-label="STORAGE_MESSAGES.tableLoadingAria"
   >
-    <AdminSpinner class="size-9 text-admin-accent" />
+    <AdminSpinner class="size-9 text-primary" />
   </div>
 
   <!-- 空状态提示 (无数据或过滤未命中) -->
   <div
     v-else-if="rows.length === 0"
-    class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-admin-border-soft bg-white p-10 text-center"
+    class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
   >
     <div
-      class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3"
+      class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
     >
       <DatabaseExport v-if="!hasActiveFilter" class="size-6" />
       <Search v-else class="size-6" />
     </div>
-    <h3 class="text-base font-semibold text-admin-title-color">
+    <h3 class="text-base font-semibold text-foreground">
       {{ STORAGE_MESSAGES.tableEmptyTitle(hasActiveFilter) }}
     </h3>
-    <p class="mt-1 max-w-sm text-xs text-admin-text-3">
+    <p class="mt-1 max-w-sm text-xs text-muted-foreground">
       {{ STORAGE_MESSAGES.tableEmptyHint(hasActiveFilter) }}
     </p>
     <button
       v-if="hasActiveFilter"
       type="button"
-      class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+      class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
       @click="emit('clear-filters')"
     >
       <Xmark class="size-3.5" />
@@ -39,10 +39,10 @@
   <!-- 存储配置表格 (1:1 对齐功能定价页 BillingPricingTable 规范，预设厂商平铺展示) -->
   <section v-else :aria-label="STORAGE_MESSAGES.tableSectionAria">
     <div class="mb-2 flex items-center gap-2">
-      <h3 class="text-sm font-bold text-admin-title-color">
+      <h3 class="text-sm font-bold text-foreground">
         {{ STORAGE_MESSAGES.tableSectionAria }}
       </h3>
-      <span class="text-xs text-admin-text-3">{{
+      <span class="text-xs text-muted-foreground">{{
         STORAGE_MESSAGES.tableSectionCount(rows.length)
       }}</span>
     </div>
@@ -90,18 +90,18 @@
                 <component
                   :is="data.vendorIcon"
                   v-else-if="data.vendorIcon"
-                  class="size-4 text-admin-text-2"
+                  class="size-4 text-muted-foreground"
                 />
                 <span
                   v-else
-                  class="text-admin-caption font-bold text-admin-accent uppercase select-none"
+                  class="text-admin-caption font-bold text-primary uppercase select-none"
                 >
                   {{ data.avatarLabel }}
                 </span>
               </button>
               <div
                 v-else
-                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-admin-border-soft bg-white p-1.5 shadow-xs"
+                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card p-1.5 shadow-xs"
               >
                 <img
                   v-if="data.vendorLogo"
@@ -112,11 +112,11 @@
                 <component
                   :is="data.vendorIcon"
                   v-else-if="data.vendorIcon"
-                  class="size-4 text-admin-text-3"
+                  class="size-4 text-muted-foreground"
                 />
                 <span
                   v-else
-                  class="text-admin-caption font-bold text-admin-text-3 uppercase select-none"
+                  class="text-admin-caption font-bold text-muted-foreground uppercase select-none"
                 >
                   {{ data.avatarLabel }}
                 </span>
@@ -124,11 +124,11 @@
               <div class="flex min-w-0 flex-col">
                 <span
                   class="truncate text-xs font-bold"
-                  :class="data.isPresetOnly ? 'text-admin-text-2' : 'text-admin-title-color'"
+                  :class="data.isPresetOnly ? 'text-muted-foreground' : 'text-foreground'"
                 >
                   {{ data.name }}
                 </span>
-                <span class="truncate text-admin-caption font-medium text-admin-text-3">{{
+                <span class="truncate text-admin-caption font-medium text-muted-foreground">{{
                   data.subtitle
                 }}</span>
               </div>
@@ -159,9 +159,9 @@
             </span>
             <span
               v-else
-              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+              class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-medium leading-none bg-muted text-muted-foreground ring-1 ring-border"
             >
-              <span class="size-1.5 rounded-full bg-slate-400" />
+              <span class="size-1.5 rounded-full bg-muted-foreground" />
               <span>{{ STORAGE_MESSAGES.unconfigured }}</span>
             </span>
           </template>
@@ -176,7 +176,7 @@
           <template #body="{ data }">
             <span
               class="truncate font-mono text-xs"
-              :class="data.bucket === '—' ? 'text-admin-text-3' : 'text-admin-text-1'"
+              :class="data.bucket === '—' ? 'text-muted-foreground' : 'text-foreground'"
             >
               {{ data.bucket }}
             </span>
@@ -191,8 +191,7 @@
         >
           <template #body="{ data }">
             <span
-              class="truncate font-mono text-xs"
-              :class="data.isPresetOnly ? 'text-admin-text-3' : 'text-admin-text-2'"
+              class="truncate font-mono text-xs text-muted-foreground"
               :title="data.endpoint"
             >
               {{ data.endpoint }}
@@ -225,7 +224,7 @@
             >
               {{ STORAGE_MESSAGES.applyCurrent }}
             </AdminButton>
-            <span v-else class="text-xs font-mono text-admin-text-3">—</span>
+            <span v-else class="text-xs font-mono text-muted-foreground">—</span>
           </template>
         </AdminColumn>
 

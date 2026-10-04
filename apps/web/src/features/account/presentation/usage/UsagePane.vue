@@ -9,8 +9,8 @@
             :class="[summaryCellClass, metric.cellClass]"
             aria-hidden="true"
           >
-            <div class="h-9 w-2/3 rounded-ib-control bg-ib-surface-muted" />
-            <div class="mt-3 h-5 w-1/2 rounded-ib-control bg-ib-surface-muted" />
+            <div class="h-9 w-2/3 rounded-ib-control bg-muted" />
+            <div class="mt-3 h-5 w-1/2 rounded-ib-control bg-muted" />
           </article>
         </div>
       </section>
@@ -18,15 +18,15 @@
 
     <section
       v-else-if="!usage && error"
-      class="rounded-ib-panel border border-ib-danger/25 bg-ib-surface p-5"
+      class="rounded-ib-panel border border-destructive/25 bg-card p-5"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">{{ t('account.errors.usageLoadFailed') }}</p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
+      <p class="m-0 font-semibold text-destructive">{{ t('account.errors.usageLoadFailed') }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(error) }}</p>
       <Button
         type="button"
         variant="ghost"
-        class="!mt-3 !px-0 !font-semibold !text-ib-creative-accent-pressed"
+        class="!mt-3 !px-0 !font-semibold !text-primary"
         @click="retry()"
       >
         {{ t('account.reload') }}
@@ -42,11 +42,11 @@
             :class="[summaryCellClass, metric.cellClass]"
           >
             <p
-              class="m-0 break-all whitespace-normal font-mono text-ib-summary-value leading-tight font-bold text-ib-text sm:text-[30px] lg:text-[34px]"
+              class="m-0 break-all whitespace-normal font-mono text-ib-summary-value leading-tight font-bold text-foreground sm:text-[30px] lg:text-[34px]"
             >
               {{ metric.value }}
             </p>
-            <p class="mt-3 mb-0 text-sm font-semibold text-ib-text-muted">{{ metric.label }}</p>
+            <p class="mt-3 mb-0 text-sm font-semibold text-muted-foreground">{{ metric.label }}</p>
           </article>
         </div>
       </section>
@@ -77,21 +77,21 @@
         <template v-if="!isInitialPending">
           <p
             v-if="isSwitching"
-            class="mt-3 mb-0 text-ib-meta font-semibold text-ib-text-subtle"
+            class="mt-3 mb-0 text-ib-meta font-semibold text-muted-foreground"
             aria-live="polite"
           >
             {{ t('account.usage.loadingRangeTrend', { range: selectedRangeText }) }}
           </p>
           <div
             v-if="error"
-            class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 sm:flex-row sm:items-center"
+            class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-ib-control border border-destructive/25 bg-muted px-3 py-2 sm:flex-row sm:items-center"
             role="alert"
           >
-            <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
+            <p class="m-0 min-w-0 text-sm text-destructive">{{ errorMessage(error) }}</p>
             <Button
               type="button"
               variant="ghost"
-              class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
+              class="!shrink-0 !p-0 !text-sm !font-semibold !text-primary"
               @click="retry()"
             >
               {{ t('account.usage.retryCurrentRange') }}
@@ -103,7 +103,7 @@
       <template #chart-fallback>
         <div
           data-testid="usage-trend-skeleton"
-          class="h-full rounded-ib-control bg-ib-surface-muted"
+          class="h-full rounded-ib-control bg-muted"
           aria-hidden="true"
         />
       </template>
@@ -155,7 +155,7 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
   () => props.active,
 )
 const summaryPanelClass =
-  'overflow-hidden rounded-ib-panel border border-ib-border-soft bg-ib-surface shadow-ib-control'
+  'overflow-hidden rounded-ib-panel border border-border bg-card shadow-ib-control'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
 const trendChartTheme = resolveUsageChartTheme()
@@ -176,19 +176,19 @@ const summaryCellDefinitions = computed(
     [
       {
         label: t('account.usage.metricTotalUsed'),
-        cellClass: 'border-r border-b border-ib-border-soft sm:border-b-0',
+        cellClass: 'border-r border-b border-border sm:border-b-0',
       },
       {
         label: t('account.usage.metricPeakDaily'),
-        cellClass: 'border-b border-ib-border-soft sm:border-r sm:border-b-0',
+        cellClass: 'border-b border-border sm:border-r sm:border-b-0',
       },
       {
         label: t('account.usage.metricAvgDaily'),
-        cellClass: 'border-r border-b border-ib-border-soft sm:border-b-0',
+        cellClass: 'border-r border-b border-border sm:border-b-0',
       },
       {
         label: t('account.usage.metricTasks'),
-        cellClass: 'border-b border-ib-border-soft sm:border-r sm:border-b-0',
+        cellClass: 'border-b border-border sm:border-r sm:border-b-0',
       },
       {
         label: t('account.usage.metricActiveDays'),

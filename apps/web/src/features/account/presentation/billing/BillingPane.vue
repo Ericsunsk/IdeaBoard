@@ -18,7 +18,7 @@
       >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
-          <time v-else class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted">
+          <time v-else class="whitespace-nowrap font-mono text-ib-body text-muted-foreground">
             {{ formatLocalDateTime(data.occurred_at) }}
           </time>
         </template>
@@ -61,7 +61,7 @@
       >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
-          <span v-else class="font-mono font-semibold text-ib-text-muted">
+          <span v-else class="font-mono font-semibold text-muted-foreground">
             {{ formatLocaleNumber(data.available_credits_after) }}
           </span>
         </template>
@@ -73,10 +73,10 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">
+          <p class="m-0 font-semibold text-destructive">
             {{ t('account.billingRecords.loadFailed') }}
           </p>
-          <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
+          <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(initialError) }}</p>
           <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
             t('account.reload')
           }}</Button>
@@ -86,10 +86,10 @@
           class="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-ib-text">{{
+          <span class="font-semibold text-foreground">{{
             t('account.billingRecords.emptyTitle')
           }}</span>
-          <span class="mt-1 text-sm text-ib-text-muted">{{
+          <span class="mt-1 text-sm text-muted-foreground">{{
             t('account.billingRecords.emptyDescription')
           }}</span>
         </div>
@@ -107,17 +107,17 @@
 
         <div
           v-if="loadMoreError"
-          class="flex items-center justify-center gap-3 border-t border-ib-border-soft px-4 py-3"
+          class="flex items-center justify-center gap-3 border-t border-border px-4 py-3"
           role="alert"
         >
-          <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
+          <span class="text-sm text-destructive">{{ errorMessage(loadMoreError) }}</span>
           <Button variant="ghost" size="sm" @click="loadMore()">{{
             t('account.billingRecords.retryLoad')
           }}</Button>
         </div>
         <div
           v-else-if="hasNextPage"
-          class="flex justify-center border-t border-ib-border-soft px-4 py-3"
+          class="flex justify-center border-t border-border px-4 py-3"
         >
           <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
             t('account.billingRecords.loadMore')
@@ -181,9 +181,9 @@ function formatSignedAmount(value: number): string {
 function amountTone(record: BillingRecordItem): string {
   if (record.credit_delta > 0) return 'text-ib-success'
   if (record.kind === 'system_adjustment' && record.credit_delta < 0) {
-    return 'text-ib-danger'
+    return 'text-destructive'
   }
-  return 'text-ib-text'
+  return 'text-foreground'
 }
 
 // Backend titles are Chinese protocol data; User copy resolves from the stable kind enum instead.

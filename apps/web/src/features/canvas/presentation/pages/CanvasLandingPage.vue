@@ -1,6 +1,6 @@
 <template>
   <div
-    class="canvas-landing-page relative flex min-h-dvh w-full flex-col overflow-x-hidden bg-board-page bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="canvas-landing-page relative flex min-h-dvh w-full flex-col overflow-x-hidden bg-background bg-fixed text-[var(--color-home-hero-text)] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
     <header
       class="absolute top-[var(--spacing-ib-page-chrome-inset)] left-[var(--spacing-ib-page-chrome-inset)] z-20 inline-flex min-w-0 max-w-[calc(100%-64px)] items-center"
@@ -23,20 +23,20 @@
         >
           <h1
             data-home-hero-safe
-            class="home-hero-title m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] font-ib-display"
+            class="home-hero-title m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[var(--color-home-hero-text)] font-ib-display"
           >
             {{ projectName }}
           </h1>
           <p
             data-home-hero-safe
-            class="home-hero-tagline mt-4 text-ib-title-sm font-normal uppercase tracking-[0.1em] text-[#202124] font-ib-hand"
+            class="home-hero-tagline mt-4 text-ib-title-sm font-normal uppercase tracking-[0.1em] text-[var(--color-home-hero-text)] font-ib-hand"
           >
             AI CANVAS FOR VISUAL DESIGNERS
           </p>
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
               data-home-hero-safe
-              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-board-primary px-10 text-ib-title-sm font-medium text-ib-text-inverse shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-board-primary-hover"
+              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-primary px-10 text-ib-title-sm font-medium text-primary-foreground shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-primary/90"
               @click="startJourney"
             >
               Get started
@@ -48,7 +48,7 @@
         <div class="home-hero-decorations pointer-events-none absolute inset-0 z-[5] h-full w-full">
           <div
             data-home-hero-safe
-            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-ib-meta leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
+            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] border border-[var(--color-home-note-border)] bg-[var(--color-home-note-bg)] px-8 py-7 text-ib-meta leading-[1.5] text-[var(--color-home-note-text)] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
             {{ projectName }} is an AI Canvas for Visual Designers to explore, compare, and refine
             image directions in one connected workspace.
@@ -86,13 +86,13 @@
 
       <nav
         :aria-label="t('canvas.homeHero.legalNavAria')"
-        class="absolute right-4 bottom-4 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-3 gap-y-1 text-ib-meta font-medium text-[#5f6368] sm:right-6 sm:bottom-5 sm:gap-x-5 sm:text-ib-body"
+        class="absolute right-4 bottom-4 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-3 gap-y-1 text-ib-meta font-medium text-[var(--color-home-hero-subtle)] sm:right-6 sm:bottom-5 sm:gap-x-5 sm:text-ib-body"
       >
         <RouterLink
           v-for="link in PUBLIC_LEGAL_LINKS"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center no-underline transition-colors hover:text-[#202124] focus-visible:outline-none focus-visible:underline"
+          class="inline-flex min-h-8 items-center no-underline transition-colors hover:text-[var(--color-home-hero-text)] focus-visible:outline-none focus-visible:underline"
         >
           {{ link.shortLabel }}
         </RouterLink>

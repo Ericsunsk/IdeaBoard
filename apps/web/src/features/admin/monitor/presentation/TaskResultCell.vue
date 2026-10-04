@@ -4,7 +4,7 @@
       v-for="(url, index) in view.preview.urls"
       :key="url"
       type="button"
-      class="block size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-admin-border-soft bg-admin-surface-muted"
+      class="block size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
       :aria-label="MONITOR_MESSAGES.resultInspectAria(row.task_id, index + 1)"
       @click="emit('inspect', row)"
     >
@@ -17,12 +17,12 @@
     </button>
     <span
       v-if="view.preview.overflow > 0"
-      class="shrink-0 font-mono text-xs font-semibold text-admin-text-3"
+      class="shrink-0 font-mono text-xs font-semibold text-muted-foreground"
     >
       +{{ view.preview.overflow }}
     </span>
   </div>
-  <span v-else class="font-mono text-xs text-admin-text-3">-</span>
+  <span v-else class="font-mono text-xs text-muted-foreground">-</span>
 </template>
 
 <script setup lang="ts">

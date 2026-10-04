@@ -40,17 +40,17 @@ const variantClasses = computed(() => {
   const v = props.variant
 
   if (sev === 'error' || sev === 'danger' || v === 'destructive') {
-    return 'border-admin-danger/30 bg-admin-danger-soft text-admin-danger font-medium'
+    return 'border-destructive/20 bg-destructive/15 text-destructive font-medium'
   }
   if (sev === 'warn' || sev === 'warning' || v === 'warning') {
-    return 'border-admin-warning/30 bg-admin-warning-soft text-admin-warning font-medium'
+    return 'border-amber-500/20 bg-amber-500/15 text-admin-warning font-medium'
   }
   if (sev === 'success' || v === 'success') {
-    return 'border-admin-success/30 bg-admin-success-soft text-admin-success font-medium'
+    return 'border-emerald-500/20 bg-emerald-500/15 text-admin-success font-medium'
   }
   if (sev === 'secondary') {
-    return 'border-admin-border bg-admin-surface-muted text-admin-text-2'
+    return 'border-border bg-muted text-muted-foreground'
   }
-  return 'border-admin-info/30 bg-admin-info-soft text-admin-info'
+  return 'border-sky-500/20 bg-sky-500/15 text-admin-info'
 })
 </script>

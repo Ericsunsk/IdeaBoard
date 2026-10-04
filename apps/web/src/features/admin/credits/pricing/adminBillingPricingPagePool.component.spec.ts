@@ -72,8 +72,8 @@ describe('AdminBillingPricingPage model pools', () => {
     expect(screen.getAllByText('b/second').length).toBeGreaterThan(0)
     // 1K appears in the pool summary (a/first [1K][2K][4K]).
     expect(screen.getAllByText('1K').length).toBeGreaterThan(0)
-    // Edit buttons exist for image SKUs only (3 ai-image rows).
-    expect(screen.getAllByRole('button', { name: '编辑模型池' })).toHaveLength(3)
+    // Model pool edit button was removed from the table cells.
+    expect(screen.queryByRole('button', { name: '编辑模型池' })).not.toBeInTheDocument()
   })
 
   it('keeps a failed pool load visible per row without failing the page', async () => {
@@ -88,14 +88,17 @@ describe('AdminBillingPricingPage model pools', () => {
     expect(screen.queryByText('功能定价加载失败')).not.toBeInTheDocument()
   })
 
-  it('opens the pool editor from a Service row', async () => {
+  it('opens the pool editor from the action column settings dialog', async () => {
     useMswHandlers(
       ...createBillingCatalogHandlers(createBillingCatalogMswState()),
       ...poolHandlers(),
     )
     const { user } = renderPricingPage()
 
-    await user.click((await screen.findAllByRole('button', { name: '编辑模型池' }))[0]!)
+    // 抠图是 active 状态，其操作列按钮为“调整”
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    const modelTab = await screen.findByRole('tab', { name: 'Model' })
+    await user.click(modelTab)
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '模型池 · 抠图' })).toBeVisible()
     })

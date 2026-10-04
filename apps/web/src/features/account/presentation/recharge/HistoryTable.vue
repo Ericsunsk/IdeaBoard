@@ -1,6 +1,6 @@
 <template>
   <section class="grid min-w-0 gap-3" aria-labelledby="recharge-history-heading">
-    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-ib-text">
+    <h3 id="recharge-history-heading" class="m-0 text-lg font-bold text-foreground">
       {{ t('account.topUp.historyTitle') }}
     </h3>
     <DataTableFrame
@@ -9,7 +9,7 @@
       :table-style="{ minWidth: '720px' }"
       :table-aria-label="t('account.topUp.historyTableAria')"
       :scroll-aria-label="t('account.topUp.historyTableAria')"
-      frame-class="rounded-ib-panel border border-ib-border-soft bg-ib-surface shadow-ib-control"
+      frame-class="rounded-ib-panel border border-border bg-card shadow-ib-control"
       :empty-title="t('account.topUp.historyEmptyTitle')"
     >
       <DataTableColumn
@@ -20,7 +20,7 @@
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
-            class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted"
+            class="whitespace-nowrap font-mono text-ib-body text-muted-foreground"
             >{{ formatDateTime(data.occurred_at) }}</time
           ></template
         >
@@ -29,7 +29,7 @@
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
-            class="font-mono font-bold text-ib-text"
+            class="font-mono font-bold text-foreground"
             >{{ formatLocaleNumber(data.idea_quantity) }}</span
           ></template
         >
@@ -42,9 +42,9 @@
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="6rem" /><span
             v-else-if="data.paid_amount_minor !== undefined && data.paid_currency"
-            class="whitespace-nowrap font-mono font-semibold text-ib-text-muted"
+            class="whitespace-nowrap font-mono font-semibold text-muted-foreground"
             >{{ formatCurrencyMinor(data.paid_amount_minor, data.paid_currency) }}</span
-          ><span v-else class="font-semibold text-ib-text-subtle">{{
+          ><span v-else class="font-semibold text-muted-foreground">{{
             t('account.topUp.unpaid')
           }}</span></template
         >
@@ -58,7 +58,7 @@
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-semibold"
-            :class="data.status === 'credited' ? 'text-ib-success' : 'text-ib-text-muted'"
+            :class="data.status === 'credited' ? 'text-ib-success' : 'text-muted-foreground'"
             >{{ rechargeStatusLabel(data) }}</span
           ></template
         >
@@ -70,9 +70,9 @@
             :href="data.receipt_url"
             target="_blank"
             rel="noopener noreferrer"
-            class="font-semibold text-ib-creative-accent-pressed"
+            class="font-semibold text-primary"
             >{{ t('account.topUp.viewReceipt') }}</a
-          ><span v-else class="text-ib-text-subtle">—</span></template
+          ><span v-else class="text-muted-foreground">—</span></template
         >
       </DataTableColumn>
 
@@ -82,7 +82,7 @@
           class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
           role="alert"
         >
-          <p class="m-0 font-semibold text-ib-danger">
+          <p class="m-0 font-semibold text-destructive">
             {{ t('account.errors.historyLoadFailed') }}
           </p>
           <Button variant="ghost" size="sm" class="mt-3" @click="emit('retry')">{{
@@ -94,7 +94,7 @@
           class="flex min-h-40 items-center justify-center px-6 py-10 text-center"
           role="status"
         >
-          <span class="font-semibold text-ib-text">{{ t('account.topUp.historyEmptyTitle') }}</span>
+          <span class="font-semibold text-foreground">{{ t('account.topUp.historyEmptyTitle') }}</span>
         </div>
       </template>
 
@@ -109,17 +109,17 @@
         </p>
         <div
           v-if="loadMoreError"
-          class="flex items-center justify-center gap-3 border-t border-ib-border-soft px-4 py-3"
+          class="flex items-center justify-center gap-3 border-t border-border px-4 py-3"
           role="alert"
         >
-          <span class="text-sm text-ib-danger">{{ t('account.topUp.loadMoreFailed') }}</span>
+          <span class="text-sm text-destructive">{{ t('account.topUp.loadMoreFailed') }}</span>
           <Button variant="ghost" size="sm" @click="emit('load-more')">{{
             t('account.topUp.retryLoad')
           }}</Button>
         </div>
         <div
           v-else-if="hasNextPage"
-          class="flex justify-center border-t border-ib-border-soft px-4 py-3"
+          class="flex justify-center border-t border-border px-4 py-3"
         >
           <Button
             variant="outline"

@@ -42,4 +42,26 @@ describe('renderBoardPreviewDataUrl', () => {
       Math.PI * 2,
     )
   })
+
+  it('renders dark mode preview when isDark option is enabled', async () => {
+    let lastFillStyle: unknown
+    const context = {
+      ...createMockCanvasContext(),
+      set fillStyle(value: unknown) {
+        lastFillStyle = value
+      },
+    }
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => context as unknown as CanvasRenderingContext2D,
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(
+      (mimeType?: string) => `data:${mimeType || 'image/png'};base64,empty-dark`,
+    )
+
+    const result = await renderBoardPreviewDataUrl(makeBoardSnapshot(), { isDark: true })
+
+    expect(result).toBe('data:image/avif;base64,empty-dark')
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 760, 490)
+    expect(lastFillStyle).toBe('#282828')
+  })
 })

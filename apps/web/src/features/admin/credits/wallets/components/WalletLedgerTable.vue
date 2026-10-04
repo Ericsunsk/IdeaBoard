@@ -1,9 +1,9 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-2xl border border-admin-border-soft bg-white p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4.5 shadow-2xs"
     aria-labelledby="admin-user-wallet-ledger-title"
   >
-    <div class="overflow-hidden rounded-xl border border-admin-border-soft">
+    <div class="overflow-hidden rounded-xl border border-border">
       <AdminTable
         :value="transactions"
         data-key="transaction_id"
@@ -34,7 +34,7 @@
               :class="
                 data.command_type === 'grant' || data.command_type === 'refund'
                   ? 'text-admin-success'
-                  : 'text-admin-title-color'
+                  : 'text-foreground'
               "
             >
               {{ getCreditCommandSign(data.command_type)
@@ -45,7 +45,7 @@
 
         <AdminColumn :header="t('admin.wallet.balanceAfter')" style="width: 150px">
           <template #body="{ data }">
-            <span class="font-mono text-admin-caption text-admin-text-2">
+            <span class="font-mono text-admin-caption text-muted-foreground">
               {{
                 t('admin.wallet.availableAmount', {
                   amount: formatIdeaAmount(data.available_credits_after),
@@ -58,12 +58,12 @@
         <AdminColumn :header="t('admin.wallet.reasonAndReference')" style="min-width: 220px">
           <template #body="{ data }">
             <div
-              class="max-w-72 truncate text-admin-body-sm text-admin-text-1"
+              class="max-w-72 truncate text-admin-body-sm text-foreground"
               :title="data.reason"
             >
               {{ data.reason || '-' }}
             </div>
-            <div v-if="data.charge" class="mt-0.5 text-admin-caption text-admin-text-3 font-mono">
+            <div v-if="data.charge" class="mt-0.5 text-admin-caption text-muted-foreground font-mono">
               {{
                 t('admin.wallet.refundableAmount', {
                   amount: formatIdeaAmount(data.charge.remaining_refundable_credits),
@@ -75,7 +75,7 @@
 
         <AdminColumn :header="t('admin.wallet.time')" style="width: 160px">
           <template #body="{ data }">
-            <span class="font-mono text-admin-caption text-admin-text-3 whitespace-nowrap">
+            <span class="font-mono text-admin-caption text-muted-foreground whitespace-nowrap">
               {{ formatAdminDateTimeWithSeconds(data.created_at) }}
             </span>
           </template>
@@ -88,12 +88,12 @@
               :label="t('admin.wallet.refund')"
               size="small"
               variant="ghost"
-              class="text-admin-danger hover:text-admin-danger-hover"
+              class="text-destructive hover:text-destructive/80"
               :disabled="commandPending"
               :aria-label="t('admin.wallet.refundAria', { id: data.transaction_id })"
               @click="emit('openRefund', data)"
             />
-            <span v-else class="text-admin-caption text-admin-text-3">-</span>
+            <span v-else class="text-admin-caption text-muted-foreground">-</span>
           </template>
         </AdminColumn>
       </AdminTable>

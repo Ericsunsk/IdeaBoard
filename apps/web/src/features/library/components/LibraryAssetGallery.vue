@@ -14,18 +14,18 @@
       <div
         v-for="n in 6"
         :key="n"
-        class="h-28 animate-pulse rounded-xl bg-board-card-border/50"
+        class="h-28 animate-pulse rounded-xl bg-muted"
       ></div>
     </div>
 
     <!-- 空状态提示 -->
     <div
       v-else-if="!loading && assets.length === 0 && !errorMessage"
-      class="grid h-full min-h-40 place-items-center rounded-[18px] border border-dashed border-board-card-border px-5 text-center"
+      class="grid h-full min-h-40 place-items-center rounded-[18px] border border-dashed border-border px-5 text-center"
     >
       <div>
         <p class="m-0 text-sm font-semibold">{{ t('library.empty.noSavedReferences') }}</p>
-        <p class="mt-1 mb-0 text-xs text-board-page-text-muted">
+        <p class="mt-1 mb-0 text-xs text-muted-foreground">
           {{ t('library.empty.dragOrSaveHint') }}
         </p>
       </div>
@@ -44,12 +44,12 @@
             v-for="asset in column"
             :key="asset.id"
             draggable="true"
-            class="group/libcard relative overflow-hidden rounded-xl bg-board-control-bg/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
+            class="group/libcard relative overflow-hidden rounded-xl bg-card/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
             @dragstart="emit('asset-dragstart', $event, asset)"
           >
             <button
               type="button"
-              class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:shadow-board-focus"
+              class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               :aria-label="
                 t('library.actions.viewSavedReference', {
                   title: asset.title || t('library.states.savedReference'),
@@ -58,12 +58,12 @@
               @click="emit('open-asset', asset)"
             >
               <div
-                class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
+                class="relative overflow-hidden bg-muted/30 backdrop-blur-md"
                 :style="{ aspectRatio: `${asset.width || 1} / ${asset.height || 1}` }"
               >
                 <div
                   v-if="failedImages.has(asset.id)"
-                  class="grid min-h-24 place-items-center px-2 text-center text-xs text-board-page-text-muted"
+                  class="grid min-h-24 place-items-center px-2 text-center text-xs text-muted-foreground"
                 >
                   {{ t('library.states.imageUnavailable') }}
                 </div>
@@ -85,7 +85,7 @@
               <div class="flex justify-end gap-1.5 pointer-events-auto">
                 <button
                   type="button"
-                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-danger transition-colors focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
+                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-destructive transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   :aria-label="t('library.actions.removeSavedReference')"
                   :title="t('library.actions.removeSavedReference')"
                   @click="emit('remove-asset', asset)"
@@ -95,7 +95,7 @@
                 <button
                   v-if="isCanvasPresentation"
                   type="button"
-                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
+                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   :aria-label="t('library.actions.addToCanvas')"
                   :title="t('library.actions.addToCanvas')"
                   @click.stop="emit('add-to-canvas', toCanvasLibraryImportDescriptor(asset))"
@@ -105,7 +105,7 @@
                 <button
                   v-else
                   type="button"
-                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-board-focus cursor-pointer"
+                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   :aria-label="t('library.actions.useAsSearchReference')"
                   :title="t('library.actions.useAsSearchReference')"
                   @click.stop="emit('select-reference', asset)"
@@ -135,7 +135,7 @@
       <button
         v-if="hasMore"
         type="button"
-        class="mx-auto my-3 block rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:shadow-board-focus disabled:opacity-50 cursor-pointer"
+        class="mx-auto my-3 block rounded-full border border-border bg-card/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 cursor-pointer"
         :disabled="loading"
         @click="emit('load-more')"
       >

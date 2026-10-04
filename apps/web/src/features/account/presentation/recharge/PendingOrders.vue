@@ -4,13 +4,13 @@
     class="grid gap-3"
     aria-labelledby="pending-payment-orders-heading"
   >
-    <h3 id="pending-payment-orders-heading" class="m-0 text-lg font-bold text-ib-text">
+    <h3 id="pending-payment-orders-heading" class="m-0 text-lg font-bold text-foreground">
       {{ t('account.topUp.pendingOrdersTitle') }}
     </h3>
 
     <div
       v-if="pending"
-      class="grid gap-2 rounded-ib-panel border border-ib-border-soft bg-ib-surface p-4 shadow-ib-control"
+      class="grid gap-2 rounded-ib-panel border border-border bg-card p-4 shadow-ib-control"
       role="status"
       :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
@@ -20,13 +20,13 @@
 
     <div
       v-else-if="error"
-      class="rounded-ib-panel border border-ib-danger/25 bg-ib-surface p-4 shadow-ib-control"
+      class="rounded-ib-panel border border-destructive/25 bg-card p-4 shadow-ib-control"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">
+      <p class="m-0 font-semibold text-destructive">
         {{ t('account.errors.pendingOrdersLoadFailed') }}
       </p>
-      <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">{{ errorMessage(error) }}</p>
       <Button variant="ghost" size="sm" class="mt-2" @click="emit('retry')">{{
         t('account.reload')
       }}</Button>
@@ -37,17 +37,17 @@
         v-for="item in items"
         :key="item.public_token"
         :data-testid="`pending-payment-order-${item.public_token}`"
-        class="rounded-ib-panel border border-ib-border-soft bg-ib-surface p-3.5 shadow-ib-control sm:p-4"
+        class="rounded-ib-panel border border-border bg-card p-3.5 shadow-ib-control sm:p-4"
       >
         <div class="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
           <div class="min-w-0">
-            <p class="m-0 font-mono text-lg font-bold text-ib-text">
+            <p class="m-0 font-mono text-lg font-bold text-foreground">
               {{ formatIdeaAmount(item.idea_quantity) }}
             </p>
             <p class="mt-1 mb-0 text-sm font-semibold" :class="statusTone(item.status)">
               {{ statusText(item) }}
             </p>
-            <p class="mt-1 mb-0 text-ib-body text-ib-text-muted">
+            <p class="mt-1 mb-0 text-ib-body text-muted-foreground">
               {{ expiryText(item) }}
             </p>
           </div>
@@ -74,10 +74,10 @@
 
         <div
           v-if="actionError && actionTarget?.publicToken === item.public_token"
-          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ib-control border border-ib-danger/25 bg-ib-surface-muted px-3 py-2"
+          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ib-control border border-destructive/25 bg-muted px-3 py-2"
           role="alert"
         >
-          <span class="text-sm font-semibold text-ib-danger">{{ errorMessage(actionError) }}</span>
+          <span class="text-sm font-semibold text-destructive">{{ errorMessage(actionError) }}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -168,9 +168,9 @@ function statusText(item: PendingPaymentOrder) {
 function statusTone(status: PendingPaymentOrder['status']) {
   if (status === 'credited') return 'text-ib-success'
   if (status === 'expired' || status === 'cancelled' || status === 'payment_failed') {
-    return 'text-ib-text-muted'
+    return 'text-muted-foreground'
   }
-  return 'text-ib-creative-accent-pressed'
+  return 'text-primary'
 }
 
 function isCreditProcessingDelayed(updatedAt: string) {

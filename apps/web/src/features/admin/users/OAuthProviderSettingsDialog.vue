@@ -20,15 +20,15 @@
           class="group relative flex items-center justify-between rounded-xl border p-3 cursor-pointer transition-colors select-none"
           :class="
             selectedProvider === provider.value
-              ? 'border-admin-accent bg-admin-accent-soft/30 shadow-2xs'
-              : 'border-admin-border-soft bg-admin-surface-muted/40 hover:border-admin-border hover:bg-admin-surface-muted'
+              ? 'border-primary bg-primary/10 shadow-2xs'
+              : 'border-border bg-muted/40 hover:border-border hover:bg-muted'
           "
           @click="selectedProvider = provider.value"
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-admin-border-soft bg-white p-1.5 shadow-2xs"
+              class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card p-1.5 shadow-2xs"
               :aria-label="USERS_MESSAGES.oauthSelectLogoAria(provider.label)"
               @click.stop="openLogoPicker($event, provider.value)"
             >
@@ -39,7 +39,7 @@
                 aria-hidden="true"
               />
             </button>
-            <span class="text-admin-body font-bold text-admin-title-color truncate">
+            <span class="text-admin-body font-bold text-foreground truncate">
               {{ provider.label }}
             </span>
           </div>
@@ -74,13 +74,13 @@
 
       <!-- 2. 当前选中 Provider 的凭据与回调配置区 -->
       <div
-        class="flex flex-col gap-3.5 rounded-xl border border-admin-border-soft bg-white p-4 shadow-2xs"
+        class="flex flex-col gap-3.5 rounded-xl border border-border bg-card p-4 shadow-2xs"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-admin-border-soft bg-admin-surface-muted p-1"
+              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-muted p-1"
               :aria-label="USERS_MESSAGES.oauthSelectLogoAria(providerLabel)"
               @click="openLogoPicker($event, selectedProvider)"
             >
@@ -91,7 +91,7 @@
                 aria-hidden="true"
               />
             </button>
-            <h3 class="m-0 text-admin-body-sm font-bold text-admin-title-color">
+            <h3 class="m-0 text-admin-body-sm font-bold text-foreground">
               {{ USERS_MESSAGES.oauthCredentialsTitle(providerLabel) }}
             </h3>
           </div>
@@ -166,7 +166,7 @@
               {{ USERS_MESSAGES.oauthCopyCallback }}
             </AdminButton>
           </div>
-          <p class="m-0 mt-1 text-admin-micro text-admin-text-3">
+          <p class="m-0 mt-1 text-admin-micro text-muted-foreground">
             {{
               USERS_MESSAGES.oauthCallbackHint(
                 providerLabel === 'Google' ? 'Google Cloud Console' : 'Discord Developer Portal',

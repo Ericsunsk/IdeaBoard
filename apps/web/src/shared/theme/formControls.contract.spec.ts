@@ -25,10 +25,10 @@ describe('User form input contract', () => {
     // user buttons already focus with.
     expect(ibFormInputClass).toContain(' h-10 ')
     expect(ibFormInputClass).not.toContain('h-12')
-    expect(ibFormInputClass).toContain('focus-visible:shadow-ib-focus')
+    expect(ibFormInputClass).toContain('focus-visible:ring-ring/20')
     // Border and glow share one modality, like Admin's focus-visible pair.
-    expect(ibFormInputClass).toContain('focus-visible:border-ib-creative-accent')
-    expect(ibFormInputClass).not.toContain('focus:border-ib-creative-accent')
+    expect(ibFormInputClass).toContain('focus-visible:border-primary')
+    expect(ibFormInputClass).not.toContain('focus:border-primary')
   })
 
   it('leaves the focus border to the surface skins, never the primitive', () => {
@@ -78,14 +78,14 @@ describe('User form input contract', () => {
       'features/canvas/presentation/nodes/primitives',
       'PromptComposerControls.vue',
     )
-    expect(composer).toContain('focus-visible:shadow-ib-focus')
+    expect(composer).toContain('focus-visible:ring-ring/20')
   })
 
   it('keeps the shared error chrome on the user danger tokens', () => {
     // `!` is load-bearing: the base chrome's hover border (0,2,0) otherwise
     // beats the plain error border (0,1,0) and hides the error under the mouse.
-    expect(ibFormInputErrorClass).toContain('!border-ib-danger')
-    expect(ibFormInputErrorClass).toContain('focus:bg-ib-danger/5')
+    expect(ibFormInputErrorClass).toContain('!border-destructive')
+    expect(ibFormInputErrorClass).toContain('focus:bg-destructive/5')
   })
 
   it('keeps the Admin invalid border above hover and focus too', () => {

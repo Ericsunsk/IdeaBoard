@@ -40,7 +40,7 @@ const props = withDefaults(
   {
     titleTag: 'span',
     headerClass: 'p-6 pb-2',
-    titleClass: 'text-ib-icon font-medium text-ib-text',
+    titleClass: 'text-ib-icon font-medium text-foreground',
     class: undefined,
     elevated: undefined,
   },

@@ -299,5 +299,5 @@ export function modelProviderBadgeClass(provider: string): string {
   if (p.includes('google') || p.includes('vertex'))
     return 'bg-sky-50 text-sky-700 border border-sky-200'
   if (p.includes('groq')) return 'bg-rose-50 text-rose-700 border border-rose-200'
-  return 'bg-admin-surface-muted text-admin-text-2 border border-admin-border-soft'
+  return 'bg-muted text-muted-foreground border border-border'
 }

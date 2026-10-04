@@ -1,7 +1,7 @@
 <template>
   <section class="grid min-w-0 gap-6" :aria-labelledby="titleId">
     <header>
-      <h2 :id="titleId" class="m-0 text-ib-modal-title leading-tight font-bold text-ib-text">
+      <h2 :id="titleId" class="m-0 text-ib-modal-title leading-tight font-bold text-foreground">
         {{ title }}
       </h2>
     </header>

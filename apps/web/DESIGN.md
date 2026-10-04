@@ -52,6 +52,51 @@ Token ownership:
 - `--color-ib-*`: cross-feature semantic aliases.
 - `--color-ib-auth-*`: Auth/User Shell.
 
+### Legacy Token Decommission (Contract)
+
+Component-layer usage of legacy domain color tokens is frozen and enforced
+by the `legacy-token` rule in `scripts/checkStyleGovernance.ts`: any new
+`admin-*` / `board-*` / `ib-*` color utility or direct
+`var(--color-admin/board/ib-*)` reference outside the pinned infrastructure
+files fails the Web Quality lane, and shrinking a pinned count trips the
+stale-allowance check.
+
+Deliberately kept, not omissions:
+
+- Domain color systems: task status palette (`status.ts`), credit health
+  presentation mapping, auth shell skin (`modalUi.ts`,
+  `RegisterAuthPanel.vue`), canvas chrome identity (`canvas-chrome.css`,
+  pinned by `canvasSurfaceSkin.contract.spec.ts`), board thumbnail bake
+  (`boardPreviewStyle.ts`, `BoardCard.vue` preview gradients).
+- Form invalid borders (`!border-admin-danger`), pinned by
+  `formControls.contract.spec.ts` (see Form Inputs below).
+- Private resolution infrastructure: `--color-*` declarations in
+  `src/app/style.css` / `src/shared/theme/tokens/dark.css` and the
+  `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
+  tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`, …)
+  resolve through the `ib-*` alias tier, so deleting those declarations
+  would break tier 3 itself — the decommission stops at the component layer
+  by design, not by omission.
+
+Type scale (`text-ib-*` / `text-admin-*` sizes) is unaffected by the freeze.
+Dark mode ships through token resolution (`html.dark` overrides in
+`src/shared/theme/tokens/dark.css`); `dark:` overrides stay banned because
+semantic tokens already cover both modes.
+
+Out of freeze scope, by design:
+
+- Elevation (`shadow-ib-*`, `shadow-board-*`): shadow tokens are elevation,
+  not color. Components may keep `shadow-ib-control` / `shadow-ib-overlay` /
+  `shadow-board-dialog`; do not conflate them with the color freeze.
+- Tier-3 dual source: `src/app/style.css` `@theme` and
+  `src/shared/theme/tokens/semantic-light.css` (`@layer base` `:root`) both
+  declare standard names (`--color-primary`, `--color-foreground`, …), and the
+  same holds for canvas tokens (`@theme` vs `tokens/canvas.css`).
+  Verified against the built bundle: `@layer base` wins over `@layer theme`,
+  so the token files are the effective runtime values and `@theme` keeps the
+  keys for utility generation. Token edits must update both sides; collapsing
+  to a single tier is deferred cleanup, not a freeze violation.
+
 ### Text Color Ramp Standard
 
 Every surface names its text ramp by **role**, never by ordinal. Ordinal names
@@ -185,7 +230,7 @@ stricter 32px floor, declared once as `--spacing-ib-touch-target-min` in
 (`scripts/checkTouchTargetContract.ts`).
 
 Controls that are visually small by design do not inflate to 32px. Instead the *hit
-area* grows past the visual box through `src/shared/theme/touch-target.css`:
+area* grows past the visual box through `src/shared/theme/atoms/touch-target.css`:
 
 | Class | Grows to | Use for |
 | --- | --- | --- |

@@ -5,9 +5,9 @@
     v-bind="$attrs"
     :class="
       cn(
-        // min-h-8 (32px) is the repo touch-target floor; the surrounding
-        // AdminTabsList is h-9, so the taller trigger still fits its rail.
-        'inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-admin-caption font-medium text-admin-text-2 transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 hover:text-admin-text-1 data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-admin-text-1 data-[state=active]:shadow-xs',
+        // h-7 (28px) perfectly fits the h-9 (36px) rail with p-1 (4px padding all around).
+        // ib-hit-target-32-inline preserves the repo 32px touch-target floor along the block axis.
+        'inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-admin-caption font-medium text-muted-foreground transition-colors cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 hover:text-foreground data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-xs ib-hit-target-32-inline',
         props.class,
       )
     "

@@ -85,7 +85,7 @@
           <template #header-extra>
             <button
               type="button"
-              class="-my-1 inline-flex min-h-8 items-center border-0 bg-transparent px-1 text-ib-caption font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
+              class="-my-1 inline-flex min-h-8 items-center border-0 bg-transparent px-1 text-ib-caption font-semibold text-primary transition-colors hover:text-primary/90 hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
               :disabled="loading"
               @click="resetMode = true"
             >
@@ -109,7 +109,7 @@
         novalidate
         @submit.prevent="handleResetPassword"
       >
-        <p class="text-xs text-ib-text-subtle">{{ t('auth.resetPasswordInstructions') }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('auth.resetPasswordInstructions') }}</p>
         <EmailField
           v-model="resetForm.email"
           :label="t('auth.fields.email')"
@@ -130,7 +130,7 @@
         >
         <button
           type="button"
-          class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
+          class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/90 hover:underline cursor-pointer disabled:opacity-60"
           :disabled="loading"
           @click="resetMode = false"
         >

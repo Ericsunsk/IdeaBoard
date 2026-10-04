@@ -9,7 +9,7 @@
     <span :class="['size-1.5 rounded-full', view.metric.dotClass]" />
     <span>{{ view.metric.label }}</span>
   </span>
-  <span v-else class="text-xs text-admin-text-3 font-mono">
+  <span v-else class="text-xs text-muted-foreground font-mono">
     {{ row.status }}
   </span>
 </template>

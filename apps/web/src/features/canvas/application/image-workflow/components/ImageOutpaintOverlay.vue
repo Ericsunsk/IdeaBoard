@@ -96,8 +96,8 @@ function onSubmit(prompt: string) {
 
 .image-node-outpaint-frame {
   --outpaint-frame-stroke: 2px;
-  --outpaint-frame-accent: var(--color-canvas-accent);
-  --outpaint-frame-grid: var(--color-canvas-accent);
+  --outpaint-frame-accent: var(--canvas-accent);
+  --outpaint-frame-grid: var(--canvas-accent);
   --outpaint-frame-contrast: rgba(255, 255, 255, 0.74);
   --outpaint-handle-center-inset: calc(var(--outpaint-frame-stroke) / 2);
   position: absolute;

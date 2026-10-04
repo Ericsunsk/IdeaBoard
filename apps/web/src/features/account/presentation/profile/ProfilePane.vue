@@ -3,11 +3,11 @@
     <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
       <div class="flex min-w-0 items-start gap-5 sm:items-center">
         <div
-          class="relative size-20 shrink-0 overflow-visible rounded-ib-pill bg-ib-surface-raised shadow-ib-control sm:size-[88px]"
+          class="relative size-20 shrink-0 overflow-visible rounded-ib-pill bg-card shadow-ib-control sm:size-[88px]"
         >
           <button
             type="button"
-            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-ib-pill border-0 bg-transparent p-0 text-ib-text-inverse outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-ib-focus disabled:cursor-wait"
+            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-ib-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-ib-focus disabled:cursor-wait"
             :disabled="avatarUploading"
             :aria-busy="avatarUploading"
             :aria-label="t('account.profile.changeAvatar')"
@@ -22,13 +22,13 @@
                 class="rounded-full object-cover"
               />
               <AvatarFallback
-                class="bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-ib-summary-value font-bold text-ib-text-inverse sm:text-[34px]"
+                class="bg-primary text-ib-summary-value font-bold text-primary-foreground sm:text-[34px]"
               >
                 {{ userInitial }}
               </AvatarFallback>
             </Avatar>
             <span
-              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-ib-pill bg-[color-mix(in_srgb,var(--color-ib-text)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-ib-pill bg-[color-mix(in_srgb,var(--color-foreground)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 avatarUploading
                   ? 'opacity-100'
@@ -53,7 +53,7 @@
 
         <div class="min-w-0">
           <p
-            class="m-0 truncate text-[24px] leading-tight font-bold tracking-normal text-ib-text sm:text-[30px]"
+            class="m-0 truncate text-[24px] leading-tight font-bold tracking-normal text-foreground sm:text-[30px]"
           >
             {{ userStore.user?.display_name }}
           </p>
@@ -78,18 +78,18 @@
     </section>
 
     <section class="min-w-0" :aria-label="t('account.profile.accountInfoAria')">
-      <dl class="m-0 border-y border-ib-border-soft">
+      <dl class="m-0 border-y border-border">
         <div
           v-for="field in profileFields"
           :key="field.label"
-          class="grid min-h-14 grid-cols-1 items-center gap-1 border-b border-ib-border-soft py-3 last:border-b-0 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4"
+          class="grid min-h-14 grid-cols-1 items-center gap-1 border-b border-border py-3 last:border-b-0 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4"
         >
-          <dt class="text-ib-body font-semibold text-ib-text-subtle">
+          <dt class="text-ib-body font-semibold text-muted-foreground">
             {{ field.label }}
           </dt>
           <dd class="m-0 min-w-0">
             <span
-              class="block truncate text-ib-title-sm font-semibold text-ib-text"
+              class="block truncate text-ib-title-sm font-semibold text-foreground"
               :class="field.mono ? 'font-mono text-ib-content' : ''"
               :title="field.value"
             >

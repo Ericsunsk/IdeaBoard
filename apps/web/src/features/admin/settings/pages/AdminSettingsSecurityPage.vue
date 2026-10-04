@@ -16,11 +16,11 @@
           @update:model-value="handleToggleRegistration"
         />
       </div>
-      <span v-else class="text-xs text-admin-text-3/50 select-none">—</span>
+      <span v-else class="text-xs text-muted-foreground/50 select-none">—</span>
     </template>
 
     <template #expansion="{ data }">
-      <div class="border-t border-admin-border-soft bg-admin-bg p-4 md:p-5">
+      <div class="border-t border-border bg-card p-4 md:p-5">
         <!-- 1. 注册与 API 限流编辑表单 -->
         <SettingEditorCard
           v-if="data.id === 'registration_ratelimit'"
@@ -35,13 +35,13 @@
         >
           <div :class="settingCardBodyClass">
             <div
-              class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
+              class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-border bg-muted/50 px-4 py-3"
             >
               <div class="flex flex-col">
-                <span class="text-admin-body font-bold text-admin-text-1">{{
+                <span class="text-admin-body font-bold text-foreground">{{
                   SETTINGS_MESSAGES.registrationOpen
                 }}</span>
-                <span class="text-admin-caption text-admin-text-3">{{
+                <span class="text-admin-caption text-muted-foreground">{{
                   SETTINGS_MESSAGES.registrationHint
                 }}</span>
               </div>

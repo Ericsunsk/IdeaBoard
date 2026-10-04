@@ -1,7 +1,7 @@
 <template>
   <div :class="['relative', fluid ? 'min-w-[220px] max-w-md flex-1' : 'w-full sm:w-[260px]']">
     <Search
-      class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-admin-text-3"
+      class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"
     />
     <AdminInput
       :model-value="modelValue"
@@ -15,7 +15,7 @@
       v-if="modelValue"
       variant="ghost"
       size="icon"
-      class="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-md text-admin-text-3 hover:text-admin-text-1"
+      class="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground"
       aria-label="清空搜索"
       @click="handleClear"
     >

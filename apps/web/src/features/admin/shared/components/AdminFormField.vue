@@ -2,7 +2,7 @@
   <label :for="props.for" :class="fieldClass">
     <span :class="labelTextClass">
       {{ label }}
-      <span v-if="required" class="text-admin-danger" aria-hidden="true">*</span>
+      <span v-if="required" class="text-destructive" aria-hidden="true">*</span>
     </span>
 
     <slot v-bind="slotProps" />
@@ -10,11 +10,11 @@
     <p
       v-if="hasError"
       :id="errorElementId"
-      class="m-0 text-admin-caption font-medium text-admin-danger"
+      class="m-0 text-admin-caption font-medium text-destructive"
     >
       {{ error }}
     </p>
-    <p v-else-if="hint" :id="hintElementId" class="m-0 text-admin-caption text-admin-text-3">
+    <p v-else-if="hint" :id="hintElementId" class="m-0 text-admin-caption text-muted-foreground">
       {{ hint }}
     </p>
   </label>
@@ -63,7 +63,7 @@ const fieldClass = computed(() =>
   props.bodyClass ? ['flex min-w-0 flex-col', props.bodyClass] : 'flex min-w-0 flex-col gap-1.5',
 )
 const labelTextClass = computed(
-  () => props.labelClass || 'text-admin-meta font-[680] text-admin-text-2',
+  () => props.labelClass || 'text-admin-meta font-[680] text-muted-foreground',
 )
 const slotProps = computed<AdminFormFieldSlotProps>(() => ({
   describedbyId: describedbyId.value,

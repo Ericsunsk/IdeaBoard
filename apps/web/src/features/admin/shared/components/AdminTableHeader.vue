@@ -1,5 +1,5 @@
 <template>
-  <thead :class="cn('[&_tr]:border-b [&_tr]:border-admin-border', props.class)">
+  <thead :class="cn('[&_tr]:border-b [&_tr]:border-border', props.class)">
     <slot />
   </thead>
 </template>

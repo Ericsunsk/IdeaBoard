@@ -77,15 +77,15 @@ describe('BillingPane', () => {
       'Ideas change',
       'Balance after',
     ])
-    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('text-ib-text')
+    expect(screen.getAllByRole('columnheader')[0]).toHaveClass('text-foreground')
     expect(screen.getByRole('region', { name: 'Transactions table' })).toHaveClass(
       'app-scrollbar',
       'overflow-x-auto',
     )
     expect(screen.getAllByText('07/14/2026, 09:08:07')).toHaveLength(3)
-    expect(screen.getByText('-20')).toHaveClass('text-ib-text')
+    expect(screen.getByText('-20')).toHaveClass('text-foreground')
     expect(screen.getByText('+50')).toHaveClass('text-ib-success')
-    expect(screen.getByText('-5')).toHaveClass('text-ib-danger')
+    expect(screen.getByText('-5')).toHaveClass('text-destructive')
     expect(screen.getByText('1,030')).toBeVisible()
   })
 

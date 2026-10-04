@@ -89,7 +89,7 @@ describe('RewardsPane', () => {
 
     const redeemButton = screen.getByRole('button', { name: 'Redeem' })
     expect(redeemButton).not.toHaveClass('p-button')
-    expect(redeemButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
+    expect(redeemButton).toHaveClass('bg-primary', 'text-primary-foreground')
   })
 
   it('submits a trimmed redemption code through the local reward workflow', async () => {

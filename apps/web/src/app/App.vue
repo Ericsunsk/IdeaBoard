@@ -7,6 +7,7 @@
   <Toaster
     class="ideaboard-toaster"
     position="top-center"
+    :theme="isDark ? 'dark' : 'light'"
     :visible-toasts="4"
     :close-button="true"
     :rich-colors="false"
@@ -24,6 +25,9 @@ import { watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
 import { i18n } from '../shared/i18n'
+import { useTheme } from '../shared/theme/composables/useTheme'
+
+const { isDark } = useTheme()
 
 const { logoURL } = useSiteBranding({ fallback: i18n.global.t('account.branding.loadFailed') })
 const iconoirProps = {

@@ -33,7 +33,7 @@
         />
 
         <!-- 错误提示 -->
-        <div v-if="firstValidationError" class="text-xs text-admin-danger" role="alert">
+        <div v-if="firstValidationError" class="text-xs text-destructive" role="alert">
           {{ firstValidationError }}
         </div>
       </div>

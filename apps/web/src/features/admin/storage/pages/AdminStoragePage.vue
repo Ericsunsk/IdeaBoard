@@ -41,11 +41,11 @@
 
       <!-- 次级统计提示条：共 X 个对象存储 -->
       <div v-if="!loading" class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1">
+        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">
             {{ STORAGE_MESSAGES.storageCount(filteredStorageRows.length) }}
           </span>
-          <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
+          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
             {{ STORAGE_MESSAGES.totalCount(allStorageRows.length) }}
           </span>
         </div>

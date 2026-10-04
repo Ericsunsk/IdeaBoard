@@ -1,35 +1,55 @@
 @import 'tailwindcss';
-@import '../shared/theme/interactive-control-state.css';
-@import '../shared/theme/touch-target.css';
-@import '../shared/theme/brand-mark.css';
-@import '../shared/theme/board-page-background.css';
-@import '../shared/theme/round-control.css';
-@import '../shared/theme/page-chrome.css';
-@import '../shared/theme/user-avatar-button.css';
+@import '../shared/theme/atoms/interactive-control-state.css';
+@import '../shared/theme/atoms/touch-target.css';
+@import '../shared/theme/atoms/brand-mark.css';
+@import '../shared/theme/atoms/board-page-background.css';
+@import '../shared/theme/atoms/round-control.css';
+@import '../shared/theme/atoms/page-chrome.css';
+@import '../shared/theme/atoms/user-avatar-button.css';
+@import '../shared/theme/tokens/index.css';
 
 @theme {
+  /* ── Primitive Light Elevation Palette Scale (Linear/Vercel standard) ── */
+  --palette-light-0: #fbfbfb;            /* Level 0: Global canvas & workspace base */
+  --palette-light-1: #ffffff;            /* Level 1: Elevated card strong, dialog shell */
+  --palette-light-2: #f5f5f5;            /* Level 2: Surface muted, secondary container */
+  --palette-light-3: #fafafa;            /* Level 3: Inputs, controls, interactive elements */
+  --palette-light-hover: #f0f0f0;        /* Level 3.5: Control hover state */
+  --palette-light-surface-pressed: #e5e5e5;/* Level 3.6: Control pressed state */
+  --palette-light-border: #e5e7eb;       /* Base structural borders & dividers */
+  --palette-light-border-soft: #ececec;  /* Softer structural borders */
+  --palette-light-border-hover: #d4d4d4; /* Interactive border hover state */
+  --palette-light-border-pressed: #bfbfbf;/* Border pressed state */
+
+  /* ── Primitive Light Typography Scale (WCAG AAA/AA monotonic ramp) ── */
+  --palette-light-title: #171717;        /* High-emphasis titles */
+  --palette-light-text-1: #313131;       /* Primary body text (AAA >= 7.0:1) */
+  --palette-light-text-label: #52525b;   /* Section labels / legends */
+  --palette-light-text-2: #62626a;       /* Secondary / muted text (AA >= 4.5:1) */
+  --palette-light-text-3: #696971;       /* Tertiary / captions / icons */
+
   --font-admin:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  --color-admin-bg: #fbfbfb;
+  --color-admin-bg: var(--palette-light-0);
   --color-admin-shell: rgba(255, 255, 255, 0.62);
   --color-admin-card: rgba(255, 255, 255, 0.94);
-  --color-admin-card-strong: #ffffff;
-  --color-admin-border: #e5e7eb;
-  --color-admin-border-soft: #ececec;
-  --color-admin-border-hover: #d4d4d4;
-  --color-admin-border-pressed: #bfbfbf;
-  --color-admin-text-1: #313131;
-  --color-admin-text-2: #62626a;
+  --color-admin-card-strong: var(--palette-light-1);
+  --color-admin-border: var(--palette-light-border);
+  --color-admin-border-soft: var(--palette-light-border-soft);
+  --color-admin-border-hover: var(--palette-light-border-hover);
+  --color-admin-border-pressed: var(--palette-light-border-pressed);
+  --color-admin-text-1: var(--palette-light-text-1);
+  --color-admin-text-2: var(--palette-light-text-2);
   /* `label` is the "group heading / fieldset legend" level: heavier than
      `text-2` but lighter than `text-1`. Formerly named `text-2-strong`, which
      read as "stronger than text-2" while actually sitting *between* the two. */
-  --color-admin-text-label: #52525b;
+  --color-admin-text-label: var(--palette-light-text-label);
   --color-admin-text-2-strong: var(--color-admin-text-label);
-  --color-admin-text-3: #696971;
-  --color-admin-text-disabled: #d4d4d4;
-  --color-admin-text-inverse: #ffffff;
-  --color-admin-title-color: #171717;
+  --color-admin-text-3: var(--palette-light-text-3);
+  --color-admin-text-disabled: var(--palette-light-border-hover);
+  --color-admin-text-inverse: var(--palette-light-1);
+  --color-admin-title-color: var(--palette-light-title);
   --color-admin-subtitle-color: var(--color-admin-text-2);
   --color-admin-accent: var(--color-ib-creative-accent);
   --color-admin-accent-hover: var(--color-ib-creative-accent-hover);
@@ -37,11 +57,11 @@
   --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
   --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
   --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
-  --color-admin-surface-muted: #f5f5f5;
-  --color-admin-surface-hover: #f0f0f0;
-  --color-admin-surface-pressed: #e5e5e5;
+  --color-admin-surface-muted: var(--palette-light-2);
+  --color-admin-surface-hover: var(--palette-light-hover);
+  --color-admin-surface-pressed: var(--palette-light-surface-pressed);
   --color-admin-surface-disabled: var(--color-admin-surface-muted);
-  --color-admin-control-bg: #fafafa;
+  --color-admin-control-bg: var(--palette-light-3);
   --color-admin-control-bg-hover: var(--color-admin-surface-hover);
   --color-admin-control-border: var(--color-admin-border);
   --color-admin-control-border-hover: var(--color-admin-border-hover);
@@ -91,6 +111,7 @@
   --color-canvas-workspace-bg: #e7e7e7;
   --color-canvas-surface-bg: #f7f7f7;
   --color-canvas-neutral-line: rgb(177 177 183 / 65%);
+  --color-canvas-dot: #c9ced8;
   --color-canvas-edge: rgba(0, 0, 0, 0.2);
   --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
   --color-canvas-edge-running: var(--color-canvas-edge-selected);
@@ -111,10 +132,15 @@
   --color-canvas-text-muted: #5d6577;
   --color-canvas-text-control: var(--color-canvas-text-secondary);
   --color-canvas-text-option: var(--color-canvas-text-muted);
+  --color-canvas-text-inverse: var(--palette-light-1);
   --color-canvas-tooltip-bg: rgba(24, 24, 27, 0.94);
   --color-canvas-tooltip-text: #f4f4f5;
   --color-canvas-running-from: #9278e6;
   --color-canvas-running-to: #6dbef7;
+  --color-canvas-glass-bg: rgba(255, 255, 255, 0.85);
+  --color-canvas-minimap-node: rgba(0, 0, 0, 0.28);
+  --color-canvas-minimap-viewport: rgba(0, 0, 0, 0.38);
+  --color-canvas-minimap-mask: rgba(0, 0, 0, 0.08);
 
   /* ── Page surface tokens ─────────────────────────────────── */
   --color-ib-page-dot: #e2e4e8;
@@ -145,6 +171,13 @@
   --spacing-ib-touch-target-min: 32px;
   /* AA floor, drag handles only (see touch-target.css). */
   --spacing-ib-touch-target-aa: 24px;
+
+  /* ── Marketing landing page tokens ───────────────────────── */
+  --color-home-hero-text: #202124;
+  --color-home-hero-subtle: #5f6368;
+  --color-home-note-bg: #e6ded5;
+  --color-home-note-border: transparent;
+  --color-home-note-text: var(--color-home-hero-text);
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
   --ib-glass-blur: 12px;
@@ -285,6 +318,15 @@
   --color-ib-auth-link-hover: var(--color-ib-creative-accent-pressed);
   --color-ib-auth-close: var(--color-ib-text-muted);
   --color-ib-auth-close-hover: var(--color-ib-text);
+
+  /* ── Toast semantic tokens ── */
+  --color-ib-toast-bg: rgba(255, 255, 255, 0.92);
+  --color-ib-toast-border: var(--palette-light-border);
+  --color-ib-toast-text: var(--palette-light-text-1);
+  --color-ib-toast-muted: var(--palette-light-text-2);
+  --color-ib-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  --color-ib-toast-highlight: rgba(38, 54, 79, 0.08);
+  --color-ib-toast-button: var(--color-ib-creative-accent-hover);
 
   /* ── shadcn-vue standard theme mappings ─────────────────── */
   --color-background: var(--color-ib-page);
@@ -441,16 +483,18 @@
 /* App-owned global: Sonner renders outside feature components and only exposes data selectors.
    Palette values resolve from app tokens so toasts cannot drift from the surfaces. */
 [data-sonner-toaster].ideaboard-toaster {
-  --ideaboard-toast-bg: rgba(255, 255, 255, 0.9);
-  --ideaboard-toast-border: var(--color-ib-border);
-  --ideaboard-toast-text: var(--color-ib-text);
-  --ideaboard-toast-muted: var(--color-ib-text-muted);
-  --ideaboard-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  --ideaboard-toast-bg: var(--color-ib-toast-bg);
+  --ideaboard-toast-border: var(--color-ib-toast-border);
+  --ideaboard-toast-text: var(--color-ib-toast-text);
+  --ideaboard-toast-muted: var(--color-ib-toast-muted);
+  --ideaboard-toast-shadow: var(--color-ib-toast-shadow);
+  --ideaboard-toast-highlight: var(--color-ib-toast-highlight);
+  --ideaboard-toast-button: var(--color-ib-toast-button);
   --ideaboard-toast-accent: var(--color-ib-accent);
-  --ideaboard-toast-success: var(--color-ib-success);
-  --ideaboard-toast-warning: var(--color-ib-warning);
-  --ideaboard-toast-error: var(--color-ib-danger);
-  --ideaboard-toast-info: var(--color-ib-info);
+  --ideaboard-toast-success: var(--color-admin-success);
+  --ideaboard-toast-warning: var(--color-admin-warning);
+  --ideaboard-toast-error: var(--color-admin-danger);
+  --ideaboard-toast-info: var(--color-admin-info);
   width: min(300px, calc(100vw - 28px));
 }
 
@@ -460,12 +504,12 @@
   border: 1px solid var(--ideaboard-toast-border);
   border-radius: 14px;
   background:
-    radial-gradient(circle at 18% 20%, rgba(38, 54, 79, 0.1) 0%, rgba(38, 54, 79, 0) 58%),
+    radial-gradient(circle at 18% 20%, var(--ideaboard-toast-highlight) 0%, transparent 58%),
     var(--ideaboard-toast-bg);
   box-shadow: var(--ideaboard-toast-shadow);
   color: var(--ideaboard-toast-text);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   /* Surface click dismisses (see installClickToDismiss in useAppToast). */
   cursor: pointer;
 }
@@ -531,7 +575,7 @@
 [data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-button] {
   border: 0;
   background: transparent;
-  color: var(--color-ib-creative-accent);
+  color: var(--ideaboard-toast-button);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
@@ -553,7 +597,8 @@ body.admin-route {
 html.admin-route,
 html.admin-route body,
 html.admin-route #app {
-  background: var(--color-ib-surface);
+  background: var(--color-background);
+  color: var(--color-foreground);
 }
 
 .app-scrollbar {

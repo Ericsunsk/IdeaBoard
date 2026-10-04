@@ -1,11 +1,11 @@
 <template>
   <div :aria-label="BILLING_PRICING_MESSAGES.poolSummaryAria(props.displayName)">
-    <span v-if="props.failed" class="truncate font-mono text-xs text-admin-text-3">
+    <span v-if="props.failed" class="truncate font-mono text-xs text-muted-foreground">
       {{ BILLING_PRICING_MESSAGES.poolLoadFailed }}
     </span>
     <span
       v-else-if="!props.pool || props.pool.entries.length === 0"
-      class="truncate font-mono text-xs text-admin-text-3"
+      class="truncate font-mono text-xs text-muted-foreground"
     >
       {{ BILLING_PRICING_MESSAGES.poolEmpty }}
     </span>
@@ -16,12 +16,12 @@
         class="flex min-w-0 items-center gap-1.5"
         :class="entry.enabled ? undefined : 'opacity-55'"
       >
-        <span class="truncate font-mono text-xs text-admin-text-1">{{ entry.modelId }}</span>
+        <span class="truncate font-mono text-xs text-foreground">{{ entry.modelId }}</span>
         <span class="flex shrink-0 items-center gap-0.5">
           <span
             v-for="resolution in entry.resolutions"
             :key="resolution"
-            class="rounded bg-admin-surface-muted px-1 py-px font-mono text-admin-caption font-medium text-admin-text-2"
+            class="rounded bg-muted px-1 py-px font-mono text-admin-caption font-medium text-muted-foreground"
           >
             {{ resolution.toUpperCase() }}
           </span>

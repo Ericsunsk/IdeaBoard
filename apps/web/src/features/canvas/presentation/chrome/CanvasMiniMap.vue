@@ -309,6 +309,9 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
 
 .canvas-minimap-viewport-fill {
   fill: var(--canvas-minimap-mask);
+  stroke: var(--canvas-minimap-viewport);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   cursor: grab;
   pointer-events: auto;
   touch-action: none;

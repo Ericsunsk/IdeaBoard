@@ -112,7 +112,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
   border-color: var(--node-tool-button-brand);
   border-radius: 999px;
   background: var(--node-tool-button-brand);
-  color: #ffffff;
+  color: var(--canvas-text-inverse);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;

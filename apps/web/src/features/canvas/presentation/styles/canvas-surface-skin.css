@@ -31,7 +31,10 @@ body.canvas-overscroll-guard {
 
   /* ── Canvas Elevation & Glass Tokens ── */
   --canvas-shadow-floating: var(--shadow-ib-overlay);
-  --canvas-glass-bg: color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent);
+  --canvas-glass-bg: var(
+    --color-canvas-glass-bg,
+    color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent)
+  );
   --canvas-glass-blur: var(--ib-glass-blur);
   --canvas-glass-border: var(--canvas-accent-border-soft);
 
@@ -48,17 +51,18 @@ body.canvas-overscroll-guard {
     var(--color-canvas-neutral-line) 32%,
     transparent
   );
-  --canvas-minimap-node: color-mix(
-    in srgb,
-    var(--color-canvas-text-muted) 55%,
-    var(--color-canvas-surface-bg)
+  --canvas-minimap-node: var(
+    --color-canvas-minimap-node,
+    color-mix(in srgb, var(--color-canvas-text-muted) 55%, var(--color-canvas-surface-bg))
   );
-  --canvas-minimap-viewport: color-mix(
-    in srgb,
-    var(--color-canvas-text-muted) 40%,
-    var(--color-canvas-surface-bg)
+  --canvas-minimap-viewport: var(
+    --color-canvas-minimap-viewport,
+    color-mix(in srgb, var(--color-canvas-text-muted) 40%, var(--color-canvas-surface-bg))
   );
-  --canvas-minimap-mask: color-mix(in srgb, var(--canvas-minimap-viewport) 26%, transparent);
+  --canvas-minimap-mask: var(
+    --color-canvas-minimap-mask,
+    color-mix(in srgb, var(--canvas-minimap-viewport) 26%, transparent)
+  );
   --canvas-panel-content-gap: 10px;
   --canvas-panel-border: color-mix(
     in srgb,
@@ -73,6 +77,7 @@ body.canvas-overscroll-guard {
   --canvas-node-text-muted: var(--color-canvas-text-muted);
   --canvas-text-control: var(--color-canvas-text-control);
   --canvas-text-option: var(--color-canvas-text-option);
+  --canvas-text-inverse: var(--color-canvas-text-inverse);
   --canvas-tooltip-bg: var(--color-canvas-tooltip-bg);
   --canvas-tooltip-text: var(--color-canvas-tooltip-text);
   --canvas-node-bg: var(--color-canvas-node-bg);

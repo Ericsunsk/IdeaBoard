@@ -51,9 +51,9 @@
 
         <div
           v-if="config.test_state === 'failed' || config.status_message"
-          class="rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 p-4"
+          class="rounded-lg border border-border bg-muted/50 p-4"
         >
-          <div class="text-admin-caption text-admin-text-3">
+          <div class="text-admin-caption text-muted-foreground">
             <span v-if="config.failure_category">{{
               SETTINGS_MESSAGES.searchFailureCategory(config.failure_category)
             }}</span>
@@ -66,13 +66,13 @@
               }}
             </span>
           </div>
-          <div v-if="config.status_message" class="mt-1 text-admin-body text-admin-text-1">
+          <div v-if="config.status_message" class="mt-1 text-admin-body text-foreground">
             {{ config.status_message }}
           </div>
         </div>
         <div
           v-else-if="config.test_state === 'passed' && config.tested_at"
-          class="text-admin-caption text-admin-text-3"
+          class="text-admin-caption text-muted-foreground"
         >
           {{ SETTINGS_MESSAGES.searchLastTestPassed(formatAdminDateTime(config.tested_at)) }}
         </div>
@@ -80,7 +80,7 @@
     </template>
     <template #actions>
       <div class="flex w-full flex-wrap items-center justify-between gap-2">
-        <div class="text-admin-caption text-admin-text-3">
+        <div class="text-admin-caption text-muted-foreground">
           {{ sequenceHint }}
         </div>
         <div class="flex items-center gap-2">

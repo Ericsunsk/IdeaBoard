@@ -11,15 +11,15 @@
     <template #header>
       <div class="flex items-center gap-3">
         <div
-          class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted text-admin-title-sm font-bold text-admin-accent select-none shadow-2xs"
+          class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-admin-title-sm font-bold text-primary select-none shadow-2xs"
         >
           {{ (user.displayName || 'U').substring(0, 1).toUpperCase() }}
         </div>
         <div class="min-w-0">
-          <div class="text-admin-title-sm font-bold text-admin-title-color truncate">
+          <div class="text-admin-title-sm font-bold text-foreground truncate">
             {{ t('admin.wallet.userAssetsTitle', { name: user.displayName }) }}
           </div>
-          <div class="text-admin-caption font-mono text-admin-text-2 truncate">
+          <div class="text-admin-caption font-mono text-muted-foreground truncate">
             UID: {{ user.publicId }}
           </div>
         </div>
@@ -48,7 +48,7 @@
       <div class="flex items-center justify-between">
         <div
           :aria-label="t('admin.wallet.actionPanelAria')"
-          class="inline-flex items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 p-1 text-xs"
+          class="inline-flex items-center rounded-lg border border-border bg-muted/50 p-1 text-xs"
         >
           <button
             v-for="opt in walletTabOptions"
@@ -58,8 +58,8 @@
             class="rounded-md px-3 py-1 font-medium transition-colors cursor-pointer"
             :class="
               activeTab === opt.value
-                ? 'bg-white text-admin-text-1 font-semibold shadow-xs'
-                : 'text-admin-text-3 hover:text-admin-text-1'
+                ? 'bg-card text-foreground font-semibold shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             "
             @click="handleTabChange(opt.value)"
           >
@@ -78,7 +78,7 @@
           @click="refreshWallet"
         >
           <template #icon>
-            <Refresh class="size-4 mr-1.5 text-admin-text-2" />
+            <Refresh class="size-4 mr-1.5 text-muted-foreground" />
           </template>
         </AdminButton>
       </div>

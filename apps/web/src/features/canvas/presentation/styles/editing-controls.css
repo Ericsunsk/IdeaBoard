@@ -226,7 +226,7 @@
 .editing-controls-toggle-button.is-active {
   border-color: var(--canvas-accent);
   background: var(--canvas-accent);
-  color: #ffffff;
+  color: var(--canvas-text-inverse);
 }
 
 .editing-controls-segmented-button[aria-pressed='true'],

@@ -10,7 +10,7 @@
     <template v-if="isGuest">
       <button
         type="button"
-        class="ib-page-chrome-surface ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold text-ib-text transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] active:scale-[0.97]"
+        class="ib-page-chrome-surface ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold text-foreground transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] active:scale-[0.97]"
         :aria-label="t('auth.signIn')"
         @click="loginItem?.command?.()"
       >
@@ -54,13 +54,78 @@
           @pointer-down-outside="handlePointerDownOutside"
         >
           <DropdownMenuItem
-            v-for="item in props.items"
+            v-for="item in nonDangerItems"
             :key="item.key ?? item.label"
             :data-control-tone="item.tone ?? 'default'"
             :class="[
               appOverlayMenuItemClass,
               props.menuItemClass,
-              item.tone === 'danger' && [appOverlayMenuDangerItemClass, props.menuDangerItemClass],
+            ]"
+            @select="item.command?.()"
+          >
+            <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
+              <span class="truncate">{{ item.label }}</span>
+            </span>
+          </DropdownMenuItem>
+
+          <DropdownMenuSub v-model:open="appearanceSubMenuOpen">
+            <DropdownMenuSubTrigger
+              :class="[appOverlayMenuItemClass, props.menuItemClass, 'cursor-pointer']"
+              @click.stop="appearanceSubMenuOpen = !appearanceSubMenuOpen"
+            >
+              <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span class="truncate">{{ t('auth.menu.appearance') }}</span>
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              :side-offset="6"
+              class="w-36 rounded-xl border border-border bg-card p-1 text-foreground shadow-lg outline-none"
+            >
+              <DropdownMenuItem
+                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+                @select="setTheme('light')"
+                @click="setTheme('light')"
+              >
+                <span class="flex items-center gap-2">
+                  <SunLight class="size-3.5 text-muted-foreground" />
+                  <span>{{ t('auth.menu.themeLight') }}</span>
+                </span>
+                <Check v-if="mode === 'light'" class="size-3.5 text-primary" />
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+                @select="setTheme('dark')"
+                @click="setTheme('dark')"
+              >
+                <span class="flex items-center gap-2">
+                  <HalfMoon class="size-3.5 text-muted-foreground" />
+                  <span>{{ t('auth.menu.themeDark') }}</span>
+                </span>
+                <Check v-if="mode === 'dark'" class="size-3.5 text-primary" />
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+                @select="setTheme('system')"
+                @click="setTheme('system')"
+              >
+                <span class="flex items-center gap-2">
+                  <Laptop class="size-3.5 text-muted-foreground" />
+                  <span>{{ t('auth.menu.themeSystem') }}</span>
+                </span>
+                <Check v-if="mode === 'auto'" class="size-3.5 text-primary" />
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuItem
+            v-for="item in dangerItems"
+            :key="item.key ?? item.label"
+            data-control-tone="danger"
+            :class="[
+              appOverlayMenuItemClass,
+              props.menuItemClass,
+              appOverlayMenuDangerItemClass,
+              props.menuDangerItemClass,
             ]"
             @select="item.command?.()"
           >
@@ -75,13 +140,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { User } from '@iconoir/vue'
+import { Check, HalfMoon, Laptop, SunLight, User } from '@iconoir/vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -91,6 +159,7 @@ import {
 } from '../theme/appOverlayMenu'
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { useMenuTriggerFocusRestore } from '../composables/useMenuTriggerFocusRestore'
+import { useTheme } from '../theme/composables/useTheme'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
@@ -123,8 +192,13 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+const { mode, setTheme } = useTheme()
+const appearanceSubMenuOpen = ref(false)
 
-const menuContentClass = 'ib-user-account-menu-panel w-32 min-w-32 max-w-[8rem]'
+const menuContentClass = 'ib-user-account-menu-panel w-36 min-w-36 max-w-[10rem]'
+
+const nonDangerItems = computed(() => props.items.filter((item) => item.tone !== 'danger'))
+const dangerItems = computed(() => props.items.filter((item) => item.tone === 'danger'))
 
 const loginItem = computed(() => props.items.find((item) => item.key === 'login'))
 const registerItem = computed(() => props.items.find((item) => item.key === 'register'))

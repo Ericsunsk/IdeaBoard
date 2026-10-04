@@ -13,7 +13,7 @@
     @update:visible="$emit('update:visible', $event)"
   >
     <div v-if="loading" class="grid min-h-56 place-items-center" role="status">
-      <span class="text-admin-body text-admin-text-3">{{
+      <span class="text-admin-body text-muted-foreground">{{
         PAYMENT_ORDERS_MESSAGES.detailLoading
       }}</span>
     </div>
@@ -28,13 +28,13 @@
     </AdminAlert>
 
     <div v-else-if="detail" class="flex min-w-0 flex-col gap-5">
-      <section class="rounded-ib-control border border-admin-border-soft p-4">
+      <section class="rounded-ib-control border border-border p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
-            <div class="font-mono text-admin-content font-bold text-admin-title-color">
+            <div class="font-mono text-admin-content font-bold text-foreground">
               {{ detail.publicOrderNumber }}
             </div>
-            <div class="mt-1 text-admin-meta text-admin-text-3">{{ detail.user.displayName }}</div>
+            <div class="mt-1 text-admin-meta text-muted-foreground">{{ detail.user.displayName }}</div>
           </div>
           <AdminBadge :severity="getPaymentOrderStatusPresentation(detail.status).severity">
             {{ getPaymentOrderStatusPresentation(detail.status).label }}
@@ -42,8 +42,8 @@
         </div>
         <dl class="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in overviewRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
-            <dd class="mt-0.5 break-words text-admin-body font-semibold text-admin-text-1">
+            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dd class="mt-0.5 break-words text-admin-body font-semibold text-foreground">
               {{ row.value }}
             </dd>
           </div>
@@ -51,13 +51,13 @@
       </section>
 
       <section aria-labelledby="payment-stripe-identities">
-        <h3 id="payment-stripe-identities" class="text-admin-body font-bold text-admin-title-color">
+        <h3 id="payment-stripe-identities" class="text-admin-body font-bold text-foreground">
           {{ PAYMENT_ORDERS_MESSAGES.stripeSummaryTitle }}
         </h3>
         <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in stripeRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
-            <dd class="mt-0.5 break-all font-mono text-admin-meta text-admin-text-1">
+            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dd class="mt-0.5 break-all font-mono text-admin-meta text-foreground">
               {{ row.value }}
             </dd>
           </div>
@@ -66,7 +66,7 @@
 
       <section aria-labelledby="payment-reconciliation">
         <div class="flex flex-wrap items-center gap-2">
-          <h3 id="payment-reconciliation" class="text-admin-body font-bold text-admin-title-color">
+          <h3 id="payment-reconciliation" class="text-admin-body font-bold text-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.reconciliationTitle }}
           </h3>
           <AdminBadge :severity="detail.reconciliation.anomalous ? 'danger' : 'secondary'">
@@ -75,34 +75,34 @@
         </div>
         <dl class="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
           <div v-for="row in reconciliationRows" :key="row.label" class="min-w-0">
-            <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
-            <dd class="mt-0.5 break-words text-admin-body text-admin-text-1">{{ row.value }}</dd>
+            <dt class="text-admin-caption font-[650] text-muted-foreground">{{ row.label }}</dt>
+            <dd class="mt-0.5 break-words text-admin-body text-foreground">{{ row.value }}</dd>
           </div>
         </dl>
       </section>
 
       <section class="grid grid-cols-1 gap-5 md:grid-cols-2">
         <div aria-labelledby="payment-refunds">
-          <h3 id="payment-refunds" class="text-admin-body font-bold text-admin-title-color">
+          <h3 id="payment-refunds" class="text-admin-body font-bold text-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.refundsTitle }}
           </h3>
-          <p v-if="detail.refunds.length === 0" class="mt-2 text-admin-meta text-admin-text-3">
+          <p v-if="detail.refunds.length === 0" class="mt-2 text-admin-meta text-muted-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.refundsEmpty }}
           </p>
           <ul v-else class="mt-2 flex flex-col gap-2">
             <li
               v-for="(refund, index) in detail.refunds"
               :key="refund.id || index"
-              class="rounded-ib-control border border-admin-border-soft p-3 text-admin-meta"
+              class="rounded-ib-control border border-border p-3 text-admin-meta"
             >
-              <div class="font-bold text-admin-text-1">{{ refundStatusLabel(refund.status) }}</div>
-              <div v-if="refund.stripeStatus" class="mt-1 text-admin-text-3">
+              <div class="font-bold text-foreground">{{ refundStatusLabel(refund.status) }}</div>
+              <div v-if="refund.stripeStatus" class="mt-1 text-muted-foreground">
                 Stripe: {{ refund.stripeStatus }}
               </div>
-              <div class="mt-1 text-admin-text-3">
+              <div class="mt-1 text-muted-foreground">
                 {{ formatRefund(refund) }} · {{ formatPaymentDateTime(refund.updatedAt) }}
               </div>
-              <div v-if="refund.errorSummary" class="mt-1 break-words text-admin-danger">
+              <div v-if="refund.errorSummary" class="mt-1 break-words text-destructive">
                 {{ refund.errorSummary }}
               </div>
             </li>
@@ -110,31 +110,31 @@
         </div>
 
         <div aria-labelledby="payment-disputes">
-          <h3 id="payment-disputes" class="text-admin-body font-bold text-admin-title-color">
+          <h3 id="payment-disputes" class="text-admin-body font-bold text-foreground">
             Dispute
           </h3>
-          <p v-if="detail.disputes.length === 0" class="mt-2 text-admin-meta text-admin-text-3">
+          <p v-if="detail.disputes.length === 0" class="mt-2 text-admin-meta text-muted-foreground">
             {{ PAYMENT_ORDERS_MESSAGES.disputesEmpty }}
           </p>
           <ul v-else class="mt-2 flex flex-col gap-2">
             <li
               v-for="(dispute, index) in detail.disputes"
               :key="dispute.id || index"
-              class="rounded-ib-control border border-admin-border-soft p-3 text-admin-meta"
+              class="rounded-ib-control border border-border p-3 text-admin-meta"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="font-bold text-admin-text-1">{{ dispute.status }}</div>
+                <div class="font-bold text-foreground">{{ dispute.status }}</div>
                 <a
                   v-if="dispute.stripeDashboardUrl"
                   :href="dispute.stripeDashboardUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="font-bold text-admin-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  class="font-bold text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   Stripe Dashboard
                 </a>
               </div>
-              <div class="mt-1 text-admin-text-3">{{ formatDispute(dispute) }}</div>
+              <div class="mt-1 text-muted-foreground">{{ formatDispute(dispute) }}</div>
             </li>
           </ul>
         </div>
@@ -143,11 +143,11 @@
       <section
         v-if="canRefund"
         aria-labelledby="payment-refund-action"
-        class="rounded-ib-control border border-admin-border-soft p-4"
+        class="rounded-ib-control border border-border p-4"
       >
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 id="payment-refund-action" class="text-admin-body font-bold text-admin-title-color">
+            <h3 id="payment-refund-action" class="text-admin-body font-bold text-foreground">
               {{ PAYMENT_ORDERS_MESSAGES.refundActionTitle }}
             </h3>
           </div>
@@ -158,7 +158,7 @@
         <form class="mt-3 flex flex-wrap items-end gap-3" novalidate @submit.prevent="submitRefund">
           <label
             for="admin-payment-refund-ideas"
-            class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+            class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground"
           >
             <span>{{ PAYMENT_ORDERS_MESSAGES.refundQuantityLabel }}</span>
             <AdminNumberInput
@@ -171,7 +171,7 @@
               :use-grouping="true"
               :invalid="Boolean(refundValidationError)"
             />
-            <small v-if="refundValidationError" class="text-admin-danger">{{
+            <small v-if="refundValidationError" class="text-destructive">{{
               refundValidationError
             }}</small>
           </label>

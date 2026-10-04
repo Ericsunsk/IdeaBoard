@@ -1,6 +1,6 @@
 <template>
   <router-view v-if="isLoginRoute" />
-  <div v-else class="flex min-h-screen bg-ib-page text-ib-text">
+  <div v-else class="flex min-h-screen bg-background text-foreground">
     <button
       v-if="drawerOpen"
       type="button"
@@ -34,10 +34,10 @@
           class="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="min-w-0">
-            <h1 class="m-0 text-2xl font-bold tracking-wide text-admin-title-color">
+            <h1 class="m-0 text-2xl font-bold tracking-wide text-foreground">
               {{ currentMeta.title }}
             </h1>
-            <p class="mt-1 text-sm text-admin-text-2">
+            <p class="mt-1 text-sm text-muted-foreground">
               {{ currentMeta.subtitle }}
             </p>
           </div>

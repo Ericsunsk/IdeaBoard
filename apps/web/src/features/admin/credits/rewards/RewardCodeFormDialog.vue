@@ -28,9 +28,9 @@
       </AdminFormField>
 
       <div class="flex min-w-0 flex-col gap-1.5">
-        <label for="reward-code-value" class="text-admin-meta font-[680] text-admin-text-2">
+        <label for="reward-code-value" class="text-admin-meta font-[680] text-muted-foreground">
           {{ t('admin.rewardCode.codeLabel') }}
-          <span v-if="!isEditing" class="text-admin-danger" aria-hidden="true">*</span>
+          <span v-if="!isEditing" class="text-destructive" aria-hidden="true">*</span>
         </label>
         <div class="flex items-stretch gap-2">
           <AdminInput
@@ -62,7 +62,7 @@
             <Shuffle class="size-4" />
           </AdminButton>
         </div>
-        <p id="reward-code-value-hint" class="m-0 text-admin-caption text-admin-text-3">
+        <p id="reward-code-value-hint" class="m-0 text-admin-caption text-muted-foreground">
           {{
             isEditing ? t('admin.rewardCode.codeHintEdit') : t('admin.rewardCode.codeHintCreate')
           }}
@@ -137,8 +137,8 @@
               class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
               :class="
                 isPresetActive(preset.days)
-                  ? 'bg-admin-accent text-white shadow-xs'
-                  : 'border border-admin-border-soft bg-admin-surface text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
               "
               :disabled="pending"
               @click="applyPreset(preset.days)"

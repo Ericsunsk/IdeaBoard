@@ -1,5 +1,5 @@
 <template>
-  <caption :class="cn('mt-4 text-xs text-admin-text-3', props.class)">
+  <caption :class="cn('mt-4 text-xs text-muted-foreground', props.class)">
     <slot />
   </caption>
 </template>

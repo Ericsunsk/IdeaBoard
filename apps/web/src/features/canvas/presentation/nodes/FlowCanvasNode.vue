@@ -321,10 +321,10 @@ function noopMouse() {}
 
 .flow-canvas-node__unsupported {
   padding: 8px 10px;
-  border: 1px dashed #d0d7de;
+  border: 1px dashed var(--canvas-node-border);
   border-radius: 8px;
   background: var(--canvas-node-bg);
-  color: #6b7280;
+  color: var(--canvas-text-muted);
   font-size: 12px;
 }
 </style>

@@ -6,14 +6,14 @@
     size="compact"
     @update:visible="emit('update:visible', $event)"
   >
-    <p class="m-0 text-admin-body text-admin-text-2">
+    <p class="m-0 text-admin-body text-muted-foreground">
       {{ REWARD_CODES_MESSAGES.plaintextWarning }}
     </p>
     <div
-      class="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-surface-muted p-3"
+      class="flex items-center gap-2 rounded-lg border border-border bg-muted p-3"
     >
       <code
-        class="min-w-0 flex-1 select-all break-all text-admin-content font-semibold text-admin-title-color"
+        class="min-w-0 flex-1 select-all break-all text-admin-content font-semibold text-foreground"
       >
         {{ plaintext }}
       </code>

@@ -13,7 +13,7 @@
       :model-value="modelValue"
       :rows="rows"
       :disabled="disabled"
-      :class="invalid ? 'border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
+      :class="invalid ? '!border-admin-danger focus-visible:ring-admin-danger/20' : undefined"
       :aria-describedby="describedbyId"
       @update:model-value="emit('update:modelValue', $event)"
     />

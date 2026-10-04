@@ -62,18 +62,18 @@
           <!-- 新增网关按钮 -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
             :aria-label="MODELS_MESSAGES.addGateway"
             @click="gatewayDialogVisible = true"
           >
-            <Globe class="size-3.5 text-admin-text-2" />
+            <Globe class="size-3.5 text-muted-foreground" />
             <span>{{ MODELS_MESSAGES.addGateway }}</span>
           </button>
 
           <!-- 主按钮：添加模型 (使用项目品牌紫 Token) -->
           <button
             type="button"
-            class="flex h-9 items-center gap-1.5 rounded-lg bg-admin-accent px-3.5 text-xs font-semibold text-white transition-colors hover:bg-admin-accent-hover cursor-pointer"
+            class="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
             :aria-label="MODELS_MESSAGES.createModel"
             @click="handleCreateModel"
           >
@@ -85,11 +85,11 @@
 
       <!-- 次级统计提示条：我们找到了 X 个模型 (Cloudflare 1:1 原生文案与布局) -->
       <div class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-admin-text-2">
-          <span class="font-medium text-admin-text-1">{{
+        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">{{
             MODELS_MESSAGES.foundCount(filteredModels.length)
           }}</span>
-          <span v-if="hasActiveFilter" class="text-xs text-admin-text-3">
+          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
             {{ MODELS_MESSAGES.totalCount(allModels.length) }}
           </span>
         </div>
@@ -104,7 +104,7 @@
       <div
         v-for="model in filteredModels"
         :key="model.id"
-        class="group flex flex-col h-full overflow-hidden rounded-xl border border-admin-border-soft bg-white transition-colors hover:border-admin-accent/50"
+        class="group flex flex-col h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/50"
       >
         <!-- 卡片主体区域 (Upper Section，含近 7 天观测区) -->
         <AdminModelCardBody
@@ -115,7 +115,7 @@
         />
         <!-- 卡片底栏 (1:1 复刻 Cloudflare ModelCard Secondary Footer: 条款/文档链接 + 复制 ID / 编辑 / 删除 按钮) -->
         <div
-          class="flex items-center justify-between border-t border-admin-border-soft bg-admin-bg/50 px-4 py-2 text-xs"
+          class="flex items-center justify-between border-t border-border bg-background/50 px-4 py-2 text-xs"
         >
           <!-- 左侧：条款/文档外部链接 (若无则留白) -->
           <div class="flex items-center">
@@ -124,7 +124,7 @@
               :href="model.termsUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex items-center gap-1 text-admin-caption font-medium text-admin-text-3 hover:text-admin-accent hover:underline transition-colors"
+              class="inline-flex items-center gap-1 text-admin-caption font-medium text-muted-foreground hover:text-primary hover:underline transition-colors"
             >
               <span>{{ MODELS_MESSAGES.termsAndDocs }}</span>
               <OpenNewWindow class="size-3" />
@@ -135,12 +135,12 @@
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-admin-text-2 hover:bg-white hover:text-admin-text-1 cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.copyIdAria(model.id)"
               @click="copyModelId(model.id)"
             >
               <Check v-if="copiedModelId === model.id" class="size-3.5 text-emerald-600" />
-              <Copy v-else class="size-3.5 text-admin-text-3" />
+              <Copy v-else class="size-3.5 text-muted-foreground" />
               <span :class="copiedModelId === model.id ? 'text-emerald-600 font-semibold' : ''">
                 {{ copiedModelId === model.id ? MODELS_MESSAGES.copied : MODELS_MESSAGES.copy }}
               </span>
@@ -148,17 +148,17 @@
 
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-admin-text-2 hover:bg-white hover:text-admin-text-1 cursor-pointer transition-colors"
+              class="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.editAria(model.name)"
               @click="handleEditModel(model)"
             >
-              <EditPencil class="size-3.5 text-admin-text-3" />
+              <EditPencil class="size-3.5 text-muted-foreground" />
               <span>{{ MODELS_MESSAGES.edit }}</span>
             </button>
 
             <button
               type="button"
-              class="inline-flex items-center justify-center rounded-md p-1 text-xs font-medium text-admin-text-3 hover:bg-white hover:text-admin-danger cursor-pointer transition-colors"
+              class="inline-flex items-center justify-center rounded-md p-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-destructive cursor-pointer transition-colors"
               :aria-label="MODELS_MESSAGES.deleteAria(model.name)"
               @click="handleDeleteModel(model)"
             >
@@ -172,22 +172,22 @@
     <!-- 3. 空状态提示 (空库或筛选无结果时) -->
     <div
       v-else
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-admin-border-soft bg-white p-10 text-center"
+      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
     >
       <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-admin-surface-muted text-admin-text-3"
+        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
       >
         <Cube v-if="!hasActiveFilter && allModels.length === 0" class="size-6" />
         <Search v-else class="size-6" />
       </div>
-      <h3 class="text-base font-semibold text-admin-title-color">
+      <h3 class="text-base font-semibold text-foreground">
         {{
           !hasActiveFilter && allModels.length === 0
             ? MODELS_MESSAGES.emptyLibrary
             : MODELS_MESSAGES.emptyNoMatch
         }}
       </h3>
-      <p class="mt-1 max-w-sm text-xs text-admin-text-3">
+      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
         {{
           !hasActiveFilter && allModels.length === 0
             ? MODELS_MESSAGES.emptyLibraryHint
@@ -197,7 +197,7 @@
       <button
         v-if="!hasActiveFilter && allModels.length === 0"
         type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-admin-accent px-3.5 text-xs font-semibold text-white transition-colors hover:bg-admin-accent-hover cursor-pointer"
+        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
         :aria-label="MODELS_MESSAGES.emptyCreateAria"
         @click="handleCreateModel"
       >
@@ -207,7 +207,7 @@
       <button
         v-else
         type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-admin-border-soft bg-white px-3 text-xs font-medium text-admin-text-1 transition-colors hover:bg-admin-surface-muted cursor-pointer"
+        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
         @click="clearFilters"
       >
         <Xmark class="size-3.5" />

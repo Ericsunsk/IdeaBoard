@@ -74,7 +74,7 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/lib/adminThemeTokens.ts': {
     counts: {
-      'raw-color': 54,
+      'raw-color': 65,
     },
     reason:
       'Admin theme token bridge owns the CSS var/fallback pairs; fallbacks keep third-party adapters and canvas rendering stable when CSS vars cannot resolve.',
@@ -143,9 +143,10 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 // `text-admin-*`); display/optical one-offs outside the scale carry explicit
 // waivers with reasons instead of forced mappings. Breakpoints use the named
 // mobile-first system (`sm/md/lg`, plus `xl` where already established);
-// arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode is out of
-// scope: the app ships a single light system with no dark tokens, selectors,
-// or queries, so `dark:` variants are banned outright.
+// arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode ships via
+// token resolution: `html.dark` overrides live in
+// `src/shared/theme/tokens/dark.css`, so `dark:` variants are banned outright —
+// components use semantic tokens that resolve in both modes instead.
 
 function isTokenOwnerFile(file: SourceFile): boolean {
   return (
@@ -185,7 +186,14 @@ const tokenCountRules = [
     id: 'dark-variant',
     pattern: /dark:/g,
     message:
-      'Dark mode is out of scope: the app ships a single light system, so dark: variants are forbidden.',
+      'Dark mode ships through semantic tokens (html.dark overrides in shared/theme/tokens/dark.css); do not add dark: overrides, use tokens that resolve in both modes.',
+  },
+  {
+    id: 'legacy-token',
+    pattern:
+      /var\(--color-(?:admin|board)-[a-z0-9-]+\)|var\(--color-ib-[a-z0-9-]+\)|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration|from|via|to)-admin-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration)-board-(?:page|primary|surface|control|card|loading|danger|dialog|create|focus)[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder)-ib-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?/g,
+    message:
+      'Legacy domain color tokens are decommissioned at the component layer: use standard semantic tokens (bg-card, text-foreground, border-border, bg-primary, ...) instead of admin-*/board-*/ib-* color utilities or direct var(--color-admin/board/ib-*) references.',
   },
 ] as const satisfies readonly CountRule<string>[]
 
@@ -200,7 +208,7 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/board/infrastructure/preview/boardPreviewSerializer.ts': {
     counts: {
-      'hex-color': 16,
+      'hex-color': 26,
     },
     reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
   },
@@ -216,12 +224,6 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Outpaint handle fill is a canvas drawing constant.',
   },
-  'src/features/canvas/presentation/nodes/FlowCanvasNode.vue': {
-    counts: {
-      'hex-color': 2,
-    },
-    reason: 'Canvas node drop-target outline is a canvas drawing constant.',
-  },
   'src/features/canvas/presentation/nodes/home/ImageActionMenu.vue': {
     counts: {
       'hex-color': 1,
@@ -230,13 +232,13 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   },
   'src/features/canvas/presentation/nodes/primitives/NodeActionButton.vue': {
     counts: {
-      'hex-color': 2,
+      'hex-color': 1,
     },
     reason: 'Stage ghost/primary button ink colors are canvas drawing constants.',
   },
   'src/features/canvas/presentation/nodes/styles/node-input-thumbnails.css': {
     counts: {
-      'hex-color': 3,
+      'hex-color': 2,
     },
     reason: 'Canvas node thumbnail chrome uses canvas drawing constants.',
   },
@@ -246,34 +248,9 @@ const hexColorAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
     },
     reason: 'Canvas node chrome uses canvas drawing constants.',
   },
-  'src/features/canvas/presentation/nodes/styles/node-tool-buttons.css': {
-    counts: {
-      'hex-color': 4,
-    },
-    reason: 'Canvas node tool buttons use canvas drawing constants.',
-  },
-  'src/features/canvas/presentation/pages/CanvasLandingPage.vue': {
-    counts: {
-      'hex-color': 7,
-    },
-    reason: 'Marketing landing page owns a bespoke one-off palette outside app surfaces.',
-  },
-  'src/features/canvas/presentation/screens/CanvasScreen.vue': {
-    counts: {
-      'hex-color': 1,
-    },
-    reason:
-      'Canvas surface intentionally overrides the page-dot token for the workspace background.',
-  },
-  'src/features/canvas/presentation/styles/canvas-chrome.css': {
-    counts: {
-      'hex-color': 2,
-    },
-    reason: 'Canvas chrome overlay uses canvas drawing constants.',
-  },
   'src/features/canvas/presentation/styles/editing-controls.css': {
     counts: {
-      'hex-color': 10,
+      'hex-color': 9,
     },
     reason: 'Retouch editing controls use the documented iOS system palette fallback.',
   },
@@ -386,6 +363,218 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
   },
 }
 
+// Phase 4 decommission freeze: component-layer legacy domain color usage is
+// pinned at the counts below. New usages fail the Web Quality lane; shrinking
+// a count trips the stale-allowance check and must narrow the allowance here.
+// Token declarations themselves live in isTokenOwnerFile files (style.css,
+// shared/theme, theme bridges) and are exempt by design: tier-3 standard
+// tokens resolve through the ib-* alias tier, so the decommission stops at
+// the component layer (see apps/web/DESIGN.md Tokens).
+const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
+  'src/features/admin/credits/health/creditHealthPresentation.ts': {
+    counts: {
+      'legacy-token': 5,
+    },
+    reason:
+      'Credit health status semantics (ok/warn/critical) are a domain visual contract, like task status.',
+  },
+  'src/features/admin/credits/shared/AdminActionReasonField.vue': {
+    counts: {
+      'legacy-token': 2,
+    },
+    reason:
+      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
+  },
+  'src/features/admin/monitor/domain/status.ts': {
+    counts: {
+      'legacy-token': 15,
+    },
+    reason: 'Task status palette is a domain visual contract shared by table and detail views.',
+  },
+  'src/features/admin/monitor/presentation/AdminTaskResultDialog.vue': {
+    counts: {
+      'legacy-token': 0,
+    },
+    reason:
+      'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
+  },
+  'src/features/admin/payments/stripe-settings/StripeSettingsDialog.vue': {
+    counts: {
+      'legacy-token': 6,
+    },
+    reason:
+      'Form invalid borders (!border-admin-danger + ring on three fields) are pinned by formControls.contract.spec.ts.',
+  },
+  'src/features/admin/shared/components/AdminInput.vue': {
+    counts: {
+      'legacy-token': 2,
+    },
+    reason:
+      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
+  },
+  'src/features/admin/shared/components/AdminNumberInput.vue': {
+    counts: {
+      'legacy-token': 2,
+    },
+    reason:
+      'Form invalid border (!border-admin-danger + ring) is pinned by formControls.contract.spec.ts.',
+  },
+  'src/features/auth/components/RegisterAuthPanel.vue': {
+    counts: {
+      'legacy-token': 4,
+    },
+    reason: 'Auth shell keeps its domain link/subtle tokens (auth surface identity).',
+  },
+  'src/features/auth/components/modalUi.ts': {
+    counts: {
+      'legacy-token': 17,
+    },
+    reason: 'Auth modal skin is a domain surface system with dark-mode token coverage.',
+  },
+  'src/features/board/infrastructure/preview/boardPreviewStyle.ts': {
+    counts: {
+      'legacy-token': 3,
+    },
+    reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
+  },
+  'src/features/board/presentation/catalog/BoardCard.vue': {
+    counts: {
+      'legacy-token': 4,
+    },
+    reason: 'Board preview fade gradients mirror the serialized thumbnail surface.',
+  },
+  'src/features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Canvas chrome focus ring identity, pinned by the canvas surface contract.',
+  },
+  'src/features/canvas/presentation/styles/canvas-chrome.css': {
+    counts: {
+      'legacy-token': 11,
+    },
+    reason:
+      'Canvas chrome identity (page-chrome/overlay tokens) is pinned by canvasSurfaceSkin.contract.spec.ts.',
+  },
+  'src/features/search/presentation/pages/SearchPage.vue': {
+    counts: {
+      'legacy-token': 9,
+    },
+    reason: 'Search page chrome shares the boards page-chrome surface language.',
+  },
+  'src/features/search/presentation/search.css': {
+    counts: {
+      'legacy-token': 4,
+    },
+    reason: 'Search surface skin resolves skeleton/type through board surface tokens.',
+  },
+  'src/shared/components/UserAccountMenu.vue': {
+    counts: {
+      'legacy-token': 5,
+    },
+    reason: 'Avatar auth-gradient and page-chrome hover states are shell identity tokens.',
+  },
+  'src/shared/components/UserCreditBalanceButton.vue': {
+    counts: {
+      'legacy-token': 8,
+    },
+    reason: 'Balance pill shares the boards page-chrome hover language and ib text/warning tokens.',
+  },
+  'src/features/admin/shared/components/AdminAlert.vue': {
+    counts: {
+      'legacy-token': 3,
+    },
+    reason:
+      'Alert severity text uses theme-adaptive admin status tokens (dark-mode readable, unlike fixed emerald/amber/sky-700).',
+  },
+  'src/features/admin/shared/components/AdminBadge.vue': {
+    counts: {
+      'legacy-token': 4,
+    },
+    reason:
+      'Badge severity text uses theme-adaptive admin status tokens (dark-mode readable).',
+  },
+  'src/features/admin/shared/components/AdminStatusPill.vue': {
+    counts: {
+      'legacy-token': 3,
+    },
+    reason:
+      'Status pill text uses theme-adaptive admin status tokens (dark-mode readable).',
+  },
+  'src/features/account/presentation/billing/BillingPane.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Credit-delta success text uses the adaptive ib-success token (dark-mode readable).',
+  },
+  'src/features/account/presentation/recharge/HistoryTable.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Credited-state text uses the adaptive ib-success token (dark-mode readable).',
+  },
+  'src/features/account/presentation/recharge/PendingOrders.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Credited-state text uses the adaptive ib-success token (dark-mode readable).',
+  },
+  'src/features/account/presentation/recharge/ReturnStatus.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Success notice uses the adaptive ib-success token (dark-mode readable).',
+  },
+  'src/features/account/presentation/rewards/RewardsPane.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Reward amount text uses the adaptive ib-success token (dark-mode readable).',
+  },
+  'src/features/admin/credits/presentation/AdminCreditsBillingLayout.vue': {
+    counts: {
+      'legacy-token': 2,
+    },
+    reason: 'Billing badge warning state uses adaptive admin-warning tokens.',
+  },
+  'src/features/admin/credits/wallets/components/WalletLedgerTable.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Grant/refund amount text uses the adaptive admin-success token.',
+  },
+  'src/features/admin/credits/wallets/components/WalletOverviewCard.vue': {
+    counts: {
+      'legacy-token': 3,
+    },
+    reason: 'Restriction notice uses adaptive admin-warning tokens (dark-mode readable).',
+  },
+  'src/features/admin/models/presentation/dialog/AdminGatewayConfigDialog.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Gateway configured indicator uses the adaptive admin-success token.',
+  },
+  'src/features/admin/prompts/components/PromptConfigEditorDialog.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Warning hint uses the adaptive admin-warning token.',
+  },
+  'src/features/admin/storage/components/AdminStorageEditorDialog.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Enabled-state text uses the adaptive admin-success token.',
+  },
+  'src/features/admin/storage/components/AdminStorageTable.vue': {
+    counts: {
+      'legacy-token': 1,
+    },
+    reason: 'Current-profile indicator uses the adaptive admin-success token.',
+  },
+}
+
 function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
   if (isStyleSpecFile(file)) return []
 
@@ -411,6 +600,7 @@ function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
   if (!isTokenOwnerFile(file)) {
     pushOver('hex-color', hexColorAllowances)
     pushOver('font-stack', fontStackAllowances)
+    pushOver('legacy-token', legacyTokenAllowances)
   }
   pushOver('text-px', textPxAllowances)
   pushOver('arbitrary-breakpoint', arbitraryBreakpointAllowances)
@@ -477,7 +667,9 @@ function isAdminProductionStyleFile(file: SourceFile): boolean {
 
 function isCanvasTokenAllowedFile(file: SourceFile): boolean {
   return (
-    file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas/')
+    file.sourcePath === 'src/app/style.css' ||
+    file.sourcePath.startsWith('src/shared/theme/') ||
+    file.sourcePath.startsWith('src/features/canvas/')
   )
 }
 
@@ -634,6 +826,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
     ...checkAllowanceReasons(fontStackAllowances, 'fontStackAllowances'),
     ...checkAllowanceReasons(textPxAllowances, 'textPxAllowances'),
     ...checkAllowanceReasons(arbitraryBreakpointAllowances, 'arbitraryBreakpointAllowances'),
+    ...checkAllowanceReasons(legacyTokenAllowances, 'legacyTokenAllowances'),
   ]
 
   for (const file of files) {
@@ -692,6 +885,12 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       tokenCountRules,
       arbitraryBreakpointAllowances,
       'stale-arbitrary-breakpoint-allowance',
+    ),
+    ...checkStaleAllowances(
+      contents,
+      tokenCountRules,
+      legacyTokenAllowances,
+      'stale-legacy-token-allowance',
     ),
   )
 

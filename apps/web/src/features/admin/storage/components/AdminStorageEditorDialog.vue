@@ -33,14 +33,14 @@
             <component
               :is="vendorIconMap[form.provider] || DatabaseExport"
               v-else
-              class="size-5 text-admin-text-2"
+              class="size-5 text-muted-foreground"
             />
           </button>
           <div>
-            <h2 class="m-0 text-admin-title-sm font-bold text-admin-title-color">
+            <h2 class="m-0 text-admin-title-sm font-bold text-foreground">
               {{ editorMode === 'create' ? STORAGE_MESSAGES.editorCreateTitle : form.name }}
             </h2>
-            <p class="m-0 text-admin-caption text-admin-text-2">
+            <p class="m-0 text-admin-caption text-muted-foreground">
               {{
                 editorMode === 'create'
                   ? STORAGE_MESSAGES.editorCreateSubtitle
@@ -70,8 +70,8 @@
           class="group relative flex size-12 items-center justify-center rounded-xl border p-2 cursor-pointer transition-colors"
           :class="
             selectedVendorKey === vendor.key
-              ? 'border-admin-accent bg-white shadow-xs'
-              : 'border-admin-border-soft bg-white hover:border-admin-accent/60'
+              ? 'border-primary bg-card shadow-xs'
+              : 'border-border bg-card hover:border-primary/60'
           "
           :aria-label="vendor.label"
           @click="emit('select-vendor', vendor.key)"
@@ -88,7 +88,7 @@
       <div v-if="textFields.length > 0">
         <nav
           :aria-label="STORAGE_MESSAGES.editorTabsAria"
-          class="inline-flex h-9 items-center justify-center rounded-lg bg-admin-surface-muted p-1 text-admin-text-2"
+          class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground"
         >
           <button
             v-for="tab in configTabOptions"
@@ -97,8 +97,8 @@
             :class="[
               'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1 text-admin-caption font-medium transition-colors cursor-pointer',
               activeConfigTab === tab.value
-                ? 'bg-white text-admin-text-1 shadow-xs font-semibold'
-                : 'hover:text-admin-text-1 text-admin-text-2',
+                ? 'bg-card text-foreground shadow-xs font-semibold'
+                : 'hover:text-foreground text-muted-foreground',
             ]"
             @click="activeConfigTab = tab.value"
           >
@@ -111,9 +111,9 @@
       <template v-if="textFields.length === 0 || activeConfigTab === 'basic'">
         <!-- 启用状态开关卡片 -->
         <div
-          class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 px-4 py-3"
+          class="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3"
         >
-          <span class="text-admin-body font-semibold text-admin-title-color">{{
+          <span class="text-admin-body font-semibold text-foreground">{{
             STORAGE_MESSAGES.editorEnableLabel
           }}</span>
           <div class="flex items-center gap-2.5">
@@ -121,13 +121,13 @@
               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
               :class="
                 form.enabled
-                  ? 'bg-admin-success-soft text-admin-success'
-                  : 'bg-admin-surface-muted text-admin-text-3 border border-admin-border-soft'
+                  ? 'bg-emerald-500/15 text-admin-success'
+                  : 'bg-muted text-muted-foreground border border-border'
               "
             >
               <span
                 class="size-1.5 rounded-full"
-                :class="form.enabled ? 'bg-admin-success animate-pulse' : 'bg-admin-text-3'"
+                :class="form.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'"
               />
               {{ STORAGE_MESSAGES.editorEnableState(form.enabled) }}
             </span>
@@ -156,7 +156,7 @@
             <div v-for="field in authFields" :key="field.key" class="flex min-w-0 flex-col gap-1">
               <label
                 :for="`admin-storage-${field.key}`"
-                class="text-admin-meta font-[680] text-admin-text-2"
+                class="text-admin-meta font-[680] text-muted-foreground"
               >
                 {{ field.label }}
               </label>
@@ -184,7 +184,7 @@
             <div class="flex items-center justify-between">
               <label
                 :for="`admin-storage-${field.key}`"
-                class="text-admin-meta font-[680] text-admin-text-2"
+                class="text-admin-meta font-[680] text-muted-foreground"
               >
                 {{ field.label }}
               </label>
@@ -217,14 +217,14 @@
               v-if="field.key === 'access_domain' && bucketDomains.length > 0"
               class="flex items-center gap-1.5 flex-wrap pt-1"
             >
-              <span class="text-admin-caption font-semibold text-admin-text-3">{{
+              <span class="text-admin-caption font-semibold text-muted-foreground">{{
                 STORAGE_MESSAGES.editorDomainsFound
               }}</span>
               <button
                 v-for="domain in bucketDomains"
                 :key="domain"
                 type="button"
-                class="cursor-pointer rounded-md border border-admin-border-soft bg-white px-2 py-0.5 text-admin-caption font-mono font-medium text-admin-accent hover:border-admin-accent transition-colors"
+                class="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-admin-caption font-mono font-medium text-primary hover:border-primary transition-colors"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 https://{{ domain }}
@@ -240,11 +240,11 @@
           <div
             v-for="field in switchFields"
             :key="field.key"
-            class="flex items-center justify-between rounded-xl border border-admin-border-soft bg-admin-surface-muted/50 p-3"
+            class="flex items-center justify-between rounded-xl border border-border bg-muted/50 p-3"
           >
             <div class="flex flex-col">
-              <span class="text-xs font-semibold text-admin-title-color">{{ field.label }}</span>
-              <span v-if="field.hint" class="text-admin-caption text-admin-text-3">{{
+              <span class="text-xs font-semibold text-foreground">{{ field.label }}</span>
+              <span v-if="field.hint" class="text-admin-caption text-muted-foreground">{{
                 field.hint
               }}</span>
             </div>

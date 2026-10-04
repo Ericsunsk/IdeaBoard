@@ -5,7 +5,7 @@
         <label
           id="reward-code-heading"
           for="account-reward-code"
-          class="text-ib-body font-semibold text-ib-text-muted"
+          class="text-ib-body font-semibold text-muted-foreground"
         >
           {{ t('account.rewards.codeLabel') }}
         </label>
@@ -35,7 +35,7 @@
         <p
           v-if="redeemFailed"
           id="account-reward-code-error"
-          class="m-0 border-0 bg-transparent p-0 text-xs font-semibold text-ib-danger"
+          class="m-0 border-0 bg-transparent p-0 text-xs font-semibold text-destructive"
           role="alert"
         >
           {{ redeemErrorText }}
@@ -44,7 +44,7 @@
     </section>
 
     <section class="grid min-w-0 gap-3" aria-labelledby="reward-history-heading">
-      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-ib-text">
+      <h3 id="reward-history-heading" class="m-0 text-lg font-bold text-foreground">
         {{ t('account.rewards.historyTitle') }}
       </h3>
       <DataTableFrame
@@ -65,7 +65,7 @@
         >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="8rem" />
-            <time v-else class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted">
+            <time v-else class="whitespace-nowrap font-mono text-ib-body text-muted-foreground">
               {{ formatShanghaiDateTime(data.redeemed_at) }}
             </time>
           </template>
@@ -108,7 +108,7 @@
         >
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
-            <span v-else class="whitespace-nowrap font-mono text-ib-body text-ib-text-muted">
+            <span v-else class="whitespace-nowrap font-mono text-ib-body text-muted-foreground">
               {{ data.masked_code_hint }}
             </span>
           </template>
@@ -120,8 +120,8 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="alert"
           >
-            <p class="m-0 font-semibold text-ib-danger">{{ t('account.rewards.loadFailed') }}</p>
-            <p class="mt-1 mb-0 text-sm text-ib-text-muted">
+            <p class="m-0 font-semibold text-destructive">{{ t('account.rewards.loadFailed') }}</p>
+            <p class="mt-1 mb-0 text-sm text-muted-foreground">
               {{ errorMessage(initialError) }}
             </p>
             <Button variant="ghost" size="sm" class="mt-3" @click="retryInitial()">{{
@@ -133,8 +133,8 @@
             class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
             role="status"
           >
-            <span class="font-semibold text-ib-text">{{ t('account.rewards.emptyTitle') }}</span>
-            <span class="mt-1 text-sm text-ib-text-subtle">{{
+            <span class="font-semibold text-foreground">{{ t('account.rewards.emptyTitle') }}</span>
+            <span class="mt-1 text-sm text-muted-foreground">{{
               t('account.rewards.emptyDescription')
             }}</span>
           </div>
@@ -152,17 +152,17 @@
 
           <div
             v-if="loadMoreError"
-            class="flex items-center justify-center gap-3 border-t border-ib-border-soft px-4 py-3"
+            class="flex items-center justify-center gap-3 border-t border-border px-4 py-3"
             role="alert"
           >
-            <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
+            <span class="text-sm text-destructive">{{ errorMessage(loadMoreError) }}</span>
             <Button variant="ghost" size="sm" @click="loadMore()">{{
               t('account.rewards.retryLoad')
             }}</Button>
           </div>
           <div
             v-else-if="hasNextPage"
-            class="flex justify-center border-t border-ib-border-soft px-4 py-3"
+            class="flex justify-center border-t border-border px-4 py-3"
           >
             <Button variant="outline" size="sm" :loading="isFetchingNextPage" @click="loadMore()">{{
               t('account.rewards.loadMore')

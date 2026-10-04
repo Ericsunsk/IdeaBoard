@@ -91,16 +91,16 @@ const healthBadge = computed(() => {
       label: presentation.badgeLabel,
       className:
         presentation.tone === 'danger'
-          ? 'border-admin-danger text-admin-danger'
+          ? 'border-destructive text-destructive'
           : presentation.tone === 'warning'
             ? 'border-admin-warning text-admin-warning'
-            : 'border-admin-border text-admin-text-3',
+            : 'border-border text-muted-foreground',
     }
   }
   return healthResource.query.isError.value
     ? {
         label: CREDITS_BILLING_LAYOUT_MESSAGES.navUnknownBadge,
-        className: 'border-admin-border text-admin-text-3',
+        className: 'border-border text-muted-foreground',
       }
     : null
 })

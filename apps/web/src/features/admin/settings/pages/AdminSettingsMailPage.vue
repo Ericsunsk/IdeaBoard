@@ -7,7 +7,7 @@
     :rows="settingRows"
   >
     <template #expansion="{ data }">
-      <div class="border-t border-admin-border-soft bg-admin-bg p-4 md:p-5">
+      <div class="border-t border-border bg-card p-4 md:p-5">
         <AdminMailConfigCard v-if="data.id === 'mail'" class="mb-0" />
       </div>
     </template>

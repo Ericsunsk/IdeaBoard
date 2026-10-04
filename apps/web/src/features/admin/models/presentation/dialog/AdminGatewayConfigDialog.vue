@@ -18,14 +18,14 @@
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label
-            class="text-admin-caption font-semibold text-admin-text-1"
+            class="text-admin-caption font-semibold text-foreground"
             for="gateway-base-url-input"
           >
             {{ MODELS_MESSAGES.gatewayBaseUrlLabel }}
           </label>
           <span
             v-if="summary?.is_first_party"
-            class="inline-flex items-center gap-1 text-admin-caption text-admin-accent font-medium"
+            class="inline-flex items-center gap-1 text-admin-caption text-primary font-medium"
           >
             <Check class="size-3.5" />
             {{ MODELS_MESSAGES.gatewayRecognized }}
@@ -44,7 +44,7 @@
       <div class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
           <label
-            class="text-admin-caption font-semibold text-admin-text-1"
+            class="text-admin-caption font-semibold text-foreground"
             for="gateway-token-input"
           >
             {{ MODELS_MESSAGES.gatewayTokenLabel }}
@@ -71,11 +71,11 @@
       <!-- CF 身份：官方域名可空（后端从 URL 派生）；自定义域名如需模型探测请填写 -->
       <div class="flex flex-col gap-1.5">
         <label
-          class="text-admin-caption font-semibold text-admin-text-1"
+          class="text-admin-caption font-semibold text-foreground"
           for="gateway-account-id-input"
         >
           Account ID
-          <span class="font-normal text-admin-text-3">{{
+          <span class="font-normal text-muted-foreground">{{
             MODELS_MESSAGES.gatewayCustomDomainHint
           }}</span>
         </label>
@@ -89,9 +89,9 @@
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <label class="text-admin-caption font-semibold text-admin-text-1" for="gateway-id-input">
+        <label class="text-admin-caption font-semibold text-foreground" for="gateway-id-input">
           Gateway ID
-          <span class="font-normal text-admin-text-3">{{
+          <span class="font-normal text-muted-foreground">{{
             MODELS_MESSAGES.gatewayCustomDomainHint
           }}</span>
         </label>
@@ -109,7 +109,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div class="flex flex-col gap-1.5">
           <label
-            class="text-admin-caption font-semibold text-admin-text-1"
+            class="text-admin-caption font-semibold text-foreground"
             for="gateway-probe-provider-input"
           >
             {{ MODELS_MESSAGES.gatewayProbeProviderLabel }}
@@ -125,7 +125,7 @@
         </div>
         <div class="flex flex-col gap-1.5">
           <label
-            class="text-admin-caption font-semibold text-admin-text-1"
+            class="text-admin-caption font-semibold text-foreground"
             for="gateway-probe-path-input"
           >
             {{ MODELS_MESSAGES.gatewayProbePathLabel }}

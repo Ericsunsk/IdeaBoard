@@ -17,7 +17,7 @@ const presentations: Record<CreditHealthStatus, CreditHealthPresentation> = {
     summary: '还没有成功的账本检查结果。',
     badgeLabel: '未检查',
     tone: 'neutral',
-    iconClass: 'text-admin-text-3',
+    iconClass: 'text-muted-foreground',
     iconKey: 'time',
   },
   healthy: {

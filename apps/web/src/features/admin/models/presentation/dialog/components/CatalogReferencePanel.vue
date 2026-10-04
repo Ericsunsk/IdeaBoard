@@ -1,10 +1,10 @@
 <template>
-  <div class="rounded-xl border border-admin-border-soft bg-white p-4 shadow-xs">
-    <div class="mb-3 flex items-center justify-between border-b border-admin-border-soft pb-2.5">
-      <h4 class="text-xs font-semibold text-admin-text-1">{{ MODELS_MESSAGES.referenceTitle }}</h4>
+  <div class="rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div class="mb-3 flex items-center justify-between border-b border-border pb-2.5">
+      <h4 class="text-xs font-semibold text-foreground">{{ MODELS_MESSAGES.referenceTitle }}</h4>
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2 hover:text-admin-accent cursor-pointer disabled:opacity-50"
+        class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground hover:text-primary cursor-pointer disabled:opacity-50"
         :disabled="loading || !hasIdentity || isFal"
         @click="refreshReference"
       >
@@ -14,21 +14,21 @@
     </div>
 
     <!-- 无身份：等用户输入模型标识 -->
-    <p v-if="!hasIdentity" class="text-admin-caption leading-relaxed text-admin-text-3">
+    <p v-if="!hasIdentity" class="text-admin-caption leading-relaxed text-muted-foreground">
       {{ MODELS_MESSAGES.referenceNoIdentity }}
     </p>
 
     <!-- fal 优雅缺省：models.dev 未收录 fal provider，恒为 miss；短路展示，不发参照请求 -->
-    <p v-else-if="isFal" class="text-admin-caption leading-relaxed text-admin-text-2">
+    <p v-else-if="isFal" class="text-admin-caption leading-relaxed text-muted-foreground">
       {{ MODELS_MESSAGES.referenceFalNotice }}
     </p>
 
-    <p v-else-if="loading" class="text-admin-caption text-admin-text-2">
+    <p v-else-if="loading" class="text-admin-caption text-muted-foreground">
       {{ MODELS_MESSAGES.referenceLoading }}
     </p>
 
     <div v-else-if="loadError" class="flex items-center justify-between gap-2">
-      <span class="text-admin-caption text-admin-danger">{{ loadError }}</span>
+      <span class="text-admin-caption text-destructive">{{ loadError }}</span>
       <button
         type="button"
         class="text-admin-caption font-semibold underline hover:no-underline cursor-pointer"
@@ -45,8 +45,8 @@
           class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg"
           :class="
             brandLogo
-              ? 'border border-admin-border-soft/60 bg-admin-surface-muted/60'
-              : 'bg-admin-accent/10 text-admin-accent'
+              ? 'border border-border/60 bg-muted/60'
+              : 'bg-primary/10 text-primary'
           "
         >
           <img
@@ -60,51 +60,51 @@
           <Cube v-else class="size-4" />
         </div>
         <div class="flex min-w-0 flex-col">
-          <span class="truncate text-xs font-semibold text-admin-text-1">
+          <span class="truncate text-xs font-semibold text-foreground">
             {{ snapshot.name || snapshot.modelId }}
           </span>
-          <span class="truncate font-mono text-admin-caption text-admin-text-3">
+          <span class="truncate font-mono text-admin-caption text-muted-foreground">
             {{ snapshot.modelId }}
           </span>
         </div>
         <span
-          class="ml-auto inline-flex shrink-0 items-center rounded bg-admin-surface-muted px-1.5 py-0.5 text-admin-micro font-medium text-admin-text-2"
+          class="ml-auto inline-flex shrink-0 items-center rounded bg-muted px-1.5 py-0.5 text-admin-micro font-medium text-muted-foreground"
         >
           source: {{ snapshot.source }}
         </span>
       </div>
 
       <!-- miss / 上游降级：found=false，HTTP 仍 200，按 error_code 解释 -->
-      <p v-if="!snapshot.found" class="text-admin-caption leading-relaxed text-admin-text-2">
+      <p v-if="!snapshot.found" class="text-admin-caption leading-relaxed text-muted-foreground">
         {{ missHint }}
       </p>
 
       <div v-else class="flex flex-col gap-2 text-xs">
         <div
-          class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referencePricingLabel }}</span>
-          <span class="font-medium text-admin-text-1">
+          <span class="text-muted-foreground">{{ MODELS_MESSAGES.referencePricingLabel }}</span>
+          <span class="font-medium text-foreground">
             {{ pricingText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
         <div
-          class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referenceContextLabel }}</span>
-          <span class="font-medium text-admin-text-1">
+          <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceContextLabel }}</span>
+          <span class="font-medium text-foreground">
             {{ contextText || MODELS_MESSAGES.referenceUnknown }}
           </span>
         </div>
 
         <div
-          class="flex items-center justify-between rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
         >
-          <span class="text-admin-text-3">{{ MODELS_MESSAGES.referenceUpdatedLabel }}</span>
-          <span class="font-mono text-admin-caption text-admin-text-1">
+          <span class="text-muted-foreground">{{ MODELS_MESSAGES.referenceUpdatedLabel }}</span>
+          <span class="font-mono text-admin-caption text-foreground">
             {{ snapshot.lastUpdated || MODELS_MESSAGES.referenceUnknown }}
-            <span v-if="freshnessText" class="text-admin-text-3">({{ freshnessText }})</span>
+            <span v-if="freshnessText" class="text-muted-foreground">({{ freshnessText }})</span>
           </span>
         </div>
 
@@ -112,13 +112,13 @@
              只读展示，参照 name 仅作标题，永不回写表单 description
             （网关侧运营文案优先）。 -->
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceCapabilitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{
+          <span class="shrink-0 text-muted-foreground">{{
             MODELS_MESSAGES.referenceCapabilitiesLabel
           }}</span>
-          <span v-if="!hasCapabilityData" class="font-medium text-admin-text-3">{{
+          <span v-if="!hasCapabilityData" class="font-medium text-muted-foreground">{{
             MODELS_MESSAGES.referenceNoData
           }}</span>
           <span v-else class="flex flex-wrap justify-end gap-1">
@@ -130,8 +130,8 @@
                 capability.supported === true
                   ? 'bg-emerald-50 text-emerald-700'
                   : capability.supported === false
-                    ? 'bg-admin-surface-muted text-admin-text-3 line-through'
-                    : 'bg-admin-surface-muted text-admin-text-3'
+                    ? 'bg-muted text-muted-foreground line-through'
+                    : 'bg-muted text-muted-foreground'
               "
             >
               {{ capability.label
@@ -143,46 +143,46 @@
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceModalitiesTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{
+          <span class="shrink-0 text-muted-foreground">{{
             MODELS_MESSAGES.referenceModalitiesLabel
           }}</span>
-          <span class="text-right font-medium text-admin-text-1">
+          <span class="text-right font-medium text-foreground">
             {{ modalitiesText || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceReleaseTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{
+          <span class="shrink-0 text-muted-foreground">{{
             MODELS_MESSAGES.referenceReleaseLabel
           }}</span>
-          <span class="font-mono text-admin-caption text-admin-text-1">
+          <span class="font-mono text-admin-caption text-foreground">
             {{ releaseKnowledgeText || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceFamilyTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceFamilyLabel }}</span>
-          <span class="font-medium text-admin-text-1">
+          <span class="shrink-0 text-muted-foreground">{{ MODELS_MESSAGES.referenceFamilyLabel }}</span>
+          <span class="font-medium text-foreground">
             {{ snapshot.family || MODELS_MESSAGES.referenceNoData }}
           </span>
         </div>
 
         <!-- 上游状态：deprecated 红色预警，beta 普通徽标；缺失即无预警，绝不误报。 -->
         <div
-          class="flex items-center justify-between gap-2 rounded-lg bg-admin-surface-muted/50 px-3 py-2"
+          class="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2"
           :title="MODELS_MESSAGES.referenceStatusTitle"
         >
-          <span class="shrink-0 text-admin-text-3">{{ MODELS_MESSAGES.referenceStatusLabel }}</span>
-          <span v-if="statusKind === 'unknown'" class="font-medium text-admin-text-3">{{
+          <span class="shrink-0 text-muted-foreground">{{ MODELS_MESSAGES.referenceStatusLabel }}</span>
+          <span v-if="statusKind === 'unknown'" class="font-medium text-muted-foreground">{{
             MODELS_MESSAGES.referenceNoData
           }}</span>
           <span
@@ -193,16 +193,16 @@
           </span>
           <span
             v-else-if="statusKind === 'beta'"
-            class="inline-flex items-center rounded border border-admin-border-soft bg-white px-1.5 py-0.5 text-admin-caption font-medium text-admin-text-2"
+            class="inline-flex items-center rounded border border-border bg-card px-1.5 py-0.5 text-admin-caption font-medium text-muted-foreground"
           >
             {{ snapshot.status }}
           </span>
-          <span v-else class="font-medium text-admin-text-1">{{ snapshot.status }}</span>
+          <span v-else class="font-medium text-foreground">{{ snapshot.status }}</span>
         </div>
       </div>
 
       <!-- 非结算声明：后端 note 恒为“参照价，非结算依据” -->
-      <p class="text-admin-caption leading-relaxed text-admin-text-3">
+      <p class="text-admin-caption leading-relaxed text-muted-foreground">
         {{ MODELS_MESSAGES.referenceDisclaimer(snapshot.note) }}
       </p>
     </div>

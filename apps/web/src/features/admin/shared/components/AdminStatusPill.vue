@@ -49,32 +49,32 @@ const sizeClasses = computed(() => {
 const pillClasses = computed(() => {
   switch (props.variant) {
     case 'success':
-      return 'bg-admin-success-soft text-admin-success border-admin-success/30 shadow-xs'
+      return 'bg-emerald-500/15 text-admin-success border-emerald-500/20 shadow-xs'
     case 'danger':
-      return 'bg-admin-danger-soft text-admin-danger border-admin-danger/30 shadow-xs'
+      return 'bg-destructive/15 text-destructive border-destructive/20 shadow-xs'
     case 'warning':
-      return 'bg-admin-warning-soft text-admin-warning border-admin-warning/30 shadow-xs'
+      return 'bg-amber-500/15 text-admin-warning border-amber-500/20 shadow-xs'
     case 'info':
-      return 'bg-admin-info-soft text-admin-info border-admin-info/30 shadow-xs'
+      return 'bg-sky-500/15 text-admin-info border-sky-500/20 shadow-xs'
     case 'neutral':
     default:
-      return 'bg-admin-surface-muted text-admin-text-3 border-admin-border-soft'
+      return 'bg-muted text-muted-foreground border-border'
   }
 })
 
 const dotColorClass = computed(() => {
   switch (props.variant) {
     case 'success':
-      return 'bg-admin-success'
+      return 'bg-emerald-500'
     case 'danger':
-      return 'bg-admin-danger'
+      return 'bg-destructive'
     case 'warning':
-      return 'bg-admin-warning'
+      return 'bg-amber-500'
     case 'info':
-      return 'bg-admin-info'
+      return 'bg-sky-500'
     case 'neutral':
     default:
-      return 'bg-admin-text-3'
+      return 'bg-muted-foreground'
   }
 })
 </script>

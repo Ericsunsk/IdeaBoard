@@ -58,6 +58,10 @@ export default {
     account: 'Cuenta',
     console: 'Consola',
     home: 'Inicio',
+    appearance: 'Aspecto',
+    themeLight: 'Claro',
+    themeDark: 'Oscuro',
+    themeSystem: 'Sistema',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

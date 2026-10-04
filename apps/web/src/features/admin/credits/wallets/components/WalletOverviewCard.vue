@@ -1,34 +1,34 @@
 <template>
   <section
-    class="flex flex-col gap-3.5 rounded-2xl border border-admin-border-soft bg-white p-4.5 shadow-2xs"
+    class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4.5 shadow-2xs"
     :aria-label="t('admin.wallet.overviewAria')"
   >
     <div class="flex flex-wrap items-center justify-between gap-4">
       <!-- 核心余额与状态 -->
       <div class="flex flex-wrap items-center gap-6 sm:gap-8">
         <div class="flex flex-col gap-0.5">
-          <span class="text-admin-caption font-semibold text-admin-text-3">
+          <span class="text-admin-caption font-semibold text-muted-foreground">
             {{ t('admin.wallet.accountBalance') }}
           </span>
           <div class="flex items-baseline gap-2">
             <span
-              class="text-2xl font-black tracking-tight text-admin-title-color font-mono tabular-nums"
+              class="text-2xl font-black tracking-tight text-foreground font-mono tabular-nums"
             >
               {{ formatIdeaAmount(availableCredits) }}
             </span>
             <span
               v-if="reservedCredits && reservedCredits > 0"
-              class="rounded-md bg-admin-warning-soft px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-admin-warning"
+              class="rounded-md bg-amber-500/15 px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-admin-warning"
             >
               {{ t('admin.wallet.reservedAmount', { amount: formatIdeaAmount(reservedCredits) }) }}
             </span>
           </div>
         </div>
 
-        <div class="hidden h-9 w-px bg-admin-border-soft sm:block" />
+        <div class="hidden h-9 w-px bg-border sm:block" />
 
         <div class="flex flex-col gap-0.5">
-          <span class="text-admin-caption font-semibold text-admin-text-3">
+          <span class="text-admin-caption font-semibold text-muted-foreground">
             {{ t('admin.wallet.accountStatus') }}
           </span>
           <div class="flex items-center gap-1.5 pt-0.5">
@@ -69,16 +69,16 @@
     <!-- 限制与冻结状态提示条 -->
     <div
       v-if="activeRestrictions.length"
-      class="flex items-start gap-2 rounded-xl border border-admin-warning/30 bg-admin-warning-soft p-3 text-xs"
+      class="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 p-3 text-xs"
     >
       <WarningTriangle class="size-4 shrink-0 text-admin-warning mt-0.5" />
       <div class="flex flex-col gap-1">
         <span class="font-bold text-admin-warning">{{
           t('admin.wallet.activeRestrictionsNotice')
         }}</span>
-        <ul class="space-y-0.5 pl-4 text-admin-text-2 list-disc">
+        <ul class="space-y-0.5 pl-4 text-muted-foreground list-disc">
           <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
-            <span class="font-semibold text-admin-title-color"
+            <span class="font-semibold text-foreground"
               >{{ getRestrictionLabel(restriction.type) }}：</span
             >
             {{ restriction.reason }}

@@ -3,11 +3,11 @@
     <!-- 顶栏：左侧标题与状态切换，右侧刷新（与用户管理页/订单页同源） -->
     <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div class="text-base font-bold text-admin-title-color">
+        <div class="text-base font-bold text-foreground">
           {{ CREDIT_HEALTH_MESSAGES.queueTitle }}
         </div>
         <div
-          class="inline-flex items-center rounded-lg border border-admin-border-soft bg-admin-surface-muted p-0.5"
+          class="inline-flex items-center rounded-lg border border-border bg-muted p-0.5"
           role="group"
           :aria-label="CREDIT_HEALTH_MESSAGES.queueViewAria"
         >
@@ -18,8 +18,8 @@
             class="rounded-md px-3 py-1 text-xs font-semibold transition-colors cursor-pointer"
             :class="
               status === opt.value
-                ? 'bg-white text-admin-text-1 shadow-xs'
-                : 'text-admin-text-2 hover:text-admin-text-1'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             "
             @click="status = opt.value"
           >
@@ -37,7 +37,7 @@
           :disabled="loading"
           @click="refreshFindings"
         >
-          <Refresh class="size-4 text-admin-text-2" />
+          <Refresh class="size-4 text-muted-foreground" />
         </AdminButton>
       </div>
     </div>
@@ -97,7 +97,7 @@
           <template #body="{ data }">
             <button
               type="button"
-              class="group block max-w-[34rem] rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent cursor-pointer"
+              class="group block max-w-[34rem] rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary cursor-pointer"
               :aria-label="
                 CREDIT_HEALTH_MESSAGES.queueViewDiagnosis(
                   getFindingTypePresentation(data.finding_type).title,
@@ -106,11 +106,11 @@
               @click="openFinding(data)"
             >
               <span
-                class="font-semibold text-admin-text-1 group-hover:text-admin-accent transition-colors"
+                class="font-semibold text-foreground group-hover:text-primary transition-colors"
               >
                 {{ getFindingTypePresentation(data.finding_type).title }}
               </span>
-              <span class="mt-1 block line-clamp-2 text-xs leading-5 text-admin-text-3">
+              <span class="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
                 {{ getFindingTypePresentation(data.finding_type).summary }}
               </span>
             </button>
@@ -123,11 +123,11 @@
         >
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col gap-1">
-              <span v-if="data.wallet_public_id" class="text-xs font-semibold text-admin-text-1">
+              <span v-if="data.wallet_public_id" class="text-xs font-semibold text-foreground">
                 Wallet · {{ data.wallet_display_name || data.wallet_public_id }}
               </span>
               <span
-                class="max-w-72 truncate font-mono text-xs text-admin-text-3"
+                class="max-w-72 truncate font-mono text-xs text-muted-foreground"
                 :title="`${data.subject_type} · ${data.subject_id}`"
               >
                 {{ data.subject_type }} · {{ data.subject_id }}
@@ -155,7 +155,7 @@
           :style="{ width: '18%', minWidth: '170px' }"
         >
           <template #body="{ data }">
-            <span class="whitespace-nowrap font-mono text-xs text-admin-text-3">
+            <span class="whitespace-nowrap font-mono text-xs text-muted-foreground">
               {{ formatAdminDateTimeWithSeconds(data.last_seen_at) }}
             </span>
           </template>
@@ -182,7 +182,7 @@
       </AdminTable>
 
       <div :class="adminTableFooterClass">
-        <span class="text-xs font-normal text-admin-text-3">
+        <span class="text-xs font-normal text-muted-foreground">
           {{ CREDIT_HEALTH_MESSAGES.queueFooterCount(status, findings.length) }}
         </span>
         <div class="flex items-center gap-2">
@@ -206,17 +206,17 @@
       />
       <DialogContent
         :show-close="false"
-        class="fixed inset-y-0 right-0 z-50 flex h-full w-[min(38rem,calc(100vw-1rem))] flex-col border-l border-admin-border-soft bg-white shadow-2xl transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
+        class="fixed inset-y-0 right-0 z-50 flex h-full w-[min(38rem,calc(100vw-1rem))] flex-col border-l border-border bg-card shadow-2xl transition-transform data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
       >
-        <div class="flex items-center justify-between border-b border-admin-border-soft px-6 py-4">
-          <DialogTitle class="text-admin-title-sm font-bold text-admin-title-color">
+        <div class="flex items-center justify-between border-b border-border px-6 py-4">
+          <DialogTitle class="text-admin-title-sm font-bold text-foreground">
             {{ CREDIT_HEALTH_MESSAGES.queueDiagnosisTitle }}
           </DialogTitle>
           <DialogDescription class="sr-only">
             {{ CREDIT_HEALTH_MESSAGES.queueDiagnosisDescription }}
           </DialogDescription>
           <DialogClose
-            class="rounded-lg p-1.5 text-admin-text-subtle hover:bg-admin-surface-hover hover:text-admin-text transition-colors cursor-pointer"
+            class="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
             :aria-label="CREDIT_HEALTH_MESSAGES.close"
           >
             <Xmark class="size-5" />
@@ -225,10 +225,10 @@
         <div class="flex-1 overflow-y-auto">
           <div v-if="selectedFinding" class="flex min-w-0 flex-col gap-6 px-6 py-5">
             <section class="min-w-0">
-              <div class="text-admin-title font-[760] text-admin-title-color">
+              <div class="text-admin-title font-[760] text-foreground">
                 {{ getFindingTypePresentation(selectedFinding.finding_type).title }}
               </div>
-              <p class="mt-2 mb-0 text-admin-body leading-6 text-admin-text-2">
+              <p class="mt-2 mb-0 text-admin-body leading-6 text-muted-foreground">
                 {{ getFindingTypePresentation(selectedFinding.finding_type).summary }}
               </p>
               <AdminBadge
@@ -240,87 +240,87 @@
             </section>
 
             <section
-              class="grid gap-x-5 gap-y-4 border-y border-admin-border-soft py-5 sm:grid-cols-2"
+              class="grid gap-x-5 gap-y-4 border-y border-border py-5 sm:grid-cols-2"
             >
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">
+                <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueSubjectColumn }}
                 </div>
-                <div class="mt-1 break-all text-admin-body font-[680] text-admin-text-1">
+                <div class="mt-1 break-all text-admin-body font-[680] text-foreground">
                   {{ selectedFinding.subject_type }} · {{ selectedFinding.subject_id }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">
+                <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueDrawerOccurrences }}
                 </div>
-                <div class="mt-1 font-mono text-admin-body font-[680] text-admin-text-1">
+                <div class="mt-1 font-mono text-admin-body font-[680] text-foreground">
                   {{ selectedFinding.occurrence_count }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">
+                <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueDrawerFirstSeen }}
                 </div>
-                <div class="mt-1 font-mono text-admin-body text-admin-text-1">
+                <div class="mt-1 font-mono text-admin-body text-foreground">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.first_seen_at) }}
                 </div>
               </div>
               <div>
-                <div class="text-admin-caption font-[700] text-admin-text-3">
+                <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueLastSeenColumn }}
                 </div>
-                <div class="mt-1 font-mono text-admin-body text-admin-text-1">
+                <div class="mt-1 font-mono text-admin-body text-foreground">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.last_seen_at) }}
                 </div>
               </div>
               <div v-if="selectedFinding.resolved_at">
-                <div class="text-admin-caption font-[700] text-admin-text-3">
+                <div class="text-admin-caption font-[700] text-muted-foreground">
                   {{ CREDIT_HEALTH_MESSAGES.queueDrawerResolvedAt }}
                 </div>
-                <div class="mt-1 font-mono text-admin-body text-admin-text-1">
+                <div class="mt-1 font-mono text-admin-body text-foreground">
                   {{ formatAdminDateTimeWithSeconds(selectedFinding.resolved_at) }}
                 </div>
               </div>
             </section>
 
             <section v-if="selectedFinding.wallet_public_id">
-              <div class="text-admin-caption font-[700] text-admin-text-3">
+              <div class="text-admin-caption font-[700] text-muted-foreground">
                 {{ CREDIT_HEALTH_MESSAGES.queueDrawerWallet }}
               </div>
-              <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
+              <div class="mt-2 text-admin-body font-[680] text-foreground">
                 Wallet ·
                 {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
               </div>
             </section>
 
             <section class="min-w-0">
-              <div class="text-admin-caption font-[700] text-admin-text-3">
+              <div class="text-admin-caption font-[700] text-muted-foreground">
                 {{ CREDIT_HEALTH_MESSAGES.queueDrawerDetails }}
               </div>
               <dl v-if="detailEntries.length > 0" class="mt-2 grid min-w-0 gap-2">
                 <div
                   v-for="entry in detailEntries"
                   :key="entry.key"
-                  class="min-w-0 rounded-lg border border-admin-border-soft bg-admin-bg/50 px-3 py-2.5"
+                  class="min-w-0 rounded-lg border border-border bg-muted/50 px-3 py-2.5"
                 >
-                  <dt class="text-admin-caption font-[700] text-admin-text-3">{{ entry.key }}</dt>
+                  <dt class="text-admin-caption font-[700] text-muted-foreground">{{ entry.key }}</dt>
                   <dd
-                    class="mt-1 mb-0 whitespace-pre-wrap break-all font-mono text-admin-caption leading-5 text-admin-text-1"
+                    class="mt-1 mb-0 whitespace-pre-wrap break-all font-mono text-admin-caption leading-5 text-foreground"
                   >
                     {{ entry.value }}
                   </dd>
                 </div>
               </dl>
-              <div v-else class="mt-2 text-admin-body text-admin-text-3">
+              <div v-else class="mt-2 text-admin-body text-muted-foreground">
                 {{ CREDIT_HEALTH_MESSAGES.queueDrawerNoDetails }}
               </div>
             </section>
 
             <section class="min-w-0">
-              <div class="text-admin-caption font-[700] text-admin-text-3">Fingerprint</div>
+              <div class="text-admin-caption font-[700] text-muted-foreground">Fingerprint</div>
               <div
-                class="mt-2 break-all rounded-lg border border-admin-border-soft bg-admin-bg/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-admin-text-2"
+                class="mt-2 break-all rounded-lg border border-border bg-muted/50 px-3 py-2.5 font-mono text-admin-caption leading-5 text-muted-foreground"
               >
                 {{ selectedFinding.fingerprint }}
               </div>

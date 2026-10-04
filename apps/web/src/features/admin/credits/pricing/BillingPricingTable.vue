@@ -1,8 +1,8 @@
 <template>
   <section :aria-label="BILLING_PRICING_MESSAGES.tableAria(props.title)">
     <div v-if="props.title" class="mb-2 flex items-center gap-2">
-      <h3 class="text-sm font-bold text-admin-title-color">{{ props.title }}</h3>
-      <span class="text-xs text-admin-text-3">{{
+      <h3 class="text-sm font-bold text-foreground">{{ props.title }}</h3>
+      <span class="text-xs text-muted-foreground">{{
         BILLING_PRICING_MESSAGES.tableCount(props.items.length)
       }}</span>
     </div>
@@ -83,24 +83,12 @@
           :style="{ width: billingPricingColumnWidths.pool }"
         >
           <template #body="{ data }">
-            <div class="flex min-w-0 items-start gap-2">
-              <ModelPoolSummaryCell
-                :display-name="data.displayName"
-                :pool="props.poolBySku[data.sku]"
-                :failed="props.poolFailed[data.sku] === true"
-                class="min-w-0 flex-1"
-              />
-              <AdminButton
-                v-if="serviceOfSku(data.sku)"
-                size="small"
-                variant="outline"
-                :class="adminActionButtonClass"
-                :aria-label="BILLING_PRICING_MESSAGES.poolEdit"
-                @click="emit('pool', data)"
-              >
-                {{ BILLING_PRICING_MESSAGES.poolEdit }}
-              </AdminButton>
-            </div>
+            <ModelPoolSummaryCell
+              :display-name="data.displayName"
+              :pool="props.poolBySku[data.sku]"
+              :failed="props.poolFailed[data.sku] === true"
+              class="min-w-0"
+            />
           </template>
         </AdminColumn>
 
@@ -174,7 +162,6 @@ import { billingPricingColumnWidths, formatPricingCellValue } from './billingPri
 import BillingServiceCell from './BillingServiceCell.vue'
 import ModelPoolSummaryCell from './ModelPoolSummaryCell.vue'
 import type { AdminBillableItemCard, AdminModelPool } from './billableCatalogTypes'
-import { serviceOfSku } from './skuFeature'
 import { BILLING_PRICING_MESSAGES } from './messages'
 
 // 对齐任务监控页事件表：同壳、同列模式；分组与状态语义归 pricingColumns 单源。
@@ -202,13 +189,12 @@ const emit = defineEmits<{
   publish: [item: AdminBillableItemCard]
   availability: [item: AdminBillableItemCard, enabled: boolean]
   delete: [item: AdminBillableItemCard]
-  pool: [item: AdminBillableItemCard]
 }>()
 
 // 未设置态与 Model 列未配置同样式（灰 mono 非粗体），有值才高亮。
 function priceValueClass(value: string): string {
   return value === '—' || value === '未设置'
-    ? 'truncate font-mono text-xs text-admin-text-3'
-    : 'truncate font-mono text-xs font-bold text-admin-title-color'
+    ? 'truncate font-mono text-xs text-muted-foreground'
+    : 'truncate font-mono text-xs font-bold text-foreground'
 }
 </script>

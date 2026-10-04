@@ -5,13 +5,13 @@
         type="button"
         :class="[
           adminFramedIconButtonClass,
-          active ? '!border-admin-text-1' : '',
+          active ? '!border-foreground' : '',
           'cursor-pointer',
         ]"
         :aria-label="filterLabel"
         :aria-pressed="active"
       >
-        <Filter :class="['size-4', active ? 'text-admin-text-1' : 'text-admin-text-2']" />
+        <Filter :class="['size-4', active ? 'text-foreground' : 'text-muted-foreground']" />
       </button>
     </PopoverTrigger>
     <PopoverPortal>
@@ -22,15 +22,15 @@
         @interact-outside="handleInteractOutside"
       >
         <div class="flex flex-col gap-4">
-          <div class="border-b border-admin-border pb-2">
-            <div class="text-admin-content font-bold text-admin-title-color">{{ title }}</div>
+          <div class="border-b border-border pb-2">
+            <div class="text-admin-content font-bold text-foreground">{{ title }}</div>
           </div>
 
           <slot />
 
           <button
             type="button"
-            class="h-9 w-full rounded-lg bg-admin-accent text-white text-admin-body font-medium transition-colors hover:bg-admin-accent-hover active:bg-admin-accent-pressed disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-xs"
+            class="h-9 w-full rounded-lg bg-primary text-primary-foreground text-admin-body font-medium transition-colors hover:bg-primary/90 active:bg-primary/80 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-xs"
             :disabled="!active"
             @click="$emit('reset')"
           >

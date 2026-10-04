@@ -15,7 +15,7 @@
       <slot name="alerts" />
       <slot />
       <div :class="adminTableFooterClass">
-        <span class="text-xs font-normal text-admin-text-label">
+        <span class="text-xs font-normal text-muted-foreground">
           <slot name="footer-label" />
         </span>
         <div class="flex items-center gap-2">

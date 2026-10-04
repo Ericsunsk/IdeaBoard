@@ -4,7 +4,7 @@
     v-bind="$attrs"
     :class="
       cn(
-        'mt-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent focus-visible:ring-offset-1',
+        'mt-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         props.class,
       )
     "

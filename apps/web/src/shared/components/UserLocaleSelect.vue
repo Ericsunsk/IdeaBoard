@@ -33,7 +33,7 @@
         :class="[
           menuItemClass,
           item.value === activeLocale &&
-            'bg-ib-surface-hover text-[var(--app-overlay-menu-item-hover-color,var(--color-ib-text))] font-medium',
+            'bg-muted text-[var(--app-overlay-menu-item-hover-color,var(--color-foreground))] font-medium',
         ]"
         :data-control-state="item.value === activeLocale ? 'active' : 'idle'"
         :aria-current="item.value === activeLocale ? 'true' : undefined"

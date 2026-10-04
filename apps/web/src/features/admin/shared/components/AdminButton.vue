@@ -114,21 +114,21 @@ const baseButtonSize = computed<ButtonVariants['size']>(() => {
 
 const adminColorClasses: Record<AdminButtonVariant, string> = {
   default:
-    'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+    'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 shadow-xs',
   primary:
-    'bg-admin-accent !text-white hover:bg-admin-accent-hover active:bg-admin-accent-pressed shadow-xs',
+    'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 shadow-xs',
   secondary:
-    'bg-admin-surface-muted text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed border border-admin-border-soft',
+    'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70 border border-border',
   destructive:
-    'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+    'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80 shadow-xs',
   danger:
-    'bg-admin-danger !text-white hover:bg-admin-danger-hover active:bg-admin-danger-pressed shadow-xs',
+    'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80 shadow-xs',
   outline:
-    'border border-admin-border bg-white text-admin-text-1 hover:bg-admin-surface-hover active:bg-admin-surface-pressed shadow-xs',
+    'border border-input bg-card text-card-foreground hover:bg-muted active:bg-muted/80 shadow-xs',
   ghost:
-    'text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1 active:bg-admin-surface-pressed',
-  link: 'text-admin-accent underline-offset-4 hover:underline',
-  success: 'bg-admin-success !text-white hover:bg-admin-success/90 shadow-xs',
+    'text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80',
+  link: 'text-primary underline-offset-4 hover:underline',
+  success: 'bg-emerald-700 text-white hover:bg-emerald-700/90 shadow-xs',
 }
 
 const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.loading))
@@ -136,7 +136,7 @@ const isDisabledOrLoading = computed(() => Boolean(props.disabled || props.loadi
 const computedClasses = computed(() => {
   const effVariant = resolveEffectiveVariant()
   return cn(
-    'focus-visible:ring-2 focus-visible:ring-admin-accent/20 select-none cursor-pointer',
+    'focus-visible:ring-2 focus-visible:ring-ring/20 select-none cursor-pointer',
     props.rounded ? 'rounded-full' : 'rounded-lg',
     (props.size === 'small' || props.size === 'sm') && 'text-admin-meta',
     (props.size === 'large' || props.size === 'lg') && 'text-admin-title-sm',
@@ -144,10 +144,10 @@ const computedClasses = computed(() => {
     adminColorClasses[effVariant],
     props.text &&
       props.severity === 'danger' &&
-      'text-admin-danger hover:bg-admin-danger-soft active:bg-admin-danger-soft/80',
+      'text-destructive hover:bg-destructive/10 active:bg-destructive/20',
     props.outlined &&
       props.severity === 'danger' &&
-      'border-admin-danger/30 text-admin-danger hover:bg-admin-danger-soft',
+      'border-destructive/30 text-destructive hover:bg-destructive/10',
     props.href && isDisabledOrLoading.value && 'pointer-events-none opacity-50 !cursor-not-allowed',
     props.class,
   )

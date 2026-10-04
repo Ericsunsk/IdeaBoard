@@ -15,15 +15,16 @@
             {{ props.message }}
           </DialogDescription>
           <div class="p-6">
-            <h3 class="m-0 text-lg font-semibold text-ib-text">{{ props.title }}</h3>
-            <p class="mt-5 mb-0 text-sm leading-6 text-board-page-text-muted">
+            <h3 class="m-0 text-lg font-semibold text-foreground">{{ props.title }}</h3>
+            <p class="mt-5 mb-0 text-sm leading-6 text-muted-foreground">
               {{ props.message }}
             </p>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
+                variant="ghost"
                 :disabled="props.loading"
-                class="rounded-full bg-transparent px-4 py-2 text-sm font-semibold text-board-page-text-muted hover:bg-ib-surface-hover"
+                class="rounded-full px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
                 @click="emit('update:visible', false)"
               >
                 {{ t('common.actions.cancel') }}
@@ -34,8 +35,8 @@
                 :class="[
                   'rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50',
                   props.intent === 'danger'
-                    ? 'bg-board-danger text-white'
-                    : 'bg-board-primary text-ib-text-inverse',
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 ]"
                 @click="emit('confirm')"
               >

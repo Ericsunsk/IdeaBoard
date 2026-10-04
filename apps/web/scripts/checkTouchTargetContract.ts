@@ -154,12 +154,11 @@ const RULES: Rule[] = [
     fix: 'keep the 20px track but carry `ib-hit-target-32`, or grow the track to `h-8`',
   },
   {
-    // Was `opt-in` on `py-1`; the trigger now declares `min-h-8` outright.
-    kind: 'required',
+    kind: 'opt-in',
     label: 'admin tab trigger',
     rel: 'features/admin/shared/components/AdminTabsTrigger.vue',
-    pattern: /\bmin-h-8\b/,
-    fix: 'keep `min-h-8` on the trigger (the AdminTabsList rail is h-9 and has room)',
+    pattern: /\bh-7\b/,
+    fix: 'keep `h-7` inside the h-9 rail and carry `ib-hit-target-32-inline`',
   },
   {
     kind: 'opt-in',
@@ -349,7 +348,7 @@ function main(): void {
   }
 
   // 2. The hit-area utility must be imported, or no control can opt in.
-  if (!styles.includes("@import '../shared/theme/touch-target.css'")) {
+  if (!styles.includes("@import '../shared/theme/atoms/touch-target.css'")) {
     violations.push(
       'app/style.css: `touch-target.css` is not imported, so `.ib-hit-target-32` does nothing.',
     )

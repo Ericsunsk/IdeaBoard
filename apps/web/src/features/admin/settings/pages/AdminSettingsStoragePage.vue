@@ -7,14 +7,14 @@
     <section :aria-label="SETTINGS_MESSAGES.uploadSectionAria" class="flex flex-col gap-2">
       <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
         <div class="flex items-center gap-2">
-          <h3 class="text-admin-title font-bold text-admin-title-color">
+          <h3 class="text-admin-title font-bold text-foreground">
             {{ SETTINGS_MESSAGES.uploadTitle }}
           </h3>
-          <span class="text-admin-meta text-admin-text-2">{{
+          <span class="text-admin-meta text-muted-foreground">{{
             SETTINGS_MESSAGES.uploadSubtitle
           }}</span>
         </div>
-        <span class="text-admin-meta text-admin-text-3">{{
+        <span class="text-admin-meta text-muted-foreground">{{
           SETTINGS_MESSAGES.paramCount(settingRows.length)
         }}</span>
       </div>
@@ -58,7 +58,7 @@
           >
             <template #body="{ data }">
               <span
-                class="inline-block rounded border border-admin-border-soft bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption font-medium text-admin-text-2"
+                class="inline-block rounded border border-border bg-muted px-2 py-0.5 font-mono text-admin-caption font-medium text-muted-foreground"
               >
                 {{ data.key }}
               </span>
@@ -72,7 +72,7 @@
             :style="{ width: '120px', minWidth: '100px' }"
           >
             <template #body="{ data }">
-              <span class="font-mono text-admin-body text-admin-text-2">
+              <span class="font-mono text-admin-body text-muted-foreground">
                 {{ data.min }} ~ {{ data.max }}
               </span>
             </template>
@@ -85,7 +85,7 @@
             :style="{ width: '100px', minWidth: '80px' }"
           >
             <template #body="{ data }">
-              <span class="font-mono text-admin-body text-admin-text-3">
+              <span class="font-mono text-admin-body text-muted-foreground">
                 {{ data.defaultValue }}
               </span>
             </template>
@@ -111,7 +111,7 @@
                   class="w-24 font-mono text-admin-body text-center"
                   :aria-label="SETTINGS_MESSAGES.concurrentLimitAria"
                 />
-                <span class="text-admin-body text-admin-text-3 select-none">{{
+                <span class="text-admin-body text-muted-foreground select-none">{{
                   SETTINGS_MESSAGES.tasksUnit
                 }}</span>
               </div>
@@ -174,7 +174,7 @@
       </div>
 
       <!-- 校验提示信息 -->
-      <div v-if="mediaUploadValidationError" class="px-1 text-admin-caption text-admin-danger">
+      <div v-if="mediaUploadValidationError" class="px-1 text-admin-caption text-destructive">
         {{ mediaUploadValidationError }}
       </div>
     </section>

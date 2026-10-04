@@ -28,7 +28,7 @@
         aria-haspopup="dialog"
         @click="oauthSettingsVisible = true"
       >
-        <Settings class="size-4 text-admin-text-2" />
+        <Settings class="size-4 text-muted-foreground" />
       </AdminButton>
 
       <AdminFilterPopover
@@ -36,7 +36,7 @@
         :filter-label="USERS_MESSAGES.filterUsers"
         @reset="resetUserFilters"
       >
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
           <span>{{ USERS_MESSAGES.role }}</span>
           <AdminSelect
             v-model="userRoleFilter"
@@ -47,7 +47,7 @@
           />
         </label>
 
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
           <span>{{ USERS_MESSAGES.status }}</span>
           <AdminSelect
             v-model="userStatusFilter"
@@ -66,7 +66,7 @@
         :loading="loading"
         @click="loadUsers"
       >
-        <Refresh class="size-4 text-admin-text-2" />
+        <Refresh class="size-4 text-muted-foreground" />
       </AdminButton>
     </template>
 
@@ -100,16 +100,16 @@
               />
               <div
                 v-else
-                class="flex size-9 items-center justify-center rounded-full bg-admin-surface-muted font-bold text-admin-accent"
+                class="flex size-9 items-center justify-center rounded-full bg-muted font-bold text-primary"
               >
                 {{ user.initial }}
               </div>
               <span
-                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
-                :class="user.isActive ? 'bg-admin-success' : 'bg-admin-danger'"
+                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card"
+                :class="user.isActive ? 'bg-emerald-500' : 'bg-destructive'"
               />
             </div>
-            <span class="truncate font-medium text-admin-text-1">
+            <span class="truncate font-medium text-foreground">
               {{ user.displayName }}
             </span>
           </div>
@@ -119,12 +119,12 @@
       <!-- Email 列：登录渠道图标 + 邮箱 -->
       <AdminColumn field="email" header="Email" :style="{ minWidth: '240px' }">
         <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-2 font-mono text-xs text-admin-text-1">
+          <div class="flex min-w-0 items-center gap-2 font-mono text-xs text-foreground">
             <span
               v-for="provider in user.providers"
               :key="provider"
               :title="getAuthProviderLabel(provider)"
-              class="flex size-5 shrink-0 items-center justify-center text-admin-text-3"
+              class="flex size-5 shrink-0 items-center justify-center text-muted-foreground"
               role="img"
               :aria-label="getAuthProviderLabel(provider)"
             >
@@ -135,7 +135,7 @@
                 {{ provider.slice(0, 1) }}
               </span>
             </span>
-            <span class="truncate text-admin-text-2">{{ user.email || '-' }}</span>
+            <span class="truncate text-muted-foreground">{{ user.email || '-' }}</span>
           </div>
         </template>
       </AdminColumn>
@@ -143,7 +143,7 @@
       <!-- IP 列：国旗 + IP 地址 -->
       <AdminColumn field="lastLoginIP" header="IP" :style="{ minWidth: '180px' }">
         <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-admin-text-1">
+          <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
             <span
               v-if="getCountryFlag(user.lastLoginCountry)"
               :title="getCountryLabel(user.lastLoginCountry)"
@@ -156,12 +156,12 @@
             <Globe
               v-else
               :title="getCountryLabel(user.lastLoginCountry)"
-              class="size-3.5 shrink-0 text-admin-text-3"
+              class="size-3.5 shrink-0 text-muted-foreground"
               role="img"
               :aria-label="getCountryLabel(user.lastLoginCountry)"
             />
             <span
-              class="whitespace-nowrap text-admin-text-2"
+              class="whitespace-nowrap text-muted-foreground"
               :title="user.lastLoginIP || undefined"
             >
               {{ user.lastLoginIP || '-' }}
@@ -184,7 +184,7 @@
         :style="{ width: '130px' }"
       >
         <template #body="{ data: user }">
-          <span class="whitespace-nowrap font-mono text-xs text-admin-text-1">
+          <span class="whitespace-nowrap font-mono text-xs text-foreground">
             {{ user.createdDateLabel }}
           </span>
         </template>
@@ -206,7 +206,7 @@
         <template #body="{ data: user }">
           <button
             type="button"
-            class="font-mono text-xs font-semibold text-admin-text-1 hover:text-admin-accent cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-accent/20 rounded"
+            class="font-mono text-xs font-semibold text-foreground hover:text-primary cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded"
             aria-haspopup="dialog"
             :aria-label="USERS_MESSAGES.openWalletAria(user.displayName)"
             @click="openWalletDialog(user)"

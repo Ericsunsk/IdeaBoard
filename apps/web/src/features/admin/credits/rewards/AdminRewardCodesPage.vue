@@ -27,7 +27,7 @@
         :filter-label="REWARD_CODES_MESSAGES.filterLabel"
         @reset="resetStatusFilter"
       >
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-muted-foreground">
           <span>{{ REWARD_CODES_MESSAGES.activeStateLabel }}</span>
           <AdminSelect v-model="statusFilter" :options="statusOptions" size="small" />
         </label>
@@ -41,7 +41,7 @@
         :disabled="loading"
         @click="refreshRewardCodes"
       >
-        <Refresh class="size-4 text-admin-text-2" />
+        <Refresh class="size-4 text-muted-foreground" />
       </AdminButton>
     </template>
 
@@ -100,10 +100,10 @@
       >
         <template #body="{ data }">
           <div class="min-w-0">
-            <div class="truncate font-medium text-admin-text-1">
+            <div class="truncate font-medium text-foreground">
               {{ data.displayName }}
             </div>
-            <div class="mt-0.5 font-mono text-xs text-admin-text-3">
+            <div class="mt-0.5 font-mono text-xs text-muted-foreground">
               {{ data.maskedCodeHint }}
             </div>
           </div>
@@ -117,7 +117,7 @@
         :style="{ width: '140px' }"
       >
         <template #body="{ data }">
-          <span class="font-mono text-xs font-semibold text-admin-text-1">
+          <span class="font-mono text-xs font-semibold text-foreground">
             {{ formatIdeaAmount(data.creditAmount) }}
           </span>
         </template>
@@ -150,7 +150,7 @@
       <!-- 兑换进度列：等宽字体分子分母 -->
       <AdminColumn :header="REWARD_CODES_MESSAGES.progressColumn" :style="{ width: '150px' }">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-admin-text-1">
+          <span class="font-mono text-xs text-foreground">
             {{ data.redemptionCount }} / {{ data.maxRedemptions === 0 ? '∞' : data.maxRedemptions }}
           </span>
         </template>
@@ -163,7 +163,7 @@
         :style="{ width: '180px' }"
       >
         <template #body="{ data }">
-          <span class="whitespace-nowrap font-mono text-xs text-admin-text-2">
+          <span class="whitespace-nowrap font-mono text-xs text-muted-foreground">
             {{ formatExpiresAt(data.expiresAt) }}
           </span>
         </template>
