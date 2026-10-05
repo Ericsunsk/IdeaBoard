@@ -9,7 +9,7 @@
     <aside
       ref="siderRef"
       aria-label="后台导航"
-      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-card transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
+      class="fixed top-0 left-0 z-50 flex h-screen shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-background transition-[width,transform,box-shadow] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] lg:z-30"
       :class="[
         effectiveCollapsed ? 'w-52 lg:w-14' : 'w-52',
         isCollapsed && isHovered ? 'lg:z-40' : '',

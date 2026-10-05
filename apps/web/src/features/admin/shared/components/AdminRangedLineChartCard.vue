@@ -3,7 +3,7 @@
     v-bind="forwarded"
     v-model="selectedRange"
     :elevated="false"
-    header-class="p-6 pb-4"
+    header-class="p-6 pb-4 bg-background"
     title-class="text-base font-bold text-foreground"
     range-group-class="inline-flex h-8 items-center rounded-lg border border-border bg-muted p-1 text-xs text-muted-foreground"
     range-selected-class="bg-card font-semibold text-foreground shadow-xs focus-visible:ring-ring"
