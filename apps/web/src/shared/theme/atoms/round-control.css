@@ -10,7 +10,7 @@
     --ib-round-control-color: var(--color-ib-text-muted);
     --ib-round-control-color-hover: var(--color-ib-text);
     --ib-round-control-color-disabled: var(--color-ib-text-disabled);
-    --ib-round-control-focus-ring: var(--color-ib-focus-ring);
+    --ib-round-control-focus-ring: var(--color-ring);
     --ib-round-control-shadow: var(--shadow-ib-control);
     display: inline-flex;
     align-items: center;

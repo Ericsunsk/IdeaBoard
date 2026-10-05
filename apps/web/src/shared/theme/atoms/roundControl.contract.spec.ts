@@ -27,7 +27,7 @@ describe('Round Control surface ownership contract', () => {
     expect(roundControl).toContain('--ib-round-control-border: var(--color-ib-border)')
     expect(roundControl).toContain('--ib-round-control-bg: var(--color-ib-surface)')
     expect(roundControl).toContain('--ib-round-control-color: var(--color-ib-text-muted)')
-    expect(roundControl).toContain('--ib-round-control-focus-ring: var(--color-ib-focus-ring)')
+    expect(roundControl).toContain('--ib-round-control-focus-ring: var(--color-ring)')
     expect(roundControl).toContain('--ib-round-control-shadow: var(--shadow-ib-control)')
     expect(roundControl).not.toMatch(/--color-(?:board|canvas)-/)
     expect(roundControl).not.toContain('--ib-control-')

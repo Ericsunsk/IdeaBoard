@@ -242,7 +242,6 @@
   --color-ib-creative-accent-secondary: #c084fc;
   --color-ib-creative-accent-soft: #f5f2ff;
   --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);
-  --color-ib-focus-ring: var(--color-admin-focus-ring);
   --color-ib-focus-accent: var(--color-ib-creative-accent);
   --color-ib-dialog-mask: color-mix(in srgb, var(--color-ib-text) 38%, transparent);
   /*
@@ -341,7 +340,7 @@
   --color-info-soft: rgb(2 132 199 / 15%);
   --color-border: var(--color-ib-border-soft);
   --color-input: var(--color-ib-border);
-  --color-ring: var(--color-ib-focus-ring);
+  --color-ring: var(--color-admin-focus-ring);
 
   --radius-ib-control: 10px;
   --radius-ib-panel: 14px;
@@ -356,7 +355,7 @@
 
   --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
   --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
-  --shadow-ib-focus: 0 0 0 3px var(--color-ib-focus-ring);
+  --shadow-ib-focus: 0 0 0 3px var(--color-ring);
   --shadow-ib-auth-shell:
     0 24px 50px -15px var(--color-ib-auth-shell-glow),
     inset 0 1px 1px var(--color-ib-auth-shell-highlight);
