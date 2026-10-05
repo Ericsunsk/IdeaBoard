@@ -44,7 +44,6 @@
   .page-chrome-control {
     --page-chrome-control-size: 40px;
     --round-control-size: var(--page-chrome-control-size);
-    --round-control-border-width: 1px;
     --round-control-border: var(--color-page-chrome-border);
     --round-control-border-hover: var(--color-page-chrome-border-hover);
     --round-control-bg: var(--color-page-chrome-bg);
