@@ -139,8 +139,8 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
 // ── Token budgets (repo-wide) ─────────────────────────────────────────────
 // Hex colors and font stacks live in the token source of truth
 // (`src/app/style.css`, `src/shared/theme/**`, `src/features/admin/shared/lib/taskMetricTokens.ts`);
-// call sites reference tokens. Type sizes use the type scale (`text-ib-*` /
-// `text-admin-*`); display/optical one-offs outside the scale carry explicit
+// call sites reference tokens. Type sizes use the type scale (`text-admin-*`);
+// display/optical one-offs outside the scale carry explicit
 // waivers with reasons instead of forced mappings. Breakpoints use the named
 // mobile-first system (`sm/md/lg`, plus `xl` where already established);
 // arbitrary `max-[...]`/`min-[...]` variants are banned. Dark mode ships via
@@ -170,12 +170,12 @@ const tokenCountRules = [
   {
     id: 'font-stack',
     pattern: /font-family\s*:|\[font-family:[^\]]*\]/g,
-    message: 'Use shared font tokens (font-ib-*) instead of inline font stacks.',
+    message: 'Use shared font tokens (font-*) instead of inline font stacks.',
   },
   {
     id: 'text-px',
     pattern: /!?text-\[\d+\.?\d*(?:px|rem)\]/g,
-    message: 'Use the type scale (text-ib-*/text-admin-*) instead of text-[Npx].',
+    message: 'Use the type scale (text-admin-*) instead of text-[Npx].',
   },
   {
     id: 'arbitrary-breakpoint',
@@ -191,9 +191,9 @@ const tokenCountRules = [
   {
     id: 'legacy-token',
     pattern:
-      /var\(--color-(?:admin|board)-[a-z0-9-]+\)|var\(--color-ib-[a-z0-9-]+\)|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration|from|via|to)-admin-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration)-board-(?:page|primary|surface|control|card|loading|danger|dialog|create|focus)[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder)-ib-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?/g,
+      /var\(--color-(?:admin|board)-[a-z0-9-]+\)|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration|from|via|to)-admin-(?!micro|caption|meta|body|content|title-sm|title|heading|icon|modal-title(?:-mobile)?|summary-value(?![a-z0-9-/]))[a-z-]*(?:\/[\d.]+)?|(?:^|[\s"'`:([!])(?:!)?(?:[a-z-]+:)*(?:bg|border|text|ring|divide|outline|placeholder|decoration)-board-(?:page|primary|surface|control|card|loading|danger|dialog|create|focus)[a-z-]*(?:\/[\d.]+)?/g,
     message:
-      'Legacy domain color tokens are decommissioned at the component layer: use standard semantic tokens (bg-card, text-foreground, border-border, bg-primary, ...) instead of admin-*/board-*/ib-* color utilities or direct var(--color-admin/board/ib-*) references.',
+      'Legacy domain color tokens are decommissioned at the component layer: use standard semantic tokens (bg-card, text-foreground, border-border, bg-primary, ...) instead of admin-*/board-* color utilities or direct var(--color-admin/board-*) references.',
   },
 ] as const satisfies readonly CountRule<string>[]
 
@@ -286,7 +286,7 @@ const fontStackAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
       'font-stack': 2,
     },
     reason:
-      'Landing page system stacks are marketing one-offs; display/handwriting stacks use font-ib-* tokens.',
+      'Landing page system stacks are marketing one-offs; display/handwriting stacks use font-* tokens.',
   },
 }
 
@@ -363,13 +363,11 @@ const arbitraryBreakpointAllowances: Record<string, CountAllowance<TokenCountRul
   },
 }
 
-// Phase 4 decommission freeze: component-layer legacy domain color usage is
+// Component-layer legacy domain color usage is
 // pinned at the counts below. New usages fail the Web Quality lane; shrinking
 // a count trips the stale-allowance check and must narrow the allowance here.
-// Token declarations themselves live in isTokenOwnerFile files (style.css,
-// shared/theme, theme bridges) and are exempt by design: tier-3 standard
-// tokens resolve through the ib-* alias tier, so the decommission stops at
-// the component layer (see apps/web/DESIGN.md Tokens).
+// Token declarations themselves are checked by the separate forbidden-alias
+// rule below. There is no product-prefixed color alias tier.
 const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = {
   'src/features/admin/monitor/presentation/AdminTaskResultDialog.vue': {
     counts: {
@@ -378,21 +376,9 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     reason:
       'Cleared: divide tint and hover border now use border-border. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
-  'src/features/auth/components/RegisterAuthPanel.vue': {
-    counts: {
-      'legacy-token': 4,
-    },
-    reason: 'Auth shell keeps its domain link/subtle tokens (auth surface identity).',
-  },
-  'src/features/auth/components/modalUi.ts': {
-    counts: {
-      'legacy-token': 17,
-    },
-    reason: 'Auth modal skin is a domain surface system with dark-mode token coverage.',
-  },
   'src/features/board/infrastructure/preview/boardPreviewStyle.ts': {
     counts: {
-      'legacy-token': 3,
+      'legacy-token': 2,
     },
     reason: 'Serialized board thumbnail palette is baked into exported thumbnails, not app chrome.',
   },
@@ -402,37 +388,30 @@ const legacyTokenAllowances: Record<string, CountAllowance<TokenCountRuleId>> = 
     },
     reason: 'Board preview fade gradients mirror the serialized thumbnail surface.',
   },
-  'src/features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue': {
-    counts: {
-      'legacy-token': 1,
+}
+
+// Product-prefixed aliases were the previous cross-feature token layer. They
+// are forbidden even in token-owner files so a new alias cannot be introduced
+// in the source-of-truth CSS while component scans remain green.
+const forbiddenTokenAliasPattern =
+  /(?:var\(\s*)?--(?:color-ib-[a-z0-9-]+|text-ib-[a-z0-9-]+|shadow-ib-(?:control|overlay|focus)(?=[\s:),]))/g
+
+function checkForbiddenTokenAliases(file: SourceFile, content: string): Violation[] {
+  if (isStyleSpecFile(file)) return []
+
+  const code = stripCommentsForStyle(content, path.extname(file.absolutePath))
+  const count = countMatches(code, forbiddenTokenAliasPattern)
+  if (count === 0) return []
+
+  return [
+    {
+      file: file.sourcePath,
+      rule: 'forbidden-token-alias',
+      message:
+        'Product-prefixed color, type, and generic shadow aliases are removed; use canonical semantic or domain-owned tokens.',
+      details: matchDetails(code, forbiddenTokenAliasPattern),
     },
-    reason: 'Canvas chrome focus ring identity, pinned by the canvas surface contract.',
-  },
-  'src/features/canvas/presentation/styles/canvas-chrome.css': {
-    counts: {
-      'legacy-token': 11,
-    },
-    reason:
-      'Canvas chrome identity (page-chrome/overlay tokens) is pinned by canvasSurfaceSkin.contract.spec.ts.',
-  },
-  'src/features/search/presentation/pages/SearchPage.vue': {
-    counts: {
-      'legacy-token': 9,
-    },
-    reason: 'Search page chrome shares the boards page-chrome surface language.',
-  },
-  'src/features/search/presentation/search.css': {
-    counts: {
-      'legacy-token': 4,
-    },
-    reason: 'Search surface skin resolves skeleton/type through board surface tokens.',
-  },
-  'src/shared/components/UserAccountMenu.vue': {
-    counts: {
-      'legacy-token': 5,
-    },
-    reason: 'Avatar auth-gradient and page-chrome hover states are shell identity tokens.',
-  },
+  ]
 }
 
 function checkTokenBudgets(file: SourceFile, content: string): Violation[] {
@@ -671,7 +650,7 @@ function checkPageDotBackgroundUtilityBoundary(file: SourceFile, content: string
       file: file.sourcePath,
       rule: 'page-dot-background-utility',
       message:
-        'User page dot backgrounds must use ib-page-dot-bg; board preview dots stay in board/infrastructure/preview because previews mirror the serialized canvas thumbnail surface.',
+        'User page dot backgrounds must use page-dot-bg; board preview dots stay in board/infrastructure/preview because previews mirror the serialized canvas thumbnail surface.',
       details: matchDetails(content, pattern),
     },
   ]
@@ -697,6 +676,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       ...checkCanvasTokenBoundaries(file, content),
       ...checkSearchTokenBoundaries(file, content),
       ...checkPageDotBackgroundUtilityBoundary(file, content),
+      ...checkForbiddenTokenAliases(file, content),
       ...checkTokenBudgets(file, content),
       ...checkCountRules(file, content, selectorCountRules, selectorAllowances),
       ...findMotionPolicyViolations(file.sourcePath, content).map((violation) => ({

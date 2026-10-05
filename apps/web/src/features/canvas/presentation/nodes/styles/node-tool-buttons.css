@@ -99,8 +99,8 @@
 
 .node-tool-output-count:focus-visible,
 .node-tool-output-count-option:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .node-tool-send {
@@ -124,7 +124,7 @@
 }
 
 .node-tool-output-count-popover {
-  --ib-popover-motion-from-transform: translateY(4px) scale(0.99);
+  --popover-motion-from-transform: translateY(4px) scale(0.99);
   position: absolute;
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));

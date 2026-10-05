@@ -42,7 +42,7 @@
         >
           <p
             :id="`account-nav-${group.key}`"
-            class="mb-2 px-2 text-ib-meta leading-5 font-semibold tracking-normal text-muted-foreground"
+            class="mb-2 px-2 text-admin-meta leading-5 font-semibold tracking-normal text-muted-foreground"
           >
             {{ t(group.labelKey) }}
           </p>

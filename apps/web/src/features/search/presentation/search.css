@@ -14,9 +14,9 @@
   flex-shrink: 0;
   cursor: pointer;
   place-items: center;
-  border-radius: var(--radius-ib-pill);
-  background-color: var(--color-board-loading-bg);
-  color: var(--color-board-page-text-muted);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-muted);
+  color: var(--color-muted-foreground);
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing),
@@ -24,8 +24,8 @@
 }
 
 .search-reference-control:hover {
-  background-color: var(--color-board-card-border);
-  color: var(--color-board-page-text);
+  background-color: var(--color-border);
+  color: var(--color-foreground);
   transform: scale(1.05);
 }
 
@@ -35,17 +35,17 @@
 
 .search-reference-control:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-board-focus);
+  box-shadow: 0 0 0 3px var(--color-ring);
 }
 
 /* Direction-aware anchor gap for Search popover. */
 .search-save-popover {
-  margin-block-start: var(--spacing-ib-overlay-gutter);
+  margin-block-start: var(--spacing-overlay-gutter);
 }
 
 .search-save-popover[data-side='top'] {
-  margin-block-start: calc(var(--spacing-ib-overlay-gutter) * -1);
-  margin-block-end: var(--spacing-ib-overlay-gutter);
+  margin-block-start: calc(var(--spacing-overlay-gutter) * -1);
+  margin-block-end: var(--spacing-overlay-gutter);
 }
 
 .search-batch-action-dock {
@@ -53,7 +53,7 @@
   align-items: center;
   user-select: none;
   pointer-events: auto;
-  border-radius: var(--radius-ib-pill);
+  border-radius: var(--radius-pill);
 }
 
 .search-batch-action-dock-enter-active {

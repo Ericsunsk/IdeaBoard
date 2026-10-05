@@ -18,12 +18,12 @@ function renderLocaleSelectWithUser(props = {}, options = {}) {
 }
 
 describe('UserLocaleSelect', () => {
-  it('renders circular trigger matching 40px chrome control (.ib-round-control.ib-page-chrome-control)', () => {
+  it('renders circular trigger matching 40px chrome control (.round-control.page-chrome-control)', () => {
     renderLocaleSelect()
     const selectRoot = screen.getByTestId('user-locale-select')
     expect(selectRoot).toBeVisible()
-    expect(selectRoot.classList.contains('ib-round-control')).toBe(true)
-    expect(selectRoot.classList.contains('ib-page-chrome-control')).toBe(true)
+    expect(selectRoot.classList.contains('round-control')).toBe(true)
+    expect(selectRoot.classList.contains('page-chrome-control')).toBe(true)
   })
 
   it('closed state renders ONLY the Translate icon without text or chevron', () => {
@@ -110,6 +110,6 @@ describe('UserLocaleSelect', () => {
     renderLocaleSelect({ wrapClass: 'custom-locale-wrap' })
     const selectRoot = screen.getByTestId('user-locale-select')
     expect(selectRoot.classList.contains('custom-locale-wrap')).toBe(true)
-    expect(selectRoot.classList.contains('ib-round-control')).toBe(true)
+    expect(selectRoot.classList.contains('round-control')).toBe(true)
   })
 })

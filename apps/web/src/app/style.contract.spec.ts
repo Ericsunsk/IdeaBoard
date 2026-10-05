@@ -7,7 +7,16 @@ const stylesheet = readFileSync(resolve(process.cwd(), 'src/app/style.css'), 'ut
 describe('global scrollbar skin', () => {
   it('keeps the idle thumb readable on admin surfaces', () => {
     expect(stylesheet).toContain(
-      '--color-ib-scrollbar-thumb: color-mix(in srgb, var(--color-ib-text) 58%, transparent);',
+      '--color-scrollbar-thumb: color-mix(in srgb, var(--color-foreground) 58%, transparent);',
+    )
+    expect(stylesheet).not.toMatch(/--color-ib-scrollbar-/)
+  })
+})
+
+describe('token namespace contract', () => {
+  it('rejects removed product-prefixed color, type, and generic shadow aliases', () => {
+    expect(stylesheet).not.toMatch(
+      /--(?:color-ib-[a-z0-9-]+|text-ib-[a-z0-9-]+|shadow-ib-(?:control|overlay|focus))\b/,
     )
   })
 })

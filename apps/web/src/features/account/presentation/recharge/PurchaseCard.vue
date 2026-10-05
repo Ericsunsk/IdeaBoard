@@ -45,7 +45,7 @@
           <h3 id="recharge-purchase-heading" class="m-0 text-base font-bold text-foreground">
             {{ t('account.topUp.chooseQuantity') }}
           </h3>
-          <span class="text-ib-meta font-semibold text-muted-foreground"
+          <span class="text-admin-meta font-semibold text-muted-foreground"
             >$1.00 USD = 100 Ideas</span
           >
         </div>
@@ -58,7 +58,7 @@
             :key="quantity"
             type="button"
             v-bind="packageControlState(quantity)"
-            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-ib-control border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-ib-focus disabled:cursor-not-allowed disabled:opacity-60"
+            class="flex min-h-[72px] min-w-0 flex-col items-start justify-center rounded-control border px-3 py-2 text-left transition-[background-color,border-color,box-shadow,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-not-allowed disabled:opacity-60"
             :class="
               quantity === selectedQuantity && selectionMode === 'package'
                 ? 'border-primary bg-primary/10 text-primary'
@@ -67,7 +67,7 @@
             @click="selectPackage(quantity)"
           >
             <span class="text-sm font-bold">{{ formatLocaleNumber(quantity) }} Ideas</span>
-            <span class="mt-1 font-mono text-ib-meta text-muted-foreground">{{
+            <span class="mt-1 font-mono text-admin-meta text-muted-foreground">{{
               formatUsdForIdeas(quantity)
             }}</span>
           </button>
@@ -79,7 +79,7 @@
         :label="t('account.topUp.customQuantity')"
         field-id="account-recharge-custom"
         field-class="grid gap-2"
-        label-class="text-ib-body font-semibold text-muted-foreground"
+        label-class="text-admin-body font-semibold text-muted-foreground"
       >
         <div class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <input
@@ -110,26 +110,26 @@
           :class="accountPrimaryActionButtonClass"
           >{{ t('account.topUp.payNow') }}</Button
         >
-        <p class="mt-2 mb-0 text-center text-ib-meta leading-5 text-muted-foreground">
+        <p class="mt-2 mb-0 text-center text-admin-meta leading-5 text-muted-foreground">
           {{ t('account.topUp.termsPrefix') }}
           <a
             :href="options.terms.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-ib-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-ib-focus"
+            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
             >{{ t('account.topUp.termsLink') }}</a
           >{{ t('account.topUp.termsAnd') }}
           <a
             :href="options.refund_policy.url"
             target="_blank"
             rel="noopener noreferrer"
-            class="rounded-ib-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-ib-focus"
+            class="rounded-control font-semibold text-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
             >{{ t('account.topUp.refundLink') }}</a
           >
         </p>
         <p
           v-if="checkoutError"
-          class="mt-2 mb-0 text-center text-ib-body font-semibold text-destructive"
+          class="mt-2 mb-0 text-center text-admin-body font-semibold text-destructive"
           role="alert"
         >
           {{ errorMessage(checkoutError) }}

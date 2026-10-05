@@ -1,23 +1,23 @@
 @layer components {
-  .ib-page-chrome-surface {
-    border: 1px solid var(--color-ib-page-chrome-border);
-    background: var(--color-ib-page-chrome-bg);
-    box-shadow: var(--shadow-ib-page-chrome);
-    backdrop-filter: blur(var(--ib-glass-blur));
-    -webkit-backdrop-filter: blur(var(--ib-glass-blur));
+  .page-chrome-surface {
+    border: 1px solid var(--color-page-chrome-border);
+    background: var(--color-page-chrome-bg);
+    box-shadow: var(--shadow-page-chrome);
+    backdrop-filter: blur(var(--blur-glass));
+    -webkit-backdrop-filter: blur(var(--blur-glass));
   }
 
-  .ib-page-chrome-account {
-    --ib-page-chrome-control-size: 40px;
+  .page-chrome-account {
+    --page-chrome-control-size: 40px;
     display: inline-flex;
-    min-width: var(--ib-page-chrome-control-size);
-    height: var(--ib-page-chrome-control-size);
+    min-width: var(--page-chrome-control-size);
+    height: var(--page-chrome-control-size);
     align-items: center;
     flex-shrink: 0;
     line-height: 1;
   }
 
-  .ib-page-chrome-account > .ib-page-chrome-control {
+  .page-chrome-account > .page-chrome-control {
     flex: none;
   }
 }

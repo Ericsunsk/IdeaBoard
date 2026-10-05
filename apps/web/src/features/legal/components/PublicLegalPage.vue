@@ -4,13 +4,13 @@
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-ib-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-control text-base font-bold text-foreground no-underline focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
           :to="HOME_PATH"
-          class="inline-flex min-h-8 items-center rounded-ib-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-control px-2 text-sm font-semibold text-muted-foreground no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
         >
           Back to home
         </RouterLink>
@@ -19,34 +19,34 @@
 
     <main class="mx-auto w-full max-w-[860px] px-4 py-8 sm:px-6 sm:py-12">
       <article
-        class="rounded-ib-panel border border-border bg-card px-5 py-6 shadow-sm sm:rounded-ib-overlay sm:px-10 sm:py-9"
+        class="rounded-panel border border-border bg-card px-5 py-6 shadow-sm sm:rounded-overlay sm:px-10 sm:py-9"
       >
         <header class="border-b border-border pb-7">
-          <p class="m-0 text-ib-meta font-semibold tracking-wide text-muted-foreground">
+          <p class="m-0 text-admin-meta font-semibold tracking-wide text-muted-foreground">
             {{ projectName }}
           </p>
           <h1
-            class="mt-2 mb-0 text-ib-summary-value leading-tight font-bold text-foreground sm:text-[34px]"
+            class="mt-2 mb-0 text-admin-summary-value leading-tight font-bold text-foreground sm:text-[34px]"
           >
             {{ title }}
           </h1>
           <p class="mt-3 mb-0 text-sm text-muted-foreground">Effective date: {{ version }}</p>
         </header>
 
-        <div class="legal-copy pt-7 text-ib-title-sm leading-7 text-muted-foreground">
+        <div class="legal-copy pt-7 text-admin-title-sm leading-7 text-muted-foreground">
           <slot />
         </div>
       </article>
 
       <nav
         aria-label="Legal links"
-        class="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-ib-body font-medium text-muted-foreground"
+        class="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-admin-body font-medium text-muted-foreground"
       >
         <RouterLink
           v-for="link in legalLinks"
           :key="link.to"
           :to="link.to"
-          class="inline-flex min-h-8 items-center rounded-ib-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-ib-focus"
+          class="inline-flex min-h-8 items-center rounded-control px-2 no-underline transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ring)]"
         >
           {{ link.label }}
         </RouterLink>

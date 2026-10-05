@@ -2,7 +2,7 @@
   <button
     type="button"
     v-bind="controlStateAttrs"
-    class="ib-control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
+    class="control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
     :class="{
       primary,
       'canvas-tool-tooltip-trigger': !!resolvedTooltip,
@@ -76,8 +76,8 @@ const controlStateAttrs = computed(() =>
 
 <style scoped>
 .node-tool-icon-button {
-  --ib-control-disabled-opacity: 0.46;
-  --ib-control-hover-transform: var(--node-tool-icon-button-hover-transform);
+  --control-disabled-opacity: 0.46;
+  --control-hover-transform: var(--node-tool-icon-button-hover-transform);
   width: var(--node-tool-icon-button-size);
   height: var(--node-tool-icon-button-size);
   border: var(--node-tool-border-width) solid var(--node-tool-icon-button-border);

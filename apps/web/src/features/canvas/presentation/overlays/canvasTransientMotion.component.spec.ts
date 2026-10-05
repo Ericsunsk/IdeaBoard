@@ -45,7 +45,7 @@ describe('Canvas transient overlay motion', () => {
 
     expect(screen.getByTestId('canvas-transient-transition')).toHaveAttribute(
       'data-transition-name',
-      'ib-popover-motion',
+      'popover-motion',
     )
     expect(screen.getByTestId('canvas-transient-transition')).toHaveAttribute(
       'data-transition-css',
@@ -128,7 +128,7 @@ describe('Canvas transient overlay motion', () => {
 
     expect(screen.getByTestId('canvas-transient-transition')).toHaveAttribute(
       'data-transition-name',
-      'ib-popover-motion',
+      'popover-motion',
     )
     expect(screen.getByTestId('canvas-transient-transition')).toHaveAttribute(
       'data-transition-css',

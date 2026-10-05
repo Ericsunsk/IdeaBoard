@@ -283,7 +283,7 @@ function snapValue(value: number) {
 }
 
 .editing-two-handle-slider__handle:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--canvas-range-focus-color, var(--canvas-accent));
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--canvas-range-focus-color, var(--canvas-accent));
+  outline-offset: var(--focus-outline-offset);
 }
 </style>

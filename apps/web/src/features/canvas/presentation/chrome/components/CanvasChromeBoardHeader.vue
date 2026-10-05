@@ -1,9 +1,9 @@
 <template>
   <div class="canvas-chrome-board-stack" @mousedown.stop>
-    <div class="ib-page-chrome-surface canvas-chrome-board-control">
+    <div class="page-chrome-surface canvas-chrome-board-control">
       <button
         type="button"
-        class="canvas-chrome-board-icon-button ib-hit-target-32"
+        class="canvas-chrome-board-icon-button hit-target-32"
         :aria-label="t('canvas.chrome.backToBoards')"
         @click.stop="emit('navigate-back')"
       >
@@ -13,7 +13,7 @@
       <div class="relative flex min-w-0 flex-1 items-center gap-2">
         <span
           :ref="bindBoardNameInputRef"
-          class="m-0 w-full max-w-none cursor-text overflow-hidden truncate rounded-sm p-0 text-ib-title-sm leading-[1.2] font-normal text-[var(--canvas-text-strong)] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)]"
+          class="m-0 w-full max-w-none cursor-text overflow-hidden truncate rounded-sm p-0 text-admin-title-sm leading-[1.2] font-normal text-[var(--canvas-text-strong)] outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)]"
           :class="{ 'text-clip': board.isRenaming }"
           :contenteditable="board.isRenaming && !board.isRenamePending ? 'plaintext-only' : 'false'"
           role="textbox"
@@ -37,7 +37,7 @@
       <div class="canvas-chrome-board-menu-slot">
         <button
           type="button"
-          class="canvas-chrome-board-icon-button ib-hit-target-32"
+          class="canvas-chrome-board-icon-button hit-target-32"
           :aria-label="t('canvas.chrome.selectBoard')"
           @click.stop="emit('toggle-board-menu')"
         >
@@ -89,7 +89,7 @@
       }}</span>
       <button
         type="button"
-        class="canvas-chrome-catalog-recovery-action ib-hit-target-32-inline"
+        class="canvas-chrome-catalog-recovery-action hit-target-32-inline"
         :aria-label="t('canvas.chrome.restoreArchivedBoard')"
         :disabled="board.archived.isRestoring"
         @click="emit('restore-archived-board')"
@@ -115,7 +115,7 @@
       </span>
       <button
         type="button"
-        class="canvas-chrome-catalog-recovery-action ib-hit-target-32-inline"
+        class="canvas-chrome-catalog-recovery-action hit-target-32-inline"
         :aria-label="t('canvas.chrome.reloadCatalog')"
         :disabled="board.catalogRecovery.status === 'reloading'"
         @click="emit('reload-catalog')"

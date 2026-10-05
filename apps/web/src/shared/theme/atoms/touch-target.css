@@ -12,7 +12,7 @@
    * activation still route to the real element and the accessible name, role
    * and focus ring are untouched.
    *
-   * `.ib-hit-target-32` grows both axes to the floor and leaves anything already
+   * `.hit-target-32` grows both axes to the floor and leaves anything already
    * larger alone, which is why it is safe to apply to a whole family. Measured
    * spacing on the densest consumer (`/admin/credits`, nine stacked switches)
    * is 57px between rows, so a 6px overhang cannot reach a neighbour.
@@ -20,18 +20,18 @@
    * Prefer a real 32px box when the visual can afford it — use this only for
    * controls that are visually small by design.
    */
-  .ib-hit-target-32 {
+  .hit-target-32 {
     position: relative;
   }
 
-  .ib-hit-target-32::after {
+  .hit-target-32::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: max(100%, var(--spacing-ib-touch-target-min));
-    height: max(100%, var(--spacing-ib-touch-target-min));
+    width: max(100%, var(--spacing-touch-target-min));
+    height: max(100%, var(--spacing-touch-target-min));
   }
 
   /*
@@ -39,17 +39,17 @@
    * rails). Only the block axis grows, so the row keeps its rhythm while each
    * target reaches the floor vertically.
    */
-  .ib-hit-target-32-inline {
+  .hit-target-32-inline {
     position: relative;
   }
 
-  .ib-hit-target-32-inline::after {
+  .hit-target-32-inline::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 0;
     width: 100%;
-    height: max(100%, var(--spacing-ib-touch-target-min));
+    height: max(100%, var(--spacing-touch-target-min));
     transform: translateY(-50%);
   }
 
@@ -61,17 +61,17 @@
    * sit pixels apart would steal each other's grabs, which is a functional
    * regression, not an improvement.
    */
-  .ib-hit-target-drag {
+  .hit-target-drag {
     position: relative;
   }
 
-  .ib-hit-target-drag::after {
+  .hit-target-drag::after {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: max(100%, var(--spacing-ib-touch-target-aa));
-    height: max(100%, var(--spacing-ib-touch-target-aa));
+    width: max(100%, var(--spacing-touch-target-aa));
+    height: max(100%, var(--spacing-touch-target-aa));
   }
 }

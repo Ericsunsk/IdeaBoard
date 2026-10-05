@@ -1,9 +1,9 @@
 <template>
   <div
     ref="pageScrollRef"
-    class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-background px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-foreground"
+    class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-background px-[var(--spacing-page-chrome-inset)] pt-[var(--spacing-page-chrome-inset)] pb-16 text-foreground"
   >
-    <div class="ib-board-page-background ib-page-dot-bg"></div>
+    <div class="ib-board-page-background page-dot-bg"></div>
     <header
       class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2"
     >
@@ -35,7 +35,7 @@
       <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="ib-page-chrome-surface min-w-0 flex-1 rounded-full p-1.5"
+            class="page-chrome-surface min-w-0 flex-1 rounded-full p-1.5"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -123,7 +123,7 @@
                 <button
                   v-if="references.length === 0"
                   type="button"
-                  class="h-8 px-3 rounded-full border border-[var(--color-ib-page-chrome-border)] text-[var(--color-ib-page-chrome-color)] hover:text-[var(--color-ib-page-chrome-color-hover)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  class="h-8 px-3 rounded-full border border-[var(--color-page-chrome-border)] text-[var(--color-page-chrome-color)] hover:text-[var(--color-page-chrome-color-hover)] hover:border-[var(--color-page-chrome-border-hover)] hover:bg-[var(--color-page-chrome-bg-hover)] flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   :aria-label="t('search.tooltips.addReferences')"
                   :title="t('search.tooltips.addReferences')"
                   :disabled="!canAddReference"
@@ -147,7 +147,7 @@
 
           <button
             type="button"
-            class="ib-page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-full transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-ib-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-ib-page-chrome-focus-ring)] cursor-pointer"
+            class="page-chrome-surface group grid size-11 shrink-0 place-items-center rounded-full transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-[var(--color-page-chrome-border-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)] cursor-pointer"
             :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-primary' : '']"
             :aria-label="t('search.tooltips.toggleLibrary')"
             :title="t('search.tooltips.toggleLibrary')"
@@ -166,7 +166,7 @@
             />
             <Bookmark
               v-else
-              class="size-4 text-[var(--color-ib-page-chrome-color)] transition-[transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:text-[var(--color-ib-page-chrome-color-hover)] group-hover:rotate-6 group-hover:scale-105"
+              class="size-4 text-[var(--color-page-chrome-color)] transition-[transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:text-[var(--color-page-chrome-color-hover)] group-hover:rotate-6 group-hover:scale-105"
               aria-hidden="true"
             />
           </button>
@@ -192,7 +192,7 @@
 
       <div class="mt-6 flex items-center justify-between gap-3">
         <div>
-          <h2 class="m-0 text-ib-modal-title-mobile font-semibold">
+          <h2 class="m-0 text-admin-modal-title-mobile font-semibold">
             {{ searchResultsHeading }}
           </h2>
           <div

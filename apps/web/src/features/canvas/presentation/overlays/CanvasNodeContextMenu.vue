@@ -17,7 +17,7 @@
         :key="item.key"
         type="button"
         role="menuitem"
-        class="h-[34px] w-full cursor-pointer rounded-[var(--canvas-radius-md)] border-0 bg-transparent px-2.5 text-left text-ib-body font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
+        class="h-[34px] w-full cursor-pointer rounded-[var(--canvas-radius-md)] border-0 bg-transparent px-2.5 text-left text-admin-body font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
         @pointerdown.stop.prevent="emit('create', item.key)"
         @keydown.enter.stop.prevent="emit('create', item.key)"
         @keydown.space.stop.prevent="emit('create', item.key)"

@@ -117,23 +117,23 @@
     :inert="inert"
     @wheel.prevent.stop
   >
-    <div class="ib-page-chrome-surface canvas-chrome-status-control">
+    <div class="page-chrome-surface canvas-chrome-status-control">
       <button
         type="button"
-        class="canvas-chrome-status-button ib-hit-target-32"
+        class="canvas-chrome-status-button hit-target-32"
         :aria-label="t('canvas.viewport.zoomOut')"
         @click="emit('zoom-out')"
       >
         <Minus class="size-4" />
       </button>
       <span
-        class="min-w-[33px] text-center text-ib-body leading-[1.2] font-normal text-[var(--canvas-text-strong)]"
+        class="min-w-[33px] text-center text-admin-body leading-[1.2] font-normal text-[var(--canvas-text-strong)]"
       >
         {{ status.zoomLevel }}%
       </span>
       <button
         type="button"
-        class="canvas-chrome-status-button ib-hit-target-32"
+        class="canvas-chrome-status-button hit-target-32"
         :aria-label="t('canvas.viewport.zoomIn')"
         @click="emit('zoom-in')"
       >

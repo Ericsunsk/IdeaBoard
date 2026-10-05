@@ -70,7 +70,7 @@
    * to live; growing the transparent box is the only route that keeps the dot
    * exactly where it was.
    */
-  width: var(--spacing-ib-touch-target-aa);
+  width: var(--spacing-touch-target-aa);
   padding: 0;
   border: 0;
   background: transparent;
@@ -123,13 +123,11 @@
 }
 
 .retouch-histogram-plot__marker:focus-visible::after {
-  outline: var(--ib-focus-outline-width, 2px) solid
-    var(--ib-focus-outline-color, var(--canvas-accent));
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline-color, var(--canvas-accent));
   outline-offset: 2px;
 }
 
 .retouch-histogram-plot__range-input:focus-visible + .retouch-histogram-plot__marker--range::after {
-  outline: var(--ib-focus-outline-width, 2px) solid
-    var(--ib-focus-outline-color, var(--canvas-accent));
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline-color, var(--canvas-accent));
   outline-offset: 2px;
 }

@@ -3,14 +3,15 @@ import { extendTailwindMerge } from 'tailwind-merge'
 
 /**
  * Theme-namespace guard for conflict resolution. tailwind-merge only dedupes
- * classes it recognises; every custom `--color-ib-*` / `--color-admin-*`
- * token would otherwise survive next to its opponent and leave the winner to
- * stylesheet order. Registering the namespaces keeps invalid-state borders
- * deterministic when a surface skin and semantic error class are composed.
+ * classes it recognises; every custom domain color token would otherwise
+ * survive next to its opponent and leave the winner to stylesheet order.
+ * Registering the namespaces keeps invalid-state borders deterministic when a
+ * surface skin and semantic error class are composed.
  * With the namespace registered, `cn()` keeps the last one — the error state
  * always wins over the base chrome, on every surface.
  */
-const isThemeColor = (value: string) => /^(ib|admin)-/.test(value)
+const isThemeColor = (value: string) =>
+  /^(?:admin|board|page-chrome|overlay|auth|toast|brand-creative)-/.test(value)
 
 const customTwMerge = extendTailwindMerge({
   extend: {
@@ -31,9 +32,6 @@ const customTwMerge = extendTailwindMerge({
             'admin-summary-value',
             'admin-modal-title',
             'admin-modal-title-mobile',
-            'ib-micro',
-            'ib-caption',
-            'ib-body',
           ],
         },
       ],

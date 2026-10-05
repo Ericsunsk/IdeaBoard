@@ -19,7 +19,7 @@
           type="button"
           role="radio"
           :aria-checked="selectedRange === range.key"
-          class="ib-hit-target-32-inline cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
+          class="hit-target-32-inline cursor-pointer rounded-md px-2.5 py-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2"
           :class="selectedRange === range.key ? rangeSelectedClass : rangeUnselectedClass"
           @click="selectedRange = range.key"
         >

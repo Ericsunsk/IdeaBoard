@@ -7,4 +7,4 @@ export const BLANK_BOARD_PREVIEW_DOT_SPACING = 12
 export const BLANK_BOARD_PREVIEW_DOT_OFFSET = BLANK_BOARD_PREVIEW_DOT_SPACING / 2
 
 export const blankBoardPreviewSurfaceClass =
-  'bg-[radial-gradient(circle,var(--color-ib-page-dot)_1px,transparent_1px),linear-gradient(var(--color-board-card-preview-from),var(--color-board-card-preview-to))] [background-size:12px_12px,cover]'
+  'bg-[radial-gradient(circle,var(--color-page-dot)_1px,transparent_1px),linear-gradient(var(--color-board-card-preview-from),var(--color-board-card-preview-to))] [background-size:12px_12px,cover]'

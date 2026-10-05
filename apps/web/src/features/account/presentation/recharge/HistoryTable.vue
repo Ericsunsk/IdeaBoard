@@ -9,7 +9,7 @@
       :table-style="{ minWidth: '720px' }"
       :table-aria-label="t('account.topUp.historyTableAria')"
       :scroll-aria-label="t('account.topUp.historyTableAria')"
-      frame-class="rounded-ib-panel border border-border bg-card shadow-ib-control"
+      frame-class="rounded-panel border border-border bg-card shadow-sm"
       :empty-title="t('account.topUp.historyEmptyTitle')"
     >
       <DataTableColumn
@@ -20,7 +20,7 @@
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="8rem" /><time
             v-else
-            class="whitespace-nowrap font-mono text-ib-body text-muted-foreground"
+            class="whitespace-nowrap font-mono text-admin-body text-muted-foreground"
             >{{ formatDateTime(data.occurred_at) }}</time
           ></template
         >

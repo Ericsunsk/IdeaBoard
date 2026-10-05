@@ -1,7 +1,7 @@
 export const adminSurfaceRootViewportClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
 export const adminSurfacePanelClass =
-  'min-w-0 overflow-hidden rounded-ib-panel border border-border bg-card p-0 text-card-foreground'
+  'min-w-0 overflow-hidden rounded-panel border border-border bg-card p-0 text-card-foreground'
 
 export const adminSurfacePanelViewportClass = 'flex flex-col min-[1081px]:h-[calc(100dvh-192px)]'
 
@@ -61,7 +61,7 @@ export const adminToolbarPageLabelClass =
 export const adminActionButtonClass = '!h-9 !rounded-lg'
 
 export const adminLogoButtonClass =
-  'ib-control-state flex shrink-0 items-center justify-center rounded-xl border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
+  'control-state flex shrink-0 items-center justify-center rounded-xl border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
 
 export const adminTextButtonClass = '!text-muted-foreground hover:!text-foreground'
 

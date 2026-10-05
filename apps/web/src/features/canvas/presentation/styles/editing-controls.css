@@ -20,7 +20,7 @@
   --editing-controls-control-radius: var(--canvas-radius-md);
   --editing-controls-control-border-color: var(--canvas-accent-border);
   --editing-controls-control-hover-border-color: var(--canvas-accent);
-  --editing-controls-control-focus-border-color: var(--ib-focus-border-color);
+  --editing-controls-control-focus-border-color: var(--focus-border-color);
   --editing-controls-control-bg: var(--canvas-surface-muted);
   --editing-controls-content-gap: var(--canvas-panel-content-gap);
   --editing-controls-text-size: var(--canvas-font-size-caption);
@@ -165,8 +165,8 @@
  * had on the user shell.
  */
 .editing-controls-select:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .editing-controls-toggle-button,
@@ -218,8 +218,8 @@
 
 .editing-controls-toggle-button:focus-visible,
 .editing-controls-segmented-button:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .editing-controls-toggle-button[aria-pressed='true'],

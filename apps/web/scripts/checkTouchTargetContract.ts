@@ -20,8 +20,8 @@ import { join } from 'node:path'
  *   admin header scroll-to-top      ~x24      6 instances   sticky page title
  *   canvas board icon buttons       29x29    4 instances   canvas header
  *
- * The floor is `--spacing-ib-touch-target-min` (32px). Controls that are
- * visually small by design carry `.ib-hit-target-32` / `.ib-hit-target-32-inline`
+ * The floor is `--spacing-touch-target-min` (32px). Controls that are
+ * visually small by design carry `.hit-target-32` / `.hit-target-32-inline`
  * from `shared/theme/touch-target.css`, which grows the hit area past the visual
  * box without inflating the design. Controls that can afford it set a real
  * `min-h-8` / `!size-8`.
@@ -30,13 +30,13 @@ import { join } from 'node:path'
  * one of those two routes.
  */
 
-/** The floor, in px. Must track `--spacing-ib-touch-target-min` in style.css. */
+/** The floor, in px. Must track `--spacing-touch-target-min` in style.css. */
 const FLOOR_PX = 32
 
 const SRC_ROOT = join(import.meta.dirname, '..', 'src')
 const STYLE = join(SRC_ROOT, 'app/style.css')
 
-const OPT_IN = /ib-hit-target-32(?:-inline)?\b|ib-hit-target-drag\b/
+const OPT_IN = /hit-target-32(?:-inline)?\b|hit-target-drag\b/
 
 /**
  * Strip comments before testing. Several of these files *document* the hit-area
@@ -56,7 +56,7 @@ function stripComments(source: string): string {
  *
  *     if (OPT_IN.test(source)) continue
  *
- * One `ib-hit-target-32` anywhere in a file therefore exempted every control in
+ * One `hit-target-32` anywhere in a file therefore exempted every control in
  * it. That is the wrong granularity for `lib/uiClasses.ts`, a module that
  * exports dozens of independent class tokens — opting in on the switch track
  * silently exempted every future icon button added to it, which is precisely
@@ -151,35 +151,35 @@ const RULES: Rule[] = [
     label: 'AdminSwitch track',
     rel: 'features/admin/shared/components/AdminSwitch.vue',
     pattern: /\bh-5\b/,
-    fix: 'keep the 20px track but carry `ib-hit-target-32`, or grow the track to `h-8`',
+    fix: 'keep the 20px track but carry `hit-target-32`, or grow the track to `h-8`',
   },
   {
     kind: 'opt-in',
     label: 'admin tab trigger',
     rel: 'features/admin/shared/components/AdminTabsTrigger.vue',
     pattern: /\bh-7\b/,
-    fix: 'keep `h-7` inside the h-9 rail and carry `ib-hit-target-32-inline`',
+    fix: 'keep `h-7` inside the h-9 rail and carry `hit-target-32-inline`',
   },
   {
     kind: 'opt-in',
     label: 'chart range segment',
     rel: 'shared/components/RangedLineChartCard.vue',
     pattern: /\bpy-1\b/,
-    fix: 'carry `ib-hit-target-32-inline` on the segment button so the row keeps its rhythm',
+    fix: 'carry `hit-target-32-inline` on the segment button so the row keeps its rhythm',
   },
   {
     kind: 'opt-in',
     label: 'node action button',
     rel: 'features/canvas/presentation/nodes/primitives/NodeActionButton.vue',
     pattern: /\bmin-h-7\b/,
-    fix: 'carry `ib-hit-target-32-inline` so node chrome keeps its compact height',
+    fix: 'carry `hit-target-32-inline` so node chrome keeps its compact height',
   },
   {
     kind: 'opt-in',
     label: 'task filter pill',
     rel: 'features/admin/monitor/presentation/components/TaskEventsCard.vue',
     pattern: /\bpy-0\.5\b/,
-    fix: 'carry `ib-hit-target-32-inline` on the pill so the dense chip rail keeps its density',
+    fix: 'carry `hit-target-32-inline` on the pill so the dense chip rail keeps its density',
   },
   {
     // Was `opt-in` on `!size-7`; the compact icon button is now `!size-8`.
@@ -209,7 +209,7 @@ const RULES: Rule[] = [
     label: 'retouch curve drag point',
     rel: 'features/canvas/tools/retouch/components/CurveGraph.vue',
     pattern: /retouch-curves__point/,
-    fix: 'carry `ib-hit-target-drag` (11px dot, keyboard-operable; a full 32px overlay would steal neighbouring grabs)',
+    fix: 'carry `hit-target-drag` (11px dot, keyboard-operable; a full 32px overlay would steal neighbouring grabs)',
   },
   {
     // Was `opt-in` on the 11px marker width; the transparent button box grew to
@@ -220,8 +220,8 @@ const RULES: Rule[] = [
     // Only the transparent button box counts: the 11px painted dot further down
     // the file is the visual, not the target.
     pattern:
-      /\.retouch-histogram-plot__marker \{[\s\S]{0,600}?width: var\(--spacing-ib-touch-target-aa\)/,
-    fix: 'grow the transparent button box to `var(--spacing-ib-touch-target-aa)`; both pseudos already paint the marker',
+      /\.retouch-histogram-plot__marker \{[\s\S]{0,600}?width: var\(--spacing-touch-target-aa\)/,
+    fix: 'grow the transparent button box to `var(--spacing-touch-target-aa)`; both pseudos already paint the marker',
   },
 ]
 
@@ -239,20 +239,20 @@ const CANVAS_CHROME_RULES: Array<{
   {
     file: 'features/canvas/presentation/chrome/components/CanvasChrome.vue',
     selector: '.canvas-chrome-status-button',
-    hitClass: 'ib-hit-target-32',
-    fix: 'the 23px zoom button needs `ib-hit-target-32` (below WCAG AA 2.5.8 without it)',
+    hitClass: 'hit-target-32',
+    fix: 'the 23px zoom button needs `hit-target-32` (below WCAG AA 2.5.8 without it)',
   },
   {
     file: 'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
     selector: '.canvas-chrome-board-icon-button',
-    hitClass: 'ib-hit-target-32',
-    fix: 'the 29px icon button needs `ib-hit-target-32`',
+    hitClass: 'hit-target-32',
+    fix: 'the 29px icon button needs `hit-target-32`',
   },
   {
     file: 'features/canvas/presentation/chrome/components/CanvasChromeBoardHeader.vue',
     selector: '.canvas-chrome-catalog-recovery-action',
-    hitClass: 'ib-hit-target-32-inline',
-    fix: 'the 22px recovery button needs `ib-hit-target-32-inline` (below WCAG AA 2.5.8 without it)',
+    hitClass: 'hit-target-32-inline',
+    fix: 'the 22px recovery button needs `hit-target-32-inline` (below WCAG AA 2.5.8 without it)',
   },
 ]
 
@@ -336,21 +336,21 @@ function main(): void {
 
   // 1. The floor token must exist and match FLOOR_PX.
   const styles = readFileSync(STYLE, 'utf8')
-  const token = styles.match(/--spacing-ib-touch-target-min:\s*(\d+)px/)
+  const token = styles.match(/--spacing-touch-target-min:\s*(\d+)px/)
   if (!token) {
     violations.push(
-      'app/style.css: `--spacing-ib-touch-target-min` is missing. The touch-target floor must be declared once, here.',
+      'app/style.css: `--spacing-touch-target-min` is missing. The touch-target floor must be declared once, here.',
     )
   } else if (Number(token[1]) !== FLOOR_PX) {
     violations.push(
-      `app/style.css: \`--spacing-ib-touch-target-min\` is ${token[1]}px but the contract floor is ${FLOOR_PX}px. Update both together.`,
+      `app/style.css: \`--spacing-touch-target-min\` is ${token[1]}px but the contract floor is ${FLOOR_PX}px. Update both together.`,
     )
   }
 
   // 2. The hit-area utility must be imported, or no control can opt in.
   if (!styles.includes("@import '../shared/theme/atoms/touch-target.css'")) {
     violations.push(
-      'app/style.css: `touch-target.css` is not imported, so `.ib-hit-target-32` does nothing.',
+      'app/style.css: `touch-target.css` is not imported, so `.hit-target-32` does nothing.',
     )
   }
 

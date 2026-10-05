@@ -359,20 +359,20 @@ describe('text ramp contrast contract', () => {
       '--color-admin-model-purple',
       '--color-canvas-accent',
     ]) {
-      expect(readDeclaration(name)).toBe('var(--color-ib-creative-accent)')
+      expect(readDeclaration(name)).toBe('var(--color-brand-creative-accent)')
     }
     expect(readDeclaration('--color-admin-accent-hover')).toBe(
-      'var(--color-ib-creative-accent-hover)',
+      'var(--color-brand-creative-accent-hover)',
     )
     expect(readDeclaration('--color-admin-accent-pressed')).toBe(
-      'var(--color-ib-creative-accent-pressed)',
+      'var(--color-brand-creative-accent-pressed)',
     )
     expect(readDeclaration('--color-canvas-accent-soft')).toBe(
-      'var(--color-ib-creative-accent-soft)',
+      'var(--color-brand-creative-accent-soft)',
     )
     // --color-canvas-accent-secondary was the same kind of alias but had zero
     // consumers, so it was deleted outright instead of re-routed. The source
-    // token --color-ib-creative-accent-secondary stays live.
+    // token --color-brand-creative-accent-secondary stays live.
   })
 
   it('folds the retired subtitle token into the text ramp', () => {
@@ -410,23 +410,24 @@ describe('text ramp contrast contract', () => {
     )
   })
 
-  it('aliases the shared type scale instead of redeclaring it', () => {
-    // --text-ib-* duplicated all eleven --text-admin-* pixel values. They now
-    // alias, so a type-scale change lands on both surfaces at once.
-    for (const step of [
-      'micro',
-      'caption',
-      'meta',
-      'body',
-      'content',
-      'title-sm',
-      'heading',
-      'icon',
-      'modal-title-mobile',
-      'modal-title',
-      'summary-value',
-    ]) {
-      expect(readDeclaration(`--text-ib-${step}`)).toBe(`var(--text-admin-${step})`)
+  it('keeps the shared type scale as canonical declarations', () => {
+    const expected: Record<string, string> = {
+      micro: '10px',
+      caption: '11px',
+      meta: '12px',
+      body: '13px',
+      content: '14px',
+      'title-sm': '15px',
+      title: '16px',
+      heading: '18px',
+      icon: '20px',
+      'modal-title-mobile': '22px',
+      'modal-title': '26px',
+      'summary-value': '28px',
+    }
+
+    for (const [step, value] of Object.entries(expected)) {
+      expect(readDeclaration(`--text-admin-${step}`)).toBe(value)
     }
   })
 
@@ -434,7 +435,7 @@ describe('text ramp contrast contract', () => {
     // Clustering every literal hex in style.css by CIELAB distance found twelve
     // values declared more than once, which is how the palette drifted in the
     // first place: --color-admin-accent, --color-canvas-accent and
-    // --color-ib-creative-accent all sat at #9278e6 with no link between them.
+    // --color-brand-creative-accent all sat at #9278e6 with no link between them.
     // Every redundant declaration is now an alias. The three survivors are
     // deliberate and listed here so a new duplicate fails review.
     const allowedDuplicates: Record<string, readonly string[]> = {
@@ -443,7 +444,7 @@ describe('text ramp contrast contract', () => {
       // Border hover and disabled text are different token families.
       '#d4d4d4': ['--color-admin-border-hover', '--color-admin-text-disabled'],
       // The running-edge gradient is a distinct role from the brand accent.
-      '#9278e6': ['--color-canvas-running-from', '--color-ib-creative-accent'],
+      '#9278e6': ['--color-canvas-running-from', '--color-brand-creative-accent'],
     }
 
     const byHex = new Map<string, string[]>()

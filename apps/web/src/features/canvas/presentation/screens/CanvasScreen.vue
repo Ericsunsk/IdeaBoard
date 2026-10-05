@@ -45,7 +45,7 @@
 
     <div
       ref="canvasWrapRef"
-      class="canvas-flow-wrap ib-page-dot-bg"
+      class="canvas-flow-wrap page-dot-bg"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
       @pointerdown.capture="onCanvasPointerDownCapture"
@@ -502,7 +502,7 @@ useCanvasScreenLifecycle({
 }
 
 .canvas-flow-wrap {
-  --color-ib-page-dot: var(--color-canvas-dot);
+  --color-page-dot: var(--color-canvas-dot);
   position: absolute;
   inset: 0;
   z-index: 2;

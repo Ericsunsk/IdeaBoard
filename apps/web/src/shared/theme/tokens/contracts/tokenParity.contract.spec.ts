@@ -7,9 +7,11 @@ describe('Theme Token Parity Contract', () => {
   const darkCss = readFileSync(join(import.meta.dirname, '../dark.css'), 'utf8')
 
   it('ensures every dark color token exists in base @theme in style.css', () => {
-    // Extract all --color-admin-*, --color-board-*, --color-canvas-*, --color-home-*, --color-ib-* declarations from dark.css
+    // Extract all canonical and domain color declarations from dark.css.
     const darkTokens = [
-      ...darkCss.matchAll(/(--color-(?:admin|board|canvas|home|ib)-[a-z0-9-]+):/g),
+      ...darkCss.matchAll(
+        /(--color-(?:admin|board|canvas|home|auth|page-chrome|overlay|toast|brand-creative|page|dialog|scrollbar)-[a-z0-9-]+):/g,
+      ),
     ].flatMap((m) => (m[1] ? [m[1]] : []))
     expect(darkTokens.length).toBeGreaterThan(0)
 
@@ -24,12 +26,21 @@ describe('Theme Token Parity Contract', () => {
 
   it('keeps dark token declarations unique within the dark scope', () => {
     const tokens = [
-      ...darkCss.matchAll(/(--color-(?:admin|board|canvas|home|ib)-[a-z0-9-]+):/g),
+      ...darkCss.matchAll(
+        /(--color-(?:admin|board|canvas|home|auth|page-chrome|overlay|toast|brand-creative|page|dialog|scrollbar)-[a-z0-9-]+):/g,
+      ),
     ].map((match) => match[1])
     const duplicates = [
       ...new Set(tokens.filter((token, index) => tokens.indexOf(token) !== index)),
     ]
     expect(duplicates, 'dark.css must not redeclare the same token').toEqual([])
+  })
+
+  it('rejects removed product-prefixed color, type, and generic shadow aliases', () => {
+    const forbidden =
+      /--(?:color-ib-[a-z0-9-]+|text-ib-[a-z0-9-]+|shadow-ib-(?:control|overlay|focus))\b/g
+    const declarations = `${styleCss}\n${darkCss}`
+    expect([...declarations.matchAll(forbidden)]).toEqual([])
   })
 
   it('ensures marketing home tokens defined in style.css have corresponding dark tokens', () => {

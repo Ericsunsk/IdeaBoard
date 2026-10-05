@@ -9,8 +9,8 @@
             :class="[summaryCellClass, metric.cellClass]"
             aria-hidden="true"
           >
-            <div class="h-9 w-2/3 rounded-ib-control bg-muted" />
-            <div class="mt-3 h-5 w-1/2 rounded-ib-control bg-muted" />
+            <div class="h-9 w-2/3 rounded-control bg-muted" />
+            <div class="mt-3 h-5 w-1/2 rounded-control bg-muted" />
           </article>
         </div>
       </section>
@@ -18,7 +18,7 @@
 
     <section
       v-else-if="!usage && error"
-      class="rounded-ib-panel border border-destructive/25 bg-card p-5"
+      class="rounded-panel border border-destructive/25 bg-card p-5"
       role="alert"
     >
       <p class="m-0 font-semibold text-destructive">{{ t('account.errors.usageLoadFailed') }}</p>
@@ -42,7 +42,7 @@
             :class="[summaryCellClass, metric.cellClass]"
           >
             <p
-              class="m-0 break-all whitespace-normal font-mono text-ib-summary-value leading-tight font-bold text-foreground sm:text-[30px] lg:text-[34px]"
+              class="m-0 break-all whitespace-normal font-mono text-admin-summary-value leading-tight font-bold text-foreground sm:text-[30px] lg:text-[34px]"
             >
               {{ metric.value }}
             </p>
@@ -77,14 +77,14 @@
         <template v-if="!isInitialPending">
           <p
             v-if="isSwitching"
-            class="mt-3 mb-0 text-ib-meta font-semibold text-muted-foreground"
+            class="mt-3 mb-0 text-admin-meta font-semibold text-muted-foreground"
             aria-live="polite"
           >
             {{ t('account.usage.loadingRangeTrend', { range: selectedRangeText }) }}
           </p>
           <div
             v-if="error"
-            class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-ib-control border border-destructive/25 bg-muted px-3 py-2 sm:flex-row sm:items-center"
+            class="mt-3 flex min-w-0 flex-col items-start justify-between gap-3 rounded-control border border-destructive/25 bg-muted px-3 py-2 sm:flex-row sm:items-center"
             role="alert"
           >
             <p class="m-0 min-w-0 text-sm text-destructive">{{ errorMessage(error) }}</p>
@@ -103,7 +103,7 @@
       <template #chart-fallback>
         <div
           data-testid="usage-trend-skeleton"
-          class="h-full rounded-ib-control bg-muted"
+          class="h-full rounded-control bg-muted"
           aria-hidden="true"
         />
       </template>
@@ -154,8 +154,7 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
   selectedRange,
   () => props.active,
 )
-const summaryPanelClass =
-  'overflow-hidden rounded-ib-panel border border-border bg-card shadow-ib-control'
+const summaryPanelClass = 'overflow-hidden rounded-panel border border-border bg-card shadow-sm'
 const summaryGridClass = 'grid grid-cols-2 sm:grid-cols-5'
 const summaryCellClass = 'min-h-[100px] min-w-0 p-4 sm:min-h-[108px] sm:p-5'
 const trendChartTheme = resolveUsageChartTheme()

@@ -3,7 +3,7 @@
     <aside
       v-if="presentation === 'canvas' || open"
       v-show="open"
-      class="ib-page-chrome-surface z-40 flex flex-col overflow-hidden rounded-[28px] p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="page-chrome-surface z-40 flex flex-col overflow-hidden rounded-[28px] p-5 text-foreground will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
       :aria-label="t('library.title')"
       @click="closeFolderMenu(false)"

@@ -17,7 +17,7 @@ import { join, relative, sep } from 'node:path'
 const SRC_ROOT = join(import.meta.dirname, '..', 'src')
 
 /** Surfaces that legitimately own a `none` shadow as an explicit contract. */
-const ALLOWED_NONE_SHADOW_TOKENS = ['--shadow-ib-overlay-menu', '--shadow-ib-page-chrome'] as const
+const ALLOWED_NONE_SHADOW_TOKENS = ['--shadow-overlay-menu', '--shadow-page-chrome'] as const
 
 /** Files allowed to mention `shadow-none` (documenting the failure mode is fine). */
 const SHADOW_NONE_ALLOWED_FILES = ['components/ui/card/Card.vue'] as const

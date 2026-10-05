@@ -310,7 +310,7 @@ function submitOutpaint(prompt: string) {
 }
 
 .image-node-stage-image:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
   outline-offset: -4px;
 }
 
@@ -353,8 +353,8 @@ function submitOutpaint(prompt: string) {
 
 .image-node-stage-empty:focus-visible {
   color: var(--canvas-accent-hover);
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: calc(-1 * var(--ib-focus-outline-width));
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: calc(-1 * var(--focus-outline-width));
 }
 
 .image-node-stage-empty .node-empty-state-icon--image,

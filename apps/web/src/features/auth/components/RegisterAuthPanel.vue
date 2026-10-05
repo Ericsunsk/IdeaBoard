@@ -112,12 +112,12 @@
           >{{ loading ? t('auth.buttons.creating') : t('auth.buttons.createAccount') }}</Button
         >
 
-        <p class="m-0 text-center text-ib-caption leading-4 text-[var(--color-ib-auth-subtle)]">
+        <p class="m-0 text-center text-admin-caption leading-4 text-[var(--color-auth-subtle)]">
           {{ t('auth.legal.agreePrefix') }}
           <RouterLink
             :to="TERMS_PATH"
             target="_blank"
-            class="rounded-ib-control font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-ib-auth-focus"
+            class="rounded-control font-semibold text-[var(--color-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-auth-focus"
           >
             Terms
           </RouterLink>
@@ -125,7 +125,7 @@
           <RouterLink
             :to="PRIVACY_POLICY_PATH"
             target="_blank"
-            class="rounded-ib-control font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-ib-auth-focus"
+            class="rounded-control font-semibold text-[var(--color-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-auth-focus"
           >
             Privacy
           </RouterLink>
@@ -139,7 +139,7 @@
         novalidate
         @submit.prevent="handleVerifyOTP"
       >
-        <p class="text-xs text-[var(--color-ib-auth-subtle)]">
+        <p class="text-xs text-[var(--color-auth-subtle)]">
           {{ t('auth.otpSentTo', { email: formValue.email }) }}
         </p>
         <OtpField

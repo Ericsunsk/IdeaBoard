@@ -142,7 +142,7 @@ describe('UsagePane', () => {
     expect(cells[0]).toHaveClass('border-b', 'sm:border-b-0')
     expect(cells[4]).toHaveClass('col-span-2', 'sm:col-span-1')
     const value = cells[0]?.querySelector('p')
-    expect(value).toHaveClass('text-ib-summary-value', 'sm:text-[30px]', 'lg:text-[34px]')
+    expect(value).toHaveClass('text-admin-summary-value', 'sm:text-[30px]', 'lg:text-[34px]')
     expect(value).toHaveClass('break-all', 'whitespace-normal', 'leading-tight')
     expect(value).not.toHaveClass('overflow-hidden', 'text-ellipsis', 'whitespace-nowrap')
     expect(value).toHaveTextContent('9,007,199,254,740,991')

@@ -18,7 +18,7 @@
       >
         <template #body="{ data }">
           <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
-          <time v-else class="whitespace-nowrap font-mono text-ib-body text-muted-foreground">
+          <time v-else class="whitespace-nowrap font-mono text-admin-body text-muted-foreground">
             {{ formatLocalDateTime(data.occurred_at) }}
           </time>
         </template>

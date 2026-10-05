@@ -3,11 +3,11 @@
     <section class="min-w-0" :aria-label="t('account.profile.overviewAria')">
       <div class="flex min-w-0 items-start gap-5 sm:items-center">
         <div
-          class="relative size-20 shrink-0 overflow-visible rounded-ib-pill bg-card shadow-ib-control sm:size-[88px]"
+          class="relative size-20 shrink-0 overflow-visible rounded-pill bg-card shadow-sm sm:size-[88px]"
         >
           <button
             type="button"
-            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-ib-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-ib-focus disabled:cursor-wait"
+            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-pill border-0 bg-transparent p-0 text-primary-foreground outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-wait"
             :disabled="avatarUploading"
             :aria-busy="avatarUploading"
             :aria-label="t('account.profile.changeAvatar')"
@@ -22,13 +22,13 @@
                 class="rounded-full object-cover"
               />
               <AvatarFallback
-                class="bg-primary text-ib-summary-value font-bold text-primary-foreground sm:text-[34px]"
+                class="bg-primary text-admin-summary-value font-bold text-primary-foreground sm:text-[34px]"
               >
                 {{ userInitial }}
               </AvatarFallback>
             </Avatar>
             <span
-              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-ib-pill bg-[color-mix(in_srgb,var(--color-foreground)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--color-foreground)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
               :class="
                 avatarUploading
                   ? 'opacity-100'
@@ -84,13 +84,13 @@
           :key="field.label"
           class="grid min-h-14 grid-cols-1 items-center gap-1 border-b border-border py-3 last:border-b-0 sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-4"
         >
-          <dt class="text-ib-body font-semibold text-muted-foreground">
+          <dt class="text-admin-body font-semibold text-muted-foreground">
             {{ field.label }}
           </dt>
           <dd class="m-0 min-w-0">
             <span
-              class="block truncate text-ib-title-sm font-semibold text-foreground"
-              :class="field.mono ? 'font-mono text-ib-content' : ''"
+              class="block truncate text-admin-title-sm font-semibold text-foreground"
+              :class="field.mono ? 'font-mono text-admin-content' : ''"
               :title="field.value"
             >
               {{ field.value }}

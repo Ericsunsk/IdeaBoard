@@ -10,7 +10,7 @@
 
     <div
       v-if="pending"
-      class="grid gap-2 rounded-ib-panel border border-border bg-card p-4 shadow-ib-control"
+      class="grid gap-2 rounded-panel border border-border bg-card p-4 shadow-sm"
       role="status"
       :aria-label="t('account.topUp.pendingOrdersLoading')"
     >
@@ -20,7 +20,7 @@
 
     <div
       v-else-if="error"
-      class="rounded-ib-panel border border-destructive/25 bg-card p-4 shadow-ib-control"
+      class="rounded-panel border border-destructive/25 bg-card p-4 shadow-sm"
       role="alert"
     >
       <p class="m-0 font-semibold text-destructive">
@@ -37,7 +37,7 @@
         v-for="item in items"
         :key="item.public_token"
         :data-testid="`pending-payment-order-${item.public_token}`"
-        class="rounded-ib-panel border border-border bg-card p-3.5 shadow-ib-control sm:p-4"
+        class="rounded-panel border border-border bg-card p-3.5 shadow-sm sm:p-4"
       >
         <div class="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
           <div class="min-w-0">
@@ -47,7 +47,7 @@
             <p class="mt-1 mb-0 text-sm font-semibold" :class="statusTone(item.status)">
               {{ statusText(item) }}
             </p>
-            <p class="mt-1 mb-0 text-ib-body text-muted-foreground">
+            <p class="mt-1 mb-0 text-admin-body text-muted-foreground">
               {{ expiryText(item) }}
             </p>
           </div>
@@ -74,7 +74,7 @@
 
         <div
           v-if="actionError && actionTarget?.publicToken === item.public_token"
-          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-ib-control border border-destructive/25 bg-muted px-3 py-2"
+          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control border border-destructive/25 bg-muted px-3 py-2"
           role="alert"
         >
           <span class="text-sm font-semibold text-destructive">{{

@@ -205,7 +205,7 @@ watch(
 }
 
 .flow-canvas-node__handle-aggregate:focus-visible .flow-canvas-node__handle-plus {
-  border-color: var(--ib-focus-outline-color);
+  border-color: var(--focus-outline-color);
 }
 
 .flow-canvas-node__handle-aggregate.is-visible:hover {

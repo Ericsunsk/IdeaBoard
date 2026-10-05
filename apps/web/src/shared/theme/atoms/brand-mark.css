@@ -1,24 +1,24 @@
 @layer components {
   .ib-brand-mark {
-    --ib-brand-mark-size: 40px;
-    --ib-brand-mark-radius: var(--radius-ib-control);
-    --ib-brand-mark-border: var(--color-ib-border-soft);
-    --ib-brand-mark-bg: var(--color-ib-surface);
-    --ib-brand-mark-color: var(--color-ib-accent-pressed);
-    --ib-brand-mark-shadow: none;
+    --brand-mark-size: 40px;
+    --brand-mark-radius: var(--radius-control);
+    --brand-mark-border: var(--color-border);
+    --brand-mark-bg: var(--color-card);
+    --brand-mark-color: var(--color-primary-hover);
+    --brand-mark-shadow: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--ib-brand-mark-size);
-    min-width: var(--ib-brand-mark-size);
-    height: var(--ib-brand-mark-size);
+    width: var(--brand-mark-size);
+    min-width: var(--brand-mark-size);
+    height: var(--brand-mark-size);
     flex: none;
     overflow: hidden;
-    border: 1px solid var(--ib-brand-mark-border);
-    border-radius: var(--ib-brand-mark-radius);
-    background: var(--ib-brand-mark-bg);
-    color: var(--ib-brand-mark-color);
-    box-shadow: var(--ib-brand-mark-shadow);
+    border: 1px solid var(--brand-mark-border);
+    border-radius: var(--brand-mark-radius);
+    background: var(--brand-mark-bg);
+    color: var(--brand-mark-color);
+    box-shadow: var(--brand-mark-shadow);
     text-decoration: none;
     transition:
       border-color var(--motion-control-duration) var(--motion-control-easing),
@@ -33,26 +33,26 @@
   }
 
   .ib-brand-mark--compact {
-    --ib-brand-mark-size: 40px;
+    --brand-mark-size: 40px;
   }
 
   .ib-brand-mark--account {
-    --ib-brand-mark-size: 2.7rem;
-    --ib-brand-mark-bg: var(--color-ib-surface-raised);
-    --ib-brand-mark-color: var(--color-ib-creative-accent-pressed);
+    --brand-mark-size: 2.7rem;
+    --brand-mark-bg: var(--color-card);
+    --brand-mark-color: var(--color-brand-creative-accent-pressed);
   }
 
   .ib-brand-mark--login {
-    --ib-brand-mark-size: 52px;
-    --ib-brand-mark-radius: 15px;
-    --ib-brand-mark-shadow: 0 10px 22px rgba(45, 64, 89, 0.08);
+    --brand-mark-size: 52px;
+    --brand-mark-radius: 15px;
+    --brand-mark-shadow: 0 10px 22px rgba(45, 64, 89, 0.08);
   }
 
   .ib-brand-mark--image {
-    --ib-brand-mark-border: transparent;
+    --brand-mark-border: transparent;
   }
 
   .ib-brand-mark--fallback-strong {
-    --ib-brand-mark-border: var(--color-ib-accent-pressed);
+    --brand-mark-border: var(--color-primary-hover);
   }
 }

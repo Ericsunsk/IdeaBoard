@@ -10,4 +10,10 @@ describe('cn utility', () => {
       'text-sm font-bold',
     )
   })
+
+  it('merges canonical and domain border tokens deterministically', () => {
+    expect(cn('border-page-chrome-border', 'border-destructive')).toBe('border-destructive')
+    expect(cn('border-admin-border', 'border-page-chrome-border')).toBe('border-page-chrome-border')
+    expect(cn('border-overlay-border', 'border-auth-input-border')).toBe('border-auth-input-border')
+  })
 })

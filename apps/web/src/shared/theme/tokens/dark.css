@@ -71,18 +71,16 @@
     --color-admin-chart-olive: #86efac;
 
     /* ── Global Page & Dots ── */
-    --color-ib-page-dot: var(--palette-dark-border);
-    --color-ib-overlay-bg: rgba(20, 20, 20, 0.95);
-    --color-ib-overlay-border: var(--palette-dark-border);
-    --color-ib-overlay-item: var(--palette-dark-text-2);
-    --color-ib-overlay-item-hover-bg: var(--palette-dark-surface-hover);
-    --color-ib-creative-accent: #fcfcfc;
-    --color-ib-creative-accent-hover: #ebebeb;
-    --color-ib-creative-accent-pressed: #d4d4d4;
-    --color-ib-creative-accent-soft: rgba(255, 255, 255, 0.08);
-    --color-ib-creative-accent-ring: rgba(255, 255, 255, 0.2);
-    --color-ib-text-inverse: var(--palette-dark-0);
-
+    --color-page-dot: var(--palette-dark-border);
+    --color-overlay-bg: rgba(20, 20, 20, 0.95);
+    --color-overlay-border: var(--palette-dark-border);
+    --color-overlay-item: var(--palette-dark-text-2);
+    --color-overlay-item-hover-bg: var(--palette-dark-surface-hover);
+    --color-brand-creative-accent: #fcfcfc;
+    --color-brand-creative-accent-hover: #ebebeb;
+    --color-brand-creative-accent-pressed: #d4d4d4;
+    --color-brand-creative-accent-soft: rgba(255, 255, 255, 0.08);
+    --color-brand-creative-accent-ring: rgba(255, 255, 255, 0.2);
     /* ── Boards & Workspace dark tokens (Linear standard) ── */
     --color-board-page: var(--palette-dark-0);
     --color-board-primary: #fcfcfc;
@@ -96,7 +94,7 @@
     --color-board-surface: rgba(20, 20, 20, 0.85);
     --color-board-surface-strong: var(--palette-dark-1);
     --color-board-control-bg: rgba(24, 24, 24, 0.78);
-    --color-ib-page-chrome-bg-hover: rgba(42, 42, 42, 0.85);
+    --color-page-chrome-bg-hover: rgba(42, 42, 42, 0.85);
     --color-board-control-text: var(--palette-dark-text-1);
     --color-board-control-input-text: var(--palette-dark-text-1);
     --color-board-control-icon: var(--palette-dark-text-3);
@@ -124,9 +122,9 @@
     --shadow-board-dialog: 0 22px 58px rgba(0, 0, 0, 0.65);
 
     /* ── Scrollbars & Overlays ── */
-    --color-ib-scrollbar-thumb: rgba(255, 255, 255, 0.2);
-    --color-ib-scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
-    --color-ib-dialog-mask: rgba(0, 0, 0, 0.72);
+    --color-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --color-scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+    --color-dialog-mask: rgba(0, 0, 0, 0.72);
 
     /* ── Canvas Workspace & Nodes (Linear & Figma dark creative standards) ── */
     --color-canvas-workspace-bg: var(--palette-dark-0);
@@ -170,49 +168,49 @@
     --color-home-note-text: #f4efe6;
 
     /* ── Auth modal dark theme tokens (Pure Neutral / White Accent) ── */
-    --color-ib-auth-shell: rgba(18, 18, 18, 0.88);
-    --color-ib-auth-shell-border: var(--palette-dark-border);
-    --color-ib-auth-shell-glow: rgba(255, 255, 255, 0.05);
-    --color-ib-auth-shell-highlight: rgba(255, 255, 255, 0.1);
-    --color-ib-auth-backdrop-from: rgba(255, 255, 255, 0.02);
-    --color-ib-auth-backdrop-via: rgba(255, 255, 255, 0.01);
-    --color-ib-auth-backdrop-to: transparent;
-    --color-ib-auth-text: var(--palette-dark-text-1);
-    --color-ib-auth-title: var(--palette-dark-title);
-    --color-ib-auth-muted: var(--palette-dark-text-2);
-    --color-ib-auth-subtle: var(--palette-dark-text-3);
-    --color-ib-auth-input: var(--palette-dark-3);
-    --color-ib-auth-input-focus: var(--palette-dark-2);
-    --color-ib-auth-input-border: var(--palette-dark-border);
-    --color-ib-auth-input-border-hover: var(--palette-dark-border-hover);
-    --color-ib-auth-focus: #fcfcfc;
-    --color-ib-auth-focus-ring: rgba(255, 255, 255, 0.2);
-    --color-ib-auth-primary-from: #fcfcfc;
-    --color-ib-auth-primary-to: #ebebeb;
-    --color-ib-auth-primary-text: #0f0f0f;
-    --color-ib-auth-primary-shadow: transparent;
-    --color-ib-auth-primary-shadow-hover: transparent;
-    --shadow-ib-auth-primary: none;
-    --shadow-ib-auth-primary-hover: none;
-    --color-ib-auth-link: #ffffff;
-    --color-ib-auth-link-hover: #e5e5e5;
-    --color-ib-auth-close: var(--palette-dark-text-2);
-    --color-ib-auth-close-hover: var(--palette-dark-title);
+    --color-auth-shell: rgba(18, 18, 18, 0.88);
+    --color-auth-shell-border: var(--palette-dark-border);
+    --color-auth-shell-glow: rgba(255, 255, 255, 0.05);
+    --color-auth-shell-highlight: rgba(255, 255, 255, 0.1);
+    --color-auth-backdrop-from: rgba(255, 255, 255, 0.02);
+    --color-auth-backdrop-via: rgba(255, 255, 255, 0.01);
+    --color-auth-backdrop-to: transparent;
+    --color-auth-text: var(--palette-dark-text-1);
+    --color-auth-title: var(--palette-dark-title);
+    --color-auth-muted: var(--palette-dark-text-2);
+    --color-auth-subtle: var(--palette-dark-text-3);
+    --color-auth-input: var(--palette-dark-3);
+    --color-auth-input-focus: var(--palette-dark-2);
+    --color-auth-input-border: var(--palette-dark-border);
+    --color-auth-input-border-hover: var(--palette-dark-border-hover);
+    --color-auth-focus: #fcfcfc;
+    --color-auth-focus-ring: rgba(255, 255, 255, 0.2);
+    --color-auth-primary-from: #fcfcfc;
+    --color-auth-primary-to: #ebebeb;
+    --color-auth-primary-text: #0f0f0f;
+    --color-auth-primary-shadow: transparent;
+    --color-auth-primary-shadow-hover: transparent;
+    --shadow-auth-primary: none;
+    --shadow-auth-primary-hover: none;
+    --color-auth-link: #ffffff;
+    --color-auth-link-hover: #e5e5e5;
+    --color-auth-close: var(--palette-dark-text-2);
+    --color-auth-close-hover: var(--palette-dark-title);
 
     /* ── Toast dark theme tokens (Pure Neutral True Black / Linear Standard) ── */
-    --color-ib-toast-bg: rgba(20, 20, 20, 0.94);
-    --color-ib-toast-border: var(--palette-dark-border);
-    --color-ib-toast-text: var(--palette-dark-text-1);
-    --color-ib-toast-muted: var(--palette-dark-text-2);
-    --color-ib-toast-shadow: 0 14px 34px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    --color-ib-toast-highlight: rgba(255, 255, 255, 0.03);
-    --color-ib-toast-button: #ffffff;
+    --color-toast-bg: rgba(20, 20, 20, 0.94);
+    --color-toast-border: var(--palette-dark-border);
+    --color-toast-text: var(--palette-dark-text-1);
+    --color-toast-muted: var(--palette-dark-text-2);
+    --color-toast-shadow: 0 14px 34px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --color-toast-highlight: rgba(255, 255, 255, 0.03);
+    --color-toast-button: #ffffff;
   }
 
   html.dark,
   html.dark body,
   html.dark #app {
-    background-color: var(--color-ib-page);
-    color: var(--color-ib-text);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
   }
 }

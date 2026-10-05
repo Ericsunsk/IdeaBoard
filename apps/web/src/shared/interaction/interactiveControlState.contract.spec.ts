@@ -15,9 +15,9 @@ const appStyles = readFileSync(resolve(process.cwd(), 'src/app/style.css'), 'utf
 describe('Interactive Control State CSS contract', () => {
   it('is an app-level policy adapter driven by stable semantic attributes', () => {
     expect(appStyles).toContain("@import '../shared/theme/atoms/interactive-control-state.css';")
-    expect(controlStateStyles).toContain('.ib-control-state:hover')
-    expect(controlStateStyles).toContain('.ib-control-state:focus-visible')
-    expect(controlStateStyles).toContain('.ib-control-state:active')
+    expect(controlStateStyles).toContain('.control-state:hover')
+    expect(controlStateStyles).toContain('.control-state:focus-visible')
+    expect(controlStateStyles).toContain('.control-state:active')
     expect(controlStateStyles).toContain("[data-control-state='loading']")
     expect(controlStateStyles).toContain("[data-control-tone='danger']")
   })

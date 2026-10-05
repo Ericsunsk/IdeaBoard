@@ -25,7 +25,7 @@ const consumers = {
 describe('Cross-feature page chrome surface contract', () => {
   it('keeps every page chrome consumer on the shared surface class', () => {
     Object.values(consumers).forEach((source) => {
-      expect(source).toContain('ib-page-chrome-surface')
+      expect(source).toContain('page-chrome-surface')
     })
   })
 
@@ -77,8 +77,8 @@ describe('Cross-feature page chrome surface contract', () => {
     ]
 
     featureStyles.forEach((source) => {
-      expect(source).not.toContain('box-shadow: var(--shadow-ib-page-chrome)')
-      expect(source).not.toContain('border: 1px solid var(--color-ib-page-chrome-border)')
+      expect(source).not.toContain('box-shadow: var(--shadow-page-chrome)')
+      expect(source).not.toContain('border: 1px solid var(--color-page-chrome-border)')
     })
   })
 })

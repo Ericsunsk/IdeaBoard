@@ -44,7 +44,7 @@
           :class="
             isSelected
               ? '!bg-primary text-primary-foreground shadow-xs'
-              : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--ib-glass-blur)]'
+              : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--blur-glass)]'
           "
           :title="
             isSelected ? t('search.tooltips.deselectImage') : t('search.tooltips.selectImage')
@@ -59,7 +59,7 @@
 
         <button
           type="button"
-          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--ib-glass-blur)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--blur-glass)] transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           :class="{
             '!bg-primary !text-primary-foreground shadow-xs': isUsedAsReference,
           }"
@@ -77,7 +77,7 @@
           <p class="m-0 truncate text-xs font-medium text-white leading-tight">
             {{ result.title || t('search.lightbox.untitledReference') }}
           </p>
-          <p class="mt-1 mb-0 truncate text-ib-caption text-white/70 leading-tight">
+          <p class="mt-1 mb-0 truncate text-admin-caption text-white/70 leading-tight">
             {{
               t('search.attribution.byAuthorProvider', {
                 author: result.author,

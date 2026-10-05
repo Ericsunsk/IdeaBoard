@@ -128,8 +128,8 @@ const resolvedTooltip = computed(() => props.tooltip || t('canvas.controls.aspec
 
 .node-aspect-ratio-trigger:focus-visible,
 .node-aspect-ratio-option:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .node-aspect-ratio-option:hover,

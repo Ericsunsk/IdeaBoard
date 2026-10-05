@@ -65,7 +65,7 @@ const actionIcon = computed(() =>
 }
 
 .canvas-selection-group-action-button {
-  --ib-popover-motion-from-transform: scale(0.96);
+  --popover-motion-from-transform: scale(0.96);
   position: absolute;
   pointer-events: auto;
   translate: -50% -100%;

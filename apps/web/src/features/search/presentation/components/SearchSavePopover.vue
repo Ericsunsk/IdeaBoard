@@ -31,7 +31,7 @@
             <span class="truncate">{{
               t('search.savePopover.createNamedFolder', { name: searchQuery.trim() })
             }}</span>
-            <span class="font-mono text-ib-micro text-primary">↵</span>
+            <span class="font-mono text-admin-micro text-primary">↵</span>
           </button>
         </div>
 
@@ -126,7 +126,7 @@ const { folders } = library.folderFacts
 let pendingOpen: OpenRequest | null = null
 
 const searchSavePopoverContentClass =
-  'search-save-popover ib-page-chrome-surface rounded-ib-control p-1.5'
+  'search-save-popover page-chrome-surface rounded-control p-1.5'
 
 const displayFolders = computed(() =>
   folders.value.filter(

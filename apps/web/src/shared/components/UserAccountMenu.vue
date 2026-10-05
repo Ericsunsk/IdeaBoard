@@ -10,7 +10,7 @@
     <template v-if="isGuest">
       <button
         type="button"
-        class="ib-page-chrome-surface ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold text-foreground transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-page-chrome-border-hover)] hover:bg-[var(--color-ib-page-chrome-bg-hover)] active:scale-[0.97]"
+        class="page-chrome-surface control-state [--control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold text-foreground transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-page-chrome-border-hover)] hover:bg-[var(--color-page-chrome-bg-hover)] active:scale-[0.97]"
         :aria-label="t('auth.signIn')"
         @click="loginItem?.command?.()"
       >
@@ -18,7 +18,7 @@
       </button>
       <button
         type="button"
-        class="ib-control-state [--ib-control-hover-transform:scale(1.02)] [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-ib-auth-primary-text)] shadow-ib-auth-primary transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-ib-auth-primary-hover active:scale-[0.97]"
+        class="control-state [--control-hover-transform:scale(1.02)] [--control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-auth-primary-from)] to-[var(--color-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-auth-primary-text)] shadow-auth-primary transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-auth-primary-hover active:scale-[0.97]"
         :aria-label="t('auth.signUpFree')"
         @click="registerItem?.command?.()"
       >

@@ -1,5 +1,5 @@
 .canvas-chrome-region {
-  --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
+  --canvas-chrome-inset: var(--spacing-page-chrome-inset);
   --canvas-chrome-control-gap: 12px;
   --canvas-chrome-minimap-height: 134px;
   --canvas-chrome-library-clearance: 20px;
@@ -77,13 +77,13 @@
       var(--canvas-chrome-library-clearance)
   );
   left: calc(
-    var(--canvas-chrome-inset) + var(--ib-page-chrome-control-size, 40px) +
+    var(--canvas-chrome-inset) + var(--page-chrome-control-size, 40px) +
       var(--canvas-chrome-control-gap)
   );
   width: min(
     320px,
     calc(
-      100vw - var(--canvas-chrome-inset) * 2 - var(--ib-page-chrome-control-size, 40px) -
+      100vw - var(--canvas-chrome-inset) * 2 - var(--page-chrome-control-size, 40px) -
         var(--canvas-chrome-control-gap)
     )
   );
@@ -129,7 +129,7 @@
   box-sizing: border-box;
   display: flex;
   width: min(200px, calc(100vw - 32px));
-  height: var(--ib-page-chrome-control-size, 40px);
+  height: var(--page-chrome-control-size, 40px);
   align-items: center;
   gap: 8px;
   border-radius: 999px;
@@ -148,7 +148,7 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   padding: 0;
-  color: var(--ib-control-icon);
+  color: var(--control-icon);
   cursor: pointer;
 }
 
@@ -162,15 +162,15 @@
 }
 
 .canvas-chrome-board-icon-button:hover {
-  background: var(--color-ib-page-chrome-bg-hover);
-  color: var(--color-ib-page-chrome-color-hover);
+  background: var(--color-page-chrome-bg-hover);
+  color: var(--color-page-chrome-color-hover);
 }
 
 .canvas-chrome-board-icon-button:focus-visible {
   outline: none;
-  background: var(--color-ib-page-chrome-bg-hover);
-  box-shadow: 0 0 0 3px var(--color-ib-page-chrome-focus-ring);
-  color: var(--color-ib-page-chrome-color-hover);
+  background: var(--color-page-chrome-bg-hover);
+  box-shadow: 0 0 0 3px var(--color-page-chrome-focus-ring);
+  color: var(--color-page-chrome-color-hover);
 }
 
 .canvas-chrome-board-menu-slot {
@@ -188,10 +188,10 @@
   min-width: 220px;
   max-width: 280px;
   overflow-y: auto;
-  border: var(--canvas-control-border-width) solid var(--color-ib-overlay-border);
+  border: var(--canvas-control-border-width) solid var(--color-overlay-border);
   border-radius: var(--canvas-radius-xl);
-  background: var(--color-ib-overlay-bg);
-  box-shadow: var(--shadow-ib-overlay-menu);
+  background: var(--color-overlay-bg);
+  box-shadow: var(--shadow-overlay-menu);
   padding: 6px;
   backdrop-filter: blur(var(--canvas-glass-blur));
   transform-origin: top left;
@@ -278,7 +278,7 @@
 }
 
 .canvas-chrome-export-button {
-  --ib-round-control-color-disabled: var(--canvas-text-control);
+  --round-control-color-disabled: var(--canvas-text-control);
 }
 
 .canvas-chrome-status-control {
@@ -289,7 +289,7 @@
   gap: 9px;
   border-radius: 999px;
   padding: 4px;
-  color: var(--color-ib-page-chrome-color-hover);
+  color: var(--color-page-chrome-color-hover);
 }
 
 .canvas-chrome-status-button {
@@ -301,15 +301,15 @@
 }
 
 .canvas-chrome-status-button:hover {
-  background: var(--color-ib-page-chrome-bg-hover);
-  color: var(--ib-control-icon-hover);
+  background: var(--color-page-chrome-bg-hover);
+  color: var(--control-icon-hover);
 }
 
 .canvas-chrome-status-button:focus-visible {
   outline: none;
-  background: var(--color-ib-page-chrome-bg-hover);
-  box-shadow: 0 0 0 3px var(--color-ib-page-chrome-focus-ring);
-  color: var(--ib-control-icon-hover);
+  background: var(--color-page-chrome-bg-hover);
+  box-shadow: 0 0 0 3px var(--color-page-chrome-focus-ring);
+  color: var(--control-icon-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {

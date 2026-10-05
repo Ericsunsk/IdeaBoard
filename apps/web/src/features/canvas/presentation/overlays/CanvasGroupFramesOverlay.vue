@@ -145,8 +145,8 @@ function onResizePointerDown(
 }
 
 .canvas-group-frame-resize-handle:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .canvas-group-frame-resize-handle.handle-n {

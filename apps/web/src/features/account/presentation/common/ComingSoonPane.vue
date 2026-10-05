@@ -6,14 +6,14 @@
     >
       <div class="max-w-[520px] border-l-2 border-primary pl-5 sm:pl-6">
         <span
-          class="inline-flex size-11 items-center justify-center rounded-ib-control border border-border bg-card text-primary shadow-ib-control"
+          class="inline-flex size-11 items-center justify-center rounded-control border border-border bg-card text-primary shadow-sm"
           aria-hidden="true"
         >
           <component :is="icon" class="size-5" />
         </span>
         <p class="mt-5 mb-0 text-xs font-semibold text-muted-foreground">{{ t(categoryKey) }}</p>
         <span
-          class="mt-1.5 inline-flex h-6 items-center rounded-ib-pill border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground"
+          class="mt-1.5 inline-flex h-6 items-center rounded-pill border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground"
         >
           {{ t('account.comingSoon') }}
         </span>

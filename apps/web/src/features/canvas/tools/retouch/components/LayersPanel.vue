@@ -34,7 +34,7 @@
           v-else
           :ref="(el) => setVisibilityButtonRef(el, index)"
           type="button"
-          class="retouch-layer-row__visibility ib-hit-target-32-inline canvas-tool-tooltip-trigger"
+          class="retouch-layer-row__visibility hit-target-32-inline canvas-tool-tooltip-trigger"
           :aria-label="
             layer.visible ? t('canvas.retouch.hideLayer') : t('canvas.retouch.showLayer')
           "
@@ -285,8 +285,8 @@ function assertNever(value: never): never {
 
 .retouch-layer-row:focus-visible,
 .retouch-layer-row__visibility:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .retouch-layer-row__visibility .canvas-tool-tooltip {

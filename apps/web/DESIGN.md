@@ -49,17 +49,27 @@ Token ownership:
 - `--color-admin-*`, `--text-admin-*`, `--leading-admin-*`: Admin.
 - `--color-canvas-*`: Canvas nodes, tools, overlays, image interactions.
 - `--color-board-*`: Boards.
-- `--color-ib-*`: cross-feature semantic aliases.
-- `--color-ib-auth-*`: Auth/User Shell.
+- Canonical semantic tokens (`--color-background`, `--color-card`,
+  `--color-foreground`, `--color-border`, `--color-primary`,
+  `--color-muted`, and their state variants): shared UI semantics.
+- `--color-auth-*`: Auth/User Shell.
+- `--color-page-chrome-*`: shared page navigation and account chrome.
+- `--color-overlay-*`: shared menus and contextual overlays.
+- `--color-toast-*`: toast surface adapter.
+- `--color-brand-creative-*`: expressive brand accent ramp.
 
 ### Legacy Token Decommission (Contract)
 
 Component-layer usage of legacy domain color tokens is frozen and enforced
 by the `legacy-token` rule in `scripts/checkStyleGovernance.ts`: any new
-`admin-*` / `board-*` / `ib-*` color utility or direct
-`var(--color-admin/board/ib-*)` reference outside the pinned infrastructure
+`admin-*` / `board-*` color utility or direct
+`var(--color-admin/board/...)` reference outside the pinned infrastructure
 files fails the Web Quality lane, and shrinking a pinned count trips the
-stale-allowance check.
+stale-allowance check. The former `ib` color alias tier is removed entirely;
+`--color-ib-*`, `--text-ib-*`, and the generic `shadow-ib-*` aliases are
+forbidden in source and token declarations. Structural utility/class names such
+as `.control-state`, `.round-control`, and `.page-dot-bg` remain separate
+CSS behavior contracts.
 
 Deliberately kept, not omissions:
 
@@ -72,20 +82,19 @@ Deliberately kept, not omissions:
   `src/app/style.css` / `src/shared/theme/tokens/dark.css` and the
   `adminThemeTokens.ts` / `taskMetricTokens.ts` bridges. Tier-3 standard
   tokens (`bg-card`, `text-foreground`, `border-border`, `bg-primary`, …)
-  resolve through the `ib-*` alias tier, so deleting those declarations
-  would break tier 3 itself — the decommission stops at the component layer
-  by design, not by omission.
+  resolve directly from canonical semantic tokens; no product-prefixed alias
+  tier is permitted.
 
-Type scale (`text-ib-*` / `text-admin-*` sizes) is unaffected by the freeze.
+Type scale (`text-admin-*` sizes) is unaffected by the color-token freeze.
 Dark mode ships through token resolution (`html.dark` overrides in
 `src/shared/theme/tokens/dark.css`); `dark:` overrides stay banned because
 semantic tokens already cover both modes.
 
 Out of freeze scope, by design:
 
-- Elevation (`shadow-ib-*`, `shadow-board-*`): shadow tokens are elevation,
-  not color. Components may keep `shadow-ib-control` / `shadow-ib-overlay` /
-  `shadow-board-dialog`; do not conflate them with the color freeze.
+- Elevation (`shadow-page-chrome-*`, `shadow-auth-*`, `shadow-board-*`):
+  shadow tokens are elevation, not color. Components may keep domain-owned
+  elevation tokens; generic `shadow-ib-*` aliases are forbidden.
 - Tier-3 dual source: `src/app/style.css` `@theme` and
   `src/shared/theme/tokens/semantic-light.css` (`@layer base` `:root`) both
   declare standard names (`--color-primary`, `--color-foreground`, …), and the
@@ -143,8 +152,9 @@ Current ramps, measured on each ramp's binding surface:
 
 `--color-canvas-text-control` and `--color-canvas-text-option` alias the Canvas
 ramp rather than declaring standalone greys; Canvas previously carried five greys
-of which two were the same value. `--color-ib-text*` aliases the Admin ramp and
-`--text-ib-*` aliases `--text-admin-*`. Do not redeclare either.
+of which two were the same value. Shared text uses the canonical semantic ramp
+(`--color-foreground`, `--color-muted-foreground`, and state variants); do not
+reintroduce product-prefixed text aliases.
 
 ## Style Ownership
 
@@ -223,18 +233,18 @@ Bind `:model-value` and forward through the command instead, the same shape
 ## Touch Targets: 32px Floor, 24px For Drag Handles
 
 WCAG 2.2 SC 2.5.8 (Target Size Minimum, AA) asks for 24x24 CSS px. This repo holds a
-stricter 32px floor, declared once as `--spacing-ib-touch-target-min` in
+stricter 32px floor, declared once as `--spacing-touch-target-min` in
 `src/app/style.css` and enforced by `npm run lint:touch-target`
 (`scripts/checkTouchTargetContract.ts`).
 
 Controls that are visually small by design do not inflate to 32px. Instead the _hit
 area_ grows past the visual box through `src/shared/theme/atoms/touch-target.css`:
 
-| Class                      | Grows to           | Use for                                                                        |
-| -------------------------- | ------------------ | ------------------------------------------------------------------------------ |
-| `.ib-hit-target-32`        | 32px both axes     | switch tracks, canvas zoom buttons, compact toolbar buttons                    |
-| `.ib-hit-target-32-inline` | 32px vertical only | chip rails, chart range segments, node action buttons — rows keep their rhythm |
-| `.ib-hit-target-drag`      | 24px (AA floor)    | drag handles only — see below                                                  |
+| Class                   | Grows to           | Use for                                                                        |
+| ----------------------- | ------------------ | ------------------------------------------------------------------------------ |
+| `.hit-target-32`        | 32px both axes     | switch tracks, canvas zoom buttons, compact toolbar buttons                    |
+| `.hit-target-32-inline` | 32px vertical only | chip rails, chart range segments, node action buttons — rows keep their rhythm |
+| `.hit-target-drag`      | 24px (AA floor)    | drag handles only — see below                                                  |
 
 The pseudo-element belongs to the control itself, so pointer and keyboard
 activation still route to the real element and the accessible name, role, and
@@ -291,10 +301,11 @@ enforces them):
    a plain error border (0,1,0) and resting the mouse on an invalid field hides
    the error. Both skins declare the error border `!`-important for this reason.
 
-Supporting rule: `cn()` (`src/lib/utils.ts`) registers the `ib-*`/`admin-*`
-namespaces in tailwind-merge's `border-color` group, so `cn()` keeps the last
-border class deterministically instead of leaving base and error tied for
-stylesheet order to decide.
+Supporting rule: `cn()` (`src/lib/utils.ts`) registers the domain color
+namespaces (`admin-*`, `board-*`, `page-chrome-*`, and `overlay-*`) in
+tailwind-merge's `border-color` group, so `cn()` keeps the last border class
+deterministically instead of leaving base and error tied for stylesheet order
+to decide. Generic `ib-*` color aliases are intentionally absent.
 
 Errors never render as placeholder text: a placeholder vanishes on first
 keystroke and is not exposed as the accessible error. `IbFormField` shows every

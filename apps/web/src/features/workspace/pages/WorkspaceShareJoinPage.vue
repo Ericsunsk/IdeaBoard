@@ -2,7 +2,7 @@
   <div class="grid min-h-screen place-items-center bg-background p-6 text-foreground">
     <Card
       :elevated="false"
-      class="w-[min(520px,100%)] p-6 rounded-ib-overlay border border-border bg-card"
+      class="w-[min(520px,100%)] p-6 rounded-overlay border border-border bg-card"
     >
       <div class="flex flex-col items-start gap-4">
         <Spinner
@@ -11,8 +11,8 @@
           stroke-width="4"
           :label="t('account.shareJoin.spinnerAria')"
         />
-        <h1 class="m-0 text-ib-modal-title-mobile font-bold text-foreground">{{ titleText }}</h1>
-        <p class="m-0 text-ib-title-sm leading-7 text-muted-foreground">{{ statusText }}</p>
+        <h1 class="m-0 text-admin-modal-title-mobile font-bold text-foreground">{{ titleText }}</h1>
+        <p class="m-0 text-admin-title-sm leading-7 text-muted-foreground">{{ statusText }}</p>
         <Button v-if="failed" variant="outline" @click="goBoards">
           {{ t('account.shareJoin.backToBoards') }}
         </Button>

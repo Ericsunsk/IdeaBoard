@@ -20,9 +20,9 @@
           :key="metric.key"
           type="button"
           :class="[
-            // 20px pills sit in a dense rail; `ib-hit-target-32-inline` grows each
+            // 20px pills sit in a dense rail; `hit-target-32-inline` grows each
             // target to the repo floor vertically without loosening the row.
-            'ib-hit-target-32-inline inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors px-2 py-0.5 rounded',
+            'hit-target-32-inline inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-colors px-2 py-0.5 rounded',
             filterStatus === metric.status
               ? metric.activePillClass
               : 'text-muted-foreground hover:text-foreground',

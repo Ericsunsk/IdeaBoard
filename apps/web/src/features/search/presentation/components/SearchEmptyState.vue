@@ -12,7 +12,7 @@
       <h3 class="m-0 text-base font-semibold text-foreground tracking-tight">
         {{ t('search.errors.unableToLoadInspiration') }}
       </h3>
-      <p class="mt-2 mb-0 text-xs sm:text-ib-body text-muted-foreground leading-relaxed">
+      <p class="mt-2 mb-0 text-xs sm:text-admin-body text-muted-foreground leading-relaxed">
         {{ t('search.errors.unableToLoadResults') }}
       </p>
       <div class="mt-6">
@@ -46,7 +46,7 @@
         {{ hasActiveSearch ? t('search.empty.noResultsTitle') : t('search.empty.emptyFeedTitle') }}
       </h3>
 
-      <p class="mt-2 mb-0 text-xs sm:text-ib-body text-muted-foreground leading-relaxed">
+      <p class="mt-2 mb-0 text-xs sm:text-admin-body text-muted-foreground leading-relaxed">
         {{
           hasActiveSearch
             ? t('search.empty.noResultsDescription')

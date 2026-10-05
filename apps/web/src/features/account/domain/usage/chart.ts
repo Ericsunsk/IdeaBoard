@@ -151,13 +151,13 @@ export function resolveUsageChartTheme(
   styles: Pick<CSSStyleDeclaration, 'getPropertyValue'> | null = readDocumentStyles(),
 ): UsageChartTheme {
   return {
-    accent: readColor(styles, '--color-ib-creative-accent', defaultTheme.accent),
-    accentFill: readColor(styles, '--color-ib-creative-accent-ring', defaultTheme.accentFill),
-    axisText: readColor(styles, '--color-ib-text-muted', defaultTheme.axisText),
-    axisLine: readColor(styles, '--color-ib-border', defaultTheme.axisLine),
-    grid: readColor(styles, '--color-ib-border-soft', defaultTheme.grid),
-    surface: readColor(styles, '--color-ib-surface', defaultTheme.surface),
-    text: readColor(styles, '--color-ib-text', defaultTheme.text),
+    accent: readColor(styles, '--color-brand-creative-accent', defaultTheme.accent),
+    accentFill: readColor(styles, '--color-brand-creative-accent-ring', defaultTheme.accentFill),
+    axisText: readColor(styles, '--color-muted-foreground', defaultTheme.axisText),
+    axisLine: readColor(styles, '--color-border', defaultTheme.axisLine),
+    grid: readColor(styles, '--color-border', defaultTheme.grid),
+    surface: readColor(styles, '--color-card', defaultTheme.surface),
+    text: readColor(styles, '--color-foreground', defaultTheme.text),
     fontFamily: defaultTheme.fontFamily,
   }
 }

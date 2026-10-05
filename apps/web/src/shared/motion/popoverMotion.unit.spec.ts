@@ -13,7 +13,7 @@ describe('Popover Motion adapter', () => {
     )
 
     expect(createPopoverMotionTransition()).toEqual({
-      name: 'ib-popover-motion',
+      name: 'popover-motion',
       css: true,
     })
   })
@@ -25,7 +25,7 @@ describe('Popover Motion adapter', () => {
     )
 
     expect(createPopoverMotionTransition()).toEqual({
-      name: 'ib-popover-motion',
+      name: 'popover-motion',
       css: false,
     })
   })

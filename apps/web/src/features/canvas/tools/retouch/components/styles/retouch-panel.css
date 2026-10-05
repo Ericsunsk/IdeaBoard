@@ -3,7 +3,7 @@
   /* The repo touch-target floor is 32px; 31px was one pixel under it. */
   --retouch-panel-row-height: 32px;
   --retouch-panel-control-radius: 8px;
-  --retouch-panel-control-focus-border-color: var(--ib-focus-border-color);
+  --retouch-panel-control-focus-border-color: var(--focus-border-color);
   --retouch-panel-inset: 7px;
   --retouch-panel-text-size: 11px;
   border: var(--retouch-panel-border-width) solid var(--canvas-accent-outline);

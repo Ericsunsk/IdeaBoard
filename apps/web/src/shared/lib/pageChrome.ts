@@ -3,11 +3,11 @@ function joinClassNames(...classes: Array<string | false | null | undefined>) {
 }
 
 const pageChromeClasses = {
-  roundControl: 'ib-round-control ib-page-chrome-control',
+  roundControl: 'round-control page-chrome-control',
 } as const
 
 export const pageChromeAccountMenuClasses = {
-  wrap: 'relative ib-page-chrome-account',
+  wrap: 'relative page-chrome-account',
   avatarButton: `${pageChromeClasses.roundControl} ib-user-avatar-button`,
   avatarImage: 'ib-user-avatar-button__image',
   avatarPlaceholder: 'ib-user-avatar-button__placeholder',

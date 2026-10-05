@@ -1,33 +1,33 @@
 @layer components {
-  .ib-round-control {
-    --ib-round-control-size: 40px;
-    --ib-round-control-border-width: 1px;
-    --ib-round-control-border: var(--color-ib-border);
-    --ib-round-control-border-hover: var(--color-ib-border-hover);
-    --ib-round-control-bg: var(--color-ib-surface);
-    --ib-round-control-bg-hover: var(--color-ib-surface-hover);
-    --ib-round-control-bg-disabled: var(--color-ib-surface-disabled);
-    --ib-round-control-color: var(--color-ib-text-muted);
-    --ib-round-control-color-hover: var(--color-ib-text);
-    --ib-round-control-color-disabled: var(--color-ib-text-disabled);
-    --ib-round-control-focus-ring: var(--color-ring);
-    --ib-round-control-shadow: var(--shadow-ib-control);
+  .round-control {
+    --round-control-size: 40px;
+    --round-control-border-width: 1px;
+    --round-control-border: var(--color-border);
+    --round-control-border-hover: var(--color-border-hover);
+    --round-control-bg: var(--color-card);
+    --round-control-bg-hover: var(--color-accent-hover);
+    --round-control-bg-disabled: var(--color-muted);
+    --round-control-color: var(--color-muted-foreground);
+    --round-control-color-hover: var(--color-foreground);
+    --round-control-color-disabled: var(--color-muted-foreground);
+    --round-control-focus-ring: var(--color-ring);
+    --round-control-shadow: var(--primitive-shadow-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: var(--ib-round-control-size);
-    min-width: var(--ib-round-control-size);
-    height: var(--ib-round-control-size);
+    width: var(--round-control-size);
+    min-width: var(--round-control-size);
+    height: var(--round-control-size);
     margin: 0;
     padding: 0;
     flex-shrink: 0;
-    border: var(--ib-round-control-border-width) solid var(--ib-round-control-border);
+    border: var(--round-control-border-width) solid var(--round-control-border);
     border-radius: 9999px;
-    background: var(--ib-round-control-bg);
-    color: var(--ib-round-control-color);
-    box-shadow: var(--ib-round-control-shadow);
-    backdrop-filter: blur(var(--ib-glass-blur));
-    -webkit-backdrop-filter: blur(var(--ib-glass-blur));
+    background: var(--round-control-bg);
+    color: var(--round-control-color);
+    box-shadow: var(--round-control-shadow);
+    backdrop-filter: blur(var(--blur-glass));
+    -webkit-backdrop-filter: blur(var(--blur-glass));
     cursor: pointer;
     appearance: none;
     transition:
@@ -37,41 +37,41 @@
       transform var(--motion-control-duration) var(--motion-control-easing);
   }
 
-  .ib-round-control:active:not(:disabled) {
+  .round-control:active:not(:disabled) {
     transform: scale(0.97);
   }
 
-  .ib-page-chrome-control {
-    --ib-page-chrome-control-size: 40px;
-    --ib-round-control-size: var(--ib-page-chrome-control-size);
-    --ib-round-control-border-width: 1px;
-    --ib-round-control-border: var(--color-ib-page-chrome-border);
-    --ib-round-control-border-hover: var(--color-ib-page-chrome-border-hover);
-    --ib-round-control-bg: var(--color-ib-page-chrome-bg);
-    --ib-round-control-bg-hover: var(--color-ib-page-chrome-bg-hover);
-    --ib-round-control-bg-disabled: var(--color-ib-page-chrome-bg);
-    --ib-round-control-color: var(--color-ib-page-chrome-color);
-    --ib-round-control-color-hover: var(--color-ib-page-chrome-color-hover);
-    --ib-round-control-color-disabled: var(--color-ib-page-chrome-color-disabled);
-    --ib-round-control-focus-ring: var(--color-ib-page-chrome-focus-ring);
-    --ib-round-control-shadow: var(--shadow-ib-page-chrome);
+  .page-chrome-control {
+    --page-chrome-control-size: 40px;
+    --round-control-size: var(--page-chrome-control-size);
+    --round-control-border-width: 1px;
+    --round-control-border: var(--color-page-chrome-border);
+    --round-control-border-hover: var(--color-page-chrome-border-hover);
+    --round-control-bg: var(--color-page-chrome-bg);
+    --round-control-bg-hover: var(--color-page-chrome-bg-hover);
+    --round-control-bg-disabled: var(--color-page-chrome-bg);
+    --round-control-color: var(--color-page-chrome-color);
+    --round-control-color-hover: var(--color-page-chrome-color-hover);
+    --round-control-color-disabled: var(--color-page-chrome-color-disabled);
+    --round-control-focus-ring: var(--color-page-chrome-focus-ring);
+    --round-control-shadow: var(--shadow-page-chrome);
   }
 
-  .ib-round-control:hover:not(:disabled) {
-    border-color: var(--ib-round-control-border-hover);
-    background: var(--ib-round-control-bg-hover);
-    color: var(--ib-round-control-color-hover);
+  .round-control:hover:not(:disabled) {
+    border-color: var(--round-control-border-hover);
+    background: var(--round-control-bg-hover);
+    color: var(--round-control-color-hover);
   }
 
-  .ib-round-control:focus-visible {
+  .round-control:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--ib-round-control-focus-ring);
+    box-shadow: 0 0 0 3px var(--round-control-focus-ring);
   }
 
-  .ib-round-control:disabled {
-    border-color: var(--ib-round-control-border);
-    background: var(--ib-round-control-bg-disabled);
-    color: var(--ib-round-control-color-disabled);
+  .round-control:disabled {
+    border-color: var(--round-control-border);
+    background: var(--round-control-bg-disabled);
+    color: var(--round-control-color-disabled);
     cursor: not-allowed;
   }
 }

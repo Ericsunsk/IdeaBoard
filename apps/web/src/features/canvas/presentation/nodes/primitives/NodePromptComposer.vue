@@ -119,7 +119,7 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 
 .image-node-prompt-composer:focus-within,
 .image-node-prompt-composer.has-text {
-  border-color: var(--ib-focus-border-color);
+  border-color: var(--focus-border-color);
 }
 
 .image-node-prompt-composer.count-stacked {

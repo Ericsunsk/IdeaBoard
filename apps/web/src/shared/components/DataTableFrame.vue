@@ -273,16 +273,16 @@ const scrollContainerClass = computed(() =>
 // size 只有 small/large 显式档位，其余（含 undefined）走 default：新增档位只加表项。
 const headerCellClasses = {
   small:
-    'border-b border-border px-3 py-2 text-left align-middle text-ib-body font-semibold text-foreground',
+    'border-b border-border px-3 py-2 text-left align-middle text-admin-body font-semibold text-foreground',
   large:
-    'border-b border-border px-5 py-4 text-left align-middle text-ib-title-sm font-semibold text-foreground',
+    'border-b border-border px-5 py-4 text-left align-middle text-admin-title-sm font-semibold text-foreground',
   default:
-    'border-b border-border px-4 py-3 text-left align-middle text-ib-body font-semibold text-foreground',
+    'border-b border-border px-4 py-3 text-left align-middle text-admin-body font-semibold text-foreground',
 } as const
 const headerCellClass = computed(() => headerCellClasses[props.size ?? 'default'])
 const bodyCellClasses = {
-  small: 'border-b border-border px-3 py-2 align-middle text-ib-body text-foreground',
-  large: 'border-b border-border px-5 py-4 align-middle text-ib-title-sm text-foreground',
+  small: 'border-b border-border px-3 py-2 align-middle text-admin-body text-foreground',
+  large: 'border-b border-border px-5 py-4 align-middle text-admin-title-sm text-foreground',
   default: 'border-b border-border px-4 py-3 align-middle text-sm text-foreground',
 } as const
 const bodyCellClass = computed(() => bodyCellClasses[props.size ?? 'default'])

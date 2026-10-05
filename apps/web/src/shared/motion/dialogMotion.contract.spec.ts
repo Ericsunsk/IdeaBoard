@@ -13,7 +13,7 @@ describe('Dialog Motion CSS adapter', () => {
     expect(dialogMotionStyles).toContain('var(--motion-enter-easing)')
     expect(dialogMotionStyles).toContain('var(--motion-exit-duration)')
     expect(dialogMotionStyles).toContain('var(--motion-exit-easing)')
-    expect(dialogMotionStyles).toContain('var(--ib-dialog-motion-from-transform, none)')
+    expect(dialogMotionStyles).toContain('var(--dialog-motion-from-transform, none)')
   })
 
   it('removes dialog transforms under reduced motion', () => {

@@ -115,10 +115,10 @@
                 </button>
               </div>
               <div class="min-w-0 pointer-events-auto">
-                <p class="m-0 truncate text-ib-caption font-medium text-white leading-tight">
+                <p class="m-0 truncate text-admin-caption font-medium text-white leading-tight">
                   {{ asset.title || t('library.states.untitledReference') }}
                 </p>
-                <p class="mt-0.5 mb-0 truncate text-ib-micro text-white/70">
+                <p class="mt-0.5 mb-0 truncate text-admin-micro text-white/70">
                   {{ asset.author || asset.provider }}
                 </p>
               </div>

@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="balance.status === 'anonymous'"
-    class="ib-page-chrome-surface inline-flex size-[var(--ib-page-chrome-control-size,40px)] shrink-0 items-center justify-center rounded-full select-none"
+    class="page-chrome-surface inline-flex size-[var(--page-chrome-control-size,40px)] shrink-0 items-center justify-center rounded-full select-none"
     :title="balance.ariaLabel"
     :aria-label="balance.ariaLabel"
   >
@@ -10,7 +10,7 @@
   <button
     v-else
     type="button"
-    class="ib-page-chrome-surface user-credit-pill"
+    class="page-chrome-surface user-credit-pill"
     :class="`is-${balance.status}`"
     :data-balance-status="balance.status"
     :title="balance.ariaLabel"
@@ -40,7 +40,7 @@ defineProps<{
   width: auto;
   min-width: 72px;
   max-width: 152px;
-  height: var(--ib-page-chrome-control-size, 40px);
+  height: var(--page-chrome-control-size, 40px);
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -74,7 +74,7 @@ defineProps<{
 
 .user-credit-pill:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-ib-focus);
+  box-shadow: 0 0 0 3px var(--color-ring);
 }
 
 .user-credit-pill__icon {

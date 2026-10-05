@@ -3,14 +3,14 @@
     <Transition name="search-batch-action-dock">
       <div
         v-if="selectedCount > 0"
-        class="ib-page-chrome-surface search-batch-action-dock fixed inset-x-0 bottom-7 z-40 mx-auto h-[var(--search-dock-height)] w-fit gap-2 p-1.5"
+        class="page-chrome-surface search-batch-action-dock fixed inset-x-0 bottom-7 z-40 mx-auto h-[var(--search-dock-height)] w-fit gap-2 p-1.5"
         role="toolbar"
         :aria-label="t('search.batch.toolbarAria')"
       >
         <!-- 已选计数 -->
         <div class="flex items-center gap-2 pl-3 pr-2 border-r border-border">
           <div
-            class="size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-ib-caption font-bold font-mono"
+            class="size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-admin-caption font-bold font-mono"
           >
             {{ selectedCount }}
           </div>

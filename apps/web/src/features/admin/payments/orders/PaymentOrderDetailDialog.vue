@@ -28,7 +28,7 @@
     </AdminAlert>
 
     <div v-else-if="detail" class="flex min-w-0 flex-col gap-5">
-      <section class="rounded-ib-control border border-border p-4">
+      <section class="rounded-control border border-border p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
             <div class="font-mono text-admin-content font-bold text-foreground">
@@ -95,7 +95,7 @@
             <li
               v-for="(refund, index) in detail.refunds"
               :key="refund.id || index"
-              class="rounded-ib-control border border-border p-3 text-admin-meta"
+              class="rounded-control border border-border p-3 text-admin-meta"
             >
               <div class="font-bold text-foreground">{{ refundStatusLabel(refund.status) }}</div>
               <div v-if="refund.stripeStatus" class="mt-1 text-muted-foreground">
@@ -120,7 +120,7 @@
             <li
               v-for="(dispute, index) in detail.disputes"
               :key="dispute.id || index"
-              class="rounded-ib-control border border-border p-3 text-admin-meta"
+              class="rounded-control border border-border p-3 text-admin-meta"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="font-bold text-foreground">{{ dispute.status }}</div>
@@ -143,7 +143,7 @@
       <section
         v-if="canRefund"
         aria-labelledby="payment-refund-action"
-        class="rounded-ib-control border border-border p-4"
+        class="rounded-control border border-border p-4"
       >
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>

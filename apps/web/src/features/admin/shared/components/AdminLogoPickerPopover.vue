@@ -49,7 +49,7 @@
               v-for="item in filteredLogos"
               :key="item.key"
               type="button"
-              class="ib-control-state flex size-9 items-center justify-center rounded-lg border border-border bg-card p-1.5 cursor-pointer transition-colors hover:border-primary hover:bg-card data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card"
+              class="control-state flex size-9 items-center justify-center rounded-lg border border-border bg-card p-1.5 cursor-pointer transition-colors hover:border-primary hover:bg-card data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card"
               :data-control-state="selectedKey === item.key ? 'selected' : 'idle'"
               :aria-label="item.label"
               :title="item.label"

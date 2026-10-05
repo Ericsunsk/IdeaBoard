@@ -49,9 +49,9 @@
   --color-admin-text-inverse: var(--palette-light-1);
   --color-admin-title-color: var(--palette-light-title);
   --color-admin-subtitle-color: var(--color-admin-text-2);
-  --color-admin-accent: var(--color-ib-creative-accent);
-  --color-admin-accent-hover: var(--color-ib-creative-accent-hover);
-  --color-admin-accent-pressed: var(--color-ib-creative-accent-pressed);
+  --color-admin-accent: var(--color-brand-creative-accent);
+  --color-admin-accent-hover: var(--color-brand-creative-accent-hover);
+  --color-admin-accent-pressed: var(--color-brand-creative-accent-pressed);
   --color-admin-accent-soft: rgba(146, 120, 230, 0.08);
   --color-admin-accent-softer: rgba(146, 120, 230, 0.05);
   --color-admin-focus-ring: rgba(146, 120, 230, 0.18);
@@ -69,7 +69,7 @@
   --color-admin-preview-bg: var(--color-admin-surface-muted);
   --color-admin-divider: rgba(0, 0, 0, 0.08);
   --color-admin-model-indigo: #4f6f9f;
-  --color-admin-model-purple: var(--color-ib-creative-accent);
+  --color-admin-model-purple: var(--color-brand-creative-accent);
   --color-admin-model-cyan: #3d8b9a;
   --color-admin-chart-tooltip-border: var(--color-admin-border);
   --color-admin-chart-tooltip-text: #262626;
@@ -102,10 +102,10 @@
   --color-canvas-edge: rgba(0, 0, 0, 0.2);
   --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
   --color-canvas-edge-running: var(--color-canvas-edge-selected);
-  --color-canvas-accent: var(--color-ib-creative-accent);
+  --color-canvas-accent: var(--color-brand-creative-accent);
   --color-canvas-accent-hover: #7a6bd5;
   --color-canvas-accent-pressed: #6d5fd0;
-  --color-canvas-accent-soft: var(--color-ib-creative-accent-soft);
+  --color-canvas-accent-soft: var(--color-brand-creative-accent-soft);
   --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
   --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
   --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
@@ -130,34 +130,30 @@
   --color-canvas-minimap-mask: rgba(0, 0, 0, 0.08);
 
   /* ── Page surface tokens ─────────────────────────────────── */
-  --color-ib-page-dot: #e2e4e8;
-  --color-ib-page-chrome-border: var(--color-board-card-border);
-  --color-ib-page-chrome-border-hover: var(--color-board-card-border-hover);
-  --color-ib-page-chrome-bg: var(--color-board-control-bg);
-  --color-ib-page-chrome-bg-hover: var(--color-ib-surface-hover);
-  --color-ib-page-chrome-color: var(--color-board-card-action);
-  --color-ib-page-chrome-color-hover: var(--color-board-card-action-hover);
-  --color-ib-page-chrome-color-disabled: var(--color-board-card-text);
-  --color-ib-page-chrome-focus-ring: var(--color-board-focus-ring);
-  --shadow-ib-page-chrome: none;
-  --spacing-ib-overlay-gutter: 10px;
-  --color-ib-overlay-bg: rgba(255, 255, 255, 0.98);
-  --color-ib-overlay-border: #d8ddea;
-  --color-ib-overlay-item: #4b5565;
-  --color-ib-overlay-item-hover-bg: var(--color-ib-creative-accent-ring);
-  --color-ib-overlay-danger: var(--color-destructive);
-  --color-ib-overlay-danger-hover-bg: color-mix(
-    in srgb,
-    var(--color-ib-overlay-danger) 10%,
-    transparent
-  );
-  --shadow-ib-overlay-menu: none;
-  --spacing-ib-page-dot: 12px;
-  --spacing-ib-page-chrome-inset: 16px;
+  --color-page-dot: #e2e4e8;
+  --color-page-chrome-border: var(--color-board-card-border);
+  --color-page-chrome-border-hover: var(--color-board-card-border-hover);
+  --color-page-chrome-bg: var(--color-board-control-bg);
+  --color-page-chrome-bg-hover: var(--color-accent-hover);
+  --color-page-chrome-color: var(--color-board-card-action);
+  --color-page-chrome-color-hover: var(--color-board-card-action-hover);
+  --color-page-chrome-color-disabled: var(--color-board-card-text);
+  --color-page-chrome-focus-ring: var(--color-board-focus-ring);
+  --shadow-page-chrome: none;
+  --spacing-overlay-gutter: 10px;
+  --color-overlay-bg: rgba(255, 255, 255, 0.98);
+  --color-overlay-border: #d8ddea;
+  --color-overlay-item: #4b5565;
+  --color-overlay-item-hover-bg: var(--color-brand-creative-accent-ring);
+  --color-overlay-danger: var(--color-destructive);
+  --color-overlay-danger-hover-bg: color-mix(in srgb, var(--color-overlay-danger) 10%, transparent);
+  --shadow-overlay-menu: none;
+  --spacing-page-dot: 12px;
+  --spacing-page-chrome-inset: 16px;
   /* Touch-target floor. WCAG 2.2 AA asks 24px; this repo holds 32px. */
-  --spacing-ib-touch-target-min: 32px;
+  --spacing-touch-target-min: 32px;
   /* AA floor, drag handles only (see touch-target.css). */
-  --spacing-ib-touch-target-aa: 24px;
+  --spacing-touch-target-aa: 24px;
 
   /* ── Marketing landing page tokens ───────────────────────── */
   --color-home-hero-text: #202124;
@@ -167,7 +163,7 @@
   --color-home-note-text: var(--color-home-hero-text);
 
   /* ── Global Glass & Frosted Surface tokens ────────────── */
-  --ib-glass-blur: 12px;
+  --blur-glass: 12px;
 
   /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: #f8f9fd;
@@ -175,12 +171,12 @@
   --color-board-page-text-muted: #616677;
   --color-board-page-glow: rgba(150, 120, 230, 0.24);
   --color-board-page-glow-clear: rgba(150, 120, 230, 0);
-  --color-board-primary: var(--color-ib-creative-accent-hover);
-  --color-board-primary-hover: var(--color-ib-creative-accent-pressed);
+  --color-board-primary: var(--color-brand-creative-accent-hover);
+  --color-board-primary-hover: var(--color-brand-creative-accent-pressed);
   --color-board-focus-ring: rgba(122, 107, 213, 0.16);
   --color-board-focus-ring-strong: rgba(122, 107, 213, 0.18);
   --color-board-surface: rgba(255, 255, 255, 0.9);
-  --color-board-surface-strong: var(--color-ib-surface);
+  --color-board-surface-strong: var(--color-card);
   --color-board-control-bg: rgba(255, 255, 255, 0.85);
   --color-board-control-text: var(--color-board-card-title);
   --color-board-control-input-text: var(--color-board-card-title);
@@ -211,121 +207,94 @@
   --shadow-board-focus-strong: 0 0 0 3px var(--color-board-focus-ring-strong);
   --shadow-board-dialog: 0 22px 58px rgba(30, 39, 60, 0.18);
 
-  /*
-   * App semantic aliases.
-   * Cross-surface tokens stay independent from Canvas so non-Canvas surfaces
-   * can share creative styling without depending on Canvas implementation tokens.
-   */
-  --color-ib-page: var(--color-admin-bg);
-  --color-ib-surface: var(--color-admin-card-strong);
-  --color-ib-surface-raised: var(--color-admin-card);
-  --color-ib-surface-muted: var(--color-admin-surface-muted);
-  --color-ib-surface-hover: var(--color-admin-surface-hover);
-  --color-ib-surface-pressed: var(--color-admin-surface-pressed);
-  --color-ib-surface-disabled: var(--color-admin-surface-disabled);
-  --color-ib-border: var(--color-admin-border);
-  --color-ib-border-soft: var(--color-admin-border-soft);
-  --color-ib-border-hover: var(--color-admin-border-hover);
-  --color-ib-border-pressed: var(--color-admin-border-pressed);
-  --color-ib-text: var(--color-admin-text-1);
-  --color-ib-text-muted: var(--color-admin-text-2);
-  --color-ib-text-subtle: var(--color-admin-text-3);
-  --color-ib-text-disabled: var(--color-admin-text-disabled);
-  --color-ib-text-inverse: var(--color-admin-text-inverse);
-  --color-ib-accent: var(--color-admin-accent);
-  --color-ib-accent-hover: var(--color-admin-accent-hover);
-  --color-ib-accent-pressed: var(--color-admin-accent-pressed);
-  --color-ib-accent-soft: var(--color-admin-accent-soft);
-  --color-ib-creative-accent: #9278e6;
-  --color-ib-creative-accent-hover: #725fd0;
-  --color-ib-creative-accent-pressed: #614ec2;
-  --color-ib-creative-accent-secondary: #c084fc;
-  --color-ib-creative-accent-soft: #f5f2ff;
-  --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);
-  --color-ib-focus-accent: var(--color-ib-creative-accent);
-  --color-ib-dialog-mask: color-mix(in srgb, var(--color-ib-text) 38%, transparent);
+  --color-brand-creative-accent: #9278e6;
+  --color-brand-creative-accent-hover: #725fd0;
+  --color-brand-creative-accent-pressed: #614ec2;
+  --color-brand-creative-accent-secondary: #c084fc;
+  --color-brand-creative-accent-soft: #f5f2ff;
+  --color-brand-creative-accent-ring: rgba(146, 120, 230, 0.1);
+  --color-brand-creative-focus-accent: var(--color-brand-creative-accent);
+  --color-dialog-mask: color-mix(in srgb, var(--color-foreground) 38%, transparent);
   /*
    * Auth modal aliases.
    * These preserve the creative glass treatment while sourcing neutral values
    * from app semantics and expressive values from creative accent tokens.
    */
-  --color-ib-auth-shell: color-mix(in srgb, var(--color-ib-surface) 80%, transparent);
-  --color-ib-auth-shell-border: color-mix(in srgb, var(--color-ib-surface) 35%, transparent);
-  --color-ib-auth-shell-glow: color-mix(in srgb, var(--color-ib-creative-accent) 18%, transparent);
-  --color-ib-auth-shell-highlight: color-mix(in srgb, var(--color-ib-surface) 60%, transparent);
-  --color-ib-auth-backdrop-from: color-mix(in srgb, var(--color-ib-surface) 30%, transparent);
-  --color-ib-auth-backdrop-via: color-mix(in srgb, var(--color-ib-surface) 55%, transparent);
-  --color-ib-auth-backdrop-to: color-mix(in srgb, var(--color-ib-surface) 80%, transparent);
-  --color-ib-auth-text: var(--color-ib-text);
-  --color-ib-auth-title: var(--color-ib-text);
-  --color-ib-auth-muted: var(--color-ib-text-muted);
-  --color-ib-auth-subtle: var(--color-ib-text-subtle);
-  --color-ib-auth-input: color-mix(in srgb, var(--color-ib-surface) 60%, transparent);
-  --color-ib-auth-input-focus: var(--color-ib-surface);
-  --color-ib-auth-input-border: var(--color-ib-border-soft);
-  --color-ib-auth-input-border-hover: var(--color-ib-border-hover);
-  --color-ib-auth-input-placeholder: var(--color-ib-text-subtle);
-  --color-ib-auth-input-icon: var(--color-ib-text-subtle);
-  --color-ib-auth-focus: var(--color-ib-creative-accent);
-  --color-ib-auth-focus-ring: color-mix(in srgb, var(--color-ib-creative-accent) 10%, transparent);
-  --color-ib-auth-error: var(--color-destructive);
-  --color-ib-auth-error-border: color-mix(
-    in srgb,
-    var(--color-destructive) 38%,
-    var(--color-ib-surface)
-  );
-  --color-ib-auth-error-bg: color-mix(in srgb, var(--color-destructive) 8%, transparent);
-  --color-ib-auth-error-placeholder: color-mix(
+  --color-auth-shell: color-mix(in srgb, var(--color-card) 80%, transparent);
+  --color-auth-shell-border: color-mix(in srgb, var(--color-card) 35%, transparent);
+  --color-auth-shell-glow: color-mix(in srgb, var(--color-brand-creative-accent) 18%, transparent);
+  --color-auth-shell-highlight: color-mix(in srgb, var(--color-card) 60%, transparent);
+  --color-auth-backdrop-from: color-mix(in srgb, var(--color-card) 30%, transparent);
+  --color-auth-backdrop-via: color-mix(in srgb, var(--color-card) 55%, transparent);
+  --color-auth-backdrop-to: color-mix(in srgb, var(--color-card) 80%, transparent);
+  --color-auth-text: var(--color-foreground);
+  --color-auth-title: var(--color-foreground);
+  --color-auth-muted: var(--color-muted-foreground);
+  --color-auth-subtle: var(--color-muted-foreground);
+  --color-auth-input: color-mix(in srgb, var(--color-card) 60%, transparent);
+  --color-auth-input-focus: var(--color-card);
+  --color-auth-input-border: var(--color-border);
+  --color-auth-input-border-hover: var(--color-border-hover);
+  --color-auth-input-placeholder: var(--color-muted-foreground);
+  --color-auth-input-icon: var(--color-muted-foreground);
+  --color-auth-focus: var(--color-brand-creative-accent);
+  --color-auth-focus-ring: color-mix(in srgb, var(--color-brand-creative-accent) 10%, transparent);
+  --color-auth-error: var(--color-destructive);
+  --color-auth-error-border: color-mix(in srgb, var(--color-destructive) 38%, var(--color-card));
+  --color-auth-error-bg: color-mix(in srgb, var(--color-destructive) 8%, transparent);
+  --color-auth-error-placeholder: color-mix(
     in srgb,
     var(--color-destructive) 75%,
-    var(--color-ib-text-subtle)
+    var(--color-muted-foreground)
   );
-  --color-ib-auth-error-ring: color-mix(in srgb, var(--color-destructive) 10%, transparent);
-  --color-ib-auth-primary-from: var(--color-ib-creative-accent);
-  --color-ib-auth-primary-to: var(--color-ib-creative-accent-hover);
-  --color-ib-auth-primary-text: var(--color-ib-text-inverse);
-  --color-ib-auth-primary-shadow: color-mix(
+  --color-auth-error-ring: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  --color-auth-primary-from: var(--color-brand-creative-accent);
+  --color-auth-primary-to: var(--color-brand-creative-accent-hover);
+  --color-auth-primary-text: var(--color-primary-foreground);
+  --color-auth-primary-shadow: color-mix(
     in srgb,
-    var(--color-ib-creative-accent) 25%,
+    var(--color-brand-creative-accent) 25%,
     transparent
   );
-  --color-ib-auth-primary-shadow-hover: color-mix(
+  --color-auth-primary-shadow-hover: color-mix(
     in srgb,
-    var(--color-ib-creative-accent) 35%,
+    var(--color-brand-creative-accent) 35%,
     transparent
   );
-  --color-ib-auth-link: var(--color-ib-creative-accent-hover);
-  --color-ib-auth-link-hover: var(--color-ib-creative-accent-pressed);
-  --color-ib-auth-close: var(--color-ib-text-muted);
-  --color-ib-auth-close-hover: var(--color-ib-text);
+  --color-auth-link: var(--color-brand-creative-accent-hover);
+  --color-auth-link-hover: var(--color-brand-creative-accent-pressed);
+  --color-auth-close: var(--color-muted-foreground);
+  --color-auth-close-hover: var(--color-foreground);
 
   /* ── Toast semantic tokens ── */
-  --color-ib-toast-bg: rgba(255, 255, 255, 0.92);
-  --color-ib-toast-border: var(--palette-light-border);
-  --color-ib-toast-text: var(--palette-light-text-1);
-  --color-ib-toast-muted: var(--palette-light-text-2);
-  --color-ib-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
-  --color-ib-toast-highlight: rgba(38, 54, 79, 0.08);
-  --color-ib-toast-button: var(--color-ib-creative-accent-hover);
+  --color-toast-bg: rgba(255, 255, 255, 0.92);
+  --color-toast-border: var(--palette-light-border);
+  --color-toast-text: var(--palette-light-text-1);
+  --color-toast-muted: var(--palette-light-text-2);
+  --color-toast-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  --color-toast-highlight: rgba(38, 54, 79, 0.08);
+  --color-toast-button: var(--color-brand-creative-accent-hover);
 
   /* ── shadcn-vue standard theme mappings ─────────────────── */
-  --color-background: var(--color-ib-page);
-  --color-foreground: var(--color-ib-text);
-  --color-card: var(--color-ib-surface);
-  --color-card-foreground: var(--color-ib-text);
-  --color-popover: var(--color-ib-surface);
-  --color-popover-foreground: var(--color-ib-text);
-  --color-primary: var(--color-ib-creative-accent-hover);
-  --color-primary-foreground: var(--color-ib-text-inverse);
-  --color-secondary: var(--color-ib-surface-muted);
-  --color-secondary-foreground: var(--color-ib-text);
-  --color-muted: var(--color-ib-surface-muted);
-  --color-muted-foreground: var(--color-ib-text-muted);
-  --color-accent: var(--color-ib-surface-hover);
-  --color-accent-foreground: var(--color-ib-text);
+  --color-background: var(--color-admin-bg);
+  --color-foreground: var(--color-admin-text-1);
+  --color-card: var(--color-admin-card-strong);
+  --color-card-foreground: var(--color-admin-text-1);
+  --color-popover: var(--color-admin-card-strong);
+  --color-popover-foreground: var(--color-admin-text-1);
+  --color-primary: var(--color-brand-creative-accent-hover);
+  --color-primary-foreground: var(--color-admin-text-inverse);
+  --color-secondary: var(--color-admin-surface-muted);
+  --color-secondary-hover: var(--color-admin-surface-hover);
+  --color-secondary-foreground: var(--color-admin-text-1);
+  --color-muted: var(--color-admin-surface-muted);
+  --color-muted-foreground: var(--color-admin-text-2);
+  --color-accent: var(--color-admin-surface-hover);
+  --color-accent-hover: var(--color-admin-surface-hover);
+  --color-accent-foreground: var(--color-admin-text-1);
   --color-destructive: var(--primitive-red-500);
   --color-destructive-hover: var(--primitive-red-600);
-  --color-destructive-foreground: var(--color-ib-text-inverse);
+  --color-destructive-foreground: var(--color-admin-text-inverse);
   --color-success: #16a34a;
   --color-success-hover: #15803d;
   --color-success-foreground: var(--palette-light-1);
@@ -338,31 +307,29 @@
   --color-info-hover: #0369a1;
   --color-info-foreground: var(--palette-light-1);
   --color-info-soft: rgb(2 132 199 / 15%);
-  --color-border: var(--color-ib-border-soft);
-  --color-input: var(--color-ib-border);
+  --color-border: var(--color-admin-border-soft);
+  --color-border-hover: var(--color-admin-border-hover);
+  --color-input: var(--color-admin-border);
   --color-ring: var(--color-admin-focus-ring);
 
-  --radius-ib-control: 10px;
-  --radius-ib-panel: 14px;
-  --radius-ib-overlay: 14px;
-  --radius-ib-pill: 999px;
+  --radius-control: 10px;
+  --radius-panel: 14px;
+  --radius-overlay: 14px;
+  --radius-pill: 999px;
 
-  --size-ib-scrollbar: 10px;
-  --size-ib-scrollbar-thumb-inset: 3px;
-  --color-ib-scrollbar-track: transparent;
-  --color-ib-scrollbar-thumb: color-mix(in srgb, var(--color-ib-text) 58%, transparent);
-  --color-ib-scrollbar-thumb-hover: color-mix(in srgb, var(--color-ib-text) 72%, transparent);
+  --size-scrollbar: 10px;
+  --size-scrollbar-thumb-inset: 3px;
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: color-mix(in srgb, var(--color-foreground) 58%, transparent);
+  --color-scrollbar-thumb-hover: color-mix(in srgb, var(--color-foreground) 72%, transparent);
 
-  --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
-  --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
-  --shadow-ib-focus: 0 0 0 3px var(--color-ring);
-  --shadow-ib-auth-shell:
-    0 24px 50px -15px var(--color-ib-auth-shell-glow),
-    inset 0 1px 1px var(--color-ib-auth-shell-highlight);
-  --shadow-ib-auth-input: inset 0 1px 2px color-mix(in srgb, var(--color-ib-text) 2%, transparent);
-  --shadow-ib-auth-primary: 0 4px 14px var(--color-ib-auth-primary-shadow);
-  --shadow-ib-auth-primary-hover: 0 6px 20px var(--color-ib-auth-primary-shadow-hover);
-  --shadow-ib-auth-focus: 0 0 0 3px var(--color-ib-auth-focus-ring);
+  --shadow-auth-shell:
+    0 24px 50px -15px var(--color-auth-shell-glow),
+    inset 0 1px 1px var(--color-auth-shell-highlight);
+  --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--color-foreground) 2%, transparent);
+  --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
+  --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);
+  --shadow-auth-focus: 0 0 0 3px var(--color-auth-focus-ring);
 
   --motion-control-duration: 160ms;
   --motion-control-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -373,22 +340,8 @@
   --motion-feedback-duration: 160ms;
   --motion-feedback-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* Cross-surface type scale. Admin and the user shell share one ladder, so
-     `ib` aliases the `admin` tokens instead of redeclaring the same pixels. */
-  --text-ib-micro: var(--text-admin-micro);
-  --text-ib-caption: var(--text-admin-caption);
-  --text-ib-meta: var(--text-admin-meta);
-  --text-ib-body: var(--text-admin-body);
-  --text-ib-content: var(--text-admin-content);
-  --text-ib-title-sm: var(--text-admin-title-sm);
-  --text-ib-heading: var(--text-admin-heading);
-  --text-ib-icon: var(--text-admin-icon);
-  --text-ib-modal-title-mobile: var(--text-admin-modal-title-mobile);
-  --text-ib-modal-title: var(--text-admin-modal-title);
-  --text-ib-summary-value: var(--text-admin-summary-value);
-
-  --font-ib-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
-  --font-ib-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
+  --font-display: 'Satoshi', -apple-system, 'SF Pro Display', sans-serif;
+  --font-hand: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', 'Caveat', cursive, sans-serif;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -400,24 +353,24 @@
   }
 }
 
-@utility ib-page-dot-bg {
-  background-image: radial-gradient(circle, var(--color-ib-page-dot) 1px, transparent 1px);
+@utility page-dot-bg {
+  background-image: radial-gradient(circle, var(--color-page-dot) 1px, transparent 1px);
   background-position: center center;
-  background-size: var(--spacing-ib-page-dot) var(--spacing-ib-page-dot);
+  background-size: var(--spacing-page-dot) var(--spacing-page-dot);
 }
 
 @layer base {
   * {
     box-sizing: border-box;
-    scrollbar-color: var(--color-ib-scrollbar-thumb) var(--color-ib-scrollbar-track);
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
     scrollbar-width: thin;
   }
 
   html,
   body {
     height: 100%;
-    background: var(--color-ib-page);
-    color: var(--color-ib-text);
+    background: var(--color-background);
+    color: var(--color-foreground);
     font-family:
       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -430,13 +383,13 @@
   }
 
   :root {
-    --ib-control-icon: var(--color-ib-text-muted);
-    --ib-control-icon-hover: var(--color-ib-focus-accent);
-    --ib-control-bg-hover: var(--color-ib-surface-hover);
-    --ib-focus-outline-width: 2px;
-    --ib-focus-outline-offset: 2px;
-    --ib-focus-outline-color: var(--color-ib-focus-accent);
-    --ib-focus-border-color: var(--ib-focus-outline-color);
+    --control-icon: var(--color-muted-foreground);
+    --control-icon-hover: var(--color-brand-creative-focus-accent);
+    --control-bg-hover: var(--color-accent-hover);
+    --focus-outline-width: 2px;
+    --focus-outline-offset: 2px;
+    --focus-outline-color: var(--color-brand-creative-focus-accent);
+    --focus-border-color: var(--focus-outline-color);
   }
 
   /* 全局链接样式 */
@@ -447,43 +400,43 @@
 
   /* Global scrollbar skin; app-scrollbar adds a stable gutter for layout-sensitive surfaces. */
   ::-webkit-scrollbar {
-    width: var(--size-ib-scrollbar);
-    height: var(--size-ib-scrollbar);
+    width: var(--size-scrollbar);
+    height: var(--size-scrollbar);
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-ib-scrollbar-track);
+    background: var(--color-scrollbar-track);
   }
 
   ::-webkit-scrollbar-thumb {
-    border: var(--size-ib-scrollbar-thumb-inset) solid transparent;
-    border-radius: var(--radius-ib-pill);
-    background-color: var(--color-ib-scrollbar-thumb);
+    border: var(--size-scrollbar-thumb-inset) solid transparent;
+    border-radius: var(--radius-pill);
+    background-color: var(--color-scrollbar-thumb);
     background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-ib-scrollbar-thumb-hover);
+    background-color: var(--color-scrollbar-thumb-hover);
   }
 
   /* 选中文字颜色 */
   ::selection {
-    background: color-mix(in srgb, var(--color-ib-creative-accent) 16%, transparent);
-    color: var(--color-ib-text);
+    background: color-mix(in srgb, var(--color-brand-creative-accent) 16%, transparent);
+    color: var(--color-foreground);
   }
 }
 
 /* App-owned global: Sonner renders outside feature components and only exposes data selectors.
    Palette values resolve from app tokens so toasts cannot drift from the surfaces. */
 [data-sonner-toaster].ideaboard-toaster {
-  --ideaboard-toast-bg: var(--color-ib-toast-bg);
-  --ideaboard-toast-border: var(--color-ib-toast-border);
-  --ideaboard-toast-text: var(--color-ib-toast-text);
-  --ideaboard-toast-muted: var(--color-ib-toast-muted);
-  --ideaboard-toast-shadow: var(--color-ib-toast-shadow);
-  --ideaboard-toast-highlight: var(--color-ib-toast-highlight);
-  --ideaboard-toast-button: var(--color-ib-toast-button);
-  --ideaboard-toast-accent: var(--color-ib-accent);
+  --ideaboard-toast-bg: var(--color-toast-bg);
+  --ideaboard-toast-border: var(--color-toast-border);
+  --ideaboard-toast-text: var(--color-toast-text);
+  --ideaboard-toast-muted: var(--color-toast-muted);
+  --ideaboard-toast-shadow: var(--color-toast-shadow);
+  --ideaboard-toast-highlight: var(--color-toast-highlight);
+  --ideaboard-toast-button: var(--color-toast-button);
+  --ideaboard-toast-accent: var(--color-primary);
   --ideaboard-toast-success: var(--color-success);
   --ideaboard-toast-warning: var(--color-warning);
   --ideaboard-toast-error: var(--color-destructive);

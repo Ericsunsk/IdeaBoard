@@ -103,7 +103,7 @@
 }
 
 .retouch-curves__point:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
   outline-offset: 2px;
 }
 
