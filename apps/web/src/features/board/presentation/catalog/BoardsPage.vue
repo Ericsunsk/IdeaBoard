@@ -2,21 +2,7 @@
   <div :class="catalogClasses.page">
     <div :class="catalogClasses.pageBackground"></div>
 
-    <header :class="catalogClasses.header">
-      <div :class="catalogClasses.brand">
-        <StudioName />
-      </div>
-      <WorkspaceNavigation />
-      <UserAccountMenu
-        :avatar-url="accountControls.viewModel.avatarUrl.value"
-        :balance="accountControls.viewModel.balance.value"
-        :items="accountControls.viewModel.menuItems.value"
-      >
-        <template #before-balance>
-          <UserLocaleSelect />
-        </template>
-      </UserAccountMenu>
-    </header>
+    <WorkspaceHeader />
 
     <main :class="catalogClasses.main">
       <h1 :class="catalogClasses.pageTitle">{{ t('workspace.boards.title') }}</h1>
@@ -36,7 +22,18 @@
             :placeholder="t('workspace.boards.searchPlaceholder')"
             :class="catalogClasses.searchInput"
             @input="onSearchInput(($event.target as HTMLInputElement).value)"
+            @keydown.esc="onSearchInput('')"
           />
+          <button
+            v-if="searchKeyword"
+            type="button"
+            :class="catalogClasses.searchClearButton"
+            :title="t('search.tooltips.clearSearch')"
+            :aria-label="t('search.tooltips.clearSearch')"
+            @click.prevent="onSearchInput('')"
+          >
+            <Xmark class="size-3.5" aria-hidden="true" />
+          </button>
         </label>
         <label :for="sortSelectId" class="sr-only">
           {{ t('workspace.boards.sortLabel') }}
@@ -53,19 +50,22 @@
           <SelectTrigger :id="sortSelectId" :class="catalogClasses.sortSelectTrigger">
             <SelectValue />
             <SelectIcon>
-              <NavArrowDown
-                class="size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
-                aria-hidden="true"
-              />
+              <NavArrowDown :class="catalogClasses.sortSelectIcon" aria-hidden="true" />
             </SelectIcon>
           </SelectTrigger>
           <SelectContent
             position="popper"
+            align="end"
             :side-offset="appOverlayMenuSideOffset"
-            class="w-[140px]"
+            :class="catalogClasses.sortSelectContent"
           >
             <SelectViewport>
-              <SelectItem v-for="item in sortOptions" :key="item.value" :value="item.value">
+              <SelectItem
+                v-for="item in sortOptions"
+                :key="item.value"
+                :value="item.value"
+                :class="catalogClasses.sortSelectItem"
+              >
                 <SelectItemText>{{ item.label }}</SelectItemText>
               </SelectItem>
             </SelectViewport>
@@ -213,18 +213,13 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BoardCard from './BoardCard.vue'
 import { catalogClasses, catalogDeleteDialogContentClass, catalogDeleteDialogStyle } from './skin'
-import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
+import { USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
 import {
   defineDialogSurfaceIntent,
   useOverlayInteractionLifecycle,
 } from '../../../../shared/composables/useOverlayInteractionLifecycle'
-import { HOME_PATH, USER_CANVAS_PATH } from '../../../../shared/constants/routePaths'
-import { useUserStore } from '../../../auth'
-import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
-import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
-import StudioName from '../../../../shared/components/StudioName.vue'
-import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
-import { NavArrowDown, Search } from '@iconoir/vue'
+import { WorkspaceHeader } from '../../../workspace'
+import { NavArrowDown, Search, Xmark } from '@iconoir/vue'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -252,8 +247,6 @@ import { formatCatalogDate, useCatalog, type CatalogSortMode } from './useCatalo
 
 const router = useRouter()
 const { t } = useI18n()
-const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const controller = useCatalog({
   navigation: {
     openBoard(boardId) {
@@ -350,11 +343,4 @@ function onSortModeChange(value: unknown) {
 
 // The sort trigger is a real form control, so it needs a programmatic label.
 const sortSelectId = 'board-catalog-sort-select'
-
-const accountControls = useWorkspaceAccountControls({
-  navigation: {
-    navigate: (path) => router.push(path),
-    logout: () => logoutAndRedirect(HOME_PATH),
-  },
-})
 </script>

@@ -45,6 +45,9 @@ import { Compass, ViewGrid } from '@iconoir/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../../shared/constants/routePaths'
 import { useAuthOverlay, useUserStore } from '../../../auth'
+import type { WorkspaceNavigationAdapter } from '../useWorkspaceAccountControls'
+
+const props = defineProps<{ navigation?: WorkspaceNavigationAdapter | null }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -95,7 +98,8 @@ async function handleGatedWorkspaceClick() {
     const user = await userStore.ensureSession({ fresh: true }).catch(() => null)
     if (user) {
       handleNavClick(USER_BOARDS_PATH)
-      if (!isWorkspaceActive.value) await router.push(USER_BOARDS_PATH)
+      if (!isWorkspaceActive.value)
+        await (props.navigation?.navigate(USER_BOARDS_PATH) ?? router.push(USER_BOARDS_PATH))
       return
     }
 

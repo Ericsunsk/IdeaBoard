@@ -65,54 +65,70 @@
             </span>
           </DropdownMenuItem>
 
-          <DropdownMenuSub v-model:open="appearanceSubMenuOpen">
-            <DropdownMenuSubTrigger
-              :class="[appOverlayMenuItemClass, props.menuItemClass, 'cursor-pointer']"
-              @click.stop="appearanceSubMenuOpen = !appearanceSubMenuOpen"
+          <DropdownMenuSeparator class="my-1" />
+
+          <div class="px-1 py-0.5">
+            <div
+              role="radiogroup"
+              :aria-label="t('auth.menu.appearance')"
+              @keydown="handleThemeKeydown"
+              class="flex h-8 w-full items-center rounded-lg border border-border bg-muted/60 p-0.5"
             >
-              <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
-                <span class="truncate">{{ t('auth.menu.appearance') }}</span>
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent
-              :side-offset="6"
-              class="w-36 rounded-xl border border-border bg-card p-1 text-foreground shadow-lg outline-none"
-            >
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
-                @select="setTheme('light')"
-                @click="setTheme('light')"
+              <button
+                type="button"
+                role="radio"
+                :aria-checked="mode === 'light'"
+                :tabindex="mode === 'light' ? 0 : -1"
+                :title="t('auth.menu.themeLight')"
+                :aria-label="t('auth.menu.themeLight')"
+                class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="
+                  mode === 'light'
+                    ? 'bg-card font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                "
+                @click.stop="setTheme('light')"
               >
-                <span class="flex items-center gap-2">
-                  <SunLight class="size-3.5 text-muted-foreground" />
-                  <span>{{ t('auth.menu.themeLight') }}</span>
-                </span>
-                <Check v-if="mode === 'light'" class="size-3.5 text-primary" />
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
-                @select="setTheme('dark')"
-                @click="setTheme('dark')"
+                <SunLight class="size-4" />
+              </button>
+              <button
+                type="button"
+                role="radio"
+                :aria-checked="mode === 'dark'"
+                :tabindex="mode === 'dark' ? 0 : -1"
+                :title="t('auth.menu.themeDark')"
+                :aria-label="t('auth.menu.themeDark')"
+                class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="
+                  mode === 'dark'
+                    ? 'bg-card font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                "
+                @click.stop="setTheme('dark')"
               >
-                <span class="flex items-center gap-2">
-                  <HalfMoon class="size-3.5 text-muted-foreground" />
-                  <span>{{ t('auth.menu.themeDark') }}</span>
-                </span>
-                <Check v-if="mode === 'dark'" class="size-3.5 text-primary" />
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                class="flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
-                @select="setTheme('system')"
-                @click="setTheme('system')"
+                <HalfMoon class="size-4" />
+              </button>
+              <button
+                type="button"
+                role="radio"
+                :aria-checked="mode === 'auto'"
+                :tabindex="mode === 'auto' ? 0 : -1"
+                :title="t('auth.menu.themeSystem')"
+                :aria-label="t('auth.menu.themeSystem')"
+                class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="
+                  mode === 'auto'
+                    ? 'bg-card font-semibold text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                "
+                @click.stop="setTheme('system')"
               >
-                <span class="flex items-center gap-2">
-                  <Laptop class="size-3.5 text-muted-foreground" />
-                  <span>{{ t('auth.menu.themeSystem') }}</span>
-                </span>
-                <Check v-if="mode === 'auto'" class="size-3.5 text-primary" />
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+                <Laptop class="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <DropdownMenuSeparator class="my-1" />
 
           <DropdownMenuItem
             v-for="item in dangerItems"
@@ -137,16 +153,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, HalfMoon, Laptop, SunLight, User } from '@iconoir/vue'
+import { HalfMoon, Laptop, SunLight, User } from '@iconoir/vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -190,7 +204,25 @@ const props = withDefaults(
 
 const { t } = useI18n()
 const { mode, setTheme } = useTheme()
-const appearanceSubMenuOpen = ref(false)
+
+const themeModes = ['light', 'dark', 'auto'] as const
+
+function handleThemeKeydown(event: KeyboardEvent) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const current = themeModes.indexOf(mode.value)
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? 2
+        : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3
+  setTheme(themeModes[next] ?? 'auto')
+  requestAnimationFrame(() => {
+    const group = event.currentTarget as HTMLElement
+    ;(group.querySelectorAll('[role="radio"]')[next] as HTMLElement | undefined)?.focus()
+  })
+}
 
 const menuContentClass = 'ib-user-account-menu-panel w-36 min-w-36 max-w-[10rem]'
 

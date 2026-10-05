@@ -11,35 +11,96 @@
         <SunLight v-else class="size-4" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" :side-offset="8" class="w-36">
-      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('light')">
-        <SunLight class="size-4 text-muted-foreground" />
-        <span class="flex-1">明亮</span>
-        <Check v-if="mode === 'light'" class="size-4 text-primary" />
-      </DropdownMenuItem>
-      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('dark')">
-        <HalfMoon class="size-4 text-muted-foreground" />
-        <span class="flex-1">暗黑</span>
-        <Check v-if="mode === 'dark'" class="size-4 text-primary" />
-      </DropdownMenuItem>
-      <DropdownMenuItem class="cursor-pointer gap-2" @select="setTheme('auto')">
-        <Laptop class="size-4 text-muted-foreground" />
-        <span class="flex-1">跟随系统</span>
-        <Check v-if="mode === 'auto'" class="size-4 text-primary" />
-      </DropdownMenuItem>
+    <DropdownMenuContent align="end" :side-offset="8" class="w-36 p-1">
+      <div
+        role="radiogroup"
+        aria-label="主题外观"
+        @keydown="handleThemeKeydown"
+        class="flex h-8 w-full items-center rounded-lg border border-border bg-muted/60 p-0.5"
+      >
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="mode === 'light'"
+          :tabindex="mode === 'light' ? 0 : -1"
+          title="明亮"
+          aria-label="明亮"
+          class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="
+            mode === 'light'
+              ? 'bg-card font-semibold text-foreground shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+          "
+          @click="setTheme('light')"
+        >
+          <SunLight class="size-4" />
+        </button>
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="mode === 'dark'"
+          :tabindex="mode === 'dark' ? 0 : -1"
+          title="暗黑"
+          aria-label="暗黑"
+          class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="
+            mode === 'dark'
+              ? 'bg-card font-semibold text-foreground shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+          "
+          @click="setTheme('dark')"
+        >
+          <HalfMoon class="size-4" />
+        </button>
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="mode === 'auto'"
+          :tabindex="mode === 'auto' ? 0 : -1"
+          title="跟随系统"
+          aria-label="跟随系统"
+          class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="
+            mode === 'auto'
+              ? 'bg-card font-semibold text-foreground shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+          "
+          @click="setTheme('auto')"
+        >
+          <Laptop class="size-4" />
+        </button>
+      </div>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>
 
 <script setup lang="ts">
-import { Check, HalfMoon, Laptop, SunLight } from '@iconoir/vue'
+import { HalfMoon, Laptop, SunLight } from '@iconoir/vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useTheme } from '@/shared/theme/composables/useTheme'
 
 const { mode, isDark, setTheme } = useTheme()
+
+const themeModes = ['light', 'dark', 'auto'] as const
+
+function handleThemeKeydown(event: KeyboardEvent) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const current = themeModes.indexOf(mode.value)
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? 2
+        : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3
+  setTheme(themeModes[next] ?? 'auto')
+  requestAnimationFrame(() => {
+    const group = event.currentTarget as HTMLElement
+    ;(group.querySelectorAll('[role="radio"]')[next] as HTMLElement | undefined)?.focus()
+  })
+}
 </script>
