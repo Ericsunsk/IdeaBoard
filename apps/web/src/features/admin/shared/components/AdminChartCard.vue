@@ -3,7 +3,7 @@
     <ChartCard
       :title="title"
       :elevated="false"
-      header-class="p-6 pb-4 bg-background"
+      header-class="p-6 pb-4"
       title-class="text-base font-bold text-foreground"
     >
       <template v-if="$slots.actions" #actions>
