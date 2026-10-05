@@ -19,17 +19,17 @@ export const adminDashboardRootClass = 'flex max-w-full min-w-0 flex-col gap-4 p
 // 数据表壳单源：任务监控事件表与定价表同壳（容器 + AdminTable 属性 + thead/tbody token），
 // 改表样式只改这里，两表一起变。
 export const adminTableCardClass =
-  'flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card'
+  'flex w-full flex-col overflow-hidden rounded-xl border border-border bg-background'
 
 export const adminTableFrameClass = 'min-w-0'
 
 export const adminTableStyle = { minWidth: '100%' } as const
 
 export const adminTableClass =
-  'border-separate border-spacing-0 [&_thead]:bg-muted/40 [&_th]:h-10 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-muted-foreground [&_th]:border-b-0 [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-xl [&_tbody_tr:first-child_td:last-child]:rounded-tr-xl [&_tbody_tr:last-child_td]:border-b-0'
+  'border-separate border-spacing-0 [&_thead]:bg-background [&_th]:h-10 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-0 [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-xl [&_tbody_tr:first-child_td:last-child]:rounded-tr-xl [&_tbody_tr:last-child_td]:border-b-0'
 
 export const adminTableFooterClass =
-  'flex items-center justify-between border-t border-border bg-card px-4 py-2.5'
+  'flex items-center justify-between border-t border-border bg-background px-4 py-2.5'
 
 export const adminTableRowActionButtonClass =
   'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'

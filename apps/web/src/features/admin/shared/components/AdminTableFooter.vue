@@ -1,7 +1,7 @@
 <template>
   <tfoot
     :class="
-      cn('border-t border-border bg-muted/50 font-medium [&>tr]:last:border-b-0', props.class)
+      cn('border-t border-border bg-background font-medium [&>tr]:last:border-b-0', props.class)
     "
   >
     <slot />

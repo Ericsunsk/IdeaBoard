@@ -489,6 +489,7 @@
     "PrincipalSummary",
     "ProvisionWorkspaceInput",
     "WorkspaceAccessKind",
+    "WorkspaceHeader",
     "WorkspaceListPage",
     "WorkspaceNavigation",
     "WorkspaceNavigationAdapter",

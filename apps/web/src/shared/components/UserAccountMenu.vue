@@ -71,8 +71,9 @@
             <div
               role="radiogroup"
               :aria-label="t('auth.menu.appearance')"
-              @keydown="handleThemeKeydown"
+              tabindex="-1"
               class="flex h-8 w-full items-center rounded-lg border border-border bg-muted/60 p-0.5"
+              @keydown="handleThemeKeydown"
             >
               <button
                 type="button"
@@ -171,6 +172,7 @@ import {
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { useMenuTriggerFocusRestore } from '../composables/useMenuTriggerFocusRestore'
 import { useTheme } from '../theme/composables/useTheme'
+import { createThemeKeyboardHandler } from '../theme/composables/themeKeyboard'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
@@ -205,24 +207,7 @@ const props = withDefaults(
 const { t } = useI18n()
 const { mode, setTheme } = useTheme()
 
-const themeModes = ['light', 'dark', 'auto'] as const
-
-function handleThemeKeydown(event: KeyboardEvent) {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  const current = themeModes.indexOf(mode.value)
-  const next =
-    event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? 2
-        : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3
-  setTheme(themeModes[next] ?? 'auto')
-  requestAnimationFrame(() => {
-    const group = event.currentTarget as HTMLElement
-    ;(group.querySelectorAll('[role="radio"]')[next] as HTMLElement | undefined)?.focus()
-  })
-}
+const handleThemeKeydown = createThemeKeyboardHandler({ mode, setTheme })
 
 const menuContentClass = 'ib-user-account-menu-panel w-36 min-w-36 max-w-[10rem]'
 

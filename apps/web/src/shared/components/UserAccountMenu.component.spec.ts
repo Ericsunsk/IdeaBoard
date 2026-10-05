@@ -231,20 +231,25 @@ describe('UserAccountMenu', () => {
     expect(loginBtn.nextElementSibling).toBe(registerBtn)
   })
 
-  it('renders appearance sub-menu allowing tri-state theme switching', async () => {
+  it('renders appearance segmented control allowing tri-state theme switching', async () => {
     const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
     const trigger = screen.getByRole('button', { name: 'Account menu' })
     await user.click(trigger)
 
-    const appearanceSpan = await screen.findByText('Appearance')
-    expect(appearanceSpan).toBeVisible()
+    const group = await screen.findByRole('radiogroup', { name: 'Appearance' })
+    expect(group).toBeVisible()
 
-    await user.click(appearanceSpan)
+    const lightRadio = screen.getByRole('radio', { name: /Light/i })
+    const darkRadio = screen.getByRole('radio', { name: /Dark/i })
+    const systemRadio = screen.getByRole('radio', { name: /System/i })
 
-    expect(await screen.findByRole('menuitem', { name: /Light/i })).toBeVisible()
-    expect(screen.getByRole('menuitem', { name: /Dark/i })).toBeVisible()
-    expect(screen.getByRole('menuitem', { name: /System/i })).toBeVisible()
+    expect(lightRadio).toBeVisible()
+    expect(darkRadio).toBeVisible()
+    expect(systemRadio).toBeVisible()
+
+    await user.click(darkRadio)
+    expect(darkRadio).toHaveAttribute('aria-checked', 'true')
   })
 })

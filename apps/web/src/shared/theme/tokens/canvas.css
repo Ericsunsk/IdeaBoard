@@ -23,10 +23,10 @@
     --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
     --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
     --color-canvas-node-bg: var(--color-canvas-surface-bg);
-    --color-canvas-node-border: #e8ecf4;
-    --color-canvas-text-primary: #272932;
-    --color-canvas-text-secondary: #555d6d;
-    --color-canvas-text-muted: #5d6577;
+    --color-canvas-node-border: #e5e7eb;
+    --color-canvas-text-primary: #171717;
+    --color-canvas-text-secondary: #52525b;
+    --color-canvas-text-muted: #62626a;
     --color-canvas-text-control: var(--color-canvas-text-secondary);
     --color-canvas-text-option: var(--color-canvas-text-muted);
     --color-canvas-text-inverse: #ffffff;

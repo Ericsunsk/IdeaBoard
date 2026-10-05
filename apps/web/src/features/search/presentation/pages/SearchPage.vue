@@ -4,22 +4,7 @@
     class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-background px-[var(--spacing-page-chrome-inset)] pt-[var(--spacing-page-chrome-inset)] pb-16 text-foreground"
   >
     <div class="ib-board-page-background page-dot-bg"></div>
-    <header
-      class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-x-4 pointer-events-none pb-2"
-    >
-      <StudioName class="pointer-events-auto" />
-      <WorkspaceNavigation class="pointer-events-auto" />
-      <UserAccountMenu
-        class="pointer-events-auto"
-        :avatar-url="accountControls.viewModel.avatarUrl.value"
-        :balance="accountControls.viewModel.balance.value"
-        :items="accountControls.viewModel.menuItems.value"
-      >
-        <template #before-balance>
-          <UserLocaleSelect />
-        </template>
-      </UserAccountMenu>
-    </header>
+    <WorkspaceHeader />
 
     <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
     <main
@@ -99,7 +84,7 @@
               <input
                 v-model="draftQuery"
                 type="text"
-                class="min-h-8 min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-foreground outline-none"
+                class="min-h-8 min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-foreground outline-none placeholder:text-muted-foreground"
                 :placeholder="
                   references.length > 0
                     ? t('search.placeholders.queryWithReferences')
@@ -107,6 +92,7 @@
                 "
                 :aria-label="t('search.inputLabel')"
                 @input="queryError = ''"
+                @keydown.esc="handleClearSearch"
               />
 
               <div class="flex items-center gap-1.5 shrink-0">
@@ -331,15 +317,11 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Bookmark, BookmarkSolid, Camera, Plus, Search, Xmark } from '@iconoir/vue'
-import StudioName from '../../../../shared/components/StudioName.vue'
-import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
-import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
-import { HOME_PATH, USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
+import { USER_BOARDS_PATH } from '../../../../shared/constants/routePaths'
 import { stringParam } from '../../../../shared/router/queryParams'
 import { VISION_REFERENCE_ACCEPT } from '../../../../shared/media/visionIngressPolicy'
 import { useAuthOverlay, useUserStore } from '../../../auth'
-import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
-import { WorkspaceNavigation, useWorkspaceAccountControls } from '../../../workspace'
+import { WorkspaceHeader } from '../../../workspace'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
@@ -358,10 +340,6 @@ const route = useRoute()
 const { t } = useI18n()
 const userStore = useUserStore()
 const authOverlay = useAuthOverlay()
-const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const accountControls = useWorkspaceAccountControls({
-  navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
-})
 const pageScrollRef = ref<HTMLElement | null>(null)
 const userPublicID = computed(() => userStore.user?.public_id)
 

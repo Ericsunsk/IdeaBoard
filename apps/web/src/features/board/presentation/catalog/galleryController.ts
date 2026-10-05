@@ -1,4 +1,4 @@
-import { computed, readonly, ref, watch } from 'vue'
+import { computed, readonly, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BoardRepository } from '../../application/catalog/repository'
 import type { BoardPreviewRefreshQueue } from '../../infrastructure/preview'
 import type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
@@ -11,6 +11,59 @@ type GalleryControllerDependencies = {
   navigation: CatalogNavigation
   feedback: BoardFeedback
   warn: (...data: unknown[]) => void
+  theme?: { isDark: Ref<boolean> | ComputedRef<boolean> }
+}
+
+function filterAndSortBoards(
+  boards: readonly CatalogEntry[],
+  keyword: string,
+  sortMode: CatalogSortMode,
+): CatalogEntry[] {
+  const normalizedKeyword = keyword.toLowerCase()
+  const filtered = boards.filter((board) => {
+    if (!normalizedKeyword) return true
+    return board.name.toLowerCase().includes(normalizedKeyword)
+  })
+  if (sortMode === 'name') {
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+  }
+  return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+function setupCatalogWatchers(
+  boards: ComputedRef<readonly CatalogEntry[]>,
+  scope: Ref<string | null>,
+  isDarkRef: Ref<boolean> | ComputedRef<boolean> | undefined,
+  preview: BoardPreviewRefreshQueue,
+  onScopeReset: () => void,
+) {
+  const stopPreviewWatch = watch(
+    boards,
+    (nextBoards) => {
+      const snapshot = [...nextBoards]
+      preview.reloadFromLocal(snapshot)
+      preview.schedule(snapshot)
+    },
+    { immediate: true },
+  )
+
+  const stopThemeWatch = isDarkRef
+    ? watch(isDarkRef, (isDark) => {
+        preview.handleThemeChange?.(isDark, [...boards.value])
+      })
+    : undefined
+
+  const stopScopeWatch = watch(scope, () => {
+    preview.invalidate()
+    onScopeReset()
+  })
+
+  return () => {
+    stopPreviewWatch()
+    stopScopeWatch()
+    stopThemeWatch?.()
+    preview.dispose()
+  }
 }
 
 export function createGalleryController(dependencies: GalleryControllerDependencies): Catalog {
@@ -32,35 +85,22 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
   const boards = computed<readonly CatalogEntry[]>(
     () => dependencies.catalog.viewModel.boards.value,
   )
-  const visibleBoards = computed(() => {
-    const keyword = searchKeyword.value.toLowerCase()
-    const filtered = boards.value.filter((board) => {
-      if (!keyword) return true
-      return board.name.toLowerCase().includes(keyword)
-    })
-    if (sortMode.value === 'name') {
-      return [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
-    }
-    return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
-  })
-
-  const stopPreviewWatch = watch(
-    boards,
-    (nextBoards) => {
-      const snapshot = [...nextBoards]
-      dependencies.preview.reloadFromLocal(snapshot)
-      dependencies.preview.schedule(snapshot)
-    },
-    { immediate: true },
+  const visibleBoards = computed(() =>
+    filterAndSortBoards(boards.value, searchKeyword.value, sortMode.value),
   )
 
-  const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
-    dependencies.preview.invalidate()
-    activeMenuBoardId.value = null
-    clearRename(false)
-    catalogRecoveryBoardId.value = null
-    resetDeleteState()
-  })
+  const disposeWatchers = setupCatalogWatchers(
+    boards,
+    dependencies.catalog.viewModel.scope,
+    dependencies.theme?.isDark,
+    dependencies.preview,
+    () => {
+      activeMenuBoardId.value = null
+      clearRename(false)
+      catalogRecoveryBoardId.value = null
+      resetDeleteState()
+    },
+  )
 
   const commandHandlers = createCommandHandlers({
     ...dependencies,
@@ -223,9 +263,7 @@ export function createGalleryController(dependencies: GalleryControllerDependenc
       confirmDelete: commandHandlers.confirmDelete,
     },
     dispose() {
-      stopPreviewWatch()
-      stopScopeWatch()
-      dependencies.preview.dispose()
+      disposeWatchers()
     },
   }
 }

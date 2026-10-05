@@ -63,13 +63,14 @@ defineProps<{
 }
 
 .user-credit-pill:hover {
-  border-color: var(--color-border-hover);
-  background: var(--color-muted);
+  border-color: var(--color-page-chrome-border-hover);
+  background: var(--color-page-chrome-bg-hover);
+  color: var(--color-page-chrome-color-hover);
 }
 
 .user-credit-pill:active {
-  border-color: var(--color-border-hover);
-  background: var(--color-secondary-hover);
+  border-color: var(--color-page-chrome-border-hover);
+  background: var(--color-page-chrome-bg-hover);
 }
 
 .user-credit-pill:focus-visible {

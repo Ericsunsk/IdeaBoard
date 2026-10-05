@@ -30,9 +30,9 @@
     --color-muted: var(--primitive-neutral-100);
     --color-muted-foreground: var(--primitive-neutral-500);
 
-    --color-accent: rgba(122, 107, 213, 0.08);
-    --color-accent-hover: rgba(122, 107, 213, 0.14);
-    --color-accent-foreground: var(--primitive-violet-700);
+    --color-accent: var(--primitive-neutral-100);
+    --color-accent-hover: var(--primitive-neutral-150);
+    --color-accent-foreground: var(--primitive-neutral-900);
 
     --color-destructive: var(--primitive-red-500);
     --color-destructive-hover: var(--primitive-red-600);

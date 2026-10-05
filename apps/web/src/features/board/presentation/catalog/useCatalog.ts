@@ -6,6 +6,8 @@ import { formatCatalogDate } from './format'
 import type { Catalog, CatalogNavigation } from './contract'
 import { useBoardFeedback } from './useBoardFeedback'
 
+import { useTheme } from '../../../../shared/theme/composables/useTheme'
+
 export type { CatalogEntry, CatalogSortMode, Catalog, CatalogNavigation } from './contract'
 export { formatCatalogDate }
 
@@ -15,6 +17,7 @@ export function createCatalog(options: { navigation: CatalogNavigation }): Catal
     preview: createBoardPreviewRefreshQueue(),
     navigation: options.navigation,
     feedback: useBoardFeedback(),
+    theme: useTheme(),
     warn: console.warn,
   })
 }

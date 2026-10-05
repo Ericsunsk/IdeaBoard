@@ -9,6 +9,8 @@ import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
 import { isBoardNameConflictError, syncBoardToServer } from '../../application/sync/boardSync'
 import type { BoardMeta } from '../../application/catalog/boards'
+import { isDarkModeActive } from '../../../../shared/theme/composables/useTheme'
+import { getStoredPreviewTheme, setStoredPreviewTheme } from './boardPreviewThemeStorage'
 
 export interface BoardPreviewRefreshQueueDependencies {
   getBoardState: (boardId: string) => BoardState | null
@@ -19,18 +21,22 @@ export interface BoardPreviewRefreshQueueDependencies {
     previewSnapshotUpdatedAt: number | undefined,
     previewSnapshotVersion: number | undefined,
   ) => BoardState | null
-  renderPreview: (state: BoardState) => Promise<string>
+  renderPreview: (state: BoardState, options?: { isDark?: boolean }) => Promise<string>
   syncBoard: (boardId: string) => Promise<unknown>
   isNameConflictError: (error: unknown) => boolean
   rendererVersion: number
   now: () => number
   warn: (...data: unknown[]) => void
+  getCurrentTheme?: () => 'dark' | 'light'
+  getPreviewTheme?: (boardId: string) => 'dark' | 'light' | null
+  setPreviewTheme?: (boardId: string, theme: 'dark' | 'light') => void
 }
 
 export interface BoardPreviewRefreshQueue {
   previewMap: Ref<Record<string, string>>
   reloadFromLocal: (boards: BoardMeta[]) => void
   schedule: (boards: BoardMeta[]) => void
+  handleThemeChange?: (isDark: boolean, boards: BoardMeta[]) => void
   invalidate: () => void
   dispose: () => void
 }
@@ -45,6 +51,9 @@ const defaultDependencies: BoardPreviewRefreshQueueDependencies = {
   rendererVersion: BOARD_PREVIEW_RENDERER_VERSION,
   now: Date.now,
   warn: console.warn,
+  getCurrentTheme: () => (isDarkModeActive() ? 'dark' : 'light'),
+  getPreviewTheme: getStoredPreviewTheme,
+  setPreviewTheme: setStoredPreviewTheme,
 }
 
 export function createBoardPreviewRefreshQueue(
@@ -58,14 +67,50 @@ export function createBoardPreviewRefreshQueue(
   let isDisposed = false
   let generation = 0
 
-  function readLatestBoardState(boardId: string, boundary: string): BoardState | null {
-    const state = deps.getBoardState(boardId)
-    const result = normalizeLatestBoardState(state, { mode: 'result', boundary })
-    if (result.ok) return result.value
+  let currentTheme: 'dark' | 'light' = deps.getCurrentTheme
+    ? deps.getCurrentTheme()
+    : isDarkModeActive()
+      ? 'dark'
+      : 'light'
+
+  const themeSnapshotCache = new Map<
+    'dark' | 'light',
+    Map<string, { dataUrl: string; updatedAt: number }>
+  >()
+
+  function getThemeCache(theme: 'dark' | 'light') {
+    let cache = themeSnapshotCache.get(theme)
+    if (!cache) {
+      cache = new Map()
+      themeSnapshotCache.set(theme, cache)
+    }
+    return cache
+  }
+
+  function getCachedThemePreview(
+    boardId: string,
+    state: BoardState | null,
+    theme: 'dark' | 'light',
+  ): string | null {
+    const cached = getThemeCache(theme).get(boardId)
+    return cached && state && cached.updatedAt >= state.updatedAt ? cached.dataUrl : null
+  }
+
+  function normalizePreviewState(
+    state: BoardState | null,
+    boundary: string,
+    boardId: string,
+  ): BoardState | null {
+    const normalized = normalizeLatestBoardState(state, { mode: 'result', boundary })
+    if (normalized.ok) return normalized.value
     if (state) {
-      deps.warn('[boards] invalid board state for preview refresh', boardId, result.error)
+      deps.warn('[boards] invalid board state for preview refresh', boardId, normalized.error)
     }
     return null
+  }
+
+  function readLatestBoardState(boardId: string, boundary: string): BoardState | null {
+    return normalizePreviewState(deps.getBoardState(boardId), boundary, boardId)
   }
 
   function readLatestBoardStates(
@@ -78,16 +123,7 @@ export function createBoardPreviewRefreshQueue(
     const rawMap = deps.getBoardStates(boardIds)
     const result = new Map<string, BoardState | null>()
     boardIds.forEach((boardId) => {
-      const state = rawMap[boardId] ?? null
-      const normalized = normalizeLatestBoardState(state, { mode: 'result', boundary })
-      if (normalized.ok) {
-        result.set(boardId, normalized.value)
-        return
-      }
-      if (state) {
-        deps.warn('[boards] invalid board state for preview refresh', boardId, normalized.error)
-      }
-      result.set(boardId, null)
+      result.set(boardId, normalizePreviewState(rawMap[boardId] ?? null, boundary, boardId))
     })
     return result
   }
@@ -99,21 +135,51 @@ export function createBoardPreviewRefreshQueue(
       'preview-reload',
     )
     boards.forEach((board) => {
-      nextMap[board.id] = states.get(board.id)?.previewSnapshotDataUrl || ''
+      const state = states.get(board.id)
+      const boardId = board.id
+      const cachedPreview = getCachedThemePreview(boardId, state ?? null, currentTheme)
+      if (cachedPreview !== null) {
+        nextMap[boardId] = cachedPreview
+        return
+      }
+
+      const snapshotUrl = state?.previewSnapshotDataUrl || ''
+      if (snapshotUrl) {
+        const recordedTheme = deps.getPreviewTheme ? deps.getPreviewTheme(boardId) : null
+        if (recordedTheme === currentTheme) {
+          nextMap[boardId] = snapshotUrl
+          getThemeCache(currentTheme).set(boardId, {
+            dataUrl: snapshotUrl,
+            updatedAt: state?.updatedAt ?? 0,
+          })
+          return
+        }
+      }
+      nextMap[boardId] = ''
     })
     previewMap.value = nextMap
   }
 
-  function isPreviewStaleState(state: BoardState | null): boolean {
+  function isPreviewStaleState(state: BoardState | null, boardId?: string): boolean {
     if (!state) return false
     if (!state.previewSnapshotDataUrl) return true
     if (!Number.isFinite(state.previewSnapshotUpdatedAt)) return true
     if (state.previewSnapshotVersion !== deps.rendererVersion) return true
-    return (state.previewSnapshotUpdatedAt || 0) < state.updatedAt
+    if ((state.previewSnapshotUpdatedAt || 0) < state.updatedAt) return true
+    if (boardId && deps.getPreviewTheme) {
+      const cached = getThemeCache(currentTheme).get(boardId)
+      if (!cached || cached.updatedAt < state.updatedAt) {
+        const recordedTheme = deps.getPreviewTheme(boardId)
+        if (recordedTheme !== currentTheme) {
+          return true
+        }
+      }
+    }
+    return false
   }
 
   function isPreviewStale(boardId: string): boolean {
-    return isPreviewStaleState(readLatestBoardState(boardId, 'preview-stale-check'))
+    return isPreviewStaleState(readLatestBoardState(boardId, 'preview-stale-check'), boardId)
   }
 
   function enqueue(boardId: string) {
@@ -122,21 +188,64 @@ export function createBoardPreviewRefreshQueue(
     queue.push(boardId)
   }
 
-  async function refreshInBackground(boardId: string, activeGeneration: number) {
-    const startState = readLatestBoardState(boardId, 'preview-render')
-    if (!startState || !isPreviewStaleState(startState)) return
-    const baseUpdatedAt = startState.updatedAt
-    let snapshotDataUrl: string | undefined
-    let snapshotUpdatedAt: number | undefined
+  async function renderSnapshotDataUrl(
+    boardId: string,
+    state: BoardState,
+    theme: 'dark' | 'light',
+    activeGeneration: number,
+  ): Promise<string | null> {
     try {
-      const renderedDataUrl = await deps.renderPreview(startState)
-      if (isDisposed || generation !== activeGeneration) return
-      snapshotDataUrl = renderedDataUrl || undefined
-      snapshotUpdatedAt = renderedDataUrl ? deps.now() : undefined
+      const rendered = await deps.renderPreview(state, { isDark: theme === 'dark' })
+      if (isDisposed || generation !== activeGeneration) return null
+      return rendered || null
     } catch (error) {
       deps.warn('[boards] failed to render board preview', boardId, error)
-      return
+      return null
     }
+  }
+
+  function commitRefreshedPreview(
+    boardId: string,
+    renderTheme: 'dark' | 'light',
+    baseUpdatedAt: number,
+    renderedDataUrl: string,
+  ): BoardState | null {
+    getThemeCache(renderTheme).set(boardId, {
+      dataUrl: renderedDataUrl,
+      updatedAt: baseUpdatedAt,
+    })
+    deps.setPreviewTheme?.(boardId, renderTheme)
+
+    const updatedState = deps.setPreviewSnapshot(
+      boardId,
+      renderedDataUrl,
+      deps.now(),
+      deps.rendererVersion,
+    )
+    if (!updatedState) return null
+
+    if (currentTheme === renderTheme) {
+      previewMap.value = {
+        ...previewMap.value,
+        [boardId]: updatedState.previewSnapshotDataUrl || '',
+      }
+    }
+    return updatedState
+  }
+
+  async function refreshInBackground(boardId: string, activeGeneration: number) {
+    const startState = readLatestBoardState(boardId, 'preview-render')
+    if (!startState || !isPreviewStaleState(startState, boardId)) return
+    const baseUpdatedAt = startState.updatedAt
+    const renderTheme = currentTheme
+
+    const renderedDataUrl = await renderSnapshotDataUrl(
+      boardId,
+      startState,
+      renderTheme,
+      activeGeneration,
+    )
+    if (!renderedDataUrl) return
 
     const latestState = readLatestBoardState(boardId, 'preview-write')
     if (isDisposed || generation !== activeGeneration || !latestState) return
@@ -145,21 +254,26 @@ export function createBoardPreviewRefreshQueue(
       return
     }
 
-    const updatedState = deps.setPreviewSnapshot(
+    const updatedState = commitRefreshedPreview(
       boardId,
-      snapshotDataUrl,
-      snapshotUpdatedAt,
-      snapshotDataUrl ? deps.rendererVersion : undefined,
+      renderTheme,
+      baseUpdatedAt,
+      renderedDataUrl,
     )
     if (!updatedState) return
-    previewMap.value = {
-      ...previewMap.value,
-      [boardId]: updatedState.previewSnapshotDataUrl || '',
+
+    const isContentStale =
+      !startState.previewSnapshotDataUrl ||
+      !Number.isFinite(startState.previewSnapshotUpdatedAt) ||
+      (startState.previewSnapshotUpdatedAt || 0) < baseUpdatedAt ||
+      startState.previewSnapshotVersion !== deps.rendererVersion
+
+    if (isContentStale) {
+      void deps.syncBoard(boardId).catch((error) => {
+        if (deps.isNameConflictError(error)) return
+        deps.warn('[boards] failed to sync refreshed preview', boardId, error)
+      })
     }
-    void deps.syncBoard(boardId).catch((error) => {
-      if (deps.isNameConflictError(error)) return
-      deps.warn('[boards] failed to sync refreshed preview', boardId, error)
-    })
   }
 
   async function runQueue() {
@@ -189,11 +303,43 @@ export function createBoardPreviewRefreshQueue(
       'preview-stale-check',
     )
     boards.forEach((board) => {
-      if (isPreviewStaleState(states.get(board.id) ?? null)) {
+      if (isPreviewStaleState(states.get(board.id) ?? null, board.id)) {
         enqueue(board.id)
       }
     })
     void runQueue()
+  }
+
+  function handleThemeChange(isDark: boolean, boards: BoardMeta[]) {
+    const nextTheme: 'dark' | 'light' = isDark ? 'dark' : 'light'
+    if (currentTheme === nextTheme) return
+    currentTheme = nextTheme
+    invalidate()
+
+    const states = readLatestBoardStates(
+      boards.map((board) => board.id),
+      'preview-theme-change',
+    )
+    const nextMap = { ...previewMap.value }
+    const staleBoardIds: string[] = []
+
+    boards.forEach((board) => {
+      const state = states.get(board.id)
+      if (!state) return
+      const cachedPreview = getCachedThemePreview(board.id, state, nextTheme)
+      if (cachedPreview !== null) {
+        nextMap[board.id] = cachedPreview
+      } else {
+        staleBoardIds.push(board.id)
+      }
+    })
+
+    previewMap.value = nextMap
+
+    if (staleBoardIds.length > 0) {
+      staleBoardIds.forEach((id) => enqueue(id))
+      void runQueue()
+    }
   }
 
   function invalidate() {
@@ -211,6 +357,7 @@ export function createBoardPreviewRefreshQueue(
     previewMap,
     reloadFromLocal,
     schedule,
+    handleThemeChange,
     invalidate,
     dispose,
   }

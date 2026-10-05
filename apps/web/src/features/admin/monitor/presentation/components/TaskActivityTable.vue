@@ -17,7 +17,7 @@
       <AdminColumn :style="{ width: adminMonitorColumnWidths.timestamp }">
         <template #header>
           <div class="flex items-center gap-1.5 font-sans">
-            <span class="font-semibold text-muted-foreground text-xs">{{
+            <span class="font-semibold text-foreground text-xs">{{
               MONITOR_MESSAGES.timestampColumn
             }}</span>
             <span class="font-mono text-admin-caption text-muted-foreground font-normal"

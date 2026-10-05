@@ -12,7 +12,7 @@
         :class="tableClass"
         :style="props.tableStyle"
       >
-        <thead class="bg-muted/40">
+        <thead class="bg-background">
           <tr>
             <th
               v-for="col in columns"

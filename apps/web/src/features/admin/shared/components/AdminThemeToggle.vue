@@ -15,8 +15,9 @@
       <div
         role="radiogroup"
         aria-label="主题外观"
-        @keydown="handleThemeKeydown"
+        tabindex="-1"
         class="flex h-8 w-full items-center rounded-lg border border-border bg-muted/60 p-0.5"
+        @keydown="handleThemeKeydown"
       >
         <button
           type="button"
@@ -82,25 +83,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useTheme } from '@/shared/theme/composables/useTheme'
+import { createThemeKeyboardHandler } from '@/shared/theme/composables/themeKeyboard'
 
 const { mode, isDark, setTheme } = useTheme()
 
-const themeModes = ['light', 'dark', 'auto'] as const
-
-function handleThemeKeydown(event: KeyboardEvent) {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  const current = themeModes.indexOf(mode.value)
-  const next =
-    event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? 2
-        : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3
-  setTheme(themeModes[next] ?? 'auto')
-  requestAnimationFrame(() => {
-    const group = event.currentTarget as HTMLElement
-    ;(group.querySelectorAll('[role="radio"]')[next] as HTMLElement | undefined)?.focus()
-  })
-}
+const handleThemeKeydown = createThemeKeyboardHandler({ mode, setTheme })
 </script>

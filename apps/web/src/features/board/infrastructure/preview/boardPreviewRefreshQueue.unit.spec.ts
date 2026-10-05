@@ -71,6 +71,9 @@ function makeDeps(states: Record<string, BoardState | null>): BoardPreviewRefres
     rendererVersion: 8,
     now: vi.fn(() => 500),
     warn: vi.fn(),
+    getCurrentTheme: () => 'light',
+    getPreviewTheme: () => 'light',
+    setPreviewTheme: vi.fn(),
   }
 }
 
@@ -156,6 +159,77 @@ describe('boardPreviewRefreshQueue', () => {
 
     expect(deps.setPreviewSnapshot).toHaveBeenCalledTimes(1)
     expect(queue.previewMap.value.boardA).toBe('deduped-preview')
+  })
+
+  it('refreshes a historical snapshot when its preview theme metadata is missing', async () => {
+    const states = {
+      boardA: makeState({
+        previewSnapshotDataUrl: 'legacy-preview',
+        previewSnapshotUpdatedAt: 150,
+        previewSnapshotVersion: 8,
+        updatedAt: 100,
+      }),
+    }
+    const deps = makeDeps(states)
+    deps.getPreviewTheme = vi.fn(() => null)
+    const queue = createBoardPreviewRefreshQueue(deps)
+    const board = makeBoard('boardA')
+
+    queue.reloadFromLocal([board])
+    expect(queue.previewMap.value.boardA).toBe('')
+    queue.schedule([board])
+    await flushPromises()
+
+    expect(deps.renderPreview).toHaveBeenCalledTimes(1)
+    expect(queue.previewMap.value.boardA).toBe('data:image/png;base64,preview')
+  })
+
+  it('drops an in-flight render from the previous theme after a theme change', async () => {
+    const lightGate = deferred<string>()
+    const states = { boardA: makeState({ updatedAt: 100 }) }
+    const deps = makeDeps(states)
+    vi.mocked(deps.renderPreview)
+      .mockReturnValueOnce(lightGate.promise)
+      .mockResolvedValueOnce('fresh-dark-preview')
+    const queue = createBoardPreviewRefreshQueue(deps)
+    const board = makeBoard('boardA')
+
+    queue.schedule([board])
+    await nextTick()
+    queue.handleThemeChange?.(true, [board])
+    lightGate.resolve('stale-light-preview')
+    await flushPromises()
+
+    expect(deps.renderPreview).toHaveBeenCalledTimes(2)
+    expect(deps.renderPreview).toHaveBeenLastCalledWith(expect.anything(), { isDark: true })
+    expect(deps.setPreviewSnapshot).toHaveBeenCalledTimes(1)
+    expect(deps.setPreviewSnapshot).toHaveBeenCalledWith('boardA', 'fresh-dark-preview', 500, 8)
+  })
+
+  it('requeues every board after a theme change, including ids already queued', async () => {
+    const lightGate = deferred<string>()
+    const states = {
+      boardA: makeState({ updatedAt: 100 }),
+      boardB: makeState({ updatedAt: 100 }),
+    }
+    const deps = makeDeps(states)
+    vi.mocked(deps.renderPreview)
+      .mockReturnValueOnce(lightGate.promise)
+      .mockResolvedValueOnce('dark-a')
+      .mockResolvedValueOnce('dark-b')
+    const queue = createBoardPreviewRefreshQueue(deps)
+    const boards = [makeBoard('boardA'), makeBoard('boardB')]
+
+    queue.schedule(boards)
+    await nextTick()
+    queue.handleThemeChange?.(true, boards)
+    lightGate.resolve('stale-light-a')
+    await flushPromises()
+    await flushPromises()
+
+    expect(deps.renderPreview).toHaveBeenCalledTimes(3)
+    expect(deps.setPreviewSnapshot).toHaveBeenCalledWith('boardA', 'dark-a', 500, 8)
+    expect(deps.setPreviewSnapshot).toHaveBeenCalledWith('boardB', 'dark-b', 500, 8)
   })
 
   it('drops a stale render after the Boards Catalog invalidates the prior scope', async () => {
@@ -352,5 +426,47 @@ describe('boardPreviewRefreshQueue', () => {
     expect(deps.getBoardStates).toHaveBeenCalledWith(['boardA', 'boardB', 'boardC'])
     await flushPromises()
     expect(queue.previewMap.value.boardA).toBe('data:image/png;base64,preview')
+  })
+
+  it('switches preview snapshots when theme changes and caches by theme', async () => {
+    const states = {
+      boardA: makeState({
+        updatedAt: 100,
+        previewSnapshotDataUrl: 'light-preview',
+        previewSnapshotUpdatedAt: 150,
+        previewSnapshotVersion: 8,
+      }),
+    }
+    const deps = makeDeps(states)
+    deps.getCurrentTheme = vi.fn((): 'light' => 'light')
+    let currentMockTheme: 'dark' | 'light' = 'light'
+    deps.getPreviewTheme = vi.fn(() => currentMockTheme)
+    deps.setPreviewTheme = vi.fn((_id, theme) => {
+      currentMockTheme = theme
+    })
+    vi.mocked(deps.renderPreview).mockImplementation(async (_state, options) => {
+      return options?.isDark ? 'dark-preview-rendered' : 'light-preview-rendered'
+    })
+
+    const queue = createBoardPreviewRefreshQueue(deps)
+    const boards = [makeBoard('boardA')]
+
+    queue.reloadFromLocal(boards)
+    expect(queue.previewMap.value.boardA).toBe('light-preview')
+
+    // Switch theme to dark: since dark preview is not cached yet, queue refreshes in background with isDark: true
+    queue.handleThemeChange?.(true, boards)
+    await flushPromises()
+
+    expect(deps.renderPreview).toHaveBeenCalledWith(expect.anything(), { isDark: true })
+    expect(queue.previewMap.value.boardA).toBe('dark-preview-rendered')
+    // Background theme switch preview re-renders must NOT trigger remote sync
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+
+    // Switch theme back to light: immediately retrieves cached light preview without re-rendering
+    vi.mocked(deps.renderPreview).mockClear()
+    queue.handleThemeChange?.(false, boards)
+    expect(queue.previewMap.value.boardA).toBe('light-preview')
+    expect(deps.renderPreview).not.toHaveBeenCalled()
   })
 })

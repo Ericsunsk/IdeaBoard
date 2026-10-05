@@ -9,6 +9,7 @@
 export { useWorkspaceAccountControls } from './shell/useWorkspaceAccountControls'
 export type { WorkspaceNavigationAdapter } from './shell/useWorkspaceAccountControls'
 export { default as WorkspaceNavigation } from './shell/components/WorkspaceNavigation.vue'
+export { default as WorkspaceHeader } from './shell/components/WorkspaceHeader.vue'
 export {
   classifyWorkspaceAccessError,
   fetchAllWorkspaces,

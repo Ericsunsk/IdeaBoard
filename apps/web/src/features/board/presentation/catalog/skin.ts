@@ -20,13 +20,20 @@ export const catalogClasses = {
     'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60',
   createButton:
     'cursor-pointer !h-[42px] !rounded-full !border-0 !bg-primary !px-5 !text-sm !font-bold !tracking-normal !text-primary-foreground !shadow-none hover:!bg-primary/90 focus-visible:!ring-2 focus-visible:!ring-ring !w-full md:!w-auto',
-  searchWrap:
-    'page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-full border border-border bg-card/85 px-3 backdrop-blur-md transition-[border-color,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-input focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20',
-  searchIcon: 'size-3.5 shrink-0 text-muted-foreground',
+  searchWrap: 'page-chrome-surface flex h-[42px] min-w-0 items-center gap-2 rounded-full p-1.5',
+  searchIcon: 'ml-2 size-3.5 shrink-0 text-muted-foreground',
   searchInput:
-    'min-w-0 flex-1 bg-transparent text-admin-body text-foreground outline-none placeholder:text-muted-foreground',
+    'min-h-8 min-w-0 flex-1 bg-transparent px-1 text-admin-body text-foreground outline-none placeholder:text-muted-foreground',
+  searchClearButton:
+    'grid size-7 shrink-0 cursor-pointer place-items-center rounded-full bg-muted text-muted-foreground transition-[background-color,color,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 hover:bg-border hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mr-0.5',
   sortSelectTrigger:
-    'inline-flex h-[42px] w-[108px] min-w-[108px] cursor-pointer items-center justify-between gap-2 rounded-full border border-border bg-card/85 px-3 text-admin-body font-semibold text-foreground backdrop-blur-md shadow-xs transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-input hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full md:w-[108px]',
+    'page-chrome-surface group inline-flex h-[42px] w-full min-w-[108px] cursor-pointer items-center justify-between gap-2 rounded-full border-[var(--color-page-chrome-border)] bg-[var(--color-page-chrome-bg)] px-3.5 text-admin-body font-semibold text-foreground shadow-none backdrop-blur-[var(--blur-glass)] transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-page-chrome-border-hover)] hover:bg-[var(--color-page-chrome-bg-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-[108px]',
+  sortSelectIcon:
+    'size-3.5 shrink-0 text-muted-foreground transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-data-[state=open]:rotate-180',
+  sortSelectContent:
+    'ib-user-account-menu-panel w-32 min-w-32 max-w-[8rem] rounded-xl border border-border bg-popover/95 p-1 shadow-lg backdrop-blur-md',
+  sortSelectItem:
+    'control-state flex w-full cursor-pointer select-none items-center rounded-lg px-2.5 py-2 text-admin-body font-semibold text-[var(--app-overlay-menu-item-color,var(--color-muted-foreground))] no-underline transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-[var(--app-overlay-menu-item-hover-bg,var(--color-accent-hover))] hover:text-[var(--app-overlay-menu-item-hover-color,var(--color-foreground))] focus:bg-[var(--app-overlay-menu-item-hover-bg,var(--color-accent-hover))] focus:text-[var(--app-overlay-menu-item-hover-color,var(--color-foreground))] data-[state=checked]:bg-muted data-[state=checked]:text-foreground data-[state=checked]:font-semibold',
   loadingState:
     'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30',
   loadingSpinner: '!h-9 !w-9 text-primary',

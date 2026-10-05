@@ -300,4 +300,63 @@ describe('createGalleryController', () => {
     expect(harness.controller.viewModel.pendingDeleteBoard.value).toBeNull()
     expect(harness.preview.invalidate).toHaveBeenCalledOnce()
   })
+
+  it('notifies preview of theme changes when theme dependency is provided', async () => {
+    const isDark = ref(false)
+    const boards = ref([makeBoard('board-1')])
+    const handleThemeChange = vi.fn()
+    const preview: BoardPreviewRefreshQueue = {
+      previewMap: ref({}),
+      reloadFromLocal: vi.fn(),
+      schedule: vi.fn(),
+      handleThemeChange,
+      invalidate: vi.fn(),
+      dispose: vi.fn(),
+    }
+    const catalog: BoardRepository = {
+      viewModel: {
+        scope: ref('user-1'),
+        boards,
+        byId: computed(() => new Map()),
+      },
+      commands: {
+        hydrate: vi.fn(async () => ({ ok: true as const })),
+        create: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
+        rename: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
+        duplicate: vi.fn(async () => ({ ok: true as const, board: makeBoard('b') })),
+        delete: vi.fn(async () => ({ ok: true as const, remoteWasMissing: false })),
+      },
+      dispose: vi.fn(),
+    }
+
+    const controller = createGalleryController({
+      catalog,
+      preview,
+      navigation: { openBoard: vi.fn() },
+      feedback: {
+        createFailed: vi.fn(),
+        renameValidationFailed: vi.fn(),
+        renameSyncFailed: vi.fn(),
+        renamed: vi.fn(),
+        copyFailed: vi.fn(),
+        copied: vi.fn(),
+        deleteFailed: vi.fn(),
+        deleted: vi.fn(),
+        catalogSyncFailed: vi.fn(),
+        catalogReloaded: vi.fn(),
+      },
+      theme: { isDark },
+      warn: vi.fn(),
+    })
+
+    expect(handleThemeChange).not.toHaveBeenCalled()
+    isDark.value = true
+    await nextTick()
+
+    expect(handleThemeChange).toHaveBeenCalledWith(true, [
+      expect.objectContaining({ id: 'board-1' }),
+    ])
+
+    controller.dispose()
+  })
 })

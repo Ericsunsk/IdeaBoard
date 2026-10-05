@@ -12,8 +12,18 @@ describe('AdminThemeToggle', () => {
 
     await user.click(button)
 
-    expect(await screen.findByRole('menuitem', { name: /明亮/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /暗黑/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /跟随系统/i })).toBeInTheDocument()
+    const group = await screen.findByRole('radiogroup', { name: '主题外观' })
+    expect(group).toBeVisible()
+
+    const lightRadio = screen.getByRole('radio', { name: /明亮/i })
+    const darkRadio = screen.getByRole('radio', { name: /暗黑/i })
+    const systemRadio = screen.getByRole('radio', { name: /跟随系统/i })
+
+    expect(lightRadio).toBeVisible()
+    expect(darkRadio).toBeVisible()
+    expect(systemRadio).toBeVisible()
+
+    await user.click(darkRadio)
+    expect(darkRadio).toHaveAttribute('aria-checked', 'true')
   })
 })
