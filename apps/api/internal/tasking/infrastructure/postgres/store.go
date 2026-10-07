@@ -10,6 +10,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/workspacetasks"
@@ -26,8 +27,9 @@ const defaultTaskPriority = int32(2)
 
 // Store implements the split workspace-task persistence seams.
 type Store struct {
-	db *pgxpool.Pool
-	q  *dbsqlc.Queries
+	db     *pgxpool.Pool
+	q      *dbsqlc.Queries
+	outbox *events.TaskStatusOutboxStore
 }
 
 // Compile-time convergence with each minimal persistence seam.
@@ -45,7 +47,7 @@ type repositoryQueryer struct {
 
 // NewStore builds a postgres workspace task Store over pool.
 func NewStore(db *pgxpool.Pool) *Store {
-	return &Store{db: db, q: dbsqlc.New(db)}
+	return &Store{db: db, q: dbsqlc.New(db), outbox: events.NewTaskStatusOutboxStore(db)}
 }
 
 func (s *Store) dbWithContext(ctx context.Context) repositoryQueryer {
@@ -285,7 +287,17 @@ func getTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID, tas
 // facts; the repository re-validates the discriminated union (canonical
 // workflow kind, asset shapes, params) so direct callers fail closed too.
 func (s *Store) CreateTask(ctx context.Context, task *workspacetasks.WorkspaceTask) (*workspacetasks.WorkspaceTask, error) {
-	return createTaskWithQueries(ctx, s.dbWithContext(ctx).q, task)
+	var created *workspacetasks.WorkspaceTask
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		var err error
+		created, err = createTaskWithQueries(ctx, q, task)
+		if err != nil {
+			return err
+		}
+		return s.insertTaskOutboxTx(ctx, tx, created, workspacetasks.StatusPending, events.EventV1TaskCreated,
+			events.V1TaskCreatedData{TaskID: created.ID, Service: created.Service})
+	})
+	return created, err
 }
 
 // CreateTaskInTx inserts a pending task inside the caller's settlement
@@ -294,7 +306,15 @@ func (s *Store) CreateTaskInTx(ctx context.Context, tx pgx.Tx, task *workspaceta
 	if tx == nil {
 		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
-	return createTaskWithQueries(ctx, s.q.WithTx(tx), task)
+	created, err := createTaskWithQueries(ctx, s.q.WithTx(tx), task)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.insertTaskOutboxTx(ctx, tx, created, workspacetasks.StatusPending, events.EventV1TaskCreated,
+		events.V1TaskCreatedData{TaskID: created.ID, Service: created.Service}); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 // CreateBillingFactsInTx records the immutable quote and initial settlement
@@ -341,6 +361,48 @@ func nilIfEmpty(value string) any {
 		return nil
 	}
 	return value
+}
+
+func taskOutboxRecord(task *workspacetasks.WorkspaceTask, status workspacetasks.Status, eventType string, data any) (events.TaskStatusOutboxRecord, error) {
+	if task == nil {
+		return events.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: outbox task is nil")
+	}
+	raw := json.RawMessage(`{}`)
+	if data != nil {
+		encoded, err := json.Marshal(data)
+		if err != nil {
+			return events.TaskStatusOutboxRecord{}, fmt.Errorf("tasking postgres: encode outbox event: %w", err)
+		}
+		raw = encoded
+	}
+	return events.TaskStatusOutboxRecord{
+		EventID:      events.StableTaskEventID(task.ID, events.TaskStatus(status), task.ExecutionToken),
+		WorkspaceID:  task.WorkspaceID,
+		TaskID:       task.ID,
+		Status:       events.TaskStatus(status),
+		EventType:    eventType,
+		EventVersion: 1,
+		ActorType:    events.V1ActorService,
+		ActorID:      "tasking",
+		ResourceType: events.V1ResourceTask,
+		ResourceID:   task.ID,
+		EventData:    raw,
+		OccurredAt:   task.UpdatedAt.UTC(),
+	}, nil
+}
+
+func (s *Store) insertTaskOutboxTx(ctx context.Context, tx pgx.Tx, task *workspacetasks.WorkspaceTask, status workspacetasks.Status, eventType string, data any) error {
+	if s == nil || s.outbox == nil {
+		return nil
+	}
+	record, err := taskOutboxRecord(task, status, eventType, data)
+	if err != nil {
+		return err
+	}
+	if record.OccurredAt.IsZero() {
+		record.OccurredAt = time.Now().UTC()
+	}
+	return s.outbox.InsertTx(ctx, tx, record)
 }
 
 // SetBillingSettlementInTx updates only the mutable settlement read model.
@@ -659,7 +721,17 @@ func (s *Store) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken s
 	if leaseToken == "" {
 		return nil, fmt.Errorf("tasking postgres: lease token required: %w", workspacetasks.ErrValidation)
 	}
-	row, err := s.dbWithContext(ctx).q.ClaimWorkspaceTask(ctx, dbsqlc.ClaimWorkspaceTaskParams{
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+	row, err := s.q.WithTx(tx).ClaimWorkspaceTask(ctx, dbsqlc.ClaimWorkspaceTaskParams{
 		LeaseToken:        leaseToken,
 		PublicID:          taskID,
 		WorkspacePublicID: workspaceID,
@@ -670,7 +742,19 @@ func (s *Store) ClaimTask(ctx context.Context, workspaceID, taskID, leaseToken s
 		}
 		return nil, err
 	}
-	return s.mapRowWithOutputs(ctx, workspaceID, row)
+	claimed, err := s.mapRowWithOutputsWithQueries(ctx, s.q.WithTx(tx), workspaceID, row)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.insertTaskOutboxTx(ctx, tx, claimed, workspacetasks.StatusRunning, events.EventV1TaskRunning,
+		events.V1TaskRunningData{TaskID: claimed.ID}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	committed = true
+	return claimed, nil
 }
 
 // claimRowToTask narrows the merged claim row back to the task projection the
@@ -741,7 +825,17 @@ func (s *Store) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, l
 	if start.RiverJobID < 0 {
 		return nil, false, fmt.Errorf("tasking postgres: attempt river job id is negative")
 	}
-	row, err := s.dbWithContext(ctx).q.ClaimWorkspaceTaskWithAttempt(ctx, dbsqlc.ClaimWorkspaceTaskWithAttemptParams{
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+	row, err := s.q.WithTx(tx).ClaimWorkspaceTaskWithAttempt(ctx, dbsqlc.ClaimWorkspaceTaskWithAttemptParams{
 		LeaseToken:        leaseToken,
 		PublicID:          taskID,
 		WorkspacePublicID: workspaceID,
@@ -759,10 +853,20 @@ func (s *Store) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, l
 		}
 		return nil, false, err
 	}
-	claimed, err := s.mapRowWithOutputs(ctx, workspaceID, claimRowToTask(row))
+	claimed, err := s.mapRowWithOutputsWithQueries(ctx, s.q.WithTx(tx), workspaceID, claimRowToTask(row))
 	if err != nil {
 		return nil, false, err
 	}
+	if row.AttemptStarted {
+		if err := s.insertTaskOutboxTx(ctx, tx, claimed, workspacetasks.StatusRunning, events.EventV1TaskRunning,
+			events.V1TaskRunningData{TaskID: claimed.ID}); err != nil {
+			return nil, false, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, err
+	}
+	committed = true
 	return claimed, row.AttemptStarted, nil
 }
 
@@ -770,7 +874,18 @@ func (s *Store) ClaimTaskWithAttempt(ctx context.Context, workspaceID, taskID, l
 // and releases the lease. Terminal tasks replay idempotently
 // (already=true).
 func (s *Store) CancelTask(ctx context.Context, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
-	return cancelTaskWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, actorUserID, reason)
+	var cancelled *workspacetasks.WorkspaceTask
+	var already bool
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		var err error
+		cancelled, already, err = cancelTaskWithQueries(ctx, s, q, workspaceID, taskID, actorUserID, reason)
+		if err != nil || already {
+			return err
+		}
+		return s.insertTaskOutboxTx(ctx, tx, cancelled, workspacetasks.StatusCancelled, events.EventV1TaskCancelled,
+			events.V1TaskCancelledData{TaskID: cancelled.ID, CancelReason: cancelled.CancelReason})
+	})
+	return cancelled, already, err
 }
 
 // CancelTaskInTx flips to cancelled inside the caller's settlement
@@ -779,7 +894,15 @@ func (s *Store) CancelTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, task
 	if tx == nil {
 		return nil, false, fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
-	return cancelTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, actorUserID, reason)
+	cancelled, already, err := cancelTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, actorUserID, reason)
+	if err != nil || already {
+		return cancelled, already, err
+	}
+	if err := s.insertTaskOutboxTx(ctx, tx, cancelled, workspacetasks.StatusCancelled, events.EventV1TaskCancelled,
+		events.V1TaskCancelledData{TaskID: cancelled.ID, CancelReason: cancelled.CancelReason}); err != nil {
+		return nil, false, err
+	}
+	return cancelled, false, nil
 }
 
 func cancelTaskWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID string, actorUserID int64, reason string) (*workspacetasks.WorkspaceTask, bool, error) {
@@ -919,7 +1042,16 @@ func (s *Store) AddOutputs(ctx context.Context, workspaceID, taskID string, outp
 // pending with retry_count incremented, the lease released, and the fresh
 // execution token recorded in the envelope.
 func (s *Store) TransitionForRetry(ctx context.Context, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
-	return transitionForRetryWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, newToken)
+	var retried *workspacetasks.WorkspaceTask
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		var err error
+		retried, err = transitionForRetryWithQueries(ctx, s, q, workspaceID, taskID, newToken)
+		if err != nil {
+			return err
+		}
+		return s.insertTaskOutboxTx(ctx, tx, retried, workspacetasks.StatusPending, "", nil)
+	})
+	return retried, err
 }
 
 // TransitionForRetryInTx consumes one retry budget entry inside the
@@ -928,7 +1060,14 @@ func (s *Store) TransitionForRetryInTx(ctx context.Context, tx pgx.Tx, workspace
 	if tx == nil {
 		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
-	return transitionForRetryWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, newToken)
+	retried, err := transitionForRetryWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, newToken)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.insertTaskOutboxTx(ctx, tx, retried, workspacetasks.StatusPending, "", nil); err != nil {
+		return nil, err
+	}
+	return retried, nil
 }
 
 func transitionForRetryWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID, newToken string) (*workspacetasks.WorkspaceTask, error) {
@@ -969,13 +1108,14 @@ func (s *Store) CompleteTask(ctx context.Context, workspaceID, taskID string, ou
 		}
 	}
 	var completed *workspacetasks.WorkspaceTask
-	err := dbutil.WithTx(ctx, s.db, func(q *dbsqlc.Queries) error {
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
 		done, err := completeTaskWithQueries(ctx, q, workspaceID, taskID, outputs)
 		if err != nil {
 			return err
 		}
 		completed = done
-		return nil
+		return s.insertTaskOutboxTx(ctx, tx, completed, workspacetasks.StatusCompleted, events.EventV1TaskCompleted,
+			events.V1TaskCompletedData{TaskID: completed.ID, OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs"})
 	})
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -1011,6 +1151,10 @@ func (s *Store) CompleteTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, ta
 		}
 		return nil, err
 	}
+	if err := s.insertTaskOutboxTx(ctx, tx, completed, workspacetasks.StatusCompleted, events.EventV1TaskCompleted,
+		events.V1TaskCompletedData{TaskID: completed.ID, OutputsURI: "/api/v1/workspaces/" + completed.WorkspaceID + "/tasks/" + completed.ID + "/outputs"}); err != nil {
+		return nil, err
+	}
 	return completed, nil
 }
 
@@ -1035,7 +1179,17 @@ func completeTaskWithQueries(ctx context.Context, q *dbsqlc.Queries, workspaceID
 // FailTask flips a live task to failed with the terminal error and
 // releases the lease.
 func (s *Store) FailTask(ctx context.Context, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {
-	return failTaskWithQueries(ctx, s, s.dbWithContext(ctx).q, workspaceID, taskID, errorMsg)
+	var failed *workspacetasks.WorkspaceTask
+	err := dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		var err error
+		failed, err = failTaskWithQueries(ctx, s, q, workspaceID, taskID, errorMsg)
+		if err != nil {
+			return err
+		}
+		return s.insertTaskOutboxTx(ctx, tx, failed, workspacetasks.StatusFailed, events.EventV1TaskFailed,
+			events.V1TaskFailedData{TaskID: failed.ID, ErrorCode: "task_failed"})
+	})
+	return failed, err
 }
 
 // FailTaskInTx flips to failed inside the caller's settlement transaction
@@ -1044,7 +1198,15 @@ func (s *Store) FailTaskInTx(ctx context.Context, tx pgx.Tx, workspaceID, taskID
 	if tx == nil {
 		return nil, fmt.Errorf("tasking postgres: settlement transaction is nil")
 	}
-	return failTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, errorMsg)
+	failed, err := failTaskWithQueries(ctx, s, s.q.WithTx(tx), workspaceID, taskID, errorMsg)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.insertTaskOutboxTx(ctx, tx, failed, workspacetasks.StatusFailed, events.EventV1TaskFailed,
+		events.V1TaskFailedData{TaskID: failed.ID, ErrorCode: "task_failed"}); err != nil {
+		return nil, err
+	}
+	return failed, nil
 }
 
 func failTaskWithQueries(ctx context.Context, s *Store, q *dbsqlc.Queries, workspaceID, taskID, errorMsg string) (*workspacetasks.WorkspaceTask, error) {

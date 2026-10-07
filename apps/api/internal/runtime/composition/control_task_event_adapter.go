@@ -65,6 +65,7 @@ func newControlTaskEventAdapter(
 func (a *controlTaskEventAdapter) PublishTaskStatus(ctx context.Context, event httpapi.ControlTaskStatusEvent) error {
 	return events.PublishTaskStatusBestEffort(ctx, a.status, events.TaskStatusEvent{
 		Type:       events.EventTypeTaskStatusChanged,
+		EventID:    event.EventID,
 		TaskID:     event.TaskID,
 		Status:     events.TaskStatus(event.Status),
 		OccurredAt: event.OccurredAt,
@@ -95,13 +96,30 @@ func (a *controlTaskEventAdapter) EmitWorkspaceTaskEvent(ctx context.Context, ev
 		slog.Warn("control task transition has no workspace payload", "task_id", event.TaskID, "type", typ)
 		return nil
 	}
-	envelope, err := events.MintV1Envelope(
-		typ,
-		event.WorkspaceID,
-		controlPlaneActor(event.ActorUserID),
-		events.V1Resource{Type: events.V1ResourceTask, ID: event.TaskID},
-		data,
-	)
+	var envelope events.V1Envelope
+	var err error
+	if strings.TrimSpace(event.EventID) != "" {
+		envelope, err = events.MintV1EnvelopeWithID(
+			event.EventID,
+			typ,
+			event.WorkspaceID,
+			events.V1Actor{Type: events.V1ActorService, ID: "tasking"},
+			events.V1Resource{Type: events.V1ResourceTask, ID: event.TaskID},
+			data,
+		)
+		envelope.OccurredAt = event.OccurredAt.UTC()
+		if err == nil {
+			err = events.ValidateV1Envelope(envelope)
+		}
+	} else {
+		envelope, err = events.MintV1Envelope(
+			typ,
+			event.WorkspaceID,
+			controlPlaneActor(event.ActorUserID),
+			events.V1Resource{Type: events.V1ResourceTask, ID: event.TaskID},
+			data,
+		)
+	}
 	if err != nil {
 		slog.Warn("mint control workspace event failed", "type", typ, "task_id", event.TaskID, "err", err)
 		return nil

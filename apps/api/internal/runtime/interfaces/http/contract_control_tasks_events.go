@@ -57,6 +57,7 @@ import (
 //     projection so the adapter can emit billing.settled without exposing
 //     amounts. They are empty for transitions without a settlement fact.
 type ControlTaskStatusEvent struct {
+	EventID           string
 	WorkspaceID       string
 	TaskID            string
 	Status            string

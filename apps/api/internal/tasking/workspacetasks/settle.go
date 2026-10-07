@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/platform/telemetry"
 	"ideaboard/api/internal/workflow"
@@ -123,8 +124,13 @@ func (s *Service) StagedEvents() []TaskEvent {
 }
 
 func (s *Service) stage(taskID, workspaceID string, status Status) {
+	s.stageWithToken(taskID, workspaceID, status, "")
+}
+
+func (s *Service) stageWithToken(taskID, workspaceID string, status Status, executionToken string) {
 	s.events = append(s.events, TaskEvent{
-		TaskID: taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: s.clock(),
+		EventID: events.StableTaskEventID(taskID, events.TaskStatus(status), executionToken),
+		TaskID:  taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: s.clock(),
 	})
 }
 
@@ -326,7 +332,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		}
 		return nil, fmt.Errorf("workspacetasks: enqueue: %w", err)
 	}
-	s.stage(created.ID, created.WorkspaceID, StatusPending)
+	s.stageWithToken(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken)
 	return created, nil
 }
 
@@ -428,7 +434,7 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 		}
 		flipped.BillingSnapshot.SettlementState = "released"
 	}
-	s.stage(taskID, workspaceID, StatusCancelled)
+	s.stageWithToken(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken)
 	return flipped, false, nil
 }
 
@@ -476,7 +482,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 		}
 		completed.BillingSnapshot.SettlementState = "captured"
 	}
-	s.stage(taskID, workspaceID, StatusCompleted)
+	s.stageWithToken(taskID, workspaceID, StatusCompleted, completed.ExecutionToken)
 	return completed, nil
 }
 
@@ -503,7 +509,7 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 		}
 		failed.BillingSnapshot.SettlementState = "released"
 	}
-	s.stage(taskID, workspaceID, StatusFailed)
+	s.stageWithToken(taskID, workspaceID, StatusFailed, failed.ExecutionToken)
 	return failed, nil
 }
 

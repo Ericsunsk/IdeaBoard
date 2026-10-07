@@ -302,7 +302,10 @@ func (b *NATSJetStreamEventBus) PublishTaskStatus(ctx context.Context, event Tas
 	if err != nil {
 		return fmt.Errorf("marshal task status event: %w", err)
 	}
-	msgID := fmt.Sprintf("%s:%s:%d", event.TaskID, event.Status, event.OccurredAt.UnixNano())
+	msgID := event.EventID
+	if strings.TrimSpace(msgID) == "" {
+		msgID = fmt.Sprintf("%s:%s:%d", event.TaskID, event.Status, event.OccurredAt.UnixNano())
+	}
 	return b.publishBridgeMessage(ctx, b.taskStatusSubject, msgID, payload, "publish task status event")
 }
 

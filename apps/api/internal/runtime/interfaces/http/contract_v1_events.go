@@ -363,11 +363,31 @@ func (h *contractV1Handler) deleteEventSubscription(c *gin.Context) {
 // follows. Callers invoke it AFTER the store commit succeeds, inside
 // the idempotency once-fn so replays never re-emit.
 func (h *contractV1Handler) emitWorkspaceEvent(ctx context.Context, identityPrincipal principal.Principal, workspaceID, typ string, resource events.V1Resource, data any) {
+	h.emitWorkspaceEventWithID(ctx, identityPrincipal, workspaceID, typ, resource, data, "", time.Time{})
+}
+
+// emitWorkspaceEventWithID is the durable-outbox bridge. When a task
+// transition already has an evt_ identity, reuse it and preserve its commit
+// timestamp so HTTP delivery and replay converge on the same envelope.
+func (h *contractV1Handler) emitWorkspaceEventWithID(ctx context.Context, identityPrincipal principal.Principal, workspaceID, typ string, resource events.V1Resource, data any, eventID string, occurredAt time.Time) {
 	if h == nil {
 		return
 	}
 	actor := events.V1Actor{Type: events.V1ActorUser, ID: tenancy.FormatUserPublicID(identityPrincipal.PublicID())}
-	envelope, err := events.MintV1Envelope(typ, workspaceID, actor, resource, data)
+	if strings.TrimSpace(eventID) != "" {
+		actor = events.V1Actor{Type: events.V1ActorService, ID: "tasking"}
+	}
+	var envelope events.V1Envelope
+	var err error
+	if strings.TrimSpace(eventID) != "" {
+		envelope, err = events.MintV1EnvelopeWithID(eventID, typ, workspaceID, actor, resource, data)
+		if occurredAt.IsZero() == false {
+			envelope.OccurredAt = occurredAt.UTC()
+			err = events.ValidateV1Envelope(envelope)
+		}
+	} else {
+		envelope, err = events.MintV1Envelope(typ, workspaceID, actor, resource, data)
+	}
 	if err != nil {
 		slog.Warn("mint workspace event failed", "type", typ, "workspace", workspaceID, "err", err)
 		return

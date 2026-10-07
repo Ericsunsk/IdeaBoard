@@ -20,6 +20,7 @@ import (
 	redmetrics "ideaboard/api/internal/runtime/infrastructure/metrics"
 	eventinterfaces "ideaboard/api/internal/runtime/interfaces/events"
 	workerbilling "ideaboard/api/internal/runtime/interfaces/worker/billing"
+	outboxworker "ideaboard/api/internal/runtime/interfaces/worker/outbox"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers"
 	"ideaboard/api/internal/runtime/interfaces/worker/providers/infrastructure"
 	workerriver "ideaboard/api/internal/runtime/interfaces/worker/river"
@@ -235,6 +236,11 @@ func newAppTaskRuntime(
 	workspaceSettlerBridge := newSettlerEventBridge(workspaceSettler, taskStatusPublisher, settlerEventDelivery{
 		log: workspaceEvents, bus: eventBus, webhooks: webhookStore,
 	})
+	taskStatusOutboxReplayer := &events.TaskStatusOutboxReplayer{
+		Store: events.NewTaskStatusOutboxStore(dbs.db), Status: taskStatusPublisher,
+		Workspace: workspaceEvents, Bus: eventBus, Webhooks: webhookStore,
+	}
+	taskStatusOutboxWorker := outboxworker.NewWorker(taskStatusOutboxReplayer)
 	workspaceMediaResolver := taskruntime.NewWorkspaceTaskRuntimeMediaResolver(workspaceMedia, services.storageService)
 	// Live dispatch finalize seam: provider image bytes land directly in
 	// workspace media assets (never legacy user storage), so Generate
@@ -350,12 +356,14 @@ func newAppTaskRuntime(
 	// #809 hard cut: the legacy task-retention periodic jobs are dropped
 	// with the retention service (no legacy store left to purge against).
 	// Workspace task lifecycle retention is #809-close work.
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(identityPeriodicJobs))
+	taskStatusOutboxPeriodicJobs := outboxworker.PeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(visionBillingPeriodicJobs)+len(settlementSweepPeriodicJobs)+len(taskStatusOutboxPeriodicJobs)+len(identityPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
 	periodicJobs = append(periodicJobs, settlementSweepPeriodicJobs...)
+	periodicJobs = append(periodicJobs, taskStatusOutboxPeriodicJobs...)
 	periodicJobs = append(periodicJobs, identityPeriodicJobs...)
 	// #809 hard cut: the legacy River task worker (old job kinds) is
 	// gone (see workerriver.NewRiverClient). Stray old-kind jobs
@@ -400,6 +408,9 @@ func newAppTaskRuntime(
 			// Final-timeout settlement sweep: converges abandoned Credit Holds
 			// through the worker's own settler bridge.
 			river.AddWorker(workers, settlementSweepWorker)
+			// Durable task status event replay shares the maintenance queue; the
+			// outbox row is the delivery retry fact, never the task queue.
+			river.AddWorker(workers, taskStatusOutboxWorker)
 			// Identity admin reconciliation: the dry-run scan worker and its
 			// schedule worker ride the same client (no new infra).
 			river.AddWorker(workers, identityreconciliation.NewExecuteWorker(identityAdminReconciler))
@@ -575,8 +586,12 @@ func (b *settlerEventBridge) flush(ctx context.Context, settleErr error) {
 		return
 	}
 	for _, event := range staged {
+		if strings.TrimSpace(event.EventID) == "" {
+			event.EventID = events.StableTaskEventID(event.TaskID, events.TaskStatus(event.Status), "")
+		}
 		statusEvent := events.TaskStatusEvent{
 			Type:       events.EventTypeTaskStatusChanged,
+			EventID:    event.EventID,
 			TaskID:     event.TaskID,
 			Status:     events.TaskStatus(event.Status),
 			OccurredAt: event.OccurredAt,
@@ -605,7 +620,8 @@ func (b *settlerEventBridge) emitWorkspaceEvent(ctx context.Context, event works
 	if !ok {
 		return
 	}
-	envelope, err := events.MintV1Envelope(
+	envelope, err := events.MintV1EnvelopeWithID(
+		event.EventID,
 		typ,
 		event.WorkspaceID,
 		events.V1Actor{Type: events.V1ActorService, ID: "workspace-task-worker"},

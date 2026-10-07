@@ -30,7 +30,11 @@ const (
 )
 
 type TaskStatusEvent struct {
-	Type       string     `json:"type"`
+	Type string `json:"type"`
+	// EventID is the durable outbox identity. It is optional on legacy
+	// callers, but every task transition persisted by the task store carries
+	// one so replay never mints a second identity.
+	EventID    string     `json:"event_id,omitempty"`
 	TaskID     string     `json:"task_id"`
 	Status     TaskStatus `json:"status"`
 	OccurredAt time.Time  `json:"occurred_at"`
@@ -52,6 +56,7 @@ func NewTaskStatusEvent(taskID, status string) TaskStatusEvent {
 }
 
 func NormalizeTaskStatusEvent(event TaskStatusEvent) TaskStatusEvent {
+	event.EventID = strings.TrimSpace(event.EventID)
 	event.TaskID = strings.TrimSpace(event.TaskID)
 	event.Status = TaskStatus(strings.TrimSpace(string(event.Status)))
 	if strings.TrimSpace(event.Type) == "" {

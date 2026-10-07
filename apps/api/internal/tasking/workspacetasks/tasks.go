@@ -258,6 +258,7 @@ func (t *WorkspaceTask) IsTerminal() bool {
 // TaskEvent is one staged status event. Events emit ONLY after commit
 // (for #807 task.* fanout); staging never publishes inside the txn.
 type TaskEvent struct {
+	EventID     string    `json:"event_id,omitempty"`
 	TaskID      string    `json:"task_id"`
 	WorkspaceID string    `json:"workspace_id"`
 	Status      Status    `json:"status"`

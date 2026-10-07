@@ -434,9 +434,9 @@ func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 				if !ok {
 					continue
 				}
-				h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
+				h.emitWorkspaceEventWithID(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
 					events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
-					events.V1TaskCreatedData{TaskID: staged.TaskID, Service: kind})
+					events.V1TaskCreatedData{TaskID: staged.TaskID, Service: kind}, staged.EventID, staged.OccurredAt)
 			}
 			h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
 				created.WorkspaceID, created.ID,
@@ -575,9 +575,9 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 					if !ok {
 						continue
 					}
-					h.emitWorkspaceEvent(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
+					h.emitWorkspaceEventWithID(c.Request.Context(), identityPrincipal, staged.WorkspaceID, typ,
 						events.V1Resource{Type: events.V1ResourceTask, ID: staged.TaskID},
-						events.V1TaskCancelledData{TaskID: staged.TaskID, CancelReason: reason})
+						events.V1TaskCancelledData{TaskID: staged.TaskID, CancelReason: reason}, staged.EventID, staged.OccurredAt)
 				}
 				h.emitTaskBillingSettled(c.Request.Context(), identityPrincipal,
 					cancelled.WorkspaceID, cancelled.ID,

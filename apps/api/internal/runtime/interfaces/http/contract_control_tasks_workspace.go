@@ -511,6 +511,7 @@ func (a *workspaceControlTaskAdapter) announceCancelTransitions(ctx context.Cont
 	}
 	for _, event := range staged {
 		published := ControlTaskStatusEvent{
+			EventID:           event.EventID,
 			WorkspaceID:       strings.TrimSpace(workspaceID),
 			TaskID:            strings.TrimSpace(event.TaskID),
 			Status:            string(event.Status),

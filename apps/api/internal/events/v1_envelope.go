@@ -194,16 +194,34 @@ type V1BillingSettledData struct {
 // contract.MintPublicID), UTC occurred_at, and the frozen version for
 // typ. Unknown types fail closed.
 func MintV1Envelope(typ, workspaceID string, actor V1Actor, resource V1Resource, data any) (V1Envelope, error) {
+	id, err := contract.MintPublicID(contract.PrefixEvent, 12)
+	if err != nil {
+		return V1Envelope{}, err
+	}
+	return MintV1EnvelopeWithID(id, typ, workspaceID, actor, resource, data)
+}
+
+// MintV1EnvelopeWithID builds a workspace envelope using a caller supplied
+// stable event identity. Durable task outbox replay uses this seam so a
+// process crash or a failed transport publish cannot mint a second SSE /
+// webhook cursor for the same committed transition.
+func MintV1EnvelopeWithID(id, typ, workspaceID string, actor V1Actor, resource V1Resource, data any) (V1Envelope, error) {
 	typ = strings.TrimSpace(typ)
 	version, ok := V1EventVersion(typ)
 	if !ok {
 		return V1Envelope{}, fmt.Errorf("events: unknown workspace event type %q", typ)
 	}
-	id, err := contract.MintPublicID(contract.PrefixEvent, 12)
-	if err != nil {
-		return V1Envelope{}, err
+	id = strings.TrimSpace(id)
+	if !contract.IsEventID(id) {
+		return V1Envelope{}, fmt.Errorf("events: event id must be evt_ opaque")
 	}
-	payload, err := json.Marshal(data)
+	var payload []byte
+	var err error
+	if raw, ok := data.(json.RawMessage); ok {
+		payload = append([]byte(nil), raw...)
+	} else {
+		payload, err = json.Marshal(data)
+	}
 	if err != nil {
 		return V1Envelope{}, fmt.Errorf("events: marshal %s data: %w", typ, err)
 	}
