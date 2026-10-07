@@ -42,16 +42,9 @@ CREATE TABLE users_used_uids (
   CONSTRAINT chk_users_used_uids_storage_uid CHECK (storage_uid ~ '^[A-Z0-9]{6}$')
 );
 
-
-
 -- Canonical objects introduced by the clean-break baseline.
 --
 --
-
-
-
-
-
 
 --
 -- Name: user_deletion_requests; Type: TABLE; Schema: public; Owner: -
@@ -68,7 +61,6 @@ CREATE TABLE user_deletion_requests (
     CONSTRAINT ck_user_deletion_requests_phase CHECK (((phase)::text = ANY (ARRAY[('pending_auth'::character varying)::text, ('pending_storage'::character varying)::text, ('pending_tombstone'::character varying)::text, ('completed'::character varying)::text])))
 );
 
-
 --
 -- Name: user_deletion_requests user_deletion_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -76,14 +68,12 @@ CREATE TABLE user_deletion_requests (
 ALTER TABLE ONLY user_deletion_requests
     ADD CONSTRAINT user_deletion_requests_pkey PRIMARY KEY (user_id);
 
-
 --
 -- Name: user_deletion_requests user_deletion_requests_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY user_deletion_requests
     ADD CONSTRAINT user_deletion_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT;
-
 
 --
 --
@@ -1110,7 +1100,6 @@ REVOKE ALL ON FUNCTION create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT
 REVOKE ALL ON FUNCTION release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
-
 CREATE FUNCTION start_credit_reconciliation(
   p_trigger_type TEXT,
   p_requested_by BIGINT,
@@ -1844,8 +1833,6 @@ REVOKE ALL ON FUNCTION apply_credit_posting_balances() FROM PUBLIC;
 REVOKE ALL ON FUNCTION validate_credit_transaction_balance() FROM PUBLIC;
 REVOKE ALL ON FUNCTION guard_credit_posting_transaction_scope() FROM PUBLIC;
 
-
-
 -- Canonical objects introduced by the clean-break baseline.
 -- Name: bind_credit_welcome_identity_key(text); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -1879,7 +1866,6 @@ BEGIN
 END;
 $_$;
 
-
 --
 -- Name: claim_credit_welcome(text, bigint); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -1906,7 +1892,6 @@ BEGIN
   RETURN TRUE;
 END;
 $_$;
-
 
 --
 -- Name: provision_credit_wallet(bigint); Type: FUNCTION; Schema: public; Owner: -
@@ -1936,7 +1921,6 @@ BEGIN
   ON CONFLICT DO NOTHING;
 END;
 $$;
-
 
 --
 -- Name: set_credit_wallet_status(bigint, text); Type: FUNCTION; Schema: public; Owner: -
@@ -1973,16 +1957,10 @@ AFTER INSERT ON users
 FOR EACH ROW
 EXECUTE FUNCTION ensure_credit_wallet_projection_on_user_insert();
 
-
 --
 
 --
 --
-
-
-
-
-
 
 --
 -- Name: credit_welcome_claims; Type: TABLE; Schema: public; Owner: -
@@ -1994,7 +1972,6 @@ CREATE TABLE credit_welcome_claims (
     claimed_at timestamp(3) with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_credit_welcome_claims_fingerprint CHECK ((identity_fingerprint ~ '^[0-9a-f]{64}$'::text))
 );
-
 
 --
 -- Name: credit_welcome_identity_key_guard; Type: TABLE; Schema: public; Owner: -
@@ -2008,14 +1985,12 @@ CREATE TABLE credit_welcome_identity_key_guard (
     CONSTRAINT credit_welcome_identity_key_guard_singleton_check CHECK (singleton)
 );
 
-
 --
 -- Name: credit_welcome_claims credit_welcome_claims_claimed_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY credit_welcome_claims
     ADD CONSTRAINT credit_welcome_claims_claimed_user_id_key UNIQUE (claimed_user_id);
-
 
 --
 -- Name: credit_welcome_claims credit_welcome_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2024,7 +1999,6 @@ ALTER TABLE ONLY credit_welcome_claims
 ALTER TABLE ONLY credit_welcome_claims
     ADD CONSTRAINT credit_welcome_claims_pkey PRIMARY KEY (identity_fingerprint);
 
-
 --
 -- Name: credit_welcome_identity_key_guard credit_welcome_identity_key_guard_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -2032,14 +2006,12 @@ ALTER TABLE ONLY credit_welcome_claims
 ALTER TABLE ONLY credit_welcome_identity_key_guard
     ADD CONSTRAINT credit_welcome_identity_key_guard_pkey PRIMARY KEY (singleton);
 
-
 --
 -- Name: credit_welcome_claims fk_credit_welcome_claims_user_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY credit_welcome_claims
     ADD CONSTRAINT fk_credit_welcome_claims_user_id FOREIGN KEY (claimed_user_id) REFERENCES users(id) ON DELETE RESTRICT;
-
 
 --
 --
@@ -2174,8 +2146,6 @@ CREATE TABLE storage_profile_secret_versions (
 CREATE UNIQUE INDEX uq_storage_profile_secret_versions_active ON storage_profile_secret_versions (profile_id, secret_name) WHERE status = 'active';
 CREATE INDEX idx_storage_profile_secret_versions_status ON storage_profile_secret_versions (status, expires_at);
 
-
-
 -- Canonical objects introduced by the clean-break baseline.
 -- Name: get_auth_runtime_settings(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -2221,7 +2191,6 @@ BEGIN
 END;
 $$;
 
-
 --
 -- Name: prevent_system_settings_admin_action_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -2235,16 +2204,10 @@ BEGIN
 END;
 $$;
 
-
 --
 
 --
 --
-
-
-
-
-
 
 --
 -- Name: system_settings_admin_actions; Type: TABLE; Schema: public; Owner: -
@@ -2261,7 +2224,6 @@ CREATE TABLE system_settings_admin_actions (
     CONSTRAINT system_settings_admin_actions_actor_id_check CHECK ((actor_id > 0))
 );
 
-
 --
 -- Name: system_settings_admin_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -2275,7 +2237,6 @@ ALTER TABLE system_settings_admin_actions ALTER COLUMN id ADD GENERATED ALWAYS A
     CACHE 1
 );
 
-
 --
 -- Name: system_settings_admin_actions system_settings_admin_actions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -2283,20 +2244,17 @@ ALTER TABLE system_settings_admin_actions ALTER COLUMN id ADD GENERATED ALWAYS A
 ALTER TABLE ONLY system_settings_admin_actions
     ADD CONSTRAINT system_settings_admin_actions_pkey PRIMARY KEY (id);
 
-
 --
 -- Name: idx_system_settings_admin_actions_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_system_settings_admin_actions_actor_id ON system_settings_admin_actions USING btree (actor_id, id DESC);
 
-
 --
 -- Name: system_settings_admin_actions system_settings_admin_actions_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER system_settings_admin_actions_append_only BEFORE DELETE OR UPDATE ON system_settings_admin_actions FOR EACH ROW EXECUTE FUNCTION prevent_system_settings_admin_action_mutation();
-
 
 --
 --
@@ -2318,7 +2276,6 @@ CREATE TABLE provider_endpoints (
 
 CREATE UNIQUE INDEX uq_provider_endpoints_name_lower ON provider_endpoints (lower(name));
 CREATE UNIQUE INDEX uq_provider_endpoints_api_type_base_url ON provider_endpoints (api_type, base_url);
-
 
 CREATE TABLE api_accounts (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -2360,8 +2317,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER prevent_api_account_provider_endpoint_change BEFORE UPDATE OF provider_endpoint_id ON api_accounts FOR EACH ROW EXECUTE FUNCTION prevent_api_account_provider_endpoint_change();
-
-
 
 CREATE TABLE api_account_secrets (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -3731,7 +3686,6 @@ BEGIN
 END;
 $_$;
 
-
 --
 -- Name: guard_task_billing_settlement_transition(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -3805,7 +3759,6 @@ BEGIN
 END;
 $$;
 
-
 --
 -- Name: prevent_billing_admin_action_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -3818,7 +3771,6 @@ BEGIN
   RAISE EXCEPTION USING ERRCODE = 'IB107', MESSAGE = 'billing admin actions are append-only';
 END;
 $$;
-
 
 --
 -- Name: prevent_billing_price_version_mutation(); Type: FUNCTION; Schema: public; Owner: -
@@ -3836,7 +3788,6 @@ BEGIN
   RAISE EXCEPTION USING ERRCODE = 'IB105', MESSAGE = 'billing price versions are immutable';
 END;
 $$;
-
 
 --
 -- Name: prevent_billing_sku_identity_mutation(); Type: FUNCTION; Schema: public; Owner: -
@@ -3860,7 +3811,6 @@ BEGIN
 END;
 $$;
 
-
 --
 -- Name: prevent_task_billing_snapshot_mutation(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -3873,7 +3823,6 @@ BEGIN
   RAISE EXCEPTION USING ERRCODE = 'IB201', MESSAGE = 'task billing snapshots are immutable';
 END;
 $$;
-
 
 --
 -- Name: publish_billing_price(text, text, text, bigint, bigint); Type: FUNCTION; Schema: public; Owner: -
@@ -3980,7 +3929,6 @@ BEGIN
 END;
 $_$;
 
-
 --
 -- Name: set_billing_item_availability(text, boolean, bigint); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -4042,7 +3990,6 @@ BEGIN
 END;
 $_$;
 
-
 --
 -- Name: validate_task_billing_snapshot_insert(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -4073,18 +4020,10 @@ BEGIN
 END;
 $$;
 
-
-
-
 --
 
 --
 --
-
-
-
-
-
 
 --
 -- Name: billing_admin_actions; Type: TABLE; Schema: public; Owner: -
@@ -4118,7 +4057,6 @@ ALTER TABLE billing_admin_actions
     AND char_length(reason) BETWEEN 1 AND 1000
   );
 
-
 --
 -- Name: billing_admin_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -4131,7 +4069,6 @@ ALTER TABLE billing_admin_actions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTI
     NO MAXVALUE
     CACHE 1
 );
-
 
 --
 -- Name: billing_price_versions; Type: TABLE; Schema: public; Owner: -
@@ -4151,7 +4088,6 @@ CREATE TABLE billing_price_versions (
     CONSTRAINT billing_price_versions_version_check CHECK ((version > 0))
 );
 
-
 --
 -- Name: billing_price_versions_price_version_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -4164,7 +4100,6 @@ ALTER TABLE billing_price_versions ALTER COLUMN price_version_id ADD GENERATED A
     NO MAXVALUE
     CACHE 1
 );
-
 
 --
 -- Name: billing_skus; Type: TABLE; Schema: public; Owner: -
@@ -4195,7 +4130,6 @@ CREATE TABLE billing_current_prices (
     CONSTRAINT billing_current_prices_resolution_check CHECK (((output_resolution)::text = ANY (ARRAY['1k'::text, '2k'::text, '4k'::text])))
 );
 
-
 --
 -- Name: task_billing_settlements; Type: TABLE; Schema: public; Owner: -
 --
@@ -4214,7 +4148,6 @@ CREATE TABLE task_billing_settlements (
     CONSTRAINT task_billing_settlement_amounts_check CHECK (actual_output_count >= 0 AND captured_credits >= 0 AND released_credits >= 0),
     CONSTRAINT task_billing_settlements_state_check CHECK (((state)::text = ANY (ARRAY[('held'::character varying)::text, ('free'::character varying)::text, ('captured'::character varying)::text, ('released'::character varying)::text])))
 );
-
 
 --
 -- Name: task_billing_snapshots; Type: TABLE; Schema: public; Owner: -
@@ -4246,14 +4179,12 @@ CREATE TABLE task_billing_snapshots (
     CONSTRAINT task_billing_snapshots_user_id_check CHECK ((user_id > 0))
 );
 
-
 --
 -- Name: billing_admin_actions billing_admin_actions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY billing_admin_actions
     ADD CONSTRAINT billing_admin_actions_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: billing_price_versions billing_price_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -4262,14 +4193,12 @@ ALTER TABLE ONLY billing_admin_actions
 ALTER TABLE ONLY billing_price_versions
     ADD CONSTRAINT billing_price_versions_pkey PRIMARY KEY (price_version_id);
 
-
 --
 -- Name: billing_price_versions billing_price_versions_sku_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY billing_price_versions
     ADD CONSTRAINT billing_price_versions_sku_id_key UNIQUE (sku, price_version_id);
-
 
 --
 -- Name: billing_price_versions billing_price_versions_sku_version_key; Type: CONSTRAINT; Schema: public; Owner: -
@@ -4281,14 +4210,12 @@ ALTER TABLE ONLY billing_price_versions
 ALTER TABLE ONLY billing_price_versions
     ADD CONSTRAINT billing_price_versions_resolution_id_key UNIQUE (sku, output_resolution, price_version_id);
 
-
 --
 -- Name: billing_price_versions billing_price_versions_snapshot_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY billing_price_versions
     ADD CONSTRAINT billing_price_versions_snapshot_key UNIQUE (sku, price_version_id, version, unit_credits);
-
 
 --
 -- Name: billing_skus billing_skus_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -4303,14 +4230,12 @@ ALTER TABLE ONLY billing_current_prices
 ALTER TABLE ONLY billing_current_prices
     ADD CONSTRAINT billing_current_prices_price_fkey FOREIGN KEY (sku, output_resolution, price_version_id) REFERENCES billing_price_versions(sku, output_resolution, price_version_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
-
 --
 -- Name: task_billing_settlements task_billing_settlements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY task_billing_settlements
     ADD CONSTRAINT task_billing_settlements_pkey PRIMARY KEY (task_id);
-
 
 --
 -- Name: task_billing_snapshots task_billing_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -4319,13 +4244,11 @@ ALTER TABLE ONLY task_billing_settlements
 ALTER TABLE ONLY task_billing_snapshots
     ADD CONSTRAINT task_billing_snapshots_pkey PRIMARY KEY (task_id);
 
-
 --
 -- Name: idx_billing_admin_actions_actor_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_billing_admin_actions_actor_id ON billing_admin_actions USING btree (actor_id, id DESC);
-
 
 --
 -- Name: idx_billing_admin_actions_sku_id; Type: INDEX; Schema: public; Owner: -
@@ -4335,13 +4258,11 @@ CREATE INDEX idx_billing_admin_actions_sku_id ON billing_admin_actions USING btr
 
 CREATE INDEX billing_current_prices_price_version_idx ON billing_current_prices USING btree (sku, price_version_id);
 
-
 --
 -- Name: idx_task_billing_snapshots_user_created; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_task_billing_snapshots_user_created ON task_billing_snapshots USING btree (user_id, created_at);
-
 
 --
 -- Name: billing_admin_actions billing_admin_actions_append_only; Type: TRIGGER; Schema: public; Owner: -
@@ -4349,13 +4270,11 @@ CREATE INDEX idx_task_billing_snapshots_user_created ON task_billing_snapshots U
 
 CREATE TRIGGER billing_admin_actions_append_only BEFORE DELETE OR UPDATE ON billing_admin_actions FOR EACH ROW EXECUTE FUNCTION prevent_billing_admin_action_mutation();
 
-
 --
 -- Name: billing_price_versions billing_price_versions_append_only; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER billing_price_versions_append_only BEFORE DELETE OR UPDATE ON billing_price_versions FOR EACH ROW EXECUTE FUNCTION prevent_billing_price_version_mutation();
-
 
 --
 -- Name: billing_skus billing_skus_immutable_identity; Type: TRIGGER; Schema: public; Owner: -
@@ -4363,13 +4282,11 @@ CREATE TRIGGER billing_price_versions_append_only BEFORE DELETE OR UPDATE ON bil
 
 CREATE TRIGGER billing_skus_immutable_identity BEFORE DELETE OR UPDATE ON billing_skus FOR EACH ROW EXECUTE FUNCTION prevent_billing_sku_identity_mutation();
 
-
 --
 -- Name: task_billing_settlements task_billing_settlements_state_machine; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER task_billing_settlements_state_machine BEFORE INSERT OR DELETE OR UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION guard_task_billing_settlement_transition();
-
 
 --
 -- Name: task_billing_snapshots task_billing_snapshots_immutable; Type: TRIGGER; Schema: public; Owner: -
@@ -4377,13 +4294,11 @@ CREATE TRIGGER task_billing_settlements_state_machine BEFORE INSERT OR DELETE OR
 
 CREATE TRIGGER task_billing_snapshots_immutable BEFORE DELETE OR UPDATE ON task_billing_snapshots FOR EACH ROW EXECUTE FUNCTION prevent_task_billing_snapshot_mutation();
 
-
 --
 -- Name: task_billing_snapshots task_billing_snapshots_validate_insert; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER task_billing_snapshots_validate_insert BEFORE INSERT ON task_billing_snapshots FOR EACH ROW EXECUTE FUNCTION validate_task_billing_snapshot_insert();
-
 
 --
 -- Name: billing_price_versions billing_price_versions_sku_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4392,14 +4307,12 @@ CREATE TRIGGER task_billing_snapshots_validate_insert BEFORE INSERT ON task_bill
 ALTER TABLE ONLY billing_price_versions
     ADD CONSTRAINT billing_price_versions_sku_fkey FOREIGN KEY (sku) REFERENCES billing_skus(sku) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
-
 --
 -- Name: billing_skus billing_skus_current_price_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY billing_skus
     ADD CONSTRAINT billing_skus_current_price_fk FOREIGN KEY (sku, current_price_version_id) REFERENCES billing_price_versions(sku, price_version_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
-
 
 --
 -- Name: task_billing_settlements task_billing_settlements_capture_transaction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4411,14 +4324,12 @@ ALTER TABLE ONLY task_billing_settlements
 ALTER TABLE ONLY task_billing_settlements
     ADD CONSTRAINT task_billing_settlements_release_transaction_id_fkey FOREIGN KEY (release_transaction_id) REFERENCES credit_transactions(transaction_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
-
 --
 -- Name: task_billing_settlements task_billing_settlements_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY task_billing_settlements
     ADD CONSTRAINT task_billing_settlements_task_id_fkey FOREIGN KEY (task_id) REFERENCES task_billing_snapshots(task_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
-
 
 --
 -- Name: task_billing_snapshots task_billing_snapshot_hold_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -4427,7 +4338,6 @@ ALTER TABLE ONLY task_billing_settlements
 ALTER TABLE ONLY task_billing_snapshots
     ADD CONSTRAINT task_billing_snapshot_hold_fk FOREIGN KEY (hold_transaction_id) REFERENCES credit_transactions(transaction_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
-
 --
 -- Name: task_billing_snapshots task_billing_snapshot_price_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -4435,14 +4345,12 @@ ALTER TABLE ONLY task_billing_snapshots
 ALTER TABLE ONLY task_billing_snapshots
     ADD CONSTRAINT task_billing_snapshot_price_fk FOREIGN KEY (sku, price_version_id, price_version, unit_credits) REFERENCES billing_price_versions(sku, price_version_id, version, unit_credits) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
-
 --
 -- Name: task_billing_snapshots task_billing_snapshots_sku_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY task_billing_snapshots
     ADD CONSTRAINT task_billing_snapshots_sku_fkey FOREIGN KEY (sku) REFERENCES billing_skus(sku) ON UPDATE RESTRICT ON DELETE RESTRICT;
-
 
 --
 --

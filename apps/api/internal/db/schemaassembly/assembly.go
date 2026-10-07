@@ -63,9 +63,33 @@ func Assemble(manifest Manifest, root string) ([]byte, error) {
 			}
 			seenObjects[object] = fragment.Name
 		}
-		output.Write(raw)
+		output.Write(normalizeBlankLines(raw))
 	}
-	return []byte(strings.TrimRight(output.String(), "\n") + "\n"), nil
+	return []byte(normalizeBlankLines([]byte(output.String()))), nil
+}
+
+// normalizeBlankLines keeps generated schema artifacts readable without
+// changing SQL semantics. Fragments can come from hand-authored SQL or
+// pg_dump output, so collapse runs of blank lines at the assembly boundary
+// instead of rewriting the source fragments.
+func normalizeBlankLines(raw []byte) []byte {
+	lines := strings.SplitAfter(string(raw), "\n")
+	var output strings.Builder
+	blank := false
+	for _, line := range lines {
+		isBlank := strings.TrimSpace(line) == ""
+		if isBlank {
+			if blank {
+				continue
+			}
+			blank = true
+			output.WriteString("\n")
+			continue
+		}
+		blank = false
+		output.WriteString(line)
+	}
+	return []byte(strings.TrimRight(output.String(), "\n") + "\n")
 }
 
 func validateRegisteredFragments(manifest Manifest, root string) error {

@@ -39,6 +39,14 @@ func TestAssembleUsesManifestOrderAndIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestNormalizeBlankLinesKeepsAtMostOneSeparator(t *testing.T) {
+	got := string(normalizeBlankLines([]byte("CREATE TABLE one (id integer);\n\n\n\n-- comment\n\nCREATE TABLE two (id integer);\n")))
+	want := "CREATE TABLE one (id integer);\n\n-- comment\n\nCREATE TABLE two (id integer);\n"
+	if got != want {
+		t.Fatalf("normalized schema=%q, want %q", got, want)
+	}
+}
+
 func TestValidateManifestRejectsUnknownAndOutOfOrderDependencies(t *testing.T) {
 	tests := []struct {
 		name string
