@@ -13,75 +13,31 @@ import {
   unbanControlUser,
   updateControlUserRole,
 } from '../../../shared/api/generated-query/control/control-users/control-users'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { controlUserIdempotencyKey } from '../../../shared/api/idempotencyKey'
-
-type ControlMutationOptions = {
-  operatorReason: string
-  idempotencyKey?: string | undefined
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
-}
+import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+  type ControlMutationOptions,
+} from '../shared/lib/controlMutation'
+import { withControlCopy } from '../shared/lib/controlCopy'
 
 function mutationHeaders(
   operation: Parameters<typeof controlUserIdempotencyKey>[0],
   options: ControlMutationOptions,
 ) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? controlUserIdempotencyKey(operation),
-    operatorReason: requireOperatorReason(options.operatorReason),
-  })
+  return buildControlMutationHeaders(options, controlUserIdempotencyKey(operation))
 }
 
 async function resolveControlOk(request: Promise<unknown>, fallback: string): Promise<void> {
   try {
     requireContractData<unknown>(await request, fallback)
   } catch (error) {
-    throw withControlCopy(error, fallback)
+    throw withControlCopy(error, fallback, {
+      control_not_found: '用户不存在',
+      billing_wallet_restricted: '账户受限，暂时无法操作',
+    })
   }
-}
-
-// withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
-function withControlCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  if (code === 'idempotency_conflict') {
-    return controlError(code, '操作已提交，请勿重复操作')
-  }
-  if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因')
-  }
-  if (code === 'control_not_found') {
-    return controlError(code, '用户不存在')
-  }
-  if (code === 'billing_wallet_restricted') {
-    return controlError(code, '账户受限，暂时无法操作')
-  }
-  if (error instanceof Error) return error
-  return controlError('control_failed', fallback)
-}
-
-function readErrorCode(error: unknown): string | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    return typeof code === 'string' ? code : undefined
-  }
-  return undefined
 }
 
 export async function banAdminUser(input: {
