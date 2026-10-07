@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../../../../shared/composables/useSupportChannels', () => ({
+  useSupportChannels: () => ({ channels: [] }),
+}))
 import { h } from 'vue'
 import { render, renderWithUser, screen } from '../../../../../test/render'
 import CanvasChrome from './CanvasChrome.vue'

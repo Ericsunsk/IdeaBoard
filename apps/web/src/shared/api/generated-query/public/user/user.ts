@@ -32,6 +32,7 @@ import type {
   AvatarUploadResultEnvelope,
   BadRequestResponse,
   ErrorEnvelope,
+  SupportChannelsSettingEnvelope,
   UnauthorizedResponse,
   UnprocessableEntityResponse,
   UserEnvelope,
@@ -40,6 +41,78 @@ import type {
 import { publicMutator } from '../../../publicMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
+
+export const getGetSupportChannelsUrl = () => {
+  return `/support-channels`
+}
+
+/**
+ * Public settings endpoint; only enabled channels are returned.
+ * @summary List enabled customer support channels
+ */
+export const getSupportChannels = async (
+  options?: Parameters<typeof publicMutator>[1],
+): Promise<SupportChannelsSettingEnvelope> => {
+  return publicMutator<SupportChannelsSettingEnvelope>(getGetSupportChannelsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetSupportChannelsQueryKey = () => {
+  return ['support-channels'] as const
+}
+
+export const getGetSupportChannelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSupportChannels>>,
+  TError = ErrorEnvelope,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportChannels>>, TError, TData>>
+  request?: SecondParameter<typeof publicMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetSupportChannelsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSupportChannels>>> = ({ signal }) =>
+    getSupportChannels({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSupportChannels>>,
+    TError,
+    TData
+  >
+}
+
+export type GetSupportChannelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSupportChannels>>
+>
+export type GetSupportChannelsQueryError = ErrorEnvelope
+
+/**
+ * @summary List enabled customer support channels
+ */
+
+export function useGetSupportChannels<
+  TData = Awaited<ReturnType<typeof getSupportChannels>>,
+  TError = ErrorEnvelope,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getSupportChannels>>, TError, TData>>
+    request?: SecondParameter<typeof publicMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetSupportChannelsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
 
 export const getGetUserUrl = () => {
   return `/user`

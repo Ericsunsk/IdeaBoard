@@ -12,8 +12,9 @@
 
     <template #expansion="{ data }">
       <div class="border-t border-border bg-card p-4 md:p-5">
+        <AdminSupportChannelsEditor v-if="data.id === 'support_channels'" />
         <SettingEditorCard
-          v-if="data.id === 'branding'"
+          v-else-if="data.id === 'branding'"
           :title="SETTINGS_MESSAGES.brandingTitle"
           :status="
             brandingForm.logo_url ? SETTINGS_MESSAGES.customLogo : SETTINGS_MESSAGES.defaultBrand
@@ -175,6 +176,12 @@ import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminSearchProviderCard from '../AdminSearchProviderCard.vue'
+import AdminSupportChannelsEditor from '../AdminSupportChannelsEditor.vue'
+import { useQuery } from '@tanstack/vue-query'
+import {
+  createAdminSupportChannelsResource,
+  supportChannelsQueryKey,
+} from '../supportChannelsResource'
 import AdminSettingsTable, {
   type AdminSettingsTableRow,
 } from '../components/AdminSettingsTable.vue'
@@ -249,8 +256,33 @@ function buildBrandingRow(form: typeof brandingForm.value): AdminSettingsTableRo
 
 const settingRows = computed<AdminSettingsTableRow[]>(() => [
   buildBrandingRow(brandingForm.value),
+  {
+    id: 'support_channels',
+    title: SETTINGS_MESSAGES.supportTitle,
+    description: SETTINGS_MESSAGES.supportDescription,
+    icon: Globe,
+    status: supportQuery.isError.value
+      ? SETTINGS_MESSAGES.providerLoadFailed
+      : supportQuery.isPending.value
+        ? SETTINGS_MESSAGES.providerLoading
+        : SETTINGS_MESSAGES.supportCount(
+            supportQuery.data.value?.channels.filter((channel) => channel.enabled).length ?? 0,
+          ),
+    statusSeverity: supportQuery.isError.value ? 'danger' : 'secondary',
+    summary: supportQuery.isError.value
+      ? SETTINGS_MESSAGES.supportLoadFailed
+      : supportQuery.isPending.value
+        ? SETTINGS_MESSAGES.providerLoading
+        : SETTINGS_MESSAGES.supportConfigured(supportQuery.data.value?.channels.length ?? 0),
+  },
   ...buildSearchProviderRows(),
 ])
+
+const supportResource = createAdminSupportChannelsResource()
+const supportQuery = useQuery({
+  queryKey: supportChannelsQueryKey,
+  queryFn: () => supportResource.get(),
+})
 
 const searchResource: AdminSearchProviderResource = createAdminSearchProviderResource()
 const searchConfigs = ref<SearchProviderConfig[]>([])

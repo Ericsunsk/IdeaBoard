@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from '../../shared/constants/contacts'
+
 export const LEGAL_DOCUMENT_VERSIONS = {
   terms: '2026-08-01',
   privacy: '2026-08-01',
@@ -6,7 +8,7 @@ export const LEGAL_DOCUMENT_VERSIONS = {
 } as const
 
 export const LEGAL_CONTACTS = {
-  support: 'support@ideaboard.art',
+  support: SUPPORT_EMAIL,
   legal: 'legal@ideaboard.art',
   privacy: 'privacy@ideaboard.art',
   copyright: 'copyright@ideaboard.art',

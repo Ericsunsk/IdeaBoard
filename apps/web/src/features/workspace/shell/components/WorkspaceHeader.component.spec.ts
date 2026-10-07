@@ -8,6 +8,10 @@ import { createAuthOverlay, provideAuthOverlay } from '../../../auth'
 import { createAccountOverlay, provideAccountOverlay } from '../../../account'
 import WorkspaceHeader from './WorkspaceHeader.vue'
 
+vi.mock('../../../../shared/composables/useSupportChannels', () => ({
+  useSupportChannels: () => ({ channels: [] }),
+}))
+
 const currentUser = ref<User | null>(null)
 
 vi.mock('../../../auth/session/userSession', () => ({

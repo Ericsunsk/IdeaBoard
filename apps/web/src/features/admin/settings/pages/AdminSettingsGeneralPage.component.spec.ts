@@ -11,6 +11,9 @@ describe('AdminSettingsGeneralPage', () => {
   beforeEach(() => {
     mockAppToast()
     useMswHandlers(
+      http.get('/api/control/v1/platform/settings/support-channels', () =>
+        HttpResponse.json({ data: { channels: [] } }),
+      ),
       http.get('/api/control/v1/platform/settings/branding', () =>
         HttpResponse.json({
           data: { project_name: 'IdeaBoard Test', logo_url: '' },
@@ -69,5 +72,16 @@ describe('AdminSettingsGeneralPage', () => {
 
     expect(await screen.findByText('Unsplash 图片源')).toBeVisible()
     expect(screen.getByText('Pexels 图片源')).toBeVisible()
+  })
+
+  it('renders support settings and expands its empty editor', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(AdminSettingsGeneralPage, {
+      global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+    })
+    expect(await screen.findByText('0 个已启用渠道')).toBeVisible()
+    expect(screen.getByText('共 0 个渠道')).toBeVisible()
+    await user.click(screen.getAllByRole('button', { name: '配置' })[1]!)
+    expect(await screen.findByText('暂无客服渠道')).toBeVisible()
   })
 })

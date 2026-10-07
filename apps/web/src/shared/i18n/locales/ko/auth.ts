@@ -61,6 +61,9 @@ export default {
     themeDark: '다크',
     themeSystem: '시스템 설정',
     language: '언어',
+    support: '고객 지원',
+    supportQr: '{channel} 고객 지원 QR 코드',
+    supportOpenChannel: '새 탭에서 {channel} 고객 지원 열기',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

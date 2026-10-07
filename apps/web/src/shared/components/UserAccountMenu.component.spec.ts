@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '../i18n'
 import { render, renderWithUser, screen, waitFor } from '../../test/render'
 import UserAccountMenu from './UserAccountMenu.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
@@ -15,11 +16,14 @@ async function openSubmenu(trigger: HTMLElement, firstOptionName: string | RegEx
 }
 
 describe('UserAccountMenu', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+  })
   it('shows the account email above a separator in the user menu', async () => {
     const { user } = renderWithUser(UserAccountMenu, {
       props: {
         userEmail: 'alice@example.test',
-        items: [{ key: 'profile', label: '账户管理' }],
+        items: [{ key: 'profile', label: '账户管理', command: vi.fn() }],
       },
     })
 
@@ -29,7 +33,9 @@ describe('UserAccountMenu', () => {
     const [separator] = screen.getAllByRole('separator')
     expect(email).toBeVisible()
     expect(separator).toBeVisible()
-    expect(email.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      email.compareDocumentPosition(separator!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('renders the typed balance control before the avatar', async () => {
@@ -244,6 +250,52 @@ describe('UserAccountMenu', () => {
     expect(screen.getByRole('menuitem', { name: '한국어' })).toBeVisible()
 
     await user.click(zhOption)
+  })
+
+  it('places configured support channels after language and links the QR code safely', async () => {
+    const supportChannels: import('../composables/useSupportChannels').SupportChannel[] = [
+      {
+        id: 'discord',
+        name: 'Discord',
+        kind: 'discord',
+        url: 'https://discord.gg/example',
+        enabled: true,
+        sort_order: 0,
+      },
+    ]
+    const items: UserAccountMenuItem[] = [
+      { key: 'profile', label: 'Account', command: vi.fn() },
+      { key: 'logout', label: 'Sign out', tone: 'danger', command: vi.fn() },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, {
+      props: { items, supportChannels },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }))
+
+    const language = await screen.findByRole('menuitem', { name: /Language/i })
+    const support = await screen.findByRole('menuitem', { name: /^(Support|支持)$/ })
+    const signOutSeparator = screen.getAllByRole('separator').at(-1)
+
+    const channel = await openSubmenu(support, 'Discord')
+    await user.click(channel)
+    const link = await screen.findByRole('link', { name: /Discord/ })
+    expect(link).toHaveAttribute('href', 'https://discord.gg/example')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link.querySelector('svg')).not.toBeNull()
+    expect(
+      language.compareDocumentPosition(support) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      support.compareDocumentPosition(signOutSeparator!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('hides Support when no channels are available', async () => {
+    const { user } = renderWithUser(UserAccountMenu, { props: { items: [] } })
+    await user.click(screen.getByRole('button', { name: 'Account menu' }))
+    expect(screen.queryByRole('menuitem', { name: 'Support' })).not.toBeInTheDocument()
   })
 
   it('renders user email at top with a separator and omits separator above appearance', async () => {

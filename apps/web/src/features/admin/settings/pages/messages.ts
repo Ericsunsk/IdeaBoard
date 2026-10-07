@@ -10,6 +10,33 @@
 // `AdminSearchProviderCard.vue`.
 
 export const SETTINGS_MESSAGES = {
+  supportTitle: '客服渠道',
+  supportDescription: '用户菜单中的客服渠道与二维码',
+  supportConfigured: (count: number) => `共 ${count} 个渠道`,
+  supportName: '渠道名称',
+  supportKind: '渠道类型',
+  supportUrl: '渠道链接',
+  supportKinds: {
+    discord: 'Discord',
+    telegram: 'Telegram',
+    whatsapp: 'WhatsApp',
+    line: 'LINE',
+    wechat: '微信',
+    custom: '自定义',
+  },
+  supportEmpty: '暂无客服渠道',
+  supportCount: (count: number) => `${count} 个已启用渠道`,
+  supportEnable: (name: string) => `启用渠道 ${name}`,
+  supportAdd: '添加渠道',
+  supportRemove: '删除渠道',
+  supportMoveUp: '上移渠道',
+  supportMoveDown: '下移渠道',
+  supportLimit: '最多配置 20 个客服渠道',
+  supportNameInvalid: '渠道名称不能为空，且不能超过 80 个字符',
+  supportUrlInvalid: '请输入不含账号密码的有效 HTTP 或 HTTPS 链接，最多 2048 个字符',
+  supportLoadFailed: '读取客服渠道失败',
+  supportSave: '保存客服渠道',
+  supportSaveConfirm: '确定保存客服渠道吗？该操作将记录操作人与原因。',
   // General page table shell.
   siteTitle: '网站设置',
   siteSubtitle: '站点名称、品牌标识与图片搜索供应商配置',

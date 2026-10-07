@@ -24,6 +24,7 @@
       :user-email="account.userEmail"
       :balance="account.balance"
       :items="account.menuItems"
+      :support-channels="supportChannels"
       :avatar-button-class="canvasChromeAvatarButtonClass"
     >
       <template #actions>
@@ -156,6 +157,7 @@ import {
 } from '@iconoir/vue'
 import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
 import UserAccountMenu from '../../../../../shared/components/UserAccountMenu.vue'
+import { useSupportChannels } from '../../../../../shared/composables/useSupportChannels'
 import {
   createPageChromeAccountRoundControlClass,
   createPageChromeRoundControlClass,
@@ -196,6 +198,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { channels: supportChannels } = useSupportChannels()
 
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
 const canvasChromeActionControlClass = createPageChromeRoundControlClass(

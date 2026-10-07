@@ -57,6 +57,7 @@
           :collision-padding="appOverlayMenuSideOffset"
           :class="menuContentClass"
           @pointer-down-outside="handlePointerDownOutside"
+          @focus-outside="keepSupportQrFocus"
         >
           <!-- 极简用户信息：展示当前登录账号邮箱 -->
           <template v-if="props.userEmail">
@@ -81,9 +82,7 @@
           </DropdownMenuItem>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger
-              :class="[appOverlayMenuItemClass, props.menuItemClass]"
-            >
+            <DropdownMenuSubTrigger :class="[appOverlayMenuItemClass, props.menuItemClass]">
               <span class="truncate">{{ t('auth.menu.appearance') }}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent
@@ -111,9 +110,7 @@
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger
-              :class="[appOverlayMenuItemClass, props.menuItemClass]"
-            >
+            <DropdownMenuSubTrigger :class="[appOverlayMenuItemClass, props.menuItemClass]">
               <span class="truncate">{{ t('auth.menu.language') }}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent
@@ -136,6 +133,28 @@
                 <span class="truncate flex-1">{{ item.label }}</span>
                 <Check v-if="item.isActive" class="size-3.5 shrink-0 ml-auto" />
               </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSub
+            v-if="supportChannels.length"
+            @update:open="!$event && (activeSupportChannelId = null)"
+          >
+            <DropdownMenuSubTrigger :class="[appOverlayMenuItemClass, props.menuItemClass]">
+              <span class="truncate">{{ t('auth.menu.support') }}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              :side-offset="appOverlayMenuSideOffset"
+              :collision-padding="appOverlayMenuSideOffset"
+              :class="submenuContentClass"
+              @focus-outside="keepSupportQrFocus"
+            >
+              <SupportChannelQr
+                v-for="channel in supportChannels"
+                :key="channel.id"
+                v-model:active-channel-id="activeSupportChannelId"
+                :channel="channel"
+              />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
@@ -164,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, HalfMoon, Laptop, SunLight, User } from '@iconoir/vue'
 import {
@@ -188,6 +207,8 @@ import { useMenuTriggerFocusRestore } from '../composables/useMenuTriggerFocusRe
 import { useTheme } from '../theme/composables/useTheme'
 import { getActiveUserLocale, setUserLocale, type SupportedLocale } from '../i18n/userLocale'
 import { LOCALE_MANIFEST } from '../i18n/localeManifest'
+import type { SupportChannel } from '../composables/useSupportChannels'
+import SupportChannelQr from './SupportChannelQr.vue'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
@@ -205,6 +226,7 @@ const props = withDefaults(
     menuItemClass?: string
     menuDangerItemClass?: string
     showCredits?: boolean
+    supportChannels?: SupportChannel[]
   }>(),
   {
     avatarUrl: undefined,
@@ -218,10 +240,12 @@ const props = withDefaults(
     menuItemClass: appOverlayMenuItemClass,
     menuDangerItemClass: appOverlayMenuDangerItemClass,
     showCredits: true,
+    supportChannels: () => [],
   },
 )
 
 const open = defineModel<boolean>('open', { default: false })
+const activeSupportChannelId = ref<string | null>(null)
 const { locale: i18nLocale, t } = useI18n()
 const { mode, setTheme } = useTheme()
 
@@ -274,6 +298,11 @@ const dangerItems = computed(() => props.items.filter((item) => item.tone === 'd
 const loginItem = computed(() => props.items.find((item) => item.key === 'login'))
 const registerItem = computed(() => props.items.find((item) => item.key === 'register'))
 const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
+
+function keepSupportQrFocus(event: Event) {
+  if (event.target instanceof Element && event.target.closest('[data-support-qr-panel]'))
+    event.preventDefault()
+}
 
 const triggerRef = useTemplateRef('triggerRef')
 const { handleMenuOpenUpdate, handlePointerDownOutside } = useMenuTriggerFocusRestore(triggerRef)

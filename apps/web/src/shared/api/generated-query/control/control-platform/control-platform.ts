@@ -70,8 +70,11 @@ import type {
   SaveControlAIGatewayCatalogBody,
   SaveControlBrandLogoOverrideBody,
   SaveControlFeaturePromptBody,
+  SupportChannelsSetting,
+  SupportChannelsSettingEnvelope,
   TestControlAIGatewayConnectionBody,
   UnauthorizedResponse,
+  UnprocessableEntityResponse,
   UpdateControlAIGatewayBody,
   UpdateControlBrandingSettingBody,
   UpdateControlMediaUploadSettingBody,
@@ -768,6 +771,206 @@ export const useUploadControlBrandingLogo = <
   TContext
 > => {
   return useMutation(getUploadControlBrandingLogoMutationOptions(options), queryClient)
+}
+export const getGetControlSupportChannelsUrl = () => {
+  return `/platform/settings/support-channels`
+}
+
+/**
+ * @summary Read support channel settings
+ */
+export const getControlSupportChannels = async (
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<SupportChannelsSettingEnvelope> => {
+  return controlMutator<SupportChannelsSettingEnvelope>(getGetControlSupportChannelsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetControlSupportChannelsQueryKey = () => {
+  return ['platform', 'settings', 'support-channels'] as const
+}
+
+export const getGetControlSupportChannelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getControlSupportChannels>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getControlSupportChannels>>, TError, TData>
+  >
+  request?: SecondParameter<typeof controlMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetControlSupportChannelsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getControlSupportChannels>>> = ({
+    signal,
+  }) => getControlSupportChannels({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getControlSupportChannels>>,
+    TError,
+    TData
+  >
+}
+
+export type GetControlSupportChannelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getControlSupportChannels>>
+>
+export type GetControlSupportChannelsQueryError = UnauthorizedResponse | ForbiddenResponse
+
+/**
+ * @summary Read support channel settings
+ */
+
+export function useGetControlSupportChannels<
+  TData = Awaited<ReturnType<typeof getControlSupportChannels>>,
+  TError = UnauthorizedResponse | ForbiddenResponse,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getControlSupportChannels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetControlSupportChannelsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateControlSupportChannelsUrl = () => {
+  return `/platform/settings/support-channels`
+}
+
+/**
+ * @summary Update support channels (operator reason required)
+ */
+export const updateControlSupportChannels = async (
+  supportChannelsSetting: SupportChannelsSetting,
+  options?: Parameters<typeof controlMutator>[1],
+): Promise<SupportChannelsSettingEnvelope> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return controlMutator<SupportChannelsSettingEnvelope>(getUpdateControlSupportChannelsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportChannelsSetting),
+  })
+}
+
+export const getUpdateControlSupportChannelsMutationKey = () =>
+  ['updateControlSupportChannels'] as const
+
+export const getUpdateControlSupportChannelsMutationOptions = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | IdempotencyConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateControlSupportChannels>>,
+    TError,
+    UpdateControlSupportChannelsMutationVariables,
+    TContext
+  >
+  request?: SecondParameter<typeof controlMutator>
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateControlSupportChannels>>,
+  TError,
+  UpdateControlSupportChannelsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateControlSupportChannelsMutationKey()
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined }
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateControlSupportChannels>>,
+    UpdateControlSupportChannelsMutationVariables
+  > = (props) => {
+    const { data } = props ?? {}
+
+    return updateControlSupportChannels(data, requestOptions)
+  }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+export type UpdateControlSupportChannelsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateControlSupportChannels>>
+>
+export type UpdateControlSupportChannelsMutationBody = SupportChannelsSetting
+export type UpdateControlSupportChannelsMutationError =
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | ForbiddenResponse
+  | IdempotencyConflictResponse
+  | UnprocessableEntityResponse
+export type UpdateControlSupportChannelsMutationVariables = { data: SupportChannelsSetting }
+
+/**
+ * @summary Update support channels (operator reason required)
+ */
+export const useUpdateControlSupportChannels = <
+  TError =
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | ForbiddenResponse
+    | IdempotencyConflictResponse
+    | UnprocessableEntityResponse,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateControlSupportChannels>>,
+      TError,
+      UpdateControlSupportChannelsMutationVariables,
+      TContext
+    >
+    request?: SecondParameter<typeof controlMutator>
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateControlSupportChannels>>,
+  TError,
+  UpdateControlSupportChannelsMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateControlSupportChannelsMutationOptions(options), queryClient)
 }
 export const getGetControlMediaUploadSettingUrl = () => {
   return `/platform/settings/media-upload`

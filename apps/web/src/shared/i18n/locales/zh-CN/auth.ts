@@ -61,6 +61,9 @@ export default {
     themeDark: '暗黑',
     themeSystem: '跟随系统',
     language: '语言',
+    support: '支持',
+    supportQr: '{channel} 客服二维码',
+    supportOpenChannel: '在新标签页打开 {channel} 客服',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

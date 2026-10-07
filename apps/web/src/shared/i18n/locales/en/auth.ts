@@ -61,6 +61,9 @@ export default {
     themeDark: 'Dark',
     themeSystem: 'System',
     language: 'Language',
+    support: 'Support',
+    supportQr: '{channel} support QR code',
+    supportOpenChannel: 'Open {channel} support in a new tab',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

@@ -22,6 +22,7 @@
         :user-email="accountControls.viewModel.userEmail.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
+        :support-channels="supportChannels"
       >
       </UserAccountMenu>
     </slot>
@@ -32,6 +33,7 @@
 import { useRouter } from 'vue-router'
 import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
+import { useSupportChannels } from '../../../../shared/composables/useSupportChannels'
 import { HOME_PATH } from '../../../../shared/constants/routePaths'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useUserStore } from '../../../auth'
@@ -52,6 +54,7 @@ const props = withDefaults(defineProps<WorkspaceHeaderProps>(), {
 })
 
 const router = useRouter()
+const { channels: supportChannels } = useSupportChannels()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 

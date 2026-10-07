@@ -120,6 +120,7 @@
           :avatar-url="userStore.user?.avatar || undefined"
           :user-email="userEmail"
           :items="accountMenuItems"
+          :support-channels="supportChannels"
           :avatar-button-class="userAvatarButtonClass"
           :avatar-image-class="userAvatarImageClass"
           :avatar-placeholder-class="userAvatarPlaceholderClass"
@@ -133,15 +134,12 @@
 </template>
 
 <script setup lang="ts">
+import { useSupportChannels } from '../../../shared/composables/useSupportChannels'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import AdminBadge from '../shared/components/AdminBadge.vue'
-import {
-  BellNotificationSolid as BellIcon,
-  Menu as MenuIcon,
-  Xmark,
-} from '@iconoir/vue'
+import { BellNotificationSolid as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
 import { useUserStore } from '../../auth'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
@@ -173,6 +171,7 @@ const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 
 const userMenuOpen = ref(false)
+const { channels: supportChannels } = useSupportChannels()
 const userAccountMenuRef = ref<InstanceType<typeof UserAccountMenu> | null>(null)
 
 const userEmail = computed(() => {
