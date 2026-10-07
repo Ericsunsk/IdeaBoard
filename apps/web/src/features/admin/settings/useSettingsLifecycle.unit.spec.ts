@@ -253,10 +253,12 @@ describe('Admin System Settings adapters', () => {
 
       await expect(harness.value.saveRateLimit()).resolves.toBe(false)
       expect(feedback.rateLimitSaveFailed).toHaveBeenCalledOnce()
-      expect(feedback.rateLimitSaveFailed.mock.calls[0]?.[0]).toMatchObject({
-        code: 'idempotency_conflict',
-        message: '操作已提交，请勿重复操作',
-      })
+      expect(feedback.rateLimitSaveFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'idempotency_conflict',
+          message: '操作已提交，请勿重复操作',
+        }),
+      )
       expect(harness.value.rateLimitForm.value.max_requests).toBe(240)
       expect(harness.value.rateLimitDirty.value).toBe(true)
     } finally {
