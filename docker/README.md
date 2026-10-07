@@ -8,7 +8,6 @@
 
 生产环境请优先使用 [docs/runbooks/deployment.md](../docs/runbooks/deployment.md) 中的 GHCR + Docker Compose 部署方式。
 
-
 ## 快速启动
 
 ```bash
@@ -33,7 +32,6 @@ docker compose -f compose.local.yml ps
 ```bash
 docker compose -f compose.local.yml logs -f postgres
 ```
-
 
 ## 服务说明
 
@@ -84,7 +82,6 @@ docker compose -f compose.local.yml restart
 
 > [!CAUTION]
 > `docker compose down -v` 会删除容器和数据卷，清空本地开发数据。仅在明确要重置环境时使用。
-
 
 ## 生产 Stack
 
@@ -144,7 +141,6 @@ Backup hardening 运行约定：
 生产数据在 Docker volumes 中持久化：`postgres-data`、`nats-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
 当前 Docker stack 管理 PostgreSQL 数据库与 NATS JetStream 数据目录；部署脚本不会自动转换或导入其他数据库形态的数据。
-
 
 ## 常见问题
 

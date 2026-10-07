@@ -96,7 +96,7 @@ VPS 防火墙只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000
 - 真实客户端 IP：宿主机反代层只信任 Cloudflare 来源，并通过 `CF-Connecting-IP` 恢复真实客户端 IP，再向 API/Auth 传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`。
 - Cache Rules：对 `/api/*`、`/api/auth/*`、SSE 任务状态接口、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。`/uploads/*` 可单独按素材访问策略缓存。
 - Metrics：API 使用独立 Prometheus listener；compose 默认仅将 `9091` 绑定到宿主机 `127.0.0.1`。监控系统抓取 `/metrics`，Nginx/Cloudflare 不得代理该端口或路径。
-- Rate Limiting / WAF：至少覆盖 `/api/auth/*`、管理员接口、上传接口、任务提交接口。对 `POST /api/user/rewards/redeem` 按可信客户端 IP 设置初始 `60 attempts / 10 minutes` coarse limit；Cloudflare 使用 `CF-Connecting-IP`，源站反代仅在请求确由 Cloudflare allowlist 到达时信任该值。该 edge rule 与应用内 per-user `10 attempts / 10 minutes` limiter 共同生效。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
+- Rate Limiting / WAF：至少覆盖 `/api/auth/*`、管理员接口、上传接口、任务提交接口。对 `POST /api/v1/workspaces/{workspace_id}/rewards/redemptions` 按可信客户端 IP 设置初始 `60 attempts / 10 minutes` coarse limit；Cloudflare 使用 `CF-Connecting-IP`，源站反代仅在请求确由 Cloudflare allowlist 到达时信任该值。该 edge rule 与应用内 per-user `10 attempts / 10 minutes` limiter 共同生效。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
 - Pages 环境隔离：production 的 `VITE_API_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL` 必须为空并使用同域 Gateway；preview 不连接生产 API/Auth/数据库。
 - HTTPS / HSTS：SSL/TLS 使用 `Full (strict)`；Always Use HTTPS 和 HSTS 先灰度，不要一开始启用 `preload` 或 `includeSubDomains`。
 
@@ -526,7 +526,7 @@ OpenAPI breaking-change 门禁：CI `API / OpenAPI Breaking Changes` job 用 oas
 
 Rewards 没有 Feature Flag。发生需要立即停止兑换或管理写入的事故时：
 
-1. 先在 Cloudflare 或 reverse proxy 阻断 `/api/user/rewards/*` 与 `/api/admin/rewards/*`，保留 health endpoint，并确认外部请求已被 gateway 拒绝。
+1. 先在 Cloudflare 或 reverse proxy 阻断 `/api/v1/workspaces/*/rewards/*` 与 `/api/control/v1/rewards/*`，保留 health endpoint，并确认外部请求已被 gateway 拒绝。
 2. 再执行 `ideaboard rollback --to previous` 回滚 image，完成 API/Auth health、登录、Credits 与非 Rewards 核心路径 smoke；如回滚版本仍包含 Rewards routes，继续保留 gateway block，直到修复版本上线并通过验证。
 3. 确认修复版本稳定后再移除 gateway block。不要为事故回滚临时引入 Feature Flag、兼容 endpoint 或 dual write。
 
@@ -585,7 +585,7 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 
 所有 AI 调用唯一出口是 Cloudflare AI Gateway；应用代码不装任何 vendor SDK，不存任何 provider key。provider 只挂在 CF 侧，代码里的 provider slug 是不透明路由 token。
 
-- 定价页模型映射值格式：`provider/model[@gateway-path]`，worker 每次执行读取当前值。
+- Service Model Pool entry 使用 `provider/model[@gateway-path]`；Submit 会把解析结果固化为不可变 `RoutingSnapshot`，worker 只执行快照，不读取 live pool。
 - 网关 path 前缀：`openrouter` / `fal` 按 CF 原生 slug 直写，其它进 `custom-<slug>`。OpenAI 永不直连（挂在 OpenRouter 或网关自有槽位做非图像调用），因此没有 direct-images 形状。
 - 响应形状按路由固定二选一：`openrouter` 走 chat-completions（含 `modalities: [text, image]` 的文生图），`fal` 走 media API（`{image:{url}}` / `{images:[{url}]}`，materializer 按 egress policy 下载落库）。
 - `@path` 永远优先：fal 各模型路径、cutout/upscale/inpaint 类 custom 路由必须在映射里显式写 `@path`。

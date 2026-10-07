@@ -1,18 +1,20 @@
-# Workspace Task Restoration ExecPlan
+# Archived Workspace Task Restoration ExecPlans
 
-## 8xx Batch ExecPlan (#886–#897, scheduler-owned)
+> Status (2026-10-08): **ARCHIVED**. The plans below describe completed work.
+> Issue acceptance comments and git history are the source of truth; do not use
+> this file as an active queue. New work needs a new plan or an issue-specific
+> execution note.
 
-- Goal: complete all `ready-for-agent` 8xx issues per acceptance criteria, working tree only, no commit.
-- Lanes (parallel, file-scoped): A=#886+#897 payments (scheduler, sequential: #897 after #886); B=#888→#895→#896 auth chain (sequential); C=#887 deletion; D=#889 task events; E=#891 control idempotency; F=#892 billing/brand; G=#890+#894 board web (sequential); H=#893 canvas web.
-- Success criteria: each issue's acceptance boxes verifiable; smallest relevant checks green (`apps/api go test`, `apps/web npm run test:run`, `git diff --check`); no generated-file hand edits; no cross-lane file edits.
-- Rollback: no commit is made; revert working-tree files per lane if needed.
-- Constraints: B chain order (#888 first); A order (#886 first); lanes must not edit `PLANS.md` (scheduler owns), must not touch other lanes' modules.
-- Sequencing note: #889 fix (ambient post-commit publish) approved as option A (post-commit callback on ambient carrier, flush in guard `runAtomic` after commit), but implement only after lane E (#891) finishes since both touch `contract_control_guard.go`.
-- Lane status: ALL 12 DONE and VERIFIED (A #886+#897 scheduler; B #888→#895→#896; C #887; D #889 option A on E; E #891; F #892; G #890+#894; H #893). Full backend green (parallel full run hit local-PG shared-memory limits only; all 18 affected packages re-ran serially green, zero assertion failures). gofmt/build/diff-check/sqlc-regen clean. No commit per instruction.
-- Pre-existing (not from lanes): schemarelease drift `idx_payment_webhook_events_processing_lease` in migration `20261004000002` but missing from fragments; lanes touched no payments schema files. Fix separately, out of 8xx scope.
-- Redundancy audit pass (scheduler, verified): R1 reclaim helper in idempotency Claim; R2 errNotWired + dead db check; R5 WithUserLock via Transact; R6 errorMessage; R7 queryIDs; R8 database.IsNotFound + PgError code (dropped privates); R9 withCurrentIntent; R10 supersedeWithRepair; R11 repairOpFor param drop; R12 versionStillCurrent via checkIntentCurrent; R13 reconciliation reuses authsync.UserSyncState + IsDemotionTarget; R14 billing comment trim; R15 board scope-key helper. Kept deliberately: BumpVersion (deadline-preserving) vs WithDeadline, beginDirectTx (external/dispute), L1+durable dual paths. All re-verified green, no commit.
+## Archived 8xx Batch ExecPlan (#886–#897)
 
-## Issue #886 ExecPlan: Payment Refund Persistence Boundary
+This scheduler plan is archived. Issues #886–#897 were completed, verified, and
+committed; the former working-tree-only constraint and lane sequencing are no
+longer active. The issue comments and git history are the source of truth for
+their acceptance evidence and commits. The detailed lane checklist was removed
+because it duplicated the issue tracker and could imply that this work is still
+pending.
+
+## Archived Issue #886 ExecPlan: Payment Refund Persistence Boundary
 
 - Goal: persist the admin refund reservation, `PurchaseRefundHold`, and phase
   audit before any Stripe I/O; make provider result convergence observe the
@@ -27,7 +29,7 @@
   refund ID and Stripe idempotency key without a second cash refund.
 - Rollback: revert the issue commit. No schema changes are expected.
 
-## Support Channels ExecPlan
+## Archived Support Channels ExecPlan
 
 - Goal: expose operator-configured external support channels from the account menu.
 - Scope: typed runtime settings in the existing system config store; audited
@@ -44,13 +46,19 @@
 
 ---
 
-## Goal
+## Archived Workspace Task Restoration (#825–#830)
+
+The workspace task production path, the #809 hard cut, and the runtime-grant
+audit were completed and committed. The original detailed scope is retained
+below as a historical acceptance summary.
+
+### Goal
 
 Complete the workspace task production path for issues #825 through #830:
 submit, execute, render, settle, and materialize while preserving the #809
 hard cut without weakening release guards.
 
-## Scope
+### Scope
 
 - #825: compile and persist a durable workflow execution plan for v1 submits.
 - #826: persist task billing snapshots and settlement facts in the existing
@@ -72,7 +80,7 @@ hard cut without weakening release guards.
   task billing, routing snapshot, task insert, and River enqueue in the same
   settlement transaction.
 
-## Success Criteria
+### Success Criteria
 
 - A submitted task carries a valid durable execution plan and can reach the
   provider gateway.
@@ -81,7 +89,7 @@ hard cut without weakening release guards.
 - The #809 hard cut is documented and tested.
 - Targeted Go and Web checks pass with no generated-code hand edits.
 
-## Risks And Rollback
+### Risks And Rollback
 
 - Transactional billing changes affect financial facts; all writes use the
   existing pgx transaction and Credits command seams.

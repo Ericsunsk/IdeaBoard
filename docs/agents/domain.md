@@ -11,7 +11,7 @@ IdeaBoard is a multi-context repository.
 - `apps/auth/CONTEXT.md` defines Auth service language (admission vs infrastructure, env contract, `{code,msg}` envelope rule) and boundaries.
 - `apps/web/src/features/canvas/CONTEXT.md` defines Canvas Workspace language and boundaries.
 - `docs/adr/` contains system-wide architecture decisions.
-- `docs/agents/model-pool-execution-guide.md` is the execution companion for ADR-0012 and issues #847–#854.
+- ADR-0012 is the current contract for the completed Service Model Pool migration (#847–#854).
 - Context-local `docs/adr/` directories contain scoped decisions when present.
 
 Do not create a duplicate `CONTEXT-MAP.md`; extend `DESIGN.md` when the context map changes.

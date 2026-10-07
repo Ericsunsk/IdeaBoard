@@ -25,9 +25,11 @@ changes stay convergent.
    (`WorkspaceLibraryStore`, `WorkspaceMediaStore`,
    `workspacetasks.WorkspaceTaskStore`); repository methods take
    `context.Context` first and use the `dbWithContext` pattern.
-4. Task submission settles Quote → Hold → Insert → Enqueue with compensating
-   rollback (Release + Delete); a single shared PostgreSQL transaction across
-   all four participants is the documented follow-up, not today's invariant.
+4. At the time this ADR was accepted, task submission settled Quote → Hold →
+   Insert → Enqueue with compensating rollback (Release + Delete); a single
+   shared PostgreSQL transaction across all four participants was the documented
+   follow-up. The current atomicity rule is recorded in ADR-0012 and in this
+   ADR's Status section below.
 5. Library assets store provider URL + source metadata only (never bytes);
    media owns bytes. Task outputs reference media by `asset_…` public id or
    by the explicit remote-output contract (URL + checksum, no storage internals).
@@ -36,43 +38,32 @@ changes stay convergent.
 
 Convergent 404 behavior and per-module seams make workspace isolation testable
 per module and composable across modules (#821 proves four cross-module
-scenarios). The compensating (non-atomic) settlement and the unwired worker
-(`workspace_task_execute` enqueued but not yet consumed), derivative renderer,
-and library materialization (503) are accepted Phase-4b residuals, not silent
-gaps: each fails closed with a documented code.
+scenarios). Task submission now performs the billing hold, task insert, routing
+snapshot pin, and River enqueue in one PostgreSQL transaction. The workspace
+worker consumes the pinned snapshot, and the derivative renderer runs in the
+workspace execution path. Library materialization remains intentionally
+internal-only and returns the documented 503 when its durable service is not
+available; it does not create a partial job or silently fall back to a legacy
+path.
 
 ## Status
 
-Accepted — Decision 4 and three of the four residuals in Consequences are
-superseded; see below
+Accepted (updated 2026-10-08). Decisions 1–3 and 5 remain the current tenancy
+contract. Decision 4 is superseded by ADR-0012 rule 2a and the production
+settlement implementation:
 
-Decisions 1–3 and 5 remain the current tenancy contract. The four residuals
-named in Consequences have since split; only the last one still holds:
+- `apps/api/internal/tasking/workspacetasks/settle_tx.go` runs Claim → Resolve →
+  Quote → Hold → Insert → RoutingSnapshot pin → Enqueue on one `pgx.Tx`.
+- `TxEnqueuer.EnqueueInTx` commits the `river_job` row with the business task
+  row. Missing transaction wiring fails closed with `ErrSettlementUnavailable`.
+- `workspace_task_execute` is consumed by the registered workspace worker, and
+  the derivative renderer persists workspace-scoped media assets.
+- The compensating path remains only in test fixtures; it is not a production
+  fallback.
 
-- **Compensating (non-atomic) settlement — resolved.** Decision 4's "a single
-  shared PostgreSQL transaction across all four participants is the documented
-  follow-up, not today's invariant" no longer holds. Settlement is now one
-  transaction: `apps/api/internal/tasking/workspacetasks/settle_tx.go`
-  `createInTx` runs Claim → Resolve → Quote → Hold → Insert → RoutingSnapshot
-  pin → Enqueue on a single `pgx.Tx`, and `TxEnqueuer.EnqueueInTx` commits the
-  `river_job` row with the business task row. Every participant is discovered
-  from that one transaction or the store fails closed (`settlementSeams` →
-  `ErrSettlementUnavailable`); a missing transaction is a wiring error, not a
-  fallback (`newPoolRoutingSnapshotSaver` in
-  `apps/api/internal/runtime/composition/http_wiring.go`). The compensating
-  path survives only as a test fixture (`AllowNonTransactionalTaskSettlement` →
-  `workspacetasks.NewTestServiceForTests`), never in production.
-- **Unwired worker — resolved.** `river.AddWorker(workers, workspaceWorker)` in
-  `apps/api/internal/runtime/composition/task_wiring.go:355`;
-  `workspace_task_execute` is now consumed.
-- **Derivative renderer — resolved.**
-  `apps/api/internal/tasking/application/runtime/workspace_task_renderer.go`
-  (#827, Phase 4b-03) runs between provider Generate and settler Complete and
-  renders outputs into workspace-scoped media assets.
-- **Library materialization (503) — still current.**
-  `apps/api/internal/library/domain/errors.go`
-  `ErrV1MaterializationUnavailable` still fails closed; the postgres Service
-  still renders 503 rather than half-persisting jobs.
+The still-valid materialization residual is `ErrV1MaterializationUnavailable`:
+the internal-only materialization service returns 503 rather than partially
+persisting a job. Resolving that residual requires a separate contract change.
 
 Current contract for the atomicity rule: `DESIGN.md` §3 "Tasking 的事实源是
 PostgreSQL + River" and `apps/api/internal/tasking/CONTEXT.md`. ADR-0012 rule 2a

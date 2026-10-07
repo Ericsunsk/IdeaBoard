@@ -60,8 +60,8 @@ sum by (reason) (rate(outbound_retries_total{target="ai-gateway"}[5m]))
 
 1. 按 `route` 定位：`sum by (route)` 找出错误率最高的路由。
 2. 用 `X-Request-ID` 关联日志：中间件对每请求打结构化日志（含 `request_id`），5xx 自动记 `slog.Error`。
-3. 若集中在 `/api/user/tasks/submit`：检查 Billing/Credits 可用性与任务提交事务（同一 PG 事务 Quote/Hold/Task/River）。
-4. 若集中在 `/api/admin/*`：检查对应 context 的 repository 与 Admin 编排（见 DESIGN.md Admin vertical contexts 表）。
+3. 若集中在 `/api/v1/workspaces/{workspace_id}/tasks`：检查 Billing/Credits 可用性与任务提交事务（同一 PG 事务 Quote/Hold/Task/River）。
+4. 若集中在 `/api/control/v1/*`：检查对应 context 的 repository 与 Admin 编排（见 DESIGN.md Admin vertical contexts 表）。
 
 ### B. `ideaboard_http_request_duration_seconds` P95 上升
 

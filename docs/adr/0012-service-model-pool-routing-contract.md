@@ -2,12 +2,10 @@
 
 ## Context
 
-GitHub issue #853 is the shared design gate for the Model Pool feature and
-Generation Pipeline reset (#847–#854). The execution companion is
-`docs/agents/model-pool-execution-guide.md`; this ADR freezes the routing rules
-so #847/#848 implementers never invent competing versions. The guide owns issue
-order, repository workflow, verification gates, and rollout constraints; this
-ADR owns the cross-context behavior and data contract.
+GitHub issue #853 was the shared design gate for the Model Pool feature and
+Generation Pipeline reset (#847–#854). This ADR freezes the routing rules and
+cross-context data contract; the completed issue history and git commits retain
+the implementation order and verification evidence.
 
 Today routing is a single-value `feature -> model` lookup with no resolution
 awareness and no pool: `ConfigRepository.ResolveModel`

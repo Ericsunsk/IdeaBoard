@@ -1,17 +1,29 @@
 # Workspace 新表 Runtime Grants 补授手册（#830）
 
-> 状态（2026-09-28）：RESOLVED。durable fix 已合入：`apps/api/internal/platform/database/runtime_privileges.go`
+> 状态（2026-10-08）：**ARCHIVED / HISTORICAL SNAPSHOT**。#830 的 durable fix 已合入：`apps/api/internal/platform/database/runtime_privileges.go`
 > 的 policy 已覆盖 workspace 表（含序列），`database_wiring_db_test.go`
 >（`workspaceRuntimeTableNames` / `workspaceRuntimeSequenceNames`）在启动测试中断言覆盖。
-> 本手册保留为 audit 证据与应急补授 SQL；新建表必须同步进 policy + 启动断言，否则 §2 所述静默遗漏会重演。
+> 本手册只保留历史事故证据、应急补授 SQL 和验证方法。当前权限事实源是 policy-as-code 与启动测试；新建表必须同步进 policy + 启动断言。
 
-> 历史状态：AUDIT ONLY。`finalize-migrate` 的 7 个 privilege policy 未覆盖 16 张 #809 workspace 新表，
-> runtime role（`DB_USER`，如 dev 的 `ideaboard_api`）对这些表零权限，首次读写即 `permission denied`。
-> 本手册给出 ops 可直接执行的补授 SQL（text，未执行）与验证方法。
+> 下文的 `MISSING` 矩阵和事故根因均是修复前的历史记录，不代表当前数据库状态。日常部署不要按 §3 手工授予权限；正常流程应重跑 `finalize-migrate`。
 
-## 1. Grant 矩阵（runtime role 实测结论）
+> 事故快照（仅供审计）：在 durable fix 合入前，`finalize-migrate` 的 7 个 privilege
+> policy 未覆盖 16 张 #809 workspace 新表，runtime role（`DB_USER`，如 dev 的
+> `ideaboard_api`）首次读写会收到 `permission denied`。下文的补授 SQL 从未作为
+> 生产部署步骤执行；它只用于没有办法立即部署 policy 修复时的止血。
 
-`OK` = policy 已覆盖；`MISSING` = 无任何 policy 覆盖，`has_table_privilege` 全为 false
+## Current source of truth
+
+- API runtime table and sequence ownership: `apps/api/internal/platform/database/runtime_privileges.go`.
+- Startup coverage assertions: `apps/api/internal/runtime/composition/database_wiring_db_test.go`.
+- A newly added table is incomplete until both the policy and the startup assertion are updated.
+
+## 1. Archived incident snapshot (before the durable fix)
+
+The following matrix records the pre-fix observation only. It is retained for audit
+reproduction and must not be read as a current grant report.
+
+`OK` = policy was covered; `MISSING` = no policy covered the object at the time of the incident.
 （在 `ideaboard-test-pg:5433` 隔离 scratch DB 实测，`Configure` 等效 grants 下复现）。
 
 | 表 | SELECT | INSERT | UPDATE | DELETE | 身份序列 USAGE | 结论 |
@@ -39,7 +51,7 @@
 以及 `tasking/application/billing/service.go:206,217`、
 `tasking/application/billing/usage.go:49`、`platform/audit/audit.go:102` 的直接调用。
 
-## 2. 根因（证据链）
+## 2. Historical root cause (evidence chain)
 
 1. Migration 本身零 GRANT：`apps/api/internal/db/migrations/20260924000001_baseline.sql`、
    `apps/api/internal/db/schema/fragments/`、`schema.sql`、`apps/api/atlas.hcl` 中无任何 `GRANT`。
@@ -60,7 +72,7 @@
      （`privileges/sql.go` verify queries），缺表不会 fail closed，
      故障只在业务请求时以 500/`permission denied` 暴露。
 
-## 3. 补授 SQL（ops 执行，单事务）
+## 3. Emergency grant SQL (only when policy deployment is unavailable)
 
 `<RUNTIME_ROLE>` 替换为实际 `DB_USER`（dev 为 `ideaboard_api`）。
 序列名遵循 `GENERATED ALWAYS AS IDENTITY` 默认命名（`<表>_internal_id_seq`，
@@ -111,7 +123,7 @@ COMMIT;
 > （`runtime_privileges.go` 的 policy + 启动断言），合并后重跑一次
 > `finalize-migrate` 使 policy-as-code 与实际一致。
 
-## 4. 验证 SQL（补授前后均可跑）
+## 4. Historical verification SQL
 
 ```sql
 -- 期望：补授前 17 张表全 f；补授后全 t（control_audit_records 仅 S,I 为 t）
@@ -140,7 +152,7 @@ INSERT INTO workspaces (public_id, name) VALUES ('ws_grant_smoke', 'smoke') RETU
 ROLLBACK;
 ```
 
-## 5. 回滚
+## 5. Emergency rollback
 
 ```sql
 REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE
@@ -156,7 +168,7 @@ FROM "<RUNTIME_ROLE>";
 -- 序列 REVOKE 同理（USAGE, SELECT, UPDATE），略。
 ```
 
-## 6. 残留风险（需 owner 跟进，非 ops 动作）
+## 6. Historical follow-up notes
 
 1. `task_billing_settlements` 的 release 路径：runtime 非测试代码中只有 INSERT
    （`service.go:217`），状态流转疑似走 `SECURITY DEFINER` credit 函数；若某条 release
