@@ -259,7 +259,9 @@ func (r *TaskStatusOutboxReplayer) deliver(ctx context.Context, row TaskStatusOu
 		}
 	}
 	if r.Webhooks != nil {
-		r.Webhooks.Dispatch(ctx, envelope)
+		if err := r.Webhooks.DispatchErr(ctx, envelope); err != nil {
+			return err
+		}
 	}
 	return nil
 }

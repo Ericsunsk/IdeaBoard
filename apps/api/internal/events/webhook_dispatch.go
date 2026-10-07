@@ -11,6 +11,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 )
 
@@ -21,11 +22,20 @@ import (
 // caller: failures are logged and dropped, mirroring the NATS publish
 // seam (emission follows the domain commit).
 func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
+	if err := s.DispatchErr(ctx, envelope); err != nil {
+		slog.Warn("webhook dispatch failed", "delivery_id", envelope.ID, "err", err)
+	}
+}
+
+// DispatchErr is the durable outbox-aware variant. It returns the first
+// persistence or enqueue failure so an upstream event outbox can retain the
+// transition for replay. All matching subscriptions are still attempted.
+func (s *WebhookStore) DispatchErr(ctx context.Context, envelope V1Envelope) error {
 	if s == nil {
-		return
+		return nil
 	}
 	if err := ValidateV1Envelope(envelope); err != nil {
-		return
+		return err
 	}
 	s.mu.Lock()
 	targets := []string{}
@@ -45,15 +55,22 @@ func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
 	enqueuer := s.enqueuer
 	persistence := s.persistence
 	s.mu.Unlock()
+	var firstErr error
 	for _, subscriptionID := range targets {
 		if persistence != nil {
 			if err := persistence.EnsureDelivery(ctx, envelope, subscriptionID); err != nil {
 				slog.Warn("webhook durable delivery creation failed", "subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+				if firstErr == nil {
+					firstErr = err
+				}
 				continue
 			}
 		}
 		if enqueuer == nil {
 			slog.Warn("webhook dispatch has no enqueuer; durable delivery remains pending", "delivery_id", envelope.ID, "subscription", subscriptionID)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("webhook dispatch enqueuer unavailable")
+			}
 			continue
 		}
 		args := WebhookDeliveryArgs{
@@ -62,8 +79,12 @@ func (s *WebhookStore) Dispatch(ctx context.Context, envelope V1Envelope) {
 		if _, err := enqueuer.Insert(ctx, args, WebhookDeliveryInsertOpts(args)); err != nil {
 			slog.Warn("webhook enqueue failed",
 				"subscription", subscriptionID, "delivery_id", envelope.ID, "err", err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
+	return firstErr
 }
 
 // ReconcilePending re-enqueues durable deliveries left behind by an enqueue
