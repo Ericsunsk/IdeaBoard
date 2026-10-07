@@ -297,21 +297,11 @@ func toTaskDTO(task *workspacetasks.WorkspaceTask) v1TaskDTO {
 	return dto
 }
 
-func requireTaskIdempotencyKey(c *gin.Context) (string, bool) {
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
-		c.Abort()
-		return "", false
-	}
-	return key, true
-}
-
 func (h *contractV1Handler) createWorkspaceTask(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndTasks, Resolve: h.resolveTaskWorkspace}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
-		key, ok := requireTaskIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -552,7 +542,7 @@ func (h *contractV1Handler) cancelWorkspaceTask(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		key, ok := requireTaskIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}

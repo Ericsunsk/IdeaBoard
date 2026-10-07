@@ -110,6 +110,19 @@ type ContractV1Deps struct {
 	SupportChannels         settings.SupportChannelsSettingProvider
 }
 
+// requireV1IdempotencyKey enforces the shared header-only idempotency contract
+// for required v1 mutations. Missing, blank, malformed, and overlong values
+// all converge to the stable 400 idempotency_key_required response.
+func requireV1IdempotencyKey(c *gin.Context) (string, bool) {
+	key, err := contract.IdempotencyKeyFromHeader(c)
+	if err != nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
+		c.Abort()
+		return "", false
+	}
+	return key, true
+}
+
 // V1UserDirectory translates between internal numeric user ids and the
 // external usr_<hex> identifiers without leaking database ids to the API.
 // Production adapts the identity UserRepository; tests use a static map.

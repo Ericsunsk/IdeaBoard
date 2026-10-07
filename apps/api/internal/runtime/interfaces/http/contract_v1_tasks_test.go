@@ -403,7 +403,7 @@ func TestV1TaskIdempotentReplayAndConflict(t *testing.T) {
 	status, missing := post("", v1CreateTaskBodyJSON("render"))
 	_ = missing
 	if status != 400 {
-		// Missing key renders 400 via requireTaskIdempotencyKey; the
+		// Missing key renders 400 via requireV1IdempotencyKey; the
 		// doV1 helper still asserts envelope + Request-Id.
 		t.Fatalf("missing key = %d, want 400", status)
 	}

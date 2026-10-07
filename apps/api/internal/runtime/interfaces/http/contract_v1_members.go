@@ -138,23 +138,13 @@ func (h *contractV1Handler) workspaceDo(c *gin.Context, userExternalID string, u
 	return result, nil, true
 }
 
-func requireWorkspaceIdempotencyKey(c *gin.Context) (string, bool) {
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
-		c.Abort()
-		return "", false
-	}
-	return key, true
-}
-
 func (h *contractV1Handler) addWorkspaceMember(c *gin.Context) {
 	// Key before bind (board add precedent): a missing key fails closed
 	// with 400 even when the body is also malformed, so this handler
 	// uses withWorkspace plus a manual bind instead of
 	// withV1WorkspaceBody.
 	h.withWorkspace(c, v1WorkspaceOpts{Allow: v1AllowOwnerOrAdmin}, func(wctx v1WorkspaceCtx) {
-		key, ok := requireWorkspaceIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -247,7 +237,7 @@ func (h *contractV1Handler) removeWorkspaceMember(c *gin.Context) {
 		if !ok {
 			return
 		}
-		key, ok := requireWorkspaceIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}

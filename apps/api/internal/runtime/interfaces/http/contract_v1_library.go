@@ -199,16 +199,6 @@ func (h *contractV1Handler) libraryDo(c *gin.Context, userExternalID string, use
 	return result, replayed, nil, true
 }
 
-func requireLibraryIdempotencyKey(c *gin.Context) (string, bool) {
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
-		c.Abort()
-		return "", false
-	}
-	return key, true
-}
-
 func logLibraryAudit(op string, operatorUserID int64, target, reason, outcome string) {
 	slog.Info("library v1 audit",
 		"op", op,
@@ -330,7 +320,7 @@ func (h *contractV1Handler) createLibraryFolder(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
-		key, ok := requireLibraryIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -427,7 +417,7 @@ func (h *contractV1Handler) deleteLibraryFolder(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		key, ok := requireLibraryIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -502,7 +492,7 @@ func (h *contractV1Handler) saveLibraryAsset(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndLibrary, Resolve: h.resolveLibraryWorkspace}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
-		key, ok := requireLibraryIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -618,7 +608,7 @@ func (h *contractV1Handler) deleteLibraryAsset(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		key, ok := requireLibraryIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}

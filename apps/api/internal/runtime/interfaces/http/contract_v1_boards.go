@@ -211,16 +211,6 @@ func renderJoinError(c *gin.Context, err error) {
 	c.Abort()
 }
 
-func requireBoardIdempotencyKey(c *gin.Context) (string, bool) {
-	key, err := contract.IdempotencyKeyFromHeader(c)
-	if err != nil {
-		contract.RenderError(c, http.StatusBadRequest, contract.CodeIdempotencyKeyRequired, msgIdempotencyKeyRequired2)
-		c.Abort()
-		return "", false
-	}
-	return key, true
-}
-
 // parseBoardIfMatch requires the If-Match precondition for document writes:
 // missing/empty/"*"/unparsable values render 400, stale values surfacing as
 // 409 happens at ReplaceDocument time.
@@ -360,7 +350,7 @@ func (h *contractV1Handler) createBoard(c *gin.Context) {
 	h.withWorkspace(c, v1WorkspaceOpts{Require: h.requireStoreAndBoards, Resolve: h.boardWorkspaceContext}, func(wctx v1WorkspaceCtx) {
 		identityPrincipal := wctx.Principal
 		workspace := wctx.Workspace
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -469,7 +459,7 @@ func (h *contractV1Handler) archiveBoard(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -507,7 +497,7 @@ func (h *contractV1Handler) restoreBoard(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -588,7 +578,7 @@ func (h *contractV1Handler) replaceBoardDocument(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner, boards.RoleEditor) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -846,7 +836,7 @@ func (h *contractV1Handler) addBoardMember(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -985,7 +975,7 @@ func (h *contractV1Handler) removeBoardMember(c *gin.Context) {
 		if targetUserID != identityPrincipal.UserID() && !requireBoardRole(c, role, boards.RoleOwner) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -1094,7 +1084,7 @@ func (h *contractV1Handler) createShareToken(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -1154,7 +1144,7 @@ func (h *contractV1Handler) revokeShareToken(c *gin.Context) {
 		if !requireBoardRole(c, role, boards.RoleOwner) {
 			return
 		}
-		key, ok := requireBoardIdempotencyKey(c)
+		key, ok := requireV1IdempotencyKey(c)
 		if !ok {
 			return
 		}
@@ -1231,7 +1221,7 @@ func (h *contractV1Handler) joinBoardByToken(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	key, ok := requireBoardIdempotencyKey(c)
+	key, ok := requireV1IdempotencyKey(c)
 	if !ok {
 		return
 	}
