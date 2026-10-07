@@ -2,12 +2,13 @@ import {
   getControlCatalogModelPool,
   replaceControlCatalogModelPool,
 } from '../../../../shared/api/generated-query/control/control-billing/control-billing'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { createAdminGatewayResource } from '../../models/infrastructure/adminGatewayResource'
+import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   parseOutputResolution,
@@ -60,7 +61,12 @@ export function createAdminModelPoolResource(
     replace: replaceAdminModelPool,
     listCatalogModels: () =>
       listCatalogModels().catch((error) => {
-        throw withPoolCopy(error, '加载模型目录失败')
+        throw withControlCopy(error, '加载模型目录失败', {
+          conflict: '模型池已被更新，请刷新后重试',
+          control_not_found: '功能不存在',
+          not_found: '功能不存在',
+          404: '功能不存在',
+        })
       }),
   }
 }
@@ -75,7 +81,12 @@ export async function fetchAdminModelPool(sku: string): Promise<AdminModelPool> 
     const body = await getControlCatalogModelPool(sku)
     return normalizePool(requireContractData<AdminModelPoolWire>(body, '加载模型池失败'), sku)
   } catch (error) {
-    throw withPoolCopy(error, '加载模型池失败')
+    throw withControlCopy(error, '加载模型池失败', {
+      conflict: '模型池已被更新，请刷新后重试',
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
 }
 
@@ -97,12 +108,17 @@ export async function replaceAdminModelPool(
         })),
         reason: operatorReason,
       },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     const data = requireContractData<AdminModelPoolSaveWire>(body, '保存模型池失败')
     return { ...normalizePool(data, sku), changed: data.changed === true }
   } catch (error) {
-    throw withPoolCopy(error, '保存模型池失败')
+    throw withControlCopy(error, '保存模型池失败', {
+      conflict: '模型池已被更新，请刷新后重试',
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
 }
 
@@ -144,58 +160,4 @@ function normalizeResolutions(raw: unknown): PoolResolution[] {
     if (parsed !== null) seen.add(parsed)
   }
   return POOL_RESOLUTIONS.filter((resolution) => seen.has(resolution))
-}
-
-function mutationHeaders(options: ModelPoolMutationOptions, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw poolError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function poolError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
-}
-
-// withPoolCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text. `conflict` is the pool
-// version race (expected_version missed): the caller must refresh and
-// re-apply, never silently overwrite.
-function withPoolCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  if (code === 'conflict' || code === 409) {
-    return poolError('conflict', '模型池已被更新，请刷新后重试')
-  }
-  if (code === 'idempotency_conflict') {
-    return poolError(code, '操作已提交，请勿重复操作')
-  }
-  if (code === 'control_reason_required') {
-    return poolError(code, '需要填写操作原因')
-  }
-  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
-    return poolError('control_not_found', '功能不存在')
-  }
-  if (error instanceof Error) return error
-  return poolError('control_failed', fallback)
-}
-
-function readErrorCode(error: unknown): string | number | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    if (typeof code === 'string' || typeof code === 'number') return code
-  }
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (status === 404 || status === 409) return status
-  }
-  return undefined
 }

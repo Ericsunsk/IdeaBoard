@@ -1,3 +1,4 @@
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
@@ -5,11 +6,7 @@ import {
   getControlBrandingSetting,
   updateControlBrandingSetting,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import type { AdminBrandingSettingsFeedback } from './useSettingsFeedback'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
@@ -156,11 +153,7 @@ async function saveBrandingSetting(
     const body = await updateControlBrandingSetting(
       { project_name: draft.project_name, logo_url: draft.logo_url },
       {
-        headers: buildContractRequestHeaders({
-          requestId: newRequestId(),
-          idempotencyKey: newRequestId(),
-          operatorReason: reason,
-        }),
+        headers: buildControlMutationHeaders({ operatorReason: reason }),
       },
     )
     return requireContractData<BrandingSetting>(body, '保存项目品牌失败')
@@ -178,18 +171,6 @@ async function uploadBrandingLogoFile(_file: File): Promise<string> {
   // guidance instead of calling the deleted `POST /api/admin/upload`.
   // Backend gap: control branding logo upload (see the stream report).
   throw adminControlUnavailable('branding-upload')
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

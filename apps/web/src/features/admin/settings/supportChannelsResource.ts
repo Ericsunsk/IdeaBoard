@@ -2,11 +2,8 @@ import {
   getControlSupportChannels,
   updateControlSupportChannels,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { newRequestId, requireContractData } from '../../../shared/api/contractKernel'
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import { withControlCopy } from '../shared/lib/controlCopy'
 import { SupportChannelKind } from '../../../shared/api/generated-query/control/model/supportChannelKind'
 import type { SupportChannelsSetting } from '../../../shared/api/generated-query/control/model/supportChannelsSetting'
@@ -35,15 +32,11 @@ export function createAdminSupportChannelsResource(): AdminSupportChannelsResour
       }
     },
     async update(input, operatorReason) {
-      if (!operatorReason.trim()) throw new Error('需要填写操作原因')
+      const reason = requireOperatorReason(operatorReason)
       try {
         return readSetting(
           await updateControlSupportChannels(input, {
-            headers: buildContractRequestHeaders({
-              requestId: newRequestId(),
-              idempotencyKey: newRequestId(),
-              operatorReason: operatorReason.trim(),
-            }),
+            headers: buildControlMutationHeaders({ operatorReason: reason }, newRequestId()),
           }),
         )
       } catch (error) {

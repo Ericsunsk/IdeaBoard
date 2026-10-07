@@ -1,12 +1,12 @@
 import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
+import {
   getControlStripeConfig,
   updateControlStripeConfig,
 } from '../../../../shared/api/generated-query/control/control-payments/control-payments'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { withSimpleControlCopy as withControlCopy } from '../../shared/lib/controlCopy'
 import type {
   AdminStripeSettingsResource,
@@ -80,11 +80,7 @@ export async function saveStripeConfiguration(
   }
   try {
     const response = await updateControlStripeConfig(body, {
-      headers: buildContractRequestHeaders({
-        requestId: newRequestId(),
-        idempotencyKey: options.idempotencyKey ?? newRequestId(),
-        operatorReason,
-      }),
+      headers: buildControlMutationHeaders(options),
     })
     return normalizeStripeConfiguration(
       requireContractData<ApiStripeConfigurationSummary>(response, '保存 Stripe 设置失败'),
@@ -111,18 +107,6 @@ function normalizeStripeConfiguration(
     purchasesEnabled: configuration.purchases_enabled,
     updatedAt: configuration.updated_at,
   }
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

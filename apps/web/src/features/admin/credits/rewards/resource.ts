@@ -11,12 +11,13 @@ import type {
   ControlRewardCodePage,
   ControlUpdatedRewardCode,
 } from '../../../../shared/api/generated-query/control/model'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { controlCreditIdempotencyKey } from '../../../../shared/api/idempotencyKey'
+import {
+  buildControlMutationHeaders,
+  createControlError,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
 // Admin reward code boundary (W2 transports). Search/create/update/
@@ -181,7 +182,7 @@ async function searchRewardCodes(input: SearchRewardCodesInput): Promise<RewardC
   })
   const page = requireContractData<ControlRewardCodePage>(body, '加载兑换码失败')
   if (!Array.isArray(page.reward_codes) || typeof page.total !== 'number') {
-    throw controlError('control_failed', '加载兑换码失败')
+    throw createControlError('control_failed', '加载兑换码失败')
   }
   const result: RewardCodePage = {
     rewardCodes: page.reward_codes.map(normalizeRewardCode),
@@ -208,14 +209,14 @@ async function createRewardCode(
         expires_at: input.expiresAt,
         reason: operatorReason,
       },
-      { headers: mutationHeaders(idempotencyKey, operatorReason) },
+      { headers: buildControlMutationHeaders({ operatorReason, idempotencyKey }) },
     )
   } catch (error) {
     throw withControlCopy(error, '创建兑换码失败')
   }
   const created = requireContractData<ControlCreatedRewardCode>(body, '创建兑换码失败')
   if (!created.reward_code || !created.plaintext) {
-    throw controlError('control_failed', '创建兑换码失败')
+    throw createControlError('control_failed', '创建兑换码失败')
   }
   return {
     rewardCode: normalizeRewardCode(created.reward_code),
@@ -248,16 +249,16 @@ async function updateRewardCode(
     }
     if (input.code) payload.code = input.code
     body = await updateControlRewardCode(id, payload, {
-      headers: mutationHeaders(
-        options.idempotencyKey ?? controlCreditIdempotencyKey('reward-update'),
+      headers: buildControlMutationHeaders({
         operatorReason,
-      ),
+        idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-update'),
+      }),
     })
   } catch (error) {
     throw withControlCopy(error, '更新兑换码失败')
   }
   const updated = requireContractData<ControlUpdatedRewardCode>(body, '更新兑换码失败')
-  if (!updated.reward_code) throw controlError('control_failed', '更新兑换码失败')
+  if (!updated.reward_code) throw createControlError('control_failed', '更新兑换码失败')
   const result: UpdatedRewardCode = { rewardCode: normalizeRewardCode(updated.reward_code) }
   if (updated.plaintext != null) result.plaintext = updated.plaintext
   if (updated.replayed != null) result.replayed = updated.replayed
@@ -276,10 +277,10 @@ async function setRewardCodeEnabled(
       id,
       { enabled, reason: operatorReason },
       {
-        headers: mutationHeaders(
-          options.idempotencyKey ?? controlCreditIdempotencyKey('reward-enabled'),
+        headers: buildControlMutationHeaders({
           operatorReason,
-        ),
+          idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-enabled'),
+        }),
       },
     )
   } catch (error) {
@@ -294,10 +295,10 @@ async function deleteRewardCode(id: number, options: RewardCodeMutationOptions):
   const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await deleteControlRewardCode(id, {
-      headers: mutationHeaders(
-        options.idempotencyKey ?? controlCreditIdempotencyKey('reward-delete'),
+      headers: buildControlMutationHeaders({
         operatorReason,
-      ),
+        idempotencyKey: options.idempotencyKey ?? controlCreditIdempotencyKey('reward-delete'),
+      }),
     })
     // Delete resolves `{ data: <ControlDeletedRewardCode> }`; acknowledgement
     // only, no view mapping.
@@ -335,35 +336,7 @@ function normalizeRewardCodeStatus(status: ControlRewardCode['status']): RewardC
   ) {
     return status
   }
-  throw controlError('control_failed', '未知的兑换码状态')
-}
-
-function mutationHeaders(idempotencyKey: string, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey,
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
+  throw createControlError('control_failed', '未知的兑换码状态')
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

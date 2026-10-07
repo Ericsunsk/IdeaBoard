@@ -1,3 +1,4 @@
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import {
   applyControlStorageProfile,
   createControlStorageProfile,
@@ -8,12 +9,9 @@ import {
   testControlStorageProfile,
   updateControlStorageProfile,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { newRequestId, requireContractData } from '../../../shared/api/contractKernel'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './profiles'
+import { withControlCopy } from '../shared/lib/controlCopy'
 
 // Admin storage boundary (W2 transports). Reads ride the Control Plane
 // with the unified contract envelope (`{ data }` success / `{ error:
@@ -118,7 +116,11 @@ async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
   try {
     body = await listControlStorageProviders()
   } catch (error) {
-    throw withControlCopy(error, '加载存储供应商失败')
+    throw withControlCopy(error, '加载存储供应商失败', {
+      control_not_found: '加载存储供应商失败',
+      not_found: '加载存储供应商失败',
+      404: '加载存储供应商失败',
+    })
   }
   const data = requireContractData<{ providers: GeneratedStorageProviderMeta[] }>(
     body,
@@ -132,7 +134,11 @@ async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
   try {
     body = await listControlStorageProfiles()
   } catch (error) {
-    throw withControlCopy(error, '加载存储配置失败')
+    throw withControlCopy(error, '加载存储配置失败', {
+      control_not_found: '加载存储配置失败',
+      not_found: '加载存储配置失败',
+      404: '加载存储配置失败',
+    })
   }
   const data = requireContractData<{ profiles: GeneratedStorageProfile[] }>(
     body,
@@ -146,7 +152,7 @@ async function saveAdminStorageProfile(
   options: StorageProfileMutationOptions,
 ): Promise<StorageProfileCommandResult> {
   const operatorReason = requireOperatorReason(options.operatorReason)
-  const headers = mutationHeaders(options, operatorReason)
+  const headers = buildControlMutationHeaders(options)
   const payload = { ...(input.payload as unknown as Record<string, unknown>) }
   let body: unknown
   try {
@@ -154,7 +160,11 @@ async function saveAdminStorageProfile(
       ? await updateControlStorageProfile(input.id, payload, { headers })
       : await createControlStorageProfile(payload, { headers })
   } catch (error) {
-    throw withControlCopy(error, '保存存储配置失败')
+    throw withControlCopy(error, '保存存储配置失败', {
+      control_not_found: '保存存储配置失败',
+      not_found: '保存存储配置失败',
+      404: '保存存储配置失败',
+    })
   }
   const saved = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
     body,
@@ -179,14 +189,17 @@ async function applyAdminStorageProfileRecord(
   id: string,
   options: StorageProfileMutationOptions,
 ): Promise<StorageProfileCommandResult> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   let body: unknown
   try {
     body = await applyControlStorageProfile(id, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
   } catch (error) {
-    throw withControlCopy(error, '设为当前失败')
+    throw withControlCopy(error, '设为当前失败', {
+      control_not_found: '设为当前失败',
+      not_found: '设为当前失败',
+      404: '设为当前失败',
+    })
   }
   const applied = requireContractData<{ message: string; profile: GeneratedStorageProfile }>(
     body,
@@ -202,14 +215,17 @@ async function testAdminStorageProfileRecord(
   id: string,
   options: StorageProfileMutationOptions,
 ): Promise<{ message: string }> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   let body: unknown
   try {
     body = await testControlStorageProfile(id, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
   } catch (error) {
-    throw withControlCopy(error, '连接失败')
+    throw withControlCopy(error, '连接失败', {
+      control_not_found: '连接失败',
+      not_found: '连接失败',
+      404: '连接失败',
+    })
   }
   return requireContractData<{ message: string }>(body, '连接失败')
 }
@@ -218,14 +234,17 @@ async function deleteAdminStorageProfileRecord(
   id: string,
   options: StorageProfileMutationOptions,
 ): Promise<{ message: string }> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   let body: unknown
   try {
     body = await deleteControlStorageProfile(id, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
   } catch (error) {
-    throw withControlCopy(error, '删除失败')
+    throw withControlCopy(error, '删除失败', {
+      control_not_found: '删除失败',
+      not_found: '删除失败',
+      404: '删除失败',
+    })
   }
   return requireContractData<{ message: string }>(body, '删除失败')
 }
@@ -235,80 +254,14 @@ async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
   try {
     body = await getControlStorageBucketInfo(id)
   } catch (error) {
-    throw withControlCopy(error, '获取 Bucket 信息失败')
+    throw withControlCopy(error, '获取 Bucket 信息失败', {
+      control_not_found: '获取 Bucket 信息失败',
+      not_found: '获取 Bucket 信息失败',
+      404: '获取 Bucket 信息失败',
+    })
   }
   const data = requireContractData<{ info: { domains?: string[] } }>(body, '获取 Bucket 信息失败')
   return data.info.domains ?? []
-}
-
-function mutationHeaders(options: StorageProfileMutationOptions, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
-}
-
-// withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text. request_id flows through for
-// correlation wherever the app surfaces the error.
-function withControlCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  const requestId = readRequestId(error)
-  if (code === 'idempotency_conflict' || code === 409) {
-    return controlError('idempotency_conflict', '操作已提交，请勿重复操作', requestId)
-  }
-  if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因', requestId)
-  }
-  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
-    return controlError('control_not_found', fallback, requestId)
-  }
-  if (error instanceof Error) return error
-  return controlError('control_failed', fallback, requestId)
-}
-
-function readErrorCode(error: unknown): string | number | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    if (typeof code === 'string' || typeof code === 'number') return code
-  }
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (typeof status === 'number') return status
-  }
-  return undefined
-}
-
-function readRequestId(error: unknown): string | undefined {
-  if (error && typeof error === 'object') {
-    const candidate = error as { requestId?: unknown; request_id?: unknown }
-    if (typeof candidate.requestId === 'string' && candidate.requestId) return candidate.requestId
-    if (typeof candidate.request_id === 'string' && candidate.request_id) {
-      return candidate.request_id
-    }
-  }
-  return undefined
 }
 
 function normalizeGeneratedProvider(provider: GeneratedStorageProviderMeta): StorageProviderMeta {

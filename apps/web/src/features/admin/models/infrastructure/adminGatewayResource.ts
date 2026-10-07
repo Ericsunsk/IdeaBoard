@@ -10,11 +10,12 @@ import {
   testControlAIGatewayConnection,
   updateControlAIGateway,
 } from '../../../../shared/api/generated-query/control/control-platform/control-platform'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+  buildControlMutationHeaders,
+  createControlError,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 import type {
   AdminModelItem,
@@ -233,11 +234,11 @@ function pickModalities(
 }
 
 function toDetectedGatewayModel(raw: unknown): DetectedGatewayModel {
-  if (!isRecord(raw)) throw controlError('control_failed', '模型探测失败')
+  if (!isRecord(raw)) throw createControlError('control_failed', '模型探测失败')
   const id = pickString(raw, 'id')
   const name = pickString(raw, 'name')
   const provider = pickString(raw, 'provider')
-  if (!id || !name || !provider) throw controlError('control_failed', '模型探测失败')
+  if (!id || !name || !provider) throw createControlError('control_failed', '模型探测失败')
   const model: DetectedGatewayModel = { id, name, provider }
   const mode = pickString(raw, 'mode')
   if (mode != null) model.mode = mode
@@ -261,7 +262,7 @@ function toModelReferenceSnapshot(raw: Record<string, unknown>): ModelReferenceS
   const modelId = pickString(raw, 'model_id')
   const source = pickString(raw, 'source')
   const note = typeof raw.note === 'string' ? raw.note : ''
-  if (!modelId || !source) throw controlError('control_failed', '参照价查询失败')
+  if (!modelId || !source) throw createControlError('control_failed', '参照价查询失败')
   const snapshot: ModelReferenceSnapshot = { modelId, source, note, found: raw.found === true }
   assignOptionalText(snapshot, raw, [
     ['provider', 'provider'],
@@ -320,10 +321,10 @@ function assignOptionalNumbers<T extends object>(
 }
 
 function toModelObservedSnapshot(raw: unknown): ModelObservedSnapshot {
-  if (!isRecord(raw)) throw controlError('control_failed', '观测数据加载失败')
+  if (!isRecord(raw)) throw createControlError('control_failed', '观测数据加载失败')
   const model = pickString(raw, 'model')
   const provider = pickString(raw, 'provider')
-  if (!model || !provider) throw controlError('control_failed', '观测数据加载失败')
+  if (!model || !provider) throw createControlError('control_failed', '观测数据加载失败')
   const snapshot: ModelObservedSnapshot = {
     model,
     provider,
@@ -363,10 +364,10 @@ function assignNullableNumbers<T extends object>(
 }
 
 function toObservedSkuMargin(raw: unknown): ModelObservedSkuMargin {
-  if (!isRecord(raw)) throw controlError('control_failed', '观测数据加载失败')
+  if (!isRecord(raw)) throw createControlError('control_failed', '观测数据加载失败')
   const sku = pickString(raw, 'sku')
   const service = pickString(raw, 'service')
-  if (!sku || !service) throw controlError('control_failed', '观测数据加载失败')
+  if (!sku || !service) throw createControlError('control_failed', '观测数据加载失败')
   const margin: ModelObservedSkuMargin = {
     sku,
     displayName: pickString(raw, 'display_name') ?? '',
@@ -431,11 +432,10 @@ async function saveModelCatalog(
   items: AdminModelItem[],
   options: GatewayMutationOptions,
 ): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await saveControlAIGatewayCatalog(
       { items: items.map(toGatewayCatalogItem) },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存模型库失败')
@@ -467,7 +467,7 @@ async function detectGatewayModels(provider?: string): Promise<GatewayModelDetec
     '模型探测失败',
   )
   if (!Array.isArray(result.models) || typeof result.configured_providers !== 'number') {
-    throw controlError('control_failed', '模型探测失败')
+    throw createControlError('control_failed', '模型探测失败')
   }
   return {
     models: result.models.map(toDetectedGatewayModel),
@@ -506,7 +506,7 @@ async function getModelReference(input: {
 async function listModelsObserved(): Promise<ModelObservedSnapshot[]> {
   const body = await listControlAIGatewayModelsObserved()
   const rows = requireContractData<unknown>(body, '观测数据加载失败')
-  if (!Array.isArray(rows)) throw controlError('control_failed', '观测数据加载失败')
+  if (!Array.isArray(rows)) throw createControlError('control_failed', '观测数据加载失败')
   return rows.map(toModelObservedSnapshot)
 }
 
@@ -525,11 +525,10 @@ async function updateGatewayConnection(
   input: UpdateGatewayConfigRequest,
   options: GatewayMutationOptions,
 ): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await updateControlAIGateway(
       { ...input },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存 AI 网关配置失败')
@@ -570,7 +569,7 @@ async function testGatewayConnection(
   let body: unknown
   try {
     body = await testControlAIGatewayConnection(payload, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
   } catch (error) {
     throw withControlCopy(error, '网关连接测试失败')
@@ -587,34 +586,6 @@ async function testGatewayConnection(
   if (typeof probe.latency_ms === 'number') result.latencyMs = probe.latency_ms
   if (typeof probe.message === 'string' && probe.message) result.message = probe.message
   return result
-}
-
-function mutationHeaders(options: GatewayMutationOptions, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

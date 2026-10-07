@@ -1,3 +1,4 @@
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
@@ -5,11 +6,7 @@ import {
   getControlMediaUploadSetting,
   updateControlMediaUploadSetting,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import type { AdminMediaUploadSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
@@ -116,29 +113,13 @@ async function saveMediaUploadSetting(
     const body = await updateControlMediaUploadSetting(
       { upload_max_concurrent: draft.upload_max_concurrent },
       {
-        headers: buildContractRequestHeaders({
-          requestId: newRequestId(),
-          idempotencyKey: newRequestId(),
-          operatorReason: reason,
-        }),
+        headers: buildControlMutationHeaders({ operatorReason: reason }),
       },
     )
     return requireContractData<MediaUploadSetting>(body, '保存上传设置失败')
   } catch (error) {
     throw withControlCopy(error, '保存上传设置失败')
   }
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

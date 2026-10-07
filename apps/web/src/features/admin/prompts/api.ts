@@ -1,12 +1,9 @@
+import { buildControlMutationHeaders } from '../shared/lib/controlMutation'
 import {
   listControlFeaturePrompts,
   saveControlFeaturePrompt,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
 // Admin feature prompt boundary (W2 transports). The list read rides the
@@ -49,44 +46,19 @@ export async function saveAdminFeaturePrompt(
   input: SaveFeaturePromptInput,
   options: SaveFeaturePromptOptions,
 ): Promise<FeaturePrompt> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   const { slug, ...payload } = input
   try {
     const body = await saveControlFeaturePrompt(
       slug,
       { ...payload },
       {
-        headers: buildContractRequestHeaders({
-          requestId: newRequestId(),
-          idempotencyKey: options.idempotencyKey ?? newRequestId(),
-          operatorReason,
-        }),
+        headers: buildControlMutationHeaders(options),
       },
     )
     return requireContractData<FeaturePrompt>(body, '保存提示词失败')
   } catch (error) {
     throw withControlCopy(error, '保存提示词失败')
   }
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

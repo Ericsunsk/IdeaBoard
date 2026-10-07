@@ -1,13 +1,10 @@
+import { buildControlMutationHeaders } from '../shared/lib/controlMutation'
 import {
   listControlSearchProviders,
   testControlSearchProvider,
   updateControlSearchProvider,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { withControlCopy } from '../shared/lib/controlCopy'
 import type {
   SearchProviderId,
@@ -70,12 +67,11 @@ async function updateSearchProvider(
   input: SearchProviderUpdate,
   options: SearchProviderMutationOptions,
 ): Promise<void> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await updateControlSearchProvider(
       provider,
       { ...input },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     // Nil-ack mutation: success is `{ data: {} }`.
     requireContractData<Record<string, unknown>>(body, '保存图片搜索供应商配置失败')
@@ -88,43 +84,14 @@ async function testSearchProvider(
   provider: SearchProviderId,
   options: SearchProviderMutationOptions,
 ): Promise<SearchProviderTestResult> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await testControlSearchProvider(provider, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
     return requireContractData<SearchProviderTestResult>(body, '测试图片搜索供应商连接失败')
   } catch (error) {
     throw withControlCopy(error, '测试图片搜索供应商连接失败')
   }
-}
-
-function mutationHeaders(options: SearchProviderMutationOptions, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

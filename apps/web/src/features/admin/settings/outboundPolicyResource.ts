@@ -1,13 +1,10 @@
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import { useQuery } from '@tanstack/vue-query'
 import {
   getControlOutboundPolicy,
   updateControlOutboundPolicy,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { withSimpleControlCopy as withControlCopy } from '../shared/lib/controlCopy'
 import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './outboundPolicyContract'
 
@@ -54,29 +51,13 @@ async function updateOutboundPolicy(
     const body = await updateControlOutboundPolicy(
       { allow_hosts: [...request.allow_hosts], reason: operatorReason },
       {
-        headers: buildContractRequestHeaders({
-          requestId: newRequestId(),
-          idempotencyKey: options.idempotencyKey ?? newRequestId(),
-          operatorReason,
-        }),
+        headers: buildControlMutationHeaders(options),
       },
     )
     return requireContractData<OutboundPolicySetting>(body, '保存私有地址访问策略失败')
   } catch (error) {
     throw withControlCopy(error, '保存私有地址访问策略失败')
   }
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

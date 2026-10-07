@@ -4,11 +4,7 @@ import {
   publishControlCatalogPrices,
   setControlCatalogAvailability,
 } from '../../../../shared/api/generated-query/control/control-billing/control-billing'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
@@ -21,6 +17,11 @@ import type {
   AdminBillableItemStatus,
   PricingVariant,
 } from './billableCatalogTypes'
+import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 
 // Admin billing catalog boundary (W2 transports). Reads and writes go
 // through the Control Plane billing operations with the contract envelope
@@ -89,15 +90,18 @@ export async function deleteArchivedBillableItem(
   sku: string,
   options: BillableCatalogMutationOptions,
 ): Promise<string> {
-  const operatorReason = requireOperatorReason(options.operatorReason)
   try {
     const body = await deleteControlCatalogItem(sku, {
-      headers: mutationHeaders(options, operatorReason),
+      headers: buildControlMutationHeaders(options),
     })
     const data = requireContractData<{ sku: string }>(body, '删除已归档功能失败')
     return data.sku
   } catch (error) {
-    throw withControlCopy(error, '删除已归档功能失败')
+    throw withControlCopy(error, '删除已归档功能失败', {
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
 }
 
@@ -111,7 +115,7 @@ export async function setBillableItemAvailability(
     const body = await setControlCatalogAvailability(
       sku,
       { enabled, reason: operatorReason },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     return normalizeAvailability(
       requireContractData<BillableItemAvailability>(
@@ -120,7 +124,11 @@ export async function setBillableItemAvailability(
       ),
     )
   } catch (error) {
-    throw withControlCopy(error, enabled ? '启用功能失败' : '停用功能失败')
+    throw withControlCopy(error, enabled ? '启用功能失败' : '停用功能失败', {
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
 }
 
@@ -135,7 +143,7 @@ export async function publishBillableItemPrices(
     const body = await publishControlCatalogPrices(
       sku,
       { prices: requestPrices, reason: operatorReason },
-      { headers: mutationHeaders(options, operatorReason) },
+      { headers: buildControlMutationHeaders(options) },
     )
     const data = requireContractData<{
       prices: Partial<Record<PricingVariant, BillingPrice>>
@@ -144,7 +152,11 @@ export async function publishBillableItemPrices(
       Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
     ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
   } catch (error) {
-    throw withControlCopy(error, '发布价格失败')
+    throw withControlCopy(error, '发布价格失败', {
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
 }
 
@@ -154,57 +166,12 @@ async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
     const data = requireContractData<{ items: BillableItemCatalogCard[] }>(body, '加载功能定价失败')
     return data.items.map(normalizeBillableItem)
   } catch (error) {
-    throw withControlCopy(error, '加载功能定价失败')
+    throw withControlCopy(error, '加载功能定价失败', {
+      control_not_found: '功能不存在',
+      not_found: '功能不存在',
+      404: '功能不存在',
+    })
   }
-}
-
-function mutationHeaders(options: BillableCatalogMutationOptions, operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey ?? newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
-}
-
-// withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
-function withControlCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  if (code === 'idempotency_conflict' || code === 409) {
-    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
-  }
-  if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因')
-  }
-  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
-    return controlError('control_not_found', '功能不存在')
-  }
-  if (error instanceof Error) return error
-  return controlError('control_failed', fallback)
-}
-
-function readErrorCode(error: unknown): string | number | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    if (typeof code === 'string' || typeof code === 'number') return code
-  }
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (status === 404 || status === 409) return status
-  }
-  return undefined
 }
 
 function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItemCard {

@@ -1,16 +1,17 @@
 import {
+  buildControlMutationHeaders,
+  requireOperatorReason,
+} from '../../shared/lib/controlMutation'
+import {
   createControlPaymentRefund,
   getControlPaymentOrder,
   listControlPaymentOrders,
 } from '../../../../shared/api/generated-query/control/control-payments/control-payments'
 import type { ListControlPaymentOrdersParams } from '../../../../shared/api/generated-query/control/model'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import { PAGE_SIZES } from '../../../../shared/config/pagination'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 export type PaymentOrderApiUser = {
@@ -114,6 +115,12 @@ export type PaymentOrderApiDetail = {
   refundable_idea_quantity?: number
 }
 
+const PAYMENT_ORDER_CONTROL_MESSAGES = {
+  control_not_found: '支付订单不存在',
+  not_found: '支付订单不存在',
+  404: '支付订单不存在',
+} as const
+
 export type AdminPaymentOrderApiAdapter = {
   search: (input: SearchAdminPaymentOrdersInput) => Promise<PaymentOrderApiPage>
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<PaymentOrderApiDetail>
@@ -156,7 +163,7 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
         const body = await listControlPaymentOrders(params, ...(signal == null ? [] : [{ signal }]))
         return requireContractData<PaymentOrderApiPage>(body, '加载支付订单失败')
       } catch (error) {
-        throw withControlCopy(error, '加载支付订单失败')
+        throw withControlCopy(error, '加载支付订单失败', PAYMENT_ORDER_CONTROL_MESSAGES)
       }
     },
     get: async (publicOrderNumber, signal) => {
@@ -167,7 +174,7 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
         )
         return requireContractData<PaymentOrderApiDetail>(body, '加载支付订单详情失败')
       } catch (error) {
-        throw withControlCopy(error, '加载支付订单详情失败')
+        throw withControlCopy(error, '加载支付订单详情失败', PAYMENT_ORDER_CONTROL_MESSAGES)
       }
     },
     refund: async (publicOrderNumber, input) => {
@@ -177,8 +184,7 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
           publicOrderNumber.trim().toUpperCase(),
           { idea_quantity: input.idea_quantity, reason: operatorReason },
           {
-            headers: buildContractRequestHeaders({
-              requestId: newRequestId(),
+            headers: buildControlMutationHeaders({
               idempotencyKey: input.idempotency_key,
               operatorReason,
             }),
@@ -186,49 +192,8 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
         )
         return requireContractData<PaymentOrderApiRefund>(body, '发起退款失败')
       } catch (error) {
-        throw withControlCopy(error, '发起退款失败')
+        throw withControlCopy(error, '发起退款失败', PAYMENT_ORDER_CONTROL_MESSAGES)
       }
     },
   }
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
-}
-
-// withControlCopy maps control error codes to operator-facing copy.
-// Branch on code, never on message text.
-function withControlCopy(error: unknown, fallback: string): Error {
-  const code = readErrorCode(error)
-  if (code === 'idempotency_conflict' || code === 409) {
-    return controlError(code === 409 ? 'idempotency_conflict' : code, '操作已提交，请勿重复操作')
-  }
-  if (code === 'control_reason_required') {
-    return controlError(code, '需要填写操作原因')
-  }
-  if (code === 'control_not_found' || code === 'not_found' || code === 404) {
-    return controlError('control_not_found', '支付订单不存在')
-  }
-  if (error instanceof Error) return error
-  return controlError('control_failed', fallback)
-}
-
-function readErrorCode(error: unknown): string | number | undefined {
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code
-    if (typeof code === 'string' || typeof code === 'number') return code
-  }
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (status === 404 || status === 409) return status
-  }
-  return undefined
 }
