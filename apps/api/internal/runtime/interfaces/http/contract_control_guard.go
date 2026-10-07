@@ -10,6 +10,7 @@ package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ import (
 	creditsdomain "ideaboard/api/internal/credits/domain"
 	credithttp "ideaboard/api/internal/credits/interfaces/http"
 	creditsports "ideaboard/api/internal/credits/ports"
+	"ideaboard/api/internal/db/dbutil"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/domain"
 	identityports "ideaboard/api/internal/identity/users/ports"
@@ -28,6 +30,7 @@ import (
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
@@ -144,8 +147,17 @@ type ContractControlDeps struct {
 	// fail-closed with 503.
 	BrandingUpload ControlBrandingUploadService
 	Idempotency    *contract.IdempotencyStore
-	RateLimiter    *ControlRateLimiter
-	AuditSink      ControlAuditSink
+	// IdempotencyDurable is the PostgreSQL authority behind Control
+	// mutation idempotency (#891): the guard claims the in-progress
+	// fact inside its guard-owned transaction before running the
+	// handler, so concurrent same-key claimants elect exactly one
+	// winner across processes and restarts, and retries replay the
+	// stored 2xx response. The process-local Idempotency store stays a
+	// same-process fast-path optimization only. Nil keeps the legacy
+	// L1-only path (tests and unwired deployments).
+	IdempotencyDurable ControlIdempotencyDurable
+	RateLimiter        *ControlRateLimiter
+	AuditSink          ControlAuditSink
 	// TxScope and TxAudit opt the guarded MUTATIONS into the atomic
 	// audit path (step 2): the guard begins one transaction per
 	// mutating call, the handler runs inside it, and the audit row
@@ -484,7 +496,10 @@ func (d *ContractControlDeps) runIdempotent(c *gin.Context, p principal.Principa
 	store := d.idempotencyStore()
 	_, operatorID := controlOperatorIdentity(p)
 	scope := contract.IdempotencyScope(operatorID, "control:"+operation)
-	requestHash := contract.HashIdempotencyRequest(c.Request.Method, c.FullPath(), string(body))
+	// The request identity pins the real target (see
+	// contract_control_idempotency.go); the process-local store stays a
+	// same-process fast path only.
+	requestHash := controlDurableClaim(p, operation, key, record, c.Request.Method, c.FullPath(), body).RequestHash
 	if existing, replayed, err := store.Lookup(scope, p.UserID(), key, requestHash); err != nil {
 		record.Status = http.StatusConflict
 		record.Outcome = ControlAuditFailed
@@ -593,12 +608,20 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	store := d.idempotencyStore()
 	_, operatorID := controlOperatorIdentity(p)
 	scope := contract.IdempotencyScope(operatorID, "control:"+operation)
-	requestHash := contract.HashIdempotencyRequest(c.Request.Method, c.FullPath(), string(body))
+	// Durable scope (operator/operation/target/key) plus the canonical
+	// request hash, computed once and shared by the L1 fast path and
+	// the durable claim below.
+	durable := controlDurableClaim(p, operation, key, record, c.Request.Method, c.FullPath(), body)
+	requestHash := durable.RequestHash
 	failTx := func(txCtx context.Context, status int, code contract.Code, message string, outcome audit.Outcome) {
 		record.Status = status
 		record.Outcome = outcome
-		d.appendAtomicAudit(txCtx, record)
 		d.TxScope.Rollback(txCtx)
+		// The guard transaction is gone, so the failure audit must use the
+		// detached sink. Keeping it outside the rolled-back mutation
+		// transaction preserves the failure trail without reviving a
+		// business write that already failed.
+		d.emitAtomicFailureAudit(c.Request.Context(), record)
 		contract.RenderError(c, status, code, message)
 	}
 	if existing, replayed, err := store.Lookup(scope, p.UserID(), key, requestHash); err != nil {
@@ -606,7 +629,7 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 		if beginErr != nil {
 			record.Status = http.StatusConflict
 			record.Outcome = ControlAuditFailed
-			emitControlAudit(c.Request.Context(), nil, *record)
+			d.emitAtomicFailureAudit(c.Request.Context(), record)
 			contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 			return
 		}
@@ -619,7 +642,7 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 			if beginErr != nil {
 				record.Status = http.StatusConflict
 				record.Outcome = ControlAuditFailed
-				emitControlAudit(c.Request.Context(), nil, *record)
+				d.emitAtomicFailureAudit(c.Request.Context(), record)
 				contract.RenderError(c, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict)
 				return
 			}
@@ -628,10 +651,10 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 		}
 		txCtx, beginErr := d.TxScope.Begin(c.Request.Context())
 		if beginErr != nil {
-			record.Status = stored.Status
-			record.Outcome = ControlAuditOK
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
 			record.Replayed = true
-			emitControlAudit(c.Request.Context(), nil, *record)
+			d.emitAtomicFailureAudit(c.Request.Context(), record)
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 			return
 		}
@@ -639,13 +662,17 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 		record.Outcome = ControlAuditOK
 		record.Replayed = true
 		if _, auditErr := d.TxAudit.AppendControlAuditTx(txCtx, controlTxOf(txCtx), *record); auditErr != nil {
-			emitControlAudit(txCtx, nil, *record)
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
 			d.TxScope.Rollback(txCtx)
+			d.emitAtomicFailureAudit(c.Request.Context(), record)
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 			return
 		}
 		if commitErr := d.TxScope.Commit(txCtx); commitErr != nil {
-			emitControlAudit(txCtx, nil, *record)
+			record.Status = http.StatusServiceUnavailable
+			record.Outcome = ControlAuditFailed
+			d.emitAtomicFailureAudit(c.Request.Context(), record)
 			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 			return
 		}
@@ -660,9 +687,70 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	if beginErr != nil {
 		record.Status = http.StatusServiceUnavailable
 		record.Outcome = ControlAuditFailed
-		emitControlAudit(c.Request.Context(), nil, *record)
+		d.emitAtomicFailureAudit(c.Request.Context(), record)
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 		return
+	}
+	// Post-commit announcements (#889): participants on the borrowed
+	// transaction defer publication to hooks run after the commit below,
+	// so an audit or commit failure drops them instead of announcing a
+	// rolled-back fact. Replay/conflict paths above return before any
+	// handler runs, so they never register hooks.
+	txCtx = dbutil.ContextWithAmbientPostCommit(txCtx)
+	// Durable single-winner election: the in-progress fact lands in the
+	// guard transaction before the handler runs, so a concurrent
+	// same-key claimant blocks on the primary key until this
+	// transaction commits or rolls back. Nil keeps the legacy L1-only
+	// path (tests and unwired deployments).
+	durableWinner := false
+	if d.IdempotencyDurable != nil {
+		claimResult, claimErr := d.IdempotencyDurable.Claim(txCtx, controlTxOf(txCtx), durable)
+		if claimErr != nil {
+			failTx(txCtx, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic, ControlAuditFailed)
+			return
+		}
+		if !claimResult.Winner {
+			durableReplay := claimResult.Existing
+			if durableReplay == nil || durableReplay.RequestHash != durable.RequestHash {
+				failTx(txCtx, http.StatusConflict, contract.CodeIdempotencyConflict, msgIdempotencyConflict, ControlAuditFailed)
+				return
+			}
+			if !durableReplay.Completed {
+				// Unreachable in production: in-progress facts only
+				// become visible after the winner commits, and winners
+				// flip to completed (or delete the claim) before commit.
+				// Fail retryable rather than execute unfenced.
+				failTx(txCtx, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic, ControlAuditFailed)
+				return
+			}
+			record.Status = durableReplay.Result.Status
+			record.Outcome = ControlAuditOK
+			record.Replayed = true
+			if _, auditErr := d.TxAudit.AppendControlAuditTx(txCtx, controlTxOf(txCtx), *record); auditErr != nil {
+				d.TxScope.Rollback(txCtx)
+				d.emitAtomicFailureAudit(c.Request.Context(), record)
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+				return
+			}
+			if commitErr := d.TxScope.Commit(txCtx); commitErr != nil {
+				d.emitAtomicFailureAudit(c.Request.Context(), record)
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+				return
+			}
+			emitControlAudit(txCtx, nil, *record)
+			store.StoreResult(scope, p.UserID(), key, requestHash, controlStoredResponse{
+				Status:      durableReplay.Result.Status,
+				Header:      map[string]string{"Content-Type": durableReplay.Result.ContentType},
+				Body:        durableReplay.Result.Body,
+				RequestHash: requestHash,
+			})
+			if contentType := durableReplay.Result.ContentType; contentType != "" {
+				c.Header("Content-Type", contentType)
+			}
+			c.Data(durableReplay.Result.Status, durableReplay.Result.ContentType, []byte(durableReplay.Result.Body))
+			return
+		}
+		durableWinner = true
 	}
 	original := c.Writer
 	capture := &controlAtomicCaptureWriter{ResponseWriter: original, header: make(http.Header)}
@@ -690,17 +778,52 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	// trail only (service subjects, step-1 skip parity) and still
 	// commits; err rolls everything back and fails the request.
 	if _, auditErr := d.TxAudit.AppendControlAuditTx(txCtx, controlTxOf(txCtx), *record); auditErr != nil {
-		emitControlAudit(txCtx, nil, *record)
 		d.TxScope.Rollback(txCtx)
+		d.emitAtomicFailureAudit(c.Request.Context(), record)
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 		return
+	}
+	// The dedup fact joins the same transaction: a 2xx flips the claim
+	// to completed with the response (retained for replay), while any
+	// other outcome abandons the claim so the retry re-executes instead
+	// of replaying a failure.
+	if durableWinner {
+		if status >= 200 && status < 300 {
+			if err := d.IdempotencyDurable.Complete(txCtx, controlTxOf(txCtx), durable, idempotency.ControlResult{
+				Status:      status,
+				ContentType: capture.header.Get("Content-Type"),
+				Body:        capture.body.String(),
+			}); err != nil {
+				d.TxScope.Rollback(txCtx)
+				d.emitAtomicFailureAudit(c.Request.Context(), record)
+				contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+				return
+			}
+		} else if err := d.IdempotencyDurable.Abandon(txCtx, controlTxOf(txCtx), durable); err != nil {
+			d.TxScope.Rollback(txCtx)
+			d.emitAtomicFailureAudit(c.Request.Context(), record)
+			contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
+			return
+		}
 	}
 	if commitErr := d.TxScope.Commit(txCtx); commitErr != nil {
-		emitControlAudit(txCtx, nil, *record)
+		d.emitAtomicFailureAudit(c.Request.Context(), record)
 		contract.RenderError(c, http.StatusServiceUnavailable, contract.CodeServiceUnavailable, msgServiceUnavailableAtomic)
 		return
 	}
+	// #889: the guard-owned transaction (business plus audit) committed:
+	// run deferred post-commit announcements now. Every failure path
+	// above returns before this line, so audit/commit failures drop
+	// their hooks with txCtx and publish nothing.
+	dbutil.RunAmbientPostCommit(txCtx)
 	emitControlAudit(txCtx, nil, *record)
+	if durableWinner && status >= 200 && status < 300 {
+		// Best-effort retention hygiene in autocommit, outside the
+		// committed guard transaction: a failure never fails the call.
+		if _, err := d.IdempotencyDurable.PurgeExpired(c.Request.Context()); err != nil {
+			slog.Warn("control durable idempotency purge failed", "err", err)
+		}
+	}
 	if status >= 200 && status < 300 {
 		store.StoreResult(scope, p.UserID(), key, requestHash, controlStoredResponse{
 			Status:      status,
@@ -712,16 +835,20 @@ func (d *ContractControlDeps) runAtomic(c *gin.Context, p principal.Principal, o
 	capture.replayTo(original)
 }
 
-// appendAtomicAudit best-effort joins a failure-path audit row into
-// txCtx before the guard rolls back: the row is discarded with the
-// rollback, but the attempt keeps the slog trail complete for the
-// failed call.
-func (d *ContractControlDeps) appendAtomicAudit(txCtx context.Context, record *ControlAuditRecord) {
-	if d == nil || d.TxAudit == nil || record == nil {
+// emitAtomicFailureAudit records a failure after the guard transaction has
+// rolled back. The normal ControlAuditSink is intentionally used here: the
+// production durable sink owns its own detached transaction, while tests can
+// observe that the failure row is emitted outside the rolled-back participant
+// transaction. WithoutCancel keeps the audit trail durable when the client
+// disconnects while the failed request is being rendered.
+func (d *ContractControlDeps) emitAtomicFailureAudit(ctx context.Context, record *ControlAuditRecord) {
+	if d == nil || record == nil {
 		return
 	}
-	_, _ = d.TxAudit.AppendControlAuditTx(txCtx, controlTxOf(txCtx), *record)
-	emitControlAudit(txCtx, nil, *record)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	emitControlAudit(context.WithoutCancel(ctx), d.sink(), *record)
 }
 
 // controlTxOf extracts the guard-owned transaction for the participant

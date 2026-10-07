@@ -235,13 +235,15 @@ func (d *ContractControlDeps) updateControlUserRole(c *gin.Context, ctx controlC
 		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
 		return
 	}
-	if err := commands.SetRole(c.Request.Context(), ctx.Operator, id.String(), strings.TrimSpace(req.Role)); err != nil {
+	outcome, err := commands.SetRole(c.Request.Context(), ctx.Operator, id.String(), strings.TrimSpace(req.Role))
+	if err != nil {
 		writeControlIdentityCommandError(c, err)
 		return
 	}
 	contract.RenderSuccess(c, struct {
-		Updated bool `json:"updated"`
-	}{Updated: true})
+		Updated         bool `json:"updated"`
+		AuthSyncPending bool `json:"auth_sync_pending"`
+	}{Updated: true, AuthSyncPending: outcome.SyncPending})
 }
 
 type controlBanUserRequest struct {
@@ -271,16 +273,18 @@ func (d *ContractControlDeps) banControlUser(c *gin.Context, ctx controlContext)
 	if reason == "" {
 		reason = ctx.Reason
 	}
-	if err := commands.Ban(c.Request.Context(), ctx.Operator, id.String(), identityports.IdentityAdminBanInput{
+	outcome, err := commands.Ban(c.Request.Context(), ctx.Operator, id.String(), identityports.IdentityAdminBanInput{
 		Reason:        reason,
 		ExpiresInDays: req.ExpiresInDays,
-	}); err != nil {
+	})
+	if err != nil {
 		writeControlIdentityCommandError(c, err)
 		return
 	}
 	contract.RenderSuccess(c, struct {
-		Banned bool `json:"banned"`
-	}{Banned: true})
+		Banned          bool `json:"banned"`
+		AuthSyncPending bool `json:"auth_sync_pending"`
+	}{Banned: true, AuthSyncPending: outcome.SyncPending})
 }
 
 func (d *ContractControlDeps) unbanControlUser(c *gin.Context, ctx controlContext) {
@@ -292,13 +296,15 @@ func (d *ContractControlDeps) unbanControlUser(c *gin.Context, ctx controlContex
 	if !ok {
 		return
 	}
-	if err := commands.Unban(c.Request.Context(), ctx.Operator, id.String()); err != nil {
+	outcome, err := commands.Unban(c.Request.Context(), ctx.Operator, id.String())
+	if err != nil {
 		writeControlIdentityCommandError(c, err)
 		return
 	}
 	contract.RenderSuccess(c, struct {
-		Unbanned bool `json:"unbanned"`
-	}{Unbanned: true})
+		Unbanned        bool `json:"unbanned"`
+		AuthSyncPending bool `json:"auth_sync_pending"`
+	}{Unbanned: true, AuthSyncPending: outcome.SyncPending})
 }
 
 func (d *ContractControlDeps) revokeControlUserSessions(c *gin.Context, ctx controlContext) {
@@ -310,7 +316,7 @@ func (d *ContractControlDeps) revokeControlUserSessions(c *gin.Context, ctx cont
 	if !ok {
 		return
 	}
-	if err := commands.RevokeSessions(c.Request.Context(), ctx.Operator, id.String()); err != nil {
+	if _, err := commands.RevokeSessions(c.Request.Context(), ctx.Operator, id.String()); err != nil {
 		writeControlIdentityCommandError(c, err)
 		return
 	}
@@ -328,7 +334,7 @@ func (d *ContractControlDeps) deleteControlUser(c *gin.Context, ctx controlConte
 	if !ok {
 		return
 	}
-	if err := commands.Delete(c.Request.Context(), ctx.Operator, id.String()); err != nil {
+	if _, err := commands.Delete(c.Request.Context(), ctx.Operator, id.String()); err != nil {
 		writeControlIdentityCommandError(c, err)
 		return
 	}

@@ -1,8 +1,10 @@
 import { computed, readonly, shallowRef, type ComputedRef, type Ref } from 'vue'
 import {
-  getAuthStorageUserScope,
-  subscribeAuthStorageScopeChange,
-} from '../../../../shared/utils/auth'
+  boardScopeKey,
+  getBoardScope,
+  isCompleteBoardScope,
+  subscribeBoardScopeChange,
+} from './scope'
 import { listBoards, subscribeBoardChanges, type BoardMeta } from './boards'
 import {
   createBoardCommands,
@@ -66,11 +68,22 @@ export type BoardRepositoryDependencies = {
   hydrate(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
 }
 
+function currentBoardScopeKey(): string | null {
+  const scope = getBoardScope()
+  return isCompleteBoardScope(scope) ? boardScopeKey(scope) : null
+}
+
+function subscribeBoardRepositoryScope(listener: (scope: string | null) => void): () => void {
+  return subscribeBoardScopeChange(() => {
+    listener(currentBoardScopeKey())
+  })
+}
+
 const defaultDependencies: BoardRepositoryDependencies = {
   listBoards,
   subscribe: subscribeBoardChanges,
-  getScope: getAuthStorageUserScope,
-  subscribeScope: subscribeAuthStorageScopeChange,
+  getScope: currentBoardScopeKey,
+  subscribeScope: subscribeBoardRepositoryScope,
   createCommands: (scopeGuard) =>
     createBoardCommands({ isMutationCurrent: scopeGuard?.isCurrent ?? (() => true) }),
   hydrate: hydrateBoardsFromServer,

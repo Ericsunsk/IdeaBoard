@@ -1,6 +1,6 @@
-import { getRecoverableAuthStorageUserScope } from '../../../../shared/utils/auth'
 import { createPrefixedId } from '../../../../shared/utils/ids'
 import { readLocalStorageItem, writeLocalStorageJson } from '../../../../shared/utils/storage'
+import { getBoardScope, scopedBoardStorageKey } from './scope'
 
 export interface BoardMeta {
   id: string
@@ -9,6 +9,8 @@ export interface BoardMeta {
   updatedAt: number
   revision?: number
   archivedAt?: string | undefined
+  /** Owning workspace: board identity is User + Workspace scoped (issue #894). */
+  workspaceId?: string | undefined
 }
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
@@ -33,6 +35,21 @@ export function normalizeBoardName(name: string): string {
   return trimmed.slice(0, MAX_BOARD_NAME_LEN)
 }
 
+function toValidWorkspaceId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return normalized ? normalized : undefined
+}
+
+function toValidRevision(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
+  return value
+}
+
+function toValidArchivedAt(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined
+}
+
 function toValidBoardMeta(item: unknown): BoardMeta | null {
   if (!item || typeof item !== 'object') return null
   const record = item as Record<string, unknown>
@@ -40,12 +57,9 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
   if (typeof record.name !== 'string') return null
   if (typeof record.createdAt !== 'number') return null
   if (typeof record.updatedAt !== 'number') return null
-  const revision =
-    typeof record.revision === 'number' && Number.isFinite(record.revision) && record.revision >= 0
-      ? record.revision
-      : undefined
-  const archivedAt =
-    typeof record.archivedAt === 'string' && record.archivedAt ? record.archivedAt : undefined
+  const revision = toValidRevision(record.revision)
+  const archivedAt = toValidArchivedAt(record.archivedAt)
+  const workspaceId = toValidWorkspaceId(record.workspaceId)
   return {
     id: record.id,
     name: normalizeBoardName(record.name) || 'Untitled',
@@ -53,13 +67,19 @@ function toValidBoardMeta(item: unknown): BoardMeta | null {
     updatedAt: record.updatedAt,
     ...(revision === undefined ? {} : { revision }),
     ...(archivedAt === undefined ? {} : { archivedAt }),
+    ...(workspaceId === undefined ? {} : { workspaceId }),
   }
 }
 
 function getScopedStorageKey(): string | null {
-  const scope = getRecoverableAuthStorageUserScope()
-  if (!scope) return null
-  return `${STORAGE_KEY_PREFIX}.${scope}`
+  return scopedBoardStorageKey(STORAGE_KEY_PREFIX)
+}
+
+/** Stamps the current workspace onto entries missing ownership (never rewrites explicit owners). */
+function withCurrentWorkspace(board: BoardMeta): BoardMeta {
+  if (board.workspaceId) return board
+  const workspaceId = getBoardScope().workspaceId
+  return workspaceId ? { ...board, workspaceId } : board
 }
 
 function readRawBoards(): BoardMeta[] {
@@ -98,6 +118,7 @@ export function listBoards(): BoardMeta[] {
 
 export function replaceBoards(boards: BoardMeta[], options: { publish?: boolean } = {}) {
   const normalized = boards
+    .map((board) => withCurrentWorkspace(board))
     .map(toValidBoardMeta)
     .filter((item): item is BoardMeta => !!item)
     .sort(compareByRecentDesc)
@@ -151,12 +172,12 @@ function makeUniqueBoardName(baseName: string, excludeBoardId?: string): string 
 export function createBoard(name = 'Untitled'): BoardMeta {
   const now = Date.now()
   const boards = readRawBoards()
-  const board: BoardMeta = {
+  const board: BoardMeta = withCurrentWorkspace({
     id: createBoardId(),
     name: makeUniqueBoardName(name),
     createdAt: now,
     updatedAt: now,
-  }
+  })
   boards.unshift(board)
   writeRawBoards(boards)
   publishCatalogChange()
@@ -179,7 +200,7 @@ export function registerBoardMeta(input: {
   const name = normalizeBoardName(input.name)
   if (!id || !name) return null
   const now = Date.now()
-  const board: BoardMeta = {
+  const board: BoardMeta = withCurrentWorkspace({
     id,
     name,
     createdAt: Number.isFinite(input.createdAt) ? Number(input.createdAt) : now,
@@ -188,7 +209,7 @@ export function registerBoardMeta(input: {
     ...(typeof input.archivedAt === 'string' && input.archivedAt
       ? { archivedAt: input.archivedAt }
       : {}),
-  }
+  })
   const valid = toValidBoardMeta(board)
   if (!valid) return null
   const boards = readRawBoards().filter((item) => item.id !== id)
@@ -278,12 +299,12 @@ export function duplicateBoard(boardId: string): BoardMeta | null {
   const source = boards.find((board) => board.id === id)
   if (!source) return null
   const now = Date.now()
-  const copy: BoardMeta = {
+  const copy: BoardMeta = withCurrentWorkspace({
     id: createBoardId(),
     name: makeUniqueBoardName(`${source.name} Copy`),
     createdAt: now,
     updatedAt: now,
-  }
+  })
   boards.unshift(copy)
   writeRawBoards(boards)
   publishCatalogChange()

@@ -184,6 +184,22 @@ type ControlAuditRecord struct {
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 }
 
+type ControlIdempotencyRecord struct {
+	OperatorIdentity    string             `json:"operator_identity"`
+	Operation           string             `json:"operation"`
+	TargetType          string             `json:"target_type"`
+	TargetID            string             `json:"target_id"`
+	IdempotencyKey      string             `json:"idempotency_key"`
+	RequestHash         string             `json:"request_hash"`
+	Completed           bool               `json:"completed"`
+	ResponseStatus      pgtype.Int4        `json:"response_status"`
+	ResponseContentType string             `json:"response_content_type"`
+	ResponseBody        string             `json:"response_body"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+	ExpiresAt           pgtype.Timestamptz `json:"expires_at"`
+}
+
 type CreditAccount struct {
 	ID           int64              `json:"id"`
 	WalletUserID pgtype.Int8        `json:"wallet_user_id"`
@@ -427,6 +443,26 @@ type IdentityAdminReconciliationRunFinding struct {
 	ObservedFirstSeenAt     pgtype.Timestamptz `json:"observed_first_seen_at"`
 	ObservedLastSeenAt      pgtype.Timestamptz `json:"observed_last_seen_at"`
 	ObservedResolvedAt      pgtype.Timestamptz `json:"observed_resolved_at"`
+}
+
+type IdentityAuthSyncIntent struct {
+	ID               int64              `json:"id"`
+	UserID           int64              `json:"user_id"`
+	AuthUserID       string             `json:"auth_user_id"`
+	Op               string             `json:"op"`
+	DesiredRole      string             `json:"desired_role"`
+	DesiredBanned    bool               `json:"desired_banned"`
+	Reason           string             `json:"reason"`
+	ExpiresInSeconds int32              `json:"expires_in_seconds"`
+	BaseVersion      int64              `json:"base_version"`
+	Status           string             `json:"status"`
+	Attempts         int32              `json:"attempts"`
+	LastError        string             `json:"last_error"`
+	NextAttemptAt    pgtype.Timestamptz `json:"next_attempt_at"`
+	ClaimedAt        pgtype.Timestamptz `json:"claimed_at"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LibraryAsset struct {
@@ -1092,6 +1128,8 @@ type User struct {
 	LastLoginCountry pgtype.Text        `json:"last_login_country"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	AuthSyncVersion  int64              `json:"auth_sync_version"`
+	BanExpiresAt     pgtype.Timestamptz `json:"ban_expires_at"`
 }
 
 type UserDeletionRequest struct {

@@ -103,25 +103,25 @@ type stubControlIdentityCommands struct {
 	fail     error
 }
 
-func (s *stubControlIdentityCommands) SetRole(context.Context, principal.Principal, string, string) error {
-	return nil
+func (s *stubControlIdentityCommands) SetRole(context.Context, principal.Principal, string, string) (identityports.IdentityAdminMutationOutcome, error) {
+	return identityports.IdentityAdminMutationOutcome{}, nil
 }
 
-func (s *stubControlIdentityCommands) Ban(context.Context, principal.Principal, string, identityports.IdentityAdminBanInput) error {
+func (s *stubControlIdentityCommands) Ban(context.Context, principal.Principal, string, identityports.IdentityAdminBanInput) (identityports.IdentityAdminMutationOutcome, error) {
 	s.banCalls++
-	return s.fail
+	return identityports.IdentityAdminMutationOutcome{}, s.fail
 }
 
-func (s *stubControlIdentityCommands) Unban(context.Context, principal.Principal, string) error {
-	return nil
+func (s *stubControlIdentityCommands) Unban(context.Context, principal.Principal, string) (identityports.IdentityAdminMutationOutcome, error) {
+	return identityports.IdentityAdminMutationOutcome{}, nil
 }
 
-func (s *stubControlIdentityCommands) RevokeSessions(context.Context, principal.Principal, string) error {
-	return nil
+func (s *stubControlIdentityCommands) RevokeSessions(context.Context, principal.Principal, string) (identityports.IdentityAdminMutationOutcome, error) {
+	return identityports.IdentityAdminMutationOutcome{}, nil
 }
 
-func (s *stubControlIdentityCommands) Delete(context.Context, principal.Principal, string) error {
-	return nil
+func (s *stubControlIdentityCommands) Delete(context.Context, principal.Principal, string) (identityports.IdentityAdminMutationOutcome, error) {
+	return identityports.IdentityAdminMutationOutcome{}, nil
 }
 
 func seedControlAuditUser(t *testing.T, pool *pgxpool.Pool, display, role string) (int64, string) {

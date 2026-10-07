@@ -407,6 +407,8 @@ func userFromSQLC(row dbsqlc.User) domain.User {
 		Avatar:           row.Avatar,
 		Role:             row.Role,
 		Status:           row.Status,
+		AuthSyncVersion:  row.AuthSyncVersion,
+		BanExpiresAt:     dbutil.TimePtr(row.BanExpiresAt),
 		LastLoginIP:      pgTextToString(row.LastLoginIp),
 		LastLoginCountry: pgTextToString(row.LastLoginCountry),
 		CreatedAt:        dbutil.TimeValue(row.CreatedAt),

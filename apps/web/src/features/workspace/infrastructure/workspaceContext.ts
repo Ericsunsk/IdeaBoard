@@ -34,6 +34,24 @@ import { setMediaWorkspaceIdResolver } from '../../../shared/api/mediaWorkspaceS
 export const WORKSPACE_URL_PARAM = 'workspace'
 export const WORKSPACE_SELECTION_STORAGE_KEY = 'ideaboard.workspace.selected.v1'
 
+const workspaceSelectionListeners = new Set<(id: string | null) => void>()
+
+function notifyWorkspaceSelectionChange(id: string | null) {
+  workspaceSelectionListeners.forEach((listener) => listener(id))
+}
+
+/**
+ * Subscribes to explicit workspace selection changes (select/clear/
+ * provision). Board catalog isolation listens here alongside the auth-scope
+ * signal so per-scope caches invalidate on either axis.
+ */
+export function subscribeWorkspaceSelectionChange(
+  listener: (id: string | null) => void,
+): () => void {
+  workspaceSelectionListeners.add(listener)
+  return () => workspaceSelectionListeners.delete(listener)
+}
+
 export type WorkspaceSelectionSource = 'url' | 'stored' | 'auto-personal' | 'auto-first' | 'none'
 
 export type WorkspaceSelectionStatus =
@@ -156,14 +174,18 @@ export function createWorkspaceSelectionStore(deps?: {
     select(id: string): void {
       const valid = asWorkspaceId(id)
       if (!valid) throw new Error('Invalid workspace selection')
+      const changed = selectedId.value !== valid
       selectedId.value = valid
       primed = true
       persist.writeSelectedId(valid)
+      if (changed) notifyWorkspaceSelectionChange(valid)
     },
     clear(): void {
+      const changed = selectedId.value !== null
       selectedId.value = null
       primed = true
       persist.writeSelectedId(null)
+      if (changed) notifyWorkspaceSelectionChange(null)
     },
     // Concurrent provisions for the same (name, organization) share one
     // promise and one idempotency key, so double-clicks cannot fork.
@@ -173,9 +195,11 @@ export function createWorkspaceSelectionStore(deps?: {
       if (running) return running
       const task = provision(input)
         .then((workspace) => {
+          const changed = selectedId.value !== workspace.publicId
           selectedId.value = workspace.publicId
           primed = true
           persist.writeSelectedId(workspace.publicId)
+          if (changed) notifyWorkspaceSelectionChange(workspace.publicId)
           return workspace
         })
         .finally(() => {

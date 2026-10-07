@@ -142,9 +142,11 @@ func HashRequest(parts ...string) string {
 // nil-safe so handlers constructed without a store still enforce keys and
 // skip replay.
 //
-// This store is deliberately NOT durable: it is shared by every control
-// plane POST, and making it transactional is a separate, larger change. The
-// money path (task submit) no longer relies on it.
+// This store is the process-local fast path only: Control mutations
+// additionally write their durable fact into
+// control_idempotency_records through ControlStore (durable.go), which
+// is the cross-process, restart-safe authority. The money path (task
+// submit) no longer relies on it.
 type Store struct {
 	mu         sync.Mutex
 	items      map[string]storedResult

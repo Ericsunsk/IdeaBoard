@@ -538,8 +538,20 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 			return nil, false, true, err
 		}
 		committed = true
+		s.stage(taskID, workspaceID, StatusCancelled)
+		return flipped, false, true, nil
 	}
-	s.stage(taskID, workspaceID, StatusCancelled)
+	// Borrowed (ambient) transaction (#889): the guard commits later
+	// together with the audit row, so staging now would let a caller
+	// publish a transition the guard can still roll back. Register the
+	// stage as a post-commit hook instead: it runs only after the
+	// guard's commit, timestamped then. Without a registry (raw carriers
+	// outside the guard) keep the legacy synchronous stage so the caller
+	// can flush after the commit it owns.
+	stage := func(context.Context) { s.stage(taskID, workspaceID, StatusCancelled) }
+	if !dbutil.DeferAmbientPostCommit(ctx, stage) {
+		s.stage(taskID, workspaceID, StatusCancelled)
+	}
 	return flipped, false, true, nil
 }
 

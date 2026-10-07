@@ -422,6 +422,11 @@ func (a *workspaceControlTaskAdapter) ResolveAdminTaskUserID(ctx context.Context
 // draining anyway keeps the buffer from leaking into a later call), but
 // publication is gated on a nil error. A terminal replay (already=true)
 // stages nothing, so an idempotent re-cancel announces nothing.
+//
+// On the guard-owned (ambient) transaction (#889) the announcement is
+// additionally deferred: it registers as a post-commit hook and runs
+// only after the guard commits, so an audit or commit failure discards
+// it instead of announcing a rolled-back flip.
 func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskID string, adminID int64, reason string) error {
 	q := a.queries()
 	if q == nil || a.store == nil {
@@ -440,11 +445,31 @@ func (a *workspaceControlTaskAdapter) CancelAdminTask(ctx context.Context, taskI
 		TaskRead: a.store, TaskLifecycle: a.store,
 		TaskBilling: a.store, Holder: a.holder,
 	})
-	cancelled, _, err := settler.Cancel(ctx, row.WorkspacePublicID, taskID, adminID, reason)
+	cancelled, already, err := settler.Cancel(ctx, row.WorkspacePublicID, taskID, adminID, reason)
 	var settlementState, holdTransactionID string
 	if cancelled != nil {
 		settlementState = cancelled.BillingSnapshot.SettlementState
 		holdTransactionID = cancelled.BillingSnapshot.HoldTransactionID
+	}
+	// #889: on the guard-owned (ambient) transaction the flip has not
+	// committed yet — it commits with the audit row at the guard. Defer
+	// the announcement to the post-commit hooks instead of publishing a
+	// fact the guard can still roll back; an audit or commit failure
+	// drops the hook and announces nothing. The stage hook registered
+	// inside settler.Cancel precedes this one (FIFO), so the drain below
+	// observes the staged transition when it runs. Terminal replays
+	// (already) and settlement errors register nothing. Without a
+	// registry (owned settlement, unwired callers) keep the synchronous
+	// announce.
+	if err == nil && !already {
+		if _, ok := dbutil.AmbientTxFromContext(ctx); ok {
+			announce := func(hookCtx context.Context) {
+				a.announceCancelTransitions(hookCtx, settler, row.WorkspacePublicID, reason, adminID, settlementState, holdTransactionID, nil)
+			}
+			if dbutil.DeferAmbientPostCommit(ctx, announce) {
+				return nil
+			}
+		}
 	}
 	a.announceCancelTransitions(ctx, settler, row.WorkspacePublicID, reason, adminID, settlementState, holdTransactionID, err)
 	return err

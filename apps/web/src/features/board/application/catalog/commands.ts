@@ -12,12 +12,14 @@ import {
   clearPendingBoardSyncRollback,
   hydrateBoardsFromServer,
   isBoardNameConflictError,
+  syncBoardRenameToServer,
   syncBoardToServer,
   syncDeleteBoardToServer,
   type HydrateBoardsFromServerOptions,
   type HydrateBoardsFromServerResult,
 } from '../sync/boardSync'
 import {
+  archiveWorkspaceBoard,
   createWorkspaceBoard,
   requireBoardWorkspaceId,
   type WorkspaceBoardMeta,
@@ -90,6 +92,7 @@ export interface BoardCommandDependencies {
   duplicateBoardState(sourceBoardId: string, targetBoardId: string): boolean
   deleteBoardState(boardId: string): boolean
   syncBoard(boardId: string): Promise<void>
+  syncRenameBoard(boardId: string, nextName: string): Promise<void>
   syncDeleteBoard(boardId: string): Promise<void>
   hydrateBoards(options?: HydrateBoardsFromServerOptions): Promise<HydrateBoardsFromServerResult>
   isNameConflictError(error: unknown): boolean
@@ -101,6 +104,8 @@ export interface BoardCommandDependencies {
   // register the minted identity locally, then sync the document.
   resolveWorkspace?(): string
   createServerBoard?(workspaceId: string, name: string): Promise<WorkspaceBoardMeta>
+  /** Archives a server-created board using the workspace captured before the request. */
+  archiveServerBoard?(workspaceId: string, boardId: string): Promise<WorkspaceBoardMeta>
   registerServerBoard?(input: { id: string; name: string; revision?: number }): BoardMeta | null
 }
 
@@ -126,6 +131,7 @@ const defaultDependencies: BoardCommandDependencies = {
   duplicateBoardState: duplicateBoardState,
   deleteBoardState: deleteBoardState,
   syncBoard: syncBoardToServer,
+  syncRenameBoard: syncBoardRenameToServer,
   syncDeleteBoard: syncDeleteBoardToServer,
   hydrateBoards: hydrateBoardsFromServer,
   isNameConflictError: isBoardNameConflictError,
@@ -134,7 +140,60 @@ const defaultDependencies: BoardCommandDependencies = {
   isMutationCurrent: () => true,
   resolveWorkspace: () => requireBoardWorkspaceId(),
   createServerBoard: (workspaceId, name) => createWorkspaceBoard(workspaceId, name),
+  archiveServerBoard: (workspaceId, boardId) => archiveWorkspaceBoard(workspaceId, boardId),
   registerServerBoard: (input) => registerBoardMeta(input),
+}
+
+/**
+ * A create/duplicate response belongs to the workspace captured before the
+ * POST. If the user changes scope before the response is applied, archive the
+ * minted board through that captured workspace so it cannot become an unseen
+ * server orphan. Archiving is the v1 reversible delete semantic. Cleanup is
+ * best effort: the mutation must still terminate as scope-changed even when
+ * the cleanup request is unavailable.
+ */
+async function archiveServerBoardAfterScopeChange(
+  deps: BoardCommandDependencies,
+  workspaceId: string,
+  boardId: string,
+): Promise<void> {
+  const archive = deps.archiveServerBoard
+  if (!archive) return
+  try {
+    await archive(workspaceId, boardId)
+  } catch {
+    // The caller cannot safely retry in the new scope. Keep the original
+    // scope-changed result; a later reconciliation can restore the board if
+    // the best-effort archive failed.
+  }
+}
+
+type SyncRegisteredBoardResult =
+  | { ok: true; board: BoardMeta }
+  | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: BoardMeta; error: unknown }
+  | BoardScopeChangedResult
+
+// Shared document-sync confirmation for server-minted boards (create and
+// duplicate share this phase verbatim): a scope switch at any await drops
+// every local follow-up instead of mutating the new scope.
+async function syncRegisteredBoard(
+  deps: BoardCommandDependencies,
+  board: BoardMeta,
+): Promise<SyncRegisteredBoardResult> {
+  try {
+    await deps.syncBoard(board.id)
+    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+    return { ok: true, board }
+  } catch (error) {
+    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+    deps.deleteBoard(board.id)
+    deps.deleteBoardState(board.id)
+    if (deps.isNameConflictError(error)) {
+      await deps.hydrateBoards()
+      return { ok: false as const, reason: 'name-conflict' as const, board, error }
+    }
+    return { ok: false as const, reason: 'sync-failed' as const, board, error }
+  }
 }
 
 export function createBoardCommands(
@@ -147,8 +206,10 @@ export function createBoardCommands(
     board: BoardMeta,
     previousBoard: BoardMeta,
   ): Promise<BoardRenameRemoteResult> {
+    // Explicit rename only: PATCH the name without writing the document, so
+    // ordinary document content can never piggyback a rename (or vice versa).
     return deps
-      .syncBoard(boardId)
+      .syncRenameBoard(boardId, board.name)
       .then(() => ({ ok: true as const, board }))
       .catch((error) => ({
         ok: false as const,
@@ -208,62 +269,72 @@ export function createBoardCommands(
     return { ok: true, board: cloneBoardMeta(rolledBack) }
   }
 
+  async function createServerBoardAndSync(
+    localBoard: BoardMeta,
+    cleanupLocal: () => void,
+    afterRegister?: (registeredBoardId: string) => void,
+  ): Promise<SyncRegisteredBoardResult> {
+    const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
+    const createServerBoard =
+      deps.createServerBoard ?? ((workspaceId, name) => createWorkspaceBoard(workspaceId, name))
+    const registerServerBoard = deps.registerServerBoard ?? ((entry) => registerBoardMeta(entry))
+
+    let workspaceId: string
+    try {
+      workspaceId = resolveWorkspace()
+    } catch (error) {
+      cleanupLocal()
+      return { ok: false, reason: 'sync-failed', board: localBoard, error }
+    }
+
+    let server: WorkspaceBoardMeta
+    try {
+      server = await createServerBoard(workspaceId, localBoard.name)
+    } catch (error) {
+      // A scope switch mid-create drops every local follow-up: the temp
+      // board stays in its own scope and the new scope is never touched.
+      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
+      cleanupLocal()
+      if (deps.isNameConflictError(error)) {
+        await deps.hydrateBoards()
+        return { ok: false, reason: 'name-conflict', board: localBoard, error }
+      }
+      return { ok: false, reason: 'sync-failed', board: localBoard, error }
+    }
+
+    // The server-minted identity belongs to the captured workspace. If the
+    // selection changed while the POST was in flight, archive it through
+    // the captured workspace and never register it into the new scope.
+    if (!deps.isMutationCurrent()) {
+      await archiveServerBoardAfterScopeChange(deps, workspaceId, server.id)
+      return { ok: false, reason: 'scope-changed' }
+    }
+
+    const registered = registerServerBoard({
+      id: server.id,
+      name: server.name || localBoard.name,
+      revision: server.revision,
+    })
+    cleanupLocal()
+    if (!registered) {
+      return {
+        ok: false,
+        reason: 'sync-failed',
+        board: { ...localBoard, id: server.id },
+        error: new Error('Board registration failed'),
+      }
+    }
+    afterRegister?.(registered.id)
+    return syncRegisteredBoard(deps, registered)
+  }
+
   return {
     async create(input = {}) {
       const board = deps.createBoard(input.name || 'Untitled')
-      const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
-      const createServerBoard =
-        deps.createServerBoard ?? ((workspaceId, name) => createWorkspaceBoard(workspaceId, name))
-      const registerServerBoard = deps.registerServerBoard ?? ((entry) => registerBoardMeta(entry))
-      let workspaceId: string
-      try {
-        workspaceId = resolveWorkspace()
-      } catch (error) {
+      return createServerBoardAndSync(board, () => {
         deps.deleteBoard(board.id)
         deps.deleteBoardState(board.id)
-        return { ok: false as const, reason: 'sync-failed' as const, board, error }
-      }
-      let server: WorkspaceBoardMeta
-      try {
-        server = await createServerBoard(workspaceId, board.name)
-      } catch (error) {
-        deps.deleteBoard(board.id)
-        deps.deleteBoardState(board.id)
-        if (deps.isNameConflictError(error)) {
-          await deps.hydrateBoards()
-          return { ok: false as const, reason: 'name-conflict' as const, board, error }
-        }
-        return { ok: false as const, reason: 'sync-failed' as const, board, error }
-      }
-      const registered = registerServerBoard({
-        id: server.id,
-        name: server.name || board.name,
-        revision: server.revision,
       })
-      deps.deleteBoard(board.id)
-      deps.deleteBoardState(board.id)
-      if (!registered) {
-        return {
-          ok: false as const,
-          reason: 'sync-failed' as const,
-          board: { ...board, id: server.id },
-          error: new Error('Board registration failed'),
-        }
-      }
-      try {
-        await deps.syncBoard(registered.id)
-        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-        return { ok: true, board: registered }
-      } catch (error) {
-        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-        deps.deleteBoard(registered.id)
-        deps.deleteBoardState(registered.id)
-        if (deps.isNameConflictError(error)) {
-          await deps.hydrateBoards()
-          return { ok: false as const, reason: 'name-conflict' as const, board: registered, error }
-        }
-        return { ok: false as const, reason: 'sync-failed' as const, board: registered, error }
-      }
     },
 
     async rename({ boardId, nextName }) {
@@ -295,62 +366,11 @@ export function createBoardCommands(
       if (!copy) {
         return { ok: false, reason: 'source-missing' }
       }
-      const resolveWorkspace = deps.resolveWorkspace ?? (() => requireBoardWorkspaceId())
-      const createServerBoard =
-        deps.createServerBoard ?? ((workspaceId, name) => createWorkspaceBoard(workspaceId, name))
-      const registerServerBoard = deps.registerServerBoard ?? ((entry) => registerBoardMeta(entry))
-      let workspaceId: string
-      try {
-        workspaceId = resolveWorkspace()
-      } catch (error) {
+      return createServerBoardAndSync(copy, () => {
         deps.deleteBoard(copy.id)
-        return { ok: false as const, reason: 'sync-failed' as const, board: copy, error }
-      }
-      let server: WorkspaceBoardMeta
-      try {
-        server = await createServerBoard(workspaceId, copy.name)
-      } catch (error) {
-        deps.deleteBoard(copy.id)
-        if (deps.isNameConflictError(error)) {
-          await deps.hydrateBoards()
-          return { ok: false as const, reason: 'name-conflict' as const, board: copy, error }
-        }
-        return { ok: false as const, reason: 'sync-failed' as const, board: copy, error }
-      }
-      const registered = registerServerBoard({
-        id: server.id,
-        name: server.name || copy.name,
-        revision: server.revision,
+      }, (registeredBoardId) => {
+        deps.duplicateBoardState(sourceBoardId, registeredBoardId)
       })
-      deps.deleteBoard(copy.id)
-      if (!registered) {
-        return {
-          ok: false as const,
-          reason: 'sync-failed' as const,
-          board: { ...copy, id: server.id },
-          error: new Error('Board registration failed'),
-        }
-      }
-      deps.duplicateBoardState(sourceBoardId, registered.id)
-      try {
-        await deps.syncBoard(registered.id)
-        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-        return { ok: true, board: registered }
-      } catch (error) {
-        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
-        deps.deleteBoard(registered.id)
-        deps.deleteBoardState(registered.id)
-        if (deps.isNameConflictError(error)) {
-          await deps.hydrateBoards()
-          return {
-            ok: false as const,
-            reason: 'name-conflict' as const,
-            board: registered,
-            error,
-          }
-        }
-        return { ok: false as const, reason: 'sync-failed' as const, board: registered, error }
-      }
     },
 
     async delete({ boardId }) {
@@ -385,6 +405,7 @@ function cloneBoardMeta(board: BoardMeta): BoardMeta {
     updatedAt: board.updatedAt,
     ...(board.revision === undefined ? {} : { revision: board.revision }),
     ...(board.archivedAt === undefined ? {} : { archivedAt: board.archivedAt }),
+    ...(board.workspaceId === undefined ? {} : { workspaceId: board.workspaceId }),
   }
 }
 

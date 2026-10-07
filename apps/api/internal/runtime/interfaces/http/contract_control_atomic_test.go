@@ -251,10 +251,21 @@ func TestControlAtomicReplayAndConflict(t *testing.T) {
 	if code := controlErrorCode(t, payload); code != string(contract.CodeIdempotencyConflict) {
 		t.Fatalf("conflict code = %q, want idempotency_conflict", code)
 	}
-	// The conflicting call joins its failure audit row and the
-	// transaction rolls back; the earlier two commits stand.
+	// The conflicting call rolls back its guard transaction, then emits
+	// its failure audit through the detached sink. The participant audit
+	// writer therefore still contains only the earlier two committed rows.
 	if _, commits, rollbacks := h.scope.counts(); commits != 2 || rollbacks != 1 {
 		t.Fatalf("commit/rollback = %d/%d, want 2/1", commits, rollbacks)
+	}
+	if got := len(h.audit.records); got != 2 {
+		t.Fatalf("participant audit rows = %d, want 2 (conflict row must not join rolled-back tx)", got)
+	}
+	records := h.sink.Records()
+	if len(records) != 1 {
+		t.Fatalf("detached failure audit rows = %d, want 1", len(records))
+	}
+	if records[0].Outcome != ControlAuditFailed || records[0].Status != http.StatusConflict {
+		t.Fatalf("detached failure audit = %+v, want failed 409", records[0])
 	}
 }
 
@@ -269,6 +280,10 @@ func TestControlAtomicBeginFailureFailsClosed(t *testing.T) {
 	}
 	if h.identity.callCount("ban") != 0 {
 		t.Fatal("a transaction that never began must never reach the business seam")
+	}
+	records := h.sink.Records()
+	if len(records) != 1 || records[0].Outcome != ControlAuditFailed || records[0].Status != http.StatusServiceUnavailable {
+		t.Fatalf("detached begin-failure audit = %+v, want one failed 503 row", records)
 	}
 }
 

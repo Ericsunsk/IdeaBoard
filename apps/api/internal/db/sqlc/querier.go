@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AbandonControlIdempotency(ctx context.Context, arg AbandonControlIdempotencyParams) error
 	// ArchiveMediaAsset stamps the archive lifecycle marker. Repeat
 	// archives miss (archived_at IS NULL guard); the caller reads back
 	// the stored row so replays converge instead of 404ing.
@@ -31,6 +32,15 @@ type Querier interface {
 	// no cancel_reason column, so the reason is recorded in the
 	// workflow_input envelope for read-back parity.
 	CancelWorkspaceTask(ctx context.Context, arg CancelWorkspaceTaskParams) (Task, error)
+	// Control Plane durable idempotency facts (#891). The guard claims the
+	// in-progress row INSIDE its guard-owned transaction before running the
+	// handler: concurrent same-key claimants block on the primary key until
+	// the winner commits or rolls back, so exactly one winner executes the
+	// business side effect. In-progress rows are therefore never committed
+	// (a crash aborts them with the transaction); only 2xx outcomes flip
+	// the row to completed with the response for replay. Business failures
+	// delete the claim so the retry re-executes.
+	ClaimControlIdempotency(ctx context.Context, arg ClaimControlIdempotencyParams) (ClaimControlIdempotencyRow, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
 	ClaimPaymentWebhookEvent(ctx context.Context, stripeEventID string) (int64, error)
 	// Durable submit idempotency fact (task_submission_idempotency), written
@@ -82,6 +92,7 @@ type Querier interface {
 	// GetWorkspaceTaskByPublicID path.
 	ClaimWorkspaceTaskWithAttempt(ctx context.Context, arg ClaimWorkspaceTaskWithAttemptParams) (ClaimWorkspaceTaskWithAttemptRow, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
+	CompleteControlIdempotency(ctx context.Context, arg CompleteControlIdempotencyParams) error
 	CompleteLibraryMaterialization(ctx context.Context, arg CompleteLibraryMaterializationParams) (CompleteLibraryMaterializationRow, error)
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
@@ -227,6 +238,7 @@ type Querier interface {
 	// Scope guard: scripts/sql-workspace-scope-check.sh enforces one scope predicate per query.
 	CreateWorkspaceTask(ctx context.Context, arg CreateWorkspaceTaskParams) (Task, error)
 	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
+	DeleteControlIdempotencyRecord(ctx context.Context, arg DeleteControlIdempotencyRecordParams) error
 	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
 	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
 	// Legacy media derivative queries (#809 schema repair).
@@ -271,6 +283,7 @@ type Querier interface {
 	GetBoardRevisionByID(ctx context.Context, arg GetBoardRevisionByIDParams) (GetBoardRevisionByIDRow, error)
 	GetBoardRevisionByNumber(ctx context.Context, arg GetBoardRevisionByNumberParams) (GetBoardRevisionByNumberRow, error)
 	GetBoardShareTokenBySecret(ctx context.Context, arg GetBoardShareTokenBySecretParams) (GetBoardShareTokenBySecretRow, error)
+	GetControlIdempotency(ctx context.Context, arg GetControlIdempotencyParams) (GetControlIdempotencyRow, error)
 	GetControlTaskBilling(ctx context.Context, taskID string) (GetControlTaskBillingRow, error)
 	// Control Plane global task read model (#809-close). Operators see every
 	// workspace (no membership gating at the repository; the control guard
@@ -513,6 +526,7 @@ type Querier interface {
 	MarkUploadSessionTransferring(ctx context.Context, arg MarkUploadSessionTransferringParams) (UploadSession, error)
 	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error)
 	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
+	PurgeExpiredControlIdempotency(ctx context.Context) (int64, error)
 	RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentOrderPaidParams) (PaymentOrder, error)
 	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
 	RenameWorkspaceBoard(ctx context.Context, arg RenameWorkspaceBoardParams) (int64, error)

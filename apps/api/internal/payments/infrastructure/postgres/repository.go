@@ -80,18 +80,38 @@ func (db paymentContextDB) beginTx() (pgx.Tx, bool, error) {
 	return tx, true, nil
 }
 
-// beginDirectTx opens a write transaction for the admin refund paths, or
-// reuses the ambient guard transaction staged in the context (control
-// audit atomicity, step 3). The bool reports ownership: true means the
-// caller opened the transaction and must commit or roll it back; false
-// means the transaction is BORROWED from the guard, which alone commits
-// or rolls it back, so the caller must do neither. These paths never run
-// under an advisory lock, so the fallback matches the previous
-// r.db.BeginTx exactly. With no carrier behavior is unchanged.
+// beginDirectTx opens a write transaction for refund/dispute persistence, or
+// reuses the ambient guard transaction staged in the context (control audit
+// atomicity, step 3). The bool reports ownership: true means the caller
+// opened the transaction and must commit or roll it back; false means the
+// transaction is BORROWED from the guard, which alone commits or rolls it
+// back, so the caller must do neither. These paths never run under an
+// advisory lock, so the fallback matches the previous r.db.BeginTx exactly.
+// The admin refund reservation and post-provider settlement use
+// beginCommittedRefundTx instead because Stripe I/O sits between their
+// transaction boundaries.
 func (r *Repository) beginDirectTx(ctx context.Context) (pgx.Tx, bool, error) {
 	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
 		return ambient, false, nil
 	}
+	if r == nil || r.db == nil {
+		return nil, false, fmt.Errorf("payments repository: database unavailable")
+	}
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	return tx, true, nil
+}
+
+// beginCommittedRefundTx starts a transaction whose commit is part of the
+// refund protocol itself. The administrator refund path performs Stripe I/O
+// immediately after reserving Ideas, so the reservation (and its phase audit)
+// must be durable before the provider call. It deliberately does not borrow
+// the Control guard carrier: the guard transaction remains open until the
+// HTTP response is audited, which is too late to establish the provider
+// boundary and would let a later audit failure roll back a cash-side effect.
+func (r *Repository) beginCommittedRefundTx(ctx context.Context) (pgx.Tx, bool, error) {
 	if r == nil || r.db == nil {
 		return nil, false, fmt.Errorf("payments repository: database unavailable")
 	}

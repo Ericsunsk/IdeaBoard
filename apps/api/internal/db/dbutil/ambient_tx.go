@@ -35,6 +35,7 @@ package dbutil
 
 import (
 	"context"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -67,4 +68,97 @@ func AmbientTxFromContext(ctx context.Context) (pgx.Tx, bool) {
 		return nil, false
 	}
 	return tx, true
+}
+
+// ambientPostCommitKey carries the post-commit hook registry for one
+// guarded mutation (#889). It is separate from ambientTxContextKey on
+// purpose: the transaction carrier predates post-commit announcements
+// and is constructed by scopes the guard does not control in tests, so
+// the registry rides its own key and is simply absent there.
+type ambientPostCommitKey struct{}
+
+// AmbientPostCommit buffers post-commit callbacks for one guarded
+// mutation (#889: task cancel transitions).
+//
+// POST-COMMIT SEMANTICS (load-bearing):
+//   - Hooks run ONLY after the guard-owned transaction commits. The
+//     guard runs them exactly once, synchronously, right after its
+//     successful Commit.
+//   - Hooks NEVER run on rollback, audit failure, or commit failure:
+//     the guard returns before the run line on those paths, so the
+//     registered callbacks are dropped with the context and publish
+//     nothing. There is no explicit discard call.
+//   - Hooks run OUTSIDE the transaction (it already committed), so they
+//     must perform side effects only (event publication) and never issue
+//     statements on the carrier.
+//   - Hooks run in registration order (FIFO): a settlement that defers
+//     its staging before its announcer defers the announcement observes
+//     the staged fact when the announcement runs.
+type AmbientPostCommit struct {
+	mu    sync.Mutex
+	hooks []func(context.Context)
+	ran   bool
+}
+
+// ContextWithAmbientPostCommit returns ctx carrying an empty post-commit
+// hook registry for the current guarded mutation. The guard is the only
+// production caller (right after its TxScope.Begin); tests attach it to
+// a carrier to prove deferral without the guard.
+func ContextWithAmbientPostCommit(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, ambientPostCommitKey{}, &AmbientPostCommit{})
+}
+
+// DeferAmbientPostCommit registers fn to run after the guard-owned
+// transaction commits. It reports false (and registers nothing) when
+// ctx carries no registry — raw carriers outside the guard, legacy
+// callers — so participants can fall back to their legacy behavior.
+// A nil fn is rejected the same way.
+func DeferAmbientPostCommit(ctx context.Context, fn func(context.Context)) bool {
+	if ctx == nil || fn == nil {
+		return false
+	}
+	reg, ok := ctx.Value(ambientPostCommitKey{}).(*AmbientPostCommit)
+	if !ok || reg == nil {
+		return false
+	}
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
+	if reg.ran {
+		return false
+	}
+	reg.hooks = append(reg.hooks, fn)
+	return true
+}
+
+// RunAmbientPostCommit runs the registered hooks in registration order.
+// It is a no-op without a registry, with no hooks, or when called twice:
+// exactly-once execution is enforced here so a repeated call can never
+// double-publish. The guard calls this once, immediately after its
+// successful Commit; hook errors are the hooks' own concern (announcers
+// warn-log and never fail the already-committed settlement).
+func RunAmbientPostCommit(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	reg, ok := ctx.Value(ambientPostCommitKey{}).(*AmbientPostCommit)
+	if !ok || reg == nil {
+		return
+	}
+	reg.mu.Lock()
+	if reg.ran {
+		reg.mu.Unlock()
+		return
+	}
+	reg.ran = true
+	hooks := reg.hooks
+	reg.hooks = nil
+	reg.mu.Unlock()
+	for _, fn := range hooks {
+		if fn != nil {
+			fn(ctx)
+		}
+	}
 }

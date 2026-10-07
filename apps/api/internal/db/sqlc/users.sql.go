@@ -79,7 +79,7 @@ func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (s
 }
 
 const getUserByAuthUserID = `-- name: GetUserByAuthUserID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE auth_user_id = $1
 `
@@ -100,12 +100,14 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID pgtype.Tex
 		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthSyncVersion,
+		&i.BanExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE id = $1
 `
@@ -126,12 +128,14 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthSyncVersion,
+		&i.BanExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByPublicID = `-- name: GetUserByPublicID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE public_id = $1
 `
@@ -152,12 +156,14 @@ func (q *Queries) GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (
 		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthSyncVersion,
+		&i.BanExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByStorageUID = `-- name: GetUserByStorageUID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE storage_uid = $1
 `
@@ -178,6 +184,8 @@ func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (U
 		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthSyncVersion,
+		&i.BanExpiresAt,
 	)
 	return i, err
 }
@@ -203,7 +211,7 @@ func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUse
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE id = ANY($1::BIGINT[])
 ORDER BY id
@@ -231,6 +239,8 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error
 			&i.LastLoginCountry,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthSyncVersion,
+			&i.BanExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -288,7 +298,7 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at, auth_sync_version, ban_expires_at
 FROM users
 WHERE (NOT $1::boolean OR display_name ILIKE $2)
   AND (NOT $3::boolean OR role = $4)
@@ -339,6 +349,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.LastLoginCountry,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthSyncVersion,
+			&i.BanExpiresAt,
 		); err != nil {
 			return nil, err
 		}

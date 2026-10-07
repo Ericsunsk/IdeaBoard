@@ -147,8 +147,9 @@ func (w *ExecuteWorker) failRun(ctx context.Context, job *river.Job[executeArgs]
 type scheduleMode string
 
 const (
-	scheduleModeDaily   scheduleMode = "daily"
-	scheduleModeCatchUp scheduleMode = "catch_up"
+	scheduleModeDaily     scheduleMode = "daily"
+	scheduleModeCatchUp   scheduleMode = "catch_up"
+	scheduleModeSyncSweep scheduleMode = "sync_sweep"
 )
 
 var scheduleLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
@@ -176,7 +177,11 @@ func (dailySchedule) Next(current time.Time) time.Time {
 }
 
 // PeriodicJobs registers the daily scan plus the startup catch-up (which
-// only enqueues when the last day has no completed run).
+// only enqueues when the last day has no completed run), plus the frequent
+// Auth sync sweep (issue #888): business mutations persist sync intents
+// without Auth I/O, and the sweep converges them ~every minute with
+// per-user serialization and version fencing. The sweep reuses the
+// schedule worker kind and queue, so no new River registration is needed.
 func PeriodicJobs() []*river.PeriodicJob {
 	insertOpts := func() *river.InsertOpts {
 		return &river.InsertOpts{Queue: IdentityReconciliationQueue, MaxAttempts: taskqueue.RiverMaxAttemptsIdentityAdminReconciliation, Priority: riverPriority}
@@ -196,11 +201,19 @@ func PeriodicJobs() []*river.PeriodicJob {
 			},
 			&river.PeriodicJobOpts{ID: "identity-admin-reconciliation-catch-up", RunOnStart: true},
 		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return scheduleArgs{Mode: scheduleModeSyncSweep}, insertOpts()
+			},
+			&river.PeriodicJobOpts{ID: "identity-auth-sync-sweep", RunOnStart: true},
+		),
 	}
 }
 
 type scheduleService interface {
 	ScheduleReconciliation(context.Context, RunDispatcher, time.Time, bool) (*Run, error)
+	SweepAuthSync(context.Context) (int, error)
 }
 
 // ScheduleWorker resolves each scheduler tick to the day slot and creates
@@ -227,6 +240,12 @@ func (*ScheduleWorker) Timeout(*river.Job[scheduleArgs]) time.Duration {
 func (w *ScheduleWorker) Work(ctx context.Context, job *river.Job[scheduleArgs]) error {
 	if w == nil || w.service == nil || w.dispatcher == nil || job == nil {
 		return errInvalidReconciliationCommand
+	}
+	if job.Args.Mode == scheduleModeSyncSweep {
+		if _, err := w.service.SweepAuthSync(ctx); err != nil {
+			return err
+		}
+		return nil
 	}
 	onlyIfOverdue, err := parseScheduleMode(job.Args.Mode)
 	if err != nil {

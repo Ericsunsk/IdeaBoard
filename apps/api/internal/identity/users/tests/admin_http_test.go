@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/identity/users/application/authsync"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
@@ -992,7 +993,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		return uploadCleaner.DeleteUserUploads(ctx, userID, targetUser.StorageUID)
 	}
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
-	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager, nil))
 	router := gin.New()
 	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -1046,7 +1047,7 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 		nil,
 		&recordingUserUploadCleaner{err: errors.New("storage down")},
 	)
-	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager, nil))
 	router := gin.New()
 	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -1090,7 +1091,7 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 		return authDeleter.DeleteUser(ctx, authUserID)
 	}
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
-	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager, nil))
 	router := gin.New()
 	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -1112,7 +1113,7 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 	}
 }
 
-func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
+func TestAdminBanUserCommitsBusinessFirstWithSyncPending(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := newUserRepoTestDB(t)
@@ -1131,7 +1132,7 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	authManager := &fakeAdminAuthManager{}
 	lifecycle := &recordingUserLifecycle{}
 	userService := NewUserService(repo, lifecycle, nil)
-	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager, authsync.NewStore(db)))
 	router := gin.New()
 	router.POST("/admin/users/:public_id/ban", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -1146,12 +1147,23 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if authManager.bannedAuthUserID != authUserID {
-		t.Fatalf("banned auth user id = %q, want %q", authManager.bannedAuthUserID, authUserID)
+	if body := rec.Body.String(); !strings.Contains(body, `"auth_sync_pending":true`) {
+		t.Fatalf("response body = %s, want auth_sync_pending:true (business committed, Auth converging)", body)
 	}
-
+	// Business-first: no Auth I/O on the request path, so the fake Auth
+	// client must stay untouched even though it is healthy.
+	if authManager.bannedAuthUserID != "" {
+		t.Fatalf("banned auth user id = %q, want no request-path Auth call", authManager.bannedAuthUserID)
+	}
 	if len(lifecycle.statusCalls) != 1 || lifecycle.statusCalls[0] != 0 {
 		t.Fatalf("status lifecycle calls = %v, want [0]", lifecycle.statusCalls)
+	}
+	var pending int
+	if err := db.QueryRow(context.Background(), `SELECT count(*) FROM identity_auth_sync_intents WHERE user_id = $1 AND status = 'pending'`, targetUser.ID).Scan(&pending); err != nil {
+		t.Fatalf("count pending intents: %v", err)
+	}
+	if pending != 1 {
+		t.Fatalf("pending intents = %d, want exactly 1 durable retry", pending)
 	}
 }
 
@@ -1173,7 +1185,7 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 
 	authManager := &fakeAdminAuthManager{}
 	userService := NewUserService(repo, nil, nil)
-	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager, nil))
 	router := gin.New()
 	router.POST("/admin/users/:public_id/revoke-sessions", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)

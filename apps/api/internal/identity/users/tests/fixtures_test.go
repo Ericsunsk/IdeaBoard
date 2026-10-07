@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/users/application/administration"
+	"ideaboard/api/internal/identity/users/application/authsync"
 	"ideaboard/api/internal/identity/users/application/lifecycle"
 	"ideaboard/api/internal/identity/users/application/provisioning"
 	identitydomain "ideaboard/api/internal/identity/users/domain"
@@ -140,8 +141,8 @@ func NewUserService(
 	return administration.NewService(repo, lifecycle, creditBalanceReader, cleaner, nil)
 }
 
-func newIdentityAdminCommands(users ports.UserMutationQueries, auth ports.AuthUserManager) ports.IdentityAdminCommands {
-	return administration.NewIdentityAdminCommands(users, auth)
+func newIdentityAdminCommands(users ports.UserMutationQueries, auth ports.AuthUserManager, sync *authsync.Store) ports.IdentityAdminCommands {
+	return administration.NewIdentityAdminCommands(users, auth, sync)
 }
 
 func identityAdminError(kind IdentityAdminErrorKind, message string, cause error) *IdentityAdminCommandError {

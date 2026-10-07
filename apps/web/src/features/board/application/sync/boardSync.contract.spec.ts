@@ -19,6 +19,7 @@ import {
   hydrateBoardsFromServer,
   isBoardArchivedError,
   isBoardNameConflictError,
+  syncBoardRenameToServer,
   syncBoardToServer,
   syncDeleteBoardToServer,
   syncRestoreBoardToServer,
@@ -59,7 +60,7 @@ function makeState(updatedAt: number, promptText: string): BoardState {
 }
 
 function boardMeta(id: string, name: string, updatedAt: number) {
-  return { id, name, createdAt: 100, updatedAt }
+  return { id, name, createdAt: 100, updatedAt, workspaceId: WORKSPACE_ID }
 }
 
 function getPromptText(boardId: string): string | undefined {
@@ -336,6 +337,138 @@ describe('boardSync', () => {
     expect(getBoardState('board-a')).toBeNull()
   })
 
+  it('drops a delayed hydrate response after switching workspaces', async () => {
+    const workspaceB = 'ws_workspaceB'
+    replaceBoards([
+      { id: 'board-a', name: 'Workspace A Board', createdAt: 100, updatedAt: 2_000, revision: 7 },
+    ])
+    replaceBoardStateMap({ 'board-a': makeState(2_000, 'workspace-a-draft') })
+    let resolveRequest!: (value: unknown) => void
+    mocks.request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRequest = resolve
+      }),
+    )
+    addRemoteBoard({
+      id: 'board-a',
+      name: 'Late Workspace A Board',
+      createdAt: 100,
+      updatedAt: 1_000,
+      revision: 8,
+      state: makeState(1_000, 'late-workspace-a'),
+    })
+    const hydrateTask = hydrateBoardsFromServer()
+
+    getWorkspaceSelectionStore().select(workspaceB)
+    resolveRequest(apiState.boardsResponse)
+
+    await expect(hydrateTask).resolves.toMatchObject({ ok: false })
+    expect(listBoards()).toEqual([])
+    expect(getBoardState('board-a')).toBeNull()
+
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+
+    expect(listBoards()[0]).toMatchObject({ revision: 7, name: 'Workspace A Board' })
+    expect(getPromptText('board-a')).toBe('workspace-a-draft')
+  })
+
+  it('ignores a delayed save response after switching workspaces', async () => {
+    const workspaceB = 'ws_workspaceB'
+    replaceBoards([
+      { id: 'board-a', name: 'Workspace A Board', createdAt: 100, updatedAt: 2_000, revision: 7 },
+    ])
+    replaceBoardStateMap({ 'board-a': makeState(2_000, 'workspace-a-draft') })
+    addRemoteBoard({
+      id: 'board-a',
+      name: 'Workspace A Board',
+      createdAt: 100,
+      updatedAt: 2_000,
+      revision: 7,
+      state: makeState(2_000, 'workspace-a-draft'),
+    })
+    let resolvePut!: (value: unknown) => void
+    mocks.request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePut = resolve
+      }),
+    )
+    const saveTask = syncBoardToServer('board-a')
+
+    getWorkspaceSelectionStore().select(workspaceB)
+    resolvePut({
+      data: {
+        board_id: 'board-a',
+        revision: 8,
+        schema_version: BOARD_STATE_SCHEMA_VERSION,
+        document: { schema_version: BOARD_STATE_SCHEMA_VERSION, payload: {} },
+        updated_at: new Date(2_001).toISOString(),
+      },
+    })
+    await saveTask
+
+    expect(listBoards()).toEqual([])
+    getWorkspaceSelectionStore().select(WORKSPACE_ID)
+    expect(listBoards()[0]).toMatchObject({ revision: 7, name: 'Workspace A Board' })
+    expect(getPromptText('board-a')).toBe('workspace-a-draft')
+  })
+
+  it('sends document saves to the newly selected workspace', async () => {
+    const workspaceB = 'ws_workspaceB'
+    getWorkspaceSelectionStore().select(workspaceB)
+    replaceBoards([{ id: 'board-b', name: 'Workspace B Board', createdAt: 100, updatedAt: 3_000 }])
+    replaceBoardStateMap({ 'board-b': makeState(3_000, 'workspace-b-draft') })
+    addRemoteBoard({
+      id: 'board-b',
+      name: 'Workspace B Board',
+      createdAt: 100,
+      updatedAt: 3_000,
+      revision: 3,
+      state: makeState(3_000, 'workspace-b-draft'),
+    })
+
+    await syncBoardToServer('board-b')
+
+    const putCall = mocks.request.mock.calls.find(
+      ([url, config]) =>
+        url === `/v1/workspaces/${workspaceB}/boards/board-b/document` &&
+        typeof config === 'object' &&
+        config !== null &&
+        'method' in config &&
+        config.method === 'PUT',
+    )
+    expect(putCall).toBeTruthy()
+    expect(listBoards()[0]).toMatchObject({ revision: 4 })
+  })
+
+  it('sends explicit renames to the newly selected workspace', async () => {
+    const workspaceB = 'ws_workspaceB'
+    getWorkspaceSelectionStore().select(workspaceB)
+    replaceBoards([
+      { id: 'board-b', name: 'Old Name', createdAt: 100, updatedAt: 3_000, revision: 3 },
+    ])
+    addRemoteBoard({
+      id: 'board-b',
+      name: 'Old Name',
+      createdAt: 100,
+      updatedAt: 3_000,
+      revision: 3,
+      state: makeState(3_000, 'workspace-b-draft'),
+    })
+
+    await syncBoardRenameToServer('board-b', 'New Name')
+
+    const patchCall = mocks.request.mock.calls.find(
+      ([url, config]) =>
+        url === `/v1/workspaces/${workspaceB}/boards/board-b` &&
+        typeof config === 'object' &&
+        config !== null &&
+        'method' in config &&
+        config.method === 'PATCH',
+    )
+    expect(patchCall).toBeTruthy()
+    expect(listBoards()[0]).toMatchObject({ revision: 3 })
+  })
+
   it('returns hydrate failure for a rejected list read', async () => {
     apiState.listError = { status: 503, code: 'service_unavailable', msg: '服务暂不可用' }
 
@@ -509,7 +642,7 @@ describe('boardSync', () => {
     }
   })
 
-  it('renames via PATCH while the document keeps the state timestamp', async () => {
+  it('saves the document without PATCHing the board name', async () => {
     replaceBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 3_000 }])
     replaceBoardStateMap({ 'board-1': makeState(1_000, 'remote-older') })
     addRemoteBoard({
@@ -522,7 +655,7 @@ describe('boardSync', () => {
 
     await syncBoardToServer('board-1')
 
-    expect(readRenamePayload('board-1')).toEqual({ data: { name: 'Local Rename' } })
+    expect(patchCallsFor('board-1')).toEqual([])
     const payload = readReplaceDocumentPayload('board-1')
     expect(payload.data).toEqual(
       expect.objectContaining({
@@ -530,6 +663,115 @@ describe('boardSync', () => {
       }),
     )
     expect((payload.data?.payload as Record<string, unknown>).updatedAt).toBe(1_000)
+  })
+
+  it('keeps a collaborator rename on the server when the local name is stale', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Old Local Name', createdAt: 100, updatedAt: 3_000 }])
+    replaceBoardStateMap({ 'board-1': makeState(3_000, 'local-edits') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Collaborator New Name',
+      createdAt: 100,
+      updatedAt: 2_500,
+      state: makeState(2_500, 'remote-state'),
+    })
+
+    await syncBoardToServer('board-1')
+
+    expect(patchCallsFor('board-1')).toEqual([])
+    const remote = apiState.boardsResponse.data.find((item) => item.id === 'board-1')
+    expect(remote?.name).toBe('Collaborator New Name')
+    expect(listBoards()[0]?.name).toBe('Old Local Name')
+  })
+
+  it('leaves the server name untouched when a document save hits a revision conflict', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Old Local Name', createdAt: 100, updatedAt: 3_000 }])
+    replaceBoardStateMap({ 'board-1': makeState(3_000, 'local-edits') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Collaborator New Name',
+      createdAt: 100,
+      updatedAt: 2_500,
+      state: makeState(2_500, 'remote-state'),
+    })
+    apiState.saveError = {
+      status: 409,
+      code: 'board_revision_conflict',
+      msg: '看板版本已变更，请刷新后重试',
+    }
+
+    await expect(syncBoardToServer('board-1')).rejects.toMatchObject({
+      code: 'board_revision_conflict',
+    })
+
+    expect(patchCallsFor('board-1')).toEqual([])
+    const remote = apiState.boardsResponse.data.find((item) => item.id === 'board-1')
+    expect(remote?.name).toBe('Collaborator New Name')
+  })
+
+  it('sends no PATCH when a document save fails on the network', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Old Local Name', createdAt: 100, updatedAt: 3_000 }])
+    replaceBoardStateMap({ 'board-1': makeState(3_000, 'local-edits') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Collaborator New Name',
+      createdAt: 100,
+      updatedAt: 2_500,
+      state: makeState(2_500, 'remote-state'),
+    })
+    apiState.saveError = new Error('network down')
+
+    await expect(syncBoardToServer('board-1')).rejects.toThrow('network down')
+
+    expect(patchCallsFor('board-1')).toEqual([])
+    expect(apiState.savedCalls.filter((call) => call.method === 'PUT')).toHaveLength(1)
+    const remote = apiState.boardsResponse.data.find((item) => item.id === 'board-1')
+    expect(remote?.name).toBe('Collaborator New Name')
+  })
+
+  it('renames via PATCH without writing the document', async () => {
+    replaceBoards([
+      { id: 'board-1', name: 'Old Name', createdAt: 100, updatedAt: 3_000, revision: 7 },
+    ])
+    replaceBoardStateMap({ 'board-1': makeState(3_000, 'untouched-state') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Old Name',
+      createdAt: 100,
+      updatedAt: 3_000,
+      revision: 7,
+      state: makeState(3_000, 'untouched-state'),
+    })
+
+    await syncBoardRenameToServer('board-1', 'Explicit New Name')
+
+    expect(readRenamePayload('board-1')).toEqual({ data: { name: 'Explicit New Name' } })
+    expect(apiState.savedCalls.filter((call) => call.method === 'PUT')).toEqual([])
+    const remote = apiState.boardsResponse.data.find((item) => item.id === 'board-1')
+    expect(remote?.name).toBe('Explicit New Name')
+    expect(listBoards()[0]?.revision).toBe(7)
+  })
+
+  it('surfaces rename PATCH failures without a document write', async () => {
+    replaceBoards([{ id: 'board-1', name: 'Old Name', createdAt: 100, updatedAt: 3_000 }])
+    replaceBoardStateMap({ 'board-1': makeState(3_000, 'untouched-state') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Old Name',
+      createdAt: 100,
+      updatedAt: 3_000,
+      state: makeState(3_000, 'untouched-state'),
+    })
+    const renameError = { status: 409, code: 'board_archived', msg: '看板已归档' }
+    mocks.request.mockRejectedValueOnce(renameError)
+
+    await expect(syncBoardRenameToServer('board-1', 'Explicit New Name')).rejects.toMatchObject({
+      code: 'board_archived',
+    })
+
+    expect(apiState.savedCalls.filter((call) => call.method === 'PUT')).toEqual([])
+    expect(isBoardArchivedError(renameError)).toBe(true)
+    expect(isBoardNameConflictError(renameError)).toBe(false)
   })
 
   it('sends the observed revision as If-Match and stores the server revision', async () => {
@@ -549,6 +791,64 @@ describe('boardSync', () => {
 
     expect(readIfMatch('board-1')).toBe('7')
     expect(listBoards()[0]?.revision).toBe(8)
+  })
+
+  it('keeps the true local base revision on preserve-local hydrate so the next save conflicts', async () => {
+    replaceBoards([
+      { id: 'board-1', name: 'Local Draft', createdAt: 100, updatedAt: 2_000, revision: 7 },
+    ])
+    replaceBoardStateMap({ 'board-1': makeState(2_000, 'local-draft') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Remote Newer Revision',
+      createdAt: 100,
+      updatedAt: 1_000,
+      revision: 8,
+      state: makeState(1_000, 'remote-v8'),
+    })
+    apiState.saveError = {
+      status: 409,
+      code: 'board_revision_conflict',
+      msg: '看板版本已变更，请刷新后重试',
+    }
+
+    await hydrateBoardsFromServer()
+
+    // The newer local timestamp keeps the draft, but must not upgrade its
+    // concurrency base to the unseen server revision.
+    expect(listBoards()[0]).toMatchObject({ revision: 7, name: 'Local Draft' })
+    expect(getPromptText('board-1')).toBe('local-draft')
+
+    await expect(syncBoardToServer('board-1')).rejects.toMatchObject({ status: 409 })
+    expect(readIfMatch('board-1')).toBe('7')
+    // Conflict recovery keeps the local draft and its base revision.
+    expect(getPromptText('board-1')).toBe('local-draft')
+    expect(listBoards()[0]?.revision).toBe(7)
+  })
+
+  it('advances the base revision after accepting the remote snapshot and saves cleanly', async () => {
+    replaceBoards([
+      { id: 'board-1', name: 'Local Draft', createdAt: 100, updatedAt: 2_000, revision: 7 },
+    ])
+    replaceBoardStateMap({ 'board-1': makeState(2_000, 'local-draft') })
+    addRemoteBoard({
+      id: 'board-1',
+      name: 'Remote Newer Revision',
+      createdAt: 100,
+      updatedAt: 1_000,
+      revision: 8,
+      state: makeState(1_000, 'remote-v8'),
+    })
+
+    await hydrateBoardsFromServer({ preserveLocalNewer: false, rollbackBoardIds: ['board-1'] })
+
+    expect(listBoards()[0]).toMatchObject({ revision: 8, name: 'Remote Newer Revision' })
+    expect(getPromptText('board-1')).toBe('remote-v8')
+
+    await syncBoardToServer('board-1')
+
+    expect(readIfMatch('board-1')).toBe('8')
+    expect(listBoards()[0]?.revision).toBe(9)
   })
 
   it('syncs the shared remote envelope shape without viewport', async () => {
@@ -691,4 +991,15 @@ function readRenamePayload(boardId: string): Record<string, unknown> {
 
 function readIfMatch(boardId: string): unknown {
   return findCall(boardId, 'PUT', '/document').headers?.['If-Match']
+}
+
+function patchCallsFor(boardId: string) {
+  return mocks.request.mock.calls.filter(
+    ([url, config]) =>
+      url === `/v1/workspaces/${WORKSPACE_ID}/boards/${boardId}` &&
+      typeof config === 'object' &&
+      config !== null &&
+      'method' in config &&
+      config.method === 'PATCH',
+  )
 }

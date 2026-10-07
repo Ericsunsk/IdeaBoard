@@ -11,8 +11,10 @@ package postgres
 //     performs no commit of its own.
 //   - A carrier rollback leaves no payments artifact behind (the
 //     step-2 gap: the payments commit used to survive on its own).
-//   - beginDirectTx (the admin refund paths) borrows the carrier when
-//     staged and opens an owned pool transaction otherwise.
+//   - beginDirectTx (the external refund/dispute paths) borrows the carrier
+//     when staged and opens an owned pool transaction otherwise; the admin
+//     refund reservation and post-provider settlement intentionally use their
+//     own committed transaction boundary.
 //   - With no carrier the starter paths run unchanged (the existing
 //     payments suite is that proof; it is not duplicated here).
 

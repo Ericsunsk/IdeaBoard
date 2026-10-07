@@ -1,8 +1,10 @@
 import {
   archiveWorkspaceBoard,
+  BoardWorkspaceUnavailableError,
   fetchWorkspaceBoardDocument,
   fetchWorkspaceBoardMeta,
   fetchWorkspaceBoards,
+  renameWorkspaceBoard,
   requireBoardWorkspaceId,
   restoreWorkspaceBoard,
   saveWorkspaceBoard,
@@ -14,9 +16,13 @@ import {
 import { userErrorCode } from '../../../../shared/errors/errorCatalog'
 import { stripUndefined } from '../../../../shared/api/stripUndefined'
 import {
-  getAuthStorageUserScope,
-  subscribeAuthStorageScopeChange,
-} from '../../../../shared/utils/auth'
+  boardScopeKey,
+  getBoardScope,
+  isBoardScopeCurrent,
+  subscribeBoardScopeChange,
+  type BoardScope,
+  type CompleteBoardScope,
+} from '../catalog/scope'
 import {
   getBoardById,
   listBoards,
@@ -45,7 +51,10 @@ export type HydrateBoardsFromServerResult = { ok: true } | { ok: false; error: u
 
 const hydrateInFlight = new Map<string, Promise<HydrateBoardsFromServerResult>>()
 const pendingRollbackBoardIds = new Set<string>()
-subscribeAuthStorageScopeChange(() => pendingRollbackBoardIds.clear())
+// Auth sign-out and workspace switches both invalidate pending per-board
+// rollback markers: a marker captured under another User + Workspace scope
+// must never steer hydration in the new scope.
+subscribeBoardScopeChange(() => pendingRollbackBoardIds.clear())
 
 export type HydrateBoardsFromServerOptions = {
   preserveLocalNewer?: boolean
@@ -175,17 +184,13 @@ function applyRemoteBoardsToLocal(
       localMeta &&
       shouldPreserveLocal(remoteMeta.id) &&
       isLocalNewer(localMeta.updatedAt, remoteMeta.updatedAt)
-    // Keep the local optimistic content, but always advance its concurrency
-    // base to the server revision observed during hydration.
-    mergedMetas.set(
-      remoteMeta.id,
-      preserveLocal
-        ? {
-            ...localMeta,
-            ...(remoteMeta.revision === undefined ? {} : { revision: remoteMeta.revision }),
-          }
-        : remoteMeta,
-    )
+    // Keep the local draft with its true concurrency base: a newer
+    // timestamp proves recency, never that the local content was rebased
+    // onto the server revision. Carrying the remote revision here would
+    // make the next save send a false `If-Match` and silently overwrite
+    // the collaborator's snapshot. The base only advances when the remote
+    // snapshot is accepted (replace path) or after an explicit rebase.
+    mergedMetas.set(remoteMeta.id, preserveLocal ? { ...localMeta } : remoteMeta)
   })
 
   localMetas.forEach((localMeta) => {
@@ -260,24 +265,30 @@ async function listRemoteBoards(
 }
 
 export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOptions = {}) {
-  const scope = getAuthStorageUserScope()
-  if (!scope) return { ok: true } satisfies HydrateBoardsFromServerResult
-  let workspaceId: string
-  try {
-    workspaceId = requireBoardWorkspaceId()
-  } catch (error) {
-    // Fail closed: no workspace selection means no sync, never an
-    // inferred workspace. Callers surface the guidance via feedback.
-    return { ok: false, error } satisfies HydrateBoardsFromServerResult
+  const captured = getBoardScope()
+  // Signed-out surfaces (public landing) have no scope and nothing to sync.
+  if (!captured.userScope) return { ok: true } satisfies HydrateBoardsFromServerResult
+  // Authed without a workspace selection fails closed: the request target
+  // must never be inferred from a board id.
+  if (!captured.workspaceId) {
+    return {
+      ok: false,
+      error: new BoardWorkspaceUnavailableError(),
+    } satisfies HydrateBoardsFromServerResult
   }
+  const scope: CompleteBoardScope = {
+    userScope: captured.userScope,
+    workspaceId: captured.workspaceId,
+  }
+  const workspaceId = scope.workspaceId
   const resolvedOptions = resolveHydrateOptions(options)
   const rollbackKey = [...resolvedOptions.rollbackBoardIds].sort().join(',')
-  const hydrateKey = `${scope}:${workspaceId}:${resolvedOptions.preserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}`
+  const hydrateKey = `${boardScopeKey(scope)}:${resolvedOptions.preserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}`
   const inFlight = hydrateInFlight.get(hydrateKey)
   if (inFlight) return inFlight
   const task = (async () => {
     const remoteBoards = await listRemoteBoards(workspaceId)
-    if (getAuthStorageUserScope() !== scope) {
+    if (!isBoardScopeCurrent(scope)) {
       throw new Error('BOARD_HYDRATE_SCOPE_CHANGED')
     }
     applyRemoteBoardsToLocal(remoteBoards, resolvedOptions)
@@ -298,24 +309,55 @@ export async function hydrateBoardsFromServer(options: HydrateBoardsFromServerOp
 }
 
 export async function syncBoardToServer(boardId: string, stateOverride?: BoardState | null) {
-  const syncScope = getAuthStorageUserScope()
+  // Fail closed when no workspace is selected (throws with guidance);
+  // the save path never infers a workspace from the board id. Resolve the
+  // workspace before touching scoped storage: without a selection the
+  // catalog reads empty, which must reject instead of silently no-op.
+  // Document-only: ordinary saves (autosave included) never PATCH the board
+  // name, so a stale local name can never overwrite a collaborator rename.
+  // Explicit renames go through `syncBoardRenameToServer` only.
+  const workspaceId = requireBoardWorkspaceId()
   const board = getBoardById(boardId)
   if (!board) return
-  // Fail closed when no workspace is selected (throws with guidance);
-  // the save path never infers a workspace from the board id.
-  const workspaceId = requireBoardWorkspaceId()
+  // Capture the User + Workspace scope: a switch mid-save must not apply
+  // this response (revision advance, rollback markers) to the new scope.
+  const captured: BoardScope = { ...getBoardScope(), workspaceId }
   const state = stateOverride ?? getBoardState(boardId) ?? createEmptyBoardState(board.updatedAt)
   try {
     const response = await saveWorkspaceBoard(workspaceId, boardId, {
-      name: board.name,
       state: toGeneratedBoardStateProjection(state),
       // v1 `If-Match` requires revision >= 1; an unknown local base
       // reconciles through the 409 rollback path below, never a 400.
       baseRevision: board.revision ?? 1,
     })
-    applySyncSuccess(boardId, response, syncScope)
+    applySyncSuccess(boardId, response, captured)
   } catch (error) {
-    markSyncFailure(boardId, syncScope, error)
+    markSyncFailure(boardId, captured, error)
+    throw error
+  }
+}
+
+/**
+ * Explicit rename path (canvas header, gallery): PATCHes the board name
+ * without writing the document. Ordinary document saves never call this,
+ * so PATCH/PUT partial failures from the old combined save cannot recur.
+ * Advances the local revision base from the rename response so the next
+ * document PUT keeps a fresh `If-Match`.
+ */
+export async function syncBoardRenameToServer(boardId: string, nextName: string): Promise<void> {
+  const normalizedBoardId = boardId.trim()
+  if (!normalizedBoardId) throw new Error('MISSING_BOARD_ID')
+  const workspaceId = requireBoardWorkspaceId()
+  if (!getBoardById(normalizedBoardId)) return
+  const captured: BoardScope = { ...getBoardScope(), workspaceId }
+  try {
+    const meta = await renameWorkspaceBoard(workspaceId, normalizedBoardId, nextName)
+    if (!isBoardScopeCurrent(captured)) return
+    const serverRevision = Number(meta.revision)
+    if (Number.isFinite(serverRevision)) setBoardRevision(normalizedBoardId, serverRevision)
+    pendingRollbackBoardIds.delete(normalizedBoardId)
+  } catch (error) {
+    markSyncFailure(normalizedBoardId, captured, error)
     throw error
   }
 }
@@ -323,17 +365,19 @@ export async function syncBoardToServer(boardId: string, stateOverride?: BoardSt
 function applySyncSuccess(
   boardId: string,
   response: SaveWorkspaceBoardResult,
-  syncScope: string | null,
+  captured: BoardScope,
 ) {
+  // A User or Workspace switch mid-save drops the local follow-up: the
+  // server write already happened, but its revision must not land in the
+  // new scope's catalog (it converges on the next scoped hydrate).
+  if (!isBoardScopeCurrent(captured)) return
   const serverRevision = Number(response.newRevision)
   if (Number.isFinite(serverRevision)) setBoardRevision(boardId, serverRevision)
-  if (syncScope && getAuthStorageUserScope() === syncScope) {
-    pendingRollbackBoardIds.delete(boardId.trim())
-  }
+  pendingRollbackBoardIds.delete(boardId.trim())
 }
 
-function markSyncFailure(boardId: string, syncScope: string | null, error: unknown) {
-  if (syncScope && getAuthStorageUserScope() === syncScope && isBoardNameConflictError(error)) {
+function markSyncFailure(boardId: string, captured: BoardScope, error: unknown) {
+  if (isBoardScopeCurrent(captured) && isBoardNameConflictError(error)) {
     pendingRollbackBoardIds.add(boardId.trim())
   }
 }
@@ -386,9 +430,11 @@ export async function fetchBoardArchivedAt(
 ): Promise<string | null> {
   const normalized = boardId.trim()
   if (!normalized) throw new Error('MISSING_BOARD_ID')
-  const meta = await fetchWorkspaceBoardMeta(requireBoardWorkspaceId(), normalized, options)
+  const workspaceId = requireBoardWorkspaceId()
+  const captured: BoardScope = { ...getBoardScope(), workspaceId }
+  const meta = await fetchWorkspaceBoardMeta(workspaceId, normalized, options)
   const archivedAt = typeof meta.archivedAt === 'string' && meta.archivedAt ? meta.archivedAt : null
-  if (getBoardById(normalized)) {
+  if (isBoardScopeCurrent(captured) && getBoardById(normalized)) {
     setBoardArchivedAt(normalized, archivedAt)
   }
   return archivedAt
@@ -404,7 +450,10 @@ export function markBoardArchivedLocally(boardId: string, archivedAt?: string): 
 export async function syncRestoreBoardToServer(boardId: string): Promise<WorkspaceBoardMeta> {
   const normalized = boardId.trim()
   if (!normalized) throw new Error('MISSING_BOARD_ID')
-  const meta = await restoreWorkspaceBoard(requireBoardWorkspaceId(), normalized)
+  const workspaceId = requireBoardWorkspaceId()
+  const captured: BoardScope = { ...getBoardScope(), workspaceId }
+  const meta = await restoreWorkspaceBoard(workspaceId, normalized)
+  if (!isBoardScopeCurrent(captured)) return meta
   if (getBoardById(normalized)) {
     setBoardArchivedAt(normalized, null)
     if (Number.isFinite(meta.revision)) setBoardRevision(normalized, meta.revision)

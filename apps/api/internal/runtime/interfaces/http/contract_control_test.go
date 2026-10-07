@@ -249,29 +249,29 @@ func (f *fakeIdentityAdminCommands) record(name string, actor principal.Principa
 	f.actors = append(f.actors, actor.UserID())
 }
 
-func (f *fakeIdentityAdminCommands) SetRole(_ context.Context, actor principal.Principal, _ string, _ string) error {
+func (f *fakeIdentityAdminCommands) SetRole(_ context.Context, actor principal.Principal, _ string, _ string) (identityports.IdentityAdminMutationOutcome, error) {
 	f.record("set_role", actor)
-	return f.fail
+	return identityports.IdentityAdminMutationOutcome{}, f.fail
 }
 
-func (f *fakeIdentityAdminCommands) Ban(_ context.Context, actor principal.Principal, _ string, _ identityports.IdentityAdminBanInput) error {
+func (f *fakeIdentityAdminCommands) Ban(_ context.Context, actor principal.Principal, _ string, _ identityports.IdentityAdminBanInput) (identityports.IdentityAdminMutationOutcome, error) {
 	f.record("ban", actor)
-	return f.fail
+	return identityports.IdentityAdminMutationOutcome{}, f.fail
 }
 
-func (f *fakeIdentityAdminCommands) Unban(_ context.Context, actor principal.Principal, _ string) error {
+func (f *fakeIdentityAdminCommands) Unban(_ context.Context, actor principal.Principal, _ string) (identityports.IdentityAdminMutationOutcome, error) {
 	f.record("unban", actor)
-	return f.fail
+	return identityports.IdentityAdminMutationOutcome{}, f.fail
 }
 
-func (f *fakeIdentityAdminCommands) RevokeSessions(_ context.Context, actor principal.Principal, _ string) error {
+func (f *fakeIdentityAdminCommands) RevokeSessions(_ context.Context, actor principal.Principal, _ string) (identityports.IdentityAdminMutationOutcome, error) {
 	f.record("revoke_sessions", actor)
-	return f.fail
+	return identityports.IdentityAdminMutationOutcome{}, f.fail
 }
 
-func (f *fakeIdentityAdminCommands) Delete(_ context.Context, actor principal.Principal, _ string) error {
+func (f *fakeIdentityAdminCommands) Delete(_ context.Context, actor principal.Principal, _ string) (identityports.IdentityAdminMutationOutcome, error) {
 	f.record("delete", actor)
-	return f.fail
+	return identityports.IdentityAdminMutationOutcome{}, f.fail
 }
 
 func (f *fakeIdentityAdminCommands) callCount(name string) int {

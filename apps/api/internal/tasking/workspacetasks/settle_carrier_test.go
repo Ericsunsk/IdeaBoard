@@ -254,3 +254,104 @@ func TestCancelRollsBackWithAmbientCarrier(t *testing.T) {
 	}
 	_ = settler
 }
+
+// TestCancelDefersStageOnRegistryCarrierUntilPostCommit proves the #889
+// deferral at the settlement seam: on a registry-carrying ambient
+// transaction Cancel settles the write but stages NOTHING publishable
+// yet; the staged cancelled event appears only after the post-commit
+// hooks run (the guard runs them right after its commit). A caller that
+// drains before the commit therefore cannot announce the transition.
+func TestCancelDefersStageOnRegistryCarrierUntilPostCommit(t *testing.T) {
+	pool := testdb.Open(t)
+	ctx := context.Background()
+	table := fmt.Sprintf("wt_carrier_probe_%d", time.Now().UnixNano())
+	if _, err := pool.Exec(ctx, `CREATE TABLE `+table+` (id text PRIMARY KEY, note text NOT NULL)`); err != nil {
+		t.Fatalf("create probe table: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DROP TABLE IF EXISTS `+table)
+	})
+
+	store := &carrierSettleStore{t: t, probe: table}
+	settler := workspacetasks.NewService(workspacetasks.ServiceDeps{
+		TaskRead: store, TaskLifecycle: store, Holder: carrierSettleHolder{},
+	})
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin carrier tx: %v", err)
+	}
+	carrier := dbutil.ContextWithAmbientPostCommit(dbutil.ContextWithAmbientTx(ctx, tx))
+	const taskID = "task_carrier_3"
+	if _, _, err := settler.Cancel(carrier, "ws-carrier", taskID, 7, "operator cancel"); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("Cancel() on registry carrier error = %v", err)
+	}
+	// Nothing publishable before the carrier commits: the guard has not
+	// run the hooks yet, so the drain must be empty even though the
+	// terminal write sits in the still-open transaction.
+	if staged := settler.StagedEvents(); len(staged) != 0 {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("staged events before carrier commit = %d, want 0 (defer until post-commit)", len(staged))
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit carrier tx: %v", err)
+	}
+	// The guard commits, then runs the hooks: only now is the cancelled
+	// transition staged for publication.
+	dbutil.RunAmbientPostCommit(carrier)
+	staged := settler.StagedEvents()
+	if len(staged) != 1 {
+		t.Fatalf("staged events after post-commit hooks = %d, want 1", len(staged))
+	}
+	if staged[0].Status != workspacetasks.StatusCancelled || staged[0].TaskID != taskID {
+		t.Fatalf("staged event = %+v, want cancelled for %s", staged[0], taskID)
+	}
+}
+
+// TestCancelDiscardsDeferredStageWhenHooksNeverRun proves the other half
+// of the deferral: when the carrier rolls back (audit/commit failure at
+// the guard), the hooks never run and no transition is ever staged, so
+// no announcement can escape for the rolled-back flip.
+func TestCancelDiscardsDeferredStageWhenHooksNeverRun(t *testing.T) {
+	pool := testdb.Open(t)
+	ctx := context.Background()
+	table := fmt.Sprintf("wt_carrier_probe_%d", time.Now().UnixNano())
+	if _, err := pool.Exec(ctx, `CREATE TABLE `+table+` (id text PRIMARY KEY, note text NOT NULL)`); err != nil {
+		t.Fatalf("create probe table: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DROP TABLE IF EXISTS `+table)
+	})
+
+	store := &carrierSettleStore{t: t, probe: table}
+	settler := workspacetasks.NewService(workspacetasks.ServiceDeps{
+		TaskRead: store, TaskLifecycle: store, Holder: carrierSettleHolder{},
+	})
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin carrier tx: %v", err)
+	}
+	carrier := dbutil.ContextWithAmbientPostCommit(dbutil.ContextWithAmbientTx(ctx, tx))
+	const taskID = "task_carrier_4"
+	if _, _, err := settler.Cancel(carrier, "ws-carrier", taskID, 7, "operator cancel"); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("Cancel() on registry carrier error = %v", err)
+	}
+	// The guard fails (audit/commit) and rolls back without running the
+	// hooks: the deferred stage is dropped with the context.
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatalf("rollback carrier tx: %v", err)
+	}
+	if staged := settler.StagedEvents(); len(staged) != 0 {
+		t.Fatalf("staged events after carrier rollback = %d, want 0 (deferred stage discarded)", len(staged))
+	}
+	var outside int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM `+table+` WHERE id = $1`, taskID).Scan(&outside); err != nil {
+		t.Fatalf("count probe after rollback: %v", err)
+	}
+	if outside != 0 {
+		t.Fatalf("settlement rows after carrier rollback = %d, want 0", outside)
+	}
+}

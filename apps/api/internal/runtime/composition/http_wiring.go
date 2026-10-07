@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/generation/routing"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users/application/administration"
+	"ideaboard/api/internal/identity/users/application/authsync"
 	identityhttp "ideaboard/api/internal/identity/users/interfaces/http"
 	librarypostgres "ideaboard/api/internal/library/infrastructure/postgres"
 	storageauth "ideaboard/api/internal/media/storage/application/authorization"
@@ -21,6 +22,8 @@ import (
 	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/audit"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/idempotency"
 	"ideaboard/api/internal/prompts"
 	rewardhttp "ideaboard/api/internal/rewards/interfaces/http"
 	"ideaboard/api/internal/runtime/adapters/webdist"
@@ -92,6 +95,13 @@ func newAppRouter(
 	controlAuditStore := audit.NewStore(repos.db)
 	controlAuditSink := newControlAuditDurableSink(controlAuditStore, controlUserDirectory)
 	controlAuditTxSink := newControlAuditAtomicSink(controlAuditStore, controlUserDirectory)
+	// Control idempotency (#891): ONE shared process-local replay store
+	// for the whole process (a per-request store would never replay:
+	// every lookup would miss its own empty cache), backed by the
+	// PostgreSQL durable authority. The local store is a same-process
+	// fast-path optimization only; correctness never depends on it.
+	controlIdempotency := contract.NewIdempotencyStore(contract.DefaultIdempotencyStoreOptions())
+	controlIdempotencyDurable := idempotency.NewControlStore(repos.db)
 
 	router := gin.New()
 	// ClientIP feeds per-IP rate limiting. Trust only the configured reverse
@@ -219,7 +229,7 @@ func newAppRouter(
 		// so the monitor / statistics / stream proxies are live.
 		ContractControl: httpapi.ContractControlDeps{
 			Users:          services.userService,
-			Identity:       administration.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+			Identity:       administration.NewIdentityAdminCommands(services.userService, services.authServiceClient, authsync.NewStore(repos.db)),
 			Impersonator:   services.authServiceClient,
 			Credits:        services.creditService,
 			CreditUsers:    creditUserResolver,
@@ -236,26 +246,28 @@ func newAppRouter(
 				// workspace bus for cross-instance envelope fanout. No second
 				// NATS connection is opened by this wiring.
 				newControlTaskEventAdapter(taskServices.taskStatusPublisher, taskServices.workspaceEvents, taskServices.workspaceEventBus, taskServices.webhooks)),
-			Tenancy:           tenancypg.NewStore(repos.db),
-			UserDirectory:     controlUserDirectory,
-			BillingAccounts:   tenancypg.NewBillingAccountStore(repos.db),
-			Catalog:           services.billingCatalog,
-			ModelPools:        catalog.NewRepository(repos.db), // #849: Admin pool reads/replaces; no second model catalog.
-			Payments:          services.paymentService,
-			Settings:          services.runtimeSettings,
-			PaymentWebhookURL: cfg.PublicOrigins.APIURL("/api/webhooks/stripe"),
-			AIGateway:         aiGatewayHandler,
-			Storage:           storagehttp.NewHandler(services.storageService),
-			SearchProviders:   searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
-			FeaturePrompts:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			Monitor:           newControlMonitorHandler(repos.db),
-			Mail:              services.authServiceClient,
-			RewardCommands:    rewardhttp.NewAdminCommandHandler(services.rewardService),
-			RewardReads:       rewardhttp.NewAdminReadHandler(services.rewardService, rewardIdentityProjector{repo: repos.userRepo}),
-			OAuth:             services.authServiceClient,
-			BrandLogos:        adminbranding.NewHandler(repos.adminBrandLogoRepo, controlRequireAdmin),
-			BrandingUpload:    services.storageService,
-			AuditSink:         controlAuditSink,
+			Tenancy:            tenancypg.NewStore(repos.db),
+			UserDirectory:      controlUserDirectory,
+			BillingAccounts:    tenancypg.NewBillingAccountStore(repos.db),
+			Catalog:            services.billingCatalog,
+			ModelPools:         catalog.NewRepository(repos.db), // #849: Admin pool reads/replaces; no second model catalog.
+			Payments:           services.paymentService,
+			Settings:           services.runtimeSettings,
+			PaymentWebhookURL:  cfg.PublicOrigins.APIURL("/api/webhooks/stripe"),
+			AIGateway:          aiGatewayHandler,
+			Storage:            storagehttp.NewHandler(services.storageService),
+			SearchProviders:    searchhttp.NewHandler(searchProviderConfig, searchinfra.NewProviderTestAdapters()...),
+			FeaturePrompts:     prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			Monitor:            newControlMonitorHandler(repos.db),
+			Mail:               services.authServiceClient,
+			RewardCommands:     rewardhttp.NewAdminCommandHandler(services.rewardService),
+			RewardReads:        rewardhttp.NewAdminReadHandler(services.rewardService, rewardIdentityProjector{repo: repos.userRepo}),
+			OAuth:              services.authServiceClient,
+			BrandLogos:         adminbranding.NewHandler(repos.adminBrandLogoRepo, controlRequireAdmin),
+			BrandingUpload:     services.storageService,
+			AuditSink:          controlAuditSink,
+			Idempotency:        controlIdempotency,
+			IdempotencyDurable: controlIdempotencyDurable,
 			// Step 2 atomic scope: every guarded mutation runs inside
 			// one guard-owned transaction that the audit row joins
 			// before commit (nil in tests keeps the legacy path).

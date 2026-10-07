@@ -17,8 +17,13 @@ import (
 //   - Scope: the dedup tuple is principal + operation + key. Scope()
 //     binds principal + operation; the key travels in the header. The
 //     process-local Store additionally takes the internal numeric user id
-//     where available (durable uniqueness facts remain the source of truth
-//     per DESIGN 3; the store never replaces them).
+//     where available. Control mutations extend this with the durable
+//     fact (control_idempotency_records via ControlStore): the durable
+//     scope is operator + operation + target + key, the canonical
+//     request hash pins method + route template + target + body, and the
+//     durable row is the cross-process authority while this store stays
+//     a same-process fast path (durable uniqueness facts remain the
+//     source of truth per DESIGN 3; neither store replaces them).
 //   - Replay vs conflict: reusing a key with the same request hash replays
 //     the first result within the TTL; reuse with a different hash is a
 //     409 (CodeIdempotencyConflict, or CodeTaskIdempotencyConflict for

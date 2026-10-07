@@ -95,6 +95,13 @@ func (s *Service) DeleteUser(
 	authDeleter ports.AuthUserDeleter,
 	uploadCleaner ports.UserUploadCleaner,
 ) error {
+	// Durable saga order: the initialization above commits business
+	// deactivate + Wallet freeze + durable deletion request first; only
+	// then do the external Auth -> Media Storage calls run, each followed
+	// by its own durable phase advance, ending with the business
+	// tombstone. No step joins the Control guard ambient transaction, so
+	// an external success followed by a guard audit/commit failure keeps
+	// its progress and the retry converges without restoring active.
 	progress, err := s.beginUserDeletion(ctx, userID)
 	if err != nil {
 		return err
@@ -154,17 +161,14 @@ func (s *Service) beginUserDeletion(ctx context.Context, userID int64) (*ports.D
 	if s == nil || s.pool == nil || s.credits == nil || userID <= 0 {
 		return nil, fmt.Errorf("invalid user deletion command")
 	}
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// deletion initialization (progress row plus user and wallet freeze)
-	// joins the borrowed guard transaction. The guard began it and the
-	// guard commits or rolls it back, so this path never commits or
-	// rolls back. The later saga phases (external Auth/storage calls
-	// between transactions) keep their own boundaries by design: only
-	// this bracketing write joins the carrier. With no carrier the
-	// legacy owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return beginUserDeletionTx(ctx, s.credits, ambient, userID)
-	}
+	// Durable deletion saga: the initialization (business deactivate +
+	// Wallet freeze + durable deletion request) always commits in its own
+	// transaction BEFORE any external Auth/Media call. It deliberately
+	// never joins the Control guard ambient transaction: the guard's
+	// audit/commit failure must not roll the initialization back to
+	// active, and the saga must not hold a DB transaction open across
+	// external Auth/Storage I/O. Each later phase advances in its own
+	// durable transaction for the same reason.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("begin user deletion transaction: %w", err)
@@ -183,7 +187,7 @@ func (s *Service) beginUserDeletion(ctx context.Context, userID int64) (*ports.D
 }
 
 // beginUserDeletionTx records the deletion progress and freezes the user
-// and wallet rows inside the caller's transaction (owned or borrowed).
+// and wallet rows inside the caller's owned transaction.
 func beginUserDeletionTx(ctx context.Context, credits ports.CreditWalletLifecycleService, tx pgx.Tx, userID int64) (*ports.DeletionProgress, error) {
 	progress, err := loadOrCreateDeletionProgress(ctx, tx, userID)
 	if err != nil {
@@ -243,15 +247,6 @@ VALUES ($1, $2, $3, $4)`, userID, progress.AuthUserID, progress.StorageUID, prog
 	return progress, nil
 }
 
-// deletionPhaseExecutor is the minimal statement seam advanceDeletion
-// needs. Both *pgxpool.Pool (legacy owned path) and pgx.Tx (borrowed
-// guard transaction) satisfy it, so the phase advance joins the carrier
-// when one is staged and keeps its single-statement behavior otherwise.
-type deletionPhaseExecutor interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
 func (s *Service) advanceDeletion(ctx context.Context, userID int64, from, to ports.DeletionPhase) (ports.DeletionPhase, error) {
 	if s == nil || s.pool == nil || userID <= 0 {
 		return "", fmt.Errorf("invalid user deletion transition")
@@ -260,17 +255,17 @@ func (s *Service) advanceDeletion(ctx context.Context, userID int64, from, to po
 		(from != ports.DeletionPendingStorage || to != ports.DeletionPendingTombstone) {
 		return "", fmt.Errorf("invalid user deletion phase transition %s -> %s", from, to)
 	}
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// saga phase advance joins the borrowed guard transaction, so the
-	// phase row and the guard's audit row share one fate. A borrowed
-	// transaction is never committed or rolled back here. With no
-	// carrier the executor is the pool (each statement self-atomic, as
-	// before).
-	var store deletionPhaseExecutor = s.pool
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		store = ambient
-	}
-	return advanceDeletionPhase(ctx, store, userID, from, to)
+	// Durable saga phase advance: each Auth/Media step commits its phase
+	// row in its own statement on the pool, independent of the Control
+	// guard ambient transaction. An external success followed by a guard
+	// audit/commit failure therefore keeps its durable progress and the
+	// retry converges instead of rolling back to the previous phase.
+	return advanceDeletionPhase(ctx, s.pool, userID, from, to)
+}
+
+type deletionPhaseExecutor interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 func advanceDeletionPhase(ctx context.Context, store deletionPhaseExecutor, userID int64, from, to ports.DeletionPhase) (ports.DeletionPhase, error) {
@@ -301,14 +296,12 @@ func (s *Service) tombstoneUser(ctx context.Context, userID int64) (ports.Deleti
 	if s == nil || s.pool == nil || s.credits == nil || userID <= 0 {
 		return "", fmt.Errorf("invalid user tombstone command")
 	}
-	// Ambient guard transaction (control audit atomicity, step 3): the
-	// tombstone unit joins the borrowed guard transaction. The guard
-	// began it and the guard commits or rolls it back, so this path
-	// never commits or rolls back. With no carrier the legacy
-	// owned-transaction path below runs unchanged.
-	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
-		return tombstoneUserTx(ctx, s.credits, ambient, userID)
-	}
+	// Durable saga final step: the PII tombstone (anonymize user, keep
+	// Wallet frozen, clear deletion PII, mark completed) always commits in
+	// its own transaction. It never joins the Control guard ambient
+	// transaction, so a guard audit/commit failure after the tombstone
+	// cannot resurrect personal data or an active Wallet; the retry
+	// replays idempotently from the completed phase.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return "", fmt.Errorf("begin user tombstone transaction: %w", err)
@@ -325,8 +318,8 @@ func (s *Service) tombstoneUser(ctx context.Context, userID int64) (ports.Deleti
 }
 
 // tombstoneUserTx anonymizes the user, freezes the wallet, and completes
-// the deletion request inside the caller's transaction (owned or
-// borrowed). A completed tombstone replays idempotently.
+// the deletion request inside the owned tombstone transaction.
+// A completed tombstone replays idempotently.
 func tombstoneUserTx(ctx context.Context, credits ports.CreditWalletLifecycleService, tx pgx.Tx, userID int64) (ports.DeletionPhase, error) {
 	phase, err := loadTombstonePhase(ctx, tx, userID)
 	if err != nil {

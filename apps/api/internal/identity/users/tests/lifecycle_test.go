@@ -798,22 +798,22 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
 	events := &[]string{}
 	authManager := &fakeIdentityAdminAuth{events: events}
-	commands := newIdentityAdminCommands(userService, authManager)
+	commands := newIdentityAdminCommands(userService, authManager, nil)
 	actor := identityAdminActor(t)
 
-	err = commands.Delete(ctx, actor, provisioned.User.PublicID.String())
+	_, err = commands.Delete(ctx, actor, provisioned.User.PublicID.String())
 	assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingStorage, 0, "frozen")
 
 	cleaner.err = nil
-	commands = newIdentityAdminCommands(userService, nil)
-	if err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
+	commands = newIdentityAdminCommands(userService, nil, nil)
+	if _, err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
 		t.Fatalf("resume deletion from pending storage: %v", err)
 	}
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionCompleted, 0, "frozen")
 
 	// A lost success response can be retried after tombstoning has cleared auth_user_id.
-	if err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
+	if _, err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
 		t.Fatalf("retry completed deletion: %v", err)
 	}
 	assertIdentityAdminEvents(t, events, "auth-delete")

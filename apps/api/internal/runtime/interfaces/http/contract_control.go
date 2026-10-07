@@ -21,8 +21,13 @@ package httpapi
 //     (no event-bus import anywhere under these files; guarded by
 //     TestV1RegistryExcludesControl and by construction).
 //   - Idempotency: header-only Idempotency-Key on ALL mutating control
-//     routes (no body-key fallback), backed by the shared contract
-//     IdempotencyStore seam.
+//     routes (no body-key fallback). The durable scope is
+//     operator/operation/target/key with a canonical request hash
+//     (see contract_control_idempotency.go): same key + same request
+//     replays the first 2xx result (cross-process, restart-safe), same
+//     key + different request is a 409 before any side effect runs.
+//     The shared contract IdempotencyStore is the same-process fast
+//     path only.
 //   - Envelope: dedicated handlers render the contract success/error
 //     envelope with Request-Id. The small set of platform-config
 //     families (ai-gateway, storage, search providers, feature prompts,

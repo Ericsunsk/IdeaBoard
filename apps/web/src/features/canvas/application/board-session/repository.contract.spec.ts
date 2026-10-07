@@ -245,13 +245,50 @@ describe('createBoardSessionRepository', () => {
     expect(savedState?.promptNodes[0]?.text).toBe('saved')
     expect(savedState).not.toHaveProperty('viewport')
     expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
-    // v1 save fans out to rename (PATCH) + document replace (PUT) + meta read (GET).
-    expect(mocks.request).toHaveBeenCalledTimes(3)
+    // Ordinary document saves only replace the document (PUT) + read back
+    // the meta (GET); they never PATCH the board name.
+    expect(mocks.request).toHaveBeenCalledTimes(2)
+    expect(patchCallsFor(board.id)).toEqual([])
     const documentBody = readPutDocumentBody(board.id)
     expect(documentBody?.schema_version).toBe(BOARD_STATE_SCHEMA_VERSION)
     expect(documentBody?.payload?.promptNodes[0]?.text).toBe('saved')
     expect(documentBody?.payload).not.toHaveProperty('viewport')
     expect(documentBody?.payload?.previewSnapshotDataUrl).toBeUndefined()
+  })
+
+  it('keeps a collaborator rename on ordinary save instead of PATCHing the stale local name', async () => {
+    const board = createBoard('Old Local Name')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+    const repository = createBoardSessionRepository()
+    findOrCreateV1BoardDto(board.id).name = 'Collaborator New Name'
+
+    await repository.save(board.id, makeSnapshot('saved'))
+
+    expect(patchCallsFor(board.id)).toEqual([])
+    expect(findOrCreateV1BoardDto(board.id).name).toBe('Collaborator New Name')
+    expect(getBoardById(board.id)?.name).toBe('Old Local Name')
+    const documentBody = readPutDocumentBody(board.id)
+    expect(documentBody?.payload?.promptNodes[0]?.text).toBe('saved')
+  })
+
+  it('keeps the server name on remote sync failure without PATCHing the stale local name', async () => {
+    const board = createBoard('Old Local Name')
+    replaceBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+    const repository = createBoardSessionRepository()
+    findOrCreateV1BoardDto(board.id).name = 'Collaborator New Name'
+    mocks.request.mockRejectedValueOnce({ status: 409, code: 'board_revision_conflict' })
+
+    let thrown: unknown
+    try {
+      await repository.save(board.id, makeSnapshot('saved-after-conflict'))
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(isBoardSessionRemoteSyncError(thrown)).toBe(true)
+    expect(patchCallsFor(board.id)).toEqual([])
+    expect(findOrCreateV1BoardDto(board.id).name).toBe('Collaborator New Name')
+    expect(getBoardState(board.id)?.promptNodes[0]?.text).toBe('saved-after-conflict')
   })
 
   it('keeps the local state and reports recoverable remote sync failure', async () => {
@@ -290,7 +327,7 @@ describe('createBoardSessionRepository', () => {
   it('rejects a previous-schema local state instead of migrating it', async () => {
     const board = createBoard('Retired Local Snapshot')
     localStorage.setItem(
-      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
+      `ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001.${WORKSPACE_ID}`,
       JSON.stringify({
         [board.id]: {
           schemaVersion: BOARD_STATE_SCHEMA_VERSION - 1,
@@ -362,7 +399,7 @@ describe('createBoardSessionRepository', () => {
   it('rejects pre-migration local state instead of normalizing across schema versions', async () => {
     const board = createBoard('Older Local Snapshot')
     localStorage.setItem(
-      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
+      `ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001.${WORKSPACE_ID}`,
       JSON.stringify({
         [board.id]: {
           schemaVersion: BOARD_STATE_SCHEMA_VERSION - 2,
@@ -410,7 +447,7 @@ describe('createBoardSessionRepository', () => {
   it('rejects invalid local state with recoverable validation context instead of returning an empty session snapshot', async () => {
     const board = createBoard('Invalid Local Snapshot')
     localStorage.setItem(
-      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
+      `ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001.${WORKSPACE_ID}`,
       JSON.stringify({
         [board.id]: {
           ...makeBoardState(),
@@ -557,4 +594,15 @@ function readPutDocumentBody(boardId: string): {
     }
   }
   throw new Error(`Missing document PUT body for ${boardId}`)
+}
+
+function patchCallsFor(boardId: string) {
+  return mocks.request.mock.calls.filter(
+    ([url, config]) =>
+      url === `/v1/workspaces/${WORKSPACE_ID}/boards/${boardId}` &&
+      typeof config === 'object' &&
+      config !== null &&
+      'method' in config &&
+      config.method === 'PATCH',
+  )
 }

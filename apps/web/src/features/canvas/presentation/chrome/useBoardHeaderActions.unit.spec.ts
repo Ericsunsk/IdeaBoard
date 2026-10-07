@@ -8,6 +8,10 @@ import {
 } from '../../../board/ports/canvas'
 import { createBoardRepository, replaceBoards } from '../../../board'
 import { clearStoredAuth, setStoredAuth } from '../../../../shared/utils/auth'
+import {
+  getWorkspaceSelectionStore,
+  resetWorkspaceSelectionStore,
+} from '../../../workspace'
 import { useBoardHeaderActions } from './useBoardHeaderActions'
 
 vi.mock('../../../board/ports/canvas', async (importOriginal) => {
@@ -65,6 +69,10 @@ describe('useBoardHeaderActions', () => {
   beforeEach(() => {
     localStorage.clear()
     clearStoredAuth()
+    // The board catalog is User + Workspace scoped: prime a selection so
+    // catalog writes in these tests land in a real scope.
+    resetWorkspaceSelectionStore()
+    getWorkspaceSelectionStore().select('ws_test123')
     vi.mocked(fetchBoardArchivedAt).mockResolvedValue(null)
     vi.mocked(syncRestoreBoardToServer).mockResolvedValue({} as never)
   })

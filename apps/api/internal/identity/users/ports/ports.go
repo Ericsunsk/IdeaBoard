@@ -211,13 +211,25 @@ type AdminUserImpersonator interface {
 	ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error)
 }
 
+// IdentityAdminMutationOutcome distinguishes a committed business
+// mutation with Auth sync still pending from a rolled-back failure
+// (issue #888). Success with SyncPending=true means the business facts
+// (role/status) are durably committed with a sync intent and Auth
+// convergence follows by retry; any returned error means nothing was
+// committed. Handlers must render SyncPending so operators never mistake
+// "accepted, syncing" for "fully converged" or "failed".
+type IdentityAdminMutationOutcome struct {
+	SyncPending bool
+	IntentID    int64
+}
+
 // IdentityAdminCommands is the complete admin identity mutation surface used by transport adapters.
 type IdentityAdminCommands interface {
-	SetRole(ctx context.Context, actor principal.Principal, targetPublicID string, role string) error
-	Ban(ctx context.Context, actor principal.Principal, targetPublicID string, input IdentityAdminBanInput) error
-	Unban(ctx context.Context, actor principal.Principal, targetPublicID string) error
-	RevokeSessions(ctx context.Context, actor principal.Principal, targetPublicID string) error
-	Delete(ctx context.Context, actor principal.Principal, targetPublicID string) error
+	SetRole(ctx context.Context, actor principal.Principal, targetPublicID string, role string) (IdentityAdminMutationOutcome, error)
+	Ban(ctx context.Context, actor principal.Principal, targetPublicID string, input IdentityAdminBanInput) (IdentityAdminMutationOutcome, error)
+	Unban(ctx context.Context, actor principal.Principal, targetPublicID string) (IdentityAdminMutationOutcome, error)
+	RevokeSessions(ctx context.Context, actor principal.Principal, targetPublicID string) (IdentityAdminMutationOutcome, error)
+	Delete(ctx context.Context, actor principal.Principal, targetPublicID string) (IdentityAdminMutationOutcome, error)
 }
 
 // UserMutationQueries defines the narrow seam required by admin mutations.

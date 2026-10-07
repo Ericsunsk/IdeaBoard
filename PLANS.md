@@ -1,5 +1,32 @@
 # Workspace Task Restoration ExecPlan
 
+## 8xx Batch ExecPlan (#886–#897, scheduler-owned)
+
+- Goal: complete all `ready-for-agent` 8xx issues per acceptance criteria, working tree only, no commit.
+- Lanes (parallel, file-scoped): A=#886+#897 payments (scheduler, sequential: #897 after #886); B=#888→#895→#896 auth chain (sequential); C=#887 deletion; D=#889 task events; E=#891 control idempotency; F=#892 billing/brand; G=#890+#894 board web (sequential); H=#893 canvas web.
+- Success criteria: each issue's acceptance boxes verifiable; smallest relevant checks green (`apps/api go test`, `apps/web npm run test:run`, `git diff --check`); no generated-file hand edits; no cross-lane file edits.
+- Rollback: no commit is made; revert working-tree files per lane if needed.
+- Constraints: B chain order (#888 first); A order (#886 first); lanes must not edit `PLANS.md` (scheduler owns), must not touch other lanes' modules.
+- Sequencing note: #889 fix (ambient post-commit publish) approved as option A (post-commit callback on ambient carrier, flush in guard `runAtomic` after commit), but implement only after lane E (#891) finishes since both touch `contract_control_guard.go`.
+- Lane status: ALL 12 DONE and VERIFIED (A #886+#897 scheduler; B #888→#895→#896; C #887; D #889 option A on E; E #891; F #892; G #890+#894; H #893). Full backend green (parallel full run hit local-PG shared-memory limits only; all 18 affected packages re-ran serially green, zero assertion failures). gofmt/build/diff-check/sqlc-regen clean. No commit per instruction.
+- Pre-existing (not from lanes): schemarelease drift `idx_payment_webhook_events_processing_lease` in migration `20261004000002` but missing from fragments; lanes touched no payments schema files. Fix separately, out of 8xx scope.
+- Redundancy audit pass (scheduler, verified): R1 reclaim helper in idempotency Claim; R2 errNotWired + dead db check; R5 WithUserLock via Transact; R6 errorMessage; R7 queryIDs; R8 database.IsNotFound + PgError code (dropped privates); R9 withCurrentIntent; R10 supersedeWithRepair; R11 repairOpFor param drop; R12 versionStillCurrent via checkIntentCurrent; R13 reconciliation reuses authsync.UserSyncState + IsDemotionTarget; R14 billing comment trim; R15 board scope-key helper. Kept deliberately: BumpVersion (deadline-preserving) vs WithDeadline, beginDirectTx (external/dispute), L1+durable dual paths. All re-verified green, no commit.
+
+## Issue #886 ExecPlan: Payment Refund Persistence Boundary
+
+- Goal: persist the admin refund reservation, `PurchaseRefundHold`, and phase
+  audit before any Stripe I/O; make provider result convergence observe the
+  committed refund and reuse its durable identity after retries.
+- Scope: isolate the refund reservation and post-provider settlement writes
+  from the Control guard's still-open transaction; preserve pending recovery,
+  existing Credits commands, and the Stripe idempotency key derived from the
+  durable refund ID; add focused production-path tests with a fake gateway.
+- Success criteria: no Stripe call occurs before the reservation commit; a
+  provider result can be recorded and settled from a fresh database connection;
+  commit/audit failures leave a recoverable pending fact; retries reuse the same
+  refund ID and Stripe idempotency key without a second cash refund.
+- Rollback: revert the issue commit. No schema changes are expected.
+
 ## Support Channels ExecPlan
 
 - Goal: expose operator-configured external support channels from the account menu.

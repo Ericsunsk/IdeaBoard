@@ -220,15 +220,17 @@ export async function createWorkspaceBoard(
 }
 
 export type SaveWorkspaceBoardInput = {
-  name?: string | undefined
   state: BoardState
   baseRevision: number
 }
 
 /**
- * Saves a board: renames via PATCH when a name is given, then replaces the
- * document snapshot via PUT with `If-Match: <baseRevision>`. Stale revisions
- * render 409 `board_revision_conflict` for the sync rollback policy.
+ * Saves a board document only: replaces the document snapshot via PUT with
+ * `If-Match: <baseRevision>`, then reads back the board meta. Ordinary
+ * Canvas document saves (autosave included) never rename: no PATCH is sent,
+ * so a stale local name can never overwrite a collaborator rename. Stale
+ * revisions render 409 `board_revision_conflict` for the sync rollback
+ * policy.
  */
 export async function saveWorkspaceBoard(
   workspaceId: string | null | undefined,
@@ -239,14 +241,6 @@ export async function saveWorkspaceBoard(
   const workspace = requireBoardWorkspaceId(workspaceId)
   const normalizedBoardId = boardId.trim()
   if (!normalizedBoardId) throw new BoardPayloadError('id')
-  if (input.name != null) {
-    await updateBoard(
-      workspace,
-      normalizedBoardId,
-      { data: { name: input.name } },
-      requestConfig(options),
-    )
-  }
   const { schemaVersion, ...payload } = input.state
   const envelope = await replaceBoardDocument(
     workspace,
@@ -266,6 +260,30 @@ export async function saveWorkspaceBoard(
   const boardEnvelope = await getBoard(workspace, normalizedBoardId, requestConfig(options))
   const board = toWorkspaceBoardMeta(boardEnvelope.data)
   return { board, document, newRevision: document.revision }
+}
+
+/**
+ * Renames a board via PATCH (no document write). Sole name-write path for
+ * explicit rename commands (canvas header, gallery); ordinary document
+ * saves never call this. Blank or overlong names render 422; writes
+ * against an archived board render 409 `board_archived`.
+ */
+export async function renameWorkspaceBoard(
+  workspaceId: string | null | undefined,
+  boardId: string,
+  name: string,
+  options: BoardsRequestOptions = {},
+): Promise<WorkspaceBoardMeta> {
+  const workspace = requireBoardWorkspaceId(workspaceId)
+  const normalizedBoardId = boardId.trim()
+  if (!normalizedBoardId) throw new BoardPayloadError('id')
+  const envelope = await updateBoard(
+    workspace,
+    normalizedBoardId,
+    { data: { name } },
+    requestConfig(options),
+  )
+  return toWorkspaceBoardMeta(envelope.data)
 }
 
 /** Archives a board (the v1 delete semantic; already-archived reads 404). */

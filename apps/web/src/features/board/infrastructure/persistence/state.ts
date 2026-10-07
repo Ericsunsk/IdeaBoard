@@ -4,9 +4,9 @@ import {
   type BoardSnapshot,
   type BoardState,
 } from '../../domain'
-import { getRecoverableAuthStorageUserScope } from '../../../../shared/utils/auth'
 import { readLocalStorageItem, writeLocalStorageItem } from '../../../../shared/utils/storage'
 import { normalizeBoardState, serializeBoardState } from './boardStateSerialization'
+import { scopedBoardStorageKey } from '../../application/catalog/scope'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
@@ -17,9 +17,7 @@ function readStorageValue(key: string): string | null {
 }
 
 function getScopedStorageKey(): string | null {
-  const scope = getRecoverableAuthStorageUserScope()
-  if (!scope) return null
-  return `${STORAGE_KEY_PREFIX}.${scope}`
+  return scopedBoardStorageKey(STORAGE_KEY_PREFIX)
 }
 
 function toValidBoardState(

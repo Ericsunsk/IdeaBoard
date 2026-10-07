@@ -129,8 +129,14 @@ func (r *Repository) createExternalRefundFact(ctx context.Context, tx pgx.Tx, or
 		return paymentsdomain.PaymentRefund{}, err
 	}
 	refundID := uuid.NewString()
-	holdResult, err := hold.Hold(ctx, ports.HoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
-		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe Dashboard refund", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
+	// Dashboard-initiated refunds reserve through the Payments-typed
+	// PurchaseRefundHold, not the generic spending Hold: a spending
+	// restriction on an active Wallet must not block legitimate refund
+	// recovery, while frozen/tombstone lifecycles stay rejected by the
+	// routine gate. Insufficient Ideas surface as ErrInsufficientCredits
+	// so dispatch records a durable anomaly for manual recovery.
+	holdResult, err := hold.PurchaseRefundHold(ctx, ports.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: domain.CommandMetadata{
+		IdempotencyKey: "refund-hold-" + refundID, Actor: domain.Actor{Type: domain.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "Stripe Dashboard refund", BusinessReference: domain.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
@@ -177,7 +183,11 @@ func (r *Repository) CreatePendingPaymentRefund(ctx context.Context, input payme
 	if strings.TrimSpace(input.Reason) == "" {
 		input.Reason = "Admin refund of unused Ideas"
 	}
-	tx, owned, err := r.beginDirectTx(ctx)
+	// This reservation is the durable hand-off to Stripe. It must commit on
+	// its own connection before CreatePaymentRefund performs provider I/O;
+	// borrowing the Control guard transaction would leave the hold and phase
+	// audit rollbackable while cash could already have moved.
+	tx, owned, err := r.beginCommittedRefundTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, false, fmt.Errorf("begin refund transaction: %w", err)
 	}
@@ -259,6 +269,10 @@ func (r *Repository) persistPendingRefund(ctx context.Context, tx pgx.Tx, order 
 }
 
 func (r *Repository) MarkPaymentRefundProviderResult(ctx context.Context, refundID, stripeRefundID, stripeStatus string, now time.Time) (paymentsdomain.PaymentRefund, error) {
+	// Single auto-commit compare-and-set on the pending row. dbWithContext
+	// only borrows an AdvisoryConnection, never the ambient Control guard
+	// transaction, so the provider outcome lands on a fresh connection and
+	// always observes the committed reservation above.
 	var refund paymentsdomain.PaymentRefund
 	err := r.dbWithContext(ctx).executor.QueryRow(ctx, `UPDATE payment_refunds SET stripe_refund_id = CASE WHEN stripe_refund_id = '' THEN $2 ELSE stripe_refund_id END, stripe_status = $3, updated_at = $4 WHERE id = $1::uuid AND status = 'pending' AND (stripe_refund_id = '' OR stripe_refund_id = $2) RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, stripeRefundID, stripeStatus, now).Scan(&refund.ID, &refund.PaymentOrderID, &refund.UserID, &refund.IdeaQuantity, &refund.AmountMinor, &refund.Currency, &refund.Status, &refund.StripeStatus, &refund.StripeRefundID, &refund.StripeChargeID, &refund.CreditHoldTransactionID, &refund.CreditTransactionID, &refund.ErrorSummary, &refund.CreatedAt, &refund.UpdatedAt)
 	if err != nil {
@@ -271,7 +285,10 @@ func (r *Repository) MarkPaymentRefundProviderResult(ctx context.Context, refund
 }
 
 func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summary string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, owned, err := r.beginDirectTx(ctx)
+	// Settlement runs after provider I/O and therefore must not be attached to
+	// a still-open Control guard transaction. Its own commit leaves a durable
+	// result for recovery even when the later HTTP audit commit fails.
+	tx, owned, err := r.beginCommittedRefundTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}
@@ -310,7 +327,9 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 }
 
 func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID string, now time.Time) (paymentsdomain.PaymentRefund, error) {
-	tx, owned, err := r.beginDirectTx(ctx)
+	// See MarkPaymentRefundFailed: provider convergence has its own explicit
+	// transaction boundary and never borrows the pre-response Control tx.
+	tx, owned, err := r.beginCommittedRefundTx(ctx)
 	if err != nil {
 		return paymentsdomain.PaymentRefund{}, err
 	}

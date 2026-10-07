@@ -36,6 +36,7 @@ export {
   memoryWorkspacePersist,
   resetWorkspaceSelectionStore,
   resolveWorkspaceSelection,
+  subscribeWorkspaceSelectionChange,
   toWorkspaceSelectionStatus,
   useWorkspaceSelection,
 } from './infrastructure/workspaceContext'

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/db/dbutil"
 )
 
 type Store struct {
@@ -35,6 +36,24 @@ func (s *Store) PublishPrice(ctx context.Context, input billing.PublishPriceInpu
 	return prices[variants[0]], err
 }
 
+// billingWriteQuerier is satisfied by both pgx.Tx (guard-owned ambient
+// transaction participant) and *pgxpool.Pool (self-contained write).
+type billingWriteQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// writeQuerier returns the guard-owned ambient transaction when the
+// Control Plane guard staged one in ctx, or the pool otherwise. A
+// returned ambient transaction is BORROWED: callers run statements on
+// it and never commit or roll it back.
+func (s *Store) writeQuerier(ctx context.Context) billingWriteQuerier {
+	if ambient, ok := dbutil.AmbientTxFromContext(ctx); ok {
+		return ambient
+	}
+	return s.pool
+}
+
 func (s *Store) PublishPrices(ctx context.Context, input billing.PublishPricesInput) (map[billing.OutputResolution]billing.PriceInfo, error) {
 	command, err := preparePublishPrices(input)
 	if err != nil {
@@ -47,7 +66,14 @@ func (s *Store) PublishPrices(ctx context.Context, input billing.PublishPricesIn
 	if err != nil {
 		return nil, fmt.Errorf("encode prices for publish: %w", err)
 	}
-	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
+	// Ambient guard transaction (control audit atomicity): when the
+	// guard staged its mutation transaction in the context, the
+	// catalog write joins it as a participant instead of committing
+	// in its own pool statement. The transaction is BORROWED (the
+	// guard commits or rolls it back with the Control audit row), so
+	// this path never begins, commits, or rolls back. With no carrier
+	// the self-contained pool write below runs unchanged.
+	rows, err := s.writeQuerier(ctx).Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
 	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
 	ORDER BY CASE output_resolution WHEN '1k' THEN 1 WHEN '2k' THEN 2 WHEN '4k' THEN 3 ELSE 4 END`, command.sku, command.displayName, command.description, string(encodedPrices), command.actorID)
 	if err != nil {
@@ -142,7 +168,8 @@ func (s *Store) SetAvailability(ctx context.Context, rawSKU string, enabled bool
 	}
 	var info billing.AvailabilityInfo
 	var persistedEnabled bool
-	err = s.pool.QueryRow(ctx, `
+	// Joins the guard-owned transaction when staged (see writeQuerier).
+	err = s.writeQuerier(ctx).QueryRow(ctx, `
 SELECT sku, enabled, updated_at
 FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 		&info.SKU, &persistedEnabled, &info.UpdatedAt,
@@ -274,7 +301,8 @@ func (s *Store) DeleteArchived(ctx context.Context, rawSKU string, actorID int64
 		return billing.ArchivedItemDeleteResult{}, err
 	}
 	var deleted billing.SKU
-	if err := s.pool.QueryRow(ctx, `SELECT delete_archived_billing_item($1, $2)`, sku, actorID).Scan(&deleted); err != nil {
+	// Joins the guard-owned transaction when staged (see writeQuerier).
+	if err := s.writeQuerier(ctx).QueryRow(ctx, `SELECT delete_archived_billing_item($1, $2)`, sku, actorID).Scan(&deleted); err != nil {
 		return billing.ArchivedItemDeleteResult{}, mapDeleteArchivedDatabaseError(err)
 	}
 	return billing.ArchivedItemDeleteResult{SKU: deleted}, nil

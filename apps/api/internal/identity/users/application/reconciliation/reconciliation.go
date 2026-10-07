@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/authidentity"
+	"ideaboard/api/internal/identity/users/application/authsync"
 	"ideaboard/api/internal/identity/users/domain"
 	"ideaboard/api/internal/identity/users/ports"
 
@@ -94,12 +95,15 @@ type userScanner interface {
 
 // Reconciler executes Identity admin reconciliation runs. The scan remains
 // read-only; the worker may separately repair only the low-privilege side of
-// a role mismatch (local user versus Auth admin).
+// a role mismatch (local user versus Auth admin). Pending Auth sync intents
+// (issue #888) converge through the same service on a frequent sweep.
 type Reconciler struct {
 	store         *Store
 	users         userScanner
 	auth          ports.AuthUserStateReader
 	manager       ports.AuthUserManager
+	sync          *authsync.Service
+	syncStore     *authsync.Store
 	autoRemediate bool
 	now           func() time.Time
 }
@@ -108,11 +112,14 @@ type Reconciler struct {
 // infrastructure: the composition root passes the users repository (which
 // satisfies userScanner) and the Auth service client (which satisfies both
 // the Auth state reader and the narrow role manager used by the worker).
+// Lifecycle enables the ban expiry sweep (issue #895); it may be nil only
+// when the caller never sweeps expiries.
 type ReconcilerDeps struct {
-	DB      *pgxpool.Pool
-	Users   userScanner
-	Auth    ports.AuthUserStateReader
-	Manager ports.AuthUserManager
+	DB        *pgxpool.Pool
+	Users     userScanner
+	Auth      ports.AuthUserStateReader
+	Manager   ports.AuthUserManager
+	Lifecycle ports.UserLifecycle
 	// AutoRemediate is the future opt-in switch. It must stay false: when
 	// true, ExecuteReconciliation fails closed with
 	// ErrAutoRemediationNotSupported instead of repairing anything.
@@ -121,22 +128,70 @@ type ReconcilerDeps struct {
 
 // NewReconciler builds the dry-run reconciler.
 func NewReconciler(deps ReconcilerDeps) *Reconciler {
+	syncStore := authsync.NewStore(deps.DB)
 	return &Reconciler{
-		store:         NewStore(deps.DB),
-		users:         deps.Users,
-		auth:          deps.Auth,
-		manager:       deps.Manager,
+		store:     NewStore(deps.DB),
+		users:     deps.Users,
+		auth:      deps.Auth,
+		manager:   deps.Manager,
+		syncStore: syncStore,
+		sync: authsync.NewService(authsync.ServiceDeps{
+			Store:     syncStore,
+			Auth:      deps.Manager,
+			Lifecycle: deps.Lifecycle,
+		}),
 		autoRemediate: deps.AutoRemediate,
 		now:           time.Now,
 	}
+}
+
+// SweepAuthSync converges due Auth sync intents and unbans expired
+// finite bans (issues #888/#895). It is the frequent counterpart to the
+// daily drift scan: business mutations only persist intents, and this
+// sweep performs the post-commit Auth I/O with per-user serialization
+// and version fencing, then finalizes each intent. Expiries run first so
+// a just-expired ban can converge in the same sweep. Transient failures
+// stay pending for the next sweep; nothing depends on process-local
+// state, so a restarted worker resumes from the rows.
+func (r *Reconciler) SweepAuthSync(ctx context.Context) (int, error) {
+	if r == nil || r.sync == nil {
+		return 0, errInvalidReconciliationCommand
+	}
+	// Converge first (latency-sensitive pushes), then expiries (which may
+	// create fresh unban intents for the next sweep). Either stage makes
+	// durable progress independently, so both run even if one fails.
+	converged, err := r.sync.ConvergeDue(ctx)
+	expired, expiryErr := r.sync.ProcessDueBanExpiries(ctx, r.clock())
+	if err != nil {
+		return converged + expired, err
+	}
+	return converged + expired, expiryErr
+}
+
+func (r *Reconciler) clock() time.Time {
+	if r != nil && r.now != nil {
+		return r.now()
+	}
+	return time.Now()
 }
 
 // RepairRoleDemotions applies only demotion findings from a completed scan.
 // SetUserRole is idempotent, and each finding is resolved only after Auth
 // acknowledges the desired local user role. Promotion drift remains manual so
 // a stale Auth read can never grant admin privileges automatically.
+//
+// Issue #896: a finding is only a clue, never the authorization fact. Before
+// every push the repair re-reads the CURRENT business row (role, lifecycle,
+// Auth identity link) under the per-user lock and re-reads the CURRENT Auth
+// state; anything that moved since the scan (legal promotion, identity
+// change, concurrent mutation) skips safely. Post-push, the business row is
+// re-verified before the finding resolves, so a concurrent legal change
+// during the push can never be confirmed away.
 func (r *Reconciler) RepairRoleDemotions(ctx context.Context, runID int64) error {
 	if r == nil || r.store == nil || r.manager == nil || runID <= 0 {
+		return errInvalidReconciliationCommand
+	}
+	if r.auth == nil || r.syncStore == nil {
 		return errInvalidReconciliationCommand
 	}
 	findings, err := r.store.ListRunFindings(ctx, runID)
@@ -147,25 +202,120 @@ func (r *Reconciler) RepairRoleDemotions(ctx context.Context, runID int64) error
 		if finding.Status != "open" || finding.FindingType != FindingRoleMismatch {
 			continue
 		}
-		authID, _ := finding.Details["auth_user_id"].(string)
-		role, _ := finding.Details["local_role"].(string)
-		if strings.TrimSpace(authID) == "" {
-			return fmt.Errorf("identity admin reconciliation: invalid role finding %d", finding.ID)
-		}
-		if role == domain.RoleAdmin {
-			continue
-		}
-		if role != domain.RoleUser {
-			return fmt.Errorf("identity admin reconciliation: invalid role finding %d", finding.ID)
-		}
-		if err := r.manager.SetUserRole(ctx, authID, role); err != nil {
-			return fmt.Errorf("identity admin reconciliation: repair role finding %d: %w", finding.ID, err)
-		}
-		if err := r.store.resolveFinding(ctx, finding.ID); err != nil {
+		if err := r.repairRoleFinding(ctx, &finding); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// repairRoleFinding revalidates one role finding against current facts and
+// repairs it only when the demotion is still the confirmed target.
+// Stale findings skip quietly (the next scan re-observes or resolves
+// them); only Auth I/O failures abort the run for retry.
+func (r *Reconciler) repairRoleFinding(ctx context.Context, finding *Finding) error {
+	authID, _ := finding.Details["auth_user_id"].(string)
+	authID = strings.TrimSpace(authID)
+	scanRole, _ := finding.Details["local_role"].(string)
+	scanRole = strings.ToLower(strings.TrimSpace(scanRole))
+	if authID == "" || finding.UserID == nil || *finding.UserID <= 0 {
+		slog.Warn("identity admin reconciliation: skipping malformed role finding",
+			"finding_id", finding.ID, "run_id", finding.LastSeenRunID)
+		return nil
+	}
+	userID := *finding.UserID
+	if scanRole != domain.RoleUser {
+		// Promotion drift (local admin): never auto-repair upward.
+		return nil
+	}
+	// Current Auth fact first (outside any transaction): a gone identity
+	// or an already-converged role needs no push.
+	states, err := r.auth.GetUserStates(ctx, []string{authID})
+	if err != nil {
+		return fmt.Errorf("identity admin reconciliation: read auth state for repair: %w", err)
+	}
+	authState, ok := states[authID]
+	if !ok {
+		// The Auth identity is gone; the scan reports
+		// auth_identity_missing for operator review. Never push.
+		return nil
+	}
+	if !isAdminRole(authState.Role) {
+		// Auth already matches the local user fact: confirm the business
+		// row still agrees, then resolve without any push.
+		current, err := r.lockedRepairState(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if authsync.IsDemotionTarget(current, authID) {
+			return r.store.resolveFinding(ctx, finding.ID)
+		}
+		return nil
+	}
+	// Drift persists (Auth admin against local user): revalidate the
+	// business row under the per-user lock shared with mutations.
+	current, err := r.lockedRepairState(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !authsync.IsDemotionTarget(current, authID) {
+		// Legal promotion, identity change, deletion ownership, or a
+		// vanished row since the scan: skip, never push stale facts.
+		return nil
+	}
+	if !r.repairStillCurrent(ctx, userID, authID, current.Version) {
+		return nil
+	}
+	if err := r.manager.SetUserRole(ctx, authID, domain.RoleUser); err != nil {
+		return fmt.Errorf("identity admin reconciliation: repair role finding %d: %w", finding.ID, err)
+	}
+	// Confirm before resolving: the business row must be untouched since
+	// the pre-push check, otherwise a concurrent legal mutation owns the
+	// new state and this finding stays open for re-evaluation.
+	confirmed, err := r.lockedRepairState(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if confirmed.Version != current.Version || !authsync.IsDemotionTarget(confirmed, authID) {
+		slog.Warn("identity admin reconciliation: business moved during repair push; finding left open",
+			"finding_id", finding.ID, "user_id", userID)
+		return nil
+	}
+	return r.store.resolveFinding(ctx, finding.ID)
+}
+
+// lockedRepairState reads the current business facts under the per-user
+// advisory lock shared with mutations, converge, and expiry (short unit,
+// no I/O). The authsync snapshot is the fencing fact source, so repair
+// reuses it instead of a parallel struct.
+func (r *Reconciler) lockedRepairState(ctx context.Context, userID int64) (authsync.UserSyncState, error) {
+	var out authsync.UserSyncState
+	err := r.syncStore.WithUserLock(ctx, userID, func(locked context.Context) error {
+		state, err := r.syncStore.ReadUserState(locked, userID, true)
+		if err != nil {
+			return err
+		}
+		out = state
+		return nil
+	})
+	if err != nil {
+		return authsync.UserSyncState{}, err
+	}
+	return out, nil
+}
+
+// repairStillCurrent re-reads the fencing facts lock-free immediately
+// before the Auth push: any concurrent legal mutation aborts the push.
+func (r *Reconciler) repairStillCurrent(ctx context.Context, userID int64, authID string, version int64) bool {
+	state, err := r.syncStore.ReadUserState(ctx, userID, false)
+	if err != nil || !state.Found {
+		return false
+	}
+	return state.Version == version && authsync.IsDemotionTarget(state, authID)
+}
+
+func isAdminRole(role string) bool {
+	return strings.ToLower(strings.TrimSpace(role)) == domain.RoleAdmin
 }
 
 // SetClock overrides the clock (tests only).

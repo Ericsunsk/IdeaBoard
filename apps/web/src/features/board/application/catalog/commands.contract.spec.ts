@@ -29,6 +29,7 @@ function makeDeps(): BoardCommandDependencies {
     duplicateBoardState: vi.fn(() => true),
     deleteBoardState: vi.fn(() => true),
     syncBoard: vi.fn(async () => undefined),
+    syncRenameBoard: vi.fn(async () => undefined),
     syncDeleteBoard: vi.fn(async () => undefined),
     hydrateBoards: vi.fn(async () => ({ ok: true as const })),
     isNameConflictError: vi.fn((error: unknown) => {
@@ -43,6 +44,14 @@ function makeDeps(): BoardCommandDependencies {
     createServerBoard: vi.fn(async (_workspaceId: string, name: string) => ({
       id: 'board-server-1',
       name,
+      revision: 1,
+      schemaVersion: 4,
+      createdAt: 100,
+      updatedAt: 200,
+    })),
+    archiveServerBoard: vi.fn(async () => ({
+      id: 'board-server-1',
+      name: 'Untitled',
       revision: 1,
       schemaVersion: 4,
       createdAt: 100,
@@ -103,9 +112,22 @@ describe('boardCommands', () => {
     expect(deps.deleteBoard).toHaveBeenCalledWith('created-board')
   })
 
+  it('archives the server board in the captured workspace when scope changes mid-create', async () => {
+    vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.create()) as BoardCreateResult
+
+    expect(result).toEqual({ ok: false, reason: 'scope-changed' })
+    expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Untitled')
+    expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
+    expect(deps.registerServerBoard).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+  })
+
   it('rolls back rename by hydrating the conflict target when remote reports a name conflict', async () => {
     const error = { status: 409, msg: '画布名称已存在' }
-    vi.mocked(deps.syncBoard).mockRejectedValueOnce(error)
+    vi.mocked(deps.syncRenameBoard).mockRejectedValueOnce(error)
     const commands = createBoardCommands(deps)
 
     const result = (await commands.rename({
@@ -116,6 +138,8 @@ describe('boardCommands', () => {
     expect(result).toMatchObject({ ok: false, reason: 'remote-name-conflict' })
     expect(deps.isNameTaken).toHaveBeenCalledWith('Taken', 'board-a')
     expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'Taken')
+    expect(deps.syncRenameBoard).toHaveBeenCalledWith('board-a', 'Taken')
+    expect(deps.syncBoard).not.toHaveBeenCalled()
     expect(deps.hydrateBoards).toHaveBeenCalledWith({
       preserveLocalNewer: false,
       rollbackBoardIds: ['board-a'],
@@ -136,6 +160,7 @@ describe('boardCommands', () => {
       previousBoard: { id: 'board-a', name: 'Board' },
     })
     expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'New Local')
+    expect(deps.syncRenameBoard).not.toHaveBeenCalled()
     expect(deps.syncBoard).not.toHaveBeenCalled()
 
     if (!result.ok) throw new Error('expected optimistic rename to succeed')
@@ -143,12 +168,13 @@ describe('boardCommands', () => {
       ok: true,
       board: { id: 'board-a', name: 'New Local' },
     })
-    expect(deps.syncBoard).toHaveBeenCalledWith('board-a')
+    expect(deps.syncRenameBoard).toHaveBeenCalledWith('board-a', 'New Local')
+    expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
   it('keeps optimistic rename local when remote conflict needs caller recovery', async () => {
     const error = { status: 409, msg: '画布名称已存在' }
-    vi.mocked(deps.syncBoard).mockRejectedValueOnce(error)
+    vi.mocked(deps.syncRenameBoard).mockRejectedValueOnce(error)
     const commands = createBoardCommands(deps)
 
     const result = commands.renameOptimistic({
@@ -192,6 +218,7 @@ describe('boardCommands', () => {
 
     expect(result).toEqual({ ok: false, reason: 'local-name-conflict' })
     expect(deps.renameBoard).not.toHaveBeenCalled()
+    expect(deps.syncRenameBoard).not.toHaveBeenCalled()
     expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
@@ -225,6 +252,22 @@ describe('boardCommands', () => {
     expect(deps.syncBoard).toHaveBeenCalledWith('board-server-1')
     expect(deps.deleteBoard).toHaveBeenCalledWith('copy-board')
     expect(deps.deleteBoardState).not.toHaveBeenCalled()
+  })
+
+  it('archives the duplicated server board in the captured workspace when scope changes', async () => {
+    vi.mocked(deps.isMutationCurrent).mockReturnValue(false)
+    const commands = createBoardCommands(deps)
+
+    const result = (await commands.duplicate({
+      sourceBoardId: 'source-board',
+    })) as BoardDuplicateResult
+
+    expect(result).toEqual({ ok: false, reason: 'scope-changed' })
+    expect(deps.createServerBoard).toHaveBeenCalledWith('ws_test123', 'Source Copy')
+    expect(deps.archiveServerBoard).toHaveBeenCalledWith('ws_test123', 'board-server-1')
+    expect(deps.registerServerBoard).not.toHaveBeenCalled()
+    expect(deps.duplicateBoardState).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
   })
 
   it('cleans local duplicate state and hydrates on duplicate remote name conflict', async () => {

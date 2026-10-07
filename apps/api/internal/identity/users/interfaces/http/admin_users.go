@@ -53,12 +53,12 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	if err := commands.SetRole(c.Request.Context(), actor, publicID, req.Role); err != nil {
+	outcome, err := commands.SetRole(c.Request.Context(), actor, publicID, req.Role)
+	if err != nil {
 		RespondIdentityAdminCommandError(c, err)
 		return
 	}
-
-	response.SuccessDTO(c, gin.H{"updated": true})
+	response.SuccessDTO(c, gin.H{"updated": true, "auth_sync_pending": outcome.SyncPending})
 }
 
 func (h *AdminHandler) BanUser(c *gin.Context) {
@@ -85,15 +85,15 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 		return
 	}
 
-	if err := commands.Ban(c.Request.Context(), actor, publicID, ports.IdentityAdminBanInput{
+	outcome, err := commands.Ban(c.Request.Context(), actor, publicID, ports.IdentityAdminBanInput{
 		Reason:        strings.TrimSpace(req.Reason),
 		ExpiresInDays: req.ExpiresInDays,
-	}); err != nil {
+	})
+	if err != nil {
 		RespondIdentityAdminCommandError(c, err)
 		return
 	}
-
-	response.SuccessDTO(c, gin.H{"banned": true})
+	response.SuccessDTO(c, gin.H{"banned": true, "auth_sync_pending": outcome.SyncPending})
 }
 
 func (h *AdminHandler) UnbanUser(c *gin.Context) {
@@ -110,12 +110,12 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 		return
 	}
 
-	if err := commands.Unban(c.Request.Context(), actor, publicID); err != nil {
+	outcome, err := commands.Unban(c.Request.Context(), actor, publicID)
+	if err != nil {
 		RespondIdentityAdminCommandError(c, err)
 		return
 	}
-
-	response.SuccessDTO(c, gin.H{"unbanned": true})
+	response.SuccessDTO(c, gin.H{"unbanned": true, "auth_sync_pending": outcome.SyncPending})
 }
 
 func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
@@ -132,7 +132,7 @@ func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
 		return
 	}
 
-	if err := commands.RevokeSessions(c.Request.Context(), actor, publicID); err != nil {
+	if _, err := commands.RevokeSessions(c.Request.Context(), actor, publicID); err != nil {
 		RespondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -154,7 +154,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	if err := commands.Delete(c.Request.Context(), actor, publicID); err != nil {
+	if _, err := commands.Delete(c.Request.Context(), actor, publicID); err != nil {
 		RespondIdentityAdminCommandError(c, err)
 		return
 	}
