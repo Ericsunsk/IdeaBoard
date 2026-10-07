@@ -59,6 +59,7 @@
     "heic2any": "^0.0.4",
     "ofetch": "^1.5.1",
     "photoswipe": "^5.4.4",
+    "qrcode.vue": "^3.11.0",
     "reka-ui": "^2.10.4",
     "tailwind-merge": "^3.7.0",
     "valibot": "^1.4.2",

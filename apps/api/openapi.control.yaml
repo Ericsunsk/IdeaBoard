@@ -1766,6 +1766,70 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /platform/settings/support-channels:
+    get:
+      tags: [ControlPlatform]
+      operationId: getControlSupportChannels
+      summary: Read support channel settings
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: false
+        outcome: read
+      responses:
+        '200':
+          description: Support channels configuration.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportChannelsSettingEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [ControlPlatform]
+      operationId: updateControlSupportChannels
+      summary: Update support channels (operator reason required)
+      x-capability: control:platform
+      x-audit:
+        operator: true
+        target: null
+        reason: true
+        outcome: success
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/OperatorReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportChannelsSetting'
+      responses:
+        '200':
+          description: Support channels updated.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportChannelsSettingEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /platform/settings/media-upload:
     get:
       tags: [ControlPlatform]
@@ -3713,6 +3777,46 @@ components:
           schema:
             $ref: '#/components/schemas/ControlErrorEnvelope'
   schemas:
+    SupportChannel:
+      type: object
+      required: [id, name, kind, url, enabled, sort_order]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          maxLength: 64
+        name:
+          type: string
+          maxLength: 80
+        kind:
+          type: string
+          enum: [discord, telegram, whatsapp, line, wechat, custom]
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+        enabled:
+          type: boolean
+        sort_order:
+          type: integer
+          minimum: 0
+    SupportChannelsSetting:
+      type: object
+      required: [channels]
+      additionalProperties: false
+      properties:
+        channels:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/SupportChannel'
+    SupportChannelsSettingEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/SupportChannelsSetting'
     ControlErrorEnvelope:
       type: object
       required: [error]

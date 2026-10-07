@@ -19,4 +19,7 @@ const (
 	msgNormalizeBranding2             = "project_name 不能超过 40 个字符"                            // NormalizeBranding @ runtime_settings.go
 	msgNormalizeBranding3             = "logo_url 不能超过 2048 个字符"                              // NormalizeBranding @ runtime_settings.go
 	msgNormalizeBranding4             = "logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL" // NormalizeBranding @ runtime_settings.go
+	msgNormalizeSupportChannels       = "客服渠道最多支持 20 条"
+	msgNormalizeSupportChannel        = "客服渠道配置无效"
+	msgNormalizeSupportChannel2       = "客服渠道 ID 不能重复"
 )

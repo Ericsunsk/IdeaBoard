@@ -1,5 +1,22 @@
 # Workspace Task Restoration ExecPlan
 
+## Support Channels ExecPlan
+
+- Goal: expose operator-configured external support channels from the account menu.
+- Scope: typed runtime settings in the existing system config store; audited
+  Control Plane reads/writes; anonymous Public API read; General settings editor;
+  channel menu with a third-level QR Popover and external QR link.
+- Success criteria: disabled channels never appear publicly, empty configuration
+  hides Support, safe HTTP(S) links generate QR locally, channel order persists,
+  and mouse/keyboard/touch interactions remain usable within the viewport.
+- Verification: settings persistence and ambient rollback on isolated PostgreSQL
+  schemas, route/control contract tests, frontend focused tests, browser geometry,
+  type/build/lint and generated API drift.
+- Rollback: revert the feature changes; no schema migration is required. The
+  optional `support_channels` system config key can remain inert.
+
+---
+
 ## Goal
 
 Complete the workspace task production path for issues #825 through #830:

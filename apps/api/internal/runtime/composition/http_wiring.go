@@ -105,8 +105,9 @@ func newAppRouter(
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth: authDeps,
 		ContractV1: httpapi.ContractV1Deps{
-			Store: tenancypg.NewStore(repos.db),
-			Users: httpapi.NewUsersRepositoryDirectory(repos.userRepo),
+			SupportChannels: services.runtimeSettings,
+			Store:           tenancypg.NewStore(repos.db),
+			Users:           httpapi.NewUsersRepositoryDirectory(repos.userRepo),
 			// Workspace board store is live (postgres mapping over
 			// board_documents/board_revisions, #809 follow-up landed).
 			Boards: boards.NewPostgresWorkspaceBoardStore(repos.db),

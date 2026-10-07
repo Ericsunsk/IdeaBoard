@@ -120,6 +120,64 @@ func (d *ContractControlDeps) updateControlBrandingSetting(c *gin.Context, _ con
 	contract.RenderSuccess(c, updated)
 }
 
+func (d *ContractControlDeps) getControlSupportChannels(c *gin.Context, _ controlContext) {
+	runtimeSettings, ok := d.requireControlSettings(c)
+	if !ok {
+		return
+	}
+	setting, err := runtimeSettings.GetSupportChannels(c.Request.Context())
+	if err != nil {
+		contract.RenderError(c, http.StatusInternalServerError, contract.CodeServiceUnavailable, msgServiceUnavailable22)
+		return
+	}
+	contract.RenderSuccess(c, setting)
+}
+
+// controlSupportChannelInput keeps request presence semantics (enabled and
+// sort_order are required fields) at the HTTP boundary while the normalized
+// settings.SupportChannel remains the single domain shape.
+type controlSupportChannelInput struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	URL       string `json:"url"`
+	Enabled   *bool  `json:"enabled"`
+	SortOrder *int   `json:"sort_order"`
+}
+
+type controlSupportChannelsRequest struct {
+	Channels *[]controlSupportChannelInput `json:"channels"`
+}
+
+func (d *ContractControlDeps) updateControlSupportChannels(c *gin.Context, _ controlContext) {
+	runtimeSettings, ok := d.requireControlSettings(c)
+	if !ok {
+		return
+	}
+	var req controlSupportChannelsRequest
+	if err := contract.BindStrictJSON(c, &req); err != nil || req.Channels == nil {
+		contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
+		return
+	}
+	channels := make([]settings.SupportChannel, 0, len(*req.Channels))
+	for _, channel := range *req.Channels {
+		if channel.Enabled == nil || channel.SortOrder == nil {
+			contract.RenderError(c, http.StatusBadRequest, contract.CodeBadRequest, msgBadRequest4)
+			return
+		}
+		channels = append(channels, settings.SupportChannel{
+			ID: channel.ID, Name: channel.Name, Kind: channel.Kind, URL: channel.URL,
+			Enabled: *channel.Enabled, SortOrder: *channel.SortOrder,
+		})
+	}
+	updated, err := runtimeSettings.UpdateSupportChannels(c.Request.Context(), settings.SupportChannelsSetting{Channels: channels})
+	if err != nil {
+		writeControlSettingsError(c, err)
+		return
+	}
+	contract.RenderSuccess(c, updated)
+}
+
 func (d *ContractControlDeps) getControlMediaUploadSetting(c *gin.Context, _ controlContext) {
 	runtimeSettings, ok := d.requireControlSettings(c)
 	if !ok {

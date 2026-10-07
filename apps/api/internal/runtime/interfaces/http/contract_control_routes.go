@@ -204,6 +204,10 @@ func (d *ContractControlDeps) registerControlPlatformSettingsRoutes(control *gin
 		controlRoute{Operation: "platform.get_branding", Route: "GET /platform/settings/branding"}, d.getControlBrandingSetting))
 	control.PUT("/platform/settings/branding", d.guard(ControlCapabilityPlatform,
 		controlRoute{Operation: "platform.update_branding", Route: "PUT /platform/settings/branding", Mutation: true}, d.updateControlBrandingSetting))
+	control.GET("/platform/settings/support-channels", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.get_support_channels", Route: "GET /platform/settings/support-channels"}, d.getControlSupportChannels))
+	control.PUT("/platform/settings/support-channels", d.guard(ControlCapabilityPlatform,
+		controlRoute{Operation: "platform.update_support_channels", Route: "PUT /platform/settings/support-channels", Mutation: true}, d.updateControlSupportChannels))
 	// Branding logo upload is a POST read-guard (the guard cannot buffer
 	// multipart bodies): reason + Idempotency-Key are enforced in-handler
 	// with content-hash replay, and every call is audited.

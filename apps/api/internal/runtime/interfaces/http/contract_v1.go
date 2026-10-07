@@ -15,6 +15,7 @@ import (
 	identityports "ideaboard/api/internal/identity/users/ports"
 	materializerassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/platform/contract"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/workspacetasks"
 	"ideaboard/api/internal/tenancy"
 
@@ -106,6 +107,7 @@ type ContractV1Deps struct {
 	// tests inject an inline runner for determinism. Unexported:
 	// production never overrides it.
 	libraryMaterializeSpawn func(func())
+	SupportChannels         settings.SupportChannelsSettingProvider
 }
 
 // V1UserDirectory translates between internal numeric user ids and the
@@ -204,6 +206,7 @@ func v1AuthMiddleware(authDeps AuthDeps) gin.HandlerFunc {
 func RegisterContractV1Routes(group *gin.RouterGroup, authDeps AuthDeps, deps ContractV1Deps) {
 	deps.normalize()
 	handler := &contractV1Handler{deps: deps}
+	group.GET("/support-channels", publicSupportChannelsV1Handler(deps.SupportChannels))
 	group.Use(v1AuthMiddleware(authDeps), ResolvePrincipal())
 	group.GET("/user", handler.getUser)
 	group.GET("/workspaces", handler.listWorkspaces)

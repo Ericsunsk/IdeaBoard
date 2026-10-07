@@ -40,6 +40,32 @@ tags:
   - name: WorkspaceSearch
     description: Workspace-scoped provider search and vision queries.
 paths:
+  /support-channels:
+    get:
+      tags: [User]
+      operationId: getSupportChannels
+      summary: List enabled customer support channels
+      description: Public settings endpoint; only enabled channels are returned.
+      security: []
+      responses:
+        '200':
+          description: Enabled support channels.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportChannelsSettingEnvelope'
+        '503':
+          description: Support channel settings unavailable.
+          headers:
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /user:
     get:
       tags: [User]
@@ -3306,6 +3332,46 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
+    SupportChannel:
+      type: object
+      required: [id, name, kind, url, enabled, sort_order]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          maxLength: 64
+        name:
+          type: string
+          maxLength: 80
+        kind:
+          type: string
+          enum: [discord, telegram, whatsapp, line, wechat, custom]
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+        enabled:
+          type: boolean
+        sort_order:
+          type: integer
+          minimum: 0
+    SupportChannelsSetting:
+      type: object
+      required: [channels]
+      additionalProperties: false
+      properties:
+        channels:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/SupportChannel'
+    SupportChannelsSettingEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/SupportChannelsSetting'
     SuccessEnvelope:
       type: object
       required: [data]
