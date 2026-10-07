@@ -677,17 +677,17 @@ func (s *Store) DeleteTask(ctx context.Context, workspaceID, taskID string) erro
 	if !validTaskRef(workspaceID, taskID) {
 		return workspacetasks.ErrNotFound
 	}
-	rows, err := s.dbWithContext(ctx).q.DeleteWorkspaceTask(ctx, dbsqlc.DeleteWorkspaceTaskParams{
-		PublicID:          taskID,
-		WorkspacePublicID: workspaceID,
-	})
-	if err != nil {
+	return dbutil.WithTxDBTX(ctx, s.db, func(q *dbsqlc.Queries, tx pgx.Tx) error {
+		rows, err := q.DeleteWorkspaceTask(ctx, dbsqlc.DeleteWorkspaceTaskParams{PublicID: taskID, WorkspacePublicID: workspaceID})
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return workspacetasks.ErrNotFound
+		}
+		_, err = tx.Exec(ctx, `DELETE FROM task_status_event_outbox WHERE task_id=$1`, taskID)
 		return err
-	}
-	if rows == 0 {
-		return workspacetasks.ErrNotFound
-	}
-	return nil
+	})
 }
 
 // convergeFailedUpdate distinguishes a lost race (unknown id or
