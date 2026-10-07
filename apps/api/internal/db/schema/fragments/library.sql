@@ -73,7 +73,6 @@ CREATE INDEX idx_library_materializations_workspace ON library_materializations 
 CREATE INDEX idx_library_materializations_library_asset ON library_materializations (library_asset_id);
 CREATE INDEX idx_library_materializations_status ON library_materializations (status, created_at);
 
--- Legacy user-scoped board tables (deprecated, remove in #809)
 -- A Library asset is URL-backed until a user imports it. This association is
 -- intentionally not a media_ref: only actual Canvas/Task use keeps Media
 -- alive, so unused imports remain reclaimable.

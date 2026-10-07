@@ -94,10 +94,9 @@ CREATE TABLE task_outputs (
 CREATE INDEX idx_task_outputs_task ON task_outputs (task_id, output_index);
 CREATE INDEX idx_task_outputs_media ON task_outputs (media_asset_id) WHERE media_asset_id IS NOT NULL;
 
--- Legacy user-scoped shells retained for #809 Phase 4: tables stay so sqlc
--- models and generated query files keep compiling (fail-closed stubs
--- reference them), but dangling FKs to the replaced user-scoped tables
--- are dropped. Fresh-DB-only; remove with the stubs in a follow-up.
+-- Execution attribution records support the task monitor and worker query
+-- surfaces. They are keyed by the workspace task identifiers and remain
+-- separate from the task lifecycle fact stored in tasks.
 CREATE TABLE task_execution_metrics (
   task_id VARCHAR(64) PRIMARY KEY,
   current_stage VARCHAR(32) NOT NULL DEFAULT 'queued',

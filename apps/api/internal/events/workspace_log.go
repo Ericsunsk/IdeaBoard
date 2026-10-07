@@ -13,8 +13,9 @@ package events
 // maxPerWorkspace envelopes per workspace (oldest-first eviction). A
 // cursor that names an evicted or unknown id resumes from the oldest
 // retained envelope with gap=true so the client refetches state instead
-// of silently missing events. Durable replay beyond the hot window lands
-// with the #809 outbox.
+// of silently missing events. Task status events can be replayed from the
+// durable task-status outbox; other event types remain bounded by this hot
+// window and the NATS retention policy.
 
 import (
 	"fmt"

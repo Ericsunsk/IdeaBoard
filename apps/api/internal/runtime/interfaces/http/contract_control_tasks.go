@@ -3,10 +3,9 @@ package httpapi
 // Control tasks family (issue #808): scoped task read/ops behind
 // control:tasks — get/list/cancel with operator reason.
 //
-// There is deliberately NO task creation path here: the submit surface
-// stays on the Public Data Plane (#805) and legacy admin submit stays
-// untouched until #809. Cancel reuses the task command seam with the
-// operator as actor. Legacy /api/admin/tasks/* routes are untouched.
+// There is deliberately NO task creation path here: submission stays on
+// the Public Data Plane. Cancel reuses the task command seam with the
+// operator as actor.
 
 import (
 	"net/http"

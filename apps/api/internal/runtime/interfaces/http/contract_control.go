@@ -39,14 +39,13 @@ package httpapi
 //     stream stay raw protocol exceptions). Auth, audit, idempotency,
 //     and reason guarantees hold uniformly via the guard either way.
 //
-// Persistence decision (Baseline 7 audit): NO new table in #808. The
-// audit record is emitted as structured slog (shippable to the log
-// aggregator) and every high-risk mutation additionally leaves its
-// durable domain fact carrying actor + reason (credits ledger command
-// metadata, identity admin command actor, tenancy membership actor,
-// settings outbound-policy actor, gateway/catalog actor ids). The
-// durable control_audit_records table is a documented #809 follow-up;
-// see the removal checklist in the issue report.
+// Persistence: every guarded call is emitted as structured slog and is
+// persisted to the append-only control_audit_records sink. High-risk
+// mutations also leave their durable domain fact carrying actor + reason
+// (credits ledger command metadata, identity admin command actor, tenancy
+// membership actor, settings outbound-policy actor, and gateway/catalog
+// actor ids). The audit sink is an observation record; domain tables remain
+// the source of truth for business state.
 
 import (
 	"bytes"

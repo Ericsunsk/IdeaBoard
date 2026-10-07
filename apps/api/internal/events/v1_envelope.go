@@ -17,9 +17,11 @@ package events
 // succeeds (see workspacetasks.Service.StagedEvents + TaskStatusV1Type).
 // Delivery is at-least-once: NATS publishes with MsgID = envelope id
 // (duplicate window), the hot log append is idempotent on id, and webhook
-// dispatch dedups per subscription. Durable outbox persistence lands
-// with #809; until then the process-local log is the hot replay window
-// and NATS JetStream (7-day retention per DESIGN) is the transport.
+// dispatch dedups per subscription. Task status transitions additionally
+// persist a durable outbox row in the same transaction as the transition;
+// its replayer reuses the stable envelope id after crashes or publish
+// failures. Other event types use the process-local hot replay window and
+// NATS JetStream (7-day retention per DESIGN) as their transport boundary.
 //
 // Control audit records are never exposed here: the registry contains no
 // audit/control types by construction (see TestV1RegistryExcludesControl).

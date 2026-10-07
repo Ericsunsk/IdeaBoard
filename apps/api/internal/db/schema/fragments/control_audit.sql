@@ -1,7 +1,6 @@
--- Control Plane audit records (#808, durable follow-up #809). Every
--- high-risk operation records operator, target, capability, reason,
--- outcome, and timestamp. Capability enforcement happens at middleware;
--- this table is the immutable audit trail.
+-- Control Plane audit records. Every high-risk operation records operator,
+-- target, capability, reason, outcome, and timestamp. Capability enforcement
+-- happens at middleware; this append-only table is the audit trail.
 CREATE TABLE control_audit_records (
   internal_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   public_id TEXT NOT NULL,
