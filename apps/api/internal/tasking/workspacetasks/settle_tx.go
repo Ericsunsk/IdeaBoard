@@ -353,7 +353,7 @@ func (s *Service) createInTx(ctx context.Context, input CreateInput, kind, resol
 		}
 		committed = true
 	}
-	s.stageWithToken(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken)
+	s.stageWithTokenAt(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
 	return created, true, nil
 }
 
@@ -450,7 +450,7 @@ func (s *Service) completeInTx(ctx context.Context, workspaceID, taskID string, 
 		}
 		committed = true
 	}
-	s.stageWithToken(taskID, workspaceID, StatusCompleted, completed.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
 	return completed, true, nil
 }
 
@@ -492,7 +492,7 @@ func (s *Service) failInTx(ctx context.Context, workspaceID, taskID, errorMsg st
 		}
 		committed = true
 	}
-	s.stageWithToken(taskID, workspaceID, StatusFailed, failed.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
 	return failed, true, nil
 }
 
@@ -538,7 +538,7 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 			return nil, false, true, err
 		}
 		committed = true
-		s.stageWithToken(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken)
+		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
 		return flipped, false, true, nil
 	}
 	// Borrowed (ambient) transaction (#889): the guard commits later
@@ -548,9 +548,11 @@ func (s *Service) cancelInTx(ctx context.Context, workspaceID, taskID string, ac
 	// guard's commit, timestamped then. Without a registry (raw carriers
 	// outside the guard) keep the legacy synchronous stage so the caller
 	// can flush after the commit it owns.
-	stage := func(context.Context) { s.stageWithToken(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken) }
+	stage := func(context.Context) {
+		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
+	}
 	if !dbutil.DeferAmbientPostCommit(ctx, stage) {
-		s.stageWithToken(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken)
+		s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
 	}
 	return flipped, false, true, nil
 }
@@ -604,6 +606,6 @@ func (s *Service) retryInTx(ctx context.Context, workspaceID, taskID, newToken s
 	// commit, for the same reason as the terminal settlements above: a
 	// staged event means a committed fact, and publishing it is the
 	// caller's post-commit job (never inside this transaction).
-	s.stageWithToken(taskID, workspaceID, StatusPending, retried.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusPending, retried.ExecutionToken, retried.UpdatedAt)
 	return retried, true, nil
 }

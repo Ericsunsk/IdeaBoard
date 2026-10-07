@@ -128,9 +128,16 @@ func (s *Service) stage(taskID, workspaceID string, status Status) {
 }
 
 func (s *Service) stageWithToken(taskID, workspaceID string, status Status, executionToken string) {
+	s.stageWithTokenAt(taskID, workspaceID, status, executionToken, s.clock())
+}
+
+func (s *Service) stageWithTokenAt(taskID, workspaceID string, status Status, executionToken string, occurredAt time.Time) {
+	if occurredAt.IsZero() {
+		occurredAt = s.clock()
+	}
 	s.events = append(s.events, TaskEvent{
 		EventID: events.StableTaskEventID(taskID, events.TaskStatus(status), executionToken),
-		TaskID:  taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: s.clock(),
+		TaskID:  taskID, WorkspaceID: workspaceID, Status: status, OccurredAt: occurredAt.UTC(),
 	})
 }
 
@@ -332,7 +339,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput, idempotencyKey 
 		}
 		return nil, fmt.Errorf("workspacetasks: enqueue: %w", err)
 	}
-	s.stageWithToken(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken)
+	s.stageWithTokenAt(created.ID, created.WorkspaceID, StatusPending, created.ExecutionToken, created.UpdatedAt)
 	return created, nil
 }
 
@@ -434,7 +441,7 @@ func (s *Service) Cancel(ctx context.Context, workspaceID, taskID string, actorU
 		}
 		flipped.BillingSnapshot.SettlementState = "released"
 	}
-	s.stageWithToken(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusCancelled, flipped.ExecutionToken, flipped.UpdatedAt)
 	return flipped, false, nil
 }
 
@@ -482,7 +489,7 @@ func (s *Service) Complete(ctx context.Context, workspaceID, taskID string, outp
 		}
 		completed.BillingSnapshot.SettlementState = "captured"
 	}
-	s.stageWithToken(taskID, workspaceID, StatusCompleted, completed.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusCompleted, completed.ExecutionToken, completed.UpdatedAt)
 	return completed, nil
 }
 
@@ -509,7 +516,7 @@ func (s *Service) Fail(ctx context.Context, workspaceID, taskID, errorMsg string
 		}
 		failed.BillingSnapshot.SettlementState = "released"
 	}
-	s.stageWithToken(taskID, workspaceID, StatusFailed, failed.ExecutionToken)
+	s.stageWithTokenAt(taskID, workspaceID, StatusFailed, failed.ExecutionToken, failed.UpdatedAt)
 	return failed, nil
 }
 
