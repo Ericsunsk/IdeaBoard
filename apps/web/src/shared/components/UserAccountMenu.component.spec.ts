@@ -15,6 +15,23 @@ async function openSubmenu(trigger: HTMLElement, firstOptionName: string | RegEx
 }
 
 describe('UserAccountMenu', () => {
+  it('shows the account email above a separator in the user menu', async () => {
+    const { user } = renderWithUser(UserAccountMenu, {
+      props: {
+        userEmail: 'alice@example.test',
+        items: [{ key: 'profile', label: '账户管理' }],
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }))
+
+    const email = await screen.findByText('alice@example.test')
+    const [separator] = screen.getAllByRole('separator')
+    expect(email).toBeVisible()
+    expect(separator).toBeVisible()
+    expect(email.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders the typed balance control before the avatar', async () => {
     const openCredits = vi.fn()
     const items: UserAccountMenuItem[] = [

@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render } from '../../../test/render'
+import { render, waitFor } from '../../../test/render'
 import type { User } from '../../../shared/api/sessionUserType'
 import { ADMIN_ROOT_PATH, HOME_PATH } from '../../../shared/constants/routePaths'
 import {
@@ -9,20 +9,36 @@ import {
   type AccountOverlay,
   type CreditWalletState,
 } from '../../account'
-import { createAuthOverlay, provideAuthOverlay, type AuthOverlay } from '../../auth'
+import {
+  authTransport,
+  createAuthOverlay,
+  provideAuthOverlay,
+  type AuthOverlay,
+} from '../../auth'
 import { useWorkspaceAccountControls } from './useWorkspaceAccountControls'
 import { makeSessionUser } from '../../../test/factories'
 
 const currentUser = ref<User | null>(null)
+const sessionEmail = ref<string | null>(null)
 const walletState = ref<CreditWalletState>({
   status: 'ready',
   availableCredits: 1280,
 })
 
+vi.mock('../../auth/session/transport', () => ({
+  authTransport: { getSessionUser: vi.fn() },
+}))
+
 vi.mock('../../auth/session/userSession', () => ({
   useUserStore: () => ({
     get user() {
       return currentUser.value
+    },
+    get email() {
+      return sessionEmail.value
+    },
+    setEmail(email: string) {
+      sessionEmail.value = email
     },
   }),
 }))
@@ -86,6 +102,8 @@ describe('useWorkspaceAccountControls', () => {
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     })
+    sessionEmail.value = null
+    vi.mocked(authTransport.getSessionUser).mockReset().mockResolvedValue(null)
     walletState.value = { status: 'ready', availableCredits: 1280 }
   })
 
@@ -107,6 +125,41 @@ describe('useWorkspaceAccountControls', () => {
       'home',
       'logout',
     ])
+  })
+
+  it('falls back to the session store email when the user projection omits email', () => {
+    currentUser.value = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
+    sessionEmail.value = 'session@example.test'
+    const { controls } = renderAccountControls({
+      navigation: { navigate: vi.fn(), logout: vi.fn() },
+    })
+
+    expect(controls.viewModel.userEmail.value).toBe('session@example.test')
+  })
+
+  it('hydrates the email from the auth session when the user projection omits it', async () => {
+    currentUser.value = makeSessionUser({
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'demo-user',
+      storage_namespace: 'USR001',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    })
+    vi.mocked(authTransport.getSessionUser).mockResolvedValue({ email: 'alice@example.test' })
+    const { controls } = renderAccountControls({
+      navigation: { navigate: vi.fn(), logout: vi.fn() },
+    })
+
+    await waitFor(() => {
+      expect(controls.viewModel.userEmail.value).toBe('alice@example.test')
+    })
+    expect(authTransport.getSessionUser).toHaveBeenCalledOnce()
   })
 
   it('exposes an anonymous balance state and guest menu items when user is not logged in', () => {

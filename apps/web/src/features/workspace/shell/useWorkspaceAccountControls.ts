@@ -1,5 +1,5 @@
-import { computed } from 'vue'
-import { useAuthOverlay, useUserStore } from '../../auth'
+import { computed, onMounted } from 'vue'
+import { authTransport, useAuthOverlay, useUserStore } from '../../auth'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import type {
   UserAccountMenuItem,
@@ -33,6 +33,28 @@ function formatIdeaValue(value: number): string {
 
 export function useWorkspaceAccountControls(options: UseWorkspaceAccountControlsOptions) {
   const userStore = useUserStore()
+  onMounted(() => {
+    const currentUser = userStore.user
+    if (!currentUser || currentUser.email || userStore.email) return
+
+    const userId = currentUser.public_id
+    void authTransport
+      .getSessionUser()
+      .then((sessionUser) => {
+        if (!sessionUser?.email) return
+        if (
+          userStore.user?.public_id !== userId ||
+          userStore.user.email ||
+          userStore.email
+        ) {
+          return
+        }
+        userStore.setEmail(sessionUser.email)
+      })
+      .catch(() => {
+        // Session email hydration must not block workspace controls.
+      })
+  })
   // Validated session only (not the best-effort restored snapshot): this
   // header mounts on public pages too, and an anonymous/stale 401 reloads
   // the whole page to login via the shared auth-failure handler.
@@ -157,7 +179,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
   return {
     viewModel: {
       avatarUrl: computed(() => userStore.user?.avatar || undefined),
-      userEmail: computed(() => userStore.user?.email || undefined),
+      userEmail: computed(() => userStore.user?.email || userStore.email || undefined),
       balance,
       menuItems,
     },

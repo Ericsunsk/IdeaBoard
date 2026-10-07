@@ -139,17 +139,15 @@ describe('AdminLayout', () => {
 
   it('opens minimalist account dropdown menu on clicking user avatar button', async () => {
     const { user } = await renderLayout()
-    const avatarButton = await screen.findByRole('button', { name: '账户菜单' })
+    const avatarButton = await screen.findByRole('button', { name: /账户菜单|Account menu/i })
 
     expect(avatarButton).toHaveAttribute('aria-expanded', 'false')
     await user.click(avatarButton)
     expect(avatarButton).toHaveAttribute('aria-expanded', 'true')
     expect(await screen.findByRole('menuitem', { name: /返回画布/ })).toBeVisible()
     expect(screen.getByRole('menuitem', { name: /退出登录/ })).toBeVisible()
-    expect(screen.getByRole('radiogroup', { name: /appearance|外观/i })).toBeVisible()
-    expect(screen.getByRole('radio', { name: /light|明亮/i })).toBeVisible()
-    expect(screen.getByRole('radio', { name: /dark|暗黑/i })).toBeVisible()
-    expect(screen.getByRole('radio', { name: /system|跟随系统/i })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /Appearance|外观/i })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /Language|语言/i })).toBeVisible()
     expect(screen.queryByText('admin')).not.toBeInTheDocument()
     expect(screen.getByText('--')).toBeVisible()
   })
@@ -158,7 +156,7 @@ describe('AdminLayout', () => {
     localStorage.setItem('ideaboard_auth_email', 'stale@example.com')
     const { user } = await renderLayout()
 
-    await user.click(await screen.findByRole('button', { name: '账户菜单' }))
+    await user.click(await screen.findByRole('button', { name: /账户菜单|Account menu/i }))
 
     expect(screen.queryByText('stale@example.com')).not.toBeInTheDocument()
     expect(screen.getByText('--')).toBeVisible()

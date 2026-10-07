@@ -27,7 +27,12 @@
     <template v-else>
       <UserCreditBalanceButton v-if="showCredits && balance" :balance="balance" />
       <slot name="actions" />
-      <DropdownMenu dir="rtl" :modal="false" @update:open="handleMenuOpenUpdate">
+      <DropdownMenu
+        v-model:open="open"
+        dir="rtl"
+        :modal="false"
+        @update:open="handleMenuOpenUpdate"
+      >
         <DropdownMenuTrigger ref="triggerRef" as-child>
           <button
             type="button"
@@ -216,6 +221,7 @@ const props = withDefaults(
   },
 )
 
+const open = defineModel<boolean>('open', { default: false })
 const { locale: i18nLocale, t } = useI18n()
 const { mode, setTheme } = useTheme()
 
@@ -271,4 +277,10 @@ const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
 
 const triggerRef = useTemplateRef('triggerRef')
 const { handleMenuOpenUpdate, handlePointerDownOutside } = useMenuTriggerFocusRestore(triggerRef)
+
+defineExpose({
+  closeMenu: () => {
+    open.value = false
+  },
+})
 </script>
