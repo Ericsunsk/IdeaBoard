@@ -159,6 +159,14 @@ describe('Admin System Settings adapters', () => {
   it('preserves Access rate-limit validation/save and registration toggle sequencing', async () => {
     const rateLimitRequests: unknown[] = []
     const registrationRequests: unknown[] = []
+    const rateLimitHeaders: Array<{
+      idempotencyKey: string | null
+      operatorReason: string | null
+    }> = []
+    const registrationHeaders: Array<{
+      idempotencyKey: string | null
+      operatorReason: string | null
+    }> = []
     let registrationEnabled = false
     useMswHandlers(
       http.get('/api/control/v1/platform/settings/registration', () =>
@@ -167,6 +175,10 @@ describe('Admin System Settings adapters', () => {
       http.put('/api/control/v1/platform/settings/registration', async ({ request }) => {
         const body = (await request.json()) as { enabled: boolean }
         registrationRequests.push(body)
+        registrationHeaders.push({
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        })
         registrationEnabled = body.enabled
         return HttpResponse.json({ data: body })
       }),
@@ -178,6 +190,10 @@ describe('Admin System Settings adapters', () => {
       http.put('/api/control/v1/platform/settings/rate-limit', async ({ request }) => {
         const body = await request.json()
         rateLimitRequests.push(body)
+        rateLimitHeaders.push({
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          operatorReason: request.headers.get('X-Operator-Reason'),
+        })
         return HttpResponse.json({ data: body })
       }),
     )
@@ -198,12 +214,51 @@ describe('Admin System Settings adapters', () => {
       harness.value.rateLimitForm.value.max_requests = 240
       await expect(harness.value.saveRateLimit()).resolves.toBe(true)
       expect(rateLimitRequests).toEqual([{ window_seconds: 60, max_requests: 240 }])
+      expect(rateLimitHeaders[0]?.idempotencyKey).toMatch(/.+/)
+      expect(rateLimitHeaders[0]?.operatorReason).toBe('lifecycle review')
       expect(feedback.rateLimitSaved).toHaveBeenCalledOnce()
 
       await harness.value.handleToggleRegistration(true)
       expect(registrationRequests).toEqual([{ enabled: true }])
+      expect(registrationHeaders[0]?.idempotencyKey).toMatch(/.+/)
+      expect(registrationHeaders[0]?.operatorReason).toBe('lifecycle review')
       expect(harness.value.registrationEnabled.value).toBe(true)
       expect(feedback.registrationUpdated).toHaveBeenCalledWith(true)
+    } finally {
+      await harness.unmount()
+    }
+  })
+
+  it('maps Access control errors while keeping the draft editable', async () => {
+    useMswHandlers(
+      http.get('/api/control/v1/platform/settings/registration', () =>
+        HttpResponse.json({ data: { enabled: false } }),
+      ),
+      http.get('/api/control/v1/platform/settings/rate-limit', () =>
+        HttpResponse.json({ data: { window_seconds: 60, max_requests: 120 } }),
+      ),
+      http.put('/api/control/v1/platform/settings/rate-limit', () =>
+        HttpResponse.json(
+          { error: { code: 'idempotency_conflict', message: 'duplicate', request_id: 'req-1' } },
+          { status: 409 },
+        ),
+      ),
+    )
+    const feedback = createAccessFeedback()
+    const harness = mountComposable(() => useAccessSettings({ feedback, confirm: testConfirm() }))
+
+    try {
+      await vi.waitFor(() => expect(harness.value.rateLimitForm.value.window_seconds).toBe(60))
+      harness.value.rateLimitForm.value.max_requests = 240
+
+      await expect(harness.value.saveRateLimit()).resolves.toBe(false)
+      expect(feedback.rateLimitSaveFailed).toHaveBeenCalledOnce()
+      expect(feedback.rateLimitSaveFailed.mock.calls[0]?.[0]).toMatchObject({
+        code: 'idempotency_conflict',
+        message: '操作已提交，请勿重复操作',
+      })
+      expect(harness.value.rateLimitForm.value.max_requests).toBe(240)
+      expect(harness.value.rateLimitDirty.value).toBe(true)
     } finally {
       await harness.unmount()
     }

@@ -7,16 +7,13 @@ import {
   updateControlRateLimitSetting,
   updateControlRegistrationSetting,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import type { AdminAccessSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import { withSimpleControlCopy as withControlCopy } from '../shared/lib/controlCopy'
+import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 
 // Admin access (rate limit + registration) boundary (W2 transports). Reads
 // and writes go through the Control Plane with the contract envelope
@@ -241,7 +238,7 @@ async function saveRegistrationSetting(
   try {
     const body = await updateControlRegistrationSetting(
       { enabled },
-      { headers: mutationHeaders(reason) },
+      { headers: buildControlMutationHeaders({ operatorReason: reason }) },
     )
     return requireContractData<RegistrationSettingData>(body, '更新注册状态失败')
   } catch (error) {
@@ -257,32 +254,12 @@ async function saveRateLimitSetting(
   try {
     const body = await updateControlRateLimitSetting(
       { window_seconds: draft.window_seconds, max_requests: draft.max_requests },
-      { headers: mutationHeaders(reason) },
+      { headers: buildControlMutationHeaders({ operatorReason: reason }) },
     )
     return requireContractData<RateLimitSetting>(body, '保存访问限流失败')
   } catch (error) {
     throw withControlCopy(error, '保存访问限流失败')
   }
-}
-
-function mutationHeaders(operatorReason: string) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: newRequestId(),
-    operatorReason,
-  })
-}
-
-function requireOperatorReason(reason: string): string {
-  const trimmed = reason.trim()
-  if (!trimmed) throw controlError('control_reason_required', '需要填写操作原因')
-  return trimmed
-}
-
-function controlError(code: string, message: string): Error & { code?: string | undefined } {
-  const error = new Error(message) as Error & { code?: string | undefined }
-  error.code = code
-  return error
 }
 
 // withControlCopy is shared — see admin/shared/lib/controlCopy.ts.

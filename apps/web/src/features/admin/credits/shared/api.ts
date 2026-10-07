@@ -24,11 +24,11 @@ import type {
   ControlLedgerTransaction,
   ListControlCreditLedgerParams,
 } from '../../../../shared/api/generated-query/control/model'
+import { requireContractData } from '../../../../shared/api/contractKernel'
 import {
-  buildContractRequestHeaders,
-  newRequestId,
-  requireContractData,
-} from '../../../../shared/api/contractKernel'
+  buildControlMutationHeaders,
+  type ControlMutationOptions,
+} from '../../shared/lib/controlMutation'
 
 // Reconciliation views (issue #809). The legacy `admin-credits` generated
 // client is gone; the same domain service now serves the Control Plane
@@ -229,18 +229,9 @@ export type ControlLedgerView = {
   hasMore: boolean
 }
 
-export type ControlCreditMutationOptions = {
+export type ControlCreditMutationOptions = ControlMutationOptions & {
   idempotencyKey: string
-  operatorReason: string
   signal?: AbortSignal | null | undefined
-}
-
-function controlMutationHeaders(options: ControlCreditMutationOptions) {
-  return buildContractRequestHeaders({
-    requestId: newRequestId(),
-    idempotencyKey: options.idempotencyKey,
-    operatorReason: options.operatorReason,
-  })
 }
 
 async function getWallet(userId: string, options?: { signal?: AbortSignal | null | undefined }) {
@@ -308,21 +299,21 @@ async function listLedger(
 
 async function grant(body: ControlCreditCommandRequest, options: ControlCreditMutationOptions) {
   const response = await createControlCreditGrant(body, {
-    headers: controlMutationHeaders(options),
+    headers: buildControlMutationHeaders(options),
   })
   return requireContractData<ControlCreditResult>(response, '赠送Idea失败')
 }
 
 async function deduct(body: ControlCreditCommandRequest, options: ControlCreditMutationOptions) {
   const response = await createControlCreditDeduction(body, {
-    headers: controlMutationHeaders(options),
+    headers: buildControlMutationHeaders(options),
   })
   return requireContractData<ControlCreditResult>(response, '扣减Idea失败')
 }
 
 async function refund(body: ControlCreditRefundRequest, options: ControlCreditMutationOptions) {
   const response = await createControlCreditRefund(body, {
-    headers: controlMutationHeaders(options),
+    headers: buildControlMutationHeaders(options),
   })
   return requireContractData<ControlCreditResult>(response, '退款Idea失败')
 }
@@ -341,11 +332,7 @@ async function startReconciliation(
     { reason },
     {
       ...toControlOptions(options),
-      headers: buildContractRequestHeaders({
-        requestId: newRequestId(),
-        idempotencyKey: newRequestId(),
-        operatorReason: reason,
-      }),
+      headers: buildControlMutationHeaders({ operatorReason: reason }),
     },
   )
   return requireContractData<CreditReconciliationRun>(envelope, '启动账本检查失败')

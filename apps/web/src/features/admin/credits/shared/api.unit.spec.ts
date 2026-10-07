@@ -155,6 +155,26 @@ describe('credits billing API adapter', () => {
     })
   })
 
+  it.each(['grant', 'deduct', 'refund'] as const)(
+    'requires an operator reason before sending %s',
+    async (command) => {
+      await expect(
+        adminCreditsBillingApi[command](
+          {
+            user_id: userId,
+            amount_credits: 5,
+            business_reference_id: `control-ui:${command}:op-1`,
+            charge_transaction_id: 'charge-1',
+          },
+          { idempotencyKey: 'test-key', operatorReason: '   ' },
+        ),
+      ).rejects.toMatchObject({ code: 'control_reason_required', message: '需要填写操作原因' })
+      expect(controlMocks.createControlCreditGrant).not.toHaveBeenCalled()
+      expect(controlMocks.createControlCreditDeduction).not.toHaveBeenCalled()
+      expect(controlMocks.createControlCreditRefund).not.toHaveBeenCalled()
+    },
+  )
+
   it('rejects control failures with domain fallbacks', async () => {
     controlMocks.getControlCreditWallet.mockResolvedValue({
       error: { code: 'control_not_found', message: 'missing', request_id: 'r1' },

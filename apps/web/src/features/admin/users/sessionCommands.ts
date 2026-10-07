@@ -1,5 +1,6 @@
 import { useUserStore } from '../../auth'
 import { impersonateAdminUser } from './api'
+import { requireOperatorReason } from '../shared/lib/controlMutation'
 
 export type AdminUserRedirect = {
   schedule: (url: string, delayMs: number) => void
@@ -29,8 +30,7 @@ export function createAdminUserSessionCommands(
 
   return {
     async startImpersonation(publicId: string, options?: { operatorReason?: string | undefined }) {
-      const operatorReason = options?.operatorReason?.trim() ?? ''
-      if (!operatorReason) throw new Error('需要填写操作原因')
+      const operatorReason = requireOperatorReason(options?.operatorReason ?? '')
       await impersonateAdminUser(publicId, { operatorReason })
 
       userStore.clearAuth()
