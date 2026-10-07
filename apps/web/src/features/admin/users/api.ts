@@ -22,7 +22,7 @@ import {
 } from '../shared/lib/controlMutation'
 import { withControlCopy } from '../shared/lib/controlCopy'
 
-function mutationHeaders(
+function controlUserHeaders(
   operation: Parameters<typeof controlUserIdempotencyKey>[0],
   options: ControlMutationOptions,
 ) {
@@ -55,7 +55,12 @@ export async function banAdminUser(input: {
         ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
         ...(input.expires_in_days === undefined ? {} : { expires_in_days: input.expires_in_days }),
       },
-      { headers: mutationHeaders('ban', { operatorReason, idempotencyKey: input.idempotencyKey }) },
+      {
+        headers: controlUserHeaders('ban', {
+          operatorReason,
+          idempotencyKey: input.idempotencyKey,
+        }),
+      },
     ),
     '封禁失败',
   )
@@ -67,7 +72,7 @@ export async function unbanAdminUser(
 ): Promise<void> {
   await resolveControlOk(
     unbanControlUser(publicId, {
-      headers: mutationHeaders('unban', options),
+      headers: controlUserHeaders('unban', options),
     }),
     '解封失败',
   )
@@ -79,7 +84,7 @@ export async function revokeAdminUserSessions(
 ): Promise<void> {
   await resolveControlOk(
     revokeControlUserSessions(publicId, {
-      headers: mutationHeaders('revoke-sessions', options),
+      headers: controlUserHeaders('revoke-sessions', options),
     }),
     '吊销会话失败',
   )
@@ -96,7 +101,7 @@ export async function updateAdminUserRole(input: {
       input.publicId,
       { role: input.role },
       {
-        headers: mutationHeaders('role', {
+        headers: controlUserHeaders('role', {
           operatorReason: input.operatorReason,
           idempotencyKey: input.idempotencyKey,
         }),
@@ -112,7 +117,7 @@ export async function deleteAdminUser(
 ): Promise<void> {
   await resolveControlOk(
     deleteControlUser(publicId, {
-      headers: mutationHeaders('delete', options),
+      headers: controlUserHeaders('delete', options),
     }),
     '注销失败',
   )
@@ -124,7 +129,7 @@ export async function impersonateAdminUser(
 ): Promise<void> {
   await resolveControlOk(
     impersonateControlUser(publicId, {
-      headers: mutationHeaders('impersonate', options),
+      headers: controlUserHeaders('impersonate', options),
     }),
     '伪装登录失败',
   )

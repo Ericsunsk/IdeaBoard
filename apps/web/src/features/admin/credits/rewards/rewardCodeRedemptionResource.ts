@@ -3,6 +3,7 @@ import {
   listControlRewardRedemptions,
 } from '../../../../shared/api/generated-query/control/control-credits/control-credits'
 import { requireContractData } from '../../../../shared/api/contractKernel'
+import { createControlError } from '../../shared/lib/controlMutation'
 import type {
   ControlAdminRedemption,
   ControlAdminRedemptionDetail,
@@ -93,7 +94,9 @@ async function listRewardCodeRedemptions(
     ...(input.signal == null ? {} : { signal: input.signal }),
   })
   const page = requireContractData<ControlAdminRedemptionPage>(body, '加载兑换记录失败')
-  if (!Array.isArray(page.redemptions)) throw controlError('control_failed', '加载兑换记录失败')
+  if (!Array.isArray(page.redemptions)) {
+    throw createControlError('control_failed', '加载兑换记录失败')
+  }
   const result: RewardCodeRedemptionPage = {
     redemptions: page.redemptions.map(normalizeRedemption),
   }
@@ -126,18 +129,4 @@ function normalizeRedemption(item: ControlAdminRedemption): RewardCodeRedemption
     creditedAmount: item.credited_amount,
     redeemedAt: item.redeemed_at,
   }
-}
-
-function controlError(
-  code: string,
-  message: string,
-  requestId?: string | undefined,
-): Error & { code?: string | undefined; requestId?: string | undefined } {
-  const error = new Error(message) as Error & {
-    code?: string | undefined
-    requestId?: string | undefined
-  }
-  error.code = code
-  if (requestId) error.requestId = requestId
-  return error
 }

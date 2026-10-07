@@ -5,7 +5,7 @@ import {
   updateControlOutboundPolicy,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
 import { requireContractData } from '../../../shared/api/contractKernel'
-import { withSimpleControlCopy as withControlCopy } from '../shared/lib/controlCopy'
+import { withControlCopy } from '../shared/lib/controlCopy'
 import type { OutboundPolicySetting, UpdateOutboundPolicyRequest } from './outboundPolicyContract'
 
 // Admin outbound policy boundary (W2 transports). Reads and writes go

@@ -11,7 +11,7 @@ import type { AdminMediaUploadSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
-import { withSimpleControlCopy as withControlCopy } from '../shared/lib/controlCopy'
+import { withControlCopy } from '../shared/lib/controlCopy'
 
 // Admin media upload boundary (W2 transports). Reads and writes go through
 // the Control Plane with the contract envelope (`{data}`); every mutation

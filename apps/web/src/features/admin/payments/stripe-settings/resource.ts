@@ -7,7 +7,7 @@ import {
   updateControlStripeConfig,
 } from '../../../../shared/api/generated-query/control/control-payments/control-payments'
 import { requireContractData } from '../../../../shared/api/contractKernel'
-import { withSimpleControlCopy as withControlCopy } from '../../shared/lib/controlCopy'
+import { withControlCopy } from '../../shared/lib/controlCopy'
 import type {
   AdminStripeSettingsResource,
   SaveStripeConfigurationInput,

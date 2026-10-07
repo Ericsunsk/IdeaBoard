@@ -21,6 +21,13 @@ import type {
   PoolResolution,
 } from './billableCatalogTypes'
 
+const MODEL_POOL_CONTROL_MESSAGES = {
+  conflict: '模型池已被更新，请刷新后重试',
+  control_not_found: '功能不存在',
+  not_found: '功能不存在',
+  404: '功能不存在',
+} as const
+
 // Admin Service Model Pool boundary (#849). Reads and atomic replaces go
 // through the Control Plane billing pool operations with the contract
 // envelope (`{data}`); the PUT carries a header-only Idempotency-Key
@@ -61,12 +68,7 @@ export function createAdminModelPoolResource(
     replace: replaceAdminModelPool,
     listCatalogModels: () =>
       listCatalogModels().catch((error) => {
-        throw withControlCopy(error, '加载模型目录失败', {
-          conflict: '模型池已被更新，请刷新后重试',
-          control_not_found: '功能不存在',
-          not_found: '功能不存在',
-          404: '功能不存在',
-        })
+        throw withControlCopy(error, '加载模型目录失败', MODEL_POOL_CONTROL_MESSAGES)
       }),
   }
 }
@@ -81,12 +83,7 @@ export async function fetchAdminModelPool(sku: string): Promise<AdminModelPool> 
     const body = await getControlCatalogModelPool(sku)
     return normalizePool(requireContractData<AdminModelPoolWire>(body, '加载模型池失败'), sku)
   } catch (error) {
-    throw withControlCopy(error, '加载模型池失败', {
-      conflict: '模型池已被更新，请刷新后重试',
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(error, '加载模型池失败', MODEL_POOL_CONTROL_MESSAGES)
   }
 }
 
@@ -113,12 +110,7 @@ export async function replaceAdminModelPool(
     const data = requireContractData<AdminModelPoolSaveWire>(body, '保存模型池失败')
     return { ...normalizePool(data, sku), changed: data.changed === true }
   } catch (error) {
-    throw withControlCopy(error, '保存模型池失败', {
-      conflict: '模型池已被更新，请刷新后重试',
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(error, '保存模型池失败', MODEL_POOL_CONTROL_MESSAGES)
   }
 }
 

@@ -23,6 +23,12 @@ import {
 } from '../../shared/lib/controlMutation'
 import { withControlCopy } from '../../shared/lib/controlCopy'
 
+const BILLABLE_ITEM_CONTROL_MESSAGES = {
+  control_not_found: '功能不存在',
+  not_found: '功能不存在',
+  404: '功能不存在',
+} as const
+
 // Admin billing catalog boundary (W2 transports). Reads and writes go
 // through the Control Plane billing operations with the contract envelope
 // (`{data}` over the same catalog service projections); every mutation
@@ -97,11 +103,7 @@ export async function deleteArchivedBillableItem(
     const data = requireContractData<{ sku: string }>(body, '删除已归档功能失败')
     return data.sku
   } catch (error) {
-    throw withControlCopy(error, '删除已归档功能失败', {
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(error, '删除已归档功能失败', BILLABLE_ITEM_CONTROL_MESSAGES)
   }
 }
 
@@ -124,11 +126,11 @@ export async function setBillableItemAvailability(
       ),
     )
   } catch (error) {
-    throw withControlCopy(error, enabled ? '启用功能失败' : '停用功能失败', {
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(
+      error,
+      enabled ? '启用功能失败' : '停用功能失败',
+      BILLABLE_ITEM_CONTROL_MESSAGES,
+    )
   }
 }
 
@@ -152,11 +154,7 @@ export async function publishBillableItemPrices(
       Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
     ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
   } catch (error) {
-    throw withControlCopy(error, '发布价格失败', {
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(error, '发布价格失败', BILLABLE_ITEM_CONTROL_MESSAGES)
   }
 }
 
@@ -166,11 +164,7 @@ async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
     const data = requireContractData<{ items: BillableItemCatalogCard[] }>(body, '加载功能定价失败')
     return data.items.map(normalizeBillableItem)
   } catch (error) {
-    throw withControlCopy(error, '加载功能定价失败', {
-      control_not_found: '功能不存在',
-      not_found: '功能不存在',
-      404: '功能不存在',
-    })
+    throw withControlCopy(error, '加载功能定价失败', BILLABLE_ITEM_CONTROL_MESSAGES)
   }
 }
 

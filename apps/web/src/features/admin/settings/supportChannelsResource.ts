@@ -2,7 +2,7 @@ import {
   getControlSupportChannels,
   updateControlSupportChannels,
 } from '../../../shared/api/generated-query/control/control-platform/control-platform'
-import { newRequestId, requireContractData } from '../../../shared/api/contractKernel'
+import { requireContractData } from '../../../shared/api/contractKernel'
 import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 import { withControlCopy } from '../shared/lib/controlCopy'
 import { SupportChannelKind } from '../../../shared/api/generated-query/control/model/supportChannelKind'
@@ -36,7 +36,7 @@ export function createAdminSupportChannelsResource(): AdminSupportChannelsResour
       try {
         return readSetting(
           await updateControlSupportChannels(input, {
-            headers: buildControlMutationHeaders({ operatorReason: reason }, newRequestId()),
+            headers: buildControlMutationHeaders({ operatorReason: reason }),
           }),
         )
       } catch (error) {

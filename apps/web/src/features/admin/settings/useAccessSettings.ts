@@ -12,7 +12,7 @@ import type { AdminAccessSettingsFeedback } from './useSettingsFeedback'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
-import { withSimpleControlCopy as withControlCopy } from '../shared/lib/controlCopy'
+import { withControlCopy } from '../shared/lib/controlCopy'
 import { buildControlMutationHeaders, requireOperatorReason } from '../shared/lib/controlMutation'
 
 // Admin access (rate limit + registration) boundary (W2 transports). Reads
