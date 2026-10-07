@@ -157,6 +157,7 @@ export function useWorkspaceAccountControls(options: UseWorkspaceAccountControls
   return {
     viewModel: {
       avatarUrl: computed(() => userStore.user?.avatar || undefined),
+      userEmail: computed(() => userStore.user?.email || undefined),
       balance,
       menuItems,
     },

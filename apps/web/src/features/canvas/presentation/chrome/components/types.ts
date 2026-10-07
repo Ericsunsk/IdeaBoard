@@ -30,6 +30,7 @@ export type CanvasChromeBoardState = {
 
 export type CanvasChromeAccountState = {
   avatarUrl?: string | undefined
+  userEmail?: string | undefined
   balance: UserIdeaBalanceControl
   menuItems: UserAccountMenuItem[]
 }

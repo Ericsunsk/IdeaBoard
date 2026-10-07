@@ -21,14 +21,12 @@ const src = (...parts: string[]) => readFileSync(resolve(process.cwd(), 'src', .
  */
 describe('User form input contract', () => {
   it('keeps one height and a visible focus ring on the shared input chrome', () => {
-    // h-10 everywhere on the user side; the ring reuses the same token the
-    // user buttons already focus with.
+    // h-10 everywhere on the user side; the ring reuses the standard shadcn focus ring token
     expect(ibFormInputClass).toContain(' h-10 ')
     expect(ibFormInputClass).not.toContain('h-12')
-    expect(ibFormInputClass).toContain('focus-visible:ring-ring/20')
-    // Border and glow share one modality, like Admin's focus-visible pair.
-    expect(ibFormInputClass).toContain('focus-visible:border-primary')
+    expect(ibFormInputClass).toContain('focus-visible:ring-ring')
     expect(ibFormInputClass).not.toContain('focus:border-primary')
+    expect(ibFormInputClass).not.toContain('hover:border-border-hover')
   })
 
   it('leaves the focus border to the surface skins, never the primitive', () => {

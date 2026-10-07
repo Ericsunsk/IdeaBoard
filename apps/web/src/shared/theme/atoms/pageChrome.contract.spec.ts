@@ -62,7 +62,6 @@ describe('Cross-feature page chrome surface contract', () => {
     for (const source of [
       readSource('shared/components/UserCreditBalanceButton.vue'),
       readSource('shared/components/UserAccountMenu.vue'),
-      readSource('shared/components/UserLocaleSelect.vue'),
     ]) {
       expect(source).not.toContain('<UiButton')
       expect(source).not.toContain("from '@/components/ui/button'")

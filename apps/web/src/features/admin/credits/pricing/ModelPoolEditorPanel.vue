@@ -1,8 +1,7 @@
 <template>
   <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between text-xs text-muted-foreground">
-      <span>{{ BILLING_PRICING_MESSAGES.poolVersion(version) }}</span>
-      <span v-if="catalogLoading">{{ BILLING_PRICING_MESSAGES.poolCatalogLoading }}</span>
+    <div v-if="catalogLoading" class="text-xs text-muted-foreground">
+      <span>{{ BILLING_PRICING_MESSAGES.poolCatalogLoading }}</span>
     </div>
 
     <ul v-if="draft.length > 0" class="flex flex-col gap-2">
@@ -140,7 +139,6 @@ import { BILLING_PRICING_MESSAGES } from './messages'
 
 const props = withDefaults(
   defineProps<{
-    version?: number | undefined
     entries?: AdminModelPoolEntry[] | undefined
     catalogModels?: AdminPoolCatalogModel[] | undefined
     catalogLoading?: boolean | undefined
@@ -151,7 +149,6 @@ const props = withDefaults(
     catalogError?: string | undefined
   }>(),
   {
-    version: 0,
     entries: () => [],
     catalogModels: () => [],
     catalogLoading: false,
@@ -164,7 +161,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  submit: [entries: AdminModelPoolEntry[]]
   reload: []
   reloadCatalog: []
 }>()
@@ -226,21 +222,23 @@ function resolutionBadgeClass(on: boolean): string {
     : 'rounded px-1.5 py-0.5 font-mono text-admin-caption text-muted-foreground bg-muted cursor-pointer'
 }
 
-function submit() {
+function checkPoolValidity(): boolean {
   showError.value = true
-  if (props.pending || props.saveDisabled) return
-  if (draft.value.some((entry) => entry.enabled && entry.resolutions.length === 0)) return
-  emit(
-    'submit',
-    draft.value.map((entry) => ({
-      modelId: entry.modelId,
-      enabled: entry.enabled,
-      resolutions: [...entry.resolutions],
-    })),
-  )
+  if (props.saveDisabled) return false
+  if (draft.value.some((entry) => entry.enabled && entry.resolutions.length === 0)) return false
+  return true
+}
+
+function getDraftEntries(): AdminModelPoolEntry[] {
+  return draft.value.map((entry) => ({
+    modelId: entry.modelId,
+    enabled: entry.enabled,
+    resolutions: [...entry.resolutions],
+  }))
 }
 
 defineExpose({
-  submit,
+  checkPoolValidity,
+  getDraftEntries,
 })
 </script>

@@ -62,6 +62,7 @@ export default {
     themeLight: 'Claro',
     themeDark: 'Oscuro',
     themeSystem: 'Sistema',
+    language: 'Idioma',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

@@ -19,14 +19,10 @@
       <UserAccountMenu
         class="pointer-events-auto"
         :avatar-url="accountControls.viewModel.avatarUrl.value"
+        :user-email="accountControls.viewModel.userEmail.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
       >
-        <template #before-balance>
-          <slot name="before-balance">
-            <UserLocaleSelect />
-          </slot>
-        </template>
       </UserAccountMenu>
     </slot>
   </header>
@@ -36,7 +32,6 @@
 import { useRouter } from 'vue-router'
 import StudioName from '../../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
-import UserLocaleSelect from '../../../../shared/components/UserLocaleSelect.vue'
 import { HOME_PATH } from '../../../../shared/constants/routePaths'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useUserStore } from '../../../auth'

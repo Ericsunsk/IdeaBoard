@@ -146,7 +146,11 @@ describe('AdminLayout', () => {
     expect(avatarButton).toHaveAttribute('aria-expanded', 'true')
     expect(await screen.findByRole('menuitem', { name: /返回画布/ })).toBeVisible()
     expect(screen.getByRole('menuitem', { name: /退出登录/ })).toBeVisible()
-    expect(screen.getByText('admin')).toBeVisible()
+    expect(screen.getByRole('radiogroup', { name: /appearance|外观/i })).toBeVisible()
+    expect(screen.getByRole('radio', { name: /light|明亮/i })).toBeVisible()
+    expect(screen.getByRole('radio', { name: /dark|暗黑/i })).toBeVisible()
+    expect(screen.getByRole('radio', { name: /system|跟随系统/i })).toBeVisible()
+    expect(screen.queryByText('admin')).not.toBeInTheDocument()
     expect(screen.getByText('--')).toBeVisible()
   })
 

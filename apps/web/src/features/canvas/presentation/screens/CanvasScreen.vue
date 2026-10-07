@@ -294,6 +294,7 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   avatarUrl: accountControls.viewModel.avatarUrl.value,
+  userEmail: accountControls.viewModel.userEmail.value,
   balance: accountControls.viewModel.balance.value,
   menuItems: accountControls.viewModel.menuItems.value,
 }))

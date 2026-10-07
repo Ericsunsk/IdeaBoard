@@ -1,6 +1,6 @@
 <template>
   <DropdownMenuSubTrigger
-    v-bind="cleanProps(props)"
+    v-bind="forwardedProps"
     :class="
       cn(
         'flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent',
@@ -10,20 +10,31 @@
     "
   >
     <slot />
-    <NavArrowRight class="ml-auto h-4 w-4" />
+    <NavArrowRight class="ml-auto h-4 w-4 shrink-0" />
   </DropdownMenuSubTrigger>
 </template>
 
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
+import { computed, type HTMLAttributes } from 'vue'
 import { DropdownMenuSubTrigger, type DropdownMenuSubTriggerProps } from 'reka-ui'
 import { NavArrowRight } from '@iconoir/vue'
 import { cn, cleanProps } from '@/lib/utils'
 
-const props = defineProps<
-  DropdownMenuSubTriggerProps & {
-    class?: HTMLAttributes['class']
-    inset?: boolean
-  }
->()
+const props = withDefaults(
+  defineProps<
+    DropdownMenuSubTriggerProps & {
+      class?: HTMLAttributes['class']
+      inset?: boolean
+    }
+  >(),
+  {
+    class: undefined,
+    inset: false,
+  },
+)
+
+const forwardedProps = computed(() => {
+  const { class: _, inset: _i, ...rest } = props
+  return cleanProps(rest)
+})
 </script>

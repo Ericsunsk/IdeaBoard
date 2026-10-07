@@ -40,6 +40,7 @@
 import IbFormField, {
   type IbFormFieldSlotProps,
 } from '../../../../shared/components/IbFormField.vue'
+import { ibFormInputIconClass } from '../../../../shared/theme/formControls'
 
 withDefaults(
   defineProps<{
@@ -47,14 +48,14 @@ withDefaults(
     error?: string
     fieldId?: string | undefined
     fieldClass?: string
-    iconClass?: string
+    iconClass?: string | undefined
     required?: boolean
   }>(),
   {
     error: '',
     fieldId: undefined,
     fieldClass: '',
-    iconClass: '',
+    iconClass: ibFormInputIconClass,
     required: true,
   },
 )

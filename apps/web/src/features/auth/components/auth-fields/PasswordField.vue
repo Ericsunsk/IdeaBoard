@@ -7,6 +7,9 @@
     :field-class="fieldClass"
     :icon-class="iconClass"
   >
+    <template v-if="$slots.prefix" #prefix>
+      <slot name="prefix" />
+    </template>
     <template v-if="$slots['header-extra']" #header-extra>
       <slot name="header-extra" />
     </template>
@@ -62,7 +65,6 @@ withDefaults(
     fieldClass: '',
     inputClass: '',
     inputErrorClass: '',
-    iconClass: '',
     autocomplete: undefined,
     disabled: false,
     required: true,

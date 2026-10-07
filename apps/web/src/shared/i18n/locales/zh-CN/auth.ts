@@ -60,6 +60,7 @@ export default {
     themeLight: '明亮',
     themeDark: '暗黑',
     themeSystem: '跟随系统',
+    language: '语言',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

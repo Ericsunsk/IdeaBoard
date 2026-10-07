@@ -107,6 +107,6 @@ export const adminDialogChromeCloseClass = 'text-muted-foreground hover:text-for
 export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'
 
 // 全局唯一输入框 chrome（AdminInput/AdminNumberInput/AdminTextarea 共用）：
-// 无阴影扁平底，hover 只加深边框，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。
+// 遵循标准 shadcn 输入栏规范，无 hover 杂效，focus 用柔光 ring；尺寸/字号由各组件按 size 追加覆盖。
 export const adminInputChromeClass =
-  'flex w-full rounded-lg border border-input bg-background text-foreground transition-colors placeholder:text-muted-foreground hover:border-border-hover focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50'
+  'flex w-full rounded-md border border-input bg-background text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'

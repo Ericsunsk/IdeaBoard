@@ -1,13 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 import { createBillingCatalogHandlers, createBillingCatalogMswState } from './testing'
 
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pool review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+const routerMocks = vi.hoisted(() => ({
+  route: { query: {} as Record<string, string>, path: '/admin/credits/pricing' },
+  push: vi.fn(),
+  replace: vi.fn(),
+}))
+
+vi.mock('vue-router', async (importOriginal) => {
+  const original = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...original,
+    useRoute: () => routerMocks.route,
+    useRouter: () => ({ push: routerMocks.push, replace: routerMocks.replace }),
+  }
+})
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
@@ -52,6 +66,9 @@ function poolHandlers(failSkus: string[] = []) {
 
 describe('AdminBillingPricingPage model pools', () => {
   beforeEach(() => {
+    routerMocks.route.query = {}
+    routerMocks.push.mockReset()
+    routerMocks.replace.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
     readReasonMock.mockReset()
@@ -88,7 +105,7 @@ describe('AdminBillingPricingPage model pools', () => {
     expect(screen.queryByText('功能定价加载失败')).not.toBeInTheDocument()
   })
 
-  it('opens the pool editor from the action column settings dialog', async () => {
+  it('opens the pool editor directly in the unified settings dialog', async () => {
     useMswHandlers(
       ...createBillingCatalogHandlers(createBillingCatalogMswState()),
       ...poolHandlers(),
@@ -97,12 +114,207 @@ describe('AdminBillingPricingPage model pools', () => {
 
     // 抠图是 active 状态，其操作列按钮为“调整”
     await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
-    const modelTab = await screen.findByRole('tab', { name: 'Model' })
-    await user.click(modelTab)
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '模型池 · 抠图' })).toBeVisible()
+      expect(screen.getByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
     })
-    expect(screen.getByText('版本 v2')).toBeVisible()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).queryByText(/版本/)).not.toBeInTheDocument()
+    expect(within(dialog).getByText('a/first')).toBeVisible()
+    expect(within(dialog).getByRole('button', { name: 'a/first1K分辨率已支持' })).toBeVisible()
+  })
+
+  it('saves pool changes from the settings dialog', async () => {
+    let replaceRequests = 0
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', async ({ request, params }) => {
+        replaceRequests += 1
+        expect(params.sku).toBe('ai-image:cutout')
+        const body = (await request.json()) as {
+          expected_version: number
+          entries: unknown[]
+          reason: string
+        }
+        expect(body.expected_version).toBe(2)
+        expect(body.reason).toBe('pool review')
+        return HttpResponse.json({
+          data: {
+            service: 'cutout',
+            sku: 'ai-image:cutout',
+            version: 3,
+            entries: body.entries,
+          },
+        })
+      }),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
+    const toggleButton = screen.getByRole('button', { name: 'a/first4K分辨率已支持' })
+    await user.click(toggleButton)
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      expect(replaceRequests).toBe(1)
+    })
+    expect(toast.success).toHaveBeenCalledWith('模型池已保存')
+  })
+
+  it('shows model pool save errors in the settings dialog', async () => {
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', () =>
+        HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'pool unavailable' } },
+          { status: 503 },
+        ),
+      ),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(await screen.findByText('pool unavailable')).toBeVisible()
+    expect(screen.getByRole('dialog')).toBeVisible()
+  })
+
+  it('saves both price and pool changes with a single confirmation when both are modified', async () => {
+    let publishRequests = 0
+    let replaceRequests = 0
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async ({ request, params }) => {
+        publishRequests += 1
+        expect(params.sku).toBe('ai-image:cutout')
+        const body = (await request.json()) as { prices: Record<string, number>; reason: string }
+        expect(body.prices['1k']).toBe(5)
+        expect(body.reason).toBe('pool review')
+        return HttpResponse.json({
+          data: {
+            prices: {
+              '1k': {
+                output_resolution: '1k',
+                price_version_id: 11,
+                version: 2,
+                unit_credits: 5,
+                created_at: '2026-07-16T12:00:00Z',
+              },
+            },
+          },
+        })
+      }),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', async ({ request, params }) => {
+        replaceRequests += 1
+        expect(params.sku).toBe('ai-image:cutout')
+        const body = (await request.json()) as {
+          expected_version: number
+          entries: unknown[]
+          reason: string
+        }
+        expect(body.expected_version).toBe(2)
+        expect(body.reason).toBe('pool review')
+        return HttpResponse.json({
+          data: {
+            service: 'cutout',
+            sku: 'ai-image:cutout',
+            version: 3,
+            entries: body.entries,
+          },
+        })
+      }),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
+
+    // 1. 修改价格
+    const priceInput = screen.getByRole('spinbutton', { name: '1K' })
+    await user.clear(priceInput)
+    await user.type(priceInput, '5')
+
+    // 2. 修改模型池
+    const toggleButton = screen.getByRole('button', { name: 'a/first4K分辨率已支持' })
+    await user.click(toggleButton)
+
+    // 3. 点击保存
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      expect(publishRequests).toBe(1)
+      expect(replaceRequests).toBe(1)
+    })
+    expect(toast.success).toHaveBeenCalledWith('配置已保存')
+  })
+
+  it('does not repeat a successful price publish when the pool save is retried', async () => {
+    let publishRequests = 0
+    let replaceRequests = 0
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      ...poolHandlers(),
+      http.post('/api/control/v1/billing/catalog/:sku/prices', async () => {
+        publishRequests += 1
+        return HttpResponse.json({
+          data: {
+            prices: {
+              '1k': {
+                output_resolution: '1k',
+                price_version_id: 11,
+                version: 2,
+                unit_credits: 5,
+                created_at: '2026-07-16T12:00:00Z',
+              },
+            },
+          },
+        })
+      }),
+      http.put('/api/control/v1/billing/catalog/:sku/pool', async ({ request, params }) => {
+        replaceRequests += 1
+        if (replaceRequests === 1) {
+          return HttpResponse.json(
+            { error: { code: 'service_unavailable', message: 'pool unavailable' } },
+            { status: 503 },
+          )
+        }
+        const body = (await request.json()) as { expected_version: number; entries: unknown[] }
+        expect(params.sku).toBe('ai-image:cutout')
+        expect(body.expected_version).toBe(2)
+        return HttpResponse.json({
+          data: {
+            service: 'cutout',
+            sku: 'ai-image:cutout',
+            version: 3,
+            entries: body.entries,
+          },
+        })
+      }),
+    )
+    const { user } = renderPricingPage()
+
+    await user.click((await screen.findAllByRole('button', { name: '调整' }))[0]!)
+    expect(await screen.findByRole('heading', { name: '编辑 · 抠图' })).toBeVisible()
+    await user.clear(screen.getByRole('spinbutton', { name: '1K' }))
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '5')
+    await user.click(screen.getByRole('button', { name: 'a/first4K分辨率已支持' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(await screen.findByText('pool unavailable')).toBeVisible()
+    expect(publishRequests).toBe(1)
+    expect(replaceRequests).toBe(1)
+    expect(toast.error).toHaveBeenCalledWith('部分配置保存失败，请根据提示重试')
+
+    await user.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(replaceRequests).toBe(2))
+    expect(publishRequests).toBe(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(toast.success).toHaveBeenCalledWith('模型池已保存')
   })
 })
 

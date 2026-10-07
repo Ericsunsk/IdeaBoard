@@ -35,7 +35,7 @@
           :value="searchKeyword"
           type="text"
           :aria-label="t('admin.common.search')"
-          class="h-9 w-full rounded-lg border border-input bg-background pr-9 pl-9 text-xs text-foreground placeholder:text-muted-foreground transition-colors focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+          class="h-9 w-full rounded-md border border-input bg-background pr-9 pl-9 text-xs text-foreground placeholder:text-muted-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           :placeholder="t('admin.common.search')"
           @input="emit('update:searchKeyword', ($event.target as HTMLInputElement).value)"
           @keydown.enter="emit('search')"

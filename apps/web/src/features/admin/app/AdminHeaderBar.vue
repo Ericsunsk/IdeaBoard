@@ -37,8 +37,6 @@
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
-        <AdminThemeToggle />
-
         <PopoverRoot>
           <PopoverTrigger as-child>
             <button
@@ -135,33 +133,90 @@
               </span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" :side-offset="8" class="w-48">
-            <!-- 极简用户信息：主标题为邮箱，副标题为 admin -->
+          <DropdownMenuContent align="end" :side-offset="8" class="w-auto min-w-36 max-w-56">
+            <!-- 极简用户信息：展示当前登录账号邮箱 -->
             <DropdownMenuLabel class="px-2.5 py-1.5 font-normal">
-              <div class="flex flex-col">
-                <span class="truncate text-xs font-semibold text-foreground">
-                  {{ userEmail }}
-                </span>
-                <span class="truncate text-admin-caption text-muted-foreground font-mono">
-                  admin
-                </span>
-              </div>
+              <span class="truncate text-xs font-semibold text-foreground">
+                {{ userEmail }}
+              </span>
             </DropdownMenuLabel>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem class="cursor-pointer gap-2" @select="handleUserAction('boards')">
-              <ViewGrid class="size-4 text-muted-foreground" />
+            <DropdownMenuItem class="cursor-pointer" @select="handleUserAction('boards')">
               <span>返回画布</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
+            <div class="px-1.5 py-1">
+              <div
+                role="radiogroup"
+                :aria-label="t('auth.menu.appearance')"
+                tabindex="-1"
+                class="flex h-8 w-full items-center rounded-lg border border-border bg-muted/60 p-0.5"
+                @keydown="handleThemeKeydown"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="mode === 'light'"
+                  :tabindex="mode === 'light' ? 0 : -1"
+                  :title="t('auth.menu.themeLight')"
+                  :aria-label="t('auth.menu.themeLight')"
+                  class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="
+                    mode === 'light'
+                      ? 'bg-card font-semibold text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setTheme('light')"
+                >
+                  <SunLight class="size-4" />
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="mode === 'dark'"
+                  :tabindex="mode === 'dark' ? 0 : -1"
+                  :title="t('auth.menu.themeDark')"
+                  :aria-label="t('auth.menu.themeDark')"
+                  class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="
+                    mode === 'dark'
+                      ? 'bg-card font-semibold text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setTheme('dark')"
+                >
+                  <HalfMoon class="size-4" />
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="mode === 'auto'"
+                  :tabindex="mode === 'auto' ? 0 : -1"
+                  :title="t('auth.menu.themeSystem')"
+                  :aria-label="t('auth.menu.themeSystem')"
+                  class="flex flex-1 h-full items-center justify-center rounded-md text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="
+                    mode === 'auto'
+                      ? 'bg-card font-semibold text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  "
+                  @click.stop="setTheme('system')"
+                >
+                  <Laptop class="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <DropdownMenuSeparator />
+
             <DropdownMenuItem
-              class="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+              class="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
               @select="handleUserAction('logout')"
             >
-              <LogOut class="size-4" />
               <span>退出登录</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -176,6 +231,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import {
   DropdownMenu,
@@ -186,13 +242,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import AdminBadge from '../shared/components/AdminBadge.vue'
-import AdminThemeToggle from '../shared/components/AdminThemeToggle.vue'
 import {
   BellNotificationSolid as BellIcon,
-  LogOut,
+  HalfMoon,
+  Laptop,
   Menu as MenuIcon,
+  SunLight,
   User as UserIcon,
-  ViewGrid,
   Xmark,
 } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'
@@ -203,6 +259,8 @@ import { useAdminToast } from '../shared/lib/toast'
 import type { AdminAnomalyItem } from '../shared/lib/anomalyRules'
 import { adminAnomalyPopoverClass } from '../shared/lib/uiClasses'
 import { ADMIN_LOGIN_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
+import { useTheme } from '../../../shared/theme/composables/useTheme'
+import { createThemeKeyboardHandler } from '../../../shared/theme/composables/themeKeyboard'
 
 defineProps<{
   activeItem: AdminNavigationItem
@@ -221,6 +279,9 @@ const toast = useAdminToast()
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { t } = useI18n()
+const { mode, setTheme } = useTheme()
+const handleThemeKeydown = createThemeKeyboardHandler({ mode, setTheme })
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 
 const userMenuOpen = ref(false)

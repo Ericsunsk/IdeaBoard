@@ -1,13 +1,19 @@
 <template>
-  <DropdownMenuSub v-bind="cleanProps(props)" @update:open="emit('update:open', $event)">
+  <DropdownMenuSub v-bind="forwarded">
     <slot />
   </DropdownMenuSub>
 </template>
 
 <script setup lang="ts">
-import { DropdownMenuSub, type DropdownMenuSubEmits, type DropdownMenuSubProps } from 'reka-ui'
-import { cleanProps } from '@/lib/utils'
+import {
+  DropdownMenuSub,
+  useForwardPropsEmits,
+  type DropdownMenuSubEmits,
+  type DropdownMenuSubProps,
+} from 'reka-ui'
 
 const props = defineProps<DropdownMenuSubProps>()
-const emit = defineEmits<DropdownMenuSubEmits>()
+const emits = defineEmits<DropdownMenuSubEmits>()
+
+const forwarded = useForwardPropsEmits(props, emits)
 </script>

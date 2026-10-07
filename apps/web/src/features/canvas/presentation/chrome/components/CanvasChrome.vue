@@ -21,13 +21,11 @@
     <UserAccountMenu
       class="canvas-chrome-action-group"
       :avatar-url="account.avatarUrl"
+      :user-email="account.userEmail"
       :balance="account.balance"
       :items="account.menuItems"
       :avatar-button-class="canvasChromeAvatarButtonClass"
     >
-      <template #before-balance>
-        <UserLocaleSelect />
-      </template>
       <template #actions>
         <button
           type="button"
@@ -158,7 +156,6 @@ import {
 } from '@iconoir/vue'
 import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
 import UserAccountMenu from '../../../../../shared/components/UserAccountMenu.vue'
-import UserLocaleSelect from '../../../../../shared/components/UserLocaleSelect.vue'
 import {
   createPageChromeAccountRoundControlClass,
   createPageChromeRoundControlClass,

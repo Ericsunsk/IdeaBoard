@@ -3,6 +3,17 @@ import { render, renderWithUser, screen, waitFor } from '../../test/render'
 import UserAccountMenu from './UserAccountMenu.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
+async function openSubmenu(trigger: HTMLElement, firstOptionName: string | RegExp) {
+  trigger.dispatchEvent(
+    new PointerEvent('pointermove', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+    }),
+  )
+  return screen.findByRole('menuitem', { name: firstOptionName })
+}
+
 describe('UserAccountMenu', () => {
   it('renders the typed balance control before the avatar', async () => {
     const openCredits = vi.fn()
@@ -182,74 +193,71 @@ describe('UserAccountMenu', () => {
     expect(customAction.nextElementSibling).toBe(accountMenu)
   })
 
-  it('renders before-balance slot leading element before credit balance in authenticated state', () => {
-    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
-    const balance: UserIdeaBalanceControl = {
-      status: 'ready',
-      availableIdeas: 100,
-      displayValue: '100',
-      ariaLabel: 'Idea余额 100 Ideas',
-      command: vi.fn(),
-    }
-    render(UserAccountMenu, {
-      props: { items, balance },
-      slots: {
-        'before-balance': '<button type="button" aria-label="locale-trigger">Translate</button>',
-        actions: '<button type="button" aria-label="custom-action">Custom Action</button>',
-      },
-    })
-
-    const localeTrigger = screen.getByRole('button', { name: 'locale-trigger' })
-    const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
-    const customAction = screen.getByRole('button', { name: 'custom-action' })
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' })
-
-    expect(localeTrigger).toBeVisible()
-    expect(localeTrigger.nextElementSibling).toBe(credits)
-    expect(credits.nextElementSibling).toBe(customAction)
-    expect(customAction.nextElementSibling).toBe(accountMenu)
-  })
-
-  it('renders before-balance slot leading element before guest login and register buttons in guest state', () => {
-    const items: UserAccountMenuItem[] = [
-      { key: 'login', label: '登录', command: vi.fn() },
-      { key: 'register', label: '免费注册', command: vi.fn() },
-    ]
-    render(UserAccountMenu, {
-      props: { items },
-      slots: {
-        'before-balance': '<button type="button" aria-label="locale-trigger">Translate</button>',
-      },
-    })
-
-    const localeTrigger = screen.getByRole('button', { name: 'locale-trigger' })
-    const loginBtn = screen.getByRole('button', { name: 'Sign in' })
-    const registerBtn = screen.getByRole('button', { name: 'Sign up for free' })
-
-    expect(localeTrigger).toBeVisible()
-    expect(localeTrigger.nextElementSibling).toBe(loginBtn)
-    expect(loginBtn.nextElementSibling).toBe(registerBtn)
-  })
-
-  it('renders appearance segmented control allowing tri-state theme switching', async () => {
+  it('renders appearance submenu allowing tri-state theme switching', async () => {
     const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
     const trigger = screen.getByRole('button', { name: 'Account menu' })
     await user.click(trigger)
 
-    const group = await screen.findByRole('radiogroup', { name: 'Appearance' })
-    expect(group).toBeVisible()
+    const appearanceTrigger = await screen.findByRole('menuitem', { name: /Appearance/i })
+    expect(appearanceTrigger).toBeVisible()
+    const darkOption = await openSubmenu(appearanceTrigger, /Dark/i)
+    expect(darkOption).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /Light/i })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: /System/i })).toBeVisible()
 
-    const lightRadio = screen.getByRole('radio', { name: /Light/i })
-    const darkRadio = screen.getByRole('radio', { name: /Dark/i })
-    const systemRadio = screen.getByRole('radio', { name: /System/i })
+    await user.click(darkOption)
+    expect(darkOption).toHaveAttribute('data-control-state', 'active')
+  })
 
-    expect(lightRadio).toBeVisible()
-    expect(darkRadio).toBeVisible()
-    expect(systemRadio).toBeVisible()
+  it('renders language submenu allowing locale switching', async () => {
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
+    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
-    await user.click(darkRadio)
-    expect(darkRadio).toHaveAttribute('aria-checked', 'true')
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
+    await user.click(trigger)
+
+    const languageTrigger = await screen.findByRole('menuitem', { name: /Language/i })
+    expect(languageTrigger).toBeVisible()
+    const zhOption = await openSubmenu(languageTrigger, '简体中文')
+    expect(zhOption).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'English' })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'Español' })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: '한국어' })).toBeVisible()
+
+    await user.click(zhOption)
+  })
+
+  it('renders user email at top with a separator and omits separator above appearance', async () => {
+    const items: UserAccountMenuItem[] = [
+      { key: 'profile', label: '账户管理', command: vi.fn() },
+      { key: 'logout', label: '退出登录', tone: 'danger', command: vi.fn() },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, {
+      props: {
+        items,
+        userEmail: 'user@ideaboard.local',
+      },
+    })
+
+    const trigger = screen.getByRole('button', { name: 'Account menu' })
+    await user.click(trigger)
+
+    const emailLabel = await screen.findByText('user@ideaboard.local')
+    expect(emailLabel).toBeVisible()
+
+    const separators = screen.getAllByRole('separator')
+    // One separator after email, one separator before danger item (logout)
+    expect(separators).toHaveLength(2)
+
+    // The first separator should immediately follow the email label container
+    const emailContainer = emailLabel.closest('div') ?? emailLabel
+    expect(emailContainer.nextElementSibling).toBe(separators[0])
+
+    // There should be no separator directly between profile and appearance
+    const profileItem = screen.getByRole('menuitem', { name: '账户管理' })
+    const appearanceTrigger = screen.getByRole('menuitem', { name: /Appearance/i })
+    expect(profileItem.nextElementSibling).toBe(appearanceTrigger)
   })
 })

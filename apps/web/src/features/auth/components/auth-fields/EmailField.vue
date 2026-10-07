@@ -7,6 +7,9 @@
     :field-class="fieldClass"
     :icon-class="iconClass"
   >
+    <template v-if="$slots.prefix" #prefix>
+      <slot name="prefix" />
+    </template>
     <template v-if="$slots['header-extra']" #header-extra>
       <slot name="header-extra" />
     </template>
@@ -65,7 +68,6 @@ const props = withDefaults(
     fieldClass: '',
     inputClass: '',
     inputErrorClass: '',
-    iconClass: '',
     inputType: 'text',
     autocomplete: undefined,
     disabled: false,

@@ -19,8 +19,17 @@
           />
         </div>
 
-        <!-- 右侧：刷新同步按钮 -->
+        <!-- 右侧：刷新同步按钮与演示模式切换 -->
         <div class="flex shrink-0 items-center gap-2">
+          <AdminButton
+            v-if="isDev || isDemoMode"
+            variant="outline"
+            size="sm"
+            :class="isDemoMode ? 'border-primary/50 text-primary bg-primary/10' : ''"
+            @click="toggleDemoMode"
+          >
+            {{ isDemoMode ? '退出演示' : '演示数据' }}
+          </AdminButton>
           <AdminRefreshButton
             :loading="isLoading"
             :aria-label="BILLING_PRICING_MESSAGES.refresh"
@@ -124,7 +133,6 @@
       :item="selectedItem"
       :pending="publishPending"
       :error-message="publishError"
-      :pool-version="poolEditVersion"
       :pool-entries="poolEditEntries"
       :pool-catalog-models="poolCatalogModels"
       :pool-catalog-loading="poolCatalogLoading"
@@ -133,8 +141,7 @@
       :pool-save-stale="poolSaveStale"
       :pool-save-disabled="!poolEditReady"
       :pool-catalog-error="poolCatalogError"
-      @submit="publishPrice"
-      @submit-pool="savePool"
+      @save="saveSettings"
       @reload-pool="reloadPool"
       @reload-catalog="loadPoolCatalog"
     />
@@ -142,7 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Coins, Refresh, Search, Xmark } from '@iconoir/vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
@@ -172,6 +180,36 @@ import type {
   PricingVariant,
 } from './billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
+import { stringParam } from '../../../../shared/router/queryParams'
+import {
+  DEMO_MODE_QUERY_VALUE,
+  createDemoBillingItems,
+  createDemoModelPools,
+  createDemoCatalogModels,
+  createDemoPricesUpdate,
+} from './demoData'
+
+const route = useRoute()
+const router = useRouter()
+const isDemoMode = computed(() =>
+  route?.query ? stringParam(route.query.demo) === DEMO_MODE_QUERY_VALUE : false,
+)
+const isDev = import.meta.env.DEV
+
+function toggleDemoMode() {
+  if (!router || !route) return
+  const query = { ...route.query }
+  if (isDemoMode.value) {
+    delete query.demo
+  } else {
+    query.demo = DEMO_MODE_QUERY_VALUE
+  }
+  void router.replace({ query })
+}
+
+watch(isDemoMode, () => {
+  void loadCatalog()
+})
 
 const resource = createAdminBillableCatalogResource()
 const poolResource = createAdminModelPoolResource()
@@ -185,6 +223,7 @@ const poolFailed = reactive<Record<string, boolean>>({})
 const poolEditItem = ref<AdminBillableItemCard | null>(null)
 const poolEditVersion = ref(0)
 const poolEditEntries = ref<AdminModelPoolEntry[]>([])
+const savedPoolEntries = ref<AdminModelPoolEntry[]>([])
 const poolEditReady = ref(false)
 const poolCatalogModels = ref<AdminPoolCatalogModel[]>([])
 const poolCatalogLoading = ref(false)
@@ -276,6 +315,16 @@ function catalogCardPriority(item: AdminBillableItemCard) {
 async function loadCatalog() {
   isLoading.value = true
   errorMessage.value = ''
+  if (isDemoMode.value) {
+    items.value = createDemoBillingItems()
+    poolBySku.value = createDemoModelPools()
+    poolCatalogModels.value = createDemoCatalogModels()
+    Object.keys(poolBySku.value).forEach((sku) => {
+      poolFailed[sku] = false
+    })
+    isLoading.value = false
+    return
+  }
   try {
     items.value = await resource.list()
     await loadModelPools()
@@ -305,6 +354,10 @@ async function loadModelPools() {
 
 async function loadPoolCatalog() {
   if (poolCatalogLoading.value) return
+  if (isDemoMode.value) {
+    poolCatalogModels.value = createDemoCatalogModels()
+    return
+  }
   poolCatalogLoading.value = true
   poolCatalogError.value = ''
   try {
@@ -324,26 +377,61 @@ async function reloadPool() {
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
+  if (isDemoMode.value) {
+    const pool: AdminModelPool = poolBySku.value[item.sku] ?? {
+      service: serviceOfSku(item.sku) ?? 'generation',
+      sku: item.sku,
+      version: 1,
+      entries: [],
+    }
+    poolBySku.value[item.sku] = pool
+    poolFailed[item.sku] = false
+    poolEditVersion.value = pool.version
+    poolEditEntries.value = clonePoolEntries(pool.entries)
+    savedPoolEntries.value = clonePoolEntries(pool.entries)
+    poolEditReady.value = true
+    poolSavePending.value = false
+    return
+  }
   try {
     const pool = await poolResource.get(item.sku)
     poolBySku.value[item.sku] = pool
     poolFailed[item.sku] = false
     poolEditVersion.value = pool.version
-    poolEditEntries.value = pool.entries.map((entry) => ({
-      modelId: entry.modelId,
-      enabled: entry.enabled,
-      resolutions: [...entry.resolutions],
-    }))
+    poolEditEntries.value = clonePoolEntries(pool.entries)
+    savedPoolEntries.value = clonePoolEntries(pool.entries)
     poolEditReady.value = true
   } catch (error) {
     poolEditVersion.value = 0
     poolEditEntries.value = []
+    savedPoolEntries.value = []
     poolEditReady.value = false
     poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
     poolSaveStale.value = true
   } finally {
     poolSavePending.value = false
   }
+}
+
+function applyPoolReplaceSuccess(item: AdminBillableItemCard, saved: AdminModelPool) {
+  poolBySku.value[item.sku] = saved
+  poolFailed[item.sku] = false
+  poolEditVersion.value = saved.version
+  poolEditEntries.value = clonePoolEntries(saved.entries)
+  savedPoolEntries.value = clonePoolEntries(saved.entries)
+}
+
+function clonePoolEntries(entries: AdminModelPoolEntry[]): AdminModelPoolEntry[] {
+  return entries.map((entry) => ({
+    modelId: entry.modelId,
+    enabled: entry.enabled,
+    resolutions: [...entry.resolutions],
+  }))
+}
+
+function handlePoolSaveError(error: unknown) {
+  poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
+  poolSaveStale.value = error instanceof Error && (error as { code?: unknown }).code === 'conflict'
 }
 
 async function savePool(entries: AdminModelPoolEntry[]) {
@@ -361,26 +449,30 @@ async function savePool(entries: AdminModelPoolEntry[]) {
   poolSavePending.value = true
   poolSaveError.value = ''
   poolSaveStale.value = false
+  if (isDemoMode.value) {
+    const saved: AdminModelPool = {
+      service: serviceOfSku(item.sku) ?? 'generation',
+      sku: item.sku,
+      version: poolEditVersion.value + 1,
+      entries: clonePoolEntries(entries),
+    }
+    applyPoolReplaceSuccess(item, saved)
+    priceDialogVisible.value = false
+    toast.success(BILLING_PRICING_MESSAGES.poolSaved)
+    poolSavePending.value = false
+    return
+  }
   try {
     const saved = await poolResource.replace(
       item.sku,
       { version: poolEditVersion.value, entries },
       { operatorReason },
     )
-    poolBySku.value[item.sku] = saved
-    poolFailed[item.sku] = false
-    poolEditVersion.value = saved.version
-    poolEditEntries.value = saved.entries.map((entry) => ({
-      modelId: entry.modelId,
-      enabled: entry.enabled,
-      resolutions: [...entry.resolutions],
-    }))
+    applyPoolReplaceSuccess(item, saved)
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.poolSaved)
   } catch (error) {
-    poolSaveError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.poolSaveFailed)
-    poolSaveStale.value =
-      error instanceof Error && (error as { code?: unknown }).code === 'conflict'
+    handlePoolSaveError(error)
   } finally {
     poolSavePending.value = false
   }
@@ -422,6 +514,12 @@ async function confirmArchivedDelete(item: AdminBillableItemCard) {
 async function deleteArchived(item: AdminBillableItemCard, operatorReason: string) {
   if (deletePending[item.sku]) return
   deletePending[item.sku] = true
+  if (isDemoMode.value) {
+    items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
+    toast.success(BILLING_PRICING_MESSAGES.deleted)
+    deletePending[item.sku] = false
+    return
+  }
   try {
     await resource.deleteArchived(item.sku, { operatorReason })
     items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
@@ -431,6 +529,16 @@ async function deleteArchived(item: AdminBillableItemCard, operatorReason: strin
   } finally {
     deletePending[item.sku] = false
   }
+}
+
+function applyPricePublishSuccess(
+  item: AdminBillableItemCard,
+  published: AdminBillableItemCard['currentPrices'],
+) {
+  item.currentPrices = published
+  const latest = Object.values(published).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+  if (latest) item.updatedAt = latest.createdAt
+  if (item.status === 'unpriced') item.status = 'active'
 }
 
 async function publishPrice(prices: Record<PricingVariant, number | undefined>) {
@@ -446,20 +554,164 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
   if (!operatorReason) return
   publishPending.value = true
   publishError.value = ''
+  if (isDemoMode.value) {
+    const published = createDemoPricesUpdate(item.currentPrices, prices)
+    applyPricePublishSuccess(item, published)
+    priceDialogVisible.value = false
+    toast.success(BILLING_PRICING_MESSAGES.published)
+    publishPending.value = false
+    return
+  }
   try {
     const published = await resource.publishPrices(item.sku, prices, { operatorReason })
-    item.currentPrices = published
-    const latest = Object.values(published).sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    )[0]
-    if (latest) item.updatedAt = latest.createdAt
-    if (item.status === 'unpriced') item.status = 'active'
+    applyPricePublishSuccess(item, published)
     priceDialogVisible.value = false
     toast.success(BILLING_PRICING_MESSAGES.published)
   } catch (error) {
     publishError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
   } finally {
     publishPending.value = false
+  }
+}
+
+function isPricingChanged(
+  item: AdminBillableItemCard,
+  newPrices: Record<PricingVariant, number | undefined>,
+): boolean {
+  if (item.status === 'unpriced') return true
+  for (const variant of item.pricingVariants) {
+    const oldVal = item.currentPrices[variant]?.unitCredits
+    const newVal = newPrices[variant]
+    if (oldVal !== newVal) return true
+  }
+  return false
+}
+
+function isPoolChanged(
+  originalEntries: AdminModelPoolEntry[],
+  newEntries?: AdminModelPoolEntry[],
+): boolean {
+  if (!newEntries) return false
+  if (originalEntries.length !== newEntries.length) return true
+  for (let i = 0; i < originalEntries.length; i++) {
+    const orig = originalEntries[i]!
+    const next = newEntries[i]!
+    if (orig.modelId !== next.modelId || orig.enabled !== next.enabled) return true
+    if (orig.resolutions.length !== next.resolutions.length) return true
+    const origSet = new Set(orig.resolutions)
+    if (next.resolutions.some((r) => !origSet.has(r))) return true
+  }
+  return false
+}
+
+async function saveCombinedSettings(
+  item: AdminBillableItemCard,
+  prices: Record<PricingVariant, number | undefined>,
+  entries: AdminModelPoolEntry[],
+) {
+  const operatorReason = await confirmSettingsSave(confirm, {
+    title: BILLING_PRICING_MESSAGES.saveAllTitle,
+    message: BILLING_PRICING_MESSAGES.saveAllMessage(item.displayName),
+    confirmLabel: BILLING_PRICING_MESSAGES.saveAllConfirm,
+  })
+  if (!operatorReason) return
+
+  publishPending.value = true
+  poolSavePending.value = true
+  publishError.value = ''
+  poolSaveError.value = ''
+  poolSaveStale.value = false
+
+  if (isDemoMode.value) {
+    const published = createDemoPricesUpdate(item.currentPrices, prices)
+    applyPricePublishSuccess(item, published)
+    const saved: AdminModelPool = {
+      service: serviceOfSku(item.sku) ?? 'generation',
+      sku: item.sku,
+      version: poolEditVersion.value + 1,
+      entries: entries.map((e) => ({
+        modelId: e.modelId,
+        enabled: e.enabled,
+        resolutions: [...e.resolutions],
+      })),
+    }
+    applyPoolReplaceSuccess(item, saved)
+    publishPending.value = false
+    poolSavePending.value = false
+    priceDialogVisible.value = false
+    toast.success(BILLING_PRICING_MESSAGES.saveAllSuccess)
+    return
+  }
+
+  const pricingChanged = isPricingChanged(item, prices)
+  const poolChanged = isPoolChanged(savedPoolEntries.value, entries)
+  let failed = false
+
+  try {
+    if (pricingChanged) {
+      publishPending.value = true
+      try {
+        const published = await resource.publishPrices(item.sku, prices, { operatorReason })
+        applyPricePublishSuccess(item, published)
+        publishError.value = ''
+      } catch (error) {
+        publishError.value = formatAdminDisplayError(error, BILLING_PRICING_MESSAGES.publishFailed)
+        failed = true
+      } finally {
+        publishPending.value = false
+      }
+    }
+
+    if (poolChanged) {
+      poolSavePending.value = true
+      try {
+        const saved = await poolResource.replace(
+          item.sku,
+          { version: poolEditVersion.value, entries },
+          { operatorReason },
+        )
+        applyPoolReplaceSuccess(item, saved)
+        poolSaveError.value = ''
+        poolSaveStale.value = false
+      } catch (error) {
+        handlePoolSaveError(error)
+        failed = true
+      } finally {
+        poolSavePending.value = false
+      }
+    }
+  } finally {
+    publishPending.value = false
+    poolSavePending.value = false
+  }
+
+  if (failed) {
+    toast.error(BILLING_PRICING_MESSAGES.saveAllFailed)
+  } else {
+    priceDialogVisible.value = false
+    toast.success(BILLING_PRICING_MESSAGES.saveAllSuccess)
+  }
+}
+
+async function saveSettings(payload: {
+  prices: Record<PricingVariant, number | undefined>
+  poolEntries?: AdminModelPoolEntry[] | undefined
+}) {
+  const item = selectedItem.value
+  if (!item || publishPending.value || poolSavePending.value) return
+
+  const pricingChanged = isPricingChanged(item, payload.prices)
+  const poolChanged =
+    Boolean(serviceOfSku(item.sku)) &&
+    Boolean(payload.poolEntries) &&
+    isPoolChanged(savedPoolEntries.value, payload.poolEntries)
+
+  if (pricingChanged && poolChanged && payload.poolEntries) {
+    await saveCombinedSettings(item, payload.prices, payload.poolEntries)
+  } else if (poolChanged && payload.poolEntries) {
+    await savePool(payload.poolEntries)
+  } else {
+    await publishPrice(payload.prices)
   }
 }
 
@@ -474,6 +726,15 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
   })
   if (!operatorReason) return
   availabilityPending[item.sku] = true
+  if (isDemoMode.value) {
+    item.status = enabled ? 'active' : 'disabled'
+    item.updatedAt = new Date().toISOString()
+    toast.success(
+      enabled ? BILLING_PRICING_MESSAGES.enabledToast : BILLING_PRICING_MESSAGES.disabledToast,
+    )
+    availabilityPending[item.sku] = false
+    return
+  }
   try {
     const availability = await resource.setAvailability(item.sku, enabled, { operatorReason })
     item.status = availability.status

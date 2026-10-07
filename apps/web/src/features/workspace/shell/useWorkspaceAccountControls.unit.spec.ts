@@ -82,6 +82,7 @@ describe('useWorkspaceAccountControls', () => {
       display_name: 'demo-user',
       storage_namespace: 'USR001',
       avatar: 'https://example.test/avatar.png',
+      email: 'demo@example.test',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     })
@@ -94,6 +95,7 @@ describe('useWorkspaceAccountControls', () => {
     })
 
     expect(controls.viewModel.avatarUrl.value).toBe('https://example.test/avatar.png')
+    expect(controls.viewModel.userEmail.value).toBe('demo@example.test')
     expect(controls.viewModel.balance.value).toMatchObject({
       availableIdeas: 1280,
       displayValue: '1,280',

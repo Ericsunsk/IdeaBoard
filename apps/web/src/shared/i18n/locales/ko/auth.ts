@@ -60,6 +60,7 @@ export default {
     themeLight: '라이트',
     themeDark: '다크',
     themeSystem: '시스템 설정',
+    language: '언어',
   },
   credits: {
     badgeAriaLabel: 'Ideas',

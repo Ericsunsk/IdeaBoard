@@ -110,7 +110,7 @@ vi.mock('../overlays', () => ({ useCanvasCustomLayerOverlay: vi.fn() }))
 
 vi.mock('../../../workspace/shell/useWorkspaceAccountControls.ts', () => ({
   useWorkspaceAccountControls: () => ({
-    viewModel: { avatarUrl: ref(null), balance: ref({}), menuItems: ref([]) },
+    viewModel: { avatarUrl: ref(null), userEmail: ref(null), balance: ref({}), menuItems: ref([]) },
     commands: { openAccount: vi.fn() },
   }),
 }))

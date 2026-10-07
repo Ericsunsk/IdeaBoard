@@ -12,6 +12,20 @@ import {
 const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const readReasonMock = vi.hoisted(() => vi.fn().mockReturnValue('pricing review'))
 const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+const routerMocks = vi.hoisted(() => ({
+  route: { query: {} as Record<string, string>, path: '/admin/credits/pricing' },
+  push: vi.fn(),
+  replace: vi.fn(),
+}))
+
+vi.mock('vue-router', async (importOriginal) => {
+  const original = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...original,
+    useRoute: () => routerMocks.route,
+    useRouter: () => ({ push: routerMocks.push, replace: routerMocks.replace }),
+  }
+})
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({
@@ -27,6 +41,9 @@ vi.mock('../../shared/lib/toast', async (importOriginal) => ({
 
 describe('AdminBillingPricingPage', () => {
   beforeEach(() => {
+    routerMocks.route.query = {}
+    routerMocks.push.mockReset()
+    routerMocks.replace.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(true)
     readReasonMock.mockReset()
@@ -250,6 +267,26 @@ describe('AdminBillingPricingPage', () => {
     expect(requests).toBe(2)
   })
 
+  it('shows price publish errors from the unified settings dialog', async () => {
+    useMswHandlers(
+      ...createBillingCatalogHandlers(createBillingCatalogMswState()),
+      http.post('/api/control/v1/billing/catalog/:sku/prices', () =>
+        HttpResponse.json(
+          { error: { code: 'service_unavailable', message: 'publish unavailable' } },
+          { status: 503 },
+        ),
+      ),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '设置' }))
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(await screen.findByText('publish unavailable')).toBeVisible()
+    expect(screen.getByRole('dialog')).toBeVisible()
+  })
+
   it('validates the price and blocks duplicate publishes while pending', async () => {
     let publishRequests = 0
     let releasePublish!: () => void
@@ -331,6 +368,20 @@ describe('AdminBillingPricingPage', () => {
       expect(screen.getByText('legacy:removed')).toBeVisible()
     })
     expect(toast.error).toHaveBeenCalledWith('功能已有历史计费记录，无法删除')
+  })
+
+  it('renders demo mock data and allows interactive preview when ?demo=1 is present', async () => {
+    routerMocks.route.query = { demo: '1' }
+    const { user } = renderPricingPage()
+
+    expect(await screen.findByText('generation')).toBeVisible()
+    expect(screen.getByText('ai-search:query')).toBeVisible()
+    expect(screen.getByText('legacy:bg-remover')).toBeVisible()
+    expect(screen.getByText('退出演示')).toBeVisible()
+
+    // 点击退出演示触发路由切换
+    await user.click(screen.getByRole('button', { name: '退出演示' }))
+    expect(routerMocks.replace).toHaveBeenCalledWith({ query: {} })
   })
 })
 
