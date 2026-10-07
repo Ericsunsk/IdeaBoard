@@ -2,8 +2,6 @@
 //
 // Versioned envelopes over `GET /api/v1/workspaces/{workspace_id}/events`
 // (SSE), shared with signed webhooks (same envelope, delivery differs).
-// Additive only: legacy `/user/events` (`userEventStream.ts`) is untouched
-// (removal is #809).
 //
 // Resume: every server frame carries `id:` (the `evt_` envelope id), so
 // native EventSource resumes automatically via Last-Event-ID. Fetch-based
@@ -449,7 +447,6 @@ export function waitForWorkspaceEnvelope(
  * Subscribe to workspace media readiness transitions. Extracts `asset_id`
  * from `media.asset_ready` / `media.asset_archived` envelopes and reports
  * it for cache invalidation. Malformed frames never reach the callback.
- * Legacy user-scope invalidation (`mediaAssetDelivery.ts`) is untouched.
  */
 export function subscribeWorkspaceMediaInvalidation(
   workspaceId: string,

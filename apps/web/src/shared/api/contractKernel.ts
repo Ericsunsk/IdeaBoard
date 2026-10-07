@@ -8,13 +8,6 @@
 // alongside `data`; the parser ignores them. Legacy numeric error bodies
 // never reach the parser (non-2xx throws in the shared client first).
 //
-// Per-feature migration TODOs (#801-#808):
-// - boardSync: move the board sync adapter to the public client + requireContractData.
-// - task + idempotency: route submit/cancel through buildContractRequestHeaders.
-// - library/search: add the snake_case -> camelCase boundary on top of parseContractEnvelope.
-// - media/upload: resolve delivery URLs through the public client envelope.
-// - SSE: resume via withSseResumeParam / buildSseResumeHeaders (Last-Event-ID).
-
 import { formatDisplayErrorMessage } from '../utils/errorMessages'
 import { opaqueIdPattern } from '../utils/opaqueIds'
 
@@ -272,7 +265,7 @@ export function buildConditionalHeaders(etag?: string | null): Record<string, st
 
 // SSE resume: native EventSource cannot set request headers, so fetch-based
 // transports resume with `?last_event_id=` while header transports use
-// `Last-Event-ID`. (Migration: userEventStream SSE Last-Event-ID, #801-#808.)
+// `Last-Event-ID`.
 export function buildSseResumeHeaders(lastEventId?: string | null): Record<string, string> {
   const trimmed = typeof lastEventId === 'string' ? lastEventId.trim() : ''
   return trimmed ? { 'Last-Event-ID': trimmed } : {}

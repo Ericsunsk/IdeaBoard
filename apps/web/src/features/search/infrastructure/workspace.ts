@@ -18,10 +18,7 @@ import { normalizeSearchQuery } from '../domain/queryPolicy'
 // via `publicMutator`). Search UI must consume this module, never
 // generated code directly.
 //
-// Migration note: `feed.ts` / `useSearchSession` still read the legacy
-// `search` + `user` generated clients. They move onto this module once
-// their call sites migrate; legacy routes are removed in #809. Query
-// length validation stays server-owned: over-limit queries surface as
+// Query length validation stays server-owned: over-limit queries surface as
 // 422 validation_failed (never a silent empty page).
 //
 // Transport note: the generated hooks own routes/envelopes; this adapter
