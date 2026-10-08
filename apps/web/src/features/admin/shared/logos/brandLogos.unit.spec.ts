@@ -46,6 +46,11 @@ describe('adminBrandLogos', () => {
     expect(minio?.logoSrc).not.toContain(LOGO_ENDPOINT)
     const github = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'github')
     expect(github?.logoSrc).not.toContain(LOGO_ENDPOINT)
+    // 图片搜索类目同理：上游仅有通用占位图，用站内品牌标。
+    const unsplash = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'unsplash')
+    expect(unsplash?.logoSrc).not.toContain(LOGO_ENDPOINT)
+    const pexels = ALL_ADMIN_BRAND_LOGOS.find((l) => l.key === 'pexels')
+    expect(pexels?.logoSrc).not.toContain(LOGO_ENDPOINT)
   })
 
   it('maps keys with divergent models.dev provider IDs to verified upstream IDs', () => {

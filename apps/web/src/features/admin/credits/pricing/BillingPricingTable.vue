@@ -99,9 +99,7 @@
         >
           <template #body="{ data }">
             <div v-if="data.status !== 'archived'" class="flex items-center gap-2">
-              <ActionButton
-                @click="emit('publish', data)"
-              >
+              <ActionButton @click="emit('publish', data)">
                 {{ BILLING_PRICING_MESSAGES.tablePublishLabel(data.status) }}
               </ActionButton>
             </div>
@@ -187,9 +185,11 @@ const emit = defineEmits<{
 }>()
 
 // 未设置态与 Model 列未配置同样式（灰 mono 非粗体），有值才高亮。
+// 数值列按 E6 追加 tabular-nums + whitespace-nowrap（ledger/orders 范本）。
+// 「未设置 / —」的档位语义区分保留，不收敛（见 billingPricingColumns.ts）。
 function priceValueClass(value: string): string {
   return value === '—' || value === '未设置'
-    ? 'truncate font-mono text-xs text-muted-foreground'
-    : 'truncate font-mono text-xs font-bold text-foreground'
+    ? 'truncate font-mono text-xs tabular-nums whitespace-nowrap text-muted-foreground'
+    : 'truncate font-mono text-xs font-bold tabular-nums whitespace-nowrap text-foreground'
 }
 </script>

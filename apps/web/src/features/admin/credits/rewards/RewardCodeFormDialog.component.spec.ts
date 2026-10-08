@@ -70,7 +70,7 @@ describe('RewardCodeFormDialog with Schema Validation', () => {
     await user.clear(capInput)
     await user.type(capInput, '3')
 
-    const submitBtn = screen.getByRole('button', { name: '保存更改' })
+    const submitBtn = screen.getByRole('button', { name: '保存' })
     await user.click(submitBtn)
 
     expect(await screen.findByText('兑换上限不能低于当前兑换次数 5')).toBeVisible()

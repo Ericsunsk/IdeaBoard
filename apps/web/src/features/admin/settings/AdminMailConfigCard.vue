@@ -112,23 +112,23 @@
       </div>
     </template>
     <template #actions>
-      <div class="flex w-full flex-wrap items-center justify-between gap-2">
-        <ActionButton
-          variant="destructive"
-          :disabled="controlsDisabled || !summary?.configured"
-          @click="clear"
-        >
-          {{ SETTINGS_MESSAGES.mailDelete }}
-        </ActionButton>
-        <div class="flex items-center gap-2">
-          <ActionButton variant="outline" :disabled="controlsDisabled" @click="reset">
-            {{ SETTINGS_MESSAGES.reset }}
+      <AdminEditorActions
+        :save-disabled="controlsDisabled"
+        :reset-disabled="controlsDisabled"
+        :saving="saving"
+        @save="save"
+        @reset="reset"
+      >
+        <template #leading>
+          <ActionButton
+            variant="destructive"
+            :disabled="controlsDisabled || !summary?.configured"
+            @click="clear"
+          >
+            {{ SETTINGS_MESSAGES.mailDelete }}
           </ActionButton>
-          <ActionButton :disabled="controlsDisabled" :loading="saving" @click="save">
-            {{ SETTINGS_MESSAGES.mailSave }}
-          </ActionButton>
-        </div>
-      </div>
+        </template>
+      </AdminEditorActions>
     </template>
   </SettingEditorCard>
 </template>
@@ -139,6 +139,7 @@ import { computed, onMounted, ref, type HTMLAttributes } from 'vue'
 import * as v from 'valibot'
 import { useForm, firstFormError } from '@/components/ui/form'
 import ActionButton from '../../../shared/components/ActionButton.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'

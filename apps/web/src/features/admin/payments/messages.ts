@@ -20,8 +20,7 @@ export const PAYMENTS_MESSAGES = {
   taxCodePlaceholder: '例如：txcd_10105001',
   purchasesLabel: '充值开放',
   purchasesState: (enabled: boolean) => (enabled ? '已开放' : '已关闭'),
-  cancel: '取消',
-  saveSettings: '保存设置',
+  saveSettings: '保存',
   apiKeyRequired: '请输入 Stripe API Key',
   pmcRequired: '请输入 Payment Method Configuration ID',
   pmcInvalid: '请输入有效的 pmc_... ID',
@@ -31,6 +30,6 @@ export const PAYMENTS_MESSAGES = {
   stripeLoadFailed: '加载 Stripe 设置失败，请重试',
   stripeSaveTitle: '保存 Stripe 设置',
   stripeSaveMessage: '确定保存 Stripe 密钥与税务配置吗？该操作将记录操作人与原因。',
-  stripeSaveConfirm: '保存设置',
+  stripeSaveConfirm: '保存',
   stripeSaveFailed: '保存 Stripe 设置失败，请重试',
 } as const

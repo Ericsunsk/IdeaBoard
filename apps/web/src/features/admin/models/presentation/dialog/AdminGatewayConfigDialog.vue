@@ -139,31 +139,28 @@
       </div>
     </div>
 
-    <!-- 弹窗底栏 -->
+    <!-- 弹窗底栏：取消 + 第三动作（测试连接，经 extra-actions 位） + 保存 -->
     <template #footer>
-      <ActionButton
-        variant="outline"
-        :disabled="saving || testing"
-        @click="emit('update:visible', false)"
-      >
-        {{ MODELS_MESSAGES.cancel }}
-      </ActionButton>
-      <ActionButton
-        variant="outline"
-        :loading="testing"
-        :disabled="loading || saving || testing"
-        @click="handleTestConnection"
-      >
-        {{ MODELS_MESSAGES.gatewayTest }}
-      </ActionButton>
-      <ActionButton
-        variant="default"
+      <AdminDialogActions
+        :cancel-label="MODELS_MESSAGES.cancel"
+        :confirm-label="MODELS_MESSAGES.gatewayHeader"
         :loading="saving"
         :disabled="loading || saving || testing"
-        @click="handleSave"
+        :cancel-disabled="saving || testing"
+        @cancel="emit('update:visible', false)"
+        @confirm="handleSave"
       >
-        {{ MODELS_MESSAGES.gatewayHeader }}
-      </ActionButton>
+        <template #extra-actions>
+          <ActionButton
+            variant="outline"
+            :loading="testing"
+            :disabled="loading || saving || testing"
+            @click="handleTestConnection"
+          >
+            {{ MODELS_MESSAGES.gatewayTest }}
+          </ActionButton>
+        </template>
+      </AdminDialogActions>
     </template>
   </AdminDialogShell>
 </template>
@@ -175,6 +172,7 @@ import { useForm } from '@/components/ui/form'
 import { Check, ShieldCheck } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
 import ActionButton from '../../../../../shared/components/ActionButton.vue'
+import AdminDialogActions from '../../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
 import { formatAdminDisplayError } from '../../../shared/lib/toast'

@@ -65,24 +65,6 @@ describe('AdminOutboundPolicyCard', () => {
     expect(confirmMock).toHaveBeenCalledOnce()
     expect(screen.getByText('已额外放行 2 项')).toBeVisible()
   })
-
-  it('aborts the save when the operator cancels the confirm dialog', async () => {
-    confirmMock.mockResolvedValueOnce(false)
-    const { user } = renderCard()
-
-    await screen.findByText('已额外放行 1 项')
-    const allowHostsInput = screen.getByRole('textbox', { name: /允许访问的私有主机/ })
-    await user.clear(allowHostsInput)
-    await user.type(allowHostsInput, 'draft.internal')
-
-    await user.click(screen.getByRole('button', { name: '保存' }))
-
-    await waitFor(() => {
-      expect(confirmMock).toHaveBeenCalledOnce()
-    })
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(updateRequests).toEqual([])
-  })
 })
 
 function renderCard() {

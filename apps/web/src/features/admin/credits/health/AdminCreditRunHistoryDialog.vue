@@ -91,12 +91,10 @@
           />
         </template>
 
-        <AdminColumn expander style="width: 52px" />
-        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryTimeColumn" style="width: 190px">
+        <AdminColumn expander :style="{ width: ADMIN_TABLE_EXPANDER_COLUMN_WIDTH }" />
+        <AdminColumn header="Trigger" style="width: 120px">
           <template #body="{ data }">
-            <span class="whitespace-nowrap">{{
-              formatAdminDateTimeWithSeconds(data.requested_at)
-            }}</span>
+            {{ getReconciliationTriggerLabel(data) }}
           </template>
         </AdminColumn>
         <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryStatusColumn" style="width: 110px">
@@ -108,16 +106,18 @@
             />
           </template>
         </AdminColumn>
-        <AdminColumn header="Trigger" style="width: 120px">
-          <template #body="{ data }">
-            {{ getReconciliationTriggerLabel(data) }}
-          </template>
-        </AdminColumn>
         <AdminColumn
           :header="CREDIT_HEALTH_MESSAGES.runHistoryResultColumn"
           style="min-width: 240px"
         >
           <template #body="{ data }">{{ formatReconciliationRunResult(data) }}</template>
+        </AdminColumn>
+        <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryTimeColumn" style="width: 190px">
+          <template #body="{ data }">
+            <span class="whitespace-nowrap">{{
+              formatAdminDateTimeWithSeconds(data.requested_at)
+            }}</span>
+          </template>
         </AdminColumn>
         <AdminColumn :header="CREDIT_HEALTH_MESSAGES.runHistoryDurationColumn" style="width: 120px">
           <template #body="{ data }">{{ formatReconciliationRunDuration(data) }}</template>
@@ -190,10 +190,7 @@
     </AdminTablePanel>
 
     <template #footer>
-      <ActionButton
-        variant="outline"
-        @click="$emit('update:visible', false)"
-      >
+      <ActionButton variant="outline" @click="$emit('update:visible', false)">
         {{ CREDIT_HEALTH_MESSAGES.close }}
       </ActionButton>
     </template>
@@ -233,6 +230,7 @@ import {
   adminTableFrameClass,
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'
+import { ADMIN_TABLE_EXPANDER_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
 import { createAdminCreditRunHistoryResource, type AdminCreditRun } from './runHistoryResource'
 import {
   formatReconciliationRunDuration,

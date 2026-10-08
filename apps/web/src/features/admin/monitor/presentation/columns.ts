@@ -2,13 +2,15 @@ import type { Component } from 'vue'
 import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import type { TaskMetricDefinition } from '../../shared/lib/taskMetricTokens'
 import { getTaskMetricByStatus } from '../../shared/lib/taskMetricTokens'
+import { ADMIN_IDENTITY_EMPTY } from '../../shared/lib/cellPlaceholders'
+import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
 import type { AdminMonitorListItemModel } from '../infrastructure/resource'
 import { TASK_RESULT_PREVIEW_COUNT, getTaskResultImageUrls } from '../domain/taskResultPresentation'
 import { toGmt8Date } from '../application/useMonitorTimeline'
 
 // 表格时间戳：精确到秒的 GMT+8 时间（与表头标注一致）。
 export function formatTaskExactTimestamp(data: AdminMonitorListItemModel) {
-  if (!data.created_at) return '-'
+  if (!data.created_at) return ADMIN_IDENTITY_EMPTY
   const date = new Date(data.created_at)
   if (isNaN(date.getTime())) return String(data.created_at)
 
@@ -35,7 +37,7 @@ export const adminMonitorColumnWidths = {
   credits: '110px',
   result: '140px',
   actions: '100px',
-  more: '64px',
+  more: ADMIN_TABLE_MORE_COLUMN_WIDTH,
 } as const
 
 // Model 列展示最终解析模型 (#852)：优先 attempt 事实归因的

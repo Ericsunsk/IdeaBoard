@@ -254,7 +254,7 @@ describe('AdminModelsPage', () => {
     await user.clear(nameInput)
     await user.type(nameInput, 'seedream-v2-ultra')
 
-    await user.click(within(dialog).getByRole('button', { name: '保存修改' }))
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(screen.getByText('seedream-v2-ultra')).toBeInTheDocument())
     expect(toast.success).toHaveBeenCalledWith('模型修改已保存')

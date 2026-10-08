@@ -33,4 +33,35 @@ describe('AdminDialogActions', () => {
     expect(screen.getByRole('button', { name: '保存' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '取消' })).not.toBeDisabled()
   })
+
+  it('falls back to the shared 取消/确认 defaults without label props', () => {
+    render(AdminDialogActions, {
+      props: {},
+    })
+
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['取消', '确认'])
+  })
+
+  it('renders extra actions between cancel and confirm without hijacking emits', async () => {
+    const { emitted } = render(AdminDialogActions, {
+      props: { cancelLabel: '取消', confirmLabel: '保存' },
+      slots: { 'extra-actions': '<button type="button">测试连接</button>' },
+    })
+
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['取消', '测试连接', '保存'])
+
+    await fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
+    expect(emitted().cancel).toBeUndefined()
+    expect(emitted().confirm).toBeUndefined()
+  })
+
+  it('renders only cancel and confirm when no extra actions are provided', () => {
+    render(AdminDialogActions, {
+      props: { cancelLabel: '取消', confirmLabel: '保存' },
+    })
+
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+  })
 })

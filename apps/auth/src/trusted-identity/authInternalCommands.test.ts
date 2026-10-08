@@ -221,27 +221,153 @@ describe('AuthInternalCommands', () => {
     assert.equal(called, false)
   })
 
-  it('classifies an unconfigured user state reader and reader throws as repository failures', async (t) => {
+  it('classifies dependency throws consistently as repository failures', async (t) => {
     t.mock.method(console, 'error', () => {})
-    const unconfigured = createTestCommands()
-    assert.deepEqual(await unconfigured.getUserStates({ userIDs: ['auth-user'] }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'auth user state reader is not configured',
+    const throwingCommands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          throw new Error('sign-up unavailable')
+        },
+      },
+      repository: {
+        removeAuthUserCascade: async () => {
+          throw new Error('delete unavailable')
+        },
+        updateAuthUserRole: async () => {
+          throw new Error('role unavailable')
+        },
+        updateAuthUserBanState: async (_id, banned) => {
+          throw new Error(banned ? 'ban unavailable' : 'unban unavailable')
+        },
+        deleteAuthUserSessions: async (authUserID) => {
+          throw new Error(`${authUserID} sessions unavailable`)
+        },
+      },
     })
-
-    const throwing = createTestCommands({
+    const duplicateLookupCommands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          throw new Error('duplicate user')
+        },
+      },
+      repository: {
+        findUserByEmail: async () => {
+          throw new Error('lookup unavailable')
+        },
+      },
+    })
+    const throwingReaderCommands = createTestCommands({
       repository: {
         findUserStatesByIDs: async () => {
           throw new Error('state store unavailable')
         },
       },
     })
-    assert.deepEqual(await throwing.getUserStates({ userIDs: ['auth-user'] }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to read auth user states',
-    })
+
+    const cases: Array<{
+      name: string
+      run: () => Promise<unknown>
+      expected: { ok: false; kind: string; message: string }
+    }> = [
+      {
+        name: 'unconfigured user state reader',
+        run: () => createTestCommands().getUserStates({ userIDs: ['auth-user'] }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'auth user state reader is not configured',
+        },
+      },
+      {
+        name: 'throwing user state reader',
+        run: () => throwingReaderCommands.getUserStates({ userIDs: ['auth-user'] }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to read auth user states',
+        },
+      },
+      {
+        name: 'throwing ensureIdentity',
+        run: () =>
+          throwingCommands.ensureIdentity({
+            email: 'admin@example.com',
+            displayName: '管理员',
+            password: 'secret1234',
+            role: 'admin',
+          }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to ensure user',
+        },
+      },
+      {
+        name: 'throwing deleteIdentity',
+        run: () => throwingCommands.deleteIdentity({ authUserID: 'delete' }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to delete auth user',
+        },
+      },
+      {
+        name: 'throwing banIdentity',
+        run: () => throwingCommands.banIdentity({ authUserID: 'ban' }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to ban auth user',
+        },
+      },
+      {
+        name: 'throwing unbanIdentity',
+        run: () => throwingCommands.unbanIdentity({ authUserID: 'unban' }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to unban auth user',
+        },
+      },
+      {
+        name: 'throwing revokeSessions',
+        run: () => throwingCommands.revokeSessions({ authUserID: 'revoke' }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to revoke auth user sessions',
+        },
+      },
+      {
+        name: 'throwing setRole',
+        run: () => throwingCommands.setRole({ authUserID: 'role', role: 'admin' }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to update auth user role',
+        },
+      },
+      {
+        name: 'duplicate lookup throw',
+        run: () =>
+          duplicateLookupCommands.ensureIdentity({
+            email: 'admin@example.com',
+            displayName: '管理员',
+            password: 'secret1234',
+            role: 'admin',
+            allowExisting: true,
+          }),
+        expected: {
+          ok: false,
+          kind: 'repository_failure',
+          message: 'failed to ensure user',
+        },
+      },
+    ]
+
+    for (const { name, run, expected } of cases) {
+      assert.deepEqual(await run(), expected, name)
+    }
   })
 
   it('classifies duplicate and mismatched trusted identities as conflicts', async () => {
@@ -462,101 +588,6 @@ describe('AuthInternalCommands', () => {
     assert.deepEqual(await commands.unbanIdentity({ authUserID: 'missing' }), expected)
     assert.deepEqual(await commands.revokeSessions({ authUserID: 'missing' }), expected)
     assert.deepEqual(await commands.setRole({ authUserID: 'missing', role: 'user' }), expected)
-  })
-
-  it('classifies dependency throws consistently as repository failures', async (t) => {
-    t.mock.method(console, 'error', () => {})
-    const throwingCommands = createTestCommands({
-      authApi: {
-        signUpEmail: async () => {
-          throw new Error('sign-up unavailable')
-        },
-      },
-      repository: {
-        removeAuthUserCascade: async () => {
-          throw new Error('delete unavailable')
-        },
-        updateAuthUserRole: async () => {
-          throw new Error('role unavailable')
-        },
-        updateAuthUserBanState: async (_id, banned) => {
-          throw new Error(banned ? 'ban unavailable' : 'unban unavailable')
-        },
-        deleteAuthUserSessions: async (authUserID) => {
-          throw new Error(`${authUserID} sessions unavailable`)
-        },
-      },
-    })
-
-    assert.deepEqual(
-      await throwingCommands.ensureIdentity({
-        email: 'admin@example.com',
-        displayName: '管理员',
-        password: 'secret1234',
-        role: 'admin',
-      }),
-      {
-        ok: false,
-        kind: 'repository_failure',
-        message: 'failed to ensure user',
-      },
-    )
-    assert.deepEqual(await throwingCommands.deleteIdentity({ authUserID: 'delete' }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to delete auth user',
-    })
-    assert.deepEqual(await throwingCommands.banIdentity({ authUserID: 'ban' }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to ban auth user',
-    })
-    assert.deepEqual(await throwingCommands.unbanIdentity({ authUserID: 'unban' }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to unban auth user',
-    })
-    assert.deepEqual(await throwingCommands.revokeSessions({ authUserID: 'revoke' }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to revoke auth user sessions',
-    })
-    assert.deepEqual(await throwingCommands.setRole({ authUserID: 'role', role: 'admin' }), {
-      ok: false,
-      kind: 'repository_failure',
-      message: 'failed to update auth user role',
-    })
-  })
-
-  it('reports duplicate lookup throws as repository failures', async (t) => {
-    t.mock.method(console, 'error', () => {})
-    const commands = createTestCommands({
-      authApi: {
-        signUpEmail: async () => {
-          throw new Error('duplicate user')
-        },
-      },
-      repository: {
-        findUserByEmail: async () => {
-          throw new Error('lookup unavailable')
-        },
-      },
-    })
-
-    assert.deepEqual(
-      await commands.ensureIdentity({
-        email: 'admin@example.com',
-        displayName: '管理员',
-        password: 'secret1234',
-        role: 'admin',
-        allowExisting: true,
-      }),
-      {
-        ok: false,
-        kind: 'repository_failure',
-        message: 'failed to ensure user',
-      },
-    )
   })
 
   it('retries the complete ban command when mandatory session revocation fails', async (t) => {

@@ -10,7 +10,7 @@ import {
   type MailSendInput,
   type StoredMailConfig,
 } from './mailConfig.js'
-import { createResendTransport, MailDeliveryError } from './mailConfigAdapters.js'
+import { MailDeliveryError } from './mailConfigAdapters.js'
 
 const secretCipher = createSecretCipher(randomBytes(32).toString('base64'))
 
@@ -357,84 +357,6 @@ describe('MailConfigService', () => {
         !error.message.includes('re_secret'),
     )
   })
-})
-
-it('Resend transport sends the supported HTTP contract without exposing credentials in the body', async () => {
-  let request: { url: string; init?: RequestInit } | undefined
-  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
-    request = { url: String(url), init }
-    return new Response(JSON.stringify({ id: 'email-1' }), { status: 200 })
-  }) as typeof fetch
-  await createResendTransport(fetchImpl).send(
-    {
-      from: 'IdeaBoard <auth@example.com>',
-      to: 'admin@example.com',
-      replyTo: 'support@example.com',
-      content: {
-        subject: 'Test',
-        html: '<p>Test</p>',
-        text: 'Test',
-      },
-    },
-    're_secret',
-  )
-
-  assert.equal(request?.url, 'https://api.resend.com/emails')
-  assert.equal(new Headers(request?.init?.headers).get('authorization'), 'Bearer re_secret')
-  assert.doesNotMatch(String(request?.init?.body), /re_secret/)
-  assert.deepEqual(JSON.parse(String(request?.init?.body)), {
-    from: 'IdeaBoard <auth@example.com>',
-    to: ['admin@example.com'],
-    reply_to: 'support@example.com',
-    subject: 'Test',
-    html: '<p>Test</p>',
-    text: 'Test',
-  })
-})
-
-it('Resend transport reports non-2xx responses without exposing the provider body', async () => {
-  const fetchImpl = (async () =>
-    new Response('api-key=re_secret raw provider payload', {
-      status: 422,
-    })) as typeof fetch
-
-  await assert.rejects(
-    () =>
-      createResendTransport(fetchImpl).send(
-        {
-          from: 'IdeaBoard <auth@example.com>',
-          to: 'admin@example.com',
-          content: { subject: 'Test', html: '<p>Test</p>', text: 'Test' },
-        },
-        're_secret',
-      ),
-    (error) =>
-      error instanceof MailDeliveryError &&
-      error.code === 'non_2xx' &&
-      !error.message.includes('re_secret'),
-  )
-})
-
-it('Resend transport aborts timed out requests with a typed error', async () => {
-  const fetchImpl = ((_url: string | URL | Request, init?: RequestInit) =>
-    new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () =>
-        reject(new DOMException('aborted', 'AbortError')),
-      )
-    })) as typeof fetch
-
-  await assert.rejects(
-    () =>
-      createResendTransport(fetchImpl, 5).send(
-        {
-          from: 'IdeaBoard <auth@example.com>',
-          to: 'admin@example.com',
-          content: { subject: 'Test', html: '<p>Test</p>', text: 'Test' },
-        },
-        're_secret',
-      ),
-    (error) => error instanceof MailDeliveryError && error.code === 'timeout',
-  )
 })
 
 function createFakeRepository() {

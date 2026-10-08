@@ -65,26 +65,16 @@
       {{ MONITOR_MESSAGES.detailLoading }}
     </div>
 
-    <div
-      v-else-if="errorMessage"
-      class="flex min-h-40 flex-col items-center justify-center gap-2.5 rounded-xl border border-destructive/20 bg-destructive/5 px-4 text-center"
-      role="alert"
-    >
-      <span class="text-xs font-semibold text-destructive">{{ errorMessage }}</span>
-      <ActionButton
-        variant="outline"
-        @click="emit('retry')"
-      >
-        {{ MONITOR_MESSAGES.retry }}
-      </ActionButton>
-    </div>
+    <AdminAlert v-else-if="errorMessage" severity="error">
+      <div class="flex min-h-40 flex-col items-center justify-center gap-2.5 text-center">
+        <span class="text-xs font-semibold">{{ errorMessage }}</span>
+        <ActionButton variant="outline" @click="emit('retry')">
+          {{ MONITOR_MESSAGES.retry }}
+        </ActionButton>
+      </div>
+    </AdminAlert>
 
-    <div
-      v-else-if="!detailTask"
-      class="flex min-h-40 items-center justify-center rounded-xl border border-border bg-muted/60 text-xs text-muted-foreground"
-    >
-      {{ MONITOR_MESSAGES.detailUnavailable }}
-    </div>
+    <AdminEmptyState v-else-if="!detailTask" compact :title="MONITOR_MESSAGES.detailUnavailable" />
 
     <!-- 主信息单页极简流 -->
     <div v-else class="flex flex-col gap-3">
@@ -511,6 +501,8 @@ import {
 import { DialogTitle } from 'reka-ui'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import TaskResultStatusBanner from './TaskResultStatusBanner.vue'

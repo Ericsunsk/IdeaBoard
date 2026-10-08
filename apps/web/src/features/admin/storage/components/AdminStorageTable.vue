@@ -1,33 +1,7 @@
 <template>
-  <!-- 加载中状态 (AdminSpinner 自带 role="progressbar") -->
-  <div
-    v-if="loading && rows.length === 0"
-    class="flex min-h-[260px] items-center justify-center rounded-xl border border-border bg-card text-muted-foreground"
-    :aria-label="STORAGE_MESSAGES.tableLoadingAria"
-  >
-    <AdminSpinner class="size-9 text-primary" />
-  </div>
-
-  <!-- 空状态提示 (无数据或过滤未命中) -->
-  <div
-    v-else-if="rows.length === 0"
-    class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
-  >
-    <div
-      class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
-    >
-      <DatabaseExport class="size-6" />
-    </div>
-    <h3 class="text-base font-semibold text-foreground">
-      {{ STORAGE_MESSAGES.tableEmptyTitle }}
-    </h3>
-    <p class="mt-1 max-w-sm text-xs text-muted-foreground">
-      {{ STORAGE_MESSAGES.tableEmptyHint }}
-    </p>
-  </div>
-
   <!-- 存储配置表格 (1:1 对齐功能定价页 BillingPricingTable 规范，预设厂商平铺展示) -->
-  <section v-else :aria-label="STORAGE_MESSAGES.tableSectionAria">
+  <!-- rows 恒含厂商预设行：初载走 AdminTable 内部 loading 行，过滤未命中走 #empty，此处不再套双层状态。 -->
+  <section :aria-label="STORAGE_MESSAGES.tableSectionAria">
     <div :class="adminTableCardClass">
       <AdminTable
         :value="rows"
@@ -44,7 +18,7 @@
           <AdminEmptyState :title="STORAGE_MESSAGES.tableEmptyMatch" />
         </template>
 
-        <!-- 存储服务列 (图标/Logo + 名称) -->
+        <!-- Service 列 (图标/Logo + 名称) -->
         <AdminColumn
           field="service"
           :header="STORAGE_MESSAGES.serviceColumn"
@@ -168,7 +142,8 @@
           </template>
         </AdminColumn>
 
-        <!-- 操作列 (与表头严格左对齐) -->
+        <!-- 启用状态列（范式：启用开关在操作列之前，操作列永远最右） -->
+        <!-- 操作列 (与表头严格左对齐，永远最右) -->
         <AdminColumn
           field="actions"
           :header="STORAGE_MESSAGES.actionsColumn"
@@ -213,7 +188,6 @@
           </template>
         </AdminColumn>
 
-        <!-- 启用状态列 -->
         <AdminColumn
           field="enabled"
           :header="STORAGE_MESSAGES.enableColumn"
@@ -248,11 +222,9 @@
 
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { DatabaseExport } from '@iconoir/vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
-import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import {

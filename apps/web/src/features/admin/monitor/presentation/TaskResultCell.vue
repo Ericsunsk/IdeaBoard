@@ -15,18 +15,20 @@
         loading="lazy"
       />
     </button>
-    <span
+    <AdminMono
       v-if="view.preview.overflow > 0"
-      class="shrink-0 font-mono text-xs font-semibold text-muted-foreground"
+      class="shrink-0 text-xs font-semibold text-muted-foreground"
     >
       +{{ view.preview.overflow }}
-    </span>
+    </AdminMono>
   </div>
-  <span v-else class="font-mono text-xs text-muted-foreground">-</span>
+  <AdminMono v-else class="text-xs text-muted-foreground">{{ ADMIN_IDENTITY_EMPTY }}</AdminMono>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AdminMono from '../../shared/components/AdminMono.vue'
+import { ADMIN_IDENTITY_EMPTY } from '../../shared/lib/cellPlaceholders'
 import { MONITOR_MESSAGES } from './pages/messages'
 import { getTaskRowView } from './columns'
 import type { AdminTaskRow } from '../application/useAdminTaskList'

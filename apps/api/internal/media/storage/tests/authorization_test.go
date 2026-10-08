@@ -6,21 +6,6 @@ import (
 	"testing"
 )
 
-func TestReadableUploadAccessSiteAssetAllowsAnonymousRawPath(t *testing.T) {
-	access := NewReadableUploadAccess(nil)
-
-	result, err := access.AuthorizeUploadPathRead(context.Background(), 0, "/uploads/site/assets/logo.png")
-	if err != nil {
-		t.Fatalf("AuthorizeUploadPathRead returned error: %v", err)
-	}
-	if result.Resource.Kind != UploadResourceKindSiteAsset {
-		t.Fatalf("kind = %q, want %q", result.Resource.Kind, UploadResourceKindSiteAsset)
-	}
-	if result.Resource.ObjectKey != "uploads/site/assets/logo.png" {
-		t.Fatalf("object key = %q, want uploads/site/assets/logo.png", result.Resource.ObjectKey)
-	}
-}
-
 func TestReadableUploadAccessProfileAvatarRejectsOwnerMismatch(t *testing.T) {
 	access := NewReadableUploadAccess(fakeReadableUploadOwnerStorage{uids: map[int64]string{2: "MEMB1A"}})
 

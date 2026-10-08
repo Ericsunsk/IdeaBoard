@@ -5,41 +5,52 @@ import AdminSettingsOnThisPage from './AdminSettingsOnThisPage.vue'
 describe('AdminSettingsOnThisPage', () => {
   const items = [
     { id: 'section-branding', title: '站点设置' },
-    { id: 'section-support', title: '客服渠道' },
+    { id: 'section-support', title: '客户支持' },
     { id: 'section-images', title: '图片库' },
   ]
 
-  it('renders all navigation items with title', () => {
-    renderWithUser(AdminSettingsOnThisPage, {
-      props: { items, activeId: 'section-branding' },
-    })
+  it('scrolls to target offset and emits select when clicked', async () => {
+    const scrollToMock = vi.fn()
+    vi.spyOn(window, 'scrollTo').mockImplementation(scrollToMock)
+    try {
+      const targetEl = document.createElement('div')
+      targetEl.id = 'section-support'
+      // tabindex="-1" 由页面侧负责添加，此处模拟该契约以验证程序化聚焦
+      targetEl.tabIndex = -1
+      document.body.appendChild(targetEl)
 
-    expect(screen.getByText('本页内容')).toBeVisible()
-    expect(screen.getByText('站点设置')).toBeVisible()
-    expect(screen.getByText('客服渠道')).toBeVisible()
-    expect(screen.getByText('图片库')).toBeVisible()
+      const onSelect = vi.fn()
+      const { user } = renderWithUser(AdminSettingsOnThisPage, {
+        props: { items, activeId: 'section-branding', onSelect },
+      })
 
-    const activeBtn = screen.getByRole('button', { name: '站点设置' })
-    expect(activeBtn).toHaveAttribute('aria-current', 'true')
+      await user.click(screen.getByRole('button', { name: '客户支持' }))
+
+      expect(onSelect).toHaveBeenCalledWith('section-support')
+      expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+      expect(targetEl).toHaveFocus()
+
+      document.body.removeChild(targetEl)
+    } finally {
+      vi.restoreAllMocks()
+    }
   })
 
-  it('scrolls into view and emits select when clicked', async () => {
-    const scrollIntoViewMock = vi.fn()
-    const targetEl = document.createElement('div')
-    targetEl.id = 'section-support'
-    targetEl.scrollIntoView = scrollIntoViewMock
-    document.body.appendChild(targetEl)
+  it('does not throw when the target section is missing', async () => {
+    const scrollToMock = vi.fn()
+    vi.spyOn(window, 'scrollTo').mockImplementation(scrollToMock)
+    try {
+      const onSelect = vi.fn()
+      const { user } = renderWithUser(AdminSettingsOnThisPage, {
+        props: { items, activeId: 'section-branding', onSelect },
+      })
 
-    const onSelect = vi.fn()
-    const { user } = renderWithUser(AdminSettingsOnThisPage, {
-      props: { items, activeId: 'section-branding', onSelect },
-    })
+      await user.click(screen.getByRole('button', { name: '客户支持' }))
 
-    await user.click(screen.getByRole('button', { name: '客服渠道' }))
-
-    expect(onSelect).toHaveBeenCalledWith('section-support')
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
-
-    document.body.removeChild(targetEl)
+      expect(onSelect).toHaveBeenCalledWith('section-support')
+      expect(scrollToMock).not.toHaveBeenCalled()
+    } finally {
+      vi.restoreAllMocks()
+    }
   })
 })

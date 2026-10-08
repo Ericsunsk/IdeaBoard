@@ -91,7 +91,7 @@ export const MODELS_MESSAGES = {
     '请检查 Cloudflare AI Gateway 是否已配置相应 Provider 的 API Key (BYOK)。仍无结果请用下方「手动新增」入库。',
   editHeader: (editing: boolean) => (editing ? '编辑模型' : '新增模型'),
   editDescription: '填写模型配置后保存。',
-  editSubmit: (editing: boolean) => (editing ? '保存修改' : '确认新增'),
+  editSubmit: (editing: boolean) => (editing ? '保存' : '确认新增'),
   editDefaultCapabilityPrimary: '标准推理',
   editDefaultCapabilityFallback: '云端加速',
   editPreviewName: '模型名称',

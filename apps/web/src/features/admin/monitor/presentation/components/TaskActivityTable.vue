@@ -13,7 +13,79 @@
         <AdminEmptyState :title="MONITOR_MESSAGES.tableEmpty" />
       </template>
 
-      <!-- 第 1 列：时间戳 GMT+8 ↓ [✏ 字段] -->
+      <!-- 第 1 列：Service (service 图标 + slug + 请求清晰度) -->
+      <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
+        <template #body="{ data }">
+          <AdminMono as="div" class="flex items-center gap-1.5 text-xs text-foreground">
+            <component
+              :is="getTaskRowView(data).serviceIcon"
+              v-if="getTaskRowView(data).serviceIcon"
+              class="size-4 shrink-0 text-muted-foreground"
+            />
+            <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
+            <span class="truncate text-foreground">{{
+              emptyPlaceholder(getTaskRowView(data).serviceSlug)
+            }}</span>
+            <span
+              v-if="getTaskServiceResolution(data)"
+              class="shrink-0 rounded border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
+              :title="getTaskServiceResolution(data)"
+            >
+              {{ getTaskServiceResolution(data) }}
+            </span>
+          </AdminMono>
+        </template>
+      </AdminColumn>
+
+      <!-- 模型列：实际解析模型 -->
+      <AdminColumn header="Model" :style="{ width: adminMonitorColumnWidths.model }">
+        <template #body="{ data }">
+          <AdminMono
+            class="truncate text-xs text-foreground"
+            :title="emptyPlaceholder(getTaskModelLabel(data))"
+          >
+            {{ emptyPlaceholder(getTaskModelLabel(data)) }}
+          </AdminMono>
+        </template>
+      </AdminColumn>
+
+      <!-- 第 3 列：Status (复用 Events 表状态 Token 胶囊与点) -->
+      <AdminColumn header="Status" :style="{ width: adminMonitorColumnWidths.status }">
+        <template #body="{ data }">
+          <TaskStatusCell :row="data" />
+        </template>
+      </AdminColumn>
+
+      <!-- 结果列：最多 3 张缩略图，超出 +N，点击进详情 -->
+      <AdminColumn header="Result" :style="{ width: adminMonitorColumnWidths.result }">
+        <template #body="{ data }">
+          <TaskResultCell :row="data" @inspect="emit('showDetail', $event)" />
+        </template>
+      </AdminColumn>
+
+      <!-- 第 5 列：Message (事件 Prompt / 诊断内容，服务名前缀已由 Service 列承载) -->
+      <AdminColumn header="Message" :style="{ width: adminMonitorColumnWidths.message }">
+        <template #body="{ data }">
+          <AdminMono
+            as="div"
+            class="max-w-[160px] truncate text-xs text-foreground"
+            :title="emptyPlaceholder(data.prompt)"
+          >
+            {{ emptyPlaceholder(getTaskRowView(data).message) }}
+          </AdminMono>
+        </template>
+      </AdminColumn>
+
+      <!-- 花费列：实际扣账 Idea 数 -->
+      <AdminColumn header="Credits" :style="{ width: adminMonitorColumnWidths.credits }">
+        <template #body="{ data }">
+          <AdminMono class="text-xs whitespace-nowrap text-foreground tabular-nums">
+            {{ data.credits || 0 }} <span class="text-muted-foreground">Idea</span>
+          </AdminMono>
+        </template>
+      </AdminColumn>
+
+      <!-- 第 7 列：时间戳 GMT+8 ↓ [✏ 字段] -->
       <AdminColumn :style="{ width: adminMonitorColumnWidths.timestamp }">
         <template #header>
           <div class="flex items-center gap-1.5 font-sans">
@@ -26,7 +98,7 @@
           </div>
         </template>
         <template #body="{ data }">
-          <div class="flex items-center gap-2 font-mono text-xs">
+          <AdminMono as="div" class="flex items-center gap-2 text-xs tabular-nums">
             <!-- 竖直状态指示条 (复用 Events 表的状态 Token 颜色) -->
             <span
               :class="[
@@ -38,91 +110,20 @@
             <span class="font-medium text-foreground">
               {{ formatTaskExactTimestamp(data) }}
             </span>
-          </div>
+          </AdminMono>
         </template>
       </AdminColumn>
 
       <!-- 耗时列：完成时间 - 创建时间，未完成展示占位 -->
       <AdminColumn header="Duration" :style="{ width: adminMonitorColumnWidths.duration }">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-foreground">
+          <AdminMono class="text-xs whitespace-nowrap text-foreground tabular-nums">
             {{ formatTaskDuration(data) }}
-          </span>
+          </AdminMono>
         </template>
       </AdminColumn>
 
-      <!-- 第 2 列：Status (复用 Events 表状态 Token 胶囊与点) -->
-      <AdminColumn header="Status" :style="{ width: adminMonitorColumnWidths.status }">
-        <template #body="{ data }">
-          <TaskStatusCell :row="data" />
-        </template>
-      </AdminColumn>
-
-      <!-- 第 3 列：Service (service 图标 + slug + 请求清晰度) -->
-      <AdminColumn header="Service" :style="{ width: adminMonitorColumnWidths.service }">
-        <template #body="{ data }">
-          <div class="flex items-center gap-1.5 font-mono text-xs text-foreground">
-            <component
-              :is="getTaskRowView(data).serviceIcon"
-              v-if="getTaskRowView(data).serviceIcon"
-              class="size-4 shrink-0 text-muted-foreground"
-            />
-            <FastArrowRight v-else class="size-3.5 text-orange-500 shrink-0" />
-            <span class="truncate text-foreground">{{
-              getTaskRowView(data).serviceSlug || '-'
-            }}</span>
-            <span
-              v-if="getTaskServiceResolution(data)"
-              class="shrink-0 rounded border border-border bg-muted px-1 font-mono text-admin-caption text-muted-foreground"
-              :title="getTaskServiceResolution(data)"
-            >
-              {{ getTaskServiceResolution(data) }}
-            </span>
-          </div>
-        </template>
-      </AdminColumn>
-
-      <!-- 模型列：实际解析模型 -->
-      <AdminColumn header="Model" :style="{ width: adminMonitorColumnWidths.model }">
-        <template #body="{ data }">
-          <span
-            class="truncate font-mono text-xs text-foreground"
-            :title="getTaskModelLabel(data) || '-'"
-          >
-            {{ getTaskModelLabel(data) || '-' }}
-          </span>
-        </template>
-      </AdminColumn>
-
-      <!-- 第 4 列：Message (事件 Prompt / 诊断内容，服务名前缀已由 Service 列承载) -->
-      <AdminColumn header="Message" :style="{ width: adminMonitorColumnWidths.message }">
-        <template #body="{ data }">
-          <div
-            class="max-w-[160px] truncate font-mono text-xs text-foreground"
-            :title="data.prompt || '-'"
-          >
-            {{ getTaskRowView(data).message || '-' }}
-          </div>
-        </template>
-      </AdminColumn>
-
-      <!-- 花费列：实际扣账 Idea 数 -->
-      <AdminColumn header="Credits" :style="{ width: adminMonitorColumnWidths.credits }">
-        <template #body="{ data }">
-          <span class="font-mono text-xs text-foreground">
-            {{ data.credits || 0 }} <span class="text-muted-foreground">Idea</span>
-          </span>
-        </template>
-      </AdminColumn>
-
-      <!-- 结果列：最多 3 张缩略图，超出 +N，点击进详情 -->
-      <AdminColumn header="Result" :style="{ width: adminMonitorColumnWidths.result }">
-        <template #body="{ data }">
-          <TaskResultCell :row="data" @inspect="emit('showDetail', $event)" />
-        </template>
-      </AdminColumn>
-
-      <!-- 第 7 列：操作 (仅取消活跃任务) -->
+      <!-- 第 9 列：操作 (仅取消活跃任务) -->
       <AdminColumn :style="{ width: adminMonitorColumnWidths.actions }">
         <template #body="{ data }">
           <div class="flex items-center justify-end gap-1">
@@ -141,7 +142,7 @@
         </template>
       </AdminColumn>
 
-      <!-- 第 8 列：More (更多图标，点击进详情弹窗；演示模式用本地数据预览) -->
+      <!-- 第 10 列：More (更多图标，点击进详情弹窗；演示模式用本地数据预览) -->
       <AdminColumn header="More" :style="{ width: adminMonitorColumnWidths.more }">
         <template #body="{ data }">
           <div class="flex items-center justify-start">
@@ -183,6 +184,7 @@ import { FastArrowRight, MoreHoriz } from '@iconoir/vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
 import AdminColumn from '../../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../../shared/components/AdminEmptyState.vue'
+import AdminMono from '../../../shared/components/AdminMono.vue'
 import AdminPagerControls from '../../../shared/components/AdminPagerControls.vue'
 import AdminTable from '../../../shared/components/AdminTable.vue'
 import {
@@ -194,6 +196,7 @@ import {
   adminTableStyle,
   adminTextButtonClass,
 } from '../../../shared/lib/uiClasses'
+import { emptyPlaceholder } from '../../../shared/lib/cellPlaceholders'
 import TaskResultCell from '../TaskResultCell.vue'
 import TaskStatusCell from '../TaskStatusCell.vue'
 import { MONITOR_MESSAGES } from '../pages/messages'

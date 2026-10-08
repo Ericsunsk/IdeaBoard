@@ -35,6 +35,18 @@ describe('Search presentation subcomponents', () => {
       expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/orig.jpg')
     })
 
+    it('keeps a visible focus ring on the close button over the dark backdrop', () => {
+      render(SearchLightboxModal, {
+        props: {
+          visible: true,
+          activeResult: mockItem,
+        },
+      })
+      const closeButton = screen.getByRole('button', { name: /关闭|close/i })
+      expect(closeButton.className).toContain('focus-visible:outline-none')
+      expect(closeButton.className).toContain('focus-visible:ring-white/80')
+    })
+
     it('traps focus, closes on Escape, and restores the opening trigger focus', async () => {
       const user = userEvent.setup()
       const trigger = document.createElement('button')

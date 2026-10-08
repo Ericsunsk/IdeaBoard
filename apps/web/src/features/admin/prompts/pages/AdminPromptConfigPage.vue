@@ -58,34 +58,26 @@
     </div>
 
     <!-- 3. 空状态提示 (无数据或过滤未命中) -->
-    <div
+    <AdminEmptyState
       v-else-if="filteredFeatureGroups.length === 0"
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
+      :title="!hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfig : PROMPTS_MESSAGES.emptyNoMatch"
+      :description="
+        !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfigHint : PROMPTS_MESSAGES.emptyNoMatchHint
+      "
+      :icon="!hasActiveFilter ? Spark : Search"
     >
-      <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
-      >
-        <Spark v-if="!hasActiveFilter" class="size-6" />
-        <Search v-else class="size-6" />
-      </div>
-      <h3 class="text-base font-semibold text-foreground">
-        {{ !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfig : PROMPTS_MESSAGES.emptyNoMatch }}
-      </h3>
-      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
-        {{
-          !hasActiveFilter ? PROMPTS_MESSAGES.emptyNoConfigHint : PROMPTS_MESSAGES.emptyNoMatchHint
-        }}
-      </p>
-      <button
-        v-if="hasActiveFilter"
-        type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
-        @click="clearFilters"
-      >
-        <Xmark class="size-3.5" />
-        <span>{{ PROMPTS_MESSAGES.clearFilters }}</span>
-      </button>
-    </div>
+      <template #actions>
+        <button
+          v-if="hasActiveFilter"
+          type="button"
+          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          @click="clearFilters"
+        >
+          <Xmark class="size-3.5" />
+          <span>{{ PROMPTS_MESSAGES.clearFilters }}</span>
+        </button>
+      </template>
+    </AdminEmptyState>
 
     <!-- 4. 分组表格视图 (按 Image / Prompt / Fusion 分组展示，1:1 对齐功能定价页 BillingPricingTable 规范) -->
     <div v-else class="flex flex-col gap-6">
@@ -106,7 +98,7 @@
         <div :class="adminTableCardClass">
           <AdminTable
             :value="group.items"
-            :loading="isInitialLoading"
+            :loading="loading"
             data-key="slug"
             scrollable
             :frame-class="adminTableFrameClass"
@@ -245,6 +237,7 @@ import { computed, ref, type Component } from 'vue'
 import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'

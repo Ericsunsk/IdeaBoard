@@ -63,43 +63,37 @@ describe('mail config schema and privileges', () => {
     assert.match(queries.join('\n'), /auth_mail_settings_config_version_seq/)
   })
 
-  it('rejects runtime access that can mutate audit history', async () => {
-    const pool = {
-      query: async () => ({
-        rows: [
-          {
-            can_manage_settings: true,
-            can_insert_audit: true,
-            can_allocate_config_version: true,
-            can_mutate_audit: true,
-          },
-        ],
-      }),
-    } as unknown as Pool
+  for (const { name, row } of [
+    {
+      name: 'runtime access that can mutate audit history',
+      row: {
+        can_manage_settings: true,
+        can_insert_audit: true,
+        can_allocate_config_version: true,
+        can_mutate_audit: true,
+      },
+    },
+    {
+      name: 'runtime access that cannot allocate config versions',
+      row: {
+        can_manage_settings: true,
+        can_insert_audit: true,
+        can_allocate_config_version: false,
+        can_mutate_audit: false,
+      },
+    },
+  ]) {
+    it(`rejects ${name}`, async () => {
+      const pool = {
+        query: async () => ({
+          rows: [row],
+        }),
+      } as unknown as Pool
 
-    await assert.rejects(
-      () => verifyMailConfigRuntimePrivileges(pool),
-      /Unsafe Auth mail config privileges/,
-    )
-  })
-
-  it('rejects runtime access that cannot allocate config versions', async () => {
-    const pool = {
-      query: async () => ({
-        rows: [
-          {
-            can_manage_settings: true,
-            can_insert_audit: true,
-            can_allocate_config_version: false,
-            can_mutate_audit: false,
-          },
-        ],
-      }),
-    } as unknown as Pool
-
-    await assert.rejects(
-      () => verifyMailConfigRuntimePrivileges(pool),
-      /Unsafe Auth mail config privileges/,
-    )
-  })
+      await assert.rejects(
+        () => verifyMailConfigRuntimePrivileges(pool),
+        /Unsafe Auth mail config privileges/,
+      )
+    })
+  }
 })

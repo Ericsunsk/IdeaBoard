@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,75 +13,84 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type stubStorageProfilesService struct {
-	meta     []domain.StorageProviderMeta
-	profiles []domain.StorageProfile
+type handlerTestService struct {
+	providers []domain.StorageProviderMeta
+	profiles  []domain.StorageProfile
+	listErr   error
 }
 
-func (s *stubStorageProfilesService) ListProviderMeta() []domain.StorageProviderMeta {
-	return s.meta
+func (s *handlerTestService) ListProviderMeta() []domain.StorageProviderMeta { return s.providers }
+func (s *handlerTestService) ListProfiles(context.Context) ([]domain.StorageProfile, error) {
+	return s.profiles, s.listErr
+}
+func (s *handlerTestService) SaveProfile(context.Context, *domain.StorageProfile) (*domain.StorageProfile, error) {
+	return nil, nil
+}
+func (s *handlerTestService) SaveAndApplyProfile(context.Context, *domain.StorageProfile) (*domain.StorageProfile, error) {
+	return nil, nil
+}
+func (s *handlerTestService) DeleteProfile(context.Context, string) error { return nil }
+func (s *handlerTestService) ApplyProfile(context.Context, string) (*domain.StorageProfile, error) {
+	return nil, nil
+}
+func (s *handlerTestService) TestProfile(context.Context, string) error { return nil }
+func (s *handlerTestService) GetBucketInfo(context.Context, string) (map[string]interface{}, error) {
+	return nil, nil
 }
 
-func (s *stubStorageProfilesService) ListProfiles(ctx context.Context) ([]domain.StorageProfile, error) {
-	return s.profiles, nil
-}
-
-func (s *stubStorageProfilesService) SaveProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
-	return profile, nil
-}
-
-func (s *stubStorageProfilesService) SaveAndApplyProfile(ctx context.Context, profile *domain.StorageProfile) (*domain.StorageProfile, error) {
-	return profile, nil
-}
-
-func (s *stubStorageProfilesService) DeleteProfile(ctx context.Context, id string) error {
-	return nil
-}
-
-func (s *stubStorageProfilesService) ApplyProfile(ctx context.Context, id string) (*domain.StorageProfile, error) {
-	return &domain.StorageProfile{ID: id, IsCurrent: true}, nil
-}
-
-func (s *stubStorageProfilesService) TestProfile(ctx context.Context, id string) error {
-	return nil
-}
-
-func (s *stubStorageProfilesService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
-	return map[string]interface{}{"status": "ok"}, nil
-}
-
-func TestStorageHandlerListProviders(t *testing.T) {
+func performHandlerRequest(handler gin.HandlerFunc) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	req, _ := http.NewRequest(http.MethodGet, "/api/admin/storage/providers", nil)
-	c.Request = req
+	router := gin.New()
+	router.GET("/storage", handler)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/storage", nil))
+	return recorder
+}
 
-	svc := &stubStorageProfilesService{
-		meta: []domain.StorageProviderMeta{{Provider: domain.StorageProviderLocal, Label: "本地存储"}},
+func TestHandlerListProvidersReturnsProviderPayload(t *testing.T) {
+	service := &handlerTestService{providers: []domain.StorageProviderMeta{{Provider: domain.StorageProviderLocal, Label: "Local"}}}
+	recorder := performHandlerRequest(NewHandler(service).ListProviders)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
 	}
-	h := NewHandler(svc)
-	h.ListProviders(c)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status code = %d, want 200", w.Code)
+	var body struct {
+		Data storageProvidersResponse `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Data.Providers) != 1 || body.Data.Providers[0].Provider != domain.StorageProviderLocal {
+		t.Fatalf("providers = %#v, want local provider", body.Data.Providers)
 	}
 }
 
-func TestStorageHandlerListProfiles(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	req, _ := http.NewRequest(http.MethodGet, "/api/admin/storage/profiles", nil)
-	c.Request = req
-
-	svc := &stubStorageProfilesService{
-		profiles: []domain.StorageProfile{{ID: "p1", Name: "Profile 1"}},
+func TestHandlerListProvidersFailsClosedWhenServiceMissing(t *testing.T) {
+	recorder := performHandlerRequest(NewHandler(nil).ListProviders)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body=%s", recorder.Code, recorder.Body.String())
 	}
-	h := NewHandler(svc)
-	h.ListProfiles(c)
+}
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("status code = %d, want 200", w.Code)
+func TestHandlerListProfilesReturnsProfiles(t *testing.T) {
+	service := &handlerTestService{profiles: []domain.StorageProfile{{ID: "profile_1", Name: "Primary"}}}
+	recorder := performHandlerRequest(NewHandler(service).ListProfiles)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	var body struct {
+		Data storageProfilesResponse `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Data.Profiles) != 1 || body.Data.Profiles[0].ID != "profile_1" {
+		t.Fatalf("profiles = %#v, want profile_1", body.Data.Profiles)
+	}
+}
+
+func TestHandlerListProfilesReturnsUnavailableOnServiceError(t *testing.T) {
+	recorder := performHandlerRequest(NewHandler(&handlerTestService{listErr: errors.New("database unavailable")}).ListProfiles)
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body=%s", recorder.Code, recorder.Body.String())
 	}
 }

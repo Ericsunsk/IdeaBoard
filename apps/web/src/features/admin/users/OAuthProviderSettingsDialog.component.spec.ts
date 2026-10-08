@@ -77,7 +77,7 @@ describe('OAuthProviderSettingsDialog', () => {
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
 
     expect(within(dialog).queryByText('请输入 Client ID')).not.toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: '保存设置' }))
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     expect(await within(dialog).findByText('请输入 Client ID')).toBeVisible()
     expect(within(dialog).getByText('请输入 Client Secret')).toBeVisible()
@@ -89,7 +89,7 @@ describe('OAuthProviderSettingsDialog', () => {
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
 
-    await user.click(within(dialog).getByRole('button', { name: '保存设置' }))
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
       expect(resource.save).toHaveBeenCalledWith('google', {
@@ -110,7 +110,7 @@ describe('OAuthProviderSettingsDialog', () => {
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     expect(await within(dialog).findByText('auth unavailable')).toBeVisible()
     expect(within(dialog).getByRole('button', { name: '重新加载' })).toBeEnabled()
-    expect(within(dialog).getByRole('button', { name: '保存设置' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: '保存' })).toBeDisabled()
   })
 
   it('reports a refresh failure as partial success without repeating the saved mutation', async () => {
@@ -123,7 +123,7 @@ describe('OAuthProviderSettingsDialog', () => {
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
 
     await user.type(within(dialog).getByLabelText('Client Secret'), 'rotated-secret')
-    await user.click(within(dialog).getByRole('button', { name: '保存设置' }))
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     expect(await within(dialog).findByText('设置已保存，但状态刷新失败，请重新加载')).toBeVisible()
     expect(resource.save).toHaveBeenCalledTimes(1)

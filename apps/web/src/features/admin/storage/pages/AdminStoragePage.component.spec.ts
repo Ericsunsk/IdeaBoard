@@ -98,7 +98,10 @@ describe('AdminStoragePage', () => {
 
     const currentSwitch = await screen.findByRole('switch', { name: '启用 生产环境 OSS' })
     expect(currentSwitch).toBeDisabled()
-    expect(currentSwitch).toHaveAttribute('aria-description', '当前存储不能停用，请先切换到其他存储')
+    expect(currentSwitch).toHaveAttribute(
+      'aria-description',
+      '当前存储不能停用，请先切换到其他存储',
+    )
     const localSwitch = screen.getByRole('switch', { name: '启用 内置本地存储' })
     expect(localSwitch).toBeDisabled()
     expect(localSwitch).toHaveAttribute('aria-description', '内置本地存储始终启用')
@@ -138,6 +141,25 @@ describe('AdminStoragePage', () => {
     expect(screen.getByRole('columnheader', { name: '启用' })).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: '启用 生产环境 OSS' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '新增存储' })).toBeInTheDocument()
+  })
+
+  it('keeps columns in subject, attributes, actions, then enable-switch-last order', async () => {
+    renderWithUser(Harness, {
+      global: {
+        plugins: [],
+      },
+    })
+
+    expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
+    const headers = ['Service', 'Status', '存储桶 / 路径', '访问端点 / 域名', '操作', '启用'].map(
+      (name) => screen.getByRole('columnheader', { name }),
+    )
+    for (let index = 0; index < headers.length - 1; index += 1) {
+      expect(
+        headers[index]!.compareDocumentPosition(headers[index + 1]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
   })
 
   it('opens redesigned compact dialog with tabbed pagination for cloud providers', async () => {

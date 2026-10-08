@@ -68,7 +68,6 @@
 
     <template #footer>
       <AdminDialogActions
-        :cancel-label="BILLING_PRICING_MESSAGES.cancel"
         :confirm-label="BILLING_PRICING_MESSAGES.save"
         :loading="isBusy"
         :disabled="isBusy || (supportsPool && poolSaveDisabled)"

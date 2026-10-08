@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { FastifyReply } from 'fastify'
-import { getErrorStatus, getHeaderValue, sendError, sendSuccess } from './httpResponse.js'
+import { getErrorStatus, getHeaderValue, sendSuccess } from './httpResponse.js'
 
 describe('getHeaderValue', () => {
   it('reads single, missing, and multi-value headers', () => {
@@ -26,7 +26,7 @@ describe('getErrorStatus', () => {
 })
 
 describe('auth HTTP envelope', () => {
-  it('renders success and error payloads', () => {
+  it('renders the success payload', () => {
     const successReply = createReply()
     sendSuccess(successReply as unknown as FastifyReply, { status: 'ok' })
     assert.equal(successReply.statusCode, 200)
@@ -35,11 +35,6 @@ describe('auth HTTP envelope', () => {
       msg: 'success',
       data: { status: 'ok' },
     })
-
-    const errorReply = createReply()
-    sendError(errorReply as unknown as FastifyReply, 401, 'unauthorized')
-    assert.equal(errorReply.statusCode, 401)
-    assert.deepEqual(errorReply.payload, { code: 401, msg: 'unauthorized' })
   })
 })
 

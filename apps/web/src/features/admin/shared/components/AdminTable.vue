@@ -11,9 +11,10 @@
         :style="tableStyle"
         :aria-label="tableAriaLabel || undefined"
         :aria-busy="loading || undefined"
+        :data-stale="isStale || undefined"
       >
         <template v-if="isDataDriven">
-          <AdminTableHeader>
+          <AdminTableHeader :class="stickyHeaderClass">
             <!-- 结构行（表头/加载/空态）不可交互：关闭行 hover 高亮，数据行保留 -->
             <AdminTableRow :hoverable="false">
               <AdminTableHead
@@ -27,9 +28,9 @@
                   type="checkbox"
                   :checked="allSelected"
                   :indeterminate="someSelected && !allSelected"
-                  :disabled="rows.length === 0"
+                  :disabled="selectableEntriesCount === 0"
                   aria-label="选择全部行"
-                  class="size-4 accent-primary"
+                  class="size-4 accent-primary disabled:cursor-not-allowed"
                   @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                 />
                 <component :is="column.headerSlot" v-if="column.headerSlot" />
@@ -41,11 +42,25 @@
             </AdminTableRow>
           </AdminTableHeader>
           <AdminTableBody>
-            <AdminTableRow v-if="loading && rows.length === 0" :hoverable="false">
-              <AdminTableCell :colspan="columnCount" class="px-3 py-10 text-center">
-                <AdminSpinner class="mx-auto size-7" aria-label="正在加载" />
-              </AdminTableCell>
-            </AdminTableRow>
+            <template v-if="loading && rows.length === 0">
+              <template v-if="skeletonRows > 0">
+                <AdminTableRow
+                  v-for="skeletonIndex in skeletonRows"
+                  :key="`skeleton-${skeletonIndex}`"
+                  :hoverable="false"
+                >
+                  <AdminTableCell :colspan="columnCount">
+                    <div data-ui="skeleton" class="h-4 w-full animate-pulse rounded-md bg-muted" />
+                    <span v-if="skeletonIndex === 1" class="sr-only" role="status">正在加载</span>
+                  </AdminTableCell>
+                </AdminTableRow>
+              </template>
+              <AdminTableRow v-else :hoverable="false">
+                <AdminTableCell :colspan="columnCount" class="px-3 py-10 text-center">
+                  <AdminSpinner class="mx-auto size-7" aria-label="正在加载" />
+                </AdminTableCell>
+              </AdminTableRow>
+            </template>
             <template v-else-if="rows.length === 0">
               <AdminTableEmpty :colspan="columnCount">
                 <slot name="empty">
@@ -65,14 +80,22 @@
             </template>
             <template v-else>
               <template v-for="(row, rowIndex) in rows" :key="rowKey(row, rowIndex)">
-                <AdminTableRow :aria-selected="isSelected(row, rowIndex) || undefined">
+                <AdminTableRow
+                  :hoverable="!isRowDisabled(row, rowIndex)"
+                  :aria-selected="isSelected(row, rowIndex) || undefined"
+                  :data-state="isSelected(row, rowIndex) ? 'selected' : undefined"
+                  :aria-disabled="isRowDisabled(row, rowIndex) || undefined"
+                  :class="rowClass(row, rowIndex)"
+                  @click="handleRowClick($event, row, rowIndex)"
+                >
                   <AdminTableCell v-for="column in columns" :key="column.key" :style="column.style">
                     <input
                       v-if="column.selectionMode === 'multiple'"
                       type="checkbox"
                       :checked="isSelected(row, rowIndex)"
+                      :disabled="isRowDisabled(row, rowIndex)"
                       :aria-label="selectionRowLabel(row, rowIndex)"
-                      class="size-4 accent-primary"
+                      class="size-4 accent-primary disabled:cursor-not-allowed"
                       @change="
                         toggleSelectRow(row, rowIndex, ($event.target as HTMLInputElement).checked)
                       "
@@ -147,6 +170,12 @@ export type AdminTableRowCollapseEvent<TRow = unknown> = {
   index: number
 }
 
+export type AdminTableRowClickEvent<TRow> = {
+  originalEvent: MouseEvent
+  data: TRow
+  index: number
+}
+
 type AdminTableColumnDef = {
   key: string
   field?: string | undefined
@@ -172,6 +201,9 @@ const props = withDefaults(
     emptyDescription?: string
     selection?: readonly TRow[] | null | undefined
     expandedRows?: Record<string, boolean> | null | undefined
+    stickyHeader?: boolean
+    rowDisabled?: ((row: TRow, index: number) => boolean) | undefined
+    skeletonRows?: number
     class?: HTMLAttributes['class'] | undefined
   }>(),
   {
@@ -187,6 +219,9 @@ const props = withDefaults(
     emptyDescription: '',
     selection: undefined,
     expandedRows: undefined,
+    stickyHeader: false,
+    rowDisabled: undefined,
+    skeletonRows: 0,
     class: undefined,
   },
 )
@@ -196,6 +231,7 @@ const emit = defineEmits<{
   'update:expandedRows': [expandedRows: Record<string, boolean>]
   'row-expand': [event: AdminTableRowExpandEvent<TRow>]
   'row-collapse': [event: AdminTableRowCollapseEvent<TRow>]
+  'row-click': [event: AdminTableRowClickEvent<TRow>]
 }>()
 
 defineOptions({ inheritAttrs: false })
@@ -206,12 +242,21 @@ const slots = useSlots()
 const tableClass = 'w-full min-w-full border-collapse text-left'
 const scrollRegionRole = computed(() => (props.scrollAriaLabel ? 'region' : undefined))
 const hasExpansionSlot = computed(() => Boolean(slots.expansion))
+// 对标 AdminModelAddDialog 手写表 thead：sticky 定位 + 背景 token，默认关闭零影响。
+const stickyHeaderClass = computed(() =>
+  props.stickyHeader ? 'sticky top-0 z-10 bg-muted/80 backdrop-blur-xs' : undefined,
+)
+// 初载（无行 + loading）走 spinner/骨架；有行 + loading 是后台刷新，行保留挂载弱示意。
+const isStale = computed(() => props.loading && rows.value.length > 0)
 
 function normalizeStyleKey(index: number, field?: string, header?: string): string {
   return field || header || `column-${index}`
 }
 
 const columns = computed<AdminTableColumnDef[]>(() => {
+  // 注意：列识别依赖 vnode.type === AdminColumn 精确匹配，包装组件会被静默丢弃。
+  // 因此列不可再包一层工厂组件；复用统一收敛到单元格级（AdminBadge/AdminMono 等），
+  // 每列约 6 行样板为有意保留的成本。若将来要列工厂，需先给本表加 columns prop。
   const vnodes = (slots.default?.() ?? []).filter((vnode) => vnode.type === AdminColumn)
   return vnodes.map((vnode, index) => {
     const columnProps = (vnode.props ?? {}) as {
@@ -271,6 +316,32 @@ function rowKey(row: TRow, index: number): string {
   return resolveKey(row, index)
 }
 
+function isRowDisabled(row: TRow, index: number): boolean {
+  return props.rowDisabled?.(row, index) ?? false
+}
+
+// 可选行保留原始下标：无 dataKey 时标识回退到下标，过滤后重排下标即错位。
+function selectableEntries(): Array<{ row: TRow; index: number }> {
+  const entries: Array<{ row: TRow; index: number }> = []
+  rows.value.forEach((row, index) => {
+    if (!isRowDisabled(row, index)) entries.push({ row, index })
+  })
+  return entries
+}
+
+const selectableEntriesCount = computed(() => selectableEntries().length)
+
+function rowClass(row: TRow, index: number): string | undefined {
+  const classes: string[] = []
+  if (isRowDisabled(row, index)) classes.push('opacity-60')
+  if (isStale.value) classes.push('opacity-70')
+  return classes.length > 0 ? classes.join(' ') : undefined
+}
+
+function handleRowClick(event: MouseEvent, row: TRow, index: number) {
+  if (isRowDisabled(row, index)) return
+  emit('row-click', { originalEvent: event, data: row, index })
+}
 function selectedKeys(): Set<string> {
   const keys = new Set<string>()
   for (const [index, row] of (props.selection ?? []).entries()) {
@@ -285,10 +356,12 @@ function isSelected(row: TRow, index: number): boolean {
 }
 
 const allSelected = computed(() => {
-  // 跨页选择时 selection 含其它页行：全选只看当前页行是否都在集合内。
-  if (!hasSelection.value || rows.value.length === 0) return false
+  // 跨页选择时 selection 含其它页行：全选只看当前页可选行是否都在集合内。
+  if (!hasSelection.value) return false
+  const entries = selectableEntries()
+  if (entries.length === 0) return false
   const keys = selectedKeys()
-  return rows.value.every((row, index) => keys.has(resolveKey(row, index)))
+  return entries.every(({ row, index }) => keys.has(resolveKey(row, index)))
 })
 const someSelected = computed(
   () => hasSelection.value && selectedKeys().size > 0 && !allSelected.value,
@@ -308,6 +381,7 @@ function warnSelectionNeedsDataKey() {
 }
 
 function toggleSelectRow(row: TRow, index: number, checked: boolean) {
+  if (isRowDisabled(row, index)) return
   warnSelectionNeedsDataKey()
   const key = resolveKey(row, index)
   const current = props.selection ? [...props.selection] : []
@@ -319,7 +393,8 @@ function toggleSelectRow(row: TRow, index: number, checked: boolean) {
 
 function toggleSelectAll(checked: boolean) {
   warnSelectionNeedsDataKey()
-  emit('update:selection', checked ? [...rows.value] : [])
+  // 全选只纳入可选行：禁用行永不进入 selection。
+  emit('update:selection', checked ? selectableEntries().map(({ row }) => row) : [])
 }
 
 function isExpanded(row: TRow, index: number): boolean {

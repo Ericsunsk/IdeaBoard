@@ -74,43 +74,56 @@ test('verifyAuthRuntimePrivileges rejects a role that can write Credits', async 
   )
 })
 
-test('verifyAuthRuntimePrivileges rejects a role without the typed Auth settings seam', async () => {
-  const pool = {
-    query: async () => ({
-      rows: [
-        {
-          current_user: 'ideaboard_auth',
-          can_execute_auth_settings: false,
-          can_read_system_configs: false,
-          can_read_auth_users: true,
-          can_write_credits: false,
-          can_execute_credit_functions: false,
-        },
-      ],
-    }),
-  } as unknown as Pool
+for (const { name, row, expected } of [
+  {
+    name: 'a role without the typed Auth settings seam',
+    row: {
+      current_user: 'ideaboard_auth',
+      can_execute_auth_settings: false,
+      can_read_system_configs: false,
+      can_read_auth_users: true,
+      can_write_credits: false,
+      can_execute_credit_functions: false,
+    },
+    expected: /execute_auth_settings=false/,
+  },
+  {
+    name: 'direct access to raw system settings',
+    row: {
+      current_user: 'ideaboard_auth',
+      can_execute_auth_settings: true,
+      can_read_system_configs: true,
+      can_read_auth_users: true,
+      can_write_credits: false,
+      can_execute_credit_functions: false,
+    },
+    expected: /read_system_configs=true/,
+  },
+  {
+    name: 'a runtime role with destructive provider settings access',
+    row: {
+      current_user: 'ideaboard_auth',
+      can_execute_auth_settings: true,
+      can_read_system_configs: false,
+      can_read_auth_users: true,
+      can_write_credits: false,
+      can_execute_credit_functions: false,
+      can_manage_social_provider_settings: true,
+      can_delete_social_provider_settings: true,
+    },
+    expected: /delete_social_provider_settings=true/,
+  },
+]) {
+  test(`verifyAuthRuntimePrivileges rejects ${name}`, async () => {
+    const pool = {
+      query: async () => ({
+        rows: [row],
+      }),
+    } as unknown as Pool
 
-  await assert.rejects(() => verifyAuthRuntimePrivileges(pool), /execute_auth_settings=false/)
-})
-
-test('verifyAuthRuntimePrivileges rejects direct access to raw system settings', async () => {
-  const pool = {
-    query: async () => ({
-      rows: [
-        {
-          current_user: 'ideaboard_auth',
-          can_execute_auth_settings: true,
-          can_read_system_configs: true,
-          can_read_auth_users: true,
-          can_write_credits: false,
-          can_execute_credit_functions: false,
-        },
-      ],
-    }),
-  } as unknown as Pool
-
-  await assert.rejects(() => verifyAuthRuntimePrivileges(pool), /read_system_configs=true/)
-})
+    await assert.rejects(() => verifyAuthRuntimePrivileges(pool), expected)
+  })
+}
 
 test('verifyAuthRuntimePrivileges accepts the limited Auth runtime role', async () => {
   const pool = {

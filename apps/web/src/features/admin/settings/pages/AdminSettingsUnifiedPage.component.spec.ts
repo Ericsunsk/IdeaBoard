@@ -110,7 +110,7 @@ describe('AdminSettingsUnifiedPage', () => {
     const aside = screen.getByRole('complementary')
     expect(within(aside).getByText('本页内容')).toBeVisible()
     expect(within(aside).getByText('站点设置')).toBeVisible()
-    expect(within(aside).getByText('客服渠道')).toBeVisible()
+    expect(within(aside).getByText('客户支持')).toBeVisible()
     expect(within(aside).getByText('图片库')).toBeVisible()
     expect(within(aside).getByText('存储配置')).toBeVisible()
     expect(within(aside).getByText('上传并发限制')).toBeVisible()
@@ -123,7 +123,7 @@ describe('AdminSettingsUnifiedPage', () => {
     const main = screen.getByRole('main')
     const sections = [
       ['站点设置', '站点设置'],
-      ['客服渠道', '客服渠道'],
+      ['客户支持', '客户支持'],
       ['图片库', '图片库'],
       ['存储配置', '存储配置'],
       ['上传并发限制', '上传并发设置'],

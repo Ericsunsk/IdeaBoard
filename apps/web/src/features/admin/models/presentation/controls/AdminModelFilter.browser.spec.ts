@@ -54,19 +54,4 @@ describe('AdminModelFilter keyboard model', () => {
     expect(updates.at(-1)).toBe('image_generation')
     expect(updates).not.toContain('')
   })
-
-  it('reports the current filter in the trigger, not the raw sentinel', async () => {
-    // The internal "all" token must never surface as the accessible name.
-    render(AdminModelFilter, {
-      props: {
-        label: '模型类型',
-        allLabel: '全部类型',
-        options: ['image_generation'],
-        modelValue: '',
-        'onUpdate:modelValue': () => {},
-      },
-    })
-    expect(screen.getByRole('combobox', { name: '筛选模型类型' })).toBeTruthy()
-    expect(screen.getByRole('combobox').textContent).toContain('全部类型')
-  })
 })

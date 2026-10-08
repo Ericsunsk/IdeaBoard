@@ -210,79 +210,90 @@ describe('SocialProviderSettingsService', () => {
     )
   })
 
-  it('fails closed when stored credentials cannot be decrypted', async () => {
-    const repository = memoryRepository({
-      provider: GOOGLE_PROVIDER,
-      enabled: true,
-      clientId: 'example.apps.googleusercontent.com',
-      encryptedClientSecret: 'not-valid-ciphertext',
-      scopes: ['openid', 'email', 'profile'],
-      configVersion: 1,
-      updatedAt: new Date('2026-08-06T00:00:00.000Z'),
-    })
-    const service = new SocialProviderSettingsService(
-      repository,
-      secretCipher,
-      'https://api.ideaboard.art',
-    )
-
-    assert.equal(await service.resolve(GOOGLE_PROVIDER), null)
-    assert.equal((await service.getSummary(GOOGLE_PROVIDER)).available, false)
-  })
-
-  it('does not persist enabled when the retained secret cannot be decrypted', async () => {
-    const repository = memoryRepository({
-      provider: GOOGLE_PROVIDER,
-      enabled: false,
-      clientId: 'example.apps.googleusercontent.com',
-      encryptedClientSecret: 'not-valid-ciphertext',
-      scopes: ['openid', 'email', 'profile'],
-      configVersion: 1,
-      updatedAt: new Date('2026-08-06T00:00:00.000Z'),
-    })
-    const service = new SocialProviderSettingsService(
-      repository,
-      secretCipher,
-      'https://api.ideaboard.art',
-    )
-
-    await assert.rejects(
-      () =>
-        service.update(GOOGLE_PROVIDER, {
+  for (const { name, check } of [
+    {
+      name: 'stored credentials cannot be decrypted',
+      check: async () => {
+        const repository = memoryRepository({
+          provider: GOOGLE_PROVIDER,
           enabled: true,
           clientId: 'example.apps.googleusercontent.com',
-        }),
-      (error: unknown) =>
-        error instanceof SocialProviderSettingsError && error.code === 'encryption_unavailable',
-    )
-    assert.equal((await repository.get(GOOGLE_PROVIDER))?.enabled, false)
-  })
+          encryptedClientSecret: 'not-valid-ciphertext',
+          scopes: ['openid', 'email', 'profile'],
+          configVersion: 1,
+          updatedAt: new Date('2026-08-06T00:00:00.000Z'),
+        })
+        const service = new SocialProviderSettingsService(
+          repository,
+          secretCipher,
+          'https://api.ideaboard.art',
+        )
 
-  it('fails closed when stored scopes differ from the code allowlist', async () => {
-    const repository = memoryRepository()
-    const service = new SocialProviderSettingsService(
-      repository,
-      secretCipher,
-      'https://api.ideaboard.art',
-    )
-    await service.update(GOOGLE_PROVIDER, {
-      enabled: true,
-      clientId: 'example.apps.googleusercontent.com',
-      clientSecret: 'google-secret',
-    })
-    const stored = await repository.get(GOOGLE_PROVIDER)
-    assert.ok(stored)
-    stored.scopes = [...stored.scopes, 'https://www.googleapis.com/auth/drive']
-    const corruptedRepository = memoryRepository(stored)
-    const corruptedService = new SocialProviderSettingsService(
-      corruptedRepository,
-      secretCipher,
-      'https://api.ideaboard.art',
-    )
+        assert.equal(await service.resolve(GOOGLE_PROVIDER), null)
+        assert.equal((await service.getSummary(GOOGLE_PROVIDER)).available, false)
+      },
+    },
+    {
+      name: 'retained secret cannot be decrypted',
+      check: async () => {
+        const repository = memoryRepository({
+          provider: GOOGLE_PROVIDER,
+          enabled: false,
+          clientId: 'example.apps.googleusercontent.com',
+          encryptedClientSecret: 'not-valid-ciphertext',
+          scopes: ['openid', 'email', 'profile'],
+          configVersion: 1,
+          updatedAt: new Date('2026-08-06T00:00:00.000Z'),
+        })
+        const service = new SocialProviderSettingsService(
+          repository,
+          secretCipher,
+          'https://api.ideaboard.art',
+        )
 
-    assert.equal(await corruptedService.resolve(GOOGLE_PROVIDER), null)
-    assert.equal((await corruptedService.getCapabilities()).social.google, false)
-  })
+        await assert.rejects(
+          () =>
+            service.update(GOOGLE_PROVIDER, {
+              enabled: true,
+              clientId: 'example.apps.googleusercontent.com',
+            }),
+          (error: unknown) =>
+            error instanceof SocialProviderSettingsError && error.code === 'encryption_unavailable',
+        )
+        assert.equal((await repository.get(GOOGLE_PROVIDER))?.enabled, false)
+      },
+    },
+    {
+      name: 'stored scopes differ from the code allowlist',
+      check: async () => {
+        const repository = memoryRepository()
+        const service = new SocialProviderSettingsService(
+          repository,
+          secretCipher,
+          'https://api.ideaboard.art',
+        )
+        await service.update(GOOGLE_PROVIDER, {
+          enabled: true,
+          clientId: 'example.apps.googleusercontent.com',
+          clientSecret: 'google-secret',
+        })
+        const stored = await repository.get(GOOGLE_PROVIDER)
+        assert.ok(stored)
+        stored.scopes = [...stored.scopes, 'https://www.googleapis.com/auth/drive']
+        const corruptedRepository = memoryRepository(stored)
+        const corruptedService = new SocialProviderSettingsService(
+          corruptedRepository,
+          secretCipher,
+          'https://api.ideaboard.art',
+        )
+
+        assert.equal(await corruptedService.resolve(GOOGLE_PROVIDER), null)
+        assert.equal((await corruptedService.getCapabilities()).social.google, false)
+      },
+    },
+  ]) {
+    it(`fails closed when ${name}`, check)
+  }
 
   it('initializes Google as disabled when the settings repository is unavailable', async () => {
     const applied: Array<string | null> = []

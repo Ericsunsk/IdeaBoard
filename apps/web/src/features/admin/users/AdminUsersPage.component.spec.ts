@@ -174,6 +174,21 @@ describe('AdminUsersPage', () => {
     expect(await screen.findByText('🇺🇸')).toBeVisible()
   })
 
+  it('keeps user columns in subject, attributes, status, time, then More-last order', async () => {
+    renderPage()
+
+    expect(await screen.findByText('203.0.113.42')).toBeVisible()
+    const headers = ['用户', 'Email', 'IP', '角色', '账户余额', '状态', '加入时间', 'More'].map(
+      (name) => screen.getByRole('columnheader', { name }),
+    )
+    for (let index = 0; index < headers.length - 1; index += 1) {
+      expect(
+        headers[index]!.compareDocumentPosition(headers[index + 1]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
+  })
+
   it('loads more Ledger entries and refreshes the user list after confirmed Grant', async () => {
     const { user } = renderPage()
     await user.click(

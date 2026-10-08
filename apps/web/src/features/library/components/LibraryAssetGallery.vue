@@ -1,7 +1,7 @@
 <template>
   <div
     ref="scrollAreaRef"
-    class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-[var(--radius-board-dialog)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     :aria-busy="loading"
     @scroll="emit('scroll')"
   >
@@ -17,7 +17,7 @@
     <!-- 空状态提示 -->
     <div
       v-else-if="!loading && assets.length === 0 && !errorMessage"
-      class="grid h-full min-h-40 place-items-center rounded-[18px] border border-dashed border-border px-5 text-center"
+      class="grid h-full min-h-40 place-items-center rounded-[var(--radius-board-dialog)] border border-dashed border-border px-5 text-center"
     >
       <div>
         <p class="m-0 text-sm font-semibold">{{ t('library.empty.noSavedReferences') }}</p>

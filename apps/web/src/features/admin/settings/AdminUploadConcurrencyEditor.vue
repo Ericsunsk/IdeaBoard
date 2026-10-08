@@ -33,7 +33,9 @@
               </span>
             </div>
             <p class="text-admin-caption text-muted-foreground">
-              {{ SETTINGS_MESSAGES.uploadRowDescription }}（取值范围 {{ MEDIA_UPLOAD_MIN_CONCURRENT }} ~ {{ MEDIA_UPLOAD_MAX_CONCURRENT }}，默认值 {{ DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING.upload_max_concurrent }}）
+              {{ SETTINGS_MESSAGES.uploadRowDescription }}（取值范围
+              {{ MEDIA_UPLOAD_MIN_CONCURRENT }} ~ {{ MEDIA_UPLOAD_MAX_CONCURRENT }}，默认值
+              {{ DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING.upload_max_concurrent }}）
             </p>
           </div>
         </div>
@@ -58,32 +60,25 @@
     </div>
 
     <template #actions>
-      <ActionButton
-        :disabled="
+      <AdminEditorActions
+        :save-disabled="
           mediaUploadLoading ||
           mediaUploadSaving ||
           !mediaUploadIsDirty ||
           !!mediaUploadValidationError
         "
-        :loading="mediaUploadSaving"
-        @click="saveMediaUpload"
-      >
-        {{ SETTINGS_MESSAGES.save }}
-      </ActionButton>
-      <ActionButton
-        variant="outline"
-        :disabled="mediaUploadLoading || mediaUploadSaving || !mediaUploadIsDirty"
-        @click="resetMediaUpload"
-      >
-        {{ SETTINGS_MESSAGES.reset }}
-      </ActionButton>
+        :reset-disabled="mediaUploadLoading || mediaUploadSaving || !mediaUploadIsDirty"
+        :saving="mediaUploadSaving"
+        @save="saveMediaUpload"
+        @reset="resetMediaUpload"
+      />
     </template>
   </SettingEditorCard>
 </template>
 
 <script setup lang="ts">
 import { Upload } from '@iconoir/vue'
-import ActionButton from '../../../shared/components/ActionButton.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import SettingEditorCard from './SettingEditorCard.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'

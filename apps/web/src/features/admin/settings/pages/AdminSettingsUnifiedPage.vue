@@ -3,36 +3,26 @@
     <!-- 左侧内容区：平铺各个板块，自适应宽度纯净排版 -->
     <div class="flex min-w-0 flex-1 w-full flex-col gap-12">
       <!-- 1. 站点设置 -->
-      <section
-        id="section-branding"
-        aria-label="站点设置"
-        class="scroll-mt-20"
-      >
+      <section id="section-branding" aria-label="站点设置" class="scroll-mt-20" tabindex="-1">
         <AdminBrandingCard />
       </section>
 
-      <!-- 2. 客服渠道 -->
+      <!-- 2. 客户支持 -->
       <section
         id="section-support-channels"
-        aria-label="客服渠道"
+        aria-label="客户支持"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminSupportChannelsEditor />
       </section>
 
       <!-- 3. 图片库 (Unsplash & Pexels) -->
-      <section
-        id="section-image-library"
-        aria-label="图片库"
-        class="scroll-mt-20"
-      >
+      <section id="section-image-library" aria-label="图片库" class="scroll-mt-20" tabindex="-1">
         <AdminAlert v-if="searchLoadError" severity="error" class="mb-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ searchLoadError }}</span>
-            <ActionButton
-              variant="outline"
-              @click="loadSearchProviders"
-            >
+            <ActionButton variant="outline" @click="loadSearchProviders">
               {{ SETTINGS_MESSAGES.retry }}
             </ActionButton>
           </div>
@@ -51,6 +41,7 @@
         id="section-storage-providers"
         aria-label="存储配置"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminStoragePage />
       </section>
@@ -60,6 +51,7 @@
         id="section-upload-concurrency"
         aria-label="上传并发限制"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminUploadConcurrencyEditor />
       </section>
@@ -69,6 +61,7 @@
         id="section-mail-service"
         aria-label="邮件发送服务"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminMailConfigCard plain />
       </section>
@@ -78,6 +71,7 @@
         id="section-registration-ratelimit"
         aria-label="注册准入与 API 限流"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminRegistrationRateLimitEditor />
       </section>
@@ -87,6 +81,7 @@
         id="section-outbound-policy"
         aria-label="私有地址访问策略"
         class="scroll-mt-20"
+        tabindex="-1"
       >
         <AdminOutboundPolicyCard plain />
       </section>
@@ -97,14 +92,14 @@
       <AdminSettingsOnThisPage
         :items="TOC_ITEMS"
         :active-id="activeSectionId"
-        @select="activeSectionId = $event"
+        @select="handleSelect"
       />
     </aside>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import {
   Database,
   Globe,
@@ -132,16 +127,14 @@ import {
   createAdminSearchProviderResource,
   type AdminSearchProviderResource,
 } from '../searchProviderResource'
-import {
-  SEARCH_PROVIDERS,
-  type SearchProviderConfig,
-} from '../searchProviderTypes'
+import { SEARCH_PROVIDERS, type SearchProviderConfig } from '../searchProviderTypes'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { SETTINGS_MESSAGES } from './messages'
+import { useScrollSpy } from '../useScrollSpy'
 
 const TOC_ITEMS: readonly OnThisPageItem[] = [
   { id: 'section-branding', title: '站点设置', icon: Globe },
-  { id: 'section-support-channels', title: '客服渠道', icon: Headset },
+  { id: 'section-support-channels', title: '客户支持', icon: Headset },
   { id: 'section-image-library', title: '图片库', icon: MediaImage },
   { id: 'section-storage-providers', title: '存储配置', icon: Database },
   { id: 'section-upload-concurrency', title: '上传并发限制', icon: Upload },
@@ -150,8 +143,7 @@ const TOC_ITEMS: readonly OnThisPageItem[] = [
   { id: 'section-outbound-policy', title: SETTINGS_MESSAGES.outboundTitle, icon: Server },
 ] as const
 
-const activeSectionId = ref<string>(TOC_ITEMS[0]!.id)
-let observer: IntersectionObserver | null = null
+const { activeId: activeSectionId, handleSelect } = useScrollSpy(TOC_ITEMS.map((item) => item.id))
 
 // 图片库配置状态维护
 const searchResource: AdminSearchProviderResource = createAdminSearchProviderResource()
@@ -180,35 +172,5 @@ async function loadSearchProviders() {
 
 onMounted(() => {
   void loadSearchProviders()
-
-  if (typeof IntersectionObserver !== 'undefined') {
-    observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting)
-        if (visible.length > 0) {
-          const first = visible.sort(
-            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
-          )[0]
-          if (first?.target.id) {
-            activeSectionId.value = first.target.id
-          }
-        }
-      },
-      {
-        rootMargin: '-80px 0px -50% 0px',
-        threshold: [0, 0.2, 0.5, 0.8, 1],
-      },
-    )
-
-    TOC_ITEMS.forEach((item) => {
-      const el = document.getElementById(item.id)
-      if (el) observer?.observe(el)
-    })
-  }
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-  observer = null
 })
 </script>

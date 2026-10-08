@@ -37,8 +37,8 @@
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
-        <PopoverRoot>
-          <PopoverTrigger as-child>
+        <AdminPopover>
+          <AdminPopoverTrigger as-child>
             <button
               title="异常雷达"
               type="button"
@@ -53,66 +53,63 @@
                 aria-hidden="true"
               ></span>
             </button>
-          </PopoverTrigger>
-          <PopoverPortal>
-            <PopoverContent
-              class="z-50 w-[340px] max-w-[calc(100vw_-_28px)] rounded-xl border border-border bg-card p-0 text-foreground shadow-lg outline-none overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
-              :side-offset="8"
-              align="end"
-            >
-              <div :class="adminAnomalyPopoverClass">
-                <div
-                  class="flex items-start justify-between gap-4 border-b border-border px-4 py-3.5"
-                >
-                  <div class="min-w-0">
-                    <div class="text-admin-content font-bold text-foreground">异常雷达</div>
-                  </div>
-                  <AdminBadge
-                    :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
-                    :severity="hasAnomalies ? 'danger' : 'success'"
-                    rounded
-                  />
+          </AdminPopoverTrigger>
+          <AdminPopoverContent
+            :side-offset="8"
+            class="w-[340px] max-w-[calc(100vw_-_28px)] p-0 shadow-lg"
+          >
+            <div :class="adminAnomalyPopoverClass">
+              <div
+                class="flex items-start justify-between gap-4 border-b border-border px-4 py-3.5"
+              >
+                <div class="min-w-0">
+                  <div class="text-admin-content font-bold text-foreground">异常雷达</div>
                 </div>
+                <AdminBadge
+                  :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
+                  :severity="hasAnomalies ? 'danger' : 'success'"
+                  rounded
+                />
+              </div>
 
-                <div v-if="hasAnomalies" class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
-                  <button
-                    v-for="item in anomalies"
-                    :key="item.id"
-                    type="button"
-                    class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted"
-                    @click="handleAnomalySelect(item)"
-                  >
-                    <span
-                      class="mt-[7px] size-2 shrink-0 rounded-full bg-destructive"
-                      aria-hidden="true"
-                    ></span>
-                    <span class="min-w-0 flex-1">
-                      <span class="flex min-w-0 items-center justify-between gap-3">
-                        <span class="truncate text-admin-body font-bold text-foreground">
-                          {{ item.title }}
-                        </span>
-                        <span class="shrink-0 text-admin-caption font-bold text-muted-foreground">
-                          {{ item.metric || item.actionLabel }}
-                        </span>
+              <div v-if="hasAnomalies" class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
+                <button
+                  v-for="item in anomalies"
+                  :key="item.id"
+                  type="button"
+                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted"
+                  @click="handleAnomalySelect(item)"
+                >
+                  <span
+                    class="mt-[7px] size-2 shrink-0 rounded-full bg-destructive"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex min-w-0 items-center justify-between gap-3">
+                      <span class="truncate text-admin-body font-bold text-foreground">
+                        {{ item.title }}
                       </span>
-                      <span class="mt-1 block text-admin-meta leading-5 text-muted-foreground">
-                        {{ item.summary }}
-                      </span>
-                      <span class="mt-1.5 block text-admin-caption font-bold text-muted-foreground">
-                        {{ item.actionLabel }}
+                      <span class="shrink-0 text-admin-caption font-bold text-muted-foreground">
+                        {{ item.metric || item.actionLabel }}
                       </span>
                     </span>
-                  </button>
-                </div>
-
-                <div v-else class="px-5 py-8 text-center">
-                  <div class="text-admin-content font-bold text-foreground">运行正常</div>
-                  <div class="mt-1.5 text-admin-meta text-muted-foreground">当前没有活跃异常</div>
-                </div>
+                    <span class="mt-1 block text-admin-meta leading-5 text-muted-foreground">
+                      {{ item.summary }}
+                    </span>
+                    <span class="mt-1.5 block text-admin-caption font-bold text-muted-foreground">
+                      {{ item.actionLabel }}
+                    </span>
+                  </span>
+                </button>
               </div>
-            </PopoverContent>
-          </PopoverPortal>
-        </PopoverRoot>
+
+              <div v-else class="px-5 py-8 text-center">
+                <div class="text-admin-content font-bold text-foreground">运行正常</div>
+                <div class="mt-1.5 text-admin-meta text-muted-foreground">当前没有活跃异常</div>
+              </div>
+            </div>
+          </AdminPopoverContent>
+        </AdminPopover>
 
         <UserAccountMenu
           ref="userAccountMenuRef"
@@ -137,7 +134,9 @@
 import { useSupportChannels } from '../../../shared/composables/useSupportChannels'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import AdminPopover from '../shared/components/AdminPopover.vue'
+import AdminPopoverTrigger from '../shared/components/AdminPopoverTrigger.vue'
+import AdminPopoverContent from '../shared/components/AdminPopoverContent.vue'
 import AdminBadge from '../shared/components/AdminBadge.vue'
 import { BellNotificationSolid as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import type { AdminNavigationItem } from './navigation'

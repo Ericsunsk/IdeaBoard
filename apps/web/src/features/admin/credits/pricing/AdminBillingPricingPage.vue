@@ -73,40 +73,32 @@
     </div>
 
     <!-- 4. 空状态提示 (无数据或过滤未命中) -->
-    <div
+    <AdminEmptyState
       v-else-if="filteredItems.length === 0"
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
+      :title="
+        !hasActiveFilter
+          ? BILLING_PRICING_MESSAGES.emptyNone
+          : BILLING_PRICING_MESSAGES.emptyNoMatch
+      "
+      :description="
+        !hasActiveFilter
+          ? BILLING_PRICING_MESSAGES.emptyNoneHint
+          : BILLING_PRICING_MESSAGES.emptyNoMatchHint
+      "
+      :icon="!hasActiveFilter ? Coins : Search"
     >
-      <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
-      >
-        <Coins v-if="!hasActiveFilter" class="size-6" />
-        <Search v-else class="size-6" />
-      </div>
-      <h3 class="text-base font-semibold text-foreground">
-        {{
-          !hasActiveFilter
-            ? BILLING_PRICING_MESSAGES.emptyNone
-            : BILLING_PRICING_MESSAGES.emptyNoMatch
-        }}
-      </h3>
-      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
-        {{
-          !hasActiveFilter
-            ? BILLING_PRICING_MESSAGES.emptyNoneHint
-            : BILLING_PRICING_MESSAGES.emptyNoMatchHint
-        }}
-      </p>
-      <button
-        v-if="hasActiveFilter"
-        type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
-        @click="clearFilters"
-      >
-        <Xmark class="size-3.5" />
-        <span>{{ BILLING_PRICING_MESSAGES.clearFilters }}</span>
-      </button>
-    </div>
+      <template #actions>
+        <button
+          v-if="hasActiveFilter"
+          type="button"
+          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          @click="clearFilters"
+        >
+          <Xmark class="size-3.5" />
+          <span>{{ BILLING_PRICING_MESSAGES.clearFilters }}</span>
+        </button>
+      </template>
+    </AdminEmptyState>
 
     <!-- 5. 分 namespace 定价表（Image / Other，ai-search 暂归 Other，对齐任务监控页事件表） -->
     <div v-else class="flex flex-col gap-6">
@@ -153,6 +145,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Coins, Refresh, Search, Xmark } from '@iconoir/vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
 import AdminRefreshButton from '../../shared/components/AdminRefreshButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'

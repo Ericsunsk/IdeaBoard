@@ -77,6 +77,46 @@ function renderPanel(overrides: Record<string, unknown> = {}) {
       catalogModels,
       ...overrides,
     },
+    // reka `Select` 把选项渲染进 portal，jsdom 里打不开（见
+    // TaskControlToolbar.browser.spec.ts 的说明）。草稿增删逻辑与选择器
+    // 键盘模型无关，此处把 AdminSelect 桩成原生 select 驱动流程；
+    // 选择器自身的语义由下面的 combobox 用例用真实组件断言。
+    global: {
+      stubs: {
+        AdminSelect: defineComponent({
+          name: 'AdminSelect',
+          props: {
+            modelValue: { type: [String, Number], default: '' },
+            options: {
+              type: Array as () => Array<{ label: string; value: string | number }>,
+              default: () => [],
+            },
+            placeholder: { type: String, default: '' },
+            disabled: { type: Boolean, default: false },
+          },
+          emits: ['update:modelValue'],
+          setup(props, { emit, attrs }) {
+            return () =>
+              h(
+                'select',
+                {
+                  value: props.modelValue,
+                  'aria-label': (attrs['aria-label'] as string | undefined) ?? props.placeholder,
+                  disabled: props.disabled,
+                  onChange: (event: Event) =>
+                    emit('update:modelValue', (event.target as HTMLSelectElement).value),
+                },
+                [
+                  h('option', { value: '', disabled: true }, props.placeholder),
+                  ...(props.options ?? []).map((opt) =>
+                    h('option', { key: String(opt.value), value: String(opt.value) }, opt.label),
+                  ),
+                ],
+              )
+          },
+        }),
+      },
+    },
   })
 }
 
@@ -117,6 +157,20 @@ describe('ModelPoolEditorPanel', () => {
     await user.click(await screen.findByRole('button', { name: '保存' }))
     expect(await screen.findByText('启用的模型至少需要一个分辨率')).toBeVisible()
     expect(emitted().save).toBeUndefined()
+  })
+
+  it('mounts the catalog picker on AdminSelect with the accessible label', async () => {
+    renderWithUser(TestHarness, {
+      props: {
+        item,
+        entries,
+        catalogModels,
+      },
+    })
+
+    const trigger = await screen.findByRole('combobox', { name: '选择模型' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveTextContent('选择模型')
   })
 
   it('adds a catalog model and removes an entry', async () => {

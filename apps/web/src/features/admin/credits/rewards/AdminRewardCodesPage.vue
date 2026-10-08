@@ -51,11 +51,7 @@
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.initialError }}</span>
-          <ActionButton
-            variant="outline"
-            :disabled="loading"
-            @click="refreshRewardCodes"
-          >
+          <ActionButton variant="outline" :disabled="loading" @click="refreshRewardCodes">
             {{ REWARD_CODES_MESSAGES.retry }}
           </ActionButton>
         </div>
@@ -63,11 +59,7 @@
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.backgroundError }}</span>
-          <ActionButton
-            variant="outline"
-            :disabled="loading"
-            @click="refreshRewardCodes"
-          >
+          <ActionButton variant="outline" :disabled="loading" @click="refreshRewardCodes">
             {{ REWARD_CODES_MESSAGES.retry }}
           </ActionButton>
         </div>
@@ -168,7 +160,7 @@
       </AdminColumn>
 
       <!-- 更多操作列 (1:1 对齐用户管理页 More 列) -->
-      <AdminColumn header="More" :style="{ width: '64px' }">
+      <AdminColumn header="More" :style="{ width: ADMIN_TABLE_MORE_COLUMN_WIDTH }">
         <template #body="{ data }">
           <div class="flex items-center justify-start">
             <button
@@ -241,6 +233,7 @@ import {
   adminTableRowActionButtonClass,
   adminTableStyle,
 } from '../../shared/lib/uiClasses'
+import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
 import RewardCodeFormDialog, { type RewardCodeFormSubmit } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'

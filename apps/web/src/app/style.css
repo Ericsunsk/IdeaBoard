@@ -317,6 +317,12 @@
   --radius-overlay: 14px;
   --radius-pill: 999px;
 
+  /* ── App stacking layers (ascending numeric order is the contract) ── */
+  --z-content: 1;
+  --z-popover: 80;
+  --z-banner: 1200;
+  --z-lightbox: 2000;
+
   --size-scrollbar: 10px;
   --size-scrollbar-thumb-inset: 3px;
   --color-scrollbar-track: transparent;
@@ -326,6 +332,9 @@
   --shadow-auth-shell:
     0 24px 50px -15px var(--color-auth-shell-glow),
     inset 0 1px 1px var(--color-auth-shell-highlight);
+  /* Neutral slate entry shadow for the Admin login card (kept distinct from
+     the brand-tinted auth shell glow). */
+  --shadow-login-card: 0 24px 70px rgba(45, 64, 89, 0.12);
   --shadow-auth-input: inset 0 1px 2px color-mix(in srgb, var(--color-foreground) 2%, transparent);
   --shadow-auth-primary: 0 4px 14px var(--color-auth-primary-shadow);
   --shadow-auth-primary-hover: 0 6px 20px var(--color-auth-primary-shadow-hover);

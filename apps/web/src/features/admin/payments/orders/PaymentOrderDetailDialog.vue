@@ -12,7 +12,15 @@
     :busy="loading"
     @update:visible="$emit('update:visible', $event)"
   >
-    <div v-if="loading" class="grid min-h-56 place-items-center" role="status">
+    <div
+      v-if="loading"
+      class="flex min-h-56 flex-col items-center justify-center gap-3"
+      role="status"
+    >
+      <AdminSpinner
+        class="size-9 text-primary"
+        :aria-label="PAYMENT_ORDERS_MESSAGES.detailLoading"
+      />
       <span class="text-admin-body text-muted-foreground">{{
         PAYMENT_ORDERS_MESSAGES.detailLoading
       }}</span>
@@ -210,6 +218,7 @@ import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
+import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import {
   formatPaymentDateTime,

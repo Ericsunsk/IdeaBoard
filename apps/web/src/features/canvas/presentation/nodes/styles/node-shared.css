@@ -87,6 +87,18 @@
   gap: 7px;
 }
 
+/*
+ * Editing state indicator for the contenteditable node title. Scoped to the
+ * editing value only, so resting titles never show chrome that could read as
+ * part of the Canvas selection ring (that ring lives on the stage frame).
+ * Outline never shifts layout.
+ */
+.node-header-title [contenteditable='plaintext-only']:focus {
+  outline: var(--focus-outline-width) solid var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
+  border-radius: 4px;
+}
+
 /* Interactive node chrome stays screen-sized while graph content remains zoomable. */
 .canvas-node-screen-ui {
   transform: scale(var(--canvas-node-ui-scale, 1));

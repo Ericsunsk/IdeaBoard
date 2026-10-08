@@ -57,27 +57,20 @@
       </div>
     </div>
     <template #actions>
-      <ActionButton
-        variant="outline"
-        :disabled="rateLimitLoading || rateLimitSaving"
-        @click="resetRateLimit"
-      >
-        {{ SETTINGS_MESSAGES.reset }}
-      </ActionButton>
-      <ActionButton
-        :disabled="rateLimitLoading || rateLimitSaving"
-        :loading="rateLimitSaving"
-        @click="saveRateLimit"
-      >
-        {{ SETTINGS_MESSAGES.save }}
-      </ActionButton>
+      <AdminEditorActions
+        :save-disabled="rateLimitLoading || rateLimitSaving"
+        :reset-disabled="rateLimitLoading || rateLimitSaving"
+        :saving="rateLimitSaving"
+        @save="saveRateLimit"
+        @reset="resetRateLimit"
+      />
     </template>
   </SettingEditorCard>
 </template>
 
 <script setup lang="ts">
 import { ShieldCheck } from '@iconoir/vue'
-import ActionButton from '../../../shared/components/ActionButton.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminSwitch from '../shared/components/AdminSwitch.vue'

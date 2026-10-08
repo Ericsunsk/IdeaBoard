@@ -82,7 +82,7 @@
         label-class="text-admin-body font-semibold text-muted-foreground"
       >
         <div class="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <input
+          <Input
             :id="fieldId"
             v-model="customQuantity"
             name="custom-recharge-quantity"
@@ -93,7 +93,7 @@
             :class="ibFormInputClass"
             placeholder="500–500,000"
             @focus="selectionMode = 'custom'"
-            @input="selectionMode = 'custom'"
+            @update:model-value="selectionMode = 'custom'"
             @blur="normalizeCustomQuantity"
           />
           <span class="whitespace-nowrap font-mono text-sm font-semibold text-muted-foreground">{{
@@ -143,6 +143,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import IbFormField from '../../../../shared/components/IbFormField.vue'
 import { userFacingErrorCopy } from '../../../../shared/errors/errorCatalog'

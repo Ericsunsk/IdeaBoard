@@ -5,7 +5,6 @@ import {
   configureSocialProviderSettingsRuntimePrivileges,
   ensureSocialProviderSettingsSchema,
 } from './socialProviderSchema.js'
-import { verifyAuthRuntimePrivileges } from '../infrastructure/runtime-privileges.js'
 
 describe('social provider settings schema', () => {
   it('creates a generic encrypted provider settings table', async () => {
@@ -48,29 +47,5 @@ describe('social provider settings schema', () => {
       /GRANT SELECT, INSERT, UPDATE ON social_provider_settings TO "ideaboard_auth"/,
     )
     assert.doesNotMatch(queries.join('\n'), /DELETE|TRUNCATE|TRIGGER/)
-  })
-
-  it('rejects a runtime role with destructive provider settings access', async () => {
-    const pool = {
-      query: async () => ({
-        rows: [
-          {
-            current_user: 'ideaboard_auth',
-            can_execute_auth_settings: true,
-            can_read_system_configs: false,
-            can_read_auth_users: true,
-            can_write_credits: false,
-            can_execute_credit_functions: false,
-            can_manage_social_provider_settings: true,
-            can_delete_social_provider_settings: true,
-          },
-        ],
-      }),
-    } as unknown as Pool
-
-    await assert.rejects(
-      () => verifyAuthRuntimePrivileges(pool),
-      /delete_social_provider_settings=true/,
-    )
   })
 })

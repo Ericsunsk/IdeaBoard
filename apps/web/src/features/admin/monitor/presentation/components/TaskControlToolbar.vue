@@ -26,24 +26,16 @@
         </button>
       </div>
 
-      <!-- 搜索输入框: 🔍 使用查询语言搜索... ❓ -->
-      <div class="relative flex min-w-[200px] flex-1 items-center">
-        <div class="pointer-events-none absolute left-3 flex items-center text-muted-foreground">
-          <Search class="size-4" />
-        </div>
-        <input
-          :value="searchKeyword"
-          type="text"
-          :aria-label="t('admin.common.search')"
-          class="h-9 w-full rounded-md border border-input bg-background pr-9 pl-9 text-xs text-foreground placeholder:text-muted-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          :placeholder="t('admin.common.search')"
-          @input="emit('update:searchKeyword', ($event.target as HTMLInputElement).value)"
-          @keydown.enter="emit('search')"
-        />
-        <div class="pointer-events-none absolute right-3 flex items-center text-muted-foreground">
-          <HelpCircle class="size-4" />
-        </div>
-      </div>
+      <!-- 搜索输入框: AdminToolbarSearch（带清空按钮，清空即重新查询） -->
+      <AdminToolbarSearch
+        :model-value="searchKeyword"
+        :input-label="t('admin.common.search')"
+        :placeholder="t('admin.common.search')"
+        fluid
+        @update:model-value="emit('update:searchKeyword', $event)"
+        @clear="emit('search')"
+        @enter="emit('search')"
+      />
     </div>
 
     <!-- 右侧：▶ 实时 + 📅 过去 1 小时 + ··· 更多 + 分页器 -->
@@ -94,15 +86,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AdminButton from '../../../shared/components/AdminButton.vue'
 import AdminSelect from '../../../shared/components/AdminSelect.vue'
-import {
-  HelpCircle,
-  MoreHoriz,
-  NavArrowDown,
-  Play,
-  Search,
-  SidebarCollapse,
-  Table,
-} from '@iconoir/vue'
+import AdminToolbarSearch from '../../../shared/components/AdminToolbarSearch.vue'
+import { MoreHoriz, NavArrowDown, Play, SidebarCollapse, Table } from '@iconoir/vue'
 import type { TimeRangePreset, TimeRangePresetKey } from '../../domain/timeRange'
 import { MONITOR_MESSAGES } from '../pages/messages'
 

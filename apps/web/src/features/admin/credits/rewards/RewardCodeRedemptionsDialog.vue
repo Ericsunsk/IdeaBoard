@@ -86,7 +86,7 @@
         @row-expand="expandRedemption"
         @row-collapse="collapseRedemption"
       >
-        <AdminColumn expander :style="{ width: '52px' }" />
+        <AdminColumn expander :style="{ width: ADMIN_TABLE_EXPANDER_COLUMN_WIDTH }" />
         <AdminColumn
           field="userPublicId"
           :header="REWARD_CODES_MESSAGES.redemptionsUserColumn"
@@ -183,10 +183,7 @@
     </AdminTablePanel>
 
     <template #footer>
-      <ActionButton
-        variant="outline"
-        @click="emit('update:visible', false)"
-      >
+      <ActionButton variant="outline" @click="emit('update:visible', false)">
         {{ REWARD_CODES_MESSAGES.close }}
       </ActionButton>
     </template>
@@ -215,6 +212,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { formatAdminDateTimeWithSeconds } from '../shared/format'
 import { adminTextButtonClass } from '../../shared/lib/uiClasses'
+import { ADMIN_TABLE_EXPANDER_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
 import type { RewardCode } from './resource'
 import { REWARD_CODES_MESSAGES } from './messages'
 import {

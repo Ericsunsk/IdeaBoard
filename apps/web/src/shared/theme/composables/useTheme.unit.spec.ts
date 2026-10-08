@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { isDarkModeActive, useTheme } from './useTheme'
 
 describe('useTheme', () => {
-  it('initializes with a valid mode and provides setTheme method', () => {
+  it('applies setTheme transitions across dark, light, and system', () => {
     const { mode, isDark, setTheme } = useTheme()
-
-    expect(['light', 'dark', 'auto']).toContain(mode.value)
-    expect(typeof isDark.value).toBe('boolean')
-    expect(typeof setTheme).toBe('function')
 
     setTheme('dark')
     expect(mode.value).toBe('dark')

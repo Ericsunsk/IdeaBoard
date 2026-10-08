@@ -58,7 +58,6 @@
     <!-- 弹窗底栏 -->
     <template #footer>
       <AdminDialogActions
-        :cancel-label="MODELS_MESSAGES.cancel"
         :confirm-label="MODELS_MESSAGES.editSubmit(isEditing)"
         :loading="pending"
         :cancel-disabled="pending"

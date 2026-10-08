@@ -15,21 +15,6 @@
     </template>
 
     <AdminColumn
-      field="createdAt"
-      :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn"
-      :style="{ width: '160px' }"
-    >
-      <template #body="{ data }">
-        <time
-          :datetime="data.createdAt"
-          class="whitespace-nowrap font-mono text-xs text-muted-foreground"
-        >
-          {{ formatPaymentDateTime(data.createdAt) }}
-        </time>
-      </template>
-    </AdminColumn>
-
-    <AdminColumn
       field="publicOrderNumber"
       :header="PAYMENT_ORDERS_MESSAGES.orderNumberColumn"
       :style="{ minWidth: '220px' }"
@@ -37,7 +22,7 @@
       <template #body="{ data }">
         <button
           type="button"
-          class="cursor-pointer rounded font-mono text-xs font-semibold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+          :class="adminInlineJumpClass"
           :aria-label="PAYMENT_ORDERS_MESSAGES.viewOrderAria(data.publicOrderNumber)"
           @click="emit('open-detail', data.publicOrderNumber)"
         >
@@ -48,7 +33,9 @@
 
     <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.userColumn" :style="{ width: '160px' }">
       <template #body="{ data }">
-        <div class="truncate font-medium text-foreground">{{ data.user.displayName }}</div>
+        <div class="truncate font-medium text-foreground" :title="data.user.displayName">
+          {{ data.user.displayName }}
+        </div>
       </template>
     </AdminColumn>
 
@@ -58,17 +45,17 @@
       :style="{ width: '120px' }"
     >
       <template #body="{ data }">
-        <span class="font-mono text-xs font-semibold text-foreground">{{
+        <AdminMono class="text-xs font-semibold whitespace-nowrap text-foreground tabular-nums">{{
           formatLocaleNumber(data.ideaQuantity)
-        }}</span>
+        }}</AdminMono>
       </template>
     </AdminColumn>
 
     <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.paidColumn" :style="{ width: '130px' }">
       <template #body="{ data }">
-        <span class="font-mono text-xs font-semibold text-foreground">{{
+        <AdminMono class="text-xs font-semibold whitespace-nowrap text-foreground tabular-nums">{{
           formatPaymentMoney(data.paidAmountMinor, data.paidCurrency)
-        }}</span>
+        }}</AdminMono>
       </template>
     </AdminColumn>
 
@@ -108,11 +95,30 @@
           severity="danger"
           rounded
         />
-        <span v-else class="text-xs text-muted-foreground">—</span>
+        <span v-else class="text-xs text-muted-foreground">{{ ADMIN_NUMERIC_EMPTY }}</span>
       </template>
     </AdminColumn>
 
-    <AdminColumn :header="PAYMENT_ORDERS_MESSAGES.detailColumn" :style="{ width: '64px' }">
+    <AdminColumn
+      field="createdAt"
+      :header="PAYMENT_ORDERS_MESSAGES.createdAtColumn"
+      :style="{ width: '160px' }"
+    >
+      <template #body="{ data }">
+        <AdminMono
+          as="time"
+          :datetime="data.createdAt"
+          class="whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+        >
+          {{ formatPaymentDateTime(data.createdAt) }}
+        </AdminMono>
+      </template>
+    </AdminColumn>
+
+    <AdminColumn
+      :header="PAYMENT_ORDERS_MESSAGES.detailColumn"
+      :style="{ width: ADMIN_TABLE_MORE_COLUMN_WIDTH }"
+    >
       <template #body="{ data }">
         <div class="flex items-center justify-start">
           <button
@@ -134,7 +140,11 @@ import { Eye } from '@iconoir/vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
+import AdminMono from '../../shared/components/AdminMono.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
+import { ADMIN_NUMERIC_EMPTY } from '../../shared/lib/cellPlaceholders'
+import { adminInlineJumpClass } from '../../shared/lib/cellClasses'
+import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../../shared/lib/tableColumns'
 import {
   adminTableClass,
   adminTableFrameClass,

@@ -22,7 +22,6 @@
 
     <template #footer="{ requestClose }">
       <AdminDialogActions
-        :cancel-label="CREDITS_SHARED_MESSAGES.actionReasonCancel"
         :confirm-label="confirmLabel"
         :loading="loading"
         :cancel-disabled="loading"

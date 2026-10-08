@@ -67,12 +67,12 @@ describe('AdminSupportChannelsEditor', () => {
         ],
       },
     })
-    expect(await screen.findByText('暂无客服渠道')).toBeVisible()
+    expect(await screen.findByText('暂无客户支持')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '添加渠道' }))
     expect(screen.getByLabelText('渠道名称')).toBeVisible()
     expect(screen.getByLabelText('渠道链接')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '删除渠道' }))
-    expect(screen.getByText('暂无客服渠道')).toBeVisible()
+    expect(screen.getByText('暂无客户支持')).toBeVisible()
     expect(resource.update).not.toHaveBeenCalled()
   })
 

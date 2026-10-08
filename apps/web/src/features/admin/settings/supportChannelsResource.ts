@@ -17,8 +17,8 @@ export interface AdminSupportChannelsResource {
 }
 
 function readSetting(body: unknown): SupportChannelsSetting {
-  const data = requireContractData<SupportChannelsSetting>(body, '读取客服渠道失败')
-  if (!Array.isArray(data.channels)) throw new Error('客服渠道响应无效')
+  const data = requireContractData<SupportChannelsSetting>(body, '读取客户支持失败')
+  if (!Array.isArray(data.channels)) throw new Error('客户支持响应无效')
   return { channels: data.channels.map((channel) => ({ ...channel })) }
 }
 
@@ -28,7 +28,7 @@ export function createAdminSupportChannelsResource(): AdminSupportChannelsResour
       try {
         return readSetting(await getControlSupportChannels())
       } catch (error) {
-        throw withControlCopy(error, '读取客服渠道失败')
+        throw withControlCopy(error, '读取客户支持失败')
       }
     },
     async update(input, operatorReason) {
@@ -40,7 +40,7 @@ export function createAdminSupportChannelsResource(): AdminSupportChannelsResour
           }),
         )
       } catch (error) {
-        throw withControlCopy(error, '保存客服渠道失败')
+        throw withControlCopy(error, '保存客户支持失败')
       }
     },
   }

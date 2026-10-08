@@ -3,11 +3,7 @@
     <AdminAlert v-if="isListError" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ MODELS_MESSAGES.listLoadFailed }}</span>
-        <ActionButton
-          variant="outline"
-          :disabled="isLoading"
-          @click="refetchCatalog"
-        >
+        <ActionButton variant="outline" :disabled="isLoading" @click="refetchCatalog">
           {{ MODELS_MESSAGES.retry }}
         </ActionButton>
       </div>
@@ -168,50 +164,42 @@
     </div>
 
     <!-- 3. 空状态提示 (空库或筛选无结果时) -->
-    <div
+    <AdminEmptyState
       v-else
-      class="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-10 text-center"
+      :title="
+        !hasActiveFilter && allModels.length === 0
+          ? MODELS_MESSAGES.emptyLibrary
+          : MODELS_MESSAGES.emptyNoMatch
+      "
+      :description="
+        !hasActiveFilter && allModels.length === 0
+          ? MODELS_MESSAGES.emptyLibraryHint
+          : MODELS_MESSAGES.emptyNoMatchHint
+      "
+      :icon="!hasActiveFilter && allModels.length === 0 ? Cube : Search"
     >
-      <div
-        class="mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
-      >
-        <Cube v-if="!hasActiveFilter && allModels.length === 0" class="size-6" />
-        <Search v-else class="size-6" />
-      </div>
-      <h3 class="text-base font-semibold text-foreground">
-        {{
-          !hasActiveFilter && allModels.length === 0
-            ? MODELS_MESSAGES.emptyLibrary
-            : MODELS_MESSAGES.emptyNoMatch
-        }}
-      </h3>
-      <p class="mt-1 max-w-sm text-xs text-muted-foreground">
-        {{
-          !hasActiveFilter && allModels.length === 0
-            ? MODELS_MESSAGES.emptyLibraryHint
-            : MODELS_MESSAGES.emptyNoMatchHint
-        }}
-      </p>
-      <button
-        v-if="!hasActiveFilter && allModels.length === 0"
-        type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
-        :aria-label="MODELS_MESSAGES.emptyCreateAria"
-        @click="handleCreateModel"
-      >
-        <Plus class="size-3.5" />
-        <span>{{ MODELS_MESSAGES.createNow }}</span>
-      </button>
-      <button
-        v-else
-        type="button"
-        class="mt-4 flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
-        @click="clearFilters"
-      >
-        <Xmark class="size-3.5" />
-        <span>{{ MODELS_MESSAGES.clearFilters }}</span>
-      </button>
-    </div>
+      <template #actions>
+        <button
+          v-if="!hasActiveFilter && allModels.length === 0"
+          type="button"
+          class="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
+          :aria-label="MODELS_MESSAGES.emptyCreateAria"
+          @click="handleCreateModel"
+        >
+          <Plus class="size-3.5" />
+          <span>{{ MODELS_MESSAGES.createNow }}</span>
+        </button>
+        <button
+          v-else
+          type="button"
+          class="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+          @click="clearFilters"
+        >
+          <Xmark class="size-3.5" />
+          <span>{{ MODELS_MESSAGES.clearFilters }}</span>
+        </button>
+      </template>
+    </AdminEmptyState>
 
     <!-- 4. 添加模型弹窗 (自动探测 + 极简多选入库) -->
     <AdminModelAddDialog
@@ -249,6 +237,7 @@ import {
   Xmark,
 } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
+import AdminEmptyState from '../../../shared/components/AdminEmptyState.vue'
 import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import { adminDashboardRootClass } from '../../../shared/lib/uiClasses'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'

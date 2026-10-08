@@ -9,7 +9,7 @@
       <div
         v-if="visible && activeResult"
         ref="dialogRef"
-        class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-[var(--z-lightbox)] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-lightbox-title"
@@ -42,7 +42,7 @@
               :href="activeResult.source_url"
               target="_blank"
               rel="noreferrer"
-              class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
+              :class="lightboxScrimLinkClass"
             >
               <span>{{ t('search.lightbox.viewSource') }}</span>
             </a>
@@ -50,7 +50,7 @@
             <button
               ref="closeButtonRef"
               type="button"
-              class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent focus-visible:outline-none cursor-pointer"
+              :class="lightboxScrimIconButtonClass"
               :aria-label="t('search.lightbox.close')"
               :title="t('search.lightbox.close')"
               @click="$emit('close')"
@@ -80,6 +80,10 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
+import {
+  lightboxScrimIconButtonClass,
+  lightboxScrimLinkClass,
+} from '../../../../shared/theme/lightboxScrim'
 import type { SearchResult } from '../../domain/models'
 
 const props = defineProps<{

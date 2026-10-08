@@ -20,19 +20,27 @@
             @focusout="emit('focus-scope-change', false)"
           >
             <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.newFolderTitle') }}</h3>
-            <label class="mt-5 block text-sm font-semibold" for="island-folder-name">{{
-              t('library.dialogs.folderNameLabel')
-            }}</label>
-            <input
-              id="island-folder-name"
-              v-model="createDraft"
-              type="text"
-              class="mt-2 w-full rounded-xl border border-border bg-card/85 px-3 py-2.5 text-sm outline-none focus:border-primary"
-              maxlength="100"
-              autofocus
-              :placeholder="t('library.dialogs.folderNamePlaceholder')"
-            />
-            <p v-if="createError" class="mt-2 mb-0 text-sm text-destructive">{{ createError }}</p>
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
+              :label="t('library.dialogs.folderNameLabel')"
+              :error="createError"
+              field-id="island-folder-name"
+              field-class="mt-5"
+              label-class="block text-sm font-semibold"
+            >
+              <Input
+                :id="fieldId"
+                v-model="createDraft"
+                type="text"
+                maxlength="100"
+                autofocus
+                :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
+                :invalid="invalid"
+                :aria-invalid="ariaInvalid"
+                :aria-describedby="describedbyId"
+                :placeholder="t('library.dialogs.folderNamePlaceholder')"
+              />
+            </IbFormField>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
@@ -76,19 +84,27 @@
             @focusout="emit('focus-scope-change', false)"
           >
             <h3 class="m-0 text-lg font-semibold">{{ t('library.dialogs.renameFolderTitle') }}</h3>
-            <label class="mt-5 block text-sm font-semibold" for="island-rename-folder-name">{{
-              t('library.dialogs.folderNameLabel')
-            }}</label>
-            <input
-              id="island-rename-folder-name"
-              v-model="renameDraft"
-              type="text"
-              class="mt-2 w-full rounded-xl border border-border bg-card/85 px-3 py-2.5 text-sm outline-none focus:border-primary"
-              maxlength="100"
-              autofocus
-              :placeholder="t('library.dialogs.folderNamePlaceholder')"
-            />
-            <p v-if="renameError" class="mt-2 mb-0 text-sm text-destructive">{{ renameError }}</p>
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, invalid }"
+              :label="t('library.dialogs.folderNameLabel')"
+              :error="renameError"
+              field-id="island-rename-folder-name"
+              field-class="mt-5"
+              label-class="block text-sm font-semibold"
+            >
+              <Input
+                :id="fieldId"
+                v-model="renameDraft"
+                type="text"
+                maxlength="100"
+                autofocus
+                :class="['mt-2', ibFormInputClass, invalid ? ibFormInputErrorClass : '']"
+                :invalid="invalid"
+                :aria-invalid="ariaInvalid"
+                :aria-describedby="describedbyId"
+                :placeholder="t('library.dialogs.folderNamePlaceholder')"
+              />
+            </IbFormField>
             <div class="mt-6 flex justify-end gap-2">
               <Button
                 type="button"
@@ -116,6 +132,7 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DialogContent,
   DialogDescription,
@@ -125,6 +142,8 @@ import {
 } from '@/components/ui/dialog'
 import { dialogContentBaseClass } from '@/components/ui/dialog/dialogClasses'
 import { cn } from '@/lib/utils'
+import IbFormField from '../../../shared/components/IbFormField.vue'
+import { ibFormInputClass, ibFormInputErrorClass } from '../../../shared/theme/formControls'
 import { ibDialogMaskClass } from '../../../shared/theme/dialogMask'
 import { userFacingErrorCopy } from '../../../shared/errors/errorCatalog'
 

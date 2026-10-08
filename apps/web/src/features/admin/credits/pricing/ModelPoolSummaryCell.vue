@@ -1,14 +1,14 @@
 <template>
   <div :aria-label="BILLING_PRICING_MESSAGES.poolSummaryAria(props.displayName)">
-    <span v-if="props.failed" class="truncate font-mono text-xs text-muted-foreground">
+    <AdminMono v-if="props.failed" class="truncate text-xs text-muted-foreground">
       {{ BILLING_PRICING_MESSAGES.poolLoadFailed }}
-    </span>
-    <span
+    </AdminMono>
+    <AdminMono
       v-else-if="!props.pool || props.pool.entries.length === 0"
-      class="truncate font-mono text-xs text-muted-foreground"
+      class="truncate text-xs text-muted-foreground"
     >
       {{ BILLING_PRICING_MESSAGES.poolEmpty }}
-    </span>
+    </AdminMono>
     <ul v-else class="flex min-w-0 flex-col gap-1">
       <li
         v-for="entry in props.pool.entries"
@@ -16,15 +16,15 @@
         class="flex min-w-0 items-center gap-1.5"
         :class="entry.enabled ? undefined : 'opacity-55'"
       >
-        <span class="truncate font-mono text-xs text-foreground">{{ entry.modelId }}</span>
+        <AdminMono class="truncate text-xs text-foreground">{{ entry.modelId }}</AdminMono>
         <span class="flex shrink-0 items-center gap-0.5">
-          <span
+          <AdminMono
             v-for="resolution in entry.resolutions"
             :key="resolution"
-            class="rounded bg-muted px-1 py-px font-mono text-admin-caption font-medium text-muted-foreground"
+            class="rounded bg-muted px-1 py-px text-admin-caption font-medium text-muted-foreground"
           >
             {{ resolution.toUpperCase() }}
-          </span>
+          </AdminMono>
         </span>
       </li>
     </ul>
@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+import AdminMono from '../../shared/components/AdminMono.vue'
 import type { AdminModelPool } from './billableCatalogTypes'
 import { BILLING_PRICING_MESSAGES } from './messages'
 

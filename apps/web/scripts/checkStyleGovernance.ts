@@ -60,10 +60,11 @@ type StyleCountRuleId = (typeof styleCountRules)[number]['id']
 const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   'src/features/admin/pages/login/AdminLoginPage.vue': {
     counts: {
-      'raw-color': 1,
-      'raw-shadow': 1,
+      'raw-color': 0,
+      'raw-shadow': 0,
     },
-    reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
+    reason:
+      'Cleared: the login card now uses --shadow-login-card and --radius-board-dialog. Allowance stays registered at zero so reintroduction is caught as an overage.',
   },
   'src/features/admin/monitor/domain/status.ts': {
     counts: {
@@ -92,6 +93,13 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason:
       'Sidebar shell motion (width/max-height choreography) uses Motion Policy var() tokens; color/transform feedback inside the shell uses plain Tailwind transition utilities.',
+  },
+  'src/features/admin/settings/components/AdminSettingsOnThisPage.vue': {
+    counts: {
+      'raw-motion': 3,
+    },
+    reason:
+      'On-this-page sliding indicator animates transform/opacity via Motion Policy var() tokens; the allowance stays registered so additional raw motion is caught as an overage.',
   },
 }
 

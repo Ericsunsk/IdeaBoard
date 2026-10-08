@@ -89,7 +89,7 @@ describe('StripeSettingsDialog', () => {
     const { user } = renderDialog()
 
     await screen.findByText('尚未配置')
-    await user.click(screen.getByRole('button', { name: '保存设置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(await screen.findByText('请输入 Stripe API Key')).toBeVisible()
     expect(resource.save).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe('StripeSettingsDialog', () => {
     await user.type(screen.getByLabelText('Stripe API Key'), 'sk_test_secret')
     await user.clear(screen.getByLabelText('Product Tax Code'))
     await user.type(screen.getByLabelText('Product Tax Code'), 'txcd_10105001')
-    await user.click(screen.getByRole('button', { name: '保存设置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
       expect(resource.save).toHaveBeenCalledWith(
@@ -128,7 +128,7 @@ describe('StripeSettingsDialog', () => {
     await screen.findByText('acct_123')
 
     await user.type(screen.getByLabelText('Stripe API Key'), 'sk_test_secret')
-    await user.click(screen.getByRole('button', { name: '保存设置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(
       await screen.findByText('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key'),

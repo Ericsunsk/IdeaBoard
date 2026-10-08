@@ -18,24 +18,25 @@
         <NavArrowRight class="ml-auto size-4 shrink-0" />
       </div>
     </DropdownMenuItem>
-    <PopoverPortal>
-      <PopoverContent
-        :side="hasHorizontalSpace ? 'left' : 'bottom'"
-        align="start"
-        :side-offset="appOverlayMenuSideOffset"
-        :collision-padding="appOverlayMenuSideOffset"
-        prioritize-position
-        :aria-label="t('auth.menu.supportQr', { channel: channel.name })"
-        class="ib-user-account-menu-panel z-50 w-auto rounded-md border border-border bg-popover p-2 shadow-md outline-none [direction:ltr]"
+    <PopoverContent
+      :side="hasHorizontalSpace ? 'left' : 'bottom'"
+      align="start"
+      :side-offset="appOverlayMenuSideOffset"
+      :collision-padding="appOverlayMenuSideOffset"
+      prioritize-position
+      class="ib-user-account-menu-panel w-auto p-2 [direction:ltr]"
+      @open-auto-focus.prevent
+      @close-auto-focus="handleCloseAutoFocus"
+      @escape-key-down="handleEscape"
+      @interact-outside="handleInteractOutside"
+    >
+      <div
         data-support-qr-panel
-        @open-auto-focus.prevent
-        @close-auto-focus="handleCloseAutoFocus"
+        :aria-label="t('auth.menu.supportQr', { channel: channel.name })"
         @pointerenter="cancelClose"
         @pointerleave="handlePointerLeave"
         @focusin="cancelClose"
         @focusout="handleBlur"
-        @escape-key-down="handleEscape"
-        @interact-outside="handleInteractOutside"
       >
         <a
           ref="link"
@@ -47,8 +48,8 @@
         >
           <QrcodeVue :value="channel.url" :size="176" level="M" render-as="svg" />
         </a>
-      </PopoverContent>
-    </PopoverPortal>
+      </div>
+    </PopoverContent>
   </Popover>
 </template>
 
@@ -59,8 +60,7 @@ import { useMediaQuery } from '@vueuse/core'
 import QrcodeVue from 'qrcode.vue'
 import { NavArrowRight } from '@iconoir/vue'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { Popover, PopoverAnchor } from '@/components/ui/popover'
-import { PopoverContent, PopoverPortal } from 'reka-ui'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { appOverlayMenuItemClass, appOverlayMenuSideOffset } from '../theme/appOverlayMenu'
 import type { SupportChannel } from '../composables/useSupportChannels'
 

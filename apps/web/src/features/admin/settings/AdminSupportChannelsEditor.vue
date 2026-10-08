@@ -1,108 +1,152 @@
 <template>
-  <SettingEditorCard
-    :icon="Headset"
-    :title="M.supportTitle"
-    :description="M.supportDescription"
-    :status="status"
-    :status-severity="query.error.value ? 'danger' : 'secondary'"
-  >
+  <div class="flex flex-col gap-3">
+    <!-- 头部：板块名 + 副标题（图片库同款），添加按钮右上 -->
+    <div class="flex flex-wrap items-center justify-between gap-3 pb-1">
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <div class="flex items-center gap-2">
+          <Headset class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <h3 class="text-admin-title-sm font-bold text-foreground">
+            {{ M.supportTitle }}
+          </h3>
+        </div>
+        <p class="text-admin-caption text-muted-foreground">
+          {{ M.supportDescription }}
+        </p>
+      </div>
+      <ActionButton :disabled="disabled || form.channels.length >= 20" @click="add"
+        ><Plus class="size-4" />{{ M.supportAdd }}</ActionButton
+      >
+    </div>
+
     <AdminAlert v-if="query.error.value" severity="error">
       {{ M.supportLoadFailed }}
       <AdminButton variant="outline" @click="query.refetch()">{{ M.retry }}</AdminButton>
     </AdminAlert>
-    <p v-else-if="loading" class="text-admin-body text-muted-foreground">{{ M.settingsLoading }}</p>
-    <p v-else-if="!form.channels.length" class="text-admin-body text-muted-foreground">
-      {{ M.supportEmpty }}
-    </p>
-    <div
-      v-for="(channel, index) in form.channels"
-      :key="channel.id"
-      class="grid min-w-0 gap-4 border-b border-border pb-4 md:grid-cols-2"
-    >
-      <AdminFormField :label="M.supportName" :for="`support-name-${channel.id}`">
-        <AdminInput
-          :id="`support-name-${channel.id}`"
-          v-model="channel.name"
-          :disabled="disabled"
-          :maxlength="80"
-          class="w-full"
-        />
-      </AdminFormField>
-      <AdminFormField :label="M.supportKind" :for="`support-kind-${channel.id}`">
-        <AdminSelect
-          :id="`support-kind-${channel.id}`"
-          v-model="channel.kind"
-          :options="kindOptions"
-          :disabled="disabled"
-          class="w-full"
-        />
-      </AdminFormField>
-      <AdminFormField
-        :label="M.supportUrl"
-        :for="`support-url-${channel.id}`"
-        class="md:col-span-2"
+
+    <!-- 全局标准表格 -->
+    <div :class="adminTableCardClass">
+      <AdminTable
+        :value="form.channels"
+        :loading="loading"
+        data-key="id"
+        scrollable
+        :frame-class="adminTableFrameClass"
+        :table-style="adminTableStyle"
+        :class="adminTableClass"
+        :table-aria-label="M.supportTitle"
       >
-        <AdminInput
-          :id="`support-url-${channel.id}`"
-          v-model="channel.url"
-          type="url"
-          :disabled="disabled"
-          :maxlength="2048"
-          class="w-full"
-        />
-      </AdminFormField>
-      <div class="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
-        <div class="flex items-center gap-2">
-          <AdminSwitch
-            v-model="channel.enabled"
-            :aria-label="M.supportEnable(channel.name || String(index + 1))"
-            :disabled="disabled"
-          />
-          <span class="text-admin-body">{{
-            channel.enabled ? M.providerEnabled : M.providerDisabled
-          }}</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <AdminButton
-            variant="outline"
-            :aria-label="M.supportMoveUp"
-            :title="M.supportMoveUp"
-            :disabled="disabled || index === 0"
-            @click="move(index, -1)"
-            ><NavArrowUp class="size-4"
-          /></AdminButton>
-          <AdminButton
-            variant="outline"
-            :aria-label="M.supportMoveDown"
-            :title="M.supportMoveDown"
-            :disabled="disabled || index === form.channels.length - 1"
-            @click="move(index, 1)"
-            ><NavArrowDown class="size-4"
-          /></AdminButton>
-          <AdminButton
-            variant="destructive"
-            :aria-label="M.supportRemove"
-            :title="M.supportRemove"
-            :disabled="disabled"
-            @click="form.channels.splice(index, 1)"
-            ><Trash class="size-4"
-          /></AdminButton>
-        </div>
-      </div>
+        <template #empty>
+          <AdminEmptyState :title="M.supportEmpty" />
+        </template>
+
+        <!-- 渠道名称列 -->
+        <AdminColumn
+          field="name"
+          :header="M.supportName"
+          :style="{ width: '180px', minWidth: '150px' }"
+        >
+          <template #body="{ data }">
+            <AdminInput
+              :id="`support-name-${data.id}`"
+              v-model="data.name"
+              :aria-label="M.supportName"
+              :disabled="disabled"
+              :maxlength="80"
+              size="small"
+              class="w-full"
+            />
+          </template>
+        </AdminColumn>
+
+        <!-- 渠道类型列 -->
+        <AdminColumn
+          field="kind"
+          :header="M.supportKind"
+          :style="{ width: '150px', minWidth: '130px' }"
+        >
+          <template #body="{ data }">
+            <AdminSelect
+              :id="`support-kind-${data.id}`"
+              v-model="data.kind"
+              :options="kindOptions"
+              :aria-label="M.supportKind"
+              size="small"
+              :disabled="disabled"
+              class="w-full"
+            />
+          </template>
+        </AdminColumn>
+
+        <!-- 渠道链接列 -->
+        <AdminColumn field="url" :header="M.supportUrl" :style="{ minWidth: '240px' }">
+          <template #body="{ data }">
+            <AdminInput
+              :id="`support-url-${data.id}`"
+              v-model="data.url"
+              type="url"
+              :aria-label="M.supportUrl"
+              :disabled="disabled"
+              :maxlength="2048"
+              size="small"
+              class="w-full font-mono"
+            />
+          </template>
+        </AdminColumn>
+
+        <!-- 操作列 -->
+        <AdminColumn :header="M.actionsColumn" :style="{ width: '150px', minWidth: '140px' }">
+          <template #body="{ index }">
+            <div class="flex items-center gap-2">
+              <AdminButton
+                variant="outline"
+                :aria-label="M.supportMoveUp"
+                :title="M.supportMoveUp"
+                :disabled="disabled || (index ?? 0) === 0"
+                @click="move(index ?? 0, -1)"
+                ><NavArrowUp class="size-4"
+              /></AdminButton>
+              <AdminButton
+                variant="outline"
+                :aria-label="M.supportMoveDown"
+                :title="M.supportMoveDown"
+                :disabled="disabled || (index ?? 0) === form.channels.length - 1"
+                @click="move(index ?? 0, 1)"
+                ><NavArrowDown class="size-4"
+              /></AdminButton>
+              <AdminButton
+                variant="destructive"
+                :aria-label="M.supportRemove"
+                :title="M.supportRemove"
+                :disabled="disabled"
+                @click="form.channels.splice(index ?? 0, 1)"
+                ><Trash class="size-4"
+              /></AdminButton>
+            </div>
+          </template>
+        </AdminColumn>
+
+        <!-- 启用状态列 -->
+        <AdminColumn field="enabled" :header="M.enableColumn" :style="{ width: '80px' }">
+          <template #body="{ data, index }">
+            <AdminSwitch
+              v-model="data.enabled"
+              :aria-label="M.supportEnable(data.name || String((index ?? 0) + 1))"
+              :disabled="disabled"
+            />
+          </template>
+        </AdminColumn>
+      </AdminTable>
     </div>
-    <ActionButton variant="outline" :disabled="disabled || form.channels.length >= 20" @click="add"
-      ><Plus class="size-4" />{{ M.supportAdd }}</ActionButton
-    >
+
     <AdminAlert v-if="validationError" severity="error">{{ validationError }}</AdminAlert>
-    <template #actions>
-      <ActionButton :disabled="disabled || !isDirty" :loading="saving" @click="save">{{
-        M.save
-      }}</ActionButton>
-      <ActionButton variant="outline" :disabled="disabled || !isDirty" @click="reset">{{
-        M.reset
-      }}</ActionButton>
-    </template>
-  </SettingEditorCard>
+    <AdminEditorActions
+      :save-disabled="disabled || !isDirty"
+      :reset-disabled="disabled || !isDirty"
+      :saving="saving"
+      @save="save"
+      @reset="reset"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -110,17 +154,25 @@ import { computed } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Headset, NavArrowDown, NavArrowUp, Plus, Trash } from '@iconoir/vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
+import AdminEmptyState from '../shared/components/AdminEmptyState.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
 import ActionButton from '../../../shared/components/ActionButton.vue'
-import AdminFormField from '../shared/components/AdminFormField.vue'
+import AdminColumn from '../shared/components/AdminColumn.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminSelect from '../shared/components/AdminSelect.vue'
 import AdminSwitch from '../shared/components/AdminSwitch.vue'
+import AdminTable from '../shared/components/AdminTable.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
+import {
+  adminTableCardClass,
+  adminTableClass,
+  adminTableFrameClass,
+  adminTableStyle,
+} from '../shared/lib/uiClasses'
 import { newRequestId } from '../../../shared/api/contractKernel'
 import { SUPPORT_CHANNELS_QUERY_KEY } from '../../../shared/composables/useSupportChannels'
-import SettingEditorCard from './SettingEditorCard.vue'
 import { SETTINGS_MESSAGES as M } from './pages/messages'
 import { useSettingsLifecycle } from './useSettingsLifecycle'
 import { useAdminSupportChannelsFeedback } from './useSettingsFeedback'
@@ -188,13 +240,6 @@ const lifecycle = useSettingsLifecycle<SupportChannelsSetting>({
 })
 const { form, isDirty, reset, validationError } = lifecycle
 const disabled = computed(() => loading.value || saving.value || Boolean(query.error.value))
-const status = computed(() =>
-  query.error.value
-    ? M.settingsLoadFailed
-    : query.data.value
-      ? M.supportCount(query.data.value.channels.filter((channel) => channel.enabled).length)
-      : M.settingsLoading,
-)
 const kindOptions = supportChannelKinds.map((kind) => ({
   value: kind,
   label: M.supportKinds[kind],

@@ -1,7 +1,7 @@
 export default {
   common: {
     save: 'Save',
-    saveChanges: 'Save Changes',
+    saveChanges: 'Save',
     create: 'Create',
     cancel: 'Cancel',
     delete: 'Delete',

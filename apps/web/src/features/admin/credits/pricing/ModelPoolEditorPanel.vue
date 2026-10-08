@@ -61,17 +61,15 @@
     <p v-else class="text-xs text-muted-foreground">{{ BILLING_PRICING_MESSAGES.poolEmpty }}</p>
 
     <div class="flex items-center gap-2">
-      <select
+      <AdminSelect
         v-model="selectedCatalogId"
-        :class="cn(adminSelectTriggerClass, adminSelectTriggerCompactClass, 'flex-1')"
+        :options="catalogSelectOptions"
+        :placeholder="BILLING_PRICING_MESSAGES.poolAddPlaceholder"
         :aria-label="BILLING_PRICING_MESSAGES.poolAddPlaceholder"
+        size="small"
+        class="flex-1"
         :disabled="pending || availableCatalogModels.length === 0"
-      >
-        <option value="" disabled>{{ BILLING_PRICING_MESSAGES.poolAddPlaceholder }}</option>
-        <option v-for="model in availableCatalogModels" :key="model.id" :value="model.id">
-          {{ model.name || model.id }}
-        </option>
-      </select>
+      />
       <ActionButton
         variant="outline"
         :disabled="pending || !selectedCatalogId"
@@ -99,12 +97,7 @@
     <AdminAlert v-if="errorMessage" severity="error">
       {{ errorMessage }}
     </AdminAlert>
-    <ActionButton
-      v-if="stale"
-      variant="outline"
-      :disabled="pending"
-      @click="emit('reload')"
-    >
+    <ActionButton v-if="stale" variant="outline" :disabled="pending" @click="emit('reload')">
       <Refresh class="size-4" />
       {{ BILLING_PRICING_MESSAGES.poolReload }}
     </ActionButton>
@@ -115,13 +108,9 @@
 import { computed, ref, watch } from 'vue'
 import { Refresh, Xmark } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
+import AdminSelect from '../../shared/components/AdminSelect.vue'
 import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
-import {
-  adminSelectTriggerClass,
-  adminSelectTriggerCompactClass,
-} from '../../shared/lib/adminSelectSkin'
-import { cn } from '../../../../lib/utils'
 import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import type {
   AdminModelPoolEntry,
@@ -182,6 +171,15 @@ const availableCatalogModels = computed(() => {
   const taken = new Set(draft.value.map((entry) => entry.modelId.toLowerCase()))
   return (props.catalogModels ?? []).filter((model) => !taken.has(model.id.toLowerCase()))
 })
+
+// AdminSelect 取 label/value 结构：保留原生 select 的 `name || id` 回退，
+// 空 name 的目录项仍显示可辨识的 id。
+const catalogSelectOptions = computed(() =>
+  availableCatalogModels.value.map((model) => ({
+    label: model.name || model.id,
+    value: model.id,
+  })),
+)
 
 function setEnabled(index: number, enabled: boolean) {
   const entry = draft.value[index]

@@ -231,7 +231,6 @@
 
     <template #footer>
       <AdminDialogActions
-        :cancel-label="STORAGE_MESSAGES.cancel"
         :confirm-label="STORAGE_MESSAGES.save"
         :loading="saving"
         :cancel-disabled="saving"
@@ -253,10 +252,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
-import {
-  adminLogoButtonClass,
-  adminTextButtonClass,
-} from '../../shared/lib/uiClasses'
+import { adminLogoButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
 import { storageVendorLogo, vendorIconMap, vendorPresetCatalog } from '../meta'
 import { STORAGE_MESSAGES } from '../pages/messages'
 import type {

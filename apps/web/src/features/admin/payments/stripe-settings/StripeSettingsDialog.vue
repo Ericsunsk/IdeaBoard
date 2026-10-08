@@ -136,7 +136,6 @@
 
     <template #footer="{ requestClose }">
       <AdminDialogActions
-        :cancel-label="PAYMENTS_MESSAGES.cancel"
         :confirm-label="PAYMENTS_MESSAGES.saveSettings"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError)"

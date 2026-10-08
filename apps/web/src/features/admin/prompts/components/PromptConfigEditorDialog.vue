@@ -72,28 +72,22 @@
     </div>
 
     <template #footer>
-      <ActionButton
-        variant="outline"
-        :disabled="saving"
-        @click="emit('close')"
-      >
-        {{ PROMPTS_MESSAGES.cancel }}
-      </ActionButton>
-      <ActionButton
-        v-if="item"
+      <AdminDialogActions
+        :cancel-label="PROMPTS_MESSAGES.cancel"
+        :confirm-label="PROMPTS_MESSAGES.save"
         :loading="saving"
         :disabled="saving || !validation?.canSave || !validation?.isDirty"
-        @click="emit('save')"
-      >
-        {{ PROMPTS_MESSAGES.save }}
-      </ActionButton>
+        :cancel-disabled="saving"
+        @cancel="emit('close')"
+        @confirm="emit('save')"
+      />
     </template>
   </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
 import { nextTick, shallowRef, watch } from 'vue'
-import ActionButton from '../../../../shared/components/ActionButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminTextarea from '../../shared/components/AdminTextarea.vue'
 import { PROMPTS_MESSAGES } from '../pages/messages'

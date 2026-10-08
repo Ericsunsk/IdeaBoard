@@ -41,6 +41,6 @@ describe('supportChannelsResource', () => {
         HttpResponse.json({ data: {} }),
       ),
     )
-    await expect(createAdminSupportChannelsResource().get()).rejects.toThrow('客服渠道响应无效')
+    await expect(createAdminSupportChannelsResource().get()).rejects.toThrow('客户支持响应无效')
   })
 })

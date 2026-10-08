@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
+import { fireEvent } from '@testing-library/vue'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminColumn from './AdminColumn.vue'
 import AdminTable from './AdminTable.vue'
@@ -200,5 +201,138 @@ describe('AdminTable', () => {
     for (const box of partialBoxes) {
       expect((box as HTMLInputElement).checked).toBe(false)
     }
+  })
+
+  it('keeps the header static by default and sticks it when stickyHeader is on', async () => {
+    const plain = renderTable({ value: rows })
+    expect(plain.container.querySelector('thead')?.className ?? '').not.toContain('sticky')
+
+    const sticky = renderTable({ value: rows, stickyHeader: true })
+    const theadClass = sticky.container.querySelector('thead')?.className ?? ''
+    for (const token of ['sticky', 'top-0', 'z-10', 'bg-muted/80', 'backdrop-blur-xs']) {
+      expect(theadClass).toContain(token)
+    }
+  })
+
+  it('emits row-click for enabled rows and locks disabled rows', async () => {
+    const { user, emitted, container } = renderWithUser(
+      h(
+        AdminTable as unknown as Parameters<typeof h>[0],
+        { value: rows, dataKey: 'id', rowDisabled: (row: Row) => row.id === 'b' },
+        {
+          default: () => [
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
+          ],
+        },
+      ),
+    )
+    const readClicks = () =>
+      ((emitted() as Record<string, Array<Array<unknown>>>)['row-click'] ?? []).map(
+        (args) => args[0] as { data: Row; index: number },
+      )
+
+    const bodyRows = container.querySelectorAll('tbody tr')
+    expect(bodyRows).toHaveLength(2)
+
+    await user.click(bodyRows[0] as HTMLElement)
+    expect(readClicks()).toHaveLength(1)
+    expect(readClicks()[0]).toMatchObject({ data: rows[0], index: 0 })
+
+    await user.click(bodyRows[1] as HTMLElement)
+    expect(readClicks()).toHaveLength(1)
+    expect(bodyRows[1]?.getAttribute('aria-disabled')).toBe('true')
+    expect(bodyRows[0]?.hasAttribute('aria-disabled')).toBe(false)
+    expect(bodyRows[1]?.className ?? '').not.toContain('hover:bg-muted/50')
+    expect(bodyRows[0]?.className ?? '').toContain('hover:bg-muted/50')
+  })
+
+  it('marks selected rows with data-state so the shared selected token applies', async () => {
+    const { container } = renderWithUser(
+      h(
+        AdminTable as unknown as Parameters<typeof h>[0],
+        { value: rows, dataKey: 'id', selection: [rows[0]] },
+        {
+          default: () => [
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
+          ],
+        },
+      ),
+    )
+
+    const bodyRows = container.querySelectorAll('tbody tr')
+    expect(bodyRows[0]?.getAttribute('data-state')).toBe('selected')
+    expect(bodyRows[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(bodyRows[1]?.hasAttribute('data-state')).toBe(false)
+  })
+
+  it('excludes disabled rows from select-all and per-row toggles', async () => {
+    const { user, emitted, container } = renderWithUser(
+      h(
+        AdminTable as unknown as Parameters<typeof h>[0],
+        { value: rows, dataKey: 'id', rowDisabled: (row: Row) => row.id === 'b' },
+        {
+          default: () => [
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
+          ],
+        },
+      ),
+    )
+    const readSelections = () =>
+      (emitted() as Record<string, Array<Array<unknown>>>)['update:selection'] ?? []
+
+    const boxes = within(container as HTMLElement).getAllByRole('checkbox')
+    expect(boxes).toHaveLength(3)
+    expect((boxes[2] as HTMLInputElement).disabled).toBe(true)
+
+    await user.click(boxes[0] as HTMLElement)
+    expect(readSelections()[0]?.[0]).toEqual([rows[0]])
+
+    // 禁用行 checkbox 即使收到 change 也不得进入 selection。
+    await fireEvent.change(boxes[2] as HTMLElement, { target: { checked: true } })
+    expect(readSelections()).toHaveLength(1)
+  })
+
+  it('keeps header and row checkboxes on one grade with indeterminate intact', async () => {
+    const { container } = renderWithUser(
+      h(
+        AdminTable as unknown as Parameters<typeof h>[0],
+        { value: rows, dataKey: 'id', selection: [rows[0]] },
+        {
+          default: () => [
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { selectionMode: 'multiple' }),
+            h(AdminColumn as unknown as Parameters<typeof h>[0], { field: 'name', header: '名称' }),
+          ],
+        },
+      ),
+    )
+
+    const boxes = within(container as HTMLElement).getAllByRole('checkbox') as HTMLInputElement[]
+    expect(boxes).toHaveLength(3)
+    for (const box of boxes) {
+      expect(box.className).toContain('size-4')
+      expect(box.className).toContain('accent-primary')
+    }
+    expect(boxes[0]?.indeterminate).toBe(true)
+  })
+
+  it('keeps rows mounted with a weak stale hint on background refresh', async () => {
+    const { container } = renderTable({ value: rows, loading: true })
+
+    const table = container.querySelector('table')
+    expect(table?.getAttribute('data-stale')).toBe('true')
+    expect(table?.getAttribute('aria-busy')).toBe('true')
+    expect(within(container as HTMLElement).getByText('Alpha')).toBeVisible()
+    expect(container.querySelector('[role="progressbar"]')).toBeNull()
+    expect(container.querySelector('tbody tr')?.className ?? '').toContain('opacity-70')
+  })
+
+  it('renders skeleton rows instead of the spinner when skeletonRows is set', async () => {
+    const { container } = renderTable({ value: [], loading: true, skeletonRows: 3 })
+
+    expect(container.querySelectorAll('[data-ui="skeleton"]')).toHaveLength(3)
+    expect(container.querySelector('[role="progressbar"]')).toBeNull()
+    expect(within(container as HTMLElement).getByText('正在加载')).toBeInTheDocument()
   })
 })

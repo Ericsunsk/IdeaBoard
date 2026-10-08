@@ -45,12 +45,13 @@
     </template>
 
     <template #actions>
-      <ActionButton :disabled="controlsDisabled" :loading="saving" @click="save">
-        {{ SETTINGS_MESSAGES.outboundSave }}
-      </ActionButton>
-      <ActionButton variant="outline" :disabled="controlsDisabled" @click="reset">
-        {{ SETTINGS_MESSAGES.reset }}
-      </ActionButton>
+      <AdminEditorActions
+        :save-disabled="controlsDisabled"
+        :reset-disabled="controlsDisabled"
+        :saving="saving"
+        @save="save"
+        @reset="reset"
+      />
     </template>
   </SettingEditorCard>
 </template>
@@ -59,6 +60,7 @@
 import { Server } from '@iconoir/vue'
 import { computed, type HTMLAttributes } from 'vue'
 import ActionButton from '../../../shared/components/ActionButton.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminTextarea from '../shared/components/AdminTextarea.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'

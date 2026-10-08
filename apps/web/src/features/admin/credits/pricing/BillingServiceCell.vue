@@ -1,16 +1,17 @@
 <template>
-  <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
+  <AdminMono as="div" class="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
     <component :is="icon" v-if="icon" class="size-4 shrink-0 text-muted-foreground" />
     <div class="flex min-w-0 flex-col">
       <span class="truncate text-foreground">{{ serviceSlug }}</span>
       <span class="truncate text-admin-caption text-muted-foreground">{{ nodeTitle }}</span>
     </div>
-  </div>
+  </AdminMono>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Search } from '@iconoir/vue'
+import AdminMono from '../../shared/components/AdminMono.vue'
 import { getServiceIcon } from '../../../../shared/domain/serviceIcons'
 import { getAdminServiceGroupMeta, getAdminServiceMeta } from '../../shared/lib/serviceAdminMeta'
 import { serviceOfSku } from './skuFeature'

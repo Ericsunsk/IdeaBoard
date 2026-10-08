@@ -1,7 +1,7 @@
 export default {
   common: {
     save: '保存',
-    saveChanges: '保存更改',
+    saveChanges: '保存',
     create: '创建',
     cancel: '取消',
     delete: '删除',

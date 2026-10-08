@@ -151,9 +151,9 @@ export function useAdminUnsupportedLogoFileFeedback() {
 export function useAdminSupportChannelsFeedback() {
   return createAdminSettingFeedback(
     useAdminToast(),
-    '读取客服渠道失败',
-    '客服渠道已保存',
-    '保存客服渠道失败',
+    '读取客户支持失败',
+    '客户支持已保存',
+    '保存客户支持失败',
   )
 }
 

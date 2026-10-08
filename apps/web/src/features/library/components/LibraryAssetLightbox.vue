@@ -9,7 +9,7 @@
     >
       <div
         v-if="!!asset"
-        class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        class="fixed inset-0 z-[var(--z-lightbox)] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
         @click="emit('close')"
       >
         <!-- 顶部极简悬浮信息与操作栏 -->
@@ -36,14 +36,14 @@
               :href="asset.sourceUrl"
               target="_blank"
               rel="noreferrer"
-              class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
+              :class="lightboxScrimLinkClass"
             >
               <span>{{ t('library.actions.viewSource') }}</span>
             </a>
 
             <button
               type="button"
-              class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-white hover:text-black hover:border-transparent focus-visible:outline-none cursor-pointer"
+              :class="lightboxScrimIconButtonClass"
               :aria-label="t('library.actions.closePreview')"
               :title="t('library.actions.closePreviewEsc')"
               @click="emit('close')"
@@ -73,6 +73,10 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Xmark } from '@iconoir/vue'
+import {
+  lightboxScrimIconButtonClass,
+  lightboxScrimLinkClass,
+} from '../../../shared/theme/lightboxScrim'
 import type { LibraryAssetView } from '../domain/transfer'
 
 const props = defineProps<{

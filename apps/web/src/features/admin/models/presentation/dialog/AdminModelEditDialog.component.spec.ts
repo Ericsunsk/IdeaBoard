@@ -184,7 +184,7 @@ describe('AdminModelEditDialog', () => {
     await user.type(nameInput, 'GPT-Image-1 增强版')
 
     // 提交
-    await user.click(within(dialog).getByRole('button', { name: '保存修改' }))
+    await user.click(within(dialog).getByRole('button', { name: '保存' }))
 
     expect(submitSpy).toHaveBeenCalledOnce()
     const submitted = submitSpy.mock.calls[0]?.[0] as AdminModelItem

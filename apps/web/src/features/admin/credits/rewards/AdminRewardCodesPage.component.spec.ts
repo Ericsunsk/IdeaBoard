@@ -350,7 +350,7 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.getByText('保存后旧 Code 将立即失效，新 Code 将立即生效。')).toBeVisible()
     await user.clear(screen.getByRole('textbox', { name: '名称' }))
     await user.type(screen.getByRole('textbox', { name: '名称' }), '八月奖励')
-    await user.click(screen.getByRole('button', { name: '保存更改' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(resource.update).toHaveBeenCalledTimes(1))
     expect(resource.update).toHaveBeenCalledWith(
@@ -390,7 +390,7 @@ describe('AdminRewardCodesPage', () => {
 
     await user.click(screen.getByRole('button', { name: '新用户奖励 操作菜单' }))
     await user.click(await screen.findByRole('button', { name: '编辑' }))
-    await user.click(screen.getByRole('button', { name: '保存更改' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(resource.update).toHaveBeenCalledTimes(1))
     expect(resource.update).toHaveBeenCalledWith(
@@ -416,7 +416,7 @@ describe('AdminRewardCodesPage', () => {
     await user.clear(screen.getByRole('textbox', { name: '名称' }))
     await user.type(screen.getByRole('textbox', { name: '名称' }), '不会保存')
     await user.type(screen.getByRole('textbox', { name: 'Code' }), 'NEWC-ODE1-WXYZ')
-    await user.click(screen.getByRole('button', { name: '保存更改' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(await screen.findByText('更新冲突')).toBeVisible()
     expect(screen.getByRole('dialog', { name: '编辑兑换码' })).toBeVisible()

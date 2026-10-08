@@ -55,7 +55,6 @@
         </div>
         <div :class="adminDialogFooterActionsClass">
           <AdminDialogActions
-            :cancel-label="USERS_MESSAGES.cancel"
             :confirm-label="USERS_MESSAGES.banConfirm"
             :loading="loading"
             :cancel-disabled="loading"

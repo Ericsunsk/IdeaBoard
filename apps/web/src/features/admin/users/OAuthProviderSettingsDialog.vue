@@ -179,7 +179,6 @@
 
     <template #footer="{ requestClose }">
       <AdminDialogActions
-        :cancel-label="USERS_MESSAGES.cancel"
         :confirm-label="USERS_MESSAGES.oauthSave"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError) || !summary"

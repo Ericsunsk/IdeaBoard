@@ -8,7 +8,7 @@
 
     <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
     <main
-      class="relative z-[1] mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
+      class="relative z-[var(--z-content)] mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
       :class="[
         libraryIslandOpen && !libraryIslandExpanded
           ? 'ml-0 md:ml-[350px] mr-auto max-w-[1600px] pl-0 md:pl-6 lg:pl-8'
@@ -20,7 +20,7 @@
       <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="page-chrome-surface min-w-0 flex-1 rounded-full p-1.5"
+            class="page-chrome-surface min-w-0 flex-1 rounded-full p-1.5 focus-within:shadow-[0_0_0_3px_var(--color-page-chrome-focus-ring)]"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -170,6 +170,7 @@
 
         <p
           v-if="queryError"
+          role="alert"
           class="mt-2 mb-0 text-sm font-semibold text-destructive pointer-events-auto"
         >
           {{ queryError }}

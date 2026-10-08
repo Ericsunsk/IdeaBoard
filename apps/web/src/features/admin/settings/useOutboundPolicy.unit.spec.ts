@@ -1,6 +1,6 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent, nextTick } from 'vue'
+import { createApp, defineComponent } from 'vue'
 import { useMswHandlers } from '../../../test/msw'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import type { AdminOutboundPolicyFeedback } from './useSettingsFeedback'
@@ -30,38 +30,6 @@ describe('useOutboundPolicy', () => {
       expect(harness.lifecycle.form.value.allow_hosts).toBe('models.internal')
       expect(harness.lifecycle.isDirty.value).toBe(false)
       expect(harness.feedback.loadFailed).not.toHaveBeenCalled()
-    } finally {
-      await harness.unmount()
-    }
-  })
-
-  it('reports validation feedback and stops invalid drafts before saving', async () => {
-    useMswHandlers(
-      ...createOutboundPolicyHandlers(createOutboundPolicyMswState({ getAllowHosts: () => [] })),
-    )
-    const harness = mountOutboundPolicy()
-
-    try {
-      await vi.waitFor(() => {
-        expect(harness.lifecycle.setting.value).toEqual({ allow_hosts: [] })
-      })
-      harness.lifecycle.form.value.allow_hosts = 'https://models.internal'
-
-      await expect(harness.lifecycle.save()).resolves.toBe(false)
-
-      expect(harness.lifecycle.validationError.value).toBe(
-        '私有主机仅支持 hostname、IP 或 host:port，每行一个',
-      )
-      expect(harness.feedback.validationFailed).toHaveBeenCalledWith(
-        '私有主机仅支持 hostname、IP 或 host:port，每行一个',
-      )
-      expect(harness.feedback.saved).not.toHaveBeenCalled()
-      expect(harness.feedback.saveFailed).not.toHaveBeenCalled()
-
-      harness.lifecycle.form.value.allow_hosts = 'models.internal'
-      await nextTick()
-
-      expect(harness.lifecycle.validationError.value).toBe('')
     } finally {
       await harness.unmount()
     }

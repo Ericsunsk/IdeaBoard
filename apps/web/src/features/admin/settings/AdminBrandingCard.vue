@@ -73,10 +73,7 @@
             />
           </AdminFormField>
 
-          <AdminFormField
-            :label="SETTINGS_MESSAGES.logoUrlLabel"
-            for="admin-branding-logo-url"
-          >
+          <AdminFormField :label="SETTINGS_MESSAGES.logoUrlLabel" for="admin-branding-logo-url">
             <AdminInput
               id="admin-branding-logo-url"
               v-model="brandingForm.logo_url"
@@ -92,23 +89,19 @@
     </div>
 
     <template #actions>
-      <span class="mr-auto text-admin-caption text-muted-foreground">
-        {{ logoHint }}
-      </span>
-      <ActionButton
-        :disabled="brandingLoading || brandingSaving || uploading"
-        :loading="brandingSaving"
-        @click="saveBranding"
+      <AdminEditorActions
+        :save-disabled="brandingLoading || brandingSaving || uploading"
+        :reset-disabled="brandingLoading || brandingSaving || uploading"
+        :saving="brandingSaving"
+        @save="saveBranding"
+        @reset="resetBranding"
       >
-        {{ SETTINGS_MESSAGES.save }}
-      </ActionButton>
-      <ActionButton
-        variant="outline"
-        :disabled="brandingLoading || brandingSaving || uploading"
-        @click="resetBranding"
-      >
-        {{ SETTINGS_MESSAGES.reset }}
-      </ActionButton>
+        <template #leading>
+          <span class="text-admin-caption text-muted-foreground">
+            {{ logoHint }}
+          </span>
+        </template>
+      </AdminEditorActions>
     </template>
   </SettingEditorCard>
 
@@ -123,7 +116,7 @@
 <script setup lang="ts">
 import { Globe, Xmark } from '@iconoir/vue'
 import { ref, watch, type HTMLAttributes } from 'vue'
-import ActionButton from '../../../shared/components/ActionButton.vue'
+import AdminEditorActions from '../shared/components/AdminEditorActions.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminLogoCropDialog from '../shared/components/AdminLogoCropDialog.vue'

@@ -19,7 +19,6 @@ export const USERS_MESSAGES = {
   balanceColumn: '账户余额',
   openWalletAria: (displayName: string) => `打开 ${displayName} 的账户详情`,
   actionsMenuAria: (displayName: string) => `${displayName} 操作菜单`,
-  cancel: '取消',
   // Ban dialog.
   banAria: '封禁用户',
   banDescription: '设置封禁时长与原因后确认封禁。',
@@ -46,7 +45,7 @@ export const USERS_MESSAGES = {
     configured ? '已配置，留空则保持不变' : '输入 Client Secret',
   oauthCopyCallback: '复制',
   oauthCallbackHint: (portal: string) => `请在 ${portal} 将此 URL 添加为重定向白名单 URI`,
-  oauthSave: '保存设置',
+  oauthSave: '保存',
   oauthLoadFailed: '加载 OAuth Provider 设置失败，请重试',
   oauthIncompleteProvider: (providerLabel: string) =>
     `请先配置 ${providerLabel} 的 Client ID 和 Client Secret`,

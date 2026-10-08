@@ -48,7 +48,6 @@ export const BILLING_PRICING_MESSAGES = {
   disabledToast: '功能已停用',
   enableFailed: '启用功能失败，请重试',
   disableFailed: '停用功能失败，请重试',
-  cancel: '取消',
   save: '保存',
   priceHeader: (displayName: string | undefined) => `编辑 · ${displayName ?? ''}`,
   priceDescription: '调整该计费项的价格配置后保存。',

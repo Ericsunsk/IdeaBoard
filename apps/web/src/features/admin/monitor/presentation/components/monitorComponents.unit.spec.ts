@@ -21,7 +21,7 @@ describe('Monitor Components', () => {
       },
     })
 
-    const input = screen.getByLabelText(/Search|搜索/)
+    const input = screen.getByRole('textbox', { name: /Search|搜索/ })
     expect(input).toHaveValue('prompt text')
     await user.type(input, '{enter}')
     expect(onSearch).toHaveBeenCalled()

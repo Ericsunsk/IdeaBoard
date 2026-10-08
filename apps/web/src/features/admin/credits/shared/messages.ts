@@ -8,6 +8,5 @@
 
 export const CREDITS_SHARED_MESSAGES = {
   actionReasonDescription: '请填写本次操作的内部原因后确认提交。',
-  actionReasonCancel: '取消',
   actionReasonLabel: '操作原因',
 } as const

@@ -7,7 +7,7 @@
       <AdminTable
         :value="transactions"
         data-key="transaction_id"
-        :loading="ledgerLoading && transactions.length === 0"
+        :loading="ledgerLoading"
         scrollable
         :table-aria-label="t('admin.wallet.ledgerAria')"
         :scroll-aria-label="t('admin.wallet.ledgerAria')"
@@ -29,8 +29,8 @@
 
         <AdminColumn :header="t('admin.wallet.change')" style="width: 120px">
           <template #body="{ data }">
-            <span
-              class="font-bold tabular-nums font-mono text-admin-body"
+            <AdminMono
+              class="font-bold tabular-nums text-admin-body whitespace-nowrap"
               :class="
                 data.command_type === 'grant' || data.command_type === 'refund'
                   ? 'text-success'
@@ -39,45 +39,50 @@
             >
               {{ getCreditCommandSign(data.command_type)
               }}{{ formatIdeaAmount(data.amount_credits) }}
-            </span>
+            </AdminMono>
           </template>
         </AdminColumn>
 
         <AdminColumn :header="t('admin.wallet.balanceAfter')" style="width: 150px">
           <template #body="{ data }">
-            <span class="font-mono text-admin-caption text-muted-foreground">
+            <AdminMono
+              class="text-admin-caption whitespace-nowrap text-muted-foreground tabular-nums"
+            >
               {{
                 t('admin.wallet.availableAmount', {
                   amount: formatIdeaAmount(data.available_credits_after),
                 })
               }}
-            </span>
+            </AdminMono>
           </template>
         </AdminColumn>
 
         <AdminColumn :header="t('admin.wallet.reasonAndReference')" style="min-width: 220px">
           <template #body="{ data }">
             <div class="max-w-72 truncate text-admin-body-sm text-foreground" :title="data.reason">
-              {{ data.reason || '-' }}
+              {{ emptyPlaceholder(data.reason) }}
             </div>
-            <div
+            <AdminMono
               v-if="data.charge"
-              class="mt-0.5 text-admin-caption text-muted-foreground font-mono"
+              as="div"
+              class="mt-0.5 text-admin-caption text-muted-foreground"
             >
               {{
                 t('admin.wallet.refundableAmount', {
                   amount: formatIdeaAmount(data.charge.remaining_refundable_credits),
                 })
               }}
-            </div>
+            </AdminMono>
           </template>
         </AdminColumn>
 
         <AdminColumn :header="t('admin.wallet.time')" style="width: 160px">
           <template #body="{ data }">
-            <span class="font-mono text-admin-caption text-muted-foreground whitespace-nowrap">
+            <AdminMono
+              class="text-admin-caption whitespace-nowrap text-muted-foreground tabular-nums"
+            >
               {{ formatAdminDateTimeWithSeconds(data.created_at) }}
-            </span>
+            </AdminMono>
           </template>
         </AdminColumn>
 
@@ -93,7 +98,9 @@
               :aria-label="t('admin.wallet.refundAria', { id: data.transaction_id })"
               @click="emit('openRefund', data)"
             />
-            <span v-else class="text-admin-caption text-muted-foreground">-</span>
+            <span v-else class="text-admin-caption text-muted-foreground">{{
+              ADMIN_IDENTITY_EMPTY
+            }}</span>
           </template>
         </AdminColumn>
       </AdminTable>
@@ -116,11 +123,13 @@
 import { useI18n } from 'vue-i18n'
 import AdminBadge from '../../../shared/components/AdminBadge.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
+import AdminMono from '../../../shared/components/AdminMono.vue'
 import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../../shared/components/AdminEmptyState.vue'
 import AdminTable from '../../../shared/components/AdminTable.vue'
 import { adminCompactTagClass } from '../../../shared/lib/uiClasses'
+import { ADMIN_IDENTITY_EMPTY, emptyPlaceholder } from '../../../shared/lib/cellPlaceholders'
 import {
   formatAdminDateTimeWithSeconds,
   getCreditCommandLabel,

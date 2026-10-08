@@ -113,7 +113,7 @@
                 :class="user.isActive ? 'bg-emerald-500' : 'bg-destructive'"
               />
             </div>
-            <span class="truncate font-medium text-foreground">
+            <span class="truncate font-medium text-foreground" :title="user.displayName">
               {{ user.displayName }}
             </span>
           </div>
@@ -123,7 +123,7 @@
       <!-- Email 列：登录渠道图标 + 邮箱 -->
       <AdminColumn field="email" header="Email" :style="{ minWidth: '240px' }">
         <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-2 font-mono text-xs text-foreground">
+          <AdminMono as="div" class="flex min-w-0 items-center gap-2 text-xs text-foreground">
             <span
               v-for="provider in user.providers"
               :key="provider"
@@ -139,15 +139,17 @@
                 {{ provider.slice(0, 1) }}
               </span>
             </span>
-            <span class="truncate text-muted-foreground">{{ user.email || '-' }}</span>
-          </div>
+            <span class="truncate text-muted-foreground" :title="user.email || undefined">{{
+              emptyPlaceholder(user.email)
+            }}</span>
+          </AdminMono>
         </template>
       </AdminColumn>
 
       <!-- IP 列：国旗 + IP 地址 -->
       <AdminColumn field="lastLoginIP" header="IP" :style="{ minWidth: '180px' }">
         <template #body="{ data: user }">
-          <div class="flex min-w-0 items-center gap-1.5 font-mono text-xs text-foreground">
+          <AdminMono as="div" class="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
             <span
               v-if="getCountryFlag(user.lastLoginCountry)"
               :title="getCountryLabel(user.lastLoginCountry)"
@@ -168,9 +170,9 @@
               class="whitespace-nowrap text-muted-foreground"
               :title="user.lastLoginIP || undefined"
             >
-              {{ user.lastLoginIP || '-' }}
+              {{ emptyPlaceholder(user.lastLoginIP) }}
             </span>
-          </div>
+          </AdminMono>
         </template>
       </AdminColumn>
 
@@ -181,16 +183,22 @@
         </template>
       </AdminColumn>
 
-      <!-- 加入时间列：等宽字体日期 -->
+      <!-- 账户余额列：可交互打开钱包详情（范式：属性列，状态列之前） -->
       <AdminColumn
-        field="createdDateLabel"
-        :header="USERS_MESSAGES.joinedAtColumn"
-        :style="{ width: '130px' }"
+        field="availableCredits"
+        :header="USERS_MESSAGES.balanceColumn"
+        :style="{ width: '140px' }"
       >
         <template #body="{ data: user }">
-          <span class="whitespace-nowrap font-mono text-xs text-foreground">
-            {{ user.createdDateLabel }}
-          </span>
+          <button
+            type="button"
+            :class="adminInlineJumpClass"
+            aria-haspopup="dialog"
+            :aria-label="USERS_MESSAGES.openWalletAria(user.displayName)"
+            @click="openWalletDialog(user)"
+          >
+            {{ user.availableCreditsLabel }}
+          </button>
         </template>
       </AdminColumn>
 
@@ -201,27 +209,21 @@
         </template>
       </AdminColumn>
 
-      <!-- 账户余额列：可交互打开钱包详情 -->
+      <!-- 加入时间列：等宽字体日期（范式：时间列，More 操作列之前） -->
       <AdminColumn
-        field="availableCredits"
-        :header="USERS_MESSAGES.balanceColumn"
-        :style="{ width: '140px' }"
+        field="createdDateLabel"
+        :header="USERS_MESSAGES.joinedAtColumn"
+        :style="{ width: '130px' }"
       >
         <template #body="{ data: user }">
-          <button
-            type="button"
-            class="font-mono text-xs font-semibold text-foreground hover:text-primary cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded"
-            aria-haspopup="dialog"
-            :aria-label="USERS_MESSAGES.openWalletAria(user.displayName)"
-            @click="openWalletDialog(user)"
-          >
-            {{ user.availableCreditsLabel }}
-          </button>
+          <AdminMono class="whitespace-nowrap text-xs text-foreground tabular-nums">
+            {{ user.createdDateLabel }}
+          </AdminMono>
         </template>
       </AdminColumn>
 
-      <!-- 更多操作列 (1:1 对齐事件表第 8 列 More) -->
-      <AdminColumn header="More" :style="{ width: '64px' }">
+      <!-- 更多操作列 (1:1 对齐事件表第 10 列 More) -->
+      <AdminColumn header="More" :style="{ width: ADMIN_TABLE_MORE_COLUMN_WIDTH }">
         <template #body="{ data: user }">
           <div class="flex items-center justify-start">
             <button
@@ -279,6 +281,7 @@ import AdminCollectionPageShell from '../shared/components/AdminCollectionPageSh
 import AdminColumn from '../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
+import AdminMono from '../shared/components/AdminMono.vue'
 import AdminRowActionsPopover from '../shared/components/AdminRowActionsPopover.vue'
 import AdminSelect from '../shared/components/AdminSelect.vue'
 import AdminTable from '../shared/components/AdminTable.vue'
@@ -291,6 +294,9 @@ import {
   adminTableRowActionButtonClass,
   adminTableStyle,
 } from '../shared/lib/uiClasses'
+import { adminInlineJumpClass } from '../shared/lib/cellClasses'
+import { emptyPlaceholder } from '../shared/lib/cellPlaceholders'
+import { ADMIN_TABLE_MORE_COLUMN_WIDTH } from '../shared/lib/tableColumns'
 import { AdminUserWalletDialog } from '../credits/wallets'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './commands'

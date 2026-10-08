@@ -80,6 +80,9 @@ import logoTencentCloud from '../../../../shared/assets/storage-vendors/tencentc
 import logoGithub from '../../../../shared/assets/oauth/github.svg'
 import logoGoogleOAuth from '../../../../shared/assets/oauth/google.svg'
 import logoDiscord from '../../../../shared/assets/oauth/discord.svg'
+// 图片搜索供应商（站内现成资产，不走 models.dev：上游仅有通用占位图）
+import logoUnsplash from '../../../../shared/assets/search-providers/unsplash.svg'
+import logoPexels from '../../../../shared/assets/search-providers/pexels.svg'
 
 export type AdminBrandCategoryKey =
   'all' | 'image-gen' | 'china-ai' | 'global-ai' | 'storage' | 'search' | 'auth'
@@ -349,17 +352,17 @@ export const ALL_ADMIN_BRAND_LOGOS: AdminBrandLogoItem[] = [
   { key: 'tencent-cos', label: '腾讯云 COS', logoSrc: logoTencentCloud, category: 'storage' },
   { key: 'minio', label: 'MinIO', logoSrc: logoMinio, category: 'storage' },
 
-  // 5. 搜索素材库
+  // 5. 搜索素材库（站内现成资产，不走 models.dev）
   {
     key: 'unsplash',
     label: 'Unsplash',
-    logoSrc: adminBrandLogoProxyUrl('unsplash'),
+    logoSrc: logoUnsplash,
     category: 'search',
   },
   {
     key: 'pexels',
     label: 'Pexels',
-    logoSrc: adminBrandLogoProxyUrl('pexels'),
+    logoSrc: logoPexels,
     category: 'search',
   },
 

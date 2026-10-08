@@ -22,43 +22,33 @@ function createPolicy(getRegistrationEnabled: () => Promise<boolean>, providerRe
 }
 
 describe('Social OAuth policy', () => {
-  it('removes caller scopes and derives sign-up intent from server policy', async () => {
-    const context = {
-      path: '/sign-in/social',
-      body: {
-        provider: 'google',
-        scopes: ['https://www.googleapis.com/auth/drive'],
-        requestSignUp: false,
-      },
-    }
+  for (const { provider, scopes, requestSignUp } of [
+    {
+      provider: 'google',
+      scopes: ['https://www.googleapis.com/auth/drive'],
+      requestSignUp: false,
+    },
+    { provider: 'discord', scopes: ['guilds'], requestSignUp: true },
+  ]) {
+    it(`removes caller scopes and derives sign-up intent from server policy (${provider})`, async () => {
+      const context = {
+        path: '/sign-in/social',
+        body: {
+          provider,
+          scopes: [...scopes],
+          requestSignUp,
+        },
+      }
 
-    await applySocialOAuthRequestPolicy(
-      context,
-      createPolicy(async () => true),
-    )
+      await applySocialOAuthRequestPolicy(
+        context,
+        createPolicy(async () => true),
+      )
 
-    assert.equal('scopes' in context.body, false)
-    assert.equal(context.body.requestSignUp, true)
-  })
-
-  it('applies the same sign-up policy to Discord', async () => {
-    const context = {
-      path: '/sign-in/social',
-      body: {
-        provider: 'discord',
-        scopes: ['guilds'],
-        requestSignUp: true,
-      },
-    }
-
-    await applySocialOAuthRequestPolicy(
-      context,
-      createPolicy(async () => true),
-    )
-
-    assert.equal('scopes' in context.body, false)
-    assert.equal(context.body.requestSignUp, true)
-  })
+      assert.equal('scopes' in context.body, false)
+      assert.equal(context.body.requestSignUp, true)
+    })
+  }
 
   it('removes caller scopes from account linking without changing other providers', async () => {
     const google = {

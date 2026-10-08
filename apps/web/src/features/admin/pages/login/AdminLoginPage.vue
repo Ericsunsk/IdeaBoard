@@ -53,7 +53,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-0 flex size-8 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                  class="absolute right-0 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :aria-label="
                     showPassword
                       ? ADMIN_LOGIN_MESSAGES.hidePassword
@@ -71,11 +71,7 @@
               {{ formError }}
             </p>
 
-            <ActionButton
-              type="submit"
-              :loading="loading"
-              class="w-full !h-11 font-bold shadow-sm"
-            >
+            <ActionButton type="submit" :loading="loading" class="w-full !h-11 font-bold shadow-sm">
               {{ loading ? ADMIN_LOGIN_MESSAGES.loggingIn : ADMIN_LOGIN_MESSAGES.enterAdmin }}
             </ActionButton>
           </form>
@@ -137,7 +133,7 @@ const brandMarkClass = computed(() =>
   ),
 )
 const loginCardClass =
-  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-border bg-card shadow-[0_24px_70px_rgba(45,64,89,0.12)]'
+  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[var(--radius-board-dialog)] border border-border bg-card shadow-login-card'
 
 const loading = ref(false)
 const showPassword = ref(false)

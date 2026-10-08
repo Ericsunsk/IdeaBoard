@@ -26,7 +26,7 @@ export const adminTableFrameClass = 'min-w-0'
 export const adminTableStyle = { minWidth: '100%' } as const
 
 export const adminTableClass =
-  'border-separate border-spacing-0 [&_thead]:bg-background [&_th]:h-10 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-0 [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-xl [&_tbody_tr:first-child_td:last-child]:rounded-tr-xl [&_tbody_tr:last-child_td]:border-b-0'
+  'border-separate border-spacing-0 [&_thead]:bg-background [&_tbody]:bg-card [&_tbody_tr:first-child_td]:border-t [&_tbody_tr:first-child_td]:border-border [&_tbody_tr:first-child_td:first-child]:rounded-tl-xl [&_tbody_tr:first-child_td:last-child]:rounded-tr-xl [&_tbody_tr:last-child_td]:border-b-0'
 
 export const adminTableFooterClass =
   'flex items-center justify-between border-t border-border bg-background px-4 py-2.5'

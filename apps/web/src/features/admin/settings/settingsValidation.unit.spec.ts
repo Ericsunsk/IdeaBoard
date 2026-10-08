@@ -12,61 +12,82 @@ import {
   validateMediaUploadSetting,
 } from './useMediaUploadSettings'
 
+/**
+ * Pure-function mirror of the MSW-level lifecycle coverage in
+ * `useSettingsLifecycle.unit.spec.ts` (which owns the load/dirty/save/reset and
+ * failure-keeps-editable contracts). This file only pins the validation truth
+ * table in one compact matrix.
+ */
 describe('admin access settings validation', () => {
-  it('accepts valid integer rate limit settings', () => {
-    expect(validateRateLimitSettings({ max_requests: 100, window_seconds: 60 })).toBe('')
-  })
-
-  it('rejects empty or non-positive request limits', () => {
-    expect(validateRateLimitSettings({ max_requests: null, window_seconds: 60 })).toBe(
-      '最大请求需为大于 0 的整数',
-    )
-    expect(validateRateLimitSettings({ max_requests: 0, window_seconds: 60 })).toBe(
-      '最大请求需为大于 0 的整数',
-    )
-  })
-
-  it('rejects values above configured caps', () => {
-    expect(
-      validateRateLimitSettings({
-        max_requests: RATE_LIMIT_MAX_REQUESTS + 1,
-        window_seconds: 60,
-      }),
-    ).toBe(`最大请求不能超过 ${RATE_LIMIT_MAX_REQUESTS}`)
-    expect(
-      validateRateLimitSettings({
-        max_requests: 100,
-        window_seconds: RATE_LIMIT_MAX_WINDOW_SECONDS + 1,
-      }),
-    ).toBe(`窗口周期不能超过 ${RATE_LIMIT_MAX_WINDOW_SECONDS} 秒`)
+  it.each([
+    {
+      name: 'accepts valid integer rate limit settings',
+      input: { max_requests: 100, window_seconds: 60 },
+      expected: '',
+    },
+    {
+      name: 'rejects null request limits',
+      input: { max_requests: null, window_seconds: 60 },
+      expected: '最大请求需为大于 0 的整数',
+    },
+    {
+      name: 'rejects non-positive request limits',
+      input: { max_requests: 0, window_seconds: 60 },
+      expected: '最大请求需为大于 0 的整数',
+    },
+    {
+      name: 'rejects request limits above the configured cap',
+      input: { max_requests: RATE_LIMIT_MAX_REQUESTS + 1, window_seconds: 60 },
+      expected: `最大请求不能超过 ${RATE_LIMIT_MAX_REQUESTS}`,
+    },
+    {
+      name: 'rejects windows above the configured cap',
+      input: { max_requests: 100, window_seconds: RATE_LIMIT_MAX_WINDOW_SECONDS + 1 },
+      expected: `窗口周期不能超过 ${RATE_LIMIT_MAX_WINDOW_SECONDS} 秒`,
+    },
+  ])('$name', ({ input, expected }) => {
+    expect(validateRateLimitSettings(input)).toBe(expected)
   })
 })
 
 describe('admin media upload settings helpers', () => {
-  it('normalizes missing values to defaults', () => {
-    expect(normalizeMediaUploadSetting(null)).toEqual(DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING)
+  it.each([
+    {
+      name: 'normalizes missing values to defaults',
+      input: null,
+      expected: DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING,
+    },
+    {
+      name: 'normalizes numeric values to integers',
+      input: { upload_max_concurrent: 12.8 },
+      expected: { upload_max_concurrent: 12 },
+    },
+  ])('$name', ({ input, expected }) => {
+    expect(normalizeMediaUploadSetting(input)).toEqual(expected)
   })
 
-  it('normalizes numeric values to integers', () => {
-    expect(normalizeMediaUploadSetting({ upload_max_concurrent: 12.8 })).toEqual({
-      upload_max_concurrent: 12,
-    })
-  })
-
-  it('validates concurrent upload range', () => {
-    expect(validateMediaUploadSetting({ upload_max_concurrent: MEDIA_UPLOAD_MIN_CONCURRENT })).toBe(
-      '',
-    )
-    expect(validateMediaUploadSetting({ upload_max_concurrent: MEDIA_UPLOAD_MAX_CONCURRENT })).toBe(
-      '',
-    )
-    expect(validateMediaUploadSetting({ upload_max_concurrent: 0 })).toBe(
-      `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
-    )
-    expect(
-      validateMediaUploadSetting({ upload_max_concurrent: MEDIA_UPLOAD_MAX_CONCURRENT + 1 }),
-    ).toBe(
-      `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
-    )
+  it.each([
+    {
+      name: 'accepts the minimum concurrent upload bound',
+      input: { upload_max_concurrent: MEDIA_UPLOAD_MIN_CONCURRENT },
+      expected: '',
+    },
+    {
+      name: 'accepts the maximum concurrent upload bound',
+      input: { upload_max_concurrent: MEDIA_UPLOAD_MAX_CONCURRENT },
+      expected: '',
+    },
+    {
+      name: 'rejects zero concurrent uploads',
+      input: { upload_max_concurrent: 0 },
+      expected: `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
+    },
+    {
+      name: 'rejects concurrent uploads above the maximum',
+      input: { upload_max_concurrent: MEDIA_UPLOAD_MAX_CONCURRENT + 1 },
+      expected: `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
+    },
+  ])('$name', ({ input, expected }) => {
+    expect(validateMediaUploadSetting(input)).toBe(expected)
   })
 })

@@ -31,7 +31,7 @@
           <AdminEmptyState :title="M.emptyConfigs" />
         </template>
 
-        <!-- 供应商列 -->
+        <!-- Service 列 -->
         <AdminColumn
           field="provider"
           :header="M.providerColumn"
@@ -40,7 +40,17 @@
           <template #body="{ data }">
             <div class="flex flex-col items-start gap-1.5">
               <div class="flex items-center gap-2">
-                <Search class="size-4 text-muted-foreground shrink-0" />
+                <span
+                  v-if="searchProviderLogo(data.provider as SearchProviderId)"
+                  class="flex size-6 shrink-0 items-center justify-center rounded-md bg-white p-1 ring-1 ring-border"
+                >
+                  <img
+                    :src="searchProviderLogo(data.provider as SearchProviderId)"
+                    :alt="SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId]"
+                    class="size-full object-contain"
+                  />
+                </span>
+                <Search v-else class="size-4 text-muted-foreground shrink-0" />
                 <span class="font-medium text-admin-body text-foreground">
                   {{ SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId] }}
                 </span>
@@ -56,11 +66,7 @@
         </AdminColumn>
 
         <!-- API Key 列 -->
-        <AdminColumn
-          field="apiKey"
-          :header="M.apiKeyColumn"
-          :style="{ minWidth: '240px' }"
-        >
+        <AdminColumn field="apiKey" :header="M.apiKeyColumn" :style="{ minWidth: '240px' }">
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col gap-1.5">
               <AdminInput
@@ -69,7 +75,9 @@
                 type="password"
                 size="small"
                 autocomplete="off"
-                :aria-label="M.searchApiKeyLabel(SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId])"
+                :aria-label="
+                  M.searchApiKeyLabel(SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId])
+                "
                 :placeholder="data.api_key_configured ? '••••••••••••••••' : M.searchApiKeyRequired"
                 :disabled="isRowBusy(data.provider as SearchProviderId)"
                 class="w-full font-mono"
@@ -106,46 +114,21 @@
         </AdminColumn>
 
         <!-- Status 列（全局规范：任务监控页 TaskStatusCell 式 Token 胶囊 + 圆点） -->
-        <AdminColumn
-          field="status"
-          header="Status"
-          :style="{ width: '105px' }"
-        >
+        <AdminColumn field="status" header="Status" :style="{ width: '105px' }">
           <template #body="{ data }">
             <span
               class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-admin-caption font-semibold leading-none"
               :class="testStatePillClass(data.test_state)"
             >
-              <span
-                class="size-1.5 rounded-full"
-                :class="testStateDotClass(data.test_state)"
-              />
+              <span class="size-1.5 rounded-full" :class="testStateDotClass(data.test_state)" />
               <span>{{ testStateLabel(data.test_state) }}</span>
             </span>
           </template>
         </AdminColumn>
 
         <!-- 启用状态列 -->
-        <AdminColumn
-          field="enabled"
-          :header="M.enableColumn"
-          :style="{ width: '80px' }"
-        >
-          <template #body="{ data }">
-            <AdminSwitch
-              :model-value="data.enabled"
-              :aria-label="`启用 ${SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId]}`"
-              :disabled="!canToggleEnable(data)"
-              @update:model-value="toggleEnabled(data.provider as SearchProviderId, $event)"
-            />
-          </template>
-        </AdminColumn>
-
         <!-- 操作列 -->
-        <AdminColumn
-          :header="M.actionsColumn"
-          :style="{ width: '180px', minWidth: '170px' }"
-        >
+        <AdminColumn :header="M.actionsColumn" :style="{ width: '180px', minWidth: '170px' }">
           <template #body="{ data }">
             <div class="flex min-w-0 flex-col items-start gap-1.5">
               <div class="flex items-center gap-2">
@@ -165,13 +148,21 @@
                   {{ M.searchSaveKey }}
                 </ActionButton>
               </div>
-              <p
-                v-if="sequenceHint(data)"
-                class="text-admin-caption text-muted-foreground"
-              >
+              <p v-if="sequenceHint(data)" class="text-admin-caption text-muted-foreground">
                 {{ sequenceHint(data) }}
               </p>
             </div>
+          </template>
+        </AdminColumn>
+
+        <AdminColumn field="enabled" :header="M.enableColumn" :style="{ width: '80px' }">
+          <template #body="{ data }">
+            <AdminSwitch
+              :model-value="data.enabled"
+              :aria-label="`启用 ${SEARCH_PROVIDER_LABELS[data.provider as SearchProviderId]}`"
+              :disabled="!canToggleEnable(data)"
+              @update:model-value="toggleEnabled(data.provider as SearchProviderId, $event)"
+            />
           </template>
         </AdminColumn>
       </AdminTable>
@@ -197,10 +188,7 @@ import AdminInput from '../shared/components/AdminInput.vue'
 import AdminSwitch from '../shared/components/AdminSwitch.vue'
 import AdminTable from '../shared/components/AdminTable.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
-import {
-  ADMIN_PROBE_OPERATOR_REASON,
-  confirmSettingsSave,
-} from '../shared/lib/confirmSettingsSave'
+import { ADMIN_PROBE_OPERATOR_REASON, confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import { formatAdminDisplayError } from '../shared/lib/toast'
 import {
   adminTableCardClass,
@@ -209,6 +197,7 @@ import {
   adminTableStyle,
 } from '../shared/lib/uiClasses'
 import { SETTINGS_MESSAGES as M } from './pages/messages'
+import { ALL_ADMIN_BRAND_LOGOS } from '../shared/logos/brandLogos'
 import { createAdminSearchProviderResource } from './searchProviderResource'
 import type { AdminSearchProviderResource } from './searchProviderResource'
 import { useAdminSearchProviderFeedback } from './useSettingsFeedback'
@@ -295,6 +284,10 @@ const tableRows = computed(() => {
   )
 })
 
+function searchProviderLogo(provider: SearchProviderId): string {
+  return ALL_ADMIN_BRAND_LOGOS.find((logo) => logo.key === provider)?.logoSrc ?? ''
+}
+
 function isRowBusy(provider: SearchProviderId): boolean {
   return testingState.value[provider] || savingState.value[provider]
 }
@@ -302,9 +295,7 @@ function isRowBusy(provider: SearchProviderId): boolean {
 function isTestDisabled(config: SearchProviderConfig): boolean {
   const provider = config.provider
   return (
-    isRowBusy(provider) ||
-    apiKeyDrafts.value[provider].trim() !== '' ||
-    !config.api_key_configured
+    isRowBusy(provider) || apiKeyDrafts.value[provider].trim() !== '' || !config.api_key_configured
   )
 }
 
