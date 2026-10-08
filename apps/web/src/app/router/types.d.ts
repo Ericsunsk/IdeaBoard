@@ -8,5 +8,6 @@ declare module 'vue-router' {
     title?: string
     seoKey?: RouteSeoKey
     hidePageHeader?: boolean
+    fullWidth?: boolean
   }
 }

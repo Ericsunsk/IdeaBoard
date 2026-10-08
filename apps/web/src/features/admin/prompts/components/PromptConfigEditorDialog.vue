@@ -72,33 +72,30 @@
     </div>
 
     <template #footer>
-      <AdminButton
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         :disabled="saving"
         @click="emit('close')"
       >
         {{ PROMPTS_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton
+      </ActionButton>
+      <ActionButton
         v-if="item"
-        :class="adminActionButtonClass"
         :loading="saving"
         :disabled="saving || !validation?.canSave || !validation?.isDirty"
         @click="emit('save')"
       >
         {{ PROMPTS_MESSAGES.save }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
 import { nextTick, shallowRef, watch } from 'vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminTextarea from '../../shared/components/AdminTextarea.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { PROMPTS_MESSAGES } from '../pages/messages'
 import type { FeaturePromptVariable, PromptDraftValidation } from '../workspace'
 import type { FeatureItem } from '../featurePromptMeta'

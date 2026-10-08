@@ -66,9 +66,9 @@ export function useOutboundPolicy(options: {
     // Control Plane writes require an operator reason (audit). Collect it
     // through the shared confirm dialog; a cancelled dialog aborts silently.
     const operatorReason = await confirmSettingsSave(options.confirm, {
-      title: '保存访问策略',
+      title: '保存',
       message: '确定保存私有地址访问策略吗？该操作将记录操作人与原因。',
-      confirmLabel: '保存访问策略',
+      confirmLabel: '保存',
     })
     if (!operatorReason) return false
 

@@ -10,14 +10,9 @@
 // `workspace.ts` next to the logic that owns them.
 
 export const STORAGE_MESSAGES = {
-  searchLabel: '搜索存储对象',
-  searchPlaceholder: '搜索存储名称、供应商或存储桶...',
-  filterLabel: '筛选存储状态',
-  refresh: '刷新存储',
+  storageTitle: '存储配置',
+  storageSubtitle: '对象存储服务供应商与凭据管理',
   create: '新增存储',
-  storageCount: (count: number) => `共 ${count} 个存储服务`,
-  totalCount: (count: number) => `(共 ${count} 个)`,
-  allStatuses: '全部状态',
   current: '使用中',
   configured: '已配置',
   unconfigured: '未配置',
@@ -31,31 +26,24 @@ export const STORAGE_MESSAGES = {
   switchLogoAria: '切换存储 Logo',
   // Table.
   tableLoadingAria: '加载存储配置中',
-  tableEmptyTitle: (hasActiveFilter: boolean) =>
-    hasActiveFilter ? '未找到匹配的存储配置' : '暂无存储配置',
-  tableEmptyHint: (hasActiveFilter: boolean) =>
-    hasActiveFilter
-      ? '未找到符合当前搜索或筛选条件的存储。请尝试调整关键词或清空筛选。'
-      : '当前没有已注册的对象存储配置。点击右上角新增存储开始配置。',
-  tableClearFilters: '清空筛选条件',
+  tableLoadFailed: '加载存储配置失败',
+  retry: '重试',
+  tableEmptyTitle: '暂无存储配置',
+  tableEmptyHint: '当前没有已注册的对象存储配置。点击右上角新增存储开始配置。',
   tableSectionAria: '对象存储',
-  tableSectionCount: (count: number) => `共 ${count} 个配置`,
   tableAria: '对象存储配置列表',
   tableScrollAria: '对象存储配置列表横向滚动区域',
   tableEmptyMatch: '暂无匹配存储',
   serviceColumn: '存储服务',
-  statusColumn: '状态',
+  enableColumn: '启用',
   bucketColumn: '存储桶 / 路径',
   endpointColumn: '访问端点 / 域名',
-  currentColumn: '当前生效',
   actionsColumn: '操作',
-  currentEffective: '当前生效',
-  configureAction: '配置',
-  editAction: '编辑',
+  configureAction: '设置',
   testAction: '测试连接',
   deleteAction: '删除',
   // Editor dialog.
-  editorCreateTitle: '添加对象存储',
+  editorCreateTitle: '新增存储',
   editorFallbackTitle: '存储配置',
   editorDescription: '填写对象存储配置后保存。',
   editorCreateSubtitle: '选择云存储厂商预设或自定义 S3 兼容接入',
@@ -65,12 +53,8 @@ export const STORAGE_MESSAGES = {
   editorTabBasic: '基础与凭据',
   editorTabEndpoint: '端点与网络',
   editorTabAdvanced: '高级选项',
-  editorEnableLabel: '启用该存储配置',
-  editorEnableState: (enabled: boolean) => (enabled ? '已启用' : '已关闭'),
-  editorEnableAria: '存储启用状态',
   editorNameLabel: '存储配置名称',
   editorNamePlaceholder: '例如：生产环境主存储 / 阿里云 OSS',
   editorDetectDomains: '一键自动探测域名',
   editorDomainsFound: '探测到域名：',
-  editorSaveApply: (isCurrent: boolean) => (isCurrent ? '保存' : '设为当前'),
 } as const

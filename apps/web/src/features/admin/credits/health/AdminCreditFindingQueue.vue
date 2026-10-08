@@ -62,15 +62,13 @@
       <AdminAlert v-if="initialError" class="m-4" severity="error">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ CREDIT_HEALTH_MESSAGES.queueLoadFailed }}</span>
-          <AdminButton
+          <ActionButton
             variant="outline"
-            size="small"
-            :class="adminActionButtonClass"
             :loading="loading"
             @click="refreshFindings"
           >
             {{ CREDIT_HEALTH_MESSAGES.queueReload }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </AdminAlert>
 
@@ -347,6 +345,7 @@ import {
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -355,7 +354,6 @@ import { useAdminCollectionQuery } from '../../shared/composables/useAdminCollec
 import { useCursorPagination } from '../../shared/composables/useCursorPagination'
 import { adminPolling } from '../../../../shared/query/queryDefaults'
 import {
-  adminActionButtonClass,
   adminCompactTagClass,
   adminFramedIconButtonClass,
   adminTableCardClass,

@@ -59,9 +59,8 @@
       <AdminAlert v-if="initialError" class="m-5" severity="error">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ CREDIT_HEALTH_MESSAGES.runHistoryLoadFailed }}</span>
-          <AdminButton
+          <ActionButton
             :label="CREDIT_HEALTH_MESSAGES.runHistoryReload"
-            :class="adminActionButtonClass"
             severity="secondary"
             variant="outline"
             :loading="runsLoading"
@@ -191,13 +190,12 @@
     </AdminTablePanel>
 
     <template #footer>
-      <AdminButton
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         @click="$emit('update:visible', false)"
       >
         {{ CREDIT_HEALTH_MESSAGES.close }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
@@ -210,6 +208,7 @@ import { Refresh } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
@@ -230,7 +229,6 @@ import {
   getRunStatusSeverity,
 } from '../shared/format'
 import {
-  adminActionButtonClass,
   adminTableClass,
   adminTableFrameClass,
   adminTextButtonClass,

@@ -78,7 +78,7 @@ describe('AdminMailConfigCard', () => {
     const { user } = renderCard()
 
     await screen.findByText('未配置')
-    await user.click(screen.getByRole('button', { name: '保存邮件配置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     expect(await screen.findByText('请输入 Resend API Key')).toBeVisible()
     expect(resource.update).not.toHaveBeenCalled()
@@ -91,7 +91,7 @@ describe('AdminMailConfigCard', () => {
     const fromName = screen.getByRole('textbox', { name: /发件人名称/ })
     await user.clear(fromName)
     await user.type(fromName, 'IdeaBoard Ops')
-    await user.click(screen.getByRole('button', { name: '保存邮件配置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() =>
       expect(resource.update).toHaveBeenCalledWith(
@@ -113,7 +113,7 @@ describe('AdminMailConfigCard', () => {
     const { user } = renderCard()
     await screen.findByText('Ready')
 
-    await user.click(screen.getByRole('button', { name: '保存邮件配置' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => expect(confirmMock).toHaveBeenCalledOnce())
     expect(resource.update).not.toHaveBeenCalled()

@@ -1,6 +1,6 @@
 import { createPrefixedId } from '../../../../shared/utils/ids'
 import { readLocalStorageItem, writeLocalStorageJson } from '../../../../shared/utils/storage'
-import { getBoardScope, scopedBoardStorageKey } from './scope'
+import { getRecoverableBoardScope, scopedBoardStorageKey } from './scope'
 
 export interface BoardMeta {
   id: string
@@ -78,7 +78,7 @@ function getScopedStorageKey(): string | null {
 /** Stamps the current workspace onto entries missing ownership (never rewrites explicit owners). */
 function withCurrentWorkspace(board: BoardMeta): BoardMeta {
   if (board.workspaceId) return board
-  const workspaceId = getBoardScope().workspaceId
+  const workspaceId = getRecoverableBoardScope().workspaceId
   return workspaceId ? { ...board, workspaceId } : board
 }
 

@@ -71,14 +71,13 @@
               {{ formError }}
             </p>
 
-            <AdminButton
+            <ActionButton
               type="submit"
-              :class="adminActionButtonClass"
               :loading="loading"
               class="w-full !h-11 font-bold shadow-sm"
             >
               {{ loading ? ADMIN_LOGIN_MESSAGES.loggingIn : ADMIN_LOGIN_MESSAGES.enterAdmin }}
-            </AdminButton>
+            </ActionButton>
           </form>
         </div>
 
@@ -110,6 +109,7 @@ import {
 import { ADMIN_DEFAULT_PATH } from '../../app/navigationMeta'
 import { Eye, EyeClosed, User } from '@iconoir/vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
@@ -118,7 +118,7 @@ import { i18n } from '../../../../shared/i18n'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { stringParam } from '../../../../shared/router/queryParams'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
-import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
+import { adminTextButtonClass } from '../../shared/lib/uiClasses'
 import { useAdminLoginFeedback } from './useAdminLoginFeedback'
 import { ADMIN_LOGIN_MESSAGES } from './messages'
 

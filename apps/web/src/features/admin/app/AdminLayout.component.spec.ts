@@ -125,7 +125,7 @@ describe('AdminLayout', () => {
 
   it('pins the topbar title permanently for system settings without scrolling', async () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
-    await renderLayout('/admin/settings/general')
+    await renderLayout('/admin/settings')
 
     const title = await screen.findByTitle('回到顶部')
     expect(title).toBeVisible()

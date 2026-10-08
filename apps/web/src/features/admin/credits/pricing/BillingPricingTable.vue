@@ -99,25 +99,21 @@
         >
           <template #body="{ data }">
             <div v-if="data.status !== 'archived'" class="flex items-center gap-2">
-              <AdminButton
-                size="small"
-                :class="adminActionButtonClass"
+              <ActionButton
                 @click="emit('publish', data)"
               >
                 {{ BILLING_PRICING_MESSAGES.tablePublishLabel(data.status) }}
-              </AdminButton>
+              </ActionButton>
             </div>
             <div v-else>
-              <AdminButton
-                size="small"
+              <ActionButton
                 variant="destructive"
-                :class="adminActionButtonClass"
                 :loading="props.deletePending[data.sku] === true"
                 :disabled="props.deletePending[data.sku] === true"
                 @click="emit('delete', data)"
               >
                 {{ BILLING_PRICING_MESSAGES.tableDelete }}
-              </AdminButton>
+              </ActionButton>
             </div>
           </template>
         </AdminColumn>
@@ -148,10 +144,9 @@
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import {
-  adminActionButtonClass,
   adminTableCardClass,
   adminTableClass,
   adminTableFrameClass,

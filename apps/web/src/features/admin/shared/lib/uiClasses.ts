@@ -58,8 +58,6 @@ export const adminCompactIconButtonClass =
 export const adminToolbarPageLabelClass =
   'flex h-7 items-center justify-center rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground'
 
-export const adminActionButtonClass = '!h-9 !rounded-lg'
-
 export const adminLogoButtonClass =
   'control-state flex shrink-0 items-center justify-center rounded-xl border border-border bg-card shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-primary hover:bg-card focus-visible:outline-none focus-visible:border-primary data-[control-state=selected]:border-primary data-[control-state=selected]:bg-card'
 

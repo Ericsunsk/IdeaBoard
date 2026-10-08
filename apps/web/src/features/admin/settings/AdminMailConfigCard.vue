@@ -1,8 +1,11 @@
 <template>
   <SettingEditorCard
-    :title="SETTINGS_MESSAGES.mailRowTitle"
-    :status="statusLabel"
-    :status-severity="statusSeverity"
+    :icon="Mail"
+    :title="SETTINGS_MESSAGES.mailTitle"
+    :description="SETTINGS_MESSAGES.mailSubtitle"
+    :status="props.plain ? undefined : statusLabel"
+    :status-severity="props.plain ? undefined : statusSeverity"
+    :plain="props.plain"
     :class="props.class"
   >
     <template #default>
@@ -10,14 +13,9 @@
         <AdminAlert v-if="error" severity="error">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ error }}</span>
-            <AdminButton
-              :class="adminActionButtonClass"
-              variant="outline"
-              size="small"
-              @click="load"
-            >
+            <ActionButton variant="outline" @click="load">
               {{ SETTINGS_MESSAGES.retry }}
-            </AdminButton>
+            </ActionButton>
           </div>
         </AdminAlert>
         <AdminAlert v-else-if="loading" severity="secondary">{{
@@ -99,15 +97,14 @@
               class="w-full"
             />
           </AdminFormField>
-          <AdminButton
-            :class="adminActionButtonClass"
+          <ActionButton
             variant="outline"
             :loading="testing"
             :disabled="testDisabled"
             @click="sendTest"
           >
             {{ SETTINGS_MESSAGES.mailSendTest }}
-          </AdminButton>
+          </ActionButton>
         </div>
         <AdminAlert v-if="testError" severity="error">
           {{ testError }}
@@ -116,31 +113,20 @@
     </template>
     <template #actions>
       <div class="flex w-full flex-wrap items-center justify-between gap-2">
-        <AdminButton
-          :class="adminActionButtonClass"
+        <ActionButton
           variant="destructive"
           :disabled="controlsDisabled || !summary?.configured"
           @click="clear"
         >
           {{ SETTINGS_MESSAGES.mailDelete }}
-        </AdminButton>
+        </ActionButton>
         <div class="flex items-center gap-2">
-          <AdminButton
-            :class="adminActionButtonClass"
-            variant="outline"
-            :disabled="controlsDisabled"
-            @click="reset"
-          >
+          <ActionButton variant="outline" :disabled="controlsDisabled" @click="reset">
             {{ SETTINGS_MESSAGES.reset }}
-          </AdminButton>
-          <AdminButton
-            :class="adminActionButtonClass"
-            :disabled="controlsDisabled"
-            :loading="saving"
-            @click="save"
-          >
+          </ActionButton>
+          <ActionButton :disabled="controlsDisabled" :loading="saving" @click="save">
             {{ SETTINGS_MESSAGES.mailSave }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </div>
     </template>
@@ -148,14 +134,14 @@
 </template>
 
 <script setup lang="ts">
+import { Mail } from '@iconoir/vue'
 import { computed, onMounted, ref, type HTMLAttributes } from 'vue'
 import * as v from 'valibot'
 import { useForm, firstFormError } from '@/components/ui/form'
-import AdminButton from '../shared/components/AdminButton.vue'
+import ActionButton from '../../../shared/components/ActionButton.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { secretField } from '../shared/lib/secretSchema'
 import { ADMIN_PROBE_OPERATOR_REASON, confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
@@ -167,10 +153,14 @@ import { createAdminMailConfigResource } from './mailConfigResource'
 import type { AdminMailConfigResource } from './mailConfigResource'
 import type { MailConfigSummary } from './mailConfigTypes'
 
-const props = defineProps<{
-  class?: HTMLAttributes['class']
-  resource?: AdminMailConfigResource
-}>()
+const props = withDefaults(
+  defineProps<{
+    class?: HTMLAttributes['class'] | undefined
+    plain?: boolean
+    resource?: AdminMailConfigResource | undefined
+  }>(),
+  { class: undefined, plain: false, resource: undefined },
+)
 const defaultResource = createAdminMailConfigResource()
 const feedback = useAdminMailSettingsFeedback()
 const confirm = useAdminConfirm()
@@ -223,8 +213,8 @@ const testDisabled = computed(
   () => controlsDisabled.value || !summary.value?.configured || !recipient.value.trim(),
 )
 const statusLabel = computed(() => {
-  if (error.value) return SETTINGS_MESSAGES.providerLoadFailed
-  if (loading.value && !summary.value) return SETTINGS_MESSAGES.providerLoading
+  if (error.value) return SETTINGS_MESSAGES.settingsLoadFailed
+  if (loading.value && !summary.value) return SETTINGS_MESSAGES.settingsLoading
   if (summary.value?.readiness === 'ready') return 'Ready'
   if (summary.value?.readiness === 'not_tested') return SETTINGS_MESSAGES.mailStatusUntested
   return SETTINGS_MESSAGES.mailStatusUnconfigured

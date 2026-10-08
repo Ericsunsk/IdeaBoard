@@ -205,9 +205,7 @@
             >
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
-                  <AdminButton
-                    size="small"
-                    :class="adminActionButtonClass"
+                  <ActionButton
                     :aria-label="PROMPTS_MESSAGES.configureAria(data.title)"
                     :disabled="isInitialLoading"
                     @click="openEditor(data)"
@@ -217,7 +215,7 @@
                         ? PROMPTS_MESSAGES.adjust
                         : PROMPTS_MESSAGES.setup
                     }}
-                  </AdminButton>
+                  </ActionButton>
                 </div>
               </template>
             </AdminColumn>
@@ -247,6 +245,7 @@ import { computed, ref, type Component } from 'vue'
 import { Refresh, Search, Spark, Xmark } from '@iconoir/vue'
 import { usePromptConfigFeedback } from '../usePromptConfigFeedback'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
@@ -255,7 +254,6 @@ import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import PromptConfigEditorDialog from '../components/PromptConfigEditorDialog.vue'
 import { usePromptConfigFilters } from '../filtering'
 import {
-  adminActionButtonClass,
   adminDashboardRootClass,
   adminEmptyStateClass,
   adminTableCardClass,

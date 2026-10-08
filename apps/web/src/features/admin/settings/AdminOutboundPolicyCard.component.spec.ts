@@ -49,7 +49,7 @@ describe('AdminOutboundPolicyCard', () => {
     await user.clear(allowHostsInput)
     await user.type(allowHostsInput, 'Models.Internal\n10.0.0.8:8443')
 
-    await user.click(screen.getByRole('button', { name: '保存访问策略' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => {
       expect(updateRequests).toEqual([
@@ -75,7 +75,7 @@ describe('AdminOutboundPolicyCard', () => {
     await user.clear(allowHostsInput)
     await user.type(allowHostsInput, 'draft.internal')
 
-    await user.click(screen.getByRole('button', { name: '保存访问策略' }))
+    await user.click(screen.getByRole('button', { name: '保存' }))
 
     await waitFor(() => {
       expect(confirmMock).toHaveBeenCalledOnce()

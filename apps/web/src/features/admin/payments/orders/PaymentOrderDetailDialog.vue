@@ -21,9 +21,9 @@
     <AdminAlert v-else-if="error" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ PAYMENT_ORDERS_MESSAGES.detailLoadFailed }}</span>
-        <AdminButton variant="outline" :class="adminActionButtonClass" @click="$emit('retry')">
+        <ActionButton variant="outline" @click="$emit('retry')">
           {{ PAYMENT_ORDERS_MESSAGES.retry }}
-        </AdminButton>
+        </ActionButton>
       </div>
     </AdminAlert>
 
@@ -175,15 +175,14 @@
               refundValidationError
             }}</small>
           </label>
-          <AdminButton
+          <ActionButton
             type="submit"
-            :class="adminActionButtonClass"
             variant="destructive"
             :loading="refunding"
             :disabled="refunding || !canSubmitRefund"
           >
             {{ PAYMENT_ORDERS_MESSAGES.refundSubmit }}
-          </AdminButton>
+          </ActionButton>
         </form>
         <AdminAlert v-if="refundError" class="mt-3" severity="error">
           {{ refundError }}
@@ -209,9 +208,9 @@ import { computed, ref, watch } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import {
   formatPaymentDateTime,
   formatPaymentMoney,

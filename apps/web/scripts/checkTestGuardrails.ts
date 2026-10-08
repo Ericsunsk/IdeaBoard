@@ -63,6 +63,13 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
         'Unmounts one Testing Library render result between multiple render() calls; the component harness still goes through src/test/render.',
     },
   ],
+  'src/features/admin/settings/components/AdminSettingsOnThisPage.component.spec.ts': [
+    {
+      rule: 'document-div-host',
+      reason:
+        'Verifies anchor scrolling by observing scrollIntoView on a real in-document section target; the scroll target must exist in the document outside the rendered component.',
+    },
+  ],
 }
 
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
@@ -72,6 +79,18 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
     {
       reason:
         'Verifies the Account dialog overlay shadow class that defines the shared visual chrome for the modal surface.',
+    },
+  ],
+  'src/features/auth/components/auth-fields/authFields.component.spec.ts': [
+    {
+      reason:
+        'Verifies the auth field prefix-icon absolute positioning contract shared by Email and Password inputs.',
+    },
+  ],
+  'src/features/admin/settings/AdminBrandingCard.component.spec.ts': [
+    {
+      reason:
+        'Verifies the brand logo preview keeps object-cover parity with the Sidebar/Login/account rendering paths instead of silently switching to object-contain.',
     },
   ],
   'src/features/auth/pages/oauthFlow.component.spec.ts': [
@@ -188,10 +207,10 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the single table-container scroll surface and its mechanical accessibility class.',
     },
   ],
-  'src/shared/components/UserLocaleSelect.component.spec.ts': [
+  'src/shared/components/ActionButton.component.spec.ts': [
     {
       reason:
-        'Verifies the locale selector preserves the 40px chrome control dimensions and circular trigger contract across open/close/disabled states.',
+        'Verifies the shared action chrome (built-in action class, small-size token, caller-class merge) that the migrated call sites rely on; the DOM harness cannot compute Tailwind styles.',
     },
   ],
 }

@@ -25,10 +25,6 @@ export const ADMIN_MONITOR_PATH = '/admin/monitor'
 export const ADMIN_FEATURE_PROMPTS_PATH = '/admin/feature-prompts'
 export const ADMIN_MODELS_PATH = '/admin/models'
 export const ADMIN_SETTINGS_PATH = '/admin/settings'
-export const ADMIN_SETTINGS_GENERAL_PATH = '/admin/settings/general'
-export const ADMIN_SETTINGS_STORAGE_PATH = '/admin/settings/storage'
-export const ADMIN_SETTINGS_MAIL_PATH = '/admin/settings/mail'
-export const ADMIN_SETTINGS_SECURITY_PATH = '/admin/settings/security'
 export const ADMIN_LOGIN_PATH = '/admin/login'
 
 export function isPathUnderRoute(path: string, rootPath: string): boolean {

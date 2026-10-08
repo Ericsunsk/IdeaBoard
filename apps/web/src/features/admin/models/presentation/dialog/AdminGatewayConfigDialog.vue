@@ -141,32 +141,29 @@
 
     <!-- 弹窗底栏 -->
     <template #footer>
-      <AdminButton
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         :disabled="saving || testing"
         @click="emit('update:visible', false)"
       >
         {{ MODELS_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton
+      </ActionButton>
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         :loading="testing"
         :disabled="loading || saving || testing"
         @click="handleTestConnection"
       >
         {{ MODELS_MESSAGES.gatewayTest }}
-      </AdminButton>
-      <AdminButton
+      </ActionButton>
+      <ActionButton
         variant="default"
-        :class="adminActionButtonClass"
         :loading="saving"
         :disabled="loading || saving || testing"
         @click="handleSave"
       >
         {{ MODELS_MESSAGES.gatewayHeader }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
@@ -177,7 +174,7 @@ import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import { Check, ShieldCheck } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
-import AdminButton from '../../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
 import AdminInput from '../../../shared/components/AdminInput.vue'
 import { formatAdminDisplayError } from '../../../shared/lib/toast'
@@ -187,7 +184,6 @@ import {
   ADMIN_PROBE_OPERATOR_REASON,
   confirmSettingsSave,
 } from '../../../shared/lib/confirmSettingsSave'
-import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import { MODELS_MESSAGES } from '../pages/messages'
 import {
   createAdminGatewayResource,

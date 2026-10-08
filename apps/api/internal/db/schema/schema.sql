@@ -4549,6 +4549,10 @@ CREATE INDEX idx_payment_webhook_events_order_history
   ON payment_webhook_events (payment_order_id, stripe_created_at DESC, stripe_event_id DESC)
   WHERE payment_order_id IS NOT NULL;
 
+CREATE INDEX idx_payment_webhook_events_processing_lease
+  ON payment_webhook_events (processing_result, processed_at)
+  WHERE processing_result = 'processing';
+
 CREATE FUNCTION prevent_payment_admin_action_mutation()
 RETURNS TRIGGER AS $$
 BEGIN

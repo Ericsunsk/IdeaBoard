@@ -20,6 +20,7 @@ export const buttonVariants = cva(
         lg: 'h-10 rounded-md px-8',
         icon: 'h-9 w-9',
         compact: 'h-8 rounded-md px-3 text-xs',
+        action: 'h-9 rounded-lg px-3 text-admin-meta',
       },
     },
     defaultVariants: {

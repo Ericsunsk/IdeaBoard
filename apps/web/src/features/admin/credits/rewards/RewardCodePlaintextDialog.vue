@@ -15,17 +15,17 @@
       >
         {{ plaintext }}
       </code>
-      <AdminButton variant="outline" :class="adminActionButtonClass" @click="copy">
+      <ActionButton variant="outline" @click="copy">
         {{ REWARD_CODES_MESSAGES.plaintextCopyLabel(copied) }}
-      </AdminButton>
+      </ActionButton>
     </div>
     <AdminAlert v-if="copyError" severity="error">{{
       REWARD_CODES_MESSAGES.plaintextCopyFailed
     }}</AdminAlert>
     <template #footer>
-      <AdminButton :class="adminActionButtonClass" @click="emit('update:visible', false)">
+      <ActionButton @click="emit('update:visible', false)">
         {{ REWARD_CODES_MESSAGES.plaintextAcknowledged }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
@@ -33,10 +33,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAppClipboard } from '../../../../shared/composables/useAppClipboard'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { REWARD_CODES_MESSAGES } from './messages'
 
 const props = withDefaults(

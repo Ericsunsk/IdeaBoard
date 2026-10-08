@@ -1,8 +1,11 @@
 <template>
   <SettingEditorCard
+    :icon="Server"
     :title="SETTINGS_MESSAGES.outboundTitle"
-    :status="statusLabel"
-    :status-severity="statusSeverity"
+    :description="SETTINGS_MESSAGES.outboundDescription"
+    :status="props.plain ? undefined : statusLabel"
+    :status-severity="props.plain ? undefined : statusSeverity"
+    :plain="props.plain"
     :class="props.class"
   >
     <template #default>
@@ -10,14 +13,9 @@
         <AdminAlert v-if="error" severity="error">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ SETTINGS_MESSAGES.outboundLoadFailed }}</span>
-            <AdminButton
-              :class="adminActionButtonClass"
-              variant="outline"
-              size="small"
-              @click="refetch()"
-            >
+            <ActionButton variant="outline" @click="refetch()">
               {{ SETTINGS_MESSAGES.retry }}
-            </AdminButton>
+            </ActionButton>
           </div>
         </AdminAlert>
         <AdminAlert v-else-if="loading && !setting" severity="secondary">
@@ -47,40 +45,36 @@
     </template>
 
     <template #actions>
-      <AdminButton
-        :class="adminActionButtonClass"
-        :disabled="controlsDisabled"
-        :loading="saving"
-        @click="save"
-      >
+      <ActionButton :disabled="controlsDisabled" :loading="saving" @click="save">
         {{ SETTINGS_MESSAGES.outboundSave }}
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
-        variant="outline"
-        :disabled="controlsDisabled"
-        @click="reset"
-      >
+      </ActionButton>
+      <ActionButton variant="outline" :disabled="controlsDisabled" @click="reset">
         {{ SETTINGS_MESSAGES.reset }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </SettingEditorCard>
 </template>
 
 <script setup lang="ts">
+import { Server } from '@iconoir/vue'
 import { computed, type HTMLAttributes } from 'vue'
-import AdminButton from '../shared/components/AdminButton.vue'
+import ActionButton from '../../../shared/components/ActionButton.vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminTextarea from '../shared/components/AdminTextarea.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import SettingEditorCard from './SettingEditorCard.vue'
 import { SETTINGS_MESSAGES } from './pages/messages'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { useOutboundPolicy } from './useOutboundPolicy'
 import { useAdminOutboundPolicyFeedback } from './useSettingsFeedback'
 
-const props = defineProps<{ class?: HTMLAttributes['class'] }>()
+const props = withDefaults(
+  defineProps<{
+    class?: HTMLAttributes['class'] | undefined
+    plain?: boolean
+  }>(),
+  { class: undefined, plain: false },
+)
 
 const feedback = useAdminOutboundPolicyFeedback()
 const confirm = useAdminConfirm()
@@ -89,8 +83,8 @@ const { error, form, loading, refetch, reset, save, saving, setting, validationE
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
 const statusLabel = computed(() => {
-  if (error.value) return SETTINGS_MESSAGES.providerLoadFailed
-  if (!setting.value) return SETTINGS_MESSAGES.providerLoading
+  if (error.value) return SETTINGS_MESSAGES.settingsLoadFailed
+  if (!setting.value) return SETTINGS_MESSAGES.settingsLoading
   const count = setting.value.allow_hosts.length
   return count ? SETTINGS_MESSAGES.outboundExtraAllowed(count) : SETTINGS_MESSAGES.outboundNoneExtra
 })

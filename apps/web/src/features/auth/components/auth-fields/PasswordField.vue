@@ -43,6 +43,7 @@
 import type { HTMLAttributes } from 'vue'
 import { PasswordInput } from '@/components/ui/input'
 import AuthFieldShell from './AuthFieldShell.vue'
+import { ibFormInputIconClass } from '../../../../shared/theme/formControls'
 
 withDefaults(
   defineProps<{
@@ -53,7 +54,7 @@ withDefaults(
     fieldClass?: string
     inputClass?: HTMLAttributes['class']
     inputErrorClass?: string
-    iconClass?: string
+    iconClass?: string | undefined
     autocomplete?: string | undefined
     disabled?: boolean
     required?: boolean
@@ -65,6 +66,7 @@ withDefaults(
     fieldClass: '',
     inputClass: '',
     inputErrorClass: '',
+    iconClass: ibFormInputIconClass,
     autocomplete: undefined,
     disabled: false,
     required: true,

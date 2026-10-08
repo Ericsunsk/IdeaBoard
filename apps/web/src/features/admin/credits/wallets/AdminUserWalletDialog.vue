@@ -67,11 +67,9 @@
           </button>
         </div>
 
-        <AdminButton
+        <ActionButton
           v-if="activeTab === 'ledger'"
           :label="t('admin.common.refresh')"
-          :class="adminActionButtonClass"
-          size="small"
           variant="outline"
           :loading="walletLoading || ledgerLoading"
           :disabled="commandPending"
@@ -80,7 +78,7 @@
           <template #icon>
             <Refresh class="size-4 mr-1.5 text-muted-foreground" />
           </template>
-        </AdminButton>
+        </ActionButton>
       </div>
 
       <!-- 3. Tab 内容展示区 -->
@@ -117,10 +115,9 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { useAdminCreditsBillingOperationsFeedback } from '../shared/feedback'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
 import { useAdminCreditWalletResource, type AdminCreditLedgerTransaction } from './resource'

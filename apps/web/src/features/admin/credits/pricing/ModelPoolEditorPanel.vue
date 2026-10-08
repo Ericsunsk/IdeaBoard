@@ -20,16 +20,14 @@
             :aria-label="BILLING_PRICING_MESSAGES.poolEnabledAria(entry.modelId)"
             @update:model-value="setEnabled(index, $event)"
           />
-          <AdminButton
-            size="small"
+          <ActionButton
             variant="outline"
-            :class="adminActionButtonClass"
             :disabled="pending"
             :aria-label="BILLING_PRICING_MESSAGES.poolRemoveAria(entry.modelId)"
             @click="removeEntry(index)"
           >
             <Xmark class="size-3.5" />
-          </AdminButton>
+          </ActionButton>
         </div>
         <div class="flex items-center gap-1.5" role="group">
           <button
@@ -74,29 +72,26 @@
           {{ model.name || model.id }}
         </option>
       </select>
-      <AdminButton
-        size="small"
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         :disabled="pending || !selectedCatalogId"
         @click="addSelected"
       >
         {{ BILLING_PRICING_MESSAGES.poolAddModel }}
-      </AdminButton>
+      </ActionButton>
     </div>
     <AdminAlert v-if="catalogError" severity="error">
       {{ catalogError }}
     </AdminAlert>
-    <AdminButton
+    <ActionButton
       v-if="catalogError"
       variant="outline"
-      :class="adminActionButtonClass"
       :disabled="pending || catalogLoading"
       @click="emit('reloadCatalog')"
     >
       <Refresh class="size-4" />
       {{ BILLING_PRICING_MESSAGES.poolReload }}
-    </AdminButton>
+    </ActionButton>
     <p v-else-if="availableCatalogModels.length === 0" class="text-xs text-muted-foreground">
       {{ BILLING_PRICING_MESSAGES.poolNoCatalogModels }}
     </p>
@@ -104,16 +99,15 @@
     <AdminAlert v-if="errorMessage" severity="error">
       {{ errorMessage }}
     </AdminAlert>
-    <AdminButton
+    <ActionButton
       v-if="stale"
       variant="outline"
-      :class="adminActionButtonClass"
       :disabled="pending"
       @click="emit('reload')"
     >
       <Refresh class="size-4" />
       {{ BILLING_PRICING_MESSAGES.poolReload }}
-    </AdminButton>
+    </ActionButton>
   </div>
 </template>
 
@@ -121,9 +115,8 @@
 import { computed, ref, watch } from 'vue'
 import { Refresh, Xmark } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import {
   adminSelectTriggerClass,
   adminSelectTriggerCompactClass,

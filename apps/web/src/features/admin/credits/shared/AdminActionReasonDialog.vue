@@ -21,22 +21,15 @@
     />
 
     <template #footer="{ requestClose }">
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="loading"
-        @click="requestClose"
-      >
-        {{ CREDITS_SHARED_MESSAGES.actionReasonCancel }}
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
-        :severity="intent"
+      <AdminDialogActions
+        :cancel-label="CREDITS_SHARED_MESSAGES.actionReasonCancel"
+        :confirm-label="confirmLabel"
         :loading="loading"
-        @click="submit"
-      >
-        {{ confirmLabel }}
-      </AdminButton>
+        :cancel-disabled="loading"
+        :severity="intent"
+        @cancel="requestClose"
+        @confirm="submit"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -44,9 +37,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { validateAdminActionReason } from '../../shared/validation/actionReasonContract'
 import AdminActionReasonField from './AdminActionReasonField.vue'
 import { CREDITS_SHARED_MESSAGES } from './messages'

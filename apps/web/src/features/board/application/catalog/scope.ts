@@ -1,17 +1,14 @@
 import {
   getAuthStorageUserScope,
+  getRecoverableAuthStorageUserScope,
   subscribeAuthStorageScopeChange,
 } from '../../../../shared/utils/auth'
-import {
-  getWorkspaceSelectionStore,
-  subscribeWorkspaceSelectionChange,
-} from '../../../workspace'
+import { getWorkspaceSelectionStore, subscribeWorkspaceSelectionChange } from '../../../workspace'
 
-// Board scope (issue #894): every catalog/state cache key plus every async
-// catalog mutation is bound to User + Workspace. The workspace half resolves
-// from the `features/workspace` selection store through its public entry;
-// Board never duplicates the selection store. A missing half means "no
-// scope": readers stay empty and writers no-op instead of inferring.
+// Active User + Workspace scope gates repository views and async mutations.
+// Local cache keys may use the remembered user during transient auth loss to
+// preserve drafts. Explicit logout clears that recovery scope; neither path
+// infers a missing workspace from legacy user-only caches.
 
 export type BoardScope = {
   userScope: string | null
@@ -26,6 +23,13 @@ export type CompleteBoardScope = {
 export function getBoardScope(): BoardScope {
   return {
     userScope: getAuthStorageUserScope(),
+    workspaceId: getWorkspaceSelectionStore().getSelectedId(),
+  }
+}
+
+export function getRecoverableBoardScope(): BoardScope {
+  return {
+    userScope: getRecoverableAuthStorageUserScope(),
     workspaceId: getWorkspaceSelectionStore().getSelectedId(),
   }
 }
@@ -53,9 +57,9 @@ export function subscribeBoardScopeChange(listener: (scope: BoardScope) => void)
   }
 }
 
-/** Scoped cache key (`<prefix>.<userScope>.<workspaceId>`); null when scope is incomplete. */
+/** Local cache key; transient auth loss can retain the remembered user scope. */
 export function scopedBoardStorageKey(prefix: string, scope?: BoardScope): string | null {
-  const resolved = scope ?? getBoardScope()
+  const resolved = scope ?? getRecoverableBoardScope()
   if (!isCompleteBoardScope(resolved)) return null
   return `${prefix}.${resolved.userScope}.${resolved.workspaceId}`
 }

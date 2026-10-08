@@ -67,30 +67,26 @@
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ PAYMENT_ORDERS_MESSAGES.initialError }}</span>
-          <AdminButton
+          <ActionButton
             variant="outline"
-            size="small"
-            :class="adminActionButtonClass"
             :disabled="loading"
             @click="refreshOrders"
           >
             {{ PAYMENT_ORDERS_MESSAGES.retry }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </AdminAlert>
 
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ PAYMENT_ORDERS_MESSAGES.backgroundError }}</span>
-          <AdminButton
+          <ActionButton
             variant="outline"
-            size="small"
-            :class="adminActionButtonClass"
             :disabled="loading"
             @click="refreshOrders"
           >
             {{ PAYMENT_ORDERS_MESSAGES.retry }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </AdminAlert>
     </template>
@@ -125,6 +121,7 @@ import { Refresh } from '@iconoir/vue'
 import AdminCollectionPageShell from '../../shared/components/AdminCollectionPageShell.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
@@ -133,7 +130,7 @@ import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { requireDestructiveReason } from '../../shared/lib/confirmSettingsSave'
 import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { usePaymentOrdersFeedback } from '../useStripeSettingsFeedback'
-import { adminActionButtonClass, adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
+import { adminFramedIconButtonClass } from '../../shared/lib/uiClasses'
 import { createUniqueId } from '../../../../shared/utils/ids'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'

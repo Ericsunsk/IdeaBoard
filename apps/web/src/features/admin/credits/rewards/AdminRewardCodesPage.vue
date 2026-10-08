@@ -16,9 +16,9 @@
         @enter="searchRewardCodes"
         @clear="clearSearch"
       />
-      <AdminButton :class="adminActionButtonClass" :disabled="saving" @click="openCreateDialog">
+      <ActionButton :disabled="saving" @click="openCreateDialog">
         {{ REWARD_CODES_MESSAGES.create }}
-      </AdminButton>
+      </ActionButton>
     </template>
 
     <template #toolbar-end>
@@ -51,29 +51,25 @@
       <AdminAlert v-if="initialError" severity="error" class="m-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.initialError }}</span>
-          <AdminButton
+          <ActionButton
             variant="outline"
-            size="small"
-            :class="adminActionButtonClass"
             :disabled="loading"
             @click="refreshRewardCodes"
           >
             {{ REWARD_CODES_MESSAGES.retry }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </AdminAlert>
       <AdminAlert v-else-if="backgroundError" severity="warn" class="mx-4 mt-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>{{ REWARD_CODES_MESSAGES.backgroundError }}</span>
-          <AdminButton
+          <ActionButton
             variant="outline"
-            size="small"
-            :class="adminActionButtonClass"
             :disabled="loading"
             @click="refreshRewardCodes"
           >
             {{ REWARD_CODES_MESSAGES.retry }}
-          </AdminButton>
+          </ActionButton>
         </div>
       </AdminAlert>
     </template>
@@ -227,6 +223,7 @@ import AdminColumn from '../../shared/components/AdminColumn.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSelect from '../../shared/components/AdminSelect.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
@@ -238,7 +235,6 @@ import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import {
-  adminActionButtonClass,
   adminFramedIconButtonClass,
   adminTableClass,
   adminTableFrameClass,

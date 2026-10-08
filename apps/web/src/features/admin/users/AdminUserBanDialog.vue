@@ -54,22 +54,15 @@
           {{ USERS_MESSAGES.banFooterNote }}
         </div>
         <div :class="adminDialogFooterActionsClass">
-          <AdminButton
-            variant="outline"
-            :class="adminActionButtonClass"
-            :disabled="loading"
-            @click="$emit('cancel')"
-          >
-            {{ USERS_MESSAGES.cancel }}
-          </AdminButton>
-          <AdminButton
-            variant="destructive"
-            :class="adminActionButtonClass"
+          <AdminDialogActions
+            :cancel-label="USERS_MESSAGES.cancel"
+            :confirm-label="USERS_MESSAGES.banConfirm"
             :loading="loading"
-            @click="$emit('confirm')"
-          >
-            {{ USERS_MESSAGES.banConfirm }}
-          </AdminButton>
+            :cancel-disabled="loading"
+            confirm-variant="destructive"
+            @cancel="$emit('cancel')"
+            @confirm="$emit('confirm')"
+          />
         </div>
       </div>
     </template>
@@ -78,7 +71,7 @@
 
 <script setup lang="ts">
 import AdminBadge from '../shared/components/AdminBadge.vue'
-import AdminButton from '../shared/components/AdminButton.vue'
+import AdminDialogActions from '../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import AdminSelect from '../shared/components/AdminSelect.vue'
 import AdminTextarea from '../shared/components/AdminTextarea.vue'
@@ -86,7 +79,6 @@ import {
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
   adminDialogTitleClass,
-  adminActionButtonClass,
 } from '../shared/lib/uiClasses'
 import { USERS_MESSAGES } from './messages'
 

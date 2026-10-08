@@ -1,6 +1,8 @@
 <template>
   <SettingEditorCard
+    :icon="Headset"
     :title="M.supportTitle"
+    :description="M.supportDescription"
     :status="status"
     :status-severity="query.error.value ? 'danger' : 'secondary'"
   >
@@ -8,7 +10,7 @@
       {{ M.supportLoadFailed }}
       <AdminButton variant="outline" @click="query.refetch()">{{ M.retry }}</AdminButton>
     </AdminAlert>
-    <p v-else-if="loading" class="text-admin-body text-muted-foreground">{{ M.providerLoading }}</p>
+    <p v-else-if="loading" class="text-admin-body text-muted-foreground">{{ M.settingsLoading }}</p>
     <p v-else-if="!form.channels.length" class="text-admin-body text-muted-foreground">
       {{ M.supportEmpty }}
     </p>
@@ -88,29 +90,17 @@
         </div>
       </div>
     </div>
-    <AdminButton
-      variant="outline"
-      :class="adminActionButtonClass"
-      :disabled="disabled || form.channels.length >= 20"
-      @click="add"
-      ><Plus class="size-4" />{{ M.supportAdd }}</AdminButton
+    <ActionButton variant="outline" :disabled="disabled || form.channels.length >= 20" @click="add"
+      ><Plus class="size-4" />{{ M.supportAdd }}</ActionButton
     >
     <AdminAlert v-if="validationError" severity="error">{{ validationError }}</AdminAlert>
     <template #actions>
-      <AdminButton
-        :class="adminActionButtonClass"
-        :disabled="disabled || !isDirty"
-        :loading="saving"
-        @click="save"
-        >{{ M.save }}</AdminButton
-      >
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="disabled || !isDirty"
-        @click="reset"
-        >{{ M.reset }}</AdminButton
-      >
+      <ActionButton :disabled="disabled || !isDirty" :loading="saving" @click="save">{{
+        M.save
+      }}</ActionButton>
+      <ActionButton variant="outline" :disabled="disabled || !isDirty" @click="reset">{{
+        M.reset
+      }}</ActionButton>
     </template>
   </SettingEditorCard>
 </template>
@@ -118,16 +108,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { NavArrowDown, NavArrowUp, Plus, Trash } from '@iconoir/vue'
+import { Headset, NavArrowDown, NavArrowUp, Plus, Trash } from '@iconoir/vue'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
+import ActionButton from '../../../shared/components/ActionButton.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminSelect from '../shared/components/AdminSelect.vue'
 import AdminSwitch from '../shared/components/AdminSwitch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../shared/lib/confirmSettingsSave'
-import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { newRequestId } from '../../../shared/api/contractKernel'
 import { SUPPORT_CHANNELS_QUERY_KEY } from '../../../shared/composables/useSupportChannels'
 import SettingEditorCard from './SettingEditorCard.vue'
@@ -200,10 +190,10 @@ const { form, isDirty, reset, validationError } = lifecycle
 const disabled = computed(() => loading.value || saving.value || Boolean(query.error.value))
 const status = computed(() =>
   query.error.value
-    ? M.providerLoadFailed
+    ? M.settingsLoadFailed
     : query.data.value
       ? M.supportCount(query.data.value.channels.filter((channel) => channel.enabled).length)
-      : M.providerLoading,
+      : M.settingsLoading,
 )
 const kindOptions = supportChannelKinds.map((kind) => ({
   value: kind,

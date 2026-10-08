@@ -19,15 +19,14 @@
         <p class="mt-2 text-admin-body text-muted-foreground">
           {{ CREDIT_HEALTH_MESSAGES.loadFailedHint }}
         </p>
-        <AdminButton
+        <ActionButton
           class="mt-5"
           variant="outline"
-          :class="adminActionButtonClass"
           :loading="resource.query.isFetching.value"
           @click="resource.query.refetch()"
         >
           {{ CREDIT_HEALTH_MESSAGES.reload }}
-        </AdminButton>
+        </ActionButton>
       </div>
 
       <div v-else-if="health && presentation" class="min-w-0">
@@ -58,15 +57,13 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <AdminButton
+            <ActionButton
               variant="outline"
-              :class="adminActionButtonClass"
               @click="historyDialogVisible = true"
             >
               {{ CREDIT_HEALTH_MESSAGES.history }}
-            </AdminButton>
-            <AdminButton
-              :class="adminActionButtonClass"
+            </ActionButton>
+            <ActionButton
               :disabled="Boolean(health.active_run) || resource.startPending.value"
               :loading="resource.startPending.value"
               @click="startReconciliation"
@@ -74,7 +71,7 @@
               {{
                 health.active_run ? CREDIT_HEALTH_MESSAGES.checking : CREDIT_HEALTH_MESSAGES.recheck
               }}
-            </AdminButton>
+            </ActionButton>
           </div>
         </div>
 
@@ -172,10 +169,10 @@ import { CheckCircle, Clock, WarningTriangle, XmarkCircle } from '@iconoir/vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/toast'
 import {
-  adminActionButtonClass,
   adminDashboardRootClass,
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'

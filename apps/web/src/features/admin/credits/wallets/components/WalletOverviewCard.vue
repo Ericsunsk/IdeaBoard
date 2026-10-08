@@ -37,21 +37,17 @@
 
       <!-- 快捷操作按钮组 -->
       <div class="flex items-center gap-2">
-        <AdminButton
+        <ActionButton
           :label="t('admin.wallet.grant')"
-          :class="adminActionButtonClass"
-          size="small"
           :disabled="commandPending || !hasWallet"
           @click="emit('openCommand', 'grant')"
         >
           <template #icon>
             <Plus class="size-4 mr-1.5" />
           </template>
-        </AdminButton>
-        <AdminButton
+        </ActionButton>
+        <ActionButton
           :label="t('admin.wallet.deduct')"
-          :class="adminActionButtonClass"
-          size="small"
           severity="danger"
           outlined
           :disabled="commandPending || !hasWallet || availableCredits < 1"
@@ -60,7 +56,7 @@
           <template #icon>
             <Minus class="size-4 mr-1.5" />
           </template>
-        </AdminButton>
+        </ActionButton>
       </div>
     </div>
 
@@ -96,9 +92,8 @@
 import { useI18n } from 'vue-i18n'
 import { Minus, Plus, WarningTriangle } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
-import AdminButton from '../../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import AdminStatusPill from '../../../shared/components/AdminStatusPill.vue'
-import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 
 type WalletRestriction = {

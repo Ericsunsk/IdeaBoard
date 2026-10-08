@@ -67,23 +67,15 @@
     </div>
 
     <template #footer>
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="isBusy"
-        @click="close"
-      >
-        {{ BILLING_PRICING_MESSAGES.cancel }}
-      </AdminButton>
-
-      <AdminButton
-        :class="adminActionButtonClass"
+      <AdminDialogActions
+        :cancel-label="BILLING_PRICING_MESSAGES.cancel"
+        :confirm-label="BILLING_PRICING_MESSAGES.save"
         :loading="isBusy"
         :disabled="isBusy || (supportsPool && poolSaveDisabled)"
-        @click="handleSave"
-      >
-        {{ BILLING_PRICING_MESSAGES.save }}
-      </AdminButton>
+        :cancel-disabled="isBusy"
+        @cancel="close"
+        @confirm="handleSave"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -91,11 +83,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { formatLocaleNumber } from '../../../../shared/i18n/formatters'
 import { OUTPUT_RESOLUTION_OPTIONS } from '../../../../shared/domain/generationContract'
 import type {

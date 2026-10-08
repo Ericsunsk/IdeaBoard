@@ -1,7 +1,11 @@
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, within } from '../../../../test/render'
+import { mockAppToast } from '../../../../test/toast'
 import AdminStoragePage from './AdminStoragePage.vue'
+
+const storageMocks = vi.hoisted(() => ({ fetchProfiles: vi.fn() }))
+vi.mock('../../../../shared/composables/useAppToast')
 
 vi.mock('../../shared/logos/brandLogoResource', () => ({
   useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
@@ -30,7 +34,7 @@ vi.mock('../resource', () => ({
         ],
       },
     ]),
-    fetchProfiles: vi.fn().mockResolvedValue([
+    fetchProfiles: storageMocks.fetchProfiles.mockResolvedValue([
       {
         id: 'storage-1',
         name: '生产环境 OSS',
@@ -38,7 +42,7 @@ vi.mock('../resource', () => ({
         enabled: true,
         is_current: true,
         builtin: false,
-        secretConfigured: true,
+        secret_configured: true,
         config: {
           endpoint: 'oss-cn-shanghai.aliyuncs.com',
           bucket_name: 'prod-bucket',
@@ -53,11 +57,21 @@ vi.mock('../resource', () => ({
         enabled: false,
         is_current: false,
         builtin: false,
-        secretConfigured: true,
+        secret_configured: true,
         config: {
           endpoint: '127.0.0.1:9000',
           bucket_name: 'backup-bucket',
         },
+      },
+      {
+        id: 'storage-local',
+        name: '内置本地存储',
+        provider: 'local',
+        enabled: true,
+        is_current: false,
+        builtin: true,
+        secret_configured: false,
+        config: {},
       },
     ]),
     applyProfile: vi.fn().mockResolvedValue({ message: 'applied' }),
@@ -76,6 +90,39 @@ const Harness = defineComponent({
 describe('AdminStoragePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockAppToast()
+  })
+
+  it('disables protected switches with an explanation while allowing ordinary toggles', async () => {
+    renderWithUser(Harness)
+
+    const currentSwitch = await screen.findByRole('switch', { name: '启用 生产环境 OSS' })
+    expect(currentSwitch).toBeDisabled()
+    expect(currentSwitch).toHaveAttribute('aria-description', '当前存储不能停用，请先切换到其他存储')
+    const localSwitch = screen.getByRole('switch', { name: '启用 内置本地存储' })
+    expect(localSwitch).toBeDisabled()
+    expect(localSwitch).toHaveAttribute('aria-description', '内置本地存储始终启用')
+    expect(screen.getByRole('switch', { name: '启用 备用 MinIO' })).not.toBeDisabled()
+  })
+
+  it('recovers from an initial load failure without losing a sibling settings draft', async () => {
+    storageMocks.fetchProfiles.mockRejectedValueOnce(new Error('load failed'))
+    const DraftHarness = defineComponent({
+      components: { AdminStoragePage },
+      data: () => ({ draft: 'existing draft' }),
+      template: '<input v-model="draft" aria-label="其他设置草稿" /><AdminStoragePage />',
+    })
+    const { user } = renderWithUser(DraftHarness)
+
+    const retry = await screen.findByRole('button', { name: '重试' })
+    expect(screen.getByText('加载存储配置失败')).toBeInTheDocument()
+    const draft = screen.getByRole('textbox', { name: '其他设置草稿' })
+    await user.type(draft, ' edited')
+    await user.click(retry)
+
+    expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
+    expect(draft).toHaveValue('existing draft edited')
   })
 
   it('renders storage cards with active badge and parameters grid', async () => {
@@ -88,6 +135,8 @@ describe('AdminStoragePage', () => {
     expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
     expect(screen.getByText('使用中')).toBeInTheDocument()
     expect(screen.getByText('备用 MinIO')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '启用' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: '启用 生产环境 OSS' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '新增存储' })).toBeInTheDocument()
   })
 
@@ -99,12 +148,14 @@ describe('AdminStoragePage', () => {
     })
 
     expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
+    // Table rows keep their own apply action; the dialog only has cancel/save.
+    expect(screen.getAllByRole('button', { name: '设为当前' }).length).toBeGreaterThan(0)
     const createBtn = screen.getByRole('button', { name: '新增存储' })
     await user.click(createBtn)
 
-    const storageDialog = await screen.findByRole('dialog', { name: '添加对象存储' })
+    const storageDialog = await screen.findByRole('dialog', { name: '新增存储' })
     expect(
-      within(storageDialog).getByText('添加对象存储', { selector: 'h2:not(.sr-only)' }),
+      within(storageDialog).getByText('新增存储', { selector: 'h2:not(.sr-only)' }),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '阿里云 OSS' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cloudflare R2' })).toBeInTheDocument()
@@ -119,6 +170,40 @@ describe('AdminStoragePage', () => {
     expect(await screen.findByLabelText('Endpoint')).toBeInTheDocument()
     expect(screen.getByLabelText('Bucket 名称')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: '设为当前' }).length).toBeGreaterThan(0)
+    expect(
+      within(storageDialog).queryByRole('button', { name: '设为当前' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders rows without search, filter, refresh, or count strip', async () => {
+    renderWithUser(Harness, {
+      global: {
+        plugins: [],
+      },
+    })
+
+    expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '刷新存储' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('搜索存储对象')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '筛选存储状态' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/共 \d+ 个存储服务/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the create dialog free of the row-level enabled switch', async () => {
+    const { user } = renderWithUser(Harness, {
+      global: {
+        plugins: [],
+      },
+    })
+
+    expect(await screen.findByText('生产环境 OSS')).toBeInTheDocument()
+    // Enabling stays on the table row switch.
+    expect(screen.getByRole('switch', { name: '启用 生产环境 OSS' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '新增存储' }))
+
+    const storageDialog = await screen.findByRole('dialog', { name: '新增存储' })
+    expect(
+      within(storageDialog).queryByRole('switch', { name: '存储启用状态' }),
+    ).not.toBeInTheDocument()
   })
 })

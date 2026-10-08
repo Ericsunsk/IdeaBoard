@@ -38,6 +38,100 @@ afterEach(() => {
 })
 
 describe('admin storage workspace facade', () => {
+  it('exposes a recoverable load failure and clears it on retry', async () => {
+    const error = new Error('load failed')
+    mockResource.fetchProfiles.mockRejectedValueOnce(error)
+    const { workspace, feedback } = createWorkspace()
+
+    await workspace.loadData()
+    expect(workspace.loadFailed.value).toBe(true)
+    expect(workspace.storages.value).toEqual([])
+    expect(feedback.loadProfilesFailed).toHaveBeenCalledWith(error)
+
+    await workspace.loadData()
+    expect(workspace.loadFailed.value).toBe(false)
+    expect(workspace.storages.value).toHaveLength(1)
+    expect(workspace.loading.value).toBe(false)
+  })
+
+  it.each([false, true])('toggles enabled state to %s without overwriting masked secrets', async (enabled) => {
+    mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile({ enabled: !enabled })])
+    const { workspace, feedback, confirm } = createWorkspace()
+    await workspace.loadData()
+
+    await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, enabled)
+
+    expect(confirm.confirm).toHaveBeenCalledOnce()
+    expect(mockResource.saveProfile).toHaveBeenCalledWith(
+      {
+        id: 'profile-1',
+        payload: {
+          name: '对象存储',
+          provider: 's3-compatible',
+          enabled,
+          config: { bucket_name: 'images' },
+        },
+      },
+      { operatorReason: 'storage review' },
+    )
+    expect(feedback.saveDraftSucceeded).toHaveBeenCalledWith('saved')
+    expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(2)
+    expect(workspace.togglingId.value).toBeNull()
+  })
+
+  it('captures toggle failures, leaves the switch state unchanged, and permits retry', async () => {
+    const error = new Error('toggle failed')
+    const { workspace, feedback } = createWorkspace()
+    await workspace.loadData()
+    mockResource.saveProfile.mockRejectedValueOnce(error)
+
+    await expect(
+      workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false),
+    ).resolves.toBeUndefined()
+
+    expect(feedback.saveDraftFailed).toHaveBeenCalledWith(error)
+    expect(feedback.saveDraftSucceeded).not.toHaveBeenCalled()
+    expect(workspace.storages.value[0]?.enabled).toBe(true)
+    expect(workspace.togglingId.value).toBeNull()
+    expect(mockResource.fetchProfiles).toHaveBeenCalledTimes(1)
+
+    await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
+    expect(feedback.saveDraftSucceeded).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { is_current: true },
+    { builtin: true, provider: 'local' },
+  ])('rejects attempts to disable protected storage %j', async (overrides) => {
+    mockResource.fetchProfiles.mockResolvedValueOnce([makeProfile(overrides)])
+    const { workspace, confirm } = createWorkspace()
+    await workspace.loadData()
+
+    await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
+
+    expect(confirm.confirm).not.toHaveBeenCalled()
+    expect(mockResource.saveProfile).not.toHaveBeenCalled()
+  })
+
+  it('serializes toggles and treats confirmation cancellation as a no-op', async () => {
+    const { workspace, feedback, confirm } = createWorkspace()
+    await workspace.loadData()
+    const confirmation = createDeferred<boolean>()
+    confirm.confirm.mockReturnValueOnce(confirmation.promise)
+
+    const toggle = workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
+    expect(workspace.togglingId.value).toBe('profile-1')
+    await workspace.toggleEnabled({ id: 'profile-1', name: '对象存储' }, false)
+    expect(confirm.confirm).toHaveBeenCalledOnce()
+
+    confirmation.resolve(false)
+    await toggle
+    expect(workspace.togglingId.value).toBeNull()
+    expect(mockResource.saveProfile).not.toHaveBeenCalled()
+    expect(feedback.saveDraftFailed).not.toHaveBeenCalled()
+    expect(feedback.saveDraftSucceeded).not.toHaveBeenCalled()
+  })
+
   it('loads providers and profiles into masked card view models', async () => {
     const { workspace } = createWorkspace()
 

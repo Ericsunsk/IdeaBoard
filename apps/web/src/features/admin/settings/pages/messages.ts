@@ -1,18 +1,14 @@
 // Colocated admin messages for the settings pages (zh-only, no `t()` wrapping).
 //
-// Copy Policy (`shared/CONTEXT.md`): admin/ops surfaces keep their literals next
-// to the page that owns them instead of locale bundles. Toast literals stay in
-// `useSettingsFeedback.ts` next to the feedback factory; card/table/layout copy
-// for `AdminMailConfigCard.vue` / `AdminOutboundPolicyCard.vue` /
-// `AdminSearchProviderCard.vue` / `components/AdminSettingsTable.vue` /
-// `AdminSettingsLayout.vue` lives here; lifecycle copy stays in `use*Settings.ts`;
-// search-provider test-state labels stay in the `TEST_STATE_META` map in
-// `AdminSearchProviderCard.vue`.
+// Copy Policy (`shared/CONTEXT.md`): admin/ops literals stay beside their owner
+// instead of locale bundles. Toast literals stay in `useSettingsFeedback.ts`;
+// card copy lives here; lifecycle copy stays in `use*Settings.ts`;
+// search-provider test-state labels stay in `TEST_STATE_STYLE` in
+// `AdminImageProvidersTable.vue`.
 
 export const SETTINGS_MESSAGES = {
   supportTitle: '客服渠道',
   supportDescription: '用户菜单中的客服渠道与二维码',
-  supportConfigured: (count: number) => `共 ${count} 个渠道`,
   supportName: '渠道名称',
   supportKind: '渠道类型',
   supportUrl: '渠道链接',
@@ -37,17 +33,9 @@ export const SETTINGS_MESSAGES = {
   supportLoadFailed: '读取客服渠道失败',
   supportSave: '保存客服渠道',
   supportSaveConfirm: '确定保存客服渠道吗？该操作将记录操作人与原因。',
-  // General page table shell.
-  siteTitle: '网站设置',
-  siteSubtitle: '站点名称、品牌标识与图片搜索供应商配置',
-  siteTableAria: '网站设置列表',
-  siteTableScrollAria: '网站设置列表横向滚动区域',
   // Branding card.
   brandingTitle: '站点设置',
   brandingDescription: '站点名称与主品牌 Logo 标识',
-  customLogo: '自定义 Logo',
-  defaultBrand: '默认标识',
-  logoLabel: '站点 Logo',
   uploadLogo: '上传站点 Logo',
   clearLogo: '清除 Logo',
   logoHint: '支持 PNG、SVG、JPG，透明底为佳',
@@ -56,87 +44,39 @@ export const SETTINGS_MESSAGES = {
   save: '保存',
   reset: '重置',
   retry: '重试',
-  defaultProjectName: '默认 (IdeaBoard)',
-  brandingSummary: (projectName: string, logoState: string) =>
-    `名称: ${projectName} · Logo: ${logoState}`,
-  logoConfigured: '已配置',
-  logoUnset: '默认',
   // Search-provider rows.
-  searchPassed: '连接正常，可启用或停用',
-  searchFailedHint: '上次连接测试失败，请检查后重试',
-  searchUntested: '尚未通过连接测试，启用前需先测试',
-  imageSourceTitle: (providerLabel: string) => `${providerLabel} 图片源`,
-  imageSourceDescription: (providerLabel: string) => `${providerLabel} 官方 API 接入与可用状态`,
-  providerLoadFailed: '加载失败',
-  providerLoading: '加载中',
-  providerConfigLoadFailed: '读取供应商配置失败',
-  providerConfigLoading: '正在读取供应商配置',
+  imageLibraryTitle: '图片库',
+  imageLibrarySubtitle: '外部图片搜索与素材供应商配置',
+  providerColumn: '供应商',
+  apiKeyColumn: 'API Key',
+  settingsLoadFailed: '加载失败',
+  settingsLoading: '加载中',
   providerEnabled: '已启用',
   providerDisabled: '已停用',
-  providerUnconfigured: '未配置',
-  apiKeyMissing: '尚未配置 API Key',
   searchProvidersLoadFailed: '加载图片搜索供应商配置失败',
   // Mail page.
   mailTitle: '邮件服务',
   mailSubtitle: 'SMTP 事务邮件发送服务与连通性测试',
-  mailTableAria: '邮件服务设置列表',
-  mailTableScrollAria: '邮件服务设置列表横向滚动区域',
-  mailRowTitle: '邮件发送',
-  mailRowDescription: 'SMTP 事务邮件发送服务与测试',
-  mailRowStatus: '邮件配置',
-  mailRowSummary: '配置发件人、发件邮箱、密码、端口与邮件连通性测试',
   // Security page.
-  securityTitle: '安全与网络',
-  securitySubtitle: '用户准入限制、API 访问速率与私网出网策略',
-  securityTableAria: '安全与网络设置列表',
-  securityTableScrollAria: '安全与网络设置列表横向滚动区域',
-  quickToggleRegistration: '快速切换开放注册',
   registrationTitle: '注册准入与 API 限流',
   registrationDescription: '开放注册开关与全局请求速率保护',
   registrationOpen: '开放注册',
-  registrationClosed: '关闭注册',
   registrationHint: '允许新用户自行注册账号；关闭后仅系统管理员可创建用户',
   maxRequestsLabel: '最大请求 (次)',
   windowSecondsLabel: '窗口周期 (秒)',
-  registrationSummary: (access: string, maxRequests: number, windowSeconds: number) =>
-    `准入: ${access} · 限流: 最大 ${maxRequests} 次 / ${windowSeconds} 秒`,
   outboundTitle: '私有地址访问',
   outboundDescription: '安全出网私有网络与专有主机放行白名单',
-  outboundStatus: '私网放行策略',
-  outboundSummary: '配置允许服务端直接发起的内部 IP / 域名访问策略',
   // Storage upload section.
-  uploadSectionAria: '上传并发设置',
   uploadTitle: '上传并发设置',
   uploadSubtitle: '媒体资产文件并发上传连接数上限控制',
-  paramCount: (count: number) => `共 ${count} 个参数配置`,
-  uploadTableAria: '上传并发设置列表',
-  uploadTableScrollAria: '上传并发设置列表横向滚动区域',
   emptyConfigs: '暂无配置项',
-  itemColumn: '配置项',
-  keyColumn: '参数键名',
-  rangeColumn: '取值范围',
-  defaultColumn: '默认值',
-  concurrentColumn: '并发数设置',
-  statusColumn: '状态',
+  enableColumn: '启用',
   actionsColumn: '操作',
   concurrentLimitAria: '上传并发上限',
   tasksUnit: '任务',
-  modifiedStatus: '已修改',
-  activeStatus: '已生效',
   uploadRowTitle: '上传并发',
   uploadRowDescription: '媒体资产文件并发上传连接数上限',
   // Settings table shell.
-  tableExpandAll: (expanded: boolean) => (expanded ? '全部收起' : '全部展开'),
-  tableModuleColumn: '设置模块',
-  tableSummaryColumn: '当前配置',
-  tableQuickSwitchColumn: '快速切换',
-  tableRowAction: (expanded: boolean) => (expanded ? '收起' : '配置'),
-  // Settings sub-navigation.
-  navGeneral: '网站设置',
-  navStorage: '存储配置',
-  navMail: '邮件服务',
-  navSecurity: '安全与网络',
-  // Mail card.
   mailLoading: '正在加载邮件配置…',
   mailFromNameLabel: '发件人名称',
   mailFromEmailLabel: '发件人 Email',
@@ -145,7 +85,7 @@ export const SETTINGS_MESSAGES = {
   mailTestHint: '保存后发送一封真实 Test Email 以启用邮件发送。',
   mailSendTest: '发送 Test Email',
   mailDelete: '删除配置',
-  mailSave: '保存邮件配置',
+  mailSave: '保存',
   mailSaveMessage: '确定保存邮件发送配置吗？该操作将记录操作人与原因。',
   mailDeleteTitle: '删除邮件配置',
   mailDeleteMessage: '确定删除邮件发送配置吗？删除后事务邮件将不可用。该操作将记录操作人与原因。',
@@ -163,23 +103,19 @@ export const SETTINGS_MESSAGES = {
   outboundLoading: '正在加载私有地址访问策略…',
   outboundHostsLabel: '允许访问的私有主机',
   outboundHostsHint: '每行一个 hostname、IP 或 host:port。公网 Endpoint 无需添加。',
-  outboundSave: '保存访问策略',
+  outboundSave: '保存',
   outboundExtraAllowed: (count: number) => `已额外放行 ${count} 项`,
   outboundNoneExtra: '未额外放行',
   // Search-provider card.
   searchApiKeyConfigured: 'API Key 已配置',
-  searchApiKeyMissing: 'API Key 未配置',
   searchApiKeyLabel: (providerLabel: string) => `${providerLabel} API Key`,
-  searchApiKeyHint: '已配置时留空即可保持不变，输入新 Key 后需重新保存并测试。',
   searchApiKeyRequired: '请输入 API Key 后再保存',
   searchFailureCategory: (category: string) => `失败分类：${category}`,
   searchTestedAt: (hasFailureCategory: boolean, formattedAt: string) =>
     `${hasFailureCategory ? ' · ' : ''}测试时间：${formattedAt}`,
   searchLastTestPassed: (formattedAt: string) => `上次测试通过：${formattedAt}`,
   searchTestConnection: '测试连接',
-  searchSaveKey: '保存 Key',
-  searchEnable: '启用',
-  searchDisable: '停用',
+  searchSaveKey: '保存',
   searchEnableState: (enabled: boolean) => (enabled ? '启用' : '停用'),
   searchSaveKeyTitle: (providerLabel: string) => `保存 ${providerLabel} API Key`,
   searchSaveKeyMessage:
@@ -191,7 +127,6 @@ export const SETTINGS_MESSAGES = {
   searchToggleEnableMessage: '启用后该供应商将承接图片搜索流量。该操作将记录操作人与原因。',
   searchToggleDisableMessage: '停用后该供应商不再承接图片搜索流量。该操作将记录操作人与原因。',
   searchToggleFailed: (enabled: boolean) => (enabled ? '启用失败' : '停用失败'),
-  searchSequenceApiKeyMissing: '先输入 API Key 并保存。',
   searchSequenceKeyChanged: 'Key 已修改，先保存再测试。',
   searchSequenceTestFirst: '保存后请先测试连接，通过后才能启用。',
   searchSequenceReady: '连接正常，可以启用或停用。',

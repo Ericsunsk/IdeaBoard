@@ -9,20 +9,26 @@
     :description="STORAGE_MESSAGES.editorDescription"
     size="form"
     content-layout="scrollable"
-    :busy="saving || savingAndApplying"
+    :busy="saving"
     @update:visible="emit('update:visible', $event)"
   >
     <template #header>
-      <div class="flex w-full min-w-0 items-center justify-between gap-3 pr-6">
+      <div v-if="editorMode === 'create'">
+        <h2 class="m-0 text-admin-title-sm font-bold text-foreground">
+          {{ STORAGE_MESSAGES.editorCreateTitle }}
+        </h2>
+      </div>
+
+      <div v-else class="flex w-full min-w-0 items-center justify-between gap-3 pr-6">
         <div class="flex items-center gap-3">
           <button
             type="button"
             :class="[adminLogoButtonClass, 'size-11 p-2 shrink-0 rounded-xl shadow-xs']"
-            :title="editorMode === 'edit' ? STORAGE_MESSAGES.switchLogoTitle : undefined"
-            :aria-label="editorMode === 'edit' ? STORAGE_MESSAGES.switchLogoAria : undefined"
+            :title="STORAGE_MESSAGES.switchLogoTitle"
+            :aria-label="STORAGE_MESSAGES.switchLogoAria"
             :data-control-state="activeLogoTargetId === form.id ? 'selected' : 'idle'"
             :aria-expanded="activeLogoTargetId === form.id ? 'true' : 'false'"
-            @click="editorMode === 'edit' && emit('open-logo-picker', $event)"
+            @click="emit('open-logo-picker', $event)"
           >
             <img
               v-if="dialogVendorLogo"
@@ -38,14 +44,10 @@
           </button>
           <div>
             <h2 class="m-0 text-admin-title-sm font-bold text-foreground">
-              {{ editorMode === 'create' ? STORAGE_MESSAGES.editorCreateTitle : form.name }}
+              {{ form.name }}
             </h2>
             <p class="m-0 text-admin-caption text-muted-foreground">
-              {{
-                editorMode === 'create'
-                  ? STORAGE_MESSAGES.editorCreateSubtitle
-                  : STORAGE_MESSAGES.editorProviderSubtitle(providerLabel(form.provider))
-              }}
+              {{ STORAGE_MESSAGES.editorProviderSubtitle(providerLabel(form.provider)) }}
             </p>
           </div>
         </div>
@@ -109,36 +111,6 @@
 
       <!-- 3. Tab 1: 基础与凭据 (或本地存储默认视图) -->
       <template v-if="textFields.length === 0 || activeConfigTab === 'basic'">
-        <!-- 启用状态开关卡片 -->
-        <div
-          class="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3"
-        >
-          <span class="text-admin-body font-semibold text-foreground">{{
-            STORAGE_MESSAGES.editorEnableLabel
-          }}</span>
-          <div class="flex items-center gap-2.5">
-            <span
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
-              :class="
-                form.enabled
-                  ? 'bg-success-soft text-success'
-                  : 'bg-muted text-muted-foreground border border-border'
-              "
-            >
-              <span
-                class="size-1.5 rounded-full"
-                :class="form.enabled ? 'bg-success animate-pulse' : 'bg-muted-foreground'"
-              />
-              {{ STORAGE_MESSAGES.editorEnableState(form.enabled) }}
-            </span>
-            <AdminSwitch
-              :model-value="form.enabled"
-              :aria-label="STORAGE_MESSAGES.editorEnableAria"
-              @update:model-value="emit('update-form-field', 'enabled', Boolean($event))"
-            />
-          </div>
-        </div>
-
         <!-- 存储名称 -->
         <AdminFormField :label="STORAGE_MESSAGES.editorNameLabel" for="admin-storage-name" required>
           <AdminInput
@@ -258,32 +230,15 @@
     </div>
 
     <template #footer>
-      <AdminButton
-        :class="adminActionButtonClass"
-        variant="outline"
-        :disabled="saving || savingAndApplying"
-        @click="emit('cancel')"
-      >
-        {{ STORAGE_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton
-        v-if="!form.isCurrent"
-        :class="adminActionButtonClass"
-        variant="outline"
+      <AdminDialogActions
+        :cancel-label="STORAGE_MESSAGES.cancel"
+        :confirm-label="STORAGE_MESSAGES.save"
         :loading="saving"
-        :disabled="savingAndApplying"
-        @click="emit('save-draft')"
-      >
-        {{ STORAGE_MESSAGES.save }}
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
-        :loading="savingAndApplying"
-        :disabled="saving"
-        @click="emit('save-and-apply')"
-      >
-        {{ STORAGE_MESSAGES.editorSaveApply(form.isCurrent) }}
-      </AdminButton>
+        :cancel-disabled="saving"
+        confirm-variant="primary"
+        @cancel="emit('cancel')"
+        @confirm="emit('save-draft')"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -293,12 +248,12 @@ import { computed, ref, watch } from 'vue'
 import { DatabaseExport } from '@iconoir/vue'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import {
-  adminActionButtonClass,
   adminLogoButtonClass,
   adminTextButtonClass,
 } from '../../shared/lib/uiClasses'
@@ -333,7 +288,6 @@ const props = defineProps<{
   switchFields: StorageProviderField[]
   bucketDomains: string[]
   saving: boolean
-  savingAndApplying: boolean
   fetching: boolean
   activeLogoTargetId?: string | null | undefined
   configTextValue: (key: string) => string
@@ -347,10 +301,9 @@ const emit = defineEmits<{
   'update-config-value': [key: string, value: string | boolean]
   'fetch-bucket-domains': []
   'save-draft': []
-  'save-and-apply': []
   cancel: []
   'open-logo-picker': [event: Event]
-  'update-form-field': [field: 'name' | 'enabled', value: string | boolean]
+  'update-form-field': [field: 'name', value: string | boolean]
 }>()
 
 const activeConfigTab = ref<StorageConfigTab>('basic')

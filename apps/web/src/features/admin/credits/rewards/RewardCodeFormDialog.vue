@@ -164,24 +164,15 @@
     </form>
 
     <template #footer>
-      <AdminButton
-        variant="outline"
-        type="button"
-        :class="adminActionButtonClass"
-        :disabled="pending"
-        @click="close"
-      >
-        {{ t('admin.common.cancel') }}
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
-        type="button"
+      <AdminDialogActions
+        :cancel-label="t('admin.common.cancel')"
+        :confirm-label="isEditing ? t('admin.common.saveChanges') : t('admin.rewardCode.createTitle')"
         :loading="pending"
         :disabled="pending"
-        @click="submit"
-      >
-        {{ isEditing ? t('admin.common.saveChanges') : t('admin.rewardCode.createTitle') }}
-      </AdminButton>
+        :cancel-disabled="pending"
+        @cancel="close"
+        @confirm="submit"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -194,11 +185,11 @@ import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminNumberInput from '../../shared/components/AdminNumberInput.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { createUniqueId } from '../../../../shared/utils/ids'
 import type { RewardCode, UpdateRewardCodeInput } from './resource'
 import { generateRewardCode } from './rewardCodeGenerator'

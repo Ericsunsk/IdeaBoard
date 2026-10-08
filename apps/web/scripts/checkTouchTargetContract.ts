@@ -212,6 +212,13 @@ const RULES: Rule[] = [
     fix: 'carry `hit-target-drag` (11px dot, keyboard-operable; a full 32px overlay would steal neighbouring grabs)',
   },
   {
+    kind: 'required',
+    label: 'admin settings section navigation',
+    rel: 'features/admin/settings/components/AdminSettingsOnThisPage.vue',
+    pattern: /<button\b[^>]*\bclass="[^"]*\bmin-h-8\b/,
+    fix: 'keep `min-h-8` on the section navigation button',
+  },
+  {
     // Was `opt-in` on the 11px marker width; the transparent button box grew to
     // the AA floor instead, because both pseudos already paint the marker.
     kind: 'required',

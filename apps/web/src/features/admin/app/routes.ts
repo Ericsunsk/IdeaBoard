@@ -4,7 +4,6 @@ import type { AdminNavigationKey } from './navigationMeta'
 import {
   ADMIN_CREDIT_PRICING_PATH,
   ADMIN_ROOT_PATH,
-  ADMIN_SETTINGS_GENERAL_PATH,
 } from '../../../shared/constants/routePaths'
 
 const adminPageComponents = {
@@ -14,7 +13,7 @@ const adminPageComponents = {
   monitor: () => import('../monitor/presentation/pages/AdminMonitorPage.vue'),
   models: () => import('../models/presentation/pages/AdminModelsPage.vue'),
   'feature-prompts': () => import('../prompts/pages/AdminPromptConfigPage.vue'),
-  settings: () => import('../settings/AdminSettingsLayout.vue'),
+  settings: () => import('../settings/pages/AdminSettingsUnifiedPage.vue'),
 } satisfies Record<AdminNavigationKey, RouteRecordRaw['component']>
 
 export const adminRoutes: RouteRecordRaw[] = [
@@ -73,35 +72,15 @@ export const adminRoutes: RouteRecordRaw[] = [
       },
       {
         path: 'settings',
+        name: 'AdminSettings',
         component: adminPageComponents['settings'],
-        meta: { requiresAuth: true, title: '系统设置', hidePageHeader: true },
-        children: [
-          { path: '', redirect: ADMIN_SETTINGS_GENERAL_PATH },
-          {
-            path: 'general',
-            name: 'AdminSettingsGeneral',
-            component: () => import('../settings/pages/AdminSettingsGeneralPage.vue'),
-            meta: { requiresAuth: true, title: '网站设置' },
-          },
-          {
-            path: 'storage',
-            name: 'AdminSettingsStorage',
-            component: () => import('../settings/pages/AdminSettingsStoragePage.vue'),
-            meta: { requiresAuth: true, title: '存储配置' },
-          },
-          {
-            path: 'mail',
-            name: 'AdminSettingsMail',
-            component: () => import('../settings/pages/AdminSettingsMailPage.vue'),
-            meta: { requiresAuth: true, title: '邮件服务' },
-          },
-          {
-            path: 'security',
-            name: 'AdminSettingsSecurity',
-            component: () => import('../settings/pages/AdminSettingsSecurityPage.vue'),
-            meta: { requiresAuth: true, title: '安全与网络' },
-          },
-        ],
+        meta: { requiresAuth: true, title: '系统设置', fullWidth: true, hidePageHeader: true },
+      },
+      // 旧子路径兼容：合并前的 /admin/settings/{general,storage,mail,security}
+      // 书签重定向到统一设置页，避免 404。
+      {
+        path: 'settings/:pathMatch(.*)*',
+        redirect: { name: 'AdminSettings' },
       },
     ],
   },

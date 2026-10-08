@@ -183,13 +183,12 @@
     </AdminTablePanel>
 
     <template #footer>
-      <AdminButton
+      <ActionButton
         variant="outline"
-        :class="adminActionButtonClass"
         @click="emit('update:visible', false)"
       >
         {{ REWARD_CODES_MESSAGES.close }}
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
@@ -206,6 +205,7 @@ import type {
 } from '../../shared/components/AdminTable.vue'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminSpinner from '../../shared/components/AdminSpinner.vue'
 import AdminTable from '../../shared/components/AdminTable.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
@@ -214,7 +214,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { formatAdminDateTimeWithSeconds } from '../shared/format'
-import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/uiClasses'
+import { adminTextButtonClass } from '../../shared/lib/uiClasses'
 import type { RewardCode } from './resource'
 import { REWARD_CODES_MESSAGES } from './messages'
 import {

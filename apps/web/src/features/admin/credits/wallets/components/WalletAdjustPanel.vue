@@ -87,21 +87,19 @@
       </div>
 
       <div class="flex items-center justify-end gap-2.5 pt-1">
-        <AdminButton
+        <ActionButton
           :label="t('admin.common.cancel')"
           type="button"
-          :class="adminActionButtonClass"
           variant="outline"
           :disabled="commandPending"
           @click="emit('cancel')"
         />
-        <AdminButton
+        <ActionButton
           :label="
             activeTab === 'refund'
               ? t('admin.wallet.reviewRefund')
               : t('admin.wallet.reviewOperation')
           "
-          :class="adminActionButtonClass"
           type="submit"
           :variant="activeTab === 'grant' ? 'default' : 'destructive'"
           :loading="commandPending"
@@ -114,11 +112,10 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import AdminButton from '../../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import AdminFormField from '../../../shared/components/AdminFormField.vue'
 import AdminNumberInput from '../../../shared/components/AdminNumberInput.vue'
 import AdminActionReasonField from '../../shared/AdminActionReasonField.vue'
-import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import { formatIdeaAmount } from '../../../../../shared/i18n/userIdeaCurrency'
 import type { AdminCreditLedgerTransaction } from '../resource'
 import type { CreditCommandValidation } from '../creditCommandContract'

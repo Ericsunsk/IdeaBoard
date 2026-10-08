@@ -23,9 +23,14 @@
         @scroll-to-top="scrollToTop"
       />
 
-      <!-- 纯净的主内容容器：统一 pt-6 pb-8 标准留白 -->
+      <!-- 纯净的主内容容器：统一 pt-6 pb-8 标准留白；fullWidth 页面解除 1600px 限制并按要求缩减右边距 1/2 -->
       <main
-        class="mx-auto flex w-full min-w-0 max-w-[1600px] flex-1 flex-col px-4 pt-6 pb-8 sm:px-6 lg:px-8"
+        class="mx-auto flex w-full min-w-0 flex-1 flex-col pt-6 pb-8"
+        :class="[
+          route.meta.fullWidth
+            ? 'max-w-none px-4 sm:px-6 lg:pl-8 lg:pr-4'
+            : 'max-w-[1600px] px-4 sm:px-6 lg:px-8',
+        ]"
       >
         <!-- hidePageHeader 路由（如积分运营自带吸顶标题块）：v-show 保留 DOM，
              顶栏滚动标题照常从 h1 取词 -->
@@ -69,7 +74,6 @@ import {
 import {
   ADMIN_CREDITS_PATH,
   ADMIN_LOGIN_PATH,
-  ADMIN_SETTINGS_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
 import { useBrandLogoOverrides } from '../shared/logos/useBrandLogoOverrides'
@@ -84,11 +88,11 @@ const headerBarRef = ref<InstanceType<typeof AdminHeaderBar> | null>(null)
 
 const { showStickyTitle, dynamicTitle, reset: resetStickyTitle } = useAdminStickyTitle()
 
-// 积分运营与系统设置等二级导航聚合页常驻顶栏标题（不随滚动显隐，其它页保持滚动行为）。
+// 仅自带吸顶标题块的聚合页（hidePageHeader）常驻顶栏标题，其它单页遵循随滚动显隐的全局标准。
 const pinStickyTitle = computed(
   () =>
-    isPathUnderRoute(route.path, ADMIN_CREDITS_PATH) ||
-    isPathUnderRoute(route.path, ADMIN_SETTINGS_PATH),
+    Boolean(route.meta.hidePageHeader) ||
+    isPathUnderRoute(route.path, ADMIN_CREDITS_PATH),
 )
 const stickyTitleVisible = computed(() => pinStickyTitle.value || showStickyTitle.value)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)

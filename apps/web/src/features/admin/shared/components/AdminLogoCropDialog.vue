@@ -90,9 +90,9 @@
     </div>
 
     <template #footer>
-      <AdminButton
+      <ActionButton
         variant="ghost"
-        :class="[adminTextButtonClass, adminActionButtonClass]"
+        :class="adminTextButtonClass"
         label="取消"
         :disabled="isProcessing"
         @click="closeDialog"
@@ -100,9 +100,8 @@
         <template #icon>
           <Xmark class="size-4" />
         </template>
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
+      </ActionButton>
+      <ActionButton
         label="确认上传"
         :disabled="isProcessing || !sourceURL"
         :loading="isProcessing"
@@ -111,7 +110,7 @@
         <template #icon>
           <Check class="size-4" />
         </template>
-      </AdminButton>
+      </ActionButton>
     </template>
   </AdminDialogShell>
 </template>
@@ -122,9 +121,9 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
 import AdminButton from './AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from './AdminDialogShell.vue'
 import {
-  adminActionButtonClass,
   adminDialogTitleClass,
   adminTextButtonClass,
 } from '../lib/uiClasses'

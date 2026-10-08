@@ -3,15 +3,13 @@
     <AdminAlert v-if="isListError" severity="error">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ MODELS_MESSAGES.listLoadFailed }}</span>
-        <AdminButton
+        <ActionButton
           variant="outline"
-          size="small"
-          :class="adminActionButtonClass"
           :disabled="isLoading"
           @click="refetchCatalog"
         >
           {{ MODELS_MESSAGES.retry }}
-        </AdminButton>
+        </ActionButton>
       </div>
     </AdminAlert>
     <AdminAlert v-else-if="isListStale" severity="warning">
@@ -251,8 +249,8 @@ import {
   Xmark,
 } from '@iconoir/vue'
 import AdminAlert from '../../../shared/components/AdminAlert.vue'
-import AdminButton from '../../../shared/components/AdminButton.vue'
-import { adminActionButtonClass, adminDashboardRootClass } from '../../../shared/lib/uiClasses'
+import ActionButton from '../../../../../shared/components/ActionButton.vue'
+import { adminDashboardRootClass } from '../../../shared/lib/uiClasses'
 import AdminModelAddDialog from '../dialog/AdminModelAddDialog.vue'
 import AdminModelEditDialog from '../dialog/AdminModelEditDialog.vue'
 import AdminGatewayConfigDialog from '../dialog/AdminGatewayConfigDialog.vue'

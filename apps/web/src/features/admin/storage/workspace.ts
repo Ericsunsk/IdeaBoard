@@ -15,6 +15,7 @@ import {
 } from './resource'
 import { storageVendorIcon, storageVendorLogo } from './meta'
 import {
+  buildPayload,
   canApply as canApplyProfile,
   canTest as canTestProfile,
   normalizeProfile,
@@ -24,6 +25,7 @@ import {
   statusText as resolveStatusText,
   storageMetaItems as resolveStorageMetaItems,
   storageStatusSeverity,
+  storageDisableReason,
   storageSubtitle as resolveStorageSubtitle,
   toProviderMetaMap,
   type StorageCard,
@@ -49,6 +51,9 @@ type DeleteStorageProfileCommandOptions = {
 export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOptions) {
   const resource = options.resource ?? createAdminStorageResource()
   const loading = ref(false)
+  const loadFailed = ref(false)
+  const togglingId = ref<string | null>(null)
+  const togglingPending = ref(false)
   const applyingId = ref<string | null>(null)
   const testingId = ref<string | null>(null)
   const applyingPending = ref(false)
@@ -96,8 +101,14 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   async function loadData() {
     await options.runAsyncAction(refreshStorageData, {
       loading,
+      before: () => {
+        loadFailed.value = false
+      },
       feedback: {
-        error: options.feedback.loadProfilesFailed,
+        error: (error) => {
+          loadFailed.value = true
+          options.feedback.loadProfilesFailed(error)
+        },
       },
     })
   }
@@ -192,6 +203,31 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         feedback: {
           error: options.feedback.applyCurrentFailed,
         },
+      },
+    )
+  }
+
+  async function toggleEnabled(target: StorageProfileCommandTarget, enabled: boolean) {
+    const storage = resolveStorageTarget(target)
+    if (!storage || (!enabled && storageDisableReason(storage))) return
+
+    await options.runAsyncAction(
+      async () => {
+        const response = await saveProfile({
+          id: storage.id,
+          payload: buildPayload({ ...storage, enabled }, providerMap.value),
+        })
+        if (response) options.feedback.saveDraftSucceeded(response.message)
+      },
+      {
+        loading: togglingPending,
+        before: () => {
+          togglingId.value = storage.id
+        },
+        after: () => {
+          togglingId.value = null
+        },
+        feedback: { error: options.feedback.saveDraftFailed },
       },
     )
   }
@@ -317,6 +353,8 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 
   return {
     loading,
+    loadFailed,
+    togglingId,
     applyingId,
     testingId,
     providers,
@@ -342,6 +380,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
     testProfile,
     deleteProfile,
     applyStorage,
+    toggleEnabled,
     testStorage,
     requestRemoveProfile,
     fetchBucketDomains,

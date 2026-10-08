@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeBoardState } from '../../testing'
+import { makeSessionUser } from '../../../../test/factories'
 import {
   clearStoredAuth,
+  forgetStoredAuthScope,
   getAuthStorageUserScope,
   setStoredAuth,
 } from '../../../../shared/utils/auth'
@@ -12,6 +14,7 @@ import { getBoardState, replaceBoardStateMap } from '../../infrastructure/persis
 import {
   boardScopeKey,
   getBoardScope,
+  getRecoverableBoardScope,
   subscribeBoardScopeChange,
   type BoardScope,
 } from './scope'
@@ -103,11 +106,34 @@ describe('boardScope', () => {
       'board-a': makeBoardState({ updatedAt: 2_000 }),
     })
 
+    // Explicit logout forgets the remembered device scope (unlike
+    // transient auth loss, which keeps it for draft recovery).
     clearStoredAuth()
+    forgetStoredAuthScope()
 
     expect(getBoardScope()).toEqual({ userScope: null, workspaceId: WORKSPACE_A })
     expect(listBoards()).toEqual([])
     expect(getBoardState('board-a')).toBeNull()
+  })
+
+  it('keeps recovery drafts isolated when a different user signs in after auth expires', () => {
+    const originalScope = userScope()
+    replaceBoards([{ id: 'board-a', name: 'A Board', createdAt: 100, updatedAt: 2_000 }])
+    replaceBoardStateMap({ 'board-a': makeBoardState({ updatedAt: 2_000 }) })
+
+    clearStoredAuth()
+    expect(getBoardScope().userScope).toBeNull()
+    expect(getRecoverableBoardScope().userScope).toBe(originalScope)
+    expect(getBoardState('board-a')).not.toBeNull()
+
+    setStoredAuth(makeSessionUser({ public_id: '00000000-0000-0000-0000-000000000002' }))
+    expect(getRecoverableBoardScope().userScope).not.toBe(originalScope)
+    expect(listBoards()).toEqual([])
+    expect(getBoardState('board-a')).toBeNull()
+
+    primeAuthenticatedWorkspace(WORKSPACE_A)
+    expect(listBoards().map((board) => board.id)).toEqual(['board-a'])
+    expect(getBoardState('board-a')).not.toBeNull()
   })
 
   it('notifies scope subscribers on workspace switches and auth changes', () => {

@@ -1091,6 +1091,27 @@ type TaskStatEvent struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TaskStatusEventOutbox struct {
+	InternalID    int64              `json:"internal_id"`
+	EventID       string             `json:"event_id"`
+	WorkspaceID   string             `json:"workspace_id"`
+	TaskID        string             `json:"task_id"`
+	Status        string             `json:"status"`
+	EventType     pgtype.Text        `json:"event_type"`
+	EventVersion  pgtype.Int4        `json:"event_version"`
+	ActorType     string             `json:"actor_type"`
+	ActorID       string             `json:"actor_id"`
+	ResourceType  string             `json:"resource_type"`
+	ResourceID    string             `json:"resource_id"`
+	EventData     []byte             `json:"event_data"`
+	OccurredAt    pgtype.Timestamptz `json:"occurred_at"`
+	StatusState   string             `json:"status_state"`
+	Attempts      int32              `json:"attempts"`
+	NextAttemptAt pgtype.Timestamptz `json:"next_attempt_at"`
+	DeliveredAt   pgtype.Timestamptz `json:"delivered_at"`
+	LastError     string             `json:"last_error"`
+}
+
 type TaskSubmissionIdempotency struct {
 	WorkspaceID    int64              `json:"workspace_id"`
 	Operation      string             `json:"operation"`

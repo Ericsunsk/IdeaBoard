@@ -1,72 +1,51 @@
 <template>
   <div class="flex flex-col gap-4">
-    <!-- 1. 顶栏操作与搜索过滤工具条 -->
-    <div class="flex w-full flex-col gap-3">
-      <div class="flex w-full flex-wrap items-center justify-between gap-2.5">
-        <!-- 左侧：搜索输入框与状态筛选器 -->
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <AdminToolbarSearch
-            v-model="searchKeyword"
-            fluid
-            :input-label="STORAGE_MESSAGES.searchLabel"
-            :placeholder="STORAGE_MESSAGES.searchPlaceholder"
-          />
-
-          <AdminOptionFilter
-            v-model="statusFilter"
-            :options="statusFilterOptions"
-            all-value="all"
-            :label="STORAGE_MESSAGES.filterLabel"
-          />
+    <!-- 头部：板块名 + 副标题 + 操作栏 -->
+    <div class="flex flex-wrap items-center justify-between gap-3 pb-1">
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <div class="flex items-center gap-2">
+          <Database class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <h3 class="text-admin-title-sm font-bold text-foreground">
+            {{ STORAGE_MESSAGES.storageTitle }}
+          </h3>
         </div>
-
-        <!-- 右侧：刷新同步与新增操作 -->
-        <div class="flex shrink-0 items-center gap-2">
-          <AdminRefreshButton
-            :loading="loading"
-            :aria-label="STORAGE_MESSAGES.refresh"
-            @click="refreshData"
-          />
-
-          <AdminButton
-            :class="adminActionButtonClass"
-            :disabled="creatableProviders.length === 0"
-            @click="handleOpenCreate"
-          >
-            <Plus class="size-4" />
-            {{ STORAGE_MESSAGES.create }}
-          </AdminButton>
-        </div>
+        <p class="text-admin-caption text-muted-foreground">
+          {{ STORAGE_MESSAGES.storageSubtitle }}
+        </p>
       </div>
 
-      <!-- 次级统计提示条：共 X 个对象存储 -->
-      <div v-if="!loading" class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="font-medium text-foreground">
-            {{ STORAGE_MESSAGES.storageCount(filteredStorageRows.length) }}
-          </span>
-          <span v-if="hasActiveFilter" class="text-xs text-muted-foreground">
-            {{ STORAGE_MESSAGES.totalCount(allStorageRows.length) }}
-          </span>
-        </div>
+      <!-- 右侧：新增操作 -->
+      <div class="flex shrink-0 items-center gap-2">
+        <ActionButton :disabled="creatableProviders.length === 0" @click="handleOpenCreate">
+          <Plus class="size-4" />
+          {{ STORAGE_MESSAGES.create }}
+        </ActionButton>
       </div>
     </div>
 
-    <!-- 2. 存储列表表格与空状态/加载态 -->
+    <!-- 1. 存储列表表格与空状态/加载态 -->
+    <AdminEmptyState v-if="loadFailed" :title="STORAGE_MESSAGES.tableLoadFailed">
+      <template #actions>
+        <ActionButton :loading="loading" @click="loadData">
+          {{ STORAGE_MESSAGES.retry }}
+        </ActionButton>
+      </template>
+    </AdminEmptyState>
     <AdminStorageTable
-      :rows="filteredStorageRows"
+      v-else
+      :rows="allStorageRows"
       :loading="loading"
-      :has-active-filter="hasActiveFilter"
       :applying-id="applyingId"
       :testing-id="testingId"
+      :toggling-id="togglingId"
       :active-logo-target-id="activeLogoTarget?.id"
-      @clear-filters="clearFilters"
       @open-logo-picker="openLogoPicker"
       @apply-storage="applyStorage"
       @configure-preset="handleConfigurePreset"
       @open-edit="handleOpenEdit"
       @test-storage="handleTest"
       @remove-storage="requestRemoveProfile"
+      @toggle-enabled="toggleEnabled"
     />
   </div>
 
@@ -81,7 +60,6 @@
     :switch-fields="switchFields"
     :bucket-domains="bucketDomains"
     :saving="saving"
-    :saving-and-applying="savingAndApplying"
     :fetching="fetching"
     :active-logo-target-id="activeLogoTarget?.id"
     :config-text-value="configTextValue"
@@ -92,7 +70,6 @@
     @update-config-value="updateConfigValue"
     @fetch-bucket-domains="fetchBucketDomains"
     @save-draft="saveDraft"
-    @save-and-apply="saveAndApply"
     @cancel="closeEditor"
     @open-logo-picker="openLogoPickerForEditing"
     @update-form-field="handleUpdateFormField"
@@ -112,13 +89,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Plus } from '@iconoir/vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import { Database, Plus } from '@iconoir/vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminLogoPickerPopover from '../../shared/components/AdminLogoPickerPopover.vue'
-import AdminOptionFilter from '../../shared/components/AdminOptionFilter.vue'
-import AdminRefreshButton from '../../shared/components/AdminRefreshButton.vue'
-import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import { vendorPresetCatalog } from '../meta'
 import { STORAGE_MESSAGES } from './messages'
 import { useStorageContext } from '../useStorageContext'
@@ -130,11 +104,12 @@ import AdminStorageEditorDialog from '../components/AdminStorageEditorDialog.vue
 const adminConfirm = useAdminConfirm()
 const {
   saving,
-  savingAndApplying,
   fetching,
   loading,
+  loadFailed,
   applyingId,
   testingId,
+  togglingId,
   editorOpen,
   editorMode,
   selectedVendorKey,
@@ -154,34 +129,13 @@ const {
   openEdit,
   closeEditor,
   saveDraft,
-  saveAndApply,
   applyStorage,
   handleTest,
+  toggleEnabled,
   fetchBucketDomains,
   requestRemoveProfile,
   loadData,
-  refreshData,
 } = useStorageContext({ confirm: adminConfirm })
-
-const searchKeyword = ref('')
-
-type StatusFilterValue = 'all' | 'current' | 'configured' | 'unconfigured'
-const statusFilter = ref<StatusFilterValue>('all')
-const statusFilterOptions: { label: string; value: StatusFilterValue }[] = [
-  { label: STORAGE_MESSAGES.allStatuses, value: 'all' },
-  { label: STORAGE_MESSAGES.current, value: 'current' },
-  { label: STORAGE_MESSAGES.configured, value: 'configured' },
-  { label: STORAGE_MESSAGES.unconfigured, value: 'unconfigured' },
-]
-
-const hasActiveFilter = computed(() => {
-  return Boolean(searchKeyword.value.trim()) || statusFilter.value !== 'all'
-})
-
-function clearFilters() {
-  searchKeyword.value = ''
-  statusFilter.value = 'all'
-}
 
 function getBucketDisplay(card: (typeof cards.items.value)[number]): string {
   if (card.storage.provider === 'local') return '/uploads'
@@ -224,15 +178,11 @@ function buildConfiguredRow(
     presetKey,
     storage: card.storage,
     name: card.storage.name,
-    subtitle: card.subtitle || card.providerLabel,
-    providerLabel: card.providerLabel,
     vendorLogo: card.vendorLogo,
     vendorIcon: card.vendorIcon,
     avatarLabel: card.avatarLabel,
     isCurrent: isCur,
-    statusText: isCur
-      ? STORAGE_MESSAGES.current
-      : (card.statusText as '使用中' | '已配置' | '未配置'),
+    enabled: card.storage.enabled,
     statusType: isCur ? 'current' : isConf ? 'configured' : 'unconfigured',
     bucket: getBucketDisplay(card),
     endpoint: getEndpointDisplay(card),
@@ -248,12 +198,10 @@ function buildUnconfiguredPresetRow(preset: (typeof vendorPresetCatalog)[number]
     isPresetOnly: true,
     presetKey: preset.key,
     name: preset.label,
-    subtitle: preset.description,
-    providerLabel: preset.label,
     vendorLogo: preset.logoSrc,
     avatarLabel: preset.label.slice(0, 2),
     isCurrent: false,
-    statusText: STORAGE_MESSAGES.unconfigured,
+    enabled: false,
     statusType: 'unconfigured',
     bucket: '—',
     endpoint: String(preset.defaultConfig?.endpoint ?? '—'),
@@ -294,31 +242,6 @@ const allStorageRows = computed<StorageTableRow[]>(() => {
   }
 
   return rows
-})
-
-const filteredStorageRows = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  let list = allStorageRows.value
-
-  if (keyword) {
-    list = list.filter((r) => {
-      const matchName = r.name.toLowerCase().includes(keyword)
-      const matchSubtitle = r.subtitle.toLowerCase().includes(keyword)
-      const matchBucket = r.bucket.toLowerCase().includes(keyword)
-      const matchEndpoint = r.endpoint.toLowerCase().includes(keyword)
-      return matchName || matchSubtitle || matchBucket || matchEndpoint
-    })
-  }
-
-  if (statusFilter.value === 'current') {
-    list = list.filter((r) => r.isCurrent)
-  } else if (statusFilter.value === 'configured') {
-    list = list.filter((r) => r.statusType === 'configured')
-  } else if (statusFilter.value === 'unconfigured') {
-    list = list.filter((r) => r.statusType === 'unconfigured')
-  }
-
-  return list
 })
 
 const activeLogoTarget = ref<{ id: string; name: string; endpoint: string } | null>(null)
@@ -364,9 +287,8 @@ function handleEditorDialogVisibleUpdate(visible: boolean) {
   if (!visible) closeEditor()
 }
 
-function handleUpdateFormField(field: 'name' | 'enabled', value: string | boolean) {
+function handleUpdateFormField(field: 'name', value: string | boolean) {
   if (field === 'name') form.value.name = String(value)
-  if (field === 'enabled') form.value.enabled = Boolean(value)
 }
 
 onMounted(() => {

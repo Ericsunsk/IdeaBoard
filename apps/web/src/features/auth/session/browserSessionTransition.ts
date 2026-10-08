@@ -9,6 +9,7 @@ import {
   persistSessionUser,
   readStoredSessionUser,
 } from './sessionPersistence'
+import { forgetStoredAuthScope } from '../../../shared/utils/auth'
 
 // Session trust window shared with the router's admin revalidation
 // threshold (`app/router`): a recently validated session is trusted
@@ -145,6 +146,7 @@ export function createBrowserSessionTransition(
     const succeeded = await transport.logout()
     if (!succeeded) return false
     clearSession()
+    forgetStoredAuthScope()
     return true
   }
 

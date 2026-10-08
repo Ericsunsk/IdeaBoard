@@ -130,7 +130,9 @@ describe('useUserStore auth cache handling', () => {
 
   it('clears auth state and Vue Query cache after logout succeeds', async () => {
     const { store, queryClient, authClient } = await getFreshUserStore()
+    const { getRecoverableAuthStorageUserScope } = await import('../../../shared/utils/auth')
     store.setAuth(makeSessionUser())
+    expect(getRecoverableAuthStorageUserScope()).not.toBeNull()
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })
     vi.mocked(authClient.signOut).mockResolvedValue({} as never)
 
@@ -138,6 +140,7 @@ describe('useUserStore auth cache handling', () => {
 
     expect(store.user).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
+    expect(getRecoverableAuthStorageUserScope()).toBeNull()
     expect(queryClient.getQueryData(['user', 'boards'])).toBeUndefined()
   })
 

@@ -102,7 +102,8 @@ export function createEmptyProfile(
     id: '',
     name: `${providerLabel(provider, providerMap)} 存储`,
     provider,
-    enabled: provider === 'local',
+    // 新建配置一律默认停用：由表格行内开关显式启用，避免未验证的配置直接生效。
+    enabled: false,
     isCurrent: false,
     builtin: false,
     secretConfigured: false,
@@ -160,6 +161,12 @@ function hasConfiguredProfile(storage: StorageCard, providerMap: ProviderMetaMap
 export function canApply(storage: StorageCard, providerMap: ProviderMetaMap) {
   if (storage.provider === 'local') return true
   return storage.enabled && hasConfiguredProfile(storage, providerMap)
+}
+
+export function storageDisableReason(storage: StorageCard) {
+  if (storage.isCurrent) return '当前存储不能停用，请先切换到其他存储'
+  if (storage.builtin && storage.provider === 'local') return '内置本地存储始终启用'
+  return undefined
 }
 
 export function canTest(storage: StorageCard, providerMap: ProviderMetaMap) {

@@ -71,14 +71,12 @@
       role="alert"
     >
       <span class="text-xs font-semibold text-destructive">{{ errorMessage }}</span>
-      <AdminButton
-        :class="adminActionButtonClass"
-        size="small"
+      <ActionButton
         variant="outline"
         @click="emit('retry')"
       >
         {{ MONITOR_MESSAGES.retry }}
-      </AdminButton>
+      </ActionButton>
     </div>
 
     <div
@@ -513,10 +511,10 @@ import {
 import { DialogTitle } from 'reka-ui'
 import AdminBadge from '../../shared/components/AdminBadge.vue'
 import AdminButton from '../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../shared/components/ActionButton.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import TaskResultStatusBanner from './TaskResultStatusBanner.vue'
 import { formatIdeaAmount } from '../../../../shared/i18n/userIdeaCurrency'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { getTaskPriorityLabel } from './columns'
 import { adminTaskStatuses, getTaskStatusDefinition } from '../domain/status'
 import type { AdminMonitorDetailModel } from '../infrastructure/resource'

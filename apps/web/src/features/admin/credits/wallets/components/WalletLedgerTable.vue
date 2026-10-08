@@ -100,9 +100,8 @@
     </div>
 
     <div v-if="hasNextPage" class="mt-2 flex justify-center">
-      <AdminButton
+      <ActionButton
         :label="t('admin.wallet.loadMore')"
-        :class="adminActionButtonClass"
         variant="outline"
         :loading="ledgerLoading && transactions.length > 0"
         :disabled="ledgerLoading || commandPending"
@@ -117,10 +116,11 @@
 import { useI18n } from 'vue-i18n'
 import AdminBadge from '../../../shared/components/AdminBadge.vue'
 import AdminButton from '../../../shared/components/AdminButton.vue'
+import ActionButton from '../../../../../shared/components/ActionButton.vue'
 import AdminColumn from '../../../shared/components/AdminColumn.vue'
 import AdminEmptyState from '../../../shared/components/AdminEmptyState.vue'
 import AdminTable from '../../../shared/components/AdminTable.vue'
-import { adminActionButtonClass, adminCompactTagClass } from '../../../shared/lib/uiClasses'
+import { adminCompactTagClass } from '../../../shared/lib/uiClasses'
 import {
   formatAdminDateTimeWithSeconds,
   getCreditCommandLabel,

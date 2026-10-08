@@ -135,22 +135,15 @@
     </form>
 
     <template #footer="{ requestClose }">
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="isBusy"
-        @click="requestClose"
-      >
-        {{ PAYMENTS_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton
-        :class="adminActionButtonClass"
+      <AdminDialogActions
+        :cancel-label="PAYMENTS_MESSAGES.cancel"
+        :confirm-label="PAYMENTS_MESSAGES.saveSettings"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError)"
-        @click="submit"
-      >
-        {{ PAYMENTS_MESSAGES.saveSettings }}
-      </AdminButton>
+        :cancel-disabled="isBusy"
+        @cancel="requestClose"
+        @confirm="submit"
+      />
     </template>
   </AdminSettingsDialogFrame>
 </template>
@@ -160,7 +153,7 @@ import { computed, ref } from 'vue'
 import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import AdminAlert from '../../shared/components/AdminAlert.vue'
-import AdminButton from '../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../shared/components/AdminDialogActions.vue'
 import AdminInput from '../../shared/components/AdminInput.vue'
 import AdminSwitch from '../../shared/components/AdminSwitch.vue'
 import AdminSettingsDialogFrame from '../../shared/components/AdminSettingsDialogFrame.vue'
@@ -169,7 +162,6 @@ import { formatAdminDisplayError } from '../../shared/lib/toast'
 import { useStripeSettingsFeedback } from '../useStripeSettingsFeedback'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { confirmSettingsSave } from '../../shared/lib/confirmSettingsSave'
-import { adminActionButtonClass } from '../../shared/lib/uiClasses'
 import { secretField } from '../../shared/lib/secretSchema'
 import { createAdminStripeSettingsResource } from './resource'
 import { PAYMENTS_MESSAGES } from '../messages'

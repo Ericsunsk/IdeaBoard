@@ -57,17 +57,14 @@
 
     <!-- 弹窗底栏 -->
     <template #footer>
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="pending"
-        @click="emit('update:visible', false)"
-      >
-        {{ MODELS_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton :class="adminActionButtonClass" :loading="pending" @click="handleSubmit">
-        {{ MODELS_MESSAGES.editSubmit(isEditing) }}
-      </AdminButton>
+      <AdminDialogActions
+        :cancel-label="MODELS_MESSAGES.cancel"
+        :confirm-label="MODELS_MESSAGES.editSubmit(isEditing)"
+        :loading="pending"
+        :cancel-disabled="pending"
+        @cancel="emit('update:visible', false)"
+        @confirm="handleSubmit"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -75,9 +72,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { watchDebounced } from '@vueuse/core'
-import AdminButton from '../../../shared/components/AdminButton.vue'
+import AdminDialogActions from '../../../shared/components/AdminDialogActions.vue'
 import AdminDialogShell from '../../../shared/components/AdminDialogShell.vue'
-import { adminActionButtonClass } from '../../../shared/lib/uiClasses'
 import {
   createAdminGatewayResource,
   type GatewayProviderOption,

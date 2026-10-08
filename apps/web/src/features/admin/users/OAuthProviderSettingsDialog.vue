@@ -178,23 +178,16 @@
     </form>
 
     <template #footer="{ requestClose }">
-      <AdminButton
-        variant="outline"
-        :class="adminActionButtonClass"
-        :disabled="isBusy"
-        @click="requestClose"
-      >
-        {{ USERS_MESSAGES.cancel }}
-      </AdminButton>
-      <AdminButton
-        variant="default"
-        :class="adminActionButtonClass"
+      <AdminDialogActions
+        :cancel-label="USERS_MESSAGES.cancel"
+        :confirm-label="USERS_MESSAGES.oauthSave"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError) || !summary"
-        @click="submit"
-      >
-        {{ USERS_MESSAGES.oauthSave }}
-      </AdminButton>
+        :cancel-disabled="isBusy"
+        confirm-variant="default"
+        @cancel="requestClose"
+        @confirm="submit"
+      />
     </template>
   </AdminSettingsDialogFrame>
 
@@ -214,6 +207,7 @@ import * as v from 'valibot'
 import { useForm } from '@/components/ui/form'
 import AdminAlert from '../shared/components/AdminAlert.vue'
 import AdminButton from '../shared/components/AdminButton.vue'
+import AdminDialogActions from '../shared/components/AdminDialogActions.vue'
 import AdminInput from '../shared/components/AdminInput.vue'
 import AdminSelect from '../shared/components/AdminSelect.vue'
 import AdminSwitch from '../shared/components/AdminSwitch.vue'
@@ -223,7 +217,6 @@ import AdminStatusPill from '../shared/components/AdminStatusPill.vue'
 import AdminLogoPickerPopover from '../shared/components/AdminLogoPickerPopover.vue'
 import { formatAdminDisplayError, useAdminToast } from '../shared/lib/toast'
 import { useAppClipboard } from '../../../shared/composables/useAppClipboard'
-import { adminActionButtonClass } from '../shared/lib/uiClasses'
 import { secretField } from '../shared/lib/secretSchema'
 import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
 import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
