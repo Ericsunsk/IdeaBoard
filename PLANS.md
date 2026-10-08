@@ -1,4 +1,17 @@
-# Archived Workspace Task Restoration ExecPlans
+# ExecPlans
+
+## Archived Image Catalog Structure
+
+- Goal: concentrate existing Unsplash/Pexels knowledge and supplier HTTP handling.
+- Scope: shared frontend provider vocabulary consumed by Search, Library and Admin;
+  separate backend supplier adapters from shared HTTP handling; remove duplicate
+  provider guards and unused search constants. No new supplier, UI or schema.
+- Verification: existing provider IDs, errors, ordering, attribution, cursor
+  encoding, URL allowlists and request behavior remain compatible; focused tests,
+  frontend type/build/lint and backend build/tests pass.
+- Rollback: revert only this refactor's working-tree changes; no data migration.
+
+## Archived Workspace Task Restoration ExecPlans
 
 > Status (2026-10-08): **ARCHIVED**. The plans below describe completed work.
 > Issue acceptance comments and git history are the source of truth; do not use

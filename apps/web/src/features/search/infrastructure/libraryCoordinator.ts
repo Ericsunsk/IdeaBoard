@@ -1,3 +1,4 @@
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import type { SearchLibraryCoordinator } from '../ports/libraryCoordinatorPort'
 import { inject, provide, toValue, type InjectionKey, type MaybeRefOrGetter } from 'vue'
 import {
@@ -55,7 +56,7 @@ export function createSearchLibraryCoordinator(
     return asset
   }
 
-  async function removeReference(provider: 'unsplash' | 'pexels', sourceID: string) {
+  async function removeReference(provider: ExternalImageProvider, sourceID: string) {
     await removeWorkspaceSearchReference(resolveWorkspaceId(), provider, sourceID)
     await mutationPublisher.publishMutation({
       kind: 'asset-removed',

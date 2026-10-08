@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,7 +9,6 @@ import (
 	"ideaboard/api/internal/platform/contract"
 	"ideaboard/api/internal/platform/errorrender"
 	"ideaboard/api/internal/searchcatalog/application"
-	"ideaboard/api/internal/searchcatalog/domain"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,10 +35,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	}
 	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit)
 	if err != nil {
-		if errors.Is(err, application.ErrNoSearchProviders) {
-			contract.RenderSuccess(c, domain.SearchResponse{Query: c.Query("q"), Results: []domain.Result{}, HasMore: false})
-			return
-		}
 		msg := err.Error()
 		if strings.Contains(msg, msgSearch) {
 			errorrender.Render(c, http.StatusBadRequest, string(contract.CodeSearchQueryInvalid), fmt.Sprintf(msgSearchQueryInvalid, application.MaxSearchQueryRunes))

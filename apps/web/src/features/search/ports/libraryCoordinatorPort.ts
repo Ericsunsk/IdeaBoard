@@ -1,3 +1,4 @@
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import type { LibraryFolderFacts, LibraryMutationPublisher } from '../../library'
 import type { WorkspaceLibraryAsset } from '../../library'
 import type { LibrarySearchReference } from '../domain/authAction'
@@ -12,7 +13,7 @@ export type SearchLibraryCoordinator = LibraryMutationPublisher & {
   saveReferences: (
     references: LibrarySearchReference[],
   ) => Promise<PromiseSettledResult<WorkspaceLibraryAsset>[]>
-  removeReference: (provider: 'unsplash' | 'pexels', sourceID: string) => Promise<void>
+  removeReference: (provider: ExternalImageProvider, sourceID: string) => Promise<void>
   reset: () => void
   dispose: () => void
 }

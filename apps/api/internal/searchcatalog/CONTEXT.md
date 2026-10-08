@@ -17,6 +17,7 @@ SearchCatalog is the image-search context with two subdomains: web image search 
 
 ## Public Seams
 
+- `SearchProviderAdapter` isolates supplier requests, payloads and result mapping in `infrastructure/unsplash.go` and `infrastructure/pexels.go`; `providers.go` owns shared outbound response handling and connection tests. Application owns aggregation, cursor progression and result URL validation.
 - `ConfigRepository.List/Save/RecordTest/APIKey` is the web-search provider config seam; `APIKey` decrypts only when enabled, tested and present, otherwise fails closed.
 - `VisionSearchService.Extract` is the vision extraction seam; the model comes only from the AI Gateway vision mapping and is never defaulted in code.
 - Vision executes through `VisionGatewayClient` on the central AI Gateway; no endpoint or key exists in vision settings — those belong to AI Gateway.

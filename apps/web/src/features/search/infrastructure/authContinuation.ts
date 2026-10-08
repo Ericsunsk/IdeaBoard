@@ -1,3 +1,4 @@
+import { isExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import type { LibrarySearchReference, SearchAuthAction } from '../domain/authAction'
 import { normalizeSearchQuery } from '../domain/queryPolicy'
 import {
@@ -23,7 +24,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isLibrarySearchReference(value: unknown): value is LibrarySearchReference {
   if (!isRecord(value)) return false
   return (
-    (value.provider === 'unsplash' || value.provider === 'pexels') &&
+    isExternalImageProvider(value.provider) &&
     typeof value.id === 'string' &&
     typeof value.source_url === 'string' &&
     typeof value.preview_url === 'string' &&

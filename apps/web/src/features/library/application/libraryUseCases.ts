@@ -1,3 +1,4 @@
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 // Workspace-scoped library use cases (issue #844; split from `../workspace`).
 //
 // Save/lookup/materialize orchestration over the transport in
@@ -111,7 +112,7 @@ export async function saveWorkspaceSearchReference(
 /** Removes a saved Search reference (resolve, then delete the owned asset). */
 export async function removeWorkspaceSearchReference(
   workspaceId: string,
-  provider: 'unsplash' | 'pexels',
+  provider: ExternalImageProvider,
   sourceId: string,
   options: WorkspaceLibraryRequestOptions = {},
 ): Promise<void> {

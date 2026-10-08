@@ -1,4 +1,5 @@
-export type SearchCatalogProvider = 'unsplash' | 'pexels'
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
+export type SearchCatalogProvider = ExternalImageProvider
 
 /** Search owns this model; generated transport types stay inside its adapter. */
 export type SearchResult = {

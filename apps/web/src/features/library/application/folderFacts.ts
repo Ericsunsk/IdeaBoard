@@ -1,3 +1,4 @@
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import { ref, shallowRef, type Ref, type ShallowRef } from 'vue'
 import { i18n } from '../../../shared/i18n'
 import type { WorkspaceLibraryFolder } from '../domain/validators'
@@ -23,7 +24,7 @@ export type LibraryGalleryEffect = 'none' | 'reload-current' | 'selection-will-r
 export type LibraryMutationOutcome =
   | {
       kind: 'asset-saved'
-      provider: 'unsplash' | 'pexels'
+      provider: ExternalImageProvider
       sourceID: string
       assetKey: string
       affectedFolderKeys: string[]
@@ -31,7 +32,7 @@ export type LibraryMutationOutcome =
     }
   | {
       kind: 'asset-removed'
-      provider: 'unsplash' | 'pexels'
+      provider: ExternalImageProvider
       sourceID: string
       assetKey: string
       affectedFolderKeys: string[]

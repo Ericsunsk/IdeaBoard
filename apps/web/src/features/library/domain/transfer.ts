@@ -1,3 +1,4 @@
+import { isExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 import type { LibrarySearchReference, WorkspaceLibraryAsset } from './validators'
 import { assertLibraryAssetId } from './validators'
 
@@ -91,7 +92,7 @@ function isSearchReference(value: unknown): value is LibrarySearchReference {
   if (!value || typeof value !== 'object') return false
   const reference = value as Partial<LibrarySearchReference>
   return (
-    (reference.provider === 'unsplash' || reference.provider === 'pexels') &&
+    isExternalImageProvider(reference.provider) &&
     typeof reference.id === 'string' &&
     typeof reference.source_url === 'string' &&
     typeof reference.preview_url === 'string' &&

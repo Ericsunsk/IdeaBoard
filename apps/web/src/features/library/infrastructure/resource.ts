@@ -1,3 +1,4 @@
+import { type ExternalImageProvider } from '../../../shared/domain/externalImageProviders'
 // Workspace-scoped library transport (issue #844; split from `../workspace`).
 //
 // Talks to the v1 endpoints under `/api/v1/workspaces/{id}/library`
@@ -198,7 +199,7 @@ export const workspaceLibraryApi = {
     options: WorkspaceLibraryRequestOptions = {},
   ): Promise<WorkspaceLibraryAsset> => {
     const effective = withLibraryIdempotency(options, 'library:asset-save')
-    const data: { provider: 'unsplash' | 'pexels'; source_id: string } & Record<string, unknown> = {
+    const data: { provider: ExternalImageProvider; source_id: string } & Record<string, unknown> = {
       provider: input.provider,
       source_id: input.sourceId,
     }
@@ -276,7 +277,7 @@ export const workspaceLibraryApi = {
             if (item.sourceId != null) entry.source_id = item.sourceId
             if (item.sourceUrl != null) entry.source_url = item.sourceUrl
             return entry as {
-              provider: 'unsplash' | 'pexels'
+              provider: ExternalImageProvider
               source_id?: string
               source_url?: string
             }

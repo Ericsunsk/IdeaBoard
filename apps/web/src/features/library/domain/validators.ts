@@ -1,3 +1,7 @@
+import {
+  isExternalImageProvider,
+  type ExternalImageProvider,
+} from '../../../shared/domain/externalImageProviders'
 // Workspace-scoped library domain (issue #844; split from `../workspace`).
 //
 // Pure opaque-id asserts, snake_case -> camelCase mappers, and save-input
@@ -100,10 +104,10 @@ export function toWorkspaceLibraryFolder(raw: unknown): WorkspaceLibraryFolder {
   }
 }
 
-export type WorkspaceLibraryAssetProvider = 'unsplash' | 'pexels'
+export type WorkspaceLibraryAssetProvider = ExternalImageProvider
 
 export function mapWorkspaceLibraryProvider(value: unknown): WorkspaceLibraryAssetProvider {
-  if (value === 'unsplash' || value === 'pexels') return value
+  if (isExternalImageProvider(value)) return value
   throw new Error('Invalid library asset payload: provider')
 }
 
@@ -240,7 +244,7 @@ export function resolveLibraryAssetCardURL(
  * input below maps it to camelCase at this boundary.
  */
 export type LibrarySearchReference = {
-  provider: 'unsplash' | 'pexels'
+  provider: ExternalImageProvider
   id: string
   source_url: string
   preview_url: string

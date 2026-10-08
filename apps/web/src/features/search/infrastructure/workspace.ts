@@ -1,4 +1,8 @@
 import {
+  isExternalImageProvider,
+  type ExternalImageProvider,
+} from '../../../shared/domain/externalImageProviders'
+import {
   createWorkspaceVisionQuery as createWorkspaceVisionQueryTransport,
   searchWorkspace as searchWorkspaceTransport,
 } from '../../../shared/api/generated-query/public/workspace-search/workspace-search'
@@ -72,10 +76,10 @@ function requiredNumber(raw: unknown, field: string): number {
   return raw
 }
 
-export type WorkspaceSearchProvider = 'unsplash' | 'pexels'
+export type WorkspaceSearchProvider = ExternalImageProvider
 
 export function mapWorkspaceSearchProvider(value: unknown): WorkspaceSearchProvider {
-  if (value === 'unsplash' || value === 'pexels') return value
+  if (isExternalImageProvider(value)) return value
   throw new Error('Invalid search payload: provider')
 }
 
@@ -182,13 +186,13 @@ export const workspaceSearchApi = {
     }
     const query: {
       q: string
-      provider?: ('unsplash' | 'pexels')[]
+      provider?: ExternalImageProvider[]
       cursor?: string
       page_size?: number
     } = {
       q: normalizeSearchQuery(input.query),
     }
-    if (providers.length === 1) query.provider = [providers[0] as 'unsplash' | 'pexels']
+    if (providers.length === 1) query.provider = [providers[0] as ExternalImageProvider]
     if (input.cursor) query.cursor = input.cursor
     if (input.pageSize != null) query.page_size = input.pageSize
     const page = await searchWorkspaceTransport(

@@ -1,4 +1,10 @@
-export type SearchProviderId = 'unsplash' | 'pexels'
+import {
+  EXTERNAL_IMAGE_PROVIDERS,
+  EXTERNAL_IMAGE_PROVIDER_LABELS,
+  type ExternalImageProvider,
+} from '../../../shared/domain/externalImageProviders'
+
+export type SearchProviderId = ExternalImageProvider
 
 export type SearchProviderTestState = 'never' | 'passed' | 'failed'
 
@@ -30,9 +36,7 @@ export interface SearchProviderTestResult {
   message: string
 }
 
-export const SEARCH_PROVIDERS: readonly SearchProviderId[] = ['unsplash', 'pexels']
+export const SEARCH_PROVIDERS: readonly SearchProviderId[] = EXTERNAL_IMAGE_PROVIDERS
 
-export const SEARCH_PROVIDER_LABELS: Record<SearchProviderId, string> = {
-  unsplash: 'Unsplash',
-  pexels: 'Pexels',
-}
+export const SEARCH_PROVIDER_LABELS: Record<SearchProviderId, string> =
+  EXTERNAL_IMAGE_PROVIDER_LABELS

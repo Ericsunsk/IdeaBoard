@@ -21,10 +21,7 @@ const (
 	MaxSearchLimit      = 48
 	MaxSearchQueryRunes = 200
 	searchTimeout       = 12 * time.Second
-	maxProviderBody     = 4 << 20
 )
-
-var ErrNoSearchProviders = errors.New("no search providers are enabled")
 
 type searchCursor struct {
 	Unsplash     int  `json:"unsplash"`
@@ -121,7 +118,7 @@ func (s *SearchService) resolveProviders(ctx context.Context, cursor searchCurso
 	keys := make(map[domain.Provider]string, len(configs))
 	availableProviders := 0
 	for _, config := range configs {
-		if !isCatalogProvider(config.Provider) || !config.Enabled || config.TestState != domain.TestStatePassed {
+		if !domain.IsProvider(config.Provider) || !config.Enabled || config.TestState != domain.TestStatePassed {
 			continue
 		}
 		key, keyErr := s.configs.APIKey(ctx, config.Provider)
@@ -196,10 +193,6 @@ func aggregateProviderResults(active []domain.Provider, resultsByProvider map[do
 		hasMore = hasMore || call.page.HasMore
 	}
 	return allResults, statuses, pages, hasMore, failures
-}
-
-func isCatalogProvider(provider domain.Provider) bool {
-	return provider == domain.ProviderUnsplash || provider == domain.ProviderPexels
 }
 
 func normalizeQuery(raw string) (string, error) {

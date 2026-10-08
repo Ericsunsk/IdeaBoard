@@ -1,17 +1,6 @@
-import type { SearchResult } from './models'
+import type { LibrarySearchReference } from '../../library'
 
-export type LibrarySearchReference = Pick<
-  SearchResult,
-  | 'provider'
-  | 'id'
-  | 'source_url'
-  | 'preview_url'
-  | 'original_url'
-  | 'title'
-  | 'author'
-  | 'width'
-  | 'height'
->
+export type { LibrarySearchReference } from '../../library'
 
 export type SearchAuthAction =
   | { kind: 'text-search'; query: string }

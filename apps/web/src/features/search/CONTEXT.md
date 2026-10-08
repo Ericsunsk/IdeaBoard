@@ -27,6 +27,8 @@ It does NOT own the Library gallery, Canvas, or auth overlay UI.
 - `infrastructure/libraryBridge` pure mapping; `infrastructure/libraryCoordinator` pub/sub over `provide/inject search:library-coordinator`.
 - `infrastructure/browserPersistence` scope-isolated `sessionStorage` primitives via `searchScopedStorageKey(:scope)`; `anonymous-query-gate` dedups by query with a cap of 5.
 
+Provider IDs and recognition share the pure `shared/domain/externalImageProviders` vocabulary with Admin; payload mapping and validation errors remain feature-owned.
+
 ## Invariants
 
 - `?q` is the single source of truth: draft is input-box only, submit writes the URL via `router.replace`, feed reacts only to the URL.
